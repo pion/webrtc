@@ -47,12 +47,12 @@ type SessionDescription struct {
 	// session or media
 	// b=<bwtype>:<bandwidth>
 	// https://tools.ietf.org/html/rfc4566#section-5.8
-	Bandwidth string
+	Bandwidth []string
 
 	// Timing lines specify the start and stop times for a session.
 	// t=<start-time> <stop-time>
 	// https://tools.ietf.org/html/rfc4566#section-5.9
-	Timing string
+	Timing []string
 
 	// RepeatTimes specify repeat times for a session
 	// r=<repeat interval> <active duration> <offsets from start-time>
@@ -78,7 +78,24 @@ type SessionDescription struct {
 	// MediaDescriptions A session description may contain a number of media descriptions.
 	// Each media description starts with an "m=" field and is terminated by
 	// either the next "m=" field or by the end of the session description.
-	// m=<media> <port> <proto> <fmt>
 	// https://tools.ietf.org/html/rfc4566#section-5.13
 	MediaDescriptions []string
+}
+
+func (s *SessionDescription) Reset() {
+	s.ProtocolVersion = 0
+	s.Origin = ""
+	s.SessionName = ""
+	s.SessionInformation = ""
+	s.URI = ""
+	s.EmailAddress = ""
+	s.PhoneNumber = ""
+	s.ConnectionData = ""
+	s.Bandwidth = nil
+	s.Timing = nil
+	s.RepeatTimes = nil
+	s.TimeZones = nil
+	s.EncryptionKeys = nil
+	s.Attributes = nil
+	s.MediaDescriptions = nil
 }
