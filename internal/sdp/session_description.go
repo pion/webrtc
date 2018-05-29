@@ -79,7 +79,7 @@ type SessionDescription struct {
 	// Each media description starts with an "m=" field and is terminated by
 	// either the next "m=" field or by the end of the session description.
 	// https://tools.ietf.org/html/rfc4566#section-5.13
-	MediaDescriptions []string
+	MediaDescriptions []*MediaDescription
 }
 
 func (s *SessionDescription) Reset() {
