@@ -169,10 +169,10 @@ a=rtpmap:102 ulpfec/90000
 
 func main() {
 	o := &sdp.SessionDescription{}
-	fmt.Println(o.Marshal(offer))
-	fmt.Printf("%+v \n", o)
+	fmt.Println(o.Unmarshal(offer))
+	fmt.Println(o.Marshal() == offer)
 
 	a := &sdp.SessionDescription{}
-	fmt.Println(a.Marshal(answer))
-	fmt.Printf("%+v \n", a)
+	fmt.Println(a.Unmarshal(answer))
+	fmt.Println(a.Marshal() == answer)
 }
