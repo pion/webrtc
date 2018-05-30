@@ -14,48 +14,53 @@ import (
 func generateVP8OnlyAnswer() *sdp.SessionDescription {
 
 	videoMediaDescription := &sdp.MediaDescription{
-		MediaName:      "video 9 UDP/TLS/RTP/SAVPF 96 97",
-		ConnectionData: "IN IP4 0.0.0.0",
+		MediaName:      "video 7 RTP/SAVPF 96 97",
+		ConnectionData: "IN IP4 127.0.0.1",
 		Attributes: []string{
-			"rtcp:9 IN IP4 0.0.0.0",
-			// TODO kc5nra proper fingerprint
-			"fingerprint:sha-256 26:12:82:57:36:FC:E3:3A:51:2E:A0:A8:33:BA:CC:A1:CD:9E:0B:FD:B5:CE:00:8C:23:F8:3B:A8:C4:B0:17:87",
-			"setup:active",
-			"mid:video",
-			"recvonly",
-			"rtcp-mux",
-			"rtcp-rsize",
 			"rtpmap:96 VP8/90000",
+			"rtpmap:97 rtx/90000",
+			"fmtp:97 apt=96",
 			"rtcp-fb:96 goog-remb",
-			"rtcp-fb:96 transport-cc",
 			"rtcp-fb:96 ccm fir",
 			"rtcp-fb:96 nack",
 			"rtcp-fb:96 nack pli",
-			"rtpmap:97 rtx/90000",
-			"fmtp:97 apt=96",
-			"ice-ufrag:" + randSeq(4),
-			"ice-pwd:" + randSeq(24),
+			"extmap:2 urn:ietf:params:rtp-hdrext:toffset",
+			"extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time",
+			"extmap:4 urn:3gpp:video-orientation",
+			"setup:active",
+			"mid:video",
+			"recvonly",
+			"ice-ufrag:" + randSeq(16),
+			"ice-pwd:" + randSeq(32),
+			"ice-options:renomination",
+			"rtcp-mux",
+			"rtcp-rsize",
 		},
 	}
 
 	// Generate only UDP host candidates for ICE
-	basePriority := rand.Int()
-	for _, c := range hostCandidates() {
-		id := rand.Int()
-		videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, fmt.Sprintf("candidate:%d 1 UDP %d %s 1816 typ host", id, basePriority, c))
-		videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, fmt.Sprintf("candidate:%d 2 UDP %d %s 1816 typ host", id, basePriority, c))
+	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
+	dstPort := 1816
+	for id, c := range hostCandidates() {
+		videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, dstPort))
+
 		basePriority = basePriority + 1
+		dstPort = dstPort + 1
 	}
+	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, "end-of-candidates")
 
 	sessionId := strconv.FormatUint(uint64(rand.Uint32())<<32+uint64(rand.Uint32()), 10)
 	return &sdp.SessionDescription{
 		ProtocolVersion: 0,
-		Origin:          "- " + sessionId + " 2 IN IP4 127.0.0.1",
+		Origin:          "pion-webrtc " + sessionId + " 2 IN IP4 0.0.0.0",
 		SessionName:     "-",
 		Timing:          []string{"0 0"},
 		Attributes: []string{
-			"group:BUNDLE audio video",
-			"msid-semantic: WMS",
+			"ice-lite",
+			// TODO kc5nra proper fingerprint
+			"fingerprint:sha-512 4E:DD:25:41:95:51:85:B6:6A:29:42:FF:56:5B:41:47:2C:6C:67:36:7D:97:91:5A:65:C7:E1:76:1B:6E:D3:22:45:B4:9F:DF:EA:93:FF:20:F4:CB:A8:53:AF:50:DA:87:5A:C5:4C:5B:F6:4C:50:DC:D9:29:A3:C0:19:7A:17:48",
+			"msid-semantic: WMS *",
+			"group:BUNDLE video",
 		},
 		MediaDescriptions: []*sdp.MediaDescription{
 			videoMediaDescription,

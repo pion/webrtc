@@ -6,5 +6,7 @@ import (
 )
 
 func main() {
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(generateVP8OnlyAnswer().Marshal())))
+	a := generateVP8OnlyAnswer().Marshal()
+	fmt.Println(a)
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte(a)))
 }
