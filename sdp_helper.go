@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"math/rand"
 	"net"
@@ -12,6 +13,9 @@ import (
 // VP8, recvonly SDP
 // TODO RTCPeerConnection.localDescription()
 func generateVP8OnlyAnswer() *sdp.SessionDescription {
+
+	iceUsername := randSeq(16)
+	icePassword := randSeq(32)
 
 	videoMediaDescription := &sdp.MediaDescription{
 		MediaName:      "video 7 RTP/SAVPF 96 97",
@@ -30,8 +34,8 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 			"setup:active",
 			"mid:video",
 			"recvonly",
-			"ice-ufrag:" + randSeq(16),
-			"ice-pwd:" + randSeq(32),
+			"ice-ufrag:" + iceUsername,
+			"ice-pwd:" + icePassword,
 			"ice-options:renomination",
 			"rtcp-mux",
 			"rtcp-rsize",
@@ -40,8 +44,13 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 
 	// Generate only UDP host candidates for ICE
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	dstPort := 1816
+	remoteKey := md5.Sum([]byte(iceUsername + ":" + icePassword))
 	for id, c := range hostCandidates() {
+		dstPort, err := udpListener(c, remoteKey)
+		if err != nil {
+			panic(err)
+		}
+
 		videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, dstPort))
 
 		basePriority = basePriority + 1
