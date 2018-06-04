@@ -67,7 +67,7 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 		Attributes: []string{
 			"ice-lite",
 			// TODO kc5nra proper fingerprint
-			"fingerprint:sha-512 4E:DD:25:41:95:51:85:B6:6A:29:42:FF:56:5B:41:47:2C:6C:67:36:7D:97:91:5A:65:C7:E1:76:1B:6E:D3:22:45:B4:9F:DF:EA:93:FF:20:F4:CB:A8:53:AF:50:DA:87:5A:C5:4C:5B:F6:4C:50:DC:D9:29:A3:C0:19:7A:17:48",
+			"fingerprint:sha-512 BD:B3:A8:15:87:D4:BB:B3:79:B2:2D:2D:3C:F8:F4:CD:29:90:67:D6:FB:B4:E7:56:51:87:78:F8:59:41:7C:8D:80:1B:CD:10:38:8B:28:D5:21:A5:71:0B:FB:8A:AD:E5:FB:96:82:F8:18:59:78:B5:0A:53:4D:8A:38:9C:51:EB",
 			"msid-semantic: WMS *",
 			"group:BUNDLE video",
 		},

@@ -3,22 +3,44 @@ package main
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/pions/pkg/stun"
+	"github.com/pions/webrtc/internal/dtls"
+
 	"golang.org/x/net/ipv4"
 )
 
-func packetHandler(relaySocket *ipv4.PacketConn, remoteKey [16]byte) {
-	const MTU = 1500
+func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey [16]byte) {
+	const MTU = 8192
 	buffer := make([]byte, MTU)
 
+	var d *dtls.DTLSState
 	for {
-		n, _, srcAddr, _ := relaySocket.ReadFrom(buffer)
+		n, _, srcAddr, _ := conn.ReadFrom(buffer)
+
+		if d != nil && d.HandleDTLSPacket(buffer, n) {
+			fmt.Println("Handling DTLS")
+		}
 
 		if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
+			if d == nil {
+				d, err = dtls.New(true, srcString, srcAddr.String())
+				if err != nil {
+					fmt.Println(err)
+				} else {
+					d.DoHandshake()
+					fmt.Println("sending handshake")
+				}
+			} else {
+				d.DoHandshake()
+				fmt.Println("sending handshake")
+				return
+			}
+			return
 			if m, err := stun.NewMessage(buffer[:n]); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
 				dstAddr := &stun.TransportAddr{IP: srcAddr.(*net.UDPAddr).IP, Port: srcAddr.(*net.UDPAddr).Port}
-				err := stun.BuildAndSend(relaySocket, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+				err := stun.BuildAndSend(conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 					&stun.XorMappedAddress{
 						XorAddress: stun.XorAddress{
 							IP:   dstAddr.IP,
@@ -48,13 +70,17 @@ func udpListener(ip string, remoteKey [16]byte) (int, error) {
 		return 0, err
 	}
 
-	relaySocket := ipv4.NewPacketConn(listener)
-	err = relaySocket.SetControlMessage(ipv4.FlagDst, true)
+	conn := ipv4.NewPacketConn(listener)
+	err = conn.SetControlMessage(ipv4.FlagDst, true)
 	if err != nil {
 		return 0, err
 	}
 
 	addr, err := stun.NewTransportAddr(listener.LocalAddr())
-	go packetHandler(relaySocket, remoteKey)
+
+	srcString := ip + ":" + strconv.Itoa(addr.Port)
+
+	dtls.AddListener(srcString, conn)
+	go packetHandler(conn, srcString, remoteKey)
 	return addr.Port, err
 }
