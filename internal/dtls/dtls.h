@@ -47,8 +47,6 @@ extern SSL_VERIFY_CB(dtls_trivial_verify_callback);
 typedef struct tlscfg {
   X509* cert;
   EVP_PKEY* pkey;
-  enum srtp_profile profile;
-  const char* cipherlist;
 } tlscfg;
 
 typedef struct dtls_sess {
@@ -72,14 +70,16 @@ typedef struct srtp_key_ptrs {
 
 bool openssl_global_init();
 
-tlscfg *dtls_build_tlscfg(void *cert_data, int cert_data_size, void *key_data, int key_data_size);
+tlscfg *dtls_build_tlscfg();
 SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
 dtls_sess* dtls_build_session(SSL_CTX* cfg, bool is_server);
 
 ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char *src, const char *dst);
 void dtls_handle_incoming(dtls_sess* sess, const char *src, const char *dst, void *buf, int len);
+char *dtls_tlscfg_fingerprint(tlscfg* cfg);
 
-void dtls_session_cleanup(tlscfg *cfg, SSL_CTX *ssl_ctx, dtls_sess *dtls_session);
+void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session);
+void dtls_tlscfg_cleanup(tlscfg *cfg);
 
 
 #endif

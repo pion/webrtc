@@ -10,12 +10,12 @@ package dtls
 import "C"
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"strconv"
 	"sync"
 	"unsafe"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
 
@@ -58,33 +58,44 @@ func go_handle_sendto(rawSrc *C.char, rawDst *C.char, rawBuf *C.char, rawBufLen 
 	}
 }
 
-type DTLSState struct {
-	tlscfg          *_Ctype_struct_tlscfg
-	sslctx          *_Ctype_struct_ssl_ctx_st
-	dtls_session    *_Ctype_struct_dtls_sess
-	rawSrc, rawDst  *_Ctype_char
-	keyRaw, certRaw unsafe.Pointer
+type TLSCfg struct {
+	tlscfg *_Ctype_struct_tlscfg
 }
 
-func New(isClient bool, src, dst string) (d *DTLSState, err error) {
-	cert, err := ioutil.ReadFile("domain.crt")
-	if err != nil {
-		return d, err
+func NewTLSCfg() *TLSCfg {
+	return &TLSCfg{
+		tlscfg: C.dtls_build_tlscfg(),
 	}
+}
 
-	key, err := ioutil.ReadFile("domain.key")
-	if err != nil {
-		return d, err
+func (t *TLSCfg) Fingerprint() string {
+	rawFingerprint := C.dtls_tlscfg_fingerprint(t.tlscfg)
+	defer C.free(unsafe.Pointer(rawFingerprint))
+	return C.GoString(rawFingerprint)
+}
+
+func (t *TLSCfg) Close() {
+	C.dtls_tlscfg_cleanup(t.tlscfg)
+}
+
+type DTLSState struct {
+	*TLSCfg
+	sslctx         *_Ctype_struct_ssl_ctx_st
+	dtls_session   *_Ctype_struct_dtls_sess
+	rawSrc, rawDst *_Ctype_char
+}
+
+func NewDTLSState(tlscfg *TLSCfg, isClient bool, src, dst string) (d *DTLSState, err error) {
+	if tlscfg == nil || tlscfg.tlscfg == nil {
+		return d, errors.Errorf("TLSCfg must not be nil")
 	}
 
 	d = &DTLSState{
-		rawSrc:  C.CString(src),
-		rawDst:  C.CString(dst),
-		certRaw: C.CBytes(cert),
-		keyRaw:  C.CBytes(key),
+		TLSCfg: tlscfg,
+		rawSrc: C.CString(src),
+		rawDst: C.CString(dst),
 	}
 
-	d.tlscfg = C.dtls_build_tlscfg(d.certRaw, C.int(len(cert)), d.keyRaw, C.int(len(key)))
 	d.sslctx = C.dtls_build_sslctx(d.tlscfg)
 	d.dtls_session = C.dtls_build_session(d.sslctx, C.bool(!isClient))
 
@@ -92,14 +103,12 @@ func New(isClient bool, src, dst string) (d *DTLSState, err error) {
 }
 
 func (d *DTLSState) Close() {
-	C.free(unsafe.Pointer(d.certRaw))
-	C.free(unsafe.Pointer(d.keyRaw))
 	C.free(unsafe.Pointer(d.rawSrc))
 	C.free(unsafe.Pointer(d.rawDst))
-	C.dtls_session_cleanup(d.tlscfg, d.sslctx, d.dtls_session)
+	C.dtls_session_cleanup(d.sslctx, d.dtls_session)
 }
 
-func (d *DTLSState) HandleDTLSPacket(packet []byte, size int) bool {
+func (d *DTLSState) MaybeHandleDTLSPacket(packet []byte, size int) bool {
 	if packet[0] >= 20 && packet[0] <= 64 {
 		packetRaw := C.CBytes(packet)
 		C.dtls_handle_incoming(d.dtls_session, d.rawSrc, d.rawDst, packetRaw, C.int(size))

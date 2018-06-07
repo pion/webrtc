@@ -1,21 +1,23 @@
 package main
 
 import (
-	"crypto/md5"
 	"fmt"
 	"math/rand"
 	"net"
 	"strconv"
 
+	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sdp"
 )
 
 // VP8, recvonly SDP
 // TODO RTCPeerConnection.localDescription()
 func generateVP8OnlyAnswer() *sdp.SessionDescription {
+	tlscfg := dtls.NewTLSCfg()
 
 	iceUsername := randSeq(16)
 	icePassword := randSeq(32)
+	fingerprint := tlscfg.Fingerprint()
 
 	videoMediaDescription := &sdp.MediaDescription{
 		MediaName:      "video 7 RTP/SAVPF 96 97",
@@ -44,9 +46,8 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 
 	// Generate only UDP host candidates for ICE
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	remoteKey := md5.Sum([]byte(iceUsername + ":" + icePassword))
 	for id, c := range hostCandidates() {
-		dstPort, err := udpListener(c, remoteKey)
+		dstPort, err := udpListener(c, []byte(icePassword), tlscfg)
 		if err != nil {
 			panic(err)
 		}
@@ -67,7 +68,7 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 		Attributes: []string{
 			"ice-lite",
 			// TODO kc5nra proper fingerprint
-			"fingerprint:sha-512 BD:B3:A8:15:87:D4:BB:B3:79:B2:2D:2D:3C:F8:F4:CD:29:90:67:D6:FB:B4:E7:56:51:87:78:F8:59:41:7C:8D:80:1B:CD:10:38:8B:28:D5:21:A5:71:0B:FB:8A:AD:E5:FB:96:82:F8:18:59:78:B5:0A:53:4D:8A:38:9C:51:EB",
+			"fingerprint:sha-256 " + fingerprint,
 			"msid-semantic: WMS *",
 			"group:BUNDLE video",
 		},

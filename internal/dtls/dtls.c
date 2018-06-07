@@ -1,26 +1,6 @@
 #include "dtls.h"
 
-//recommended cipher suites.
-const char cipherlist[] =
-  "ECDHE-RSA-AES128-GCM-SHA256:"
-  "ECDHE-ECDSA-AES128-GCM-SHA256:"
-  "ECDHE-RSA-AES256-GCM-SHA384:"
-  "ECDHE-ECDSA-AES256-GCM-SHA384:"
-  "DHE-RSA-AES128-GCM-SHA256:"
-  "kEDH+AESGCM:"
-  "ECDHE-RSA-AES128-SHA256:"
-  "ECDHE-ECDSA-AES128-SHA256:"
-  "ECDHE-RSA-AES128-SHA:"
-  "ECDHE-ECDSA-AES128-SHA:"
-  "ECDHE-RSA-AES256-SHA384:"
-  "ECDHE-ECDSA-AES256-SHA384:"
-  "ECDHE-RSA-AES256-SHA:"
-  "ECDHE-ECDSA-AES256-SHA:"
-  "DHE-RSA-AES128-SHA256:"
-  "DHE-RSA-AES128-SHA:"
-  "DHE-RSA-AES256-SHA256:"
-  "DHE-RSA-AES256-SHA:"
-  "!aNULL:!eNULL:!EXPORT:!DSS:!DES:!RC4:!3DES:!MD5:!PSK";
+#define ONE_YEAR 60*60*24*365
 
 static inline bool str_isempty(const char* str) {
   return ((str == NULL) || (str[0] == '\0'));
@@ -65,55 +45,42 @@ static inline void srtp_key_material_extract(const srtp_key_material* km,
 }
 
 SSL_VERIFY_CB(dtls_trivial_verify_callback) {
-  // TODO: add actuall verify routines here, if needed.
-  (void)preverify_ok;
-  (void)ctx;
+  (void) preverify_ok;
+  (void) ctx;
   return 1;
 }
 
-SSL_CTX* dtls_ctx_init(int verify_mode, ssl_verify_cb* cb, const tlscfg* cfg) {
+SSL_CTX* dtls_ctx_init (tlscfg *cfg) {
   SSL_CTX* ctx = SSL_CTX_new(DTLS_method());
 
-  SSL_CTX_set_read_ahead(ctx, true);
+  SSL_CTX_set_read_ahead(ctx, 1);
   SSL_CTX_set_ecdh_auto(ctx, true);
-  SSL_CTX_set_verify(ctx,
-		     (verify_mode & DTLS_VERIFY_FINGERPRINT) ||
-			     (verify_mode & DTLS_VERIFY_CERTIFICATE)
-			 ? (SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT)
-			 : SSL_VERIFY_NONE,
-		     !(verify_mode & DTLS_VERIFY_CERTIFICATE)
-			 ? (cb ? cb : dtls_trivial_verify_callback)
-			 : NULL);
+  SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, dtls_trivial_verify_callback);
 
-  switch (cfg->profile) {
-    case SRTP_PROFILE_AES128_CM_SHA1_80:
-      SSL_CTX_set_tlsext_use_srtp(ctx, "SRTP_AES128_CM_SHA1_80");
-      break;
-    case SRTP_PROFILE_AES128_CM_SHA1_32:
-      SSL_CTX_set_tlsext_use_srtp(ctx, "SRTP_AES128_CM_SHA1_32");
-      break;
-    default:
-      SSL_CTX_free(ctx);
-      return NULL;
+  if (SSL_CTX_set_tlsext_use_srtp(ctx, "SRTP_AES128_CM_SHA1_32:SRTP_AES128_CM_SHA1_80") != 0) {
+    goto error;
   }
 
   if (!SSL_CTX_use_certificate(ctx, cfg->cert)) {
-    SSL_CTX_free(ctx);
-    return NULL;
+    goto error;
   }
 
   if (!SSL_CTX_use_PrivateKey(ctx, cfg->pkey) ||
       !SSL_CTX_check_private_key(ctx)) {
-    SSL_CTX_free(ctx);
-    return NULL;
+    goto error;
   }
 
-  if (!SSL_CTX_set_cipher_list(ctx, cfg->cipherlist)) {
-    SSL_CTX_free(ctx);
-    return NULL;
+  if (!SSL_CTX_set_cipher_list(ctx, "HIGH:!aNULL:!MD5:!RC4")) {
+    goto error;
   }
 
   return ctx;
+
+error:
+  if (ctx != NULL) {
+    SSL_CTX_free(ctx);
+  }
+  return NULL;
 }
 
 dtls_sess* dtls_sess_new(SSL_CTX* sslcfg, int con_state) {
@@ -268,73 +235,87 @@ void key_material_free(srtp_key_material* km) {
   free(km);
 }
 
-// function to print binary blobs as comma-separated hexadecimals.
-int fprinthex(FILE* fp, const char* prefix, const void* b, size_t l) {
-  int totallen = 0;
-  const char* finger = (const char*)b;
-  const char* end = finger + l;
-  totallen += fprintf(fp, "%s:        %hhx", prefix, *(finger++));
-  for (; finger != end; finger++) {
-    totallen += fprintf(fp, ":%hhx", *finger);
-  }
-  totallen += fputs("\n\n", fp);
-  return totallen;
-}
-
-// function to specifically print content srtp_key_ptrs objects.
-int fprintkeymat(FILE* fp, const srtp_key_ptrs* ptrs) {
-  return fputs("********\n", fp) +
-	 fprinthex(fp, "localkey", ptrs->localkey, MASTER_KEY_LEN) +
-	 fprinthex(fp, "remotekey", ptrs->remotekey, MASTER_KEY_LEN) +
-	 fprinthex(fp, "localsalt", ptrs->localsalt, MASTER_SALT_LEN) +
-	 fprinthex(fp, "remotesalt", ptrs->remotesalt, MASTER_SALT_LEN) +
-	 fputs("********\n", fp);
-}
-
-// function to specifically print fingerprint of X509 objects.
-int fprintfinger(FILE* fp, const char* prefix, const X509* cert) {
-  unsigned char fingerprint[EVP_MAX_MD_SIZE];
-  unsigned int size = sizeof(fingerprint);
-  memset(fingerprint, 0, sizeof(fingerprint));
-  if (!X509_digest(cert, EVP_sha512(), fingerprint, &size) || size == 0) {
-    fprintf(stderr, "Failed to generated fingerprint from X509 object %p\n",
-	    cert);
-    return 0;
-  }
-  return fprinthex(fp, prefix, fingerprint, size);
-}
-
-tlscfg* dtls_build_tlscfg(void* cert_data, int cert_data_size, void* key_data,
-			  int key_data_size) {
+tlscfg* dtls_build_tlscfg() {
   tlscfg* cfg = (tlscfg*)calloc(1, sizeof(tlscfg));
-  cfg->profile = SRTP_PROFILE_AES128_CM_SHA1_80;
-  cfg->cipherlist = cipherlist;
 
-  BIO* bio = BIO_new_mem_buf(cert_data, cert_data_size);
-  if (NULL == (cfg->cert = PEM_read_bio_X509(bio, NULL, NULL, NULL))) {
-    fputs("Fail to parse certificate file!\n", stderr);
-    BIO_free(bio);
-    return NULL;
+  static const int num_bits = 2048;
+
+  BIGNUM *bne = BN_new();
+  if(bne == NULL) {
+    goto error;
   }
-  fprintfinger(stdout, "Fingerprint of local cert is ", cfg->cert);
-  BIO_free(bio);
 
-  bio = BIO_new_mem_buf(key_data, key_data_size);
-  if (NULL == (cfg->pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL))) {
-    fputs("Fail to parse private key file!\n", stderr);
-    BIO_free(bio);
-    return NULL;
+  if(!BN_set_word(bne, RSA_F4)) {
+    goto error;
   }
-  BIO_free(bio);
 
+  RSA *rsa_key = RSA_new();
+  if(rsa_key == NULL) {
+    goto error;
+  }
+
+  if(!RSA_generate_key_ex(rsa_key, num_bits, bne, NULL)) {
+    goto error;
+  }
+
+  if((cfg->pkey = EVP_PKEY_new()) == NULL) {
+    goto error;
+  }
+
+  if(!EVP_PKEY_assign_RSA(cfg->pkey, rsa_key)) {
+    goto error;
+  }
+
+  rsa_key = NULL;
+  if((cfg->cert = X509_new()) == NULL) {
+    goto error;
+  }
+
+  X509_set_version(cfg->cert, 2);
+  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000); // TODO
+  X509_gmtime_adj(X509_get_notBefore(cfg->cert), -1 * ONE_YEAR);
+  X509_gmtime_adj(X509_get_notAfter(cfg->cert), ONE_YEAR);
+  if(!X509_set_pubkey(cfg->cert, cfg->pkey)) {
+    goto error;
+  }
+
+  X509_NAME *cert_name = cert_name = X509_get_subject_name(cfg->cert);
+  if(cert_name == NULL) {
+    goto error;
+  }
+
+  const char *name = "pion-webrtc";
+  X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
+  X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
+
+  if(!X509_set_issuer_name(cfg->cert, cert_name)) {
+    goto error;
+  }
+
+  if(!X509_sign(cfg->cert, cfg->pkey, EVP_sha1())) {
+    goto error;
+  }
+
+  BN_free(bne);
   return cfg;
+
+error:
+  if(bne)
+    BN_free(bne);
+  if(rsa_key && !cfg && !cfg->pkey)
+    RSA_free(rsa_key);
+  if(cfg && cfg->pkey)
+    EVP_PKEY_free(cfg->pkey);
+  if(cfg && cfg->cert)
+    X509_free(cfg->cert);
+  return NULL;
 }
 
 SSL_CTX* dtls_build_sslctx(tlscfg* cfg) {
   if (cfg == NULL) {
     return NULL;
   }
-  return dtls_ctx_init(DTLS_VERIFY_FINGERPRINT, NULL, cfg);
+  return dtls_ctx_init(cfg);
 }
 
 dtls_sess* dtls_build_session(SSL_CTX* cfg, bool is_server) {
@@ -347,14 +328,16 @@ bool openssl_global_init() {
   return SSL_library_init();
 }
 
-void dtls_session_cleanup(tlscfg* cfg, SSL_CTX* ssl_ctx,
-			  dtls_sess* dtls_session) {
+void dtls_session_cleanup(SSL_CTX* ssl_ctx, dtls_sess* dtls_session) {
   if (dtls_session) {
     dtls_sess_free(dtls_session);
   }
   if (ssl_ctx) {
     SSL_CTX_free(ssl_ctx);
   }
+}
+
+void dtls_tlscfg_cleanup(tlscfg* cfg) {
   if (cfg) {
     if (cfg->cert) {
       X509_free(cfg->cert);
@@ -385,7 +368,6 @@ void dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
 	      sess);
       return;
     }
-    fprintfinger(stdout, "Fingerprint of peer's cert is ", peercert);
     X509_free(peercert);
 
     srtp_key_material* km = srtp_get_key_material(sess);
@@ -397,7 +379,6 @@ void dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
     }
     srtp_key_ptrs ptrs = {0, 0, 0, 0};
     srtp_key_material_extract(km, &ptrs);
-    fprintkeymat(stdout, &ptrs);
     key_material_free(km);
 
     /* if we are a server
@@ -414,4 +395,26 @@ void dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
       sess->type = DTLS_CONTYPE_NEW;
     */
   }
+}
+
+char *dtls_tlscfg_fingerprint(tlscfg* cfg) {
+  if (cfg == NULL) {
+    return NULL;
+  }
+
+  unsigned int size;
+  unsigned char fingerprint[EVP_MAX_MD_SIZE];
+  if(X509_digest(cfg->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
+    return NULL;
+  }
+
+  char *hex_fingeprint = calloc(1, sizeof(char) * 160);
+  char *curr = hex_fingeprint;
+  unsigned int i = 0;
+  for(i = 0; i < size; i++) {
+    sprintf(curr, "%.2X:", fingerprint[i]);
+    curr += 3;
+  }
+  *(curr-1) = '\0';
+  return hex_fingeprint;
 }

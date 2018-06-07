@@ -11,35 +11,20 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey [16]byte) {
+func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg) {
 	const MTU = 8192
 	buffer := make([]byte, MTU)
 
-	var d *dtls.DTLSState
+	dtlsStates := make(map[string]*dtls.DTLSState)
 	for {
-		n, _, srcAddr, _ := conn.ReadFrom(buffer)
+		n, _, rawDstAddr, _ := conn.ReadFrom(buffer)
+		d, haveHandshaked := dtlsStates[rawDstAddr.String()]
 
-		if d != nil && d.HandleDTLSPacket(buffer, n) {
-			fmt.Println("Handling DTLS")
-		}
-
-		if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
-			if d == nil {
-				d, err = dtls.New(true, srcString, srcAddr.String())
-				if err != nil {
-					fmt.Println(err)
-				} else {
-					d.DoHandshake()
-					fmt.Println("sending handshake")
-				}
-			} else {
-				d.DoHandshake()
-				fmt.Println("sending handshake")
-				return
-			}
-			return
+		if haveHandshaked && d.MaybeHandleDTLSPacket(buffer, n) {
+			fmt.Println("Handled DTLS")
+		} else if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
 			if m, err := stun.NewMessage(buffer[:n]); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
-				dstAddr := &stun.TransportAddr{IP: srcAddr.(*net.UDPAddr).IP, Port: srcAddr.(*net.UDPAddr).Port}
+				dstAddr := &stun.TransportAddr{IP: rawDstAddr.(*net.UDPAddr).IP, Port: rawDstAddr.(*net.UDPAddr).Port}
 				err := stun.BuildAndSend(conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 					&stun.XorMappedAddress{
 						XorAddress: stun.XorAddress{
@@ -58,13 +43,24 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey [16]byte) 
 				}
 
 			}
+		} else {
+			fmt.Println("Probably SRTP")
 		}
 
-	}
+		if !haveHandshaked {
+			d, err := dtls.NewDTLSState(tlscfg, true, srcString, rawDstAddr.String())
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 
+			d.DoHandshake()
+			dtlsStates[rawDstAddr.String()] = d
+		}
+	}
 }
 
-func udpListener(ip string, remoteKey [16]byte) (int, error) {
+func udpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
 	if err != nil {
 		return 0, err
@@ -81,6 +77,6 @@ func udpListener(ip string, remoteKey [16]byte) (int, error) {
 	srcString := ip + ":" + strconv.Itoa(addr.Port)
 
 	dtls.AddListener(srcString, conn)
-	go packetHandler(conn, srcString, remoteKey)
+	go packetHandler(conn, srcString, remoteKey, tlscfg)
 	return addr.Port, err
 }
