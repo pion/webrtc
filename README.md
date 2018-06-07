@@ -6,8 +6,9 @@ A (almost) pure Golang implementation of the WebRTC Native API.
 
 # Status
 Things need to be completed before it is usable for public consumption.
-- [x] ICE-lite (only works if peers can communicate directly via host candidates)
+- [x] ICE-lite (peers can communicate directly via host candidates)
 - [x] DTLS
+- [ ] SRTP
 - [ ] API that matches WebRTC spec
 
 Things that I plan to do, but will happen only when someone requests/I need it.
