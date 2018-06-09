@@ -1,26 +1,15 @@
-#ifndef DTLS_FOO_H
-#define DTLS_FOO_H
+#ifndef DTLS_H
+#define DTLS_H
 
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <stdbool.h>
 #include <string.h>
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-#include <pthread.h>
-
-#define MASTER_KEY_LEN 16
-#define MASTER_SALT_LEN 14
-
-enum dtls_verify_mode {
-  DTLS_VERIFY_NONE = 0,               /*!< Don't verify anything */
-  DTLS_VERIFY_FINGERPRINT = (1 << 0), /*!< Verify the fingerprint */
-  DTLS_VERIFY_CERTIFICATE = (1 << 1), /*!< Verify the certificate */
-};
+#define SRTP_MASTER_KEY_KEY_LEN 16
+#define SRTP_MASTER_KEY_SALT_LEN 14
 
 enum dtls_con_state {
   DTLS_CONSTATE_ACT, //Endpoint is willing to inititate connections.
@@ -34,16 +23,6 @@ enum dtls_con_type {
   DTLS_CONTYPE_EXISTING = true, //Endpoint wishes to use existing connection
 };
 
-enum srtp_profile {
-  SRTP_PROFILE_RESERVED=0,
-  SRTP_PROFILE_AES128_CM_SHA1_80=1,
-  SRTP_PROFILE_AES128_CM_SHA1_32=2,
-};
-
-#define SSL_VERIFY_CB(x) int (x)(int preverify_ok, X509_STORE_CTX *ctx)
-typedef SSL_VERIFY_CB(ssl_verify_cb);
-extern SSL_VERIFY_CB(dtls_trivial_verify_callback);
-
 typedef struct tlscfg {
   X509* cert;
   EVP_PKEY* pkey;
@@ -56,17 +35,16 @@ typedef struct dtls_sess {
   pthread_mutex_t lock;
 } dtls_sess;
 
-typedef struct srtp_key_material{
-  uint8_t material[(MASTER_KEY_LEN + MASTER_SALT_LEN) * 2];
-  enum dtls_con_state ispassive;
-}srtp_key_material;
+#define PROFILE_STRING_LENGTH 23
+#define SRTP_MASTER_KEY_KEY_LEN 16
+#define SRTP_MASTER_KEY_SALT_LEN 14
 
-typedef struct srtp_key_ptrs {
-  const uint8_t* localkey;
-  const uint8_t* remotekey;
-  const uint8_t* localsalt;
-  const uint8_t* remotesalt;
-} srtp_key_ptrs;
+typedef struct dtls_handle_incoming_return {
+  char client_write_key[SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN];
+  char server_write_key[SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN];
+  char profile[PROFILE_STRING_LENGTH];
+  int key_length;
+} dtls_handle_incoming_return;
 
 bool openssl_global_init();
 
@@ -75,11 +53,10 @@ SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
 dtls_sess* dtls_build_session(SSL_CTX* cfg, bool is_server);
 
 ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char *src, const char *dst);
-void dtls_handle_incoming(dtls_sess* sess, const char *src, const char *dst, void *buf, int len);
+dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess* sess, const char *src, const char *dst, void *buf, int len);
 char *dtls_tlscfg_fingerprint(tlscfg* cfg);
 
 void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session);
 void dtls_tlscfg_cleanup(tlscfg *cfg);
-
 
 #endif

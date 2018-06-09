@@ -25,7 +25,6 @@ func init() {
 	}
 }
 
-var webrtcPacketMTU int = 8192
 var listenerMap map[string]*ipv4.PacketConn = make(map[string]*ipv4.PacketConn)
 var listenerMapLock = &sync.Mutex{}
 
@@ -108,15 +107,31 @@ func (d *DTLSState) Close() {
 	C.dtls_session_cleanup(d.sslctx, d.dtls_session)
 }
 
-func (d *DTLSState) MaybeHandleDTLSPacket(packet []byte, size int) bool {
+type DTLSCertPair struct {
+	ClientWriteKey []byte
+	ServerWriteKey []byte
+	Profile        string
+}
+
+func (d *DTLSState) MaybeHandleDTLSPacket(packet []byte, size int) (isDTLSPacket bool, certPair *DTLSCertPair) {
 	if packet[0] >= 20 && packet[0] <= 64 {
+		isDTLSPacket = true
 		packetRaw := C.CBytes(packet)
-		C.dtls_handle_incoming(d.dtls_session, d.rawSrc, d.rawDst, packetRaw, C.int(size))
-		C.free(unsafe.Pointer(packetRaw))
-		return true
+		defer C.free(unsafe.Pointer(packetRaw))
+
+		if ret := C.dtls_handle_incoming(d.dtls_session, d.rawSrc, d.rawDst, packetRaw, C.int(size)); ret != nil {
+			certPair = &DTLSCertPair{
+				ClientWriteKey: []byte(C.GoStringN(&ret.client_write_key[0], ret.key_length)),
+				ServerWriteKey: []byte(C.GoStringN(&ret.server_write_key[0], ret.key_length)),
+				Profile:        C.GoString(&ret.profile[0]),
+			}
+			C.free(unsafe.Pointer(ret))
+		}
+
+		return isDTLSPacket, certPair
 	}
 
-	return false
+	return isDTLSPacket, certPair
 }
 
 func (d *DTLSState) DoHandshake() {

@@ -20,12 +20,21 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 		n, _, rawDstAddr, _ := conn.ReadFrom(buffer)
 		d, haveHandshaked := dtlsStates[rawDstAddr.String()]
 
-		if haveHandshaked && d.MaybeHandleDTLSPacket(buffer, n) {
-			fmt.Println("Handled DTLS")
-		} else if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
+		if haveHandshaked {
+			if handled, certPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
+				if certPair != nil {
+					fmt.Println(certPair)
+					fmt.Println(len(certPair.ServerWriteKey))
+				}
+				fmt.Println("Handled DTLS")
+				continue
+			}
+		}
+
+		if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
 			if m, err := stun.NewMessage(buffer[:n]); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
 				dstAddr := &stun.TransportAddr{IP: rawDstAddr.(*net.UDPAddr).IP, Port: rawDstAddr.(*net.UDPAddr).Port}
-				err := stun.BuildAndSend(conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+				if err := stun.BuildAndSend(conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 					&stun.XorMappedAddress{
 						XorAddress: stun.XorAddress{
 							IP:   dstAddr.IP,
@@ -35,13 +44,10 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 					&stun.MessageIntegrity{
 						Key: remoteKey,
 					},
-
 					&stun.Fingerprint{},
-				)
-				if err != nil {
+				); err != nil {
 					fmt.Println(err)
 				}
-
 			}
 		} else {
 			fmt.Println("Probably SRTP")

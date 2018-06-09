@@ -1,50 +1,9 @@
 #include "dtls.h"
 
 #define ONE_YEAR 60*60*24*365
+#define STRINGIFY(STRING) #STRING,
 
-static inline bool str_isempty(const char* str) {
-  return ((str == NULL) || (str[0] == '\0'));
-}
-
-static inline const char* str_nullforempty(const char* str) {
-  return (str_isempty(str) ? NULL : str);
-}
-
-static inline BIO* dtls_sess_get_rbio(dtls_sess* sess) {
-  return SSL_get_rbio(sess->ssl);
-}
-static inline BIO* dtls_sess_get_wbio(dtls_sess* sess) {
-  return SSL_get_wbio(sess->ssl);
-}
-
-srtp_key_material* srtp_get_key_material(dtls_sess* sess);
-void key_material_free(srtp_key_material* km);
-
-static inline void dtls_sess_set_state(dtls_sess* sess,
-				       enum dtls_con_state state) {
-  sess->state = state;
-}
-
-static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess* sess) {
-  return sess->state;
-}
-
-static inline void srtp_key_material_extract(const srtp_key_material* km,
-					     srtp_key_ptrs* ptrs) {
-  if (km->ispassive == DTLS_CONSTATE_ACT) {
-    ptrs->localkey = (km->material);
-    ptrs->remotekey = ptrs->localkey + MASTER_KEY_LEN;
-    ptrs->localsalt = ptrs->remotekey + MASTER_KEY_LEN;
-    ptrs->remotesalt = ptrs->localsalt + MASTER_SALT_LEN;
-  } else {
-    ptrs->remotekey = (km->material);
-    ptrs->localkey = ptrs->remotekey + MASTER_KEY_LEN;
-    ptrs->remotesalt = ptrs->localkey + MASTER_KEY_LEN;
-    ptrs->localsalt = ptrs->remotesalt + MASTER_SALT_LEN;
-  }
-}
-
-SSL_VERIFY_CB(dtls_trivial_verify_callback) {
+int dtls_trivial_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
   (void) preverify_ok;
   (void) ctx;
   return 1;
@@ -145,7 +104,7 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess* sess, const char* src,
   if (sess->ssl == NULL) {
     return -2;
   }
-  BIO* wbio = dtls_sess_get_wbio(sess);
+  BIO* wbio = SSL_get_wbio(sess->ssl);
   size_t pending = BIO_ctrl_pending(wbio);
   size_t len = 0;
   if (pending > 0) {
@@ -171,7 +130,7 @@ ptrdiff_t dtls_sess_put_packet(dtls_sess* sess, const char* src,
   pthread_mutex_lock(&sess->lock);
   pthread_mutex_unlock(&sess->lock);
 
-  BIO* rbio = dtls_sess_get_rbio(sess);
+  BIO* rbio = SSL_get_rbio(sess->ssl);
 
   if (sess->state == DTLS_CONSTATE_ACTPASS) {
     sess->state = DTLS_CONSTATE_PASS;
@@ -196,6 +155,10 @@ ptrdiff_t dtls_sess_put_packet(dtls_sess* sess, const char* src,
   return ret;
 }
 
+static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess* sess) {
+  return sess->state;
+}
+
 ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char* src, const char* dst) {
   if (sess->ssl == NULL ||
       (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT &&
@@ -203,36 +166,13 @@ ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char* src, const char* dst) {
     return -2;
   }
   if (dtls_sess_get_state(sess) == DTLS_CONSTATE_ACTPASS) {
-    dtls_sess_set_state(sess, DTLS_CONSTATE_ACT);
+    sess->state = DTLS_CONSTATE_ACT;
   }
   SSL_do_handshake(sess->ssl);
   pthread_mutex_lock(&sess->lock);
   ptrdiff_t ret = dtls_sess_send_pending(sess, src, dst);
   pthread_mutex_unlock(&sess->lock);
   return ret;
-}
-
-srtp_key_material* srtp_get_key_material(dtls_sess* sess) {
-  if (!SSL_is_init_finished(sess->ssl)) {
-    return NULL;
-  }
-
-  srtp_key_material* km = calloc(1, sizeof(srtp_key_material));
-
-  if (!SSL_export_keying_material(sess->ssl, km->material, sizeof(km->material),
-				  "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
-    key_material_free(km);
-    return NULL;
-  }
-
-  km->ispassive = sess->state;
-
-  return km;
-}
-
-void key_material_free(srtp_key_material* km) {
-  memset(km->material, 0, sizeof(km->material));
-  free(km);
 }
 
 tlscfg* dtls_build_tlscfg() {
@@ -315,6 +255,7 @@ SSL_CTX* dtls_build_sslctx(tlscfg* cfg) {
   if (cfg == NULL) {
     return NULL;
   }
+
   return dtls_ctx_init(cfg);
 }
 
@@ -350,51 +291,52 @@ void dtls_tlscfg_cleanup(tlscfg* cfg) {
   }
 }
 
-void dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
+
+
+dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
 			  void* buf, int len) {
   ptrdiff_t stat = dtls_sess_put_packet(sess, src, dst, buf, len);
   if (SSL_get_error(sess->ssl, stat) == SSL_ERROR_SSL) {
     fprintf(stderr,
-	    "DTLS failure occurred on dtls session %p due to reason '%s'\n",
-	    sess, ERR_reason_error_string(ERR_get_error()));
-    return;
+	"DTLS failure occurred on dtls session %p due to reason '%s'\n",
+	sess, ERR_reason_error_string(ERR_get_error()));
+    return NULL;
   }
 
   if (sess->type == DTLS_CONTYPE_EXISTING) {
-    X509* peercert = SSL_get_peer_certificate(sess->ssl);
-    if (peercert == NULL) {
-      fprintf(stderr,
-	      "No certificate was provided by the peer on dtls session %p\n",
-	      sess);
-      return;
+    unsigned char dtls_buffer[SRTP_MASTER_KEY_KEY_LEN * 2 + SRTP_MASTER_KEY_SALT_LEN * 2];
+
+    const char *label = "EXTRACTOR-dtls_srtp";
+    if (!SSL_export_keying_material(sess->ssl, dtls_buffer, sizeof(dtls_buffer), label, strlen(label), NULL, 0, 0)) {
+      fprintf(stderr, "SSL_export_keying_material failed");
+      return NULL;
     }
-    X509_free(peercert);
 
-    srtp_key_material* km = srtp_get_key_material(sess);
-    if (km == NULL) {
-      fprintf(stderr,
-	      "Unable to extract SRTP keying material from dtls session %p\n",
-	      sess);
-      return;
+    size_t offset = 0;
+    dtls_handle_incoming_return *ret = calloc(1, sizeof(dtls_handle_incoming_return));
+    ret->key_length = SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN;
+
+    memcpy(&ret->client_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
+    offset += SRTP_MASTER_KEY_KEY_LEN;
+    memcpy(&ret->server_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
+    offset += SRTP_MASTER_KEY_KEY_LEN;
+    memcpy(&ret->client_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
+    offset += SRTP_MASTER_KEY_SALT_LEN;
+    memcpy(&ret->server_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
+
+    switch(SSL_get_selected_srtp_profile(sess->ssl)->id) {
+      case SRTP_AES128_CM_SHA1_80:
+	memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
+	break;
+      case SRTP_AES128_CM_SHA1_32:
+	memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_32", strlen("SRTP_AES128_CM_SHA1_32"));
+	break;
     }
-    srtp_key_ptrs ptrs = {0, 0, 0, 0};
-    srtp_key_material_extract(km, &ptrs);
-    key_material_free(km);
 
-    /* if we are a server
-      if(sess->ssl == NULL || !SSL_is_init_finished(sess->ssl)){
-	return;
-      }
-
-      SSL_clear(sess->ssl);
-      if (sess->state == DTLS_CONSTATE_PASS) {
-	SSL_set_accept_state(sess->ssl);
-      } else {
-	SSL_set_connect_state(sess->ssl);
-      }
-      sess->type = DTLS_CONTYPE_NEW;
-    */
+    return ret;
   }
+
+  return NULL;
 }
 
 char *dtls_tlscfg_fingerprint(tlscfg* cfg) {

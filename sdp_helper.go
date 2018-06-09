@@ -67,7 +67,6 @@ func generateVP8OnlyAnswer() *sdp.SessionDescription {
 		Timing:          []string{"0 0"},
 		Attributes: []string{
 			"ice-lite",
-			// TODO kc5nra proper fingerprint
 			"fingerprint:sha-256 " + fingerprint,
 			"msid-semantic: WMS *",
 			"group:BUNDLE video",
