@@ -7,6 +7,7 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/webrtc/internal/srtp"
 
 	"golang.org/x/net/ipv4"
 )
@@ -16,6 +17,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	buffer := make([]byte, MTU)
 
 	dtlsStates := make(map[string]*dtls.DTLSState)
+	var srtpSession *srtp.Session
 	for {
 		n, _, rawDstAddr, _ := conn.ReadFrom(buffer)
 		d, haveHandshaked := dtlsStates[rawDstAddr.String()]
@@ -23,10 +25,8 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 		if haveHandshaked {
 			if handled, certPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
 				if certPair != nil {
-					fmt.Println(certPair)
-					fmt.Println(len(certPair.ServerWriteKey))
+					srtpSession = srtp.New(certPair.ServerWriteKey, certPair.ClientWriteKey, certPair.Profile)
 				}
-				fmt.Println("Handled DTLS")
 				continue
 			}
 		}
@@ -49,8 +49,16 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 					fmt.Println(err)
 				}
 			}
+		} else if srtpSession != nil {
+			ok, unencrypted := srtpSession.DecryptPacket(buffer[:n])
+			if !ok {
+				fmt.Println("Failed to decrypt packet")
+				continue
+			}
+
+			fmt.Println(unencrypted)
 		} else {
-			fmt.Println("Probably SRTP")
+			fmt.Println("SRTP packet, but no srtpSession")
 		}
 
 		if !haveHandshaked {

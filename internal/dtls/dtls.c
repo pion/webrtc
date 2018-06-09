@@ -1,7 +1,6 @@
 #include "dtls.h"
 
 #define ONE_YEAR 60*60*24*365
-#define STRINGIFY(STRING) #STRING,
 
 int dtls_trivial_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
   (void) preverify_ok;

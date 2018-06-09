@@ -8,11 +8,12 @@ A (almost) pure Golang implementation of the WebRTC Native API.
 Things need to be completed before it is usable for public consumption.
 - [x] ICE-lite (peers can communicate directly via host candidates)
 - [x] DTLS
-- [ ] SRTP
+- [x] SRTP
 - [ ] API that matches WebRTC spec
 
 Things that I plan to do, but will happen only when someone requests/I need it.
 * [ ] Native DTLS (Currently we use OpenSSL)
+* [ ] Native SRTP (Currently we use libsrtp2)
 * [ ] DataChannels
 * [ ] TURN/STUN/ICE
 * [ ] Sending Video

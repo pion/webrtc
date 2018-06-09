@@ -1,8 +1,7 @@
 package dtls
 
 /*
-#cgo CFLAGS: -I .
-#cgo LDFLAGS: -lcrypto -lssl
+#cgo pkg-config: openssl
 
 #include "dtls.h"
 
@@ -107,20 +106,20 @@ func (d *DTLSState) Close() {
 	C.dtls_session_cleanup(d.sslctx, d.dtls_session)
 }
 
-type DTLSCertPair struct {
+type CertPair struct {
 	ClientWriteKey []byte
 	ServerWriteKey []byte
 	Profile        string
 }
 
-func (d *DTLSState) MaybeHandleDTLSPacket(packet []byte, size int) (isDTLSPacket bool, certPair *DTLSCertPair) {
+func (d *DTLSState) MaybeHandleDTLSPacket(packet []byte, size int) (isDTLSPacket bool, certPair *CertPair) {
 	if packet[0] >= 20 && packet[0] <= 64 {
 		isDTLSPacket = true
 		packetRaw := C.CBytes(packet)
 		defer C.free(unsafe.Pointer(packetRaw))
 
 		if ret := C.dtls_handle_incoming(d.dtls_session, d.rawSrc, d.rawDst, packetRaw, C.int(size)); ret != nil {
-			certPair = &DTLSCertPair{
+			certPair = &CertPair{
 				ClientWriteKey: []byte(C.GoStringN(&ret.client_write_key[0], ret.key_length)),
 				ServerWriteKey: []byte(C.GoStringN(&ret.server_write_key[0], ret.key_length)),
 				Profile:        C.GoString(&ret.profile[0]),
