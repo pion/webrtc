@@ -9,7 +9,7 @@ Things need to be completed before it is usable for public consumption.
 - [x] ICE-lite (peers can communicate directly via host candidates)
 - [x] DTLS
 - [x] SRTP
-- [ ] API that matches WebRTC spec
+- [x] API that matches WebRTC spec
 
 Things that I plan to do, but will happen only when someone requests/I need it.
 * [ ] Native DTLS (Currently we use OpenSSL)
@@ -19,10 +19,11 @@ Things that I plan to do, but will happen only when someone requests/I need it.
 * [ ] Sending Video
 
 # How to use
-Build (or run) this project `go run *.go` This will print your SDP, and a base64 version of it.
+This project provides an API to work with WebRTC clients. To see a quick demo we provide an example.
 
-Open the [demo page](https://jsfiddle.net/tr2uq31e/) and put the base64
-from running the Go application in the text area, and press 'Start Session'
+Build (or run) [save-to-disk](https://github.com/pions/webrtc/tree/master/examples/save-to-disk) This will first ask for your browsers SDP, and then provide yours
+
+Open the [demo page](https://jsfiddle.net/tr2uq31e/1/) and get the base64 from the browser, then provide ours and press 'Start Session'
 
 The Go application should print when it gets any packets, and the web page will print it's status as well.
 

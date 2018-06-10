@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"fmt"
@@ -7,9 +7,8 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
-	"github.com/pions/webrtc/internal/srtp"
-
 	"github.com/pions/webrtc/internal/rtp"
+	"github.com/pions/webrtc/internal/srtp"
 	"golang.org/x/net/ipv4"
 )
 
@@ -83,7 +82,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	}
 }
 
-func udpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg) (int, error) {
+func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
 	if err != nil {
 		return 0, err
