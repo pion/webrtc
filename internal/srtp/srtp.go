@@ -8,7 +8,6 @@ package srtp
 */
 import "C"
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -44,7 +43,6 @@ func (s *Session) DecryptPacket(encryted []byte) (ok bool, unencryted []byte) {
 	defer C.free(unsafe.Pointer(rawIn))
 
 	if rawPacket := C.srtp_decrypt_packet(s.rawSession, rawIn, C.int(len(encryted))); rawPacket != nil {
-		fmt.Println(rawPacket)
 		return true, C.GoBytes(rawPacket.data, rawPacket.len)
 	}
 
