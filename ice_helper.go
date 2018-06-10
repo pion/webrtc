@@ -9,6 +9,7 @@ import (
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/srtp"
 
+	"github.com/pions/webrtc/internal/rtp"
 	"golang.org/x/net/ipv4"
 )
 
@@ -56,7 +57,15 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 				continue
 			}
 
-			fmt.Println(unencrypted)
+			packet := rtp.Packet{}
+			if err := packet.Unmarshal(unencrypted); err != nil {
+				fmt.Println("Failed to unmarshal RTP packet")
+				continue
+			}
+
+			fmt.Printf("<- RTP SSRC: %d, SN: %d, TS: %d, PT: %d\n", packet.SSRC, packet.SequenceNumber,
+				packet.Timestamp, packet.PayloadType)
+
 		} else {
 			fmt.Println("SRTP packet, but no srtpSession")
 		}
