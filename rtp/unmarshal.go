@@ -2,6 +2,7 @@ package rtp
 
 import (
 	"encoding/binary"
+
 	"github.com/pkg/errors"
 )
 
@@ -37,9 +38,9 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	p.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
 	p.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
 
-	headerPlusCsrcs := headerLength + timestampLength + ssrcLength + (len(p.CSRC) * csrcLength)
-	if len(rawPacket) < headerPlusCsrcs {
-		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerPlusCsrcs)
+	currOffset := headerLength + timestampLength + ssrcLength + (len(p.CSRC) * csrcLength)
+	if len(rawPacket) < currOffset {
+		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
 	}
 
 	for i := range p.CSRC {
@@ -47,7 +48,15 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:offset])
 	}
 
-	p.Payload = rawPacket[headerPlusCsrcs:]
+	if p.Extension {
+		currOffset += extensionHeaderIdLength
+		extensionLength := binary.BigEndian.Uint16(rawPacket[currOffset:])
+		currOffset += extensionLengthFieldLength
+
+		currOffset += (int(extensionLength) * extensionHeaderAssumedLength)
+	}
+
+	p.Payload = rawPacket[currOffset:]
 
 	return nil
 }

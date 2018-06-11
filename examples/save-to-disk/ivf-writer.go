@@ -9,8 +9,6 @@ import (
 	"github.com/pions/webrtc/rtp"
 )
 
-var le = binary.LittleEndian
-
 type IVFWriter struct {
 	fd           *os.File
 	time         time.Time
@@ -49,16 +47,16 @@ func NewIVFWriter(fileName string) (*IVFWriter, error) {
 	}
 
 	header := make([]byte, 32)
-	copy(header[0:], []byte("DKIF")) // DKIF
-	le.PutUint16(header[4:], 0)      // Version
-	le.PutUint16(header[6:], 32)     // Header Size
-	copy(header[8:], []byte("VP80")) // FOURCC
-	le.PutUint16(header[12:], 640)   // Version
-	le.PutUint16(header[14:], 480)   // Header Size
-	le.PutUint32(header[16:], 30)    // Framerate numerator
-	le.PutUint32(header[20:], 1)     // Framerate Denominator
-	le.PutUint32(header[24:], 900)   // Frame count
-	le.PutUint32(header[28:], 0)     // Unused
+	copy(header[0:], []byte("DKIF"))                // DKIF
+	binary.LittleEndian.PutUint16(header[4:], 0)    // Version
+	binary.LittleEndian.PutUint16(header[6:], 32)   // Header Size
+	copy(header[8:], []byte("VP80"))                // FOURCC
+	binary.LittleEndian.PutUint16(header[12:], 640) // Version
+	binary.LittleEndian.PutUint16(header[14:], 480) // Header Size
+	binary.LittleEndian.PutUint32(header[16:], 30)  // Framerate numerator
+	binary.LittleEndian.PutUint32(header[20:], 1)   // Framerate Denominator
+	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count
+	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
 	panicWrite(f, header)
 
@@ -103,7 +101,6 @@ func (i *IVFWriter) DecodeVP8RTPPacket(packet *rtp.Packet) (*VP8RTPPacket, error
 		payloadIndex++
 	}
 
-	fmt.Print(vp8Packet)
 	vp8Packet.Payload = p[payloadIndex:]
 
 	return vp8Packet, nil
@@ -123,9 +120,8 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) {
 	}
 
 	frameHeader := make([]byte, 12)
-
-	le.PutUint32(frameHeader[0:], uint32(len(i.currentFrame))) // Frame length
-	le.PutUint64(frameHeader[4:], i.count)                     // PTS
+	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(i.currentFrame))) // Frame length
+	binary.LittleEndian.PutUint64(frameHeader[4:], i.count)                     // PTS
 
 	i.count += 1
 

@@ -14,23 +14,26 @@ type Packet struct {
 }
 
 const (
-	headerLength    = 4
-	versionShift    = 6
-	versionMask     = 0x3
-	paddingShift    = 5
-	paddingMask     = 0x1
-	extensionShift  = 4
-	extensionMask   = 0x1
-	ccMask          = 0xF
-	markerShift     = 7
-	markerMask      = 0x1
-	ptMask          = 0x7F
-	seqNumOffset    = 2
-	seqNumLength    = 2
-	timestampOffset = 4
-	timestampLength = 4
-	ssrcOffset      = 8
-	ssrcLength      = 4
-	csrcOffset      = 12
-	csrcLength      = 4
+	headerLength                 = 4
+	versionShift                 = 6
+	versionMask                  = 0x3
+	paddingShift                 = 5
+	paddingMask                  = 0x1
+	extensionShift               = 4
+	extensionMask                = 0x1
+	ccMask                       = 0xF
+	markerShift                  = 7
+	markerMask                   = 0x1
+	ptMask                       = 0x7F
+	seqNumOffset                 = 2
+	seqNumLength                 = 2
+	timestampOffset              = 4
+	timestampLength              = 4
+	ssrcOffset                   = 8
+	ssrcLength                   = 4
+	csrcOffset                   = 12
+	csrcLength                   = 4
+	extensionHeaderIdLength      = 2
+	extensionLengthFieldLength   = 2
+	extensionHeaderAssumedLength = 4
 )
