@@ -11,6 +11,8 @@ import (
 	"github.com/pions/webrtc/rtp"
 )
 
+var trackCount uint64
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -32,8 +34,8 @@ func main() {
 	peerConnection := &webrtc.RTCPeerConnection{}
 
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
-	// an ivf file, since we could have multiple video tracks we provide a counter
-	var trackCount uint64
+	// an ivf file, since we could have multiple video tracks we provide a counter.
+	// In your application this is where you would handle/process video
 	peerConnection.Ontrack = func(mediaType webrtc.MediaType, packets chan *rtp.Packet) {
 		go func() {
 			track := atomic.AddUint64(&trackCount, 1)
@@ -43,16 +45,8 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-
-			currentFrame := []byte{}
 			for {
-				packet := <-packets
-				currentFrame = append(currentFrame, packet.Payload[4:]...)
-
-				if packet.Marker {
-					i.AddBuffer(currentFrame)
-					currentFrame = nil
-				}
+				i.AddPacket(<-packets)
 			}
 		}()
 	}

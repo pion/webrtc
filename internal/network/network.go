@@ -57,11 +57,6 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 				fmt.Println("Failed to decrypt packet")
 				continue
 			}
-			// addr := &net.UDPAddr{
-			// 	Port: 5000,
-			// 	IP:   net.ParseIP("127.0.0.1"),
-			// }
-			// conn.WriteTo(unencrypted, nil, addr)
 
 			packet := &rtp.Packet{}
 			if err := packet.Unmarshal(unencrypted); err != nil {
