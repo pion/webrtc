@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
+	"github.com/pions/webrtc/rtp"
 
 	"github.com/pkg/errors"
 )
+
+type ChannelGenerator func(username string, srcAddr *stun.TransportAddr) (password string, ok bool)
 
 type MediaType int
 
@@ -25,7 +29,7 @@ const (
 )
 
 type RTCPeerConnection struct {
-	Ontrack          func(mediaType MediaType, buffers <-chan []byte)
+	Ontrack          func(mediaType MediaType, buffers chan *rtp.Packet)
 	LocalDescription *sdp.SessionDescription
 
 	tlscfg *dtls.TLSCfg
@@ -51,7 +55,7 @@ func (r *RTCPeerConnection) CreateOffer() error {
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 	for id, c := range ice.HostInterfaces() {
-		dstPort, err := network.UdpListener(c, []byte(r.icePassword), r.tlscfg)
+		dstPort, err := network.UdpListener(c, []byte(r.icePassword), r.tlscfg, r.generateChannel)
 		if err != nil {
 			panic(err)
 		}
@@ -69,3 +73,12 @@ func (r *RTCPeerConnection) AddStream(mediaType MediaType) (buffers chan<- []byt
 }
 
 // Private
+func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan *rtp.Packet) {
+	if r.Ontrack == nil {
+		return nil
+	}
+
+	bufferTransport := make(chan *rtp.Packet, 15)
+	r.Ontrack(VP8, bufferTransport) // TODO look up media via SSRC in remote SD
+	return bufferTransport
+}

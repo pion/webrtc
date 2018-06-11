@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"sync/atomic"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/rtp"
 )
 
 func main() {
@@ -30,9 +32,29 @@ func main() {
 	peerConnection := &webrtc.RTCPeerConnection{}
 
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
-	// an ivf file of the users choosing
-	peerConnection.Ontrack = func(mediaType webrtc.MediaType, buffers <-chan []byte) {
-		fmt.Println("We track was discovered")
+	// an ivf file, since we could have multiple video tracks we provide a counter
+	var trackCount uint64
+	peerConnection.Ontrack = func(mediaType webrtc.MediaType, packets chan *rtp.Packet) {
+		go func() {
+			track := atomic.AddUint64(&trackCount, 1)
+			fmt.Printf("Track %d has started \n", track)
+
+			i, err := NewIVFWriter(fmt.Sprintf("output-%d.ivf", track))
+			if err != nil {
+				panic(err)
+			}
+
+			currentFrame := []byte{}
+			for {
+				packet := <-packets
+				currentFrame = append(currentFrame, packet.Payload[4:]...)
+
+				if packet.Marker {
+					i.AddBuffer(currentFrame)
+					currentFrame = nil
+				}
+			}
+		}()
 	}
 
 	// Set the remote SessionDescription

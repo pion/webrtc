@@ -7,16 +7,18 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
-	"github.com/pions/webrtc/internal/rtp"
 	"github.com/pions/webrtc/internal/srtp"
+	"github.com/pions/webrtc/rtp"
 	"golang.org/x/net/ipv4"
 )
 
-func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg) {
+func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) {
 	const MTU = 8192
 	buffer := make([]byte, MTU)
 
 	dtlsStates := make(map[string]*dtls.DTLSState)
+	bufferTransports := make(map[uint32]chan *rtp.Packet)
+
 	var srtpSession *srtp.Session
 	for {
 		n, _, rawDstAddr, _ := conn.ReadFrom(buffer)
@@ -55,16 +57,28 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 				fmt.Println("Failed to decrypt packet")
 				continue
 			}
+			// addr := &net.UDPAddr{
+			// 	Port: 5000,
+			// 	IP:   net.ParseIP("127.0.0.1"),
+			// }
+			// conn.WriteTo(unencrypted, nil, addr)
 
-			packet := rtp.Packet{}
+			packet := &rtp.Packet{}
 			if err := packet.Unmarshal(unencrypted); err != nil {
 				fmt.Println("Failed to unmarshal RTP packet")
 				continue
 			}
 
-			fmt.Printf("<- RTP SSRC: %d, SN: %d, TS: %d, PT: %d\n", packet.SSRC, packet.SequenceNumber,
-				packet.Timestamp, packet.PayloadType)
-
+			bufferTransport := bufferTransports[packet.SSRC]
+			if bufferTransport == nil {
+				bufferTransport = b(packet.SSRC)
+				if bufferTransport == nil {
+					fmt.Println("Failed to generate buffer transport, onTrack should be defined")
+					continue
+				}
+				bufferTransports[packet.SSRC] = bufferTransport
+			}
+			bufferTransport <- packet
 		} else {
 			fmt.Println("SRTP packet, but no srtpSession")
 		}
@@ -82,7 +96,9 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	}
 }
 
-func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg) (int, error) {
+type BufferTransportGenerator func(uint32) chan *rtp.Packet
+
+func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
 	if err != nil {
 		return 0, err
@@ -99,6 +115,6 @@ func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg) (int, error) 
 	srcString := ip + ":" + strconv.Itoa(addr.Port)
 
 	dtls.AddListener(srcString, conn)
-	go packetHandler(conn, srcString, remoteKey, tlscfg)
+	go packetHandler(conn, srcString, remoteKey, tlscfg, b)
 	return addr.Port, err
 }
