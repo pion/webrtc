@@ -6,30 +6,13 @@ import (
 	"os"
 
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pions/webrtc/pkg/rtp/codecs"
 )
 
 type IVFWriter struct {
 	fd           *os.File
 	count        uint64
 	currentFrame []byte
-}
-
-type VP8RTPPacket struct {
-	// Required Header
-	X   uint8 /* extended controlbits present */
-	N   uint8 /* (non-reference frame)  when set to 1 this frame can be discarded */
-	S   uint8 /* start of VP8 partition */
-	PID uint8 /* partition index */
-
-	// Optional Header
-	I         uint8  /* 1 if PictureID is present */
-	L         uint8  /* 1 if TL0PICIDX is present */
-	T         uint8  /* 1 if TID is present */
-	K         uint8  /* 1 if KEYIDX is present */
-	PictureID uint16 /* 8 or 16 bits, picture ID */
-	TL0PICIDX uint8  /* 8 bits temporal level zero index */
-
-	Payload []byte
 }
 
 func panicWrite(fd *os.File, data []byte) {
@@ -62,51 +45,10 @@ func NewIVFWriter(fileName string) (*IVFWriter, error) {
 	return i, nil
 }
 
-func (i *IVFWriter) DecodeVP8RTPPacket(packet *rtp.Packet) (*VP8RTPPacket, error) {
-	p := packet.Payload
-
-	vp8Packet := &VP8RTPPacket{}
-
-	payloadIndex := 0
-	vp8Packet.X = (p[payloadIndex] & 0x80) >> 7
-	vp8Packet.N = (p[payloadIndex] & 0x20) >> 5
-	vp8Packet.S = (p[payloadIndex] & 0x10) >> 4
-	vp8Packet.PID = p[payloadIndex] & 0x07
-
-	payloadIndex++
-
-	if vp8Packet.X == 1 {
-		vp8Packet.I = (p[payloadIndex] & 0x80) >> 7
-		vp8Packet.L = (p[payloadIndex] & 0x40) >> 6
-		vp8Packet.T = (p[payloadIndex] & 0x20) >> 5
-		vp8Packet.K = (p[payloadIndex] & 0x10) >> 4
-		payloadIndex++
-	}
-
-	if vp8Packet.I == 1 { // PID present?
-		if p[payloadIndex]&0x80 > 0 { // M == 1, PID is 16bit
-			payloadIndex += 2
-		} else {
-			payloadIndex++
-		}
-	}
-
-	if vp8Packet.L == 1 {
-		payloadIndex++
-	}
-
-	if vp8Packet.T == 1 || vp8Packet.K == 1 {
-		payloadIndex++
-	}
-
-	vp8Packet.Payload = p[payloadIndex:]
-
-	return vp8Packet, nil
-}
-
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) {
 
-	vp8Packet, err := i.DecodeVP8RTPPacket(packet)
+	vp8Packet := codecs.VP8Packet{}
+	err := vp8Packet.Unmarshal(packet)
 	if err != nil {
 		panic(err)
 	}
