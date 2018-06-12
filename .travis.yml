@@ -8,7 +8,7 @@ notifications:
   email: false
 
 before_install:
-  - cd /tmp && git clone https://github.com/cisco/libsrtp.git && cd libsrtp && ./configure --prefix=/usr && make &>/dev/null && sudo make install
+  - pushd && cd /tmp && git clone https://github.com/cisco/libsrtp.git && cd libsrtp && ./configure --prefix=/usr && make &>/dev/null && sudo make install && popd
 
 before_script:
   - go get github.com/golang/lint/golint
