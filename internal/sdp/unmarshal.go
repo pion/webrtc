@@ -162,7 +162,7 @@ func (s *SessionDescription) Unmarshal(raw string) error {
 		case "m":
 			return s.unmarshalMedias(scanner, value)
 		default:
-			return errors.Errorf("Invalid session attribute: %s")
+			return errors.Errorf("Invalid session attribute: %s", key)
 		}
 	}
 }
