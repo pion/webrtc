@@ -126,7 +126,6 @@ func (s *SessionDescription) Unmarshal(raw string) error {
 	}
 	s.SessionName = value
 
-	const attrAlreadySet string = "attribute %s has already been set"
 	for {
 		key, value, scanStatus, err = nextLine(scanner)
 		if err != nil || !scanStatus {

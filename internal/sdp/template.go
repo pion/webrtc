@@ -31,9 +31,7 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 		},
 	}
 
-	for _, c := range candidates {
-		videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, c)
-	}
+	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, candidates...)
 	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, "end-of-candidates")
 
 	// Generate only UDP host candidates for ICE

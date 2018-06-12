@@ -4,14 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
 type IVFWriter struct {
 	fd           *os.File
-	time         time.Time
 	count        uint64
 	currentFrame []byte
 }
