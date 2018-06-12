@@ -7,6 +7,9 @@ go:
 notifications:
   email: false
 
+before_install:
+  - cd /tmp && git clone https://github.com/cisco/libsrtp.git && cd libsrtp && ./configure --prefix=/usr && make && make install
+
 before_script:
   - go get github.com/golang/lint/golint
   - go get honnef.co/go/tools/cmd/megacheck
