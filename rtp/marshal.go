@@ -55,7 +55,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 	if p.Extension {
 		binary.BigEndian.PutUint16(rawPacket[currOffset:], p.ExtensionProfile)
 		currOffset += 2
-		binary.BigEndian.PutUint16(rawPacket[currOffset:], uint16(len(p.ExtensionPayload)))
+		binary.BigEndian.PutUint16(rawPacket[currOffset:], uint16(len(p.ExtensionPayload)) / 4)
 		currOffset += 2
 		copy(rawPacket[currOffset:], p.ExtensionPayload)
 	}

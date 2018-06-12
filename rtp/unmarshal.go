@@ -54,7 +54,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 		extensionLength := binary.BigEndian.Uint16(rawPacket[currOffset:])
 		currOffset += 2
 		p.ExtensionPayload = rawPacket[currOffset : currOffset+int(extensionLength)]
-		currOffset += len(p.ExtensionPayload)
+		currOffset += len(p.ExtensionPayload) * 4
 	}
 
 	p.Payload = rawPacket[currOffset:]
