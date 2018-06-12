@@ -38,7 +38,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	p.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
 	p.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
 
-	currOffset := headerLength + timestampLength + ssrcLength + (len(p.CSRC) * csrcLength)
+	currOffset := csrcOffset + (len(p.CSRC) * csrcLength)
 	if len(rawPacket) < currOffset {
 		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
 	}
@@ -49,11 +49,12 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	}
 
 	if p.Extension {
-		currOffset += extensionHeaderIdLength
+		p.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
+		currOffset += 2
 		extensionLength := binary.BigEndian.Uint16(rawPacket[currOffset:])
-		currOffset += extensionLengthFieldLength
-
-		currOffset += (int(extensionLength) * extensionHeaderAssumedLength)
+		currOffset += 2
+		p.ExtensionPayload = rawPacket[currOffset : currOffset+int(extensionLength)]
+		currOffset += len(p.ExtensionPayload)
 	}
 
 	p.Payload = rawPacket[currOffset:]
