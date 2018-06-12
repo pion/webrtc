@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/pions/webrtc/rtp"
+	"github.com/pions/webrtc/pkg/rtp"
 )
 
 type IVFWriter struct {
@@ -108,7 +108,10 @@ func (i *IVFWriter) DecodeVP8RTPPacket(packet *rtp.Packet) (*VP8RTPPacket, error
 
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) {
 
-	vp8Packet, _ := i.DecodeVP8RTPPacket(packet)
+	vp8Packet, err := i.DecodeVP8RTPPacket(packet)
+	if err != nil {
+		panic(err)
+	}
 
 	i.currentFrame = append(i.currentFrame, vp8Packet.Payload[0:]...)
 

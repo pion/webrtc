@@ -8,7 +8,7 @@ import (
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/rtp"
+	"github.com/pions/webrtc/pkg/rtp"
 	"golang.org/x/net/ipv4"
 )
 
@@ -21,7 +21,11 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 
 	var srtpSession *srtp.Session
 	for {
-		n, _, rawDstAddr, _ := conn.ReadFrom(buffer)
+		n, _, rawDstAddr, err := conn.ReadFrom(buffer)
+		if err != nil {
+			fmt.Printf("Failed to read packet: %s \n", err.Error())
+			continue
+		}
 		d, haveHandshaked := dtlsStates[rawDstAddr.String()]
 
 		if haveHandshaked {

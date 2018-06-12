@@ -9,7 +9,7 @@ import (
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
-	"github.com/pions/webrtc/rtp"
+	"github.com/pions/webrtc/pkg/rtp"
 
 	"github.com/pkg/errors"
 )

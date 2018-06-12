@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/rtp"
+	"github.com/pions/webrtc/pkg/rtp"
 )
 
 var trackCount uint64
