@@ -25,7 +25,7 @@ func attributeValid(statuses []*attributeStatus, attribute string) (err error) {
 
 		if v.value == attribute {
 			if v.seen && !v.allowMultiple {
-				return errors.Errorf("Attribute %s was attempted to be set twice", attribute, v.value)
+				return errors.Errorf("Attribute %s was attempted to be set twice: %v", attribute, v.value)
 			}
 			attrFound = true
 			v.seen = true
@@ -210,9 +210,7 @@ func (s *SessionDescription) unmarshalMedias(scanner *bufio.Scanner, firstMediaN
 		case "a":
 			currentMedia.Attributes = append(currentMedia.Attributes, value)
 		default:
-			return errors.Errorf("Invalid media attribute: %s")
+			return errors.Errorf("Invalid media attribute: %s", key)
 		}
 	}
-
-	return nil
 }

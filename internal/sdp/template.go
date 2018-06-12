@@ -54,6 +54,4 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 			videoMediaDescription,
 		},
 	}
-
-	return nil
 }
