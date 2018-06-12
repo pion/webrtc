@@ -1,0 +1,24 @@
+language: go
+
+go:
+  - 1.9    # (CURRENT - 1)
+  - master
+
+notifications:
+  email: false
+
+before_script:
+  - go get github.com/golang/lint/golint
+  - go get honnef.co/go/tools/cmd/megacheck
+  - go get github.com/fzipp/gocyclo
+  - go get -u github.com/kisielk/errcheck
+  - go get github.com/mattn/goveralls
+
+script:
+  - test -z "$(gofmt -s -l ./..)"
+  - goveralls -v -race -covermode=atomic -service=travis-ci
+  - go vet ./...
+  - megacheck ./...
+  - gocyclo -over 20 ./..
+  - golint -set_exit_status $(go list ./...)
+  - errcheck -asserts -blank ./...

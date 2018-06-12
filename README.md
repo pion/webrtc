@@ -1,5 +1,9 @@
 # Pion WebRTC
-[![GoDoc](https://godoc.org/github.com/pions/turn?status.svg)](https://godoc.org/github.com/pions/turn)
+[![Build Status](https://travis-ci.org/pions/webrtc.svg?branch=master)](https://travis-ci.org/pions/webrtc)
+[![GoDoc](https://godoc.org/github.com/pions/webrtc?status.svg)](https://godoc.org/github.com/pions/webrtc)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pions/webrtc)](https://goreportcard.com/report/github.com/pions/webrtc)
+[![Coverage Status](https://coveralls.io/repos/github/pions/webrtc/badge.svg)](https://coveralls.io/github/pions/webrtc)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d)](https://www.codacy.com/app/Sean-Der/webrtc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
 A (almost) pure Golang implementation of the WebRTC Native API.
