@@ -1,18 +1,38 @@
 #include "dtls.h"
 
-#define ONE_YEAR 60*60*24*365
+#define ONE_YEAR 60 * 60 * 24 * 365
 
 int dtls_trivial_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
-  (void) preverify_ok;
-  (void) ctx;
+  (void)preverify_ok;
+  (void)ctx;
   return 1;
 }
 
-SSL_CTX* dtls_ctx_init (tlscfg *cfg) {
-  SSL_CTX* ctx = SSL_CTX_new(DTLS_method());
+SSL_CTX *dtls_ctx_init(tlscfg *cfg) {
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+  SSL_CTX *ctx = SSL_CTX_new(DTLS_method());
+#elif (OPENSSL_VERSION_NUMBER >= 0x10001000L)
+  SSL_CTX *ctx = SSL_CTX_new(DTLSv1_method());
+#else
+#error "Unsupported OpenSSL Version"
+#endif
+
+#if (OPENSSL_VERSION_NUMBER >= 0x10002000L)
+  SSL_CTX_set_ecdh_auto(ctx, true);
+#else
+  EC_KEY *ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+
+  if (!ecdh) {
+    goto error;
+  }
+
+  if (SSL_CTX_set_tmp_ecdh(ctx, ecdh) != 1) {
+    goto error;
+  }
+  EC_KEY_free(ecdh);
+#endif
 
   SSL_CTX_set_read_ahead(ctx, 1);
-  SSL_CTX_set_ecdh_auto(ctx, true);
   SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, dtls_trivial_verify_callback);
 
   if (SSL_CTX_set_tlsext_use_srtp(ctx, "SRTP_AES128_CM_SHA1_32:SRTP_AES128_CM_SHA1_80") != 0) {
@@ -41,10 +61,10 @@ error:
   return NULL;
 }
 
-dtls_sess* dtls_sess_new(SSL_CTX* sslcfg, int con_state) {
-  dtls_sess* sess = (dtls_sess*)calloc(1, sizeof(dtls_sess));
-  BIO* rbio = NULL;
-  BIO* wbio = NULL;
+dtls_sess *dtls_sess_new(SSL_CTX *sslcfg, int con_state) {
+  dtls_sess *sess = (dtls_sess*)calloc(1, sizeof(dtls_sess));
+  BIO *rbio = NULL;
+  BIO *wbio = NULL;
 
   sess->state = con_state;
 
@@ -87,7 +107,7 @@ error:
   return NULL;
 }
 
-void dtls_sess_free(dtls_sess* sess) {
+void dtls_sess_free(dtls_sess *sess) {
   if (sess->ssl != NULL) {
     SSL_free(sess->ssl);
     sess->ssl = NULL;
@@ -96,18 +116,16 @@ void dtls_sess_free(dtls_sess* sess) {
   free(sess);
 }
 
-extern void go_handle_sendto(const char* src, const char* dst, char* buf,
-			     int len);
-ptrdiff_t dtls_sess_send_pending(dtls_sess* sess, const char* src,
-				 const char* dst) {
+extern void go_handle_sendto(const char *src, const char *dst, char *buf, int len);
+ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, const char *src, const char *dst) {
   if (sess->ssl == NULL) {
     return -2;
   }
-  BIO* wbio = SSL_get_wbio(sess->ssl);
+  BIO *wbio = SSL_get_wbio(sess->ssl);
   size_t pending = BIO_ctrl_pending(wbio);
   size_t len = 0;
   if (pending > 0) {
-    char* buf = malloc(pending);
+    char *buf = malloc(pending);
     len = BIO_read(wbio, buf, pending);
     buf = realloc(buf, len);
 
@@ -117,8 +135,7 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess* sess, const char* src,
   return 0;
 }
 
-ptrdiff_t dtls_sess_put_packet(dtls_sess* sess, const char* src,
-			       const char* dst, const void* buf, size_t len) {
+ptrdiff_t dtls_sess_put_packet(dtls_sess *sess, const char *src, const char *dst, const void *buf, size_t len) {
   if (sess->ssl == NULL) {
     return -1;
   }
@@ -129,7 +146,7 @@ ptrdiff_t dtls_sess_put_packet(dtls_sess* sess, const char* src,
   pthread_mutex_lock(&sess->lock);
   pthread_mutex_unlock(&sess->lock);
 
-  BIO* rbio = SSL_get_rbio(sess->ssl);
+  BIO *rbio = SSL_get_rbio(sess->ssl);
 
   if (sess->state == DTLS_CONSTATE_ACTPASS) {
     sess->state = DTLS_CONSTATE_PASS;
@@ -154,11 +171,11 @@ ptrdiff_t dtls_sess_put_packet(dtls_sess* sess, const char* src,
   return ret;
 }
 
-static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess* sess) {
+static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) {
   return sess->state;
 }
 
-ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char* src, const char* dst) {
+ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst) {
   if (sess->ssl == NULL ||
       (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT &&
        dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
@@ -174,64 +191,64 @@ ptrdiff_t dtls_do_handshake(dtls_sess* sess, const char* src, const char* dst) {
   return ret;
 }
 
-tlscfg* dtls_build_tlscfg() {
-  tlscfg* cfg = (tlscfg*)calloc(1, sizeof(tlscfg));
+tlscfg *dtls_build_tlscfg() {
+  tlscfg *cfg = (tlscfg*)calloc(1, sizeof(tlscfg));
 
   static const int num_bits = 2048;
 
   BIGNUM *bne = BN_new();
-  if(bne == NULL) {
+  if (bne == NULL) {
     goto error;
   }
 
-  if(!BN_set_word(bne, RSA_F4)) {
+  if (!BN_set_word(bne, RSA_F4)) {
     goto error;
   }
 
   RSA *rsa_key = RSA_new();
-  if(rsa_key == NULL) {
+  if (rsa_key == NULL) {
     goto error;
   }
 
-  if(!RSA_generate_key_ex(rsa_key, num_bits, bne, NULL)) {
+  if (!RSA_generate_key_ex(rsa_key, num_bits, bne, NULL)) {
     goto error;
   }
 
-  if((cfg->pkey = EVP_PKEY_new()) == NULL) {
+  if ((cfg->pkey = EVP_PKEY_new()) == NULL) {
     goto error;
   }
 
-  if(!EVP_PKEY_assign_RSA(cfg->pkey, rsa_key)) {
+  if (!EVP_PKEY_assign_RSA(cfg->pkey, rsa_key)) {
     goto error;
   }
 
   rsa_key = NULL;
-  if((cfg->cert = X509_new()) == NULL) {
+  if ((cfg->cert = X509_new()) == NULL) {
     goto error;
   }
 
   X509_set_version(cfg->cert, 2);
-  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000); // TODO
+  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000);  // TODO
   X509_gmtime_adj(X509_get_notBefore(cfg->cert), -1 * ONE_YEAR);
   X509_gmtime_adj(X509_get_notAfter(cfg->cert), ONE_YEAR);
-  if(!X509_set_pubkey(cfg->cert, cfg->pkey)) {
+  if (!X509_set_pubkey(cfg->cert, cfg->pkey)) {
     goto error;
   }
 
   X509_NAME *cert_name = cert_name = X509_get_subject_name(cfg->cert);
-  if(cert_name == NULL) {
+  if (cert_name == NULL) {
     goto error;
   }
 
   const char *name = "pion-webrtc";
-  X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
-  X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
+  X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned*)name, -1, -1, 0);
+  X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned*)name, -1, -1, 0);
 
-  if(!X509_set_issuer_name(cfg->cert, cert_name)) {
+  if (!X509_set_issuer_name(cfg->cert, cert_name)) {
     goto error;
   }
 
-  if(!X509_sign(cfg->cert, cfg->pkey, EVP_sha1())) {
+  if (!X509_sign(cfg->cert, cfg->pkey, EVP_sha1())) {
     goto error;
   }
 
@@ -239,18 +256,22 @@ tlscfg* dtls_build_tlscfg() {
   return cfg;
 
 error:
-  if(bne)
+  if (bne) {
     BN_free(bne);
-  if(rsa_key && !cfg && !cfg->pkey)
+  }
+  if (rsa_key && !cfg && !cfg->pkey) {
     RSA_free(rsa_key);
-  if(cfg && cfg->pkey)
+  }
+  if (cfg && cfg->pkey) {
     EVP_PKEY_free(cfg->pkey);
-  if(cfg && cfg->cert)
+  }
+  if (cfg && cfg->cert) {
     X509_free(cfg->cert);
+  }
   return NULL;
 }
 
-SSL_CTX* dtls_build_sslctx(tlscfg* cfg) {
+SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
   if (cfg == NULL) {
     return NULL;
   }
@@ -258,7 +279,7 @@ SSL_CTX* dtls_build_sslctx(tlscfg* cfg) {
   return dtls_ctx_init(cfg);
 }
 
-dtls_sess* dtls_build_session(SSL_CTX* cfg, bool is_server) {
+dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server) {
   return dtls_sess_new(cfg, is_server);
 }
 
@@ -268,7 +289,7 @@ bool openssl_global_init() {
   return SSL_library_init();
 }
 
-void dtls_session_cleanup(SSL_CTX* ssl_ctx, dtls_sess* dtls_session) {
+void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session) {
   if (dtls_session) {
     dtls_sess_free(dtls_session);
   }
@@ -277,7 +298,7 @@ void dtls_session_cleanup(SSL_CTX* ssl_ctx, dtls_sess* dtls_session) {
   }
 }
 
-void dtls_tlscfg_cleanup(tlscfg* cfg) {
+void dtls_tlscfg_cleanup(tlscfg *cfg) {
   if (cfg) {
     if (cfg->cert) {
       X509_free(cfg->cert);
@@ -290,10 +311,7 @@ void dtls_tlscfg_cleanup(tlscfg* cfg) {
   }
 }
 
-
-
-dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess* sess, const char* src, const char* dst,
-			  void* buf, int len) {
+dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *src, const char *dst, void *buf, int len) {
   ptrdiff_t stat = dtls_sess_put_packet(sess, src, dst, buf, len);
   if (SSL_get_error(sess->ssl, stat) == SSL_ERROR_SSL) {
     fprintf(stderr,
@@ -323,7 +341,7 @@ dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess* sess, const char* s
     offset += SRTP_MASTER_KEY_SALT_LEN;
     memcpy(&ret->server_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
 
-    switch(SSL_get_selected_srtp_profile(sess->ssl)->id) {
+    switch (SSL_get_selected_srtp_profile(sess->ssl)->id) {
       case SRTP_AES128_CM_SHA1_80:
 	memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
 	break;
@@ -338,24 +356,24 @@ dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess* sess, const char* s
   return NULL;
 }
 
-char *dtls_tlscfg_fingerprint(tlscfg* cfg) {
+char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
   if (cfg == NULL) {
     return NULL;
   }
 
   unsigned int size;
   unsigned char fingerprint[EVP_MAX_MD_SIZE];
-  if(X509_digest(cfg->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
+  if (X509_digest(cfg->cert, EVP_sha256(), (unsigned char*)fingerprint, &size) == 0) {
     return NULL;
   }
 
   char *hex_fingeprint = calloc(1, sizeof(char) * 160);
   char *curr = hex_fingeprint;
   unsigned int i = 0;
-  for(i = 0; i < size; i++) {
+  for (i = 0; i < size; i++) {
     sprintf(curr, "%.2X:", fingerprint[i]);
     curr += 3;
   }
-  *(curr-1) = '\0';
+  *(curr - 1) = '\0';
   return hex_fingeprint;
 }
