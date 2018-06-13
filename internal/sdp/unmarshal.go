@@ -72,23 +72,6 @@ func nextLine(scanner *bufio.Scanner) (key, value string, scanStatus bool, err e
 // https://tools.ietf.org/html/rfc4566#section-5
 func (s *SessionDescription) Unmarshal(raw string) error {
 	earlyEndErr := errors.Errorf("session description ended before all required values were found")
-	orderedSessionAttributes := []*attributeStatus{
-		&attributeStatus{value: "v"},
-		&attributeStatus{value: "o"},
-		&attributeStatus{value: "s"},
-		&attributeStatus{value: "i"},
-		&attributeStatus{value: "u"},
-		&attributeStatus{value: "e"},
-		&attributeStatus{value: "p"},
-		&attributeStatus{value: "c"},
-		&attributeStatus{value: "b", allowMultiple: true},
-		&attributeStatus{value: "t", allowMultiple: true},
-		&attributeStatus{value: "r", allowMultiple: true},
-		&attributeStatus{value: "z", allowMultiple: true},
-		&attributeStatus{value: "k", allowMultiple: true},
-		&attributeStatus{value: "a", allowMultiple: true},
-		&attributeStatus{value: "m", allowMultiple: true},
-	}
 
 	s.Reset()
 	scanner := bufio.NewScanner(strings.NewReader(raw))
@@ -126,8 +109,30 @@ func (s *SessionDescription) Unmarshal(raw string) error {
 	}
 	s.SessionName = value
 
+	return s.unmarshalOptionalAttributes(scanner)
+}
+
+func (s *SessionDescription) unmarshalOptionalAttributes(scanner *bufio.Scanner) error {
+	orderedSessionAttributes := []*attributeStatus{
+		&attributeStatus{value: "v"},
+		&attributeStatus{value: "o"},
+		&attributeStatus{value: "s"},
+		&attributeStatus{value: "i"},
+		&attributeStatus{value: "u"},
+		&attributeStatus{value: "e"},
+		&attributeStatus{value: "p"},
+		&attributeStatus{value: "c"},
+		&attributeStatus{value: "b", allowMultiple: true},
+		&attributeStatus{value: "t", allowMultiple: true},
+		&attributeStatus{value: "r", allowMultiple: true},
+		&attributeStatus{value: "z", allowMultiple: true},
+		&attributeStatus{value: "k", allowMultiple: true},
+		&attributeStatus{value: "a", allowMultiple: true},
+		&attributeStatus{value: "m", allowMultiple: true},
+	}
+
 	for {
-		key, value, scanStatus, err = nextLine(scanner)
+		key, value, scanStatus, err := nextLine(scanner)
 		if err != nil || !scanStatus {
 			return err
 		}
