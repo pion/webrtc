@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
@@ -29,7 +28,7 @@ const (
 )
 
 type RTCPeerConnection struct {
-	Ontrack          func(mediaType MediaType, buffers chan *rtp.Packet)
+	Ontrack          func(mediaType MediaType, buffers <-chan *rtp.Packet)
 	LocalDescription *sdp.SessionDescription
 
 	tlscfg *dtls.TLSCfg
@@ -73,7 +72,7 @@ func (r *RTCPeerConnection) AddStream(mediaType MediaType) (buffers chan<- []byt
 }
 
 // Private
-func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan *rtp.Packet) {
+func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan<- *rtp.Packet) {
 	if r.Ontrack == nil {
 		return nil
 	}

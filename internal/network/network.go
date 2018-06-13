@@ -17,7 +17,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	buffer := make([]byte, MTU)
 
 	dtlsStates := make(map[string]*dtls.DTLSState)
-	bufferTransports := make(map[uint32]chan *rtp.Packet)
+	bufferTransports := make(map[uint32]chan<- *rtp.Packet)
 
 	var srtpSession *srtp.Session
 	for {
@@ -95,7 +95,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	}
 }
 
-type BufferTransportGenerator func(uint32) chan *rtp.Packet
+type BufferTransportGenerator func(uint32) chan<- *rtp.Packet
 
 func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
