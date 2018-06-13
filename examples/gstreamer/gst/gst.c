@@ -36,9 +36,9 @@ GstElement *gst_create_pipeline() {
   gst_init(NULL, NULL);
   GError *error = NULL;
 #define PIPELINE                                                                                                       \
-  "appsrc format=time is-live=true do-timestamp=true name=src caps=\"application/x-rtp, media=(string)video, "         \
-  "clock-rate=(int)90000, encoding-name=(string)VP8-DRAFT-IETF-01, payload=(int)96\""                                  \
-  "! queue ! rtpvp8depay ! vp8dec ! videoconvert ! ximagesink"
+  "appsrc format=time is-live=true do-timestamp=true name=src ! application/x-rtp, "                                   \
+  "encoding-name=(string)VP8-DRAFT-IETF-01 "                                                                           \
+  "! queue ! rtpvp8depay ! vp8dec ! videoconvert ! autovideosink"
   return gst_parse_launch(PIPELINE, &error);
 }
 
