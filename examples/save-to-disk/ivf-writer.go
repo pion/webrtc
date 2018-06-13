@@ -9,7 +9,7 @@ import (
 	"github.com/pions/webrtc/pkg/rtp/codecs"
 )
 
-type IVFWriter struct {
+type ivfWriter struct {
 	fd           *os.File
 	count        uint64
 	currentFrame []byte
@@ -21,7 +21,7 @@ func panicWrite(fd *os.File, data []byte) {
 	}
 }
 
-func NewIVFWriter(fileName string) (*IVFWriter, error) {
+func newIVFWriter(fileName string) (*ivfWriter, error) {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
@@ -41,11 +41,11 @@ func NewIVFWriter(fileName string) (*IVFWriter, error) {
 
 	panicWrite(f, header)
 
-	i := &IVFWriter{fd: f}
+	i := &ivfWriter{fd: f}
 	return i, nil
 }
 
-func (i *IVFWriter) AddPacket(packet *rtp.Packet) {
+func (i *ivfWriter) addPacket(packet *rtp.Packet) {
 
 	vp8Packet := codecs.VP8Packet{}
 	err := vp8Packet.Unmarshal(packet)
@@ -66,14 +66,10 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) {
 	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(i.currentFrame))) // Frame length
 	binary.LittleEndian.PutUint64(frameHeader[4:], i.count)                     // PTS
 
-	i.count += 1
+	i.count++
 
 	panicWrite(i.fd, frameHeader)
 	panicWrite(i.fd, i.currentFrame)
 
 	i.currentFrame = nil
-}
-
-func (i *IVFWriter) Close() error {
-	return i.fd.Close()
 }

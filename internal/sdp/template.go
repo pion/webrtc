@@ -5,6 +5,7 @@ import (
 	"strconv"
 )
 
+// VP8OnlyDescription generates a default SDP response that is ice-lite, initiates the DTLS session and only supports VP8
 func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates []string) *SessionDescription {
 	videoMediaDescription := &MediaDescription{
 		MediaName:      "video 7 RTP/SAVPF 96 97",
@@ -36,10 +37,10 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 
 	// Generate only UDP host candidates for ICE
 
-	sessionId := strconv.FormatUint(uint64(rand.Uint32())<<32+uint64(rand.Uint32()), 10)
+	sessionID := strconv.FormatUint(uint64(rand.Uint32())<<32+uint64(rand.Uint32()), 10)
 	return &SessionDescription{
 		ProtocolVersion: 0,
-		Origin:          "pion-webrtc " + sessionId + " 2 IN IP4 0.0.0.0",
+		Origin:          "pion-webrtc " + sessionID + " 2 IN IP4 0.0.0.0",
 		SessionName:     "-",
 		Timing:          []string{"0 0"},
 		Attributes: []string{

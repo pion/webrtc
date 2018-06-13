@@ -2,6 +2,7 @@ package ice
 
 import "net"
 
+// HostInterfaces generates a slice of all the IPs associated with interfaces
 func HostInterfaces() (ips []string) {
 	ifaces, err := net.Interfaces()
 	if err != nil {

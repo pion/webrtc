@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Packet represents an RTP Packet
+// RTP is a network protocol for delivering audio and video over IP networks.
 type Packet struct {
 	Raw              []byte
 	Version          uint8
@@ -44,7 +46,7 @@ const (
 	csrcLength      = 4
 )
 
-
+// Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon
 func (p *Packet) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
 		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerLength)
@@ -101,6 +103,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	return nil
 }
 
+// Marshal returns a raw RTP packet for the instance it is called upon
 func (p *Packet) Marshal() ([]byte, error) {
 
 	/*
@@ -152,7 +155,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 	if p.Extension {
 		binary.BigEndian.PutUint16(rawPacket[currOffset:], p.ExtensionProfile)
 		currOffset += 2
-		binary.BigEndian.PutUint16(rawPacket[currOffset:], uint16(len(p.ExtensionPayload)) / 4)
+		binary.BigEndian.PutUint16(rawPacket[currOffset:], uint16(len(p.ExtensionPayload))/4)
 		currOffset += 2
 		copy(rawPacket[currOffset:], p.ExtensionPayload)
 	}

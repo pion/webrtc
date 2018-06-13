@@ -16,7 +16,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	const MTU = 8192
 	buffer := make([]byte, MTU)
 
-	dtlsStates := make(map[string]*dtls.DTLSState)
+	dtlsStates := make(map[string]*dtls.State)
 	bufferTransports := make(map[uint32]chan<- *rtp.Packet)
 
 	var srtpSession *srtp.Session
@@ -83,7 +83,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 		}
 
 		if !haveHandshaked {
-			d, err := dtls.NewDTLSState(tlscfg, true, srcString, rawDstAddr.String())
+			d, err := dtls.NewState(tlscfg, true, srcString, rawDstAddr.String())
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -95,9 +95,12 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	}
 }
 
+// BufferTransportGenerator generates a new channel for the associated SSRC
+// This channel is used to send RTP packets to users of pion-WebRTC
 type BufferTransportGenerator func(uint32) chan<- *rtp.Packet
 
-func UdpListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (int, error) {
+// UDPListener starts a new UDPListener, and will send the DTLS handshake if we are the client
+func UDPListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
 	if err != nil {
 		return 0, err

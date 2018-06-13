@@ -82,6 +82,7 @@ type SessionDescription struct {
 	MediaDescriptions []*MediaDescription
 }
 
+// Reset cleans the SessionDescription, and sets all fields back to their default values
 func (s *SessionDescription) Reset() {
 	s.ProtocolVersion = 0
 	s.Origin = ""

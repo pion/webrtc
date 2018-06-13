@@ -11,24 +11,27 @@ import (
 	"unsafe"
 )
 
+// Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline *C.GstElement
 }
 
+// CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline() *Pipeline {
-	p := &Pipeline{}
-	p.Pipeline = C.gst_create_pipeline()
-	return p
+	return &Pipeline{Pipeline: C.gst_create_pipeline()}
 }
 
+// Start starts the GStreamer Pipeline
 func (p *Pipeline) Start() {
 	C.gst_start_pipeline(p.Pipeline)
 }
 
+// Stop stops the GStreamer Pipeline
 func (p *Pipeline) Stop() {
 	C.gst_stop_pipeline(p.Pipeline)
 }
 
+// Push pushes a buffer on the appsrc of the GStreamer Pipeline
 func (p *Pipeline) Push(buffer []byte) {
 	b := C.CBytes(buffer)
 	defer C.free(unsafe.Pointer(b))

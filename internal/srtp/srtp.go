@@ -15,10 +15,12 @@ func init() {
 	C.srtp_init()
 }
 
+// Session containts the libsrtp state for this SRTP session
 type Session struct {
 	rawSession *_Ctype_srtp_t
 }
 
+// New creates a new SRTP Session
 func New(ClientWriteKey, ServerWriteKey []byte, profile string) *Session {
 	rawClientWriteKey := C.CBytes(ClientWriteKey)
 	rawServerWriteKey := C.CBytes(ServerWriteKey)
@@ -38,6 +40,7 @@ func New(ClientWriteKey, ServerWriteKey []byte, profile string) *Session {
 	return nil
 }
 
+// DecryptPacket decrypts a SRTP packet
 func (s *Session) DecryptPacket(encryted []byte) (ok bool, unencryted []byte) {
 	rawIn := C.CBytes(encryted)
 	defer C.free(unsafe.Pointer(rawIn))

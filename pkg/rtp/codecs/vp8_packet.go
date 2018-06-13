@@ -2,6 +2,7 @@ package codecs
 
 import "github.com/pions/webrtc/pkg/rtp"
 
+// VP8Packet represents the VP8 header that is stored in the payload of an RTP Packet
 type VP8Packet struct {
 	// Required Header
 	X   uint8 /* extended controlbits present */
@@ -20,6 +21,7 @@ type VP8Packet struct {
 	Payload []byte
 }
 
+// Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
 func (p *VP8Packet) Unmarshal(packet *rtp.Packet) error {
 	payload := packet.Payload
 

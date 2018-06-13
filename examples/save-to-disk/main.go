@@ -41,12 +41,12 @@ func main() {
 			track := atomic.AddUint64(&trackCount, 1)
 			fmt.Printf("Track %d has started \n", track)
 
-			i, err := NewIVFWriter(fmt.Sprintf("output-%d.ivf", track))
+			i, err := newIVFWriter(fmt.Sprintf("output-%d.ivf", track))
 			if err != nil {
 				panic(err)
 			}
 			for {
-				i.AddPacket(<-packets)
+				i.addPacket(<-packets)
 			}
 		}()
 	}
