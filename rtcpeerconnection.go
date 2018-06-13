@@ -13,29 +13,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MediaType determines the type of media we are sending receiving
-type MediaType int
+// TrackType determines the type of media we are sending receiving
+type TrackType int
 
 const (
-	// G711 is a MediaType
-	G711 MediaType = iota
-	// G722 is a MediaType
-	G722 MediaType = iota
-	// ILBC is a MediaType
-	ILBC MediaType = iota
-	// ISAC is a MediaType
-	ISAC MediaType = iota
-	// H264 is a MediaType
-	H264 MediaType = iota
-	// VP8 is a MediaType
-	VP8 MediaType = iota
-	// Opus is a MediaType
-	Opus MediaType = iota
+	// G711 is a TrackType
+	G711 TrackType = iota
+	// G722 is a TrackType
+	G722 TrackType = iota
+	// ILBC is a TrackType
+	ILBC TrackType = iota
+	// ISAC is a TrackType
+	ISAC TrackType = iota
+	// H264 is a TrackType
+	H264 TrackType = iota
+	// VP8 is a TrackType
+	VP8 TrackType = iota
+	// Opus is a TrackType
+	Opus TrackType = iota
 )
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
-	Ontrack          func(mediaType MediaType, buffers <-chan *rtp.Packet)
+	Ontrack          func(mediaType TrackType, buffers <-chan *rtp.Packet)
 	LocalDescription *sdp.SessionDescription
 
 	tlscfg *dtls.TLSCfg
@@ -78,10 +78,10 @@ func (r *RTCPeerConnection) CreateOffer() error {
 	return nil
 }
 
-// AddStream adds a new media to the RTCPeerConnection
+// AddTrack adds a new track to the RTCPeerConnection
 // This function returns a channel to push buffers on, and an error if the channel can't be added
 // Closing the channel ends this stream
-func (r *RTCPeerConnection) AddStream(mediaType MediaType) (buffers chan<- []byte, err error) {
+func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte, err error) {
 	return nil, nil
 }
 

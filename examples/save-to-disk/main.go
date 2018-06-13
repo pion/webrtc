@@ -36,7 +36,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.Ontrack = func(mediaType webrtc.MediaType, packets <-chan *rtp.Packet) {
+	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
 		go func() {
 			track := atomic.AddUint64(&trackCount, 1)
 			fmt.Printf("Track %d has started \n", track)

@@ -37,7 +37,7 @@ func startWebrtc(pipeline *gst.Pipeline) {
 
 	// Set a handler for when a new remote track starts, this handler starts a gstreamer pipeline
 	// with the first track and assumes it is VP8 video data.
-	peerConnection.Ontrack = func(mediaType webrtc.MediaType, packets <-chan *rtp.Packet) {
+	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
 		go func() {
 			track := atomic.AddUint64(&trackCount, 1)
 			fmt.Printf("Track %d has started \n", track)
