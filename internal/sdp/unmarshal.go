@@ -114,21 +114,21 @@ func (s *SessionDescription) Unmarshal(raw string) error {
 
 func (s *SessionDescription) unmarshalOptionalAttributes(scanner *bufio.Scanner) error {
 	orderedSessionAttributes := []*attributeStatus{
-		&attributeStatus{value: "v"},
-		&attributeStatus{value: "o"},
-		&attributeStatus{value: "s"},
-		&attributeStatus{value: "i"},
-		&attributeStatus{value: "u"},
-		&attributeStatus{value: "e"},
-		&attributeStatus{value: "p"},
-		&attributeStatus{value: "c"},
-		&attributeStatus{value: "b", allowMultiple: true},
-		&attributeStatus{value: "t", allowMultiple: true},
-		&attributeStatus{value: "r", allowMultiple: true},
-		&attributeStatus{value: "z", allowMultiple: true},
-		&attributeStatus{value: "k", allowMultiple: true},
-		&attributeStatus{value: "a", allowMultiple: true},
-		&attributeStatus{value: "m", allowMultiple: true},
+		{value: "v"},
+		{value: "o"},
+		{value: "s"},
+		{value: "i"},
+		{value: "u"},
+		{value: "e"},
+		{value: "p"},
+		{value: "c"},
+		{value: "b", allowMultiple: true},
+		{value: "t", allowMultiple: true},
+		{value: "r", allowMultiple: true},
+		{value: "z", allowMultiple: true},
+		{value: "k", allowMultiple: true},
+		{value: "a", allowMultiple: true},
+		{value: "m", allowMultiple: true},
 	}
 
 	for {
@@ -175,11 +175,11 @@ func (s *SessionDescription) unmarshalOptionalAttributes(scanner *bufio.Scanner)
 func (s *SessionDescription) unmarshalMedias(scanner *bufio.Scanner, firstMediaName string) (err error) {
 	currentMedia := &MediaDescription{MediaName: firstMediaName}
 	orderedMediaAttributes := []*attributeStatus{
-		&attributeStatus{value: "i"},
-		&attributeStatus{value: "c"},
-		&attributeStatus{value: "b", allowMultiple: true},
-		&attributeStatus{value: "k", allowMultiple: true},
-		&attributeStatus{value: "a", allowMultiple: true},
+		{value: "i"},
+		{value: "c"},
+		{value: "b", allowMultiple: true},
+		{value: "k", allowMultiple: true},
+		{value: "a", allowMultiple: true},
 	}
 	resetMediaAttributes := func() {
 		for _, v := range orderedMediaAttributes {
