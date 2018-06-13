@@ -4,6 +4,7 @@
 #include <glib.h>
 #include <gst/gst.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 GstElement *gst_create_pipeline();
 void gst_start_pipeline(GstElement *pipeline);

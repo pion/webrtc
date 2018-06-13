@@ -43,8 +43,7 @@ SSL_CTX *dtls_ctx_init(tlscfg *cfg) {
     goto error;
   }
 
-  if (!SSL_CTX_use_PrivateKey(ctx, cfg->pkey) ||
-      !SSL_CTX_check_private_key(ctx)) {
+  if (!SSL_CTX_use_PrivateKey(ctx, cfg->pkey) || !SSL_CTX_check_private_key(ctx)) {
     goto error;
   }
 
@@ -62,7 +61,7 @@ error:
 }
 
 dtls_sess *dtls_sess_new(SSL_CTX *sslcfg, int con_state) {
-  dtls_sess *sess = (dtls_sess*)calloc(1, sizeof(dtls_sess));
+  dtls_sess *sess = (dtls_sess *)calloc(1, sizeof(dtls_sess));
   BIO *rbio = NULL;
   BIO *wbio = NULL;
 
@@ -171,14 +170,11 @@ ptrdiff_t dtls_sess_put_packet(dtls_sess *sess, const char *src, const char *dst
   return ret;
 }
 
-static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) {
-  return sess->state;
-}
+static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) { return sess->state; }
 
 ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst) {
   if (sess->ssl == NULL ||
-      (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT &&
-       dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
+      (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT && dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
     return -2;
   }
   if (dtls_sess_get_state(sess) == DTLS_CONSTATE_ACTPASS) {
@@ -192,7 +188,7 @@ ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst) {
 }
 
 tlscfg *dtls_build_tlscfg() {
-  tlscfg *cfg = (tlscfg*)calloc(1, sizeof(tlscfg));
+  tlscfg *cfg = (tlscfg *)calloc(1, sizeof(tlscfg));
 
   static const int num_bits = 2048;
 
@@ -228,7 +224,7 @@ tlscfg *dtls_build_tlscfg() {
   }
 
   X509_set_version(cfg->cert, 2);
-  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000);  // TODO
+  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000); // TODO
   X509_gmtime_adj(X509_get_notBefore(cfg->cert), -1 * ONE_YEAR);
   X509_gmtime_adj(X509_get_notAfter(cfg->cert), ONE_YEAR);
   if (!X509_set_pubkey(cfg->cert, cfg->pkey)) {
@@ -241,8 +237,8 @@ tlscfg *dtls_build_tlscfg() {
   }
 
   const char *name = "pion-webrtc";
-  X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned*)name, -1, -1, 0);
-  X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned*)name, -1, -1, 0);
+  X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
+  X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
 
   if (!X509_set_issuer_name(cfg->cert, cert_name)) {
     goto error;
@@ -279,9 +275,7 @@ SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
   return dtls_ctx_init(cfg);
 }
 
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server) {
-  return dtls_sess_new(cfg, is_server);
-}
+dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server) { return dtls_sess_new(cfg, is_server); }
 
 bool openssl_global_init() {
   OpenSSL_add_ssl_algorithms();
@@ -311,12 +305,12 @@ void dtls_tlscfg_cleanup(tlscfg *cfg) {
   }
 }
 
-dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *src, const char *dst, void *buf, int len) {
+dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *src, const char *dst, void *buf,
+                                                  int len) {
   ptrdiff_t stat = dtls_sess_put_packet(sess, src, dst, buf, len);
   if (SSL_get_error(sess->ssl, stat) == SSL_ERROR_SSL) {
-    fprintf(stderr,
-	"DTLS failure occurred on dtls session %p due to reason '%s'\n",
-	sess, ERR_reason_error_string(ERR_get_error()));
+    fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
+            ERR_reason_error_string(ERR_get_error()));
     return NULL;
   }
 
@@ -342,12 +336,12 @@ dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *s
     memcpy(&ret->server_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
 
     switch (SSL_get_selected_srtp_profile(sess->ssl)->id) {
-      case SRTP_AES128_CM_SHA1_80:
-	memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
-	break;
-      case SRTP_AES128_CM_SHA1_32:
-	memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_32", strlen("SRTP_AES128_CM_SHA1_32"));
-	break;
+    case SRTP_AES128_CM_SHA1_80:
+      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
+      break;
+    case SRTP_AES128_CM_SHA1_32:
+      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_32", strlen("SRTP_AES128_CM_SHA1_32"));
+      break;
     }
 
     return ret;
@@ -363,7 +357,7 @@ char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
 
   unsigned int size;
   unsigned char fingerprint[EVP_MAX_MD_SIZE];
-  if (X509_digest(cfg->cert, EVP_sha256(), (unsigned char*)fingerprint, &size) == 0) {
+  if (X509_digest(cfg->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
     return NULL;
   }
 
