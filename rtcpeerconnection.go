@@ -8,6 +8,7 @@ import (
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
+	"github.com/pions/webrtc/internal/util"
 	"github.com/pions/webrtc/pkg/rtp"
 
 	"github.com/pkg/errors"
@@ -16,20 +17,14 @@ import (
 // TrackType determines the type of media we are sending receiving
 type TrackType int
 
+// List of supported TrackTypes
 const (
-	// G711 is a TrackType
 	G711 TrackType = iota
-	// G722 is a TrackType
 	G722 TrackType = iota
-	// ILBC is a TrackType
 	ILBC TrackType = iota
-	// ISAC is a TrackType
 	ISAC TrackType = iota
-	// H264 is a TrackType
 	H264 TrackType = iota
-	// VP8 is a TrackType
-	VP8 TrackType = iota
-	// Opus is a TrackType
+	VP8  TrackType = iota
 	Opus TrackType = iota
 )
 
@@ -59,8 +54,8 @@ func (r *RTCPeerConnection) CreateOffer() error {
 		return errors.Errorf("tlscfg is already defined, CreateOffer can only be called once")
 	}
 	r.tlscfg = dtls.NewTLSCfg()
-	r.iceUsername = randSeq(16)
-	r.icePassword = randSeq(32)
+	r.iceUsername = util.RandSeq(16)
+	r.icePassword = util.RandSeq(32)
 
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))

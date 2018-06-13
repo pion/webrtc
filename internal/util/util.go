@@ -1,11 +1,12 @@
-package webrtc
+package util
 
 import (
 	"math/rand"
 	"time"
 )
 
-func randSeq(n int) string {
+// RandSeq generates a random alpha numeric sequence of the requested length
+func RandSeq(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	b := make([]rune, n)
