@@ -92,6 +92,6 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan<- *rtp.Pa
 	}
 
 	bufferTransport := make(chan *rtp.Packet, 15)
-	r.Ontrack(VP8, bufferTransport) // TODO look up media via SSRC in remote SD
+	go r.Ontrack(VP8, bufferTransport) // TODO look up media via SSRC in remote SD
 	return bufferTransport
 }

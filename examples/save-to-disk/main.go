@@ -37,18 +37,16 @@ func main() {
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
 	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
-		go func() {
-			track := atomic.AddUint64(&trackCount, 1)
-			fmt.Printf("Track %d has started \n", track)
+		track := atomic.AddUint64(&trackCount, 1)
+		fmt.Printf("Track %d has started \n", track)
 
-			i, err := newIVFWriter(fmt.Sprintf("output-%d.ivf", track))
-			if err != nil {
-				panic(err)
-			}
-			for {
-				i.addPacket(<-packets)
-			}
-		}()
+		i, err := newIVFWriter(fmt.Sprintf("output-%d.ivf", track))
+		if err != nil {
+			panic(err)
+		}
+		for {
+			i.addPacket(<-packets)
+		}
 	}
 
 	// Set the remote SessionDescription
