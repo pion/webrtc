@@ -31,7 +31,11 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 		if haveHandshaked {
 			if handled, certPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
 				if certPair != nil {
-					srtpSession = srtp.New(certPair.ServerWriteKey, certPair.ClientWriteKey, certPair.Profile)
+					srtpSession, err = srtp.New(certPair.ServerWriteKey, certPair.ClientWriteKey, certPair.Profile)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
 				}
 				continue
 			}
@@ -56,15 +60,14 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 				}
 			}
 		} else if srtpSession != nil {
-			ok, unencrypted := srtpSession.DecryptPacket(buffer[:n])
-			if !ok {
-				fmt.Println("Failed to decrypt packet")
+			packet := &rtp.Packet{}
+			if err := packet.Unmarshal(buffer[:n]); err != nil {
+				fmt.Println("Failed to unmarshal RTP packet")
 				continue
 			}
 
-			packet := &rtp.Packet{}
-			if err := packet.Unmarshal(unencrypted); err != nil {
-				fmt.Println("Failed to unmarshal RTP packet")
+			if ok := srtpSession.DecryptPacket(packet, buffer[:n]); !ok {
+				fmt.Println("Failed to decrypt packet")
 				continue
 			}
 
