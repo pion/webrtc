@@ -19,7 +19,11 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 	dtlsStates := make(map[string]*dtls.State)
 	bufferTransports := make(map[uint32]chan<- *rtp.Packet)
 
-	var srtpSession *srtp.Session
+	// TODO multiple SRTP Contexts
+	// https://tools.ietf.org/html/rfc3711#section-3.2.3
+	// A cryptographic context SHALL be uniquely identified by the triplet
+	//  <SSRC, destination network address, destination transport port number>
+	var srtpContext *srtp.Context
 	for {
 		n, _, rawDstAddr, err := conn.ReadFrom(buffer)
 		if err != nil {
@@ -31,7 +35,7 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 		if haveHandshaked {
 			if handled, certPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
 				if certPair != nil {
-					srtpSession, err = srtp.New(certPair.ServerWriteKey, certPair.ClientWriteKey, certPair.Profile)
+					srtpContext, err = srtp.CreateContext([]byte(certPair.ServerWriteKey[0:16]), []byte(certPair.ServerWriteKey[16:]), certPair.Profile)
 					if err != nil {
 						fmt.Println(err)
 						continue
@@ -59,14 +63,14 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 					fmt.Println(err)
 				}
 			}
-		} else if srtpSession != nil {
+		} else if srtpContext != nil {
 			packet := &rtp.Packet{}
 			if err := packet.Unmarshal(buffer[:n]); err != nil {
 				fmt.Println("Failed to unmarshal RTP packet")
 				continue
 			}
 
-			if ok := srtpSession.DecryptPacket(packet, buffer[:n]); !ok {
+			if ok := srtpContext.DecryptPacket(packet); !ok {
 				fmt.Println("Failed to decrypt packet")
 				continue
 			}

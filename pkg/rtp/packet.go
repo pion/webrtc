@@ -14,6 +14,7 @@ type Packet struct {
 	Padding          bool
 	Extension        bool
 	Marker           bool
+	PayloadOffset    int
 	PayloadType      uint8
 	SequenceNumber   uint16
 	Timestamp        uint32
@@ -99,6 +100,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	}
 
 	p.Payload = rawPacket[currOffset:]
+	p.PayloadOffset = currOffset
 	p.Raw = rawPacket
 	return nil
 }
