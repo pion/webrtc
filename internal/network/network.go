@@ -64,8 +64,13 @@ func packetHandler(conn *ipv4.PacketConn, srcString string, remoteKey []byte, tl
 				}
 			}
 		} else if srtpContext != nil {
+			// Make copy of packet
+			// buffer[:n] can't be modified outside of network loop
+			rawPacket := make([]byte, n)
+			copy(rawPacket, buffer[:n])
+
 			packet := &rtp.Packet{}
-			if err := packet.Unmarshal(buffer[:n]); err != nil {
+			if err := packet.Unmarshal(rawPacket); err != nil {
 				fmt.Println("Failed to unmarshal RTP packet")
 				continue
 			}
