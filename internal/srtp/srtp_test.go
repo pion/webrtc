@@ -62,3 +62,39 @@ func TestValidPacketCounter(t *testing.T) {
 		t.Errorf("Session Key % 02x does not match expected % 02x", counter, expectedCounter)
 	}
 }
+
+func TestRolloverCount(t *testing.T) {
+	masterKey := []byte{0x0d, 0xcd, 0x21, 0x3e, 0x4c, 0xbc, 0xf2, 0x8f, 0x01, 0x7f, 0x69, 0x94, 0x40, 0x1e, 0x28, 0x89}
+	masterSalt := []byte{0x62, 0x77, 0x60, 0x38, 0xc0, 0x6d, 0xc9, 0x41, 0x9f, 0x6d, 0xd9, 0x43, 0x3e, 0x7c}
+
+	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	// Set initial seqnum
+	c.updateRolloverCount(65530)
+
+	// We rolled over to 0
+	c.updateRolloverCount(0)
+	if c.rolloverCounter != 1 {
+		t.Errorf("rolloverCounter was not updated after it crossed 0")
+	}
+
+	c.updateRolloverCount(65530)
+	if c.rolloverCounter != 0 {
+		t.Errorf("rolloverCounter was not updated when it rolled back, failed to handle out of order")
+	}
+
+	c.updateRolloverCount(5)
+	if c.rolloverCounter != 1 {
+		t.Errorf("rolloverCounter was not updated when it rolled over initial, to handle out of order")
+	}
+
+	c.updateRolloverCount(6)
+	c.updateRolloverCount(7)
+	c.updateRolloverCount(8)
+	if c.rolloverCounter != 1 {
+		t.Errorf("rolloverCounter was improperly updated for non-significant packets")
+	}
+}

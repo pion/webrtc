@@ -15,20 +15,26 @@ const (
 
 	keyLen  = 16
 	saltLen = 14
+
+	maxROCDisorder    = 100
+	maxSequenceNumber = 65535
 )
 
 // Context represents a SRTP cryptographic context
 // which is a tuple of <SSRC, destination network address, destination transport port number>
 type Context struct {
-	ssrc            uint32
-	rolloverCounter uint32
+	ssrc uint32
+
+	rolloverCounter      uint32
+	rolloverHasProcessed bool
+	lastSequenceNumber   uint16
 
 	masterKey  []byte
 	masterSalt []byte
-	block      cipher.Block
 
 	sessionKey  []byte
 	sessionSalt []byte
+	block       cipher.Block
 }
 
 /*
@@ -130,12 +136,36 @@ func (c *Context) generateCounter(sequenceNumber uint16) []byte {
 	return counter
 }
 
+// https://tools.ietf.org/html/rfc3550#appendix-A.1
+func (c *Context) updateRolloverCount(sequenceNumber uint16) {
+	if !c.rolloverHasProcessed {
+		c.rolloverHasProcessed = true
+	} else if sequenceNumber == 0 { // We exactly hit the rollover count
+
+		// Only update rolloverCounter if lastSequenceNumber is greater then maxROCDisorder
+		// otherwise we already incremented for disorder
+		if c.lastSequenceNumber > maxROCDisorder {
+			c.rolloverCounter++
+		}
+	} else if c.lastSequenceNumber < maxROCDisorder && sequenceNumber > (maxSequenceNumber-maxROCDisorder) {
+		// Our last sequence number incremented because we crossed 0, but then our current number was within maxROCDisorder of the max
+		// So we fell behind, drop to account for jitter
+		c.rolloverCounter--
+	} else if sequenceNumber < maxROCDisorder && c.lastSequenceNumber > (maxSequenceNumber-maxROCDisorder) {
+		// our current is within a maxROCDisorder of 0
+		// and our last sequence number was a high sequence number, increment to account for jitter
+		c.rolloverCounter++
+	}
+	c.lastSequenceNumber = sequenceNumber
+}
+
 // DecryptPacket decrypts a RTP packet with an encrypted payload
 func (c *Context) DecryptPacket(packet *rtp.Packet) bool {
 	if c.ssrc != 0 && c.ssrc != packet.SSRC {
 		return false
 	}
 	c.ssrc = packet.SSRC
+	c.updateRolloverCount(packet.SequenceNumber)
 
 	stream := cipher.NewCTR(c.block, c.generateCounter(packet.SequenceNumber))
 	stream.XORKeyStream(packet.Payload, packet.Payload)
