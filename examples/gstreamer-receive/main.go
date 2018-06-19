@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/gstreamer/gst"
+	"github.com/pions/webrtc/examples/gstreamer-receive/gst"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
