@@ -62,7 +62,7 @@ func (r *RTCPeerConnection) CreateOffer() error {
 	for id, c := range ice.HostInterfaces() {
 		dstPort, err := network.UDPListener(c, []byte(r.icePassword), r.tlscfg, r.generateChannel)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, dstPort))
 		basePriority = basePriority + 1

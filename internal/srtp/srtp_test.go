@@ -35,12 +35,19 @@ func TestValidSessionKeys(t *testing.T) {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
 
-	sessionKey := c.generateSessionKey()
+	sessionKey, err := c.generateSessionKey()
+	if err != nil {
+		t.Error(errors.Wrap(err, "generateSessionKey failed"))
+	}
+
 	if !bytes.Equal(sessionKey, expectedSessionKey) {
 		t.Errorf("Session Key % 02x does not match expected % 02x", sessionKey, expectedSessionKey)
 	}
 
-	sessionSalt := c.generateSessionSalt()
+	sessionSalt, err := c.generateSessionSalt()
+	if err != nil {
+		t.Error(errors.Wrap(err, "generateSessionSalt failed"))
+	}
 	if !bytes.Equal(sessionSalt, expectedSessionSalt) {
 		t.Errorf("Session Salt % 02x does not match expected % 02x", sessionSalt, expectedSessionSalt)
 	}
