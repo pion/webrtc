@@ -1,7 +1,11 @@
 package dtls
 
 /*
-#cgo pkg-config: openssl
+#cgo linux windows pkg-config: libssl libcrypto
+#cgo linux CFLAGS: -Wno-deprecated-declarations
+#cgo darwin CFLAGS: -I/usr/local/opt/openssl/include -I/usr/local/opt/openssl/include -Wno-deprecated-declarations
+#cgo darwin LDFLAGS: -L/usr/local/opt/openssl/lib -L/usr/local/opt/openssl/lib -lssl -lcrypto
+#cgo windows CFLAGS: -DWIN32_LEAN_AND_MEAN
 
 #include "dtls.h"
 
