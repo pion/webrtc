@@ -20,12 +20,12 @@ type TrackType int
 // List of supported TrackTypes
 const (
 	G711 TrackType = iota
-	G722 TrackType = iota
-	ILBC TrackType = iota
-	ISAC TrackType = iota
-	H264 TrackType = iota
-	VP8  TrackType = iota
-	Opus TrackType = iota
+	G722
+	ILBC
+	ISAC
+	H264
+	VP8
+	Opus
 )
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
