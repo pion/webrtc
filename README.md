@@ -6,41 +6,50 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d)](https://www.codacy.com/app/Sean-Der/webrtc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
-A (almost) pure Golang implementation of the WebRTC API.
+A Golang implementation of the WebRTC API.
 
-See [DESIGN.md](DESIGN.md) for the the features it offers, and future goals.
+See [DESIGN.md](DESIGN.md) for the features it offers, and future goals.
 
 ## Getting Started
 This project provides a Go implementation of the WebRTC API. There isn't a application that will fit all your needs, but we provide a
-few simple examples to show common use cases (Sending and Receiving video) that you are free to modify and extend to your needs
+few simple examples to show common use cases that you are free to modify and extend to your needs.
+
+### Prerequisites
+We still use OpenSSL for DTLS (we are actively working on replacing it) so make sure to install the OpenSSL headers for
+your platform before using pion-WebRTC.
+#### Ubuntu/Debian
+`sudo apt-get install libssl-dev`
+
+#### OSX
+`brew install openssl`
+
+#### Fedora
+`sudo yum install openssl-devel`
+
+#### Windows
+1. Install [mingw-w64](http://mingw-w64.sourceforge.net/)
+2. Install [pkg-config-lite](http://sourceforge.net/projects/pkgconfiglite)
+3. Build (or install precompiled) openssl for mingw32-w64
+4. Set __PKG\_CONFIG\_PATH__ to the directory containing openssl.pc
+   (i.e. c:\mingw64\mingw64\lib\pkgconfig)
 
 ### Example Programs
-#### gstreamer
-GStreamer shows how to use pion-WebRTC with GStreamer. Once connected it streams video to an autovideosink
-
-#### save-to-disk
-save-to-disk shows how to use pion-WebRTC to record and save video. Once connected it saves video to *.ivf files which can be played with ffmpeg
+Examples for common use cases, extend and modify to quickly get started.
+* [gstreamer-receive](examples/gstreamer-receive/README.md) Play video from your Webcam live using GStreamer
+* [save-to-disk](examples/save-to-disk/README.md) Save video from your Webcam to disk
 
 ### Writing your own application
-The example applications provide examples for common use cases. The API should match the Javascript WebRTC API, and the [GoDoc](https://godoc.org/github.com/pions/webrtc) is actively maintained
+The API should match the Javascript WebRTC API, and the [GoDoc](https://godoc.org/github.com/pions/webrtc) is actively maintained
 
 ## Roadmap
 pion-WebRTC is in active development, you can find the roadmap [here](https://github.com/pions/webrtc/issues/9).
 
-The master branch will always be usable, but will have features that aren't completed.
-
 ## Questions/Support
 Sign up for the [Golang Slack](https://invite.slack.golangbridge.org/) and join the #pion channel for discussions and support
 
-If you need commercial support/don't want to use public methods you can contact us at [team@pion.ly](team@pion.ly)
+You can also use [Pion mailing list](https://groups.google.com/forum/#!forum/pion/new)
 
-## Project Ideas
-I am looking to support other interesting WebRTC projects, so if you have something to build please reach out!
-pion-WebRTC would make a great foundation for.
-
-* Easy language bindings (Python)
-* Golang SFU
-* Server side processing (video effects or an MCU)
+If you need commercial support/don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -49,6 +58,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 * [John Bradley](https://github.com/kc5nra) - *Original Author*
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
+
+## Project Ideas
+I am looking to support other interesting WebRTC projects, so if you have something to build please reach out!
+pion-WebRTC would make a great foundation for.
+
+* Easy language bindings (Python)
+* Golang SFU
+* Server side processing (video effects or an MCU)
 
 ## License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
