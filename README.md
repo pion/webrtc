@@ -14,6 +14,15 @@ See [DESIGN.md](DESIGN.md) for the features it offers, and future goals.
 This project provides a Go implementation of the WebRTC API. There isn't a application that will fit all your needs, but we provide a
 few simple examples to show common use cases that you are free to modify and extend to your needs.
 
+### What can I build with pion-WebRTC?
+pion-WebRTC is here to help you get media/text from A<->B, here are some of the cool things you could build.
+
+* Send a video file to multiple browser in real time, perfectly synchronized movie watching.
+* Send a webcam on a small device to your browser, with no additional server required
+* Securely send video between two servers
+* Record your webcam and do special effects server side
+* Build a conferencing application that processes audio/video and make decisions off of it
+
 ### Prerequisites
 We still use OpenSSL for DTLS (we are actively working on replacing it) so make sure to install the OpenSSL headers for
 your platform before using pion-WebRTC.
