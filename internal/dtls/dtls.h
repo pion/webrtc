@@ -5,6 +5,8 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include <pthread.h>
+
 #include <stdbool.h>
 #include <string.h>
 
