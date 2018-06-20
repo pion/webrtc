@@ -37,6 +37,8 @@ type RTCPeerConnection struct {
 
 	iceUsername string
 	icePassword string
+
+	ports []*network.Port
 }
 
 // Public
@@ -60,12 +62,13 @@ func (r *RTCPeerConnection) CreateOffer() error {
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 	for id, c := range ice.HostInterfaces() {
-		dstPort, err := network.UDPListener(c, []byte(r.icePassword), r.tlscfg, r.generateChannel)
+		port, err := network.NewPort(c+":0", []byte(r.icePassword), r.tlscfg, r.generateChannel)
 		if err != nil {
 			return err
 		}
-		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, dstPort))
+		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, port.ListeningAddr.Port))
 		basePriority = basePriority + 1
+		r.ports = append(r.ports, port)
 	}
 
 	r.LocalDescription = sdp.VP8OnlyDescription(r.iceUsername, r.icePassword, r.tlscfg.Fingerprint(), candidates)
