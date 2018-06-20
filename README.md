@@ -6,6 +6,12 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d)](https://www.codacy.com/app/Sean-Der/webrtc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
+<div align="center">
+    <a href="#">
+        <img src="./.github/pion-gopher-webrtc.png" height="300px">
+    </a>
+</div>
+
 A Golang implementation of the WebRTC API.
 
 See [DESIGN.md](DESIGN.md) for the features it offers, and future goals.
@@ -67,6 +73,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 * [John Bradley](https://github.com/kc5nra) - *Original Author*
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
+* [Michael Melvin Santry](https://github.com/santrym) - *Mascot*
 
 ## Project Ideas
 I am looking to support other interesting WebRTC projects, so if you have something to build please reach out!
