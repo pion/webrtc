@@ -6,7 +6,8 @@ gstreamer-receive is a simple application that shows how to record your webcam u
 This example requires you have GStreamer installed, these are the supported platforms
 #### Debian/Ubuntu
 `sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good`
-
+#### Windows MinGW64/MSYS2
+`pacman -Ss mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gst-libav mingw-w64-x86_64-gst-plugins-good mingw-w64-x86_64-gst-plugins-bad mingw-w64-x86_64-gst-plugins-ugly`
 ### Download gstreamer-receive
 ```
 go get github.com/pions/webrtc/examples/gstreamer-receive
