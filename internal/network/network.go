@@ -9,6 +9,7 @@ import (
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
 
@@ -115,13 +116,7 @@ type BufferTransportGenerator func(uint32) chan<- *rtp.Packet
 func UDPListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (int, error) {
 	listener, err := net.ListenPacket("udp4", ip+":0")
 	if err != nil {
-		return 0, err
-	}
-
-	conn := ipv4.NewPacketConn(listener)
-	err = conn.SetControlMessage(ipv4.FlagDst, true)
-	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "Failed to listen packet")
 	}
 
 	addr, err := stun.NewTransportAddr(listener.LocalAddr())
