@@ -119,6 +119,8 @@ func UDPListener(ip string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTrans
 		return 0, errors.Wrap(err, "Failed to listen packet")
 	}
 
+	conn := ipv4.NewPacketConn(listener)
+
 	addr, err := stun.NewTransportAddr(listener.LocalAddr())
 
 	srcString := ip + ":" + strconv.Itoa(addr.Port)
