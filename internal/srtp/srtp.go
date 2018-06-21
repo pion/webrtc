@@ -44,7 +44,7 @@ type Context struct {
 */
 
 // CreateContext creates a new SRTP Context
-func CreateContext(masterKey, masterSalt []byte, profile string) (c *Context, err error) {
+func CreateContext(masterKey, masterSalt []byte, profile string, ssrc uint32) (c *Context, err error) {
 	if masterKeyLen := len(masterKey); masterKeyLen != keyLen {
 		return c, errors.Errorf("SRTP Master Key must be len %d, got %d", masterKey, keyLen)
 	} else if masterSaltLen := len(masterSalt); masterSaltLen != saltLen {
@@ -54,6 +54,7 @@ func CreateContext(masterKey, masterSalt []byte, profile string) (c *Context, er
 	c = &Context{
 		masterKey:  masterKey,
 		masterSalt: masterSalt,
+		ssrc:       ssrc,
 	}
 
 	if c.sessionKey, err = c.generateSessionKey(); err != nil {
@@ -168,10 +169,6 @@ func (c *Context) updateRolloverCount(sequenceNumber uint16) {
 
 // DecryptPacket decrypts a RTP packet with an encrypted payload
 func (c *Context) DecryptPacket(packet *rtp.Packet) bool {
-	if c.ssrc != 0 && c.ssrc != packet.SSRC {
-		return false
-	}
-	c.ssrc = packet.SSRC
 	c.updateRolloverCount(packet.SequenceNumber)
 
 	stream := cipher.NewCTR(c.block, c.generateCounter(packet.SequenceNumber))

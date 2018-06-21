@@ -1,6 +1,8 @@
 package network
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"strconv"
@@ -16,11 +18,17 @@ import (
 type Port struct {
 	ListeningAddr *stun.TransportAddr
 
-	conn                     *ipv4.PacketConn
-	srcString                string
-	remoteKey                []byte
-	tlscfg                   *dtls.TLSCfg
-	bufferTransportGenerator BufferTransportGenerator
+	dtlsStates       map[string]*dtls.State
+	bufferTransports map[uint32]chan<- *rtp.Packet
+
+	// https://tools.ietf.org/html/rfc3711#section-3.2.3
+	// A cryptographic context SHALL be uniquely identified by the triplet
+	//  <SSRC, destination network address, destination transport port number>
+	// contexts are keyed by IP:PORT:SSRC
+	srtpContextsIn map[string]*srtp.Context
+	// TODO srtpContextOut map[string]*srtp.Context
+
+	conn *ipv4.PacketConn
 }
 
 // NewPort creates a new Port
@@ -42,32 +50,32 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 	p := &Port{
 		ListeningAddr: addr,
 
-		conn:      conn,
-		srcString: srcString,
-		remoteKey: remoteKey,
-		tlscfg:    tlscfg,
-		bufferTransportGenerator: b,
+		conn:             conn,
+		dtlsStates:       make(map[string]*dtls.State),
+		bufferTransports: make(map[uint32]chan<- *rtp.Packet),
+
+		srtpContextsIn: make(map[string]*srtp.Context),
 	}
 
-	go p.packetHandler()
+	go p.packetHandler(srcString, remoteKey, tlscfg, b)
 	return p, nil
 }
 
+// Stop closes the listening port and cleans up any state
 func (p *Port) Stop() {
 }
 
-func (p *Port) packetHandler() {
+// Send sends a *rtp.Packet if we have a connected peer
+func (p *Port) Send() {
+	fmt.Println("Port has no selected peer yet")
+}
+
+func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) {
 	const MTU = 8192
 	buffer := make([]byte, MTU)
 
-	dtlsStates := make(map[string]*dtls.State)
-	bufferTransports := make(map[uint32]chan<- *rtp.Packet)
+	var certPair *dtls.CertPair
 
-	// TODO multiple SRTP Contexts
-	// https://tools.ietf.org/html/rfc3711#section-3.2.3
-	// A cryptographic context SHALL be uniquely identified by the triplet
-	//  <SSRC, destination network address, destination transport port number>
-	var srtpContext *srtp.Context
 	for {
 		n, _, rawDstAddr, err := p.conn.ReadFrom(buffer)
 		if err != nil {
@@ -75,15 +83,11 @@ func (p *Port) packetHandler() {
 			continue
 		}
 
-		d, haveHandshaked := dtlsStates[rawDstAddr.String()]
+		d, haveHandshaked := p.dtlsStates[rawDstAddr.String()]
 		if haveHandshaked {
-			if handled, certPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
-				if certPair != nil {
-					srtpContext, err = srtp.CreateContext([]byte(certPair.ServerWriteKey[0:16]), []byte(certPair.ServerWriteKey[16:]), certPair.Profile)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
+			if handled, tmpCertPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
+				if tmpCertPair != nil {
+					certPair = tmpCertPair
 				}
 				continue
 			}
@@ -100,14 +104,34 @@ func (p *Port) packetHandler() {
 						},
 					},
 					&stun.MessageIntegrity{
-						Key: p.remoteKey,
+						Key: remoteKey,
 					},
 					&stun.Fingerprint{},
 				); err != nil {
 					fmt.Println(err)
 				}
 			}
-		} else if srtpContext != nil {
+		} else {
+			if certPair == nil {
+				fmt.Println("SRTP packet, but unable to handle DTLS handshake has not completed")
+				continue
+			}
+
+			if len(buffer) > 4 {
+				var rtcpPacketType uint8
+
+				r := bytes.NewReader([]byte{buffer[1]})
+				if err := binary.Read(r, binary.BigEndian, &rtcpPacketType); err != nil {
+					fmt.Println("Failed to check packet for RTCP")
+					continue
+				}
+
+				if rtcpPacketType >= 192 && rtcpPacketType <= 223 {
+					fmt.Println("Discarding RTCP packet TODO")
+					continue
+				}
+			}
+
 			// Make copy of packet
 			// buffer[:n] can't be modified outside of network loop
 			rawPacket := make([]byte, n)
@@ -119,34 +143,44 @@ func (p *Port) packetHandler() {
 				continue
 			}
 
+			contextMapKey := rawDstAddr.String() + ":" + fmt.Sprint(packet.SSRC)
+			srtpContext, ok := p.srtpContextsIn[contextMapKey]
+			if !ok {
+				srtpContext, err = srtp.CreateContext([]byte(certPair.ServerWriteKey[0:16]), []byte(certPair.ServerWriteKey[16:]), certPair.Profile, packet.SSRC)
+				if err != nil {
+					fmt.Println("Failed to build SRTP context")
+					continue
+				}
+
+				p.srtpContextsIn[contextMapKey] = srtpContext
+			}
+
 			if ok := srtpContext.DecryptPacket(packet); !ok {
 				fmt.Println("Failed to decrypt packet")
 				continue
 			}
 
-			bufferTransport := bufferTransports[packet.SSRC]
+			bufferTransport := p.bufferTransports[packet.SSRC]
 			if bufferTransport == nil {
-				bufferTransport = p.bufferTransportGenerator(packet.SSRC)
+				bufferTransport = b(packet.SSRC)
 				if bufferTransport == nil {
 					fmt.Println("Failed to generate buffer transport, onTrack should be defined")
 					continue
 				}
-				bufferTransports[packet.SSRC] = bufferTransport
+				p.bufferTransports[packet.SSRC] = bufferTransport
 			}
 			bufferTransport <- packet
-		} else {
-			fmt.Println("SRTP packet, but no srtpSession")
 		}
 
 		if !haveHandshaked {
-			d, err := dtls.NewState(p.tlscfg, true, p.srcString, rawDstAddr.String())
+			d, err := dtls.NewState(tlscfg, true, srcString, rawDstAddr.String())
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
 
 			d.DoHandshake()
-			dtlsStates[rawDstAddr.String()] = d
+			p.dtlsStates[rawDstAddr.String()] = d
 		}
 	}
 

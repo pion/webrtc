@@ -8,17 +8,18 @@ import (
 )
 
 const cipherContextAlgo = "SRTP_AES128_CM_SHA1_80"
+const defaultSsrc = 0
 
 func TestKeyLen(t *testing.T) {
-	if _, err := CreateContext([]byte{}, make([]byte, saltLen), cipherContextAlgo); err == nil {
+	if _, err := CreateContext([]byte{}, make([]byte, saltLen), cipherContextAlgo, defaultSsrc); err == nil {
 		t.Errorf("CreateContext accepted a 0 length key")
 	}
 
-	if _, err := CreateContext(make([]byte, keyLen), []byte{}, cipherContextAlgo); err == nil {
+	if _, err := CreateContext(make([]byte, keyLen), []byte{}, cipherContextAlgo, defaultSsrc); err == nil {
 		t.Errorf("CreateContext accepted a 0 length salt")
 	}
 
-	if _, err := CreateContext(make([]byte, keyLen), make([]byte, saltLen), cipherContextAlgo); err != nil {
+	if _, err := CreateContext(make([]byte, keyLen), make([]byte, saltLen), cipherContextAlgo, defaultSsrc); err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed with a valid length key and salt"))
 	}
 }
@@ -30,7 +31,7 @@ func TestValidSessionKeys(t *testing.T) {
 	expectedSessionKey := []byte{0xC6, 0x1E, 0x7A, 0x93, 0x74, 0x4F, 0x39, 0xEE, 0x10, 0x73, 0x4A, 0xFE, 0x3F, 0xF7, 0xA0, 0x87}
 	expectedSessionSalt := []byte{0x30, 0xCB, 0xBC, 0x08, 0x86, 0x3D, 0x8C, 0x85, 0xD4, 0x9D, 0xB3, 0x4A, 0x9A, 0xE1}
 
-	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
 	if err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
@@ -57,7 +58,7 @@ func TestValidPacketCounter(t *testing.T) {
 	masterKey := []byte{0x0d, 0xcd, 0x21, 0x3e, 0x4c, 0xbc, 0xf2, 0x8f, 0x01, 0x7f, 0x69, 0x94, 0x40, 0x1e, 0x28, 0x89}
 	masterSalt := []byte{0x62, 0x77, 0x60, 0x38, 0xc0, 0x6d, 0xc9, 0x41, 0x9f, 0x6d, 0xd9, 0x43, 0x3e, 0x7c}
 
-	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
 	if err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
@@ -74,7 +75,7 @@ func TestRolloverCount(t *testing.T) {
 	masterKey := []byte{0x0d, 0xcd, 0x21, 0x3e, 0x4c, 0xbc, 0xf2, 0x8f, 0x01, 0x7f, 0x69, 0x94, 0x40, 0x1e, 0x28, 0x89}
 	masterSalt := []byte{0x62, 0x77, 0x60, 0x38, 0xc0, 0x6d, 0xc9, 0x41, 0x9f, 0x6d, 0xd9, 0x43, 0x3e, 0x7c}
 
-	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
 	if err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
