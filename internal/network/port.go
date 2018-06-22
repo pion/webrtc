@@ -14,11 +14,18 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
+type authedConnection struct {
+	pair *dtls.CertPair
+	peer net.Addr
+}
+
 // Port represents a UDP listener that handles incoming/outgoing traffic
 type Port struct {
 	ListeningAddr *stun.TransportAddr
 
-	dtlsStates       map[string]*dtls.State
+	dtlsStates        map[string]*dtls.State
+	authedConnections []*authedConnection
+
 	bufferTransports map[uint32]chan<- *rtp.Packet
 
 	// https://tools.ietf.org/html/rfc3711#section-3.2.3
@@ -66,8 +73,9 @@ func (p *Port) Stop() {
 }
 
 // Send sends a *rtp.Packet if we have a connected peer
-func (p *Port) Send() {
-	fmt.Println("Port has no selected peer yet")
+func (p *Port) Send(pkt []byte) {
+	// fmt.Println(len(p.authedConnections))
+	// p.conn.WriteTo(pkt, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 5000})
 }
 
 func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) {
@@ -75,7 +83,6 @@ func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TL
 	buffer := make([]byte, MTU)
 
 	var certPair *dtls.CertPair
-
 	for {
 		n, _, rawDstAddr, err := p.conn.ReadFrom(buffer)
 		if err != nil {
@@ -86,8 +93,13 @@ func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TL
 		d, haveHandshaked := p.dtlsStates[rawDstAddr.String()]
 		if haveHandshaked {
 			if handled, tmpCertPair := d.MaybeHandleDTLSPacket(buffer, n); handled {
+
 				if tmpCertPair != nil {
 					certPair = tmpCertPair
+					p.authedConnections = append(p.authedConnections, &authedConnection{
+						pair: certPair,
+						peer: rawDstAddr,
+					})
 				}
 				continue
 			}

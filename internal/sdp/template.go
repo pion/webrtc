@@ -11,16 +11,6 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 		MediaName:      "video 7 RTP/SAVPF 96 97",
 		ConnectionData: "IN IP4 127.0.0.1",
 		Attributes: []string{
-			"rtpmap:96 VP8/90000",
-			"rtpmap:97 rtx/90000",
-			"fmtp:97 apt=96",
-			"rtcp-fb:96 goog-remb",
-			"rtcp-fb:96 ccm fir",
-			"rtcp-fb:96 nack",
-			"rtcp-fb:96 nack pli",
-			"extmap:2 urn:ietf:params:rtp-hdrext:toffset",
-			"extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time",
-			"extmap:4 urn:3gpp:video-orientation",
 			"setup:active",
 			"mid:video",
 			"recvonly",
@@ -29,11 +19,26 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 			"ice-options:renomination",
 			"rtcp-mux",
 			"rtcp-rsize",
+			"rtpmap:96 VP8/90000",
+			"rtpmap:97 rtx/90000",
+			"fmtp:97 apt=96",
+			"rtcp-fb:96 goog-remb",
+			"rtcp-fb:96 ccm fir",
+			"rtcp-fb:96 nack",
+			"rtcp-fb:96 nack pli",
 		},
 	}
 
 	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, candidates...)
 	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, "end-of-candidates")
+
+	more := []string{
+		"ssrc:2581832418 cname:pionvideo",
+		"ssrc:2581832418 msid:pion pionv0",
+		"ssrc:2581832418 mslabel:pion",
+		"ssrc:2581832418 label:pionv0",
+	}
+	videoMediaDescription.Attributes = append(videoMediaDescription.Attributes, more...)
 
 	// Generate only UDP host candidates for ICE
 
@@ -46,7 +51,7 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 		Attributes: []string{
 			"ice-lite",
 			"fingerprint:sha-256 " + fingerprint,
-			"msid-semantic: WMS *",
+			"msid-semantic: WMS pion",
 			"group:BUNDLE video",
 		},
 		MediaDescriptions: []*MediaDescription{

@@ -38,6 +38,7 @@ type RTCPeerConnection struct {
 	iceUsername string
 	icePassword string
 
+	// TODO mutex
 	ports []*network.Port
 }
 
@@ -80,7 +81,16 @@ func (r *RTCPeerConnection) CreateOffer() error {
 // This function returns a channel to push buffers on, and an error if the channel can't be added
 // Closing the channel ends this stream
 func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte, err error) {
-	return nil, nil
+	trackInput := make(chan []byte, 15)
+	go func() {
+		for {
+			rtpPacket := <-trackInput
+			for _, p := range r.ports {
+				p.Send(rtpPacket)
+			}
+		}
+	}()
+	return trackInput, nil
 }
 
 // Private
