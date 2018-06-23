@@ -32,8 +32,8 @@ type Port struct {
 	// A cryptographic context SHALL be uniquely identified by the triplet
 	//  <SSRC, destination network address, destination transport port number>
 	// contexts are keyed by IP:PORT:SSRC
-	srtpContextsIn map[string]*srtp.Context
-	// TODO srtpContextOut map[string]*srtp.Context
+	srtpContextsIn  map[string]*srtp.Context
+	srtpContextsOut map[string]*srtp.Context
 
 	conn *ipv4.PacketConn
 }
@@ -61,7 +61,8 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 		dtlsStates:       make(map[string]*dtls.State),
 		bufferTransports: make(map[uint32]chan<- *rtp.Packet),
 
-		srtpContextsIn: make(map[string]*srtp.Context),
+		srtpContextsIn:  make(map[string]*srtp.Context),
+		srtpContextsOut: make(map[string]*srtp.Context),
 	}
 
 	go p.packetHandler(srcString, remoteKey, tlscfg, b)
@@ -74,7 +75,22 @@ func (p *Port) Stop() {
 
 // Send sends a *rtp.Packet if we have a connected peer
 func (p *Port) Send(pkt []byte) {
-	// fmt.Println(len(p.authedConnections))
+	var err error
+
+	for _, authed := range p.authedConnections {
+		contextMapKey := authed.peer.String() + ":2581832418"
+		srtpContext, ok := p.srtpContextsOut[contextMapKey]
+		if !ok {
+			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ServerWriteKey[0:16]), []byte(authed.pair.ServerWriteKey[16:]), authed.pair.Profile, 2581832418)
+			if err != nil {
+				fmt.Println("Failed to build SRTP context")
+				continue
+			}
+
+			p.srtpContextsOut[contextMapKey] = srtpContext
+		}
+		fmt.Println(srtpContext)
+	}
 	// p.conn.WriteTo(pkt, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 5000})
 }
 
