@@ -84,10 +84,13 @@ func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte
 	trackInput := make(chan []byte, 15)
 	go func() {
 		for {
-			rtpPacket := <-trackInput
-			for _, p := range r.ports {
-				p.Send(rtpPacket)
-			}
+			<-trackInput
+			fmt.Println("TODO Discarding packet, need media parsing")
+
+			// rtpPacket := <-trackInput
+			// for _, p := range r.ports {
+			// 	p.Send(rtpPacket)
+			// }
 		}
 	}()
 	return trackInput, nil

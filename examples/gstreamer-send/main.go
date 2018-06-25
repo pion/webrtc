@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"bufio"
 	"encoding/base64"
@@ -37,13 +36,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	go func() {
-		for {
-			in <- []byte{}
-			time.Sleep(1 * time.Second)
-		}
-	}()
 
 	// Set the remote SessionDescription
 	if err := peerConnection.SetRemoteDescription(string(sd)); err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
@@ -32,8 +33,8 @@ type Port struct {
 	// A cryptographic context SHALL be uniquely identified by the triplet
 	//  <SSRC, destination network address, destination transport port number>
 	// contexts are keyed by IP:PORT:SSRC
-	srtpContextsIn  map[string]*srtp.Context
-	srtpContextsOut map[string]*srtp.Context
+	srtpContextsLock *sync.Mutex
+	srtpContexts     map[string]*srtp.Context
 
 	conn *ipv4.PacketConn
 }
@@ -61,8 +62,8 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 		dtlsStates:       make(map[string]*dtls.State),
 		bufferTransports: make(map[uint32]chan<- *rtp.Packet),
 
-		srtpContextsIn:  make(map[string]*srtp.Context),
-		srtpContextsOut: make(map[string]*srtp.Context),
+		srtpContextsLock: &sync.Mutex{},
+		srtpContexts:     make(map[string]*srtp.Context),
 	}
 
 	go p.packetHandler(srcString, remoteKey, tlscfg, b)
@@ -74,12 +75,14 @@ func (p *Port) Stop() {
 }
 
 // Send sends a *rtp.Packet if we have a connected peer
-func (p *Port) Send(pkt []byte) {
+func (p *Port) Send(packet *rtp.Packet) {
 	var err error
 
 	for _, authed := range p.authedConnections {
-		contextMapKey := authed.peer.String() + ":2581832418"
-		srtpContext, ok := p.srtpContextsOut[contextMapKey]
+
+		contextMapKey := authed.peer.String() + ":" + fmt.Sprint(packet.SSRC)
+		p.srtpContextsLock.Lock()
+		srtpContext, ok := p.srtpContexts[contextMapKey]
 		if !ok {
 			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ClientWriteKey[0:16]), []byte(authed.pair.ClientWriteKey[16:]), authed.pair.Profile, 2581832418)
 			if err != nil {
@@ -87,11 +90,16 @@ func (p *Port) Send(pkt []byte) {
 				continue
 			}
 
-			p.srtpContextsOut[contextMapKey] = srtpContext
+			p.srtpContexts[contextMapKey] = srtpContext
 		}
+		p.srtpContextsLock.Unlock()
 
-		if ok, encrypted := srtpContext.EncryptPacket(pkt); ok {
-			if _, err := p.conn.WriteTo(encrypted, nil, authed.peer); err != nil {
+		if ok := srtpContext.EncryptPacket(packet); ok {
+			raw, err := packet.Marshal()
+			if err != nil {
+				fmt.Printf("Failed to marshal packet: %s \n", err.Error())
+			}
+			if _, err := p.conn.WriteTo(raw, nil, authed.peer); err != nil {
 				fmt.Printf("Failed to send packet: %s \n", err.Error())
 			}
 		} else {
@@ -179,8 +187,9 @@ func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TL
 				continue
 			}
 
-			contextMapKey := rawDstAddr.String() + ":" + fmt.Sprint(packet.SSRC)
-			srtpContext, ok := p.srtpContextsIn[contextMapKey]
+			contextMapKey := srcString + ":" + fmt.Sprint(packet.SSRC)
+			p.srtpContextsLock.Lock()
+			srtpContext, ok := p.srtpContexts[contextMapKey]
 			if !ok {
 				srtpContext, err = srtp.CreateContext([]byte(certPair.ServerWriteKey[0:16]), []byte(certPair.ServerWriteKey[16:]), certPair.Profile, packet.SSRC)
 				if err != nil {
@@ -188,8 +197,9 @@ func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TL
 					continue
 				}
 
-				p.srtpContextsIn[contextMapKey] = srtpContext
+				p.srtpContexts[contextMapKey] = srtpContext
 			}
+			p.srtpContextsLock.Unlock()
 
 			if ok := srtpContext.DecryptPacket(packet); !ok {
 				fmt.Println("Failed to decrypt packet")
