@@ -13,7 +13,7 @@ func VP8OnlyDescription(iceUsername, icePassword, fingerprint string, candidates
 		Attributes: []string{
 			"setup:active",
 			"mid:video",
-			"recvonly",
+			"sendrecv",
 			"ice-ufrag:" + iceUsername,
 			"ice-pwd:" + icePassword,
 			"ice-options:renomination",

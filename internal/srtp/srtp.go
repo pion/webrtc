@@ -183,3 +183,8 @@ func (c *Context) DecryptPacket(packet *rtp.Packet) bool {
 
 	return true
 }
+
+// DecryptPacket Encrypts a SRTP packet
+func (c *Context) EncryptPacket(unencrypted []byte) (ok bool, encrypted []byte) {
+	return ok, encrypted
+}

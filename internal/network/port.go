@@ -81,7 +81,7 @@ func (p *Port) Send(pkt []byte) {
 		contextMapKey := authed.peer.String() + ":2581832418"
 		srtpContext, ok := p.srtpContextsOut[contextMapKey]
 		if !ok {
-			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ServerWriteKey[0:16]), []byte(authed.pair.ServerWriteKey[16:]), authed.pair.Profile, 2581832418)
+			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ClientWriteKey[0:16]), []byte(authed.pair.ClientWriteKey[16:]), authed.pair.Profile, 2581832418)
 			if err != nil {
 				fmt.Println("Failed to build SRTP context")
 				continue
@@ -89,9 +89,17 @@ func (p *Port) Send(pkt []byte) {
 
 			p.srtpContextsOut[contextMapKey] = srtpContext
 		}
-		fmt.Println(srtpContext)
+
+		if ok, encrypted := srtpContext.EncryptPacket(pkt); ok {
+			if _, err := p.conn.WriteTo(encrypted, nil, authed.peer); err != nil {
+				fmt.Printf("Failed to send packet: %s \n", err.Error())
+			}
+		} else {
+			fmt.Println("Failed to encrypt packet")
+			continue
+		}
+
 	}
-	// p.conn.WriteTo(pkt, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 5000})
 }
 
 func (p *Port) packetHandler(srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) {
