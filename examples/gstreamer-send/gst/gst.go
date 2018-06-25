@@ -23,18 +23,18 @@ var globalPipeline *Pipeline
 
 // CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline(in chan<- []byte) *Pipeline {
-	globalPipeline = &Pipeline{in: in, Pipeline: C.gst_create_pipeline()}
+	globalPipeline = &Pipeline{in: in, Pipeline: C.gstreamer_send_create_pipeline()}
 	return globalPipeline
 }
 
 // Start starts the GStreamer Pipeline
 func (p *Pipeline) Start() {
-	C.gst_start_pipeline(p.Pipeline)
+	C.gstreamer_send_start_pipeline(p.Pipeline)
 }
 
 // Stop stops the GStreamer Pipeline
 func (p *Pipeline) Stop() {
-	C.gst_stop_pipeline(p.Pipeline)
+	C.gstreamer_send_stop_pipeline(p.Pipeline)
 }
 
 //export goHandlePipelineBuffer

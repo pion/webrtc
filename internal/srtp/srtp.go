@@ -184,7 +184,7 @@ func (c *Context) DecryptPacket(packet *rtp.Packet) bool {
 	return true
 }
 
-// DecryptPacket Encrypts a SRTP packet
+// EncryptPacket Encrypts a SRTP packet in place
 func (c *Context) EncryptPacket(packet *rtp.Packet) bool {
 	return false
 }

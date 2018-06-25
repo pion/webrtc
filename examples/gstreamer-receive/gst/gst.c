@@ -2,7 +2,7 @@
 
 #include <gst/app/gstappsrc.h>
 
-static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
+static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   GMainLoop *loop = (GMainLoop *)data;
 
   switch (GST_MESSAGE_TYPE(msg)) {
@@ -32,7 +32,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   return TRUE;
 }
 
-GstElement *gst_create_pipeline() {
+GstElement *gstreamer_recieve_create_pipeline() {
   gst_init(NULL, NULL);
   GError *error = NULL;
 #define PIPELINE                                                                                                       \
@@ -42,7 +42,7 @@ GstElement *gst_create_pipeline() {
   return gst_parse_launch(PIPELINE, &error);
 }
 
-void gst_start_pipeline(GstElement *pipeline) {
+void gstreamer_recieve_start_pipeline(GstElement *pipeline) {
   GMainLoop *loop;
   GstElement *source, *demuxer, *decoder, *conv, *sink;
   GstBus *bus;
@@ -51,7 +51,7 @@ void gst_start_pipeline(GstElement *pipeline) {
   loop = g_main_loop_new(NULL, FALSE);
 
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  bus_watch_id = gst_bus_add_watch(bus, bus_call, loop);
+  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, loop);
   gst_object_unref(bus);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -65,9 +65,9 @@ void gst_start_pipeline(GstElement *pipeline) {
   g_main_loop_unref(loop);
 }
 
-void gst_stop_pipeline(GstElement *pipeline) { gst_element_set_state(pipeline, GST_STATE_NULL); }
+void gstreamer_recieve_stop_pipeline(GstElement *pipeline) { gst_element_set_state(pipeline, GST_STATE_NULL); }
 
-void gst_push_buffer(GstElement *pipeline, void *buffer, int len) {
+void gstreamer_recieve_push_buffer(GstElement *pipeline, void *buffer, int len) {
   GstElement *src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
   if (src != NULL) {
     gpointer p = g_memdup(buffer, len);

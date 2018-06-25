@@ -4,7 +4,7 @@
 
 #define PIPELINE "videotestsrc ! vp8enc ! rtpvp8pay ssrc=2581832418 ! appsink name=appsink"
 
-static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
+static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   GMainLoop *loop = (GMainLoop *)data;
 
   switch (GST_MESSAGE_TYPE(msg)) {
@@ -33,7 +33,7 @@ static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   return TRUE;
 }
 
-GstFlowReturn gst_new_sample_handler(GstElement *object, gpointer user_data) {
+GstFlowReturn gstreamer_send_new_sample_handler(GstElement *object, gpointer user_data) {
   GstSample *sample = NULL;
   GstBuffer *buffer = NULL;
   gpointer copy = NULL;
@@ -52,22 +52,22 @@ GstFlowReturn gst_new_sample_handler(GstElement *object, gpointer user_data) {
   return GST_FLOW_OK;
 }
 
-GstElement *gst_create_pipeline() {
+GstElement *gstreamer_send_create_pipeline() {
   gst_init(NULL, NULL);
   GError *error = NULL;
   return gst_parse_launch(PIPELINE, &error);
 }
 
-void gst_start_pipeline(GstElement *pipeline) {
+void gstreamer_send_start_pipeline(GstElement *pipeline) {
   GMainLoop *loop = g_main_loop_new(NULL, FALSE);
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  guint bus_watch_id = gst_bus_add_watch(bus, bus_call, loop);
+  guint bus_watch_id = gst_bus_add_watch(bus, gstreamer_send_bus_call, loop);
   gst_object_unref(bus);
 
   GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
   g_object_set(appsink, "emit-signals", TRUE, NULL);
-  g_signal_connect(appsink, "new-sample", G_CALLBACK(gst_new_sample_handler), appsink);
+  g_signal_connect(appsink, "new-sample", G_CALLBACK(gstreamer_send_new_sample_handler), appsink);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
@@ -80,7 +80,7 @@ void gst_start_pipeline(GstElement *pipeline) {
   g_main_loop_unref(loop);
 }
 
-void gst_stop_pipeline(GstElement *pipeline) {
+void gstreamer_send_stop_pipeline(GstElement *pipeline) {
   gst_element_set_state(pipeline, GST_STATE_NULL);
 }
 

@@ -6,9 +6,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-GstElement *gst_create_pipeline();
-void gst_start_pipeline(GstElement *pipeline);
-void gst_stop_pipeline(GstElement *pipeline);
-void gst_push_buffer(GstElement *pipeline, void *buffer, int len);
+GstElement *gstreamer_recieve_create_pipeline();
+void gstreamer_recieve_start_pipeline(GstElement *pipeline);
+void gstreamer_recieve_stop_pipeline(GstElement *pipeline);
+void gstreamer_recieve_push_buffer(GstElement *pipeline, void *buffer, int len);
 
 #endif
