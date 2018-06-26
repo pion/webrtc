@@ -62,7 +62,7 @@ pion-WebRTC is in active development, you can find the roadmap [here](https://gi
 ## Questions/Support
 Sign up for the [Golang Slack](https://invite.slack.golangbridge.org/) and join the #pion channel for discussions and support
 
-You can also use [Pion mailing list](https://groups.google.com/forum/#!forum/pion/new)
+You can also use [Pion mailing list](https://groups.google.com/forum/#!forum/pion)
 
 If you need commercial support/don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
 
