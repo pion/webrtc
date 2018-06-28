@@ -2,7 +2,7 @@
 
 #include <gst/app/gstappsrc.h>
 
-#define PIPELINE "videotestsrc ! vp8enc ! rtpvp8pay ssrc=2581832418 ! appsink name=appsink"
+#define PIPELINE "videotestsrc ! vp8enc ! appsink name=appsink"
 
 static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   GMainLoop *loop = (GMainLoop *)data;

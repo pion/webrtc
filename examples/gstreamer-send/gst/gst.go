@@ -14,8 +14,8 @@ import (
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
-	Pipeline *C.GstElement
-	in       chan<- []byte
+	Pipeline   *C.GstElement
+	in         chan<- []byte
 }
 
 // This allows cgo to access pipeline, this will not work if you want multiple
@@ -23,7 +23,11 @@ var globalPipeline *Pipeline
 
 // CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline(in chan<- []byte) *Pipeline {
-	globalPipeline = &Pipeline{in: in, Pipeline: C.gstreamer_send_create_pipeline()}
+	globalPipeline = &Pipeline{
+		Pipeline:   C.gstreamer_send_create_pipeline(),
+		in:         in,
+	}
+
 	return globalPipeline
 }
 

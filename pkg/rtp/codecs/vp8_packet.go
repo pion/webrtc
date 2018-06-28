@@ -2,6 +2,63 @@ package codecs
 
 import "github.com/pions/webrtc/pkg/rtp"
 
+type VP8Payloader struct{}
+
+const (
+	vp8HeaderSize = 1
+)
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+/*
+ * https://tools.ietf.org/html/rfc7741#section-4.2
+ *
+ *       0 1 2 3 4 5 6 7
+ *      +-+-+-+-+-+-+-+-+
+ *      |X|R|N|S|R| PID | (REQUIRED)
+ *      +-+-+-+-+-+-+-+-+
+ * X:   |I|L|T|K| RSV   | (OPTIONAL)
+ *      +-+-+-+-+-+-+-+-+
+ * I:   |M| PictureID   | (OPTIONAL)
+ *      +-+-+-+-+-+-+-+-+
+ * L:   |   TL0PICIDX   | (OPTIONAL)
+ *      +-+-+-+-+-+-+-+-+
+ * T/K: |TID|Y| KEYIDX  | (OPTIONAL)
+ *      +-+-+-+-+-+-+-+-+
+ *  S: Start of VP8 partition.  SHOULD be set to 1 when the first payload
+ *     octet of the RTP packet is the beginning of a new VP8 partition,
+ *     and MUST NOT be 1 otherwise.  The S bit MUST be set to 1 for the
+ *     first packet of each encoded frame.
+ */
+func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
+	maxFragmentSize := mtu - vp8HeaderSize
+
+	payloadData := payload
+	payloadDataRemaining := len(payload)
+	payloadDataIndex := 0
+	var payloads [][]byte
+	for payloadDataRemaining > 0 {
+		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		out := make([]byte, vp8HeaderSize+currentFragmentSize)
+		if payloadDataRemaining == len(payload) {
+			out[0] = 0x10
+		}
+
+		copy(out[vp8HeaderSize:], payloadData[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		payloads = append(payloads, out)
+
+		payloadDataRemaining -= currentFragmentSize
+		payloadDataIndex += currentFragmentSize
+	}
+
+	return payloads
+}
+
 // VP8Packet represents the VP8 header that is stored in the payload of an RTP Packet
 type VP8Packet struct {
 	// Required Header

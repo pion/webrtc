@@ -12,6 +12,7 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 
+	"github.com/pions/webrtc/pkg/rtp/codecs"
 	"github.com/pkg/errors"
 )
 
@@ -106,14 +107,19 @@ func (r *RTCPeerConnection) CreateOffer() error {
 func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte, err error) {
 	trackInput := make(chan []byte, 15)
 	go func() {
+		packetizer := rtp.NewPacketizer(1500, 96, 123, &codecs.VP8Payloader{}, rtp.NewRandomSequencer())
 		for {
-			<-trackInput
-			fmt.Println("TODO Discarding packet, need media parsing")
-
-			// rtpPacket := <-trackInput
-			// for _, p := range r.ports {
-			// 	p.Send(rtpPacket)
-			// }
+			if mediaType == VP8 {
+				packets := packetizer.Packetize(<-trackInput)
+				for _, p := range packets {
+					for _, port := range r.ports {
+						port.Send(p)
+					}
+				}
+			} else {
+				<-trackInput
+				fmt.Println("TODO Discarding packet, need media parsing")
+			}
 		}
 	}()
 	return trackInput, nil

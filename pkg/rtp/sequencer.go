@@ -7,10 +7,14 @@ import (
 	"time"
 )
 
+// Sequencer generates sequential sequence numbers for building RTP packets
 type Sequencer interface {
 	NextSequenceNumber() uint16
+	RollOverCount() uint64
 }
 
+// NewRandomSequencer returns a new sequencer starting from a random sequence
+// number
 func NewRandomSequencer() Sequencer {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
@@ -20,6 +24,8 @@ func NewRandomSequencer() Sequencer {
 	}
 }
 
+// NewFixedSequencer returns a new sequencer starting from a specific
+// sequence number
 func NewFixedSequencer(s uint16) Sequencer {
 	return &sequencer{
 		sequenceNumber: s - 1, // -1 because the first sequence number prepends 1
@@ -32,6 +38,8 @@ type sequencer struct {
 	mutex          sync.Mutex
 }
 
+// NextSequenceNumber increment and returns a new sequence number for
+// building RTP packets
 func (s *sequencer) NextSequenceNumber() uint16 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -42,4 +50,13 @@ func (s *sequencer) NextSequenceNumber() uint16 {
 	}
 
 	return s.sequenceNumber
+}
+
+// RollOverCount returns the amount of times the 16bit sequence number
+// has wrapped
+func (s *sequencer) RollOverCount() uint64 {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.rollOverCount
 }
