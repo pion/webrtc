@@ -9,6 +9,7 @@ import (
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/gstreamer-send/gst"
+	"github.com/pions/webrtc/pkg/ice"
 )
 
 func main() {
@@ -45,6 +46,12 @@ func main() {
 	// Sets the LocalDescription, and starts our UDP listeners
 	if err := peerConnection.CreateOffer(); err != nil {
 		panic(err)
+	}
+
+	// Set the handler for ICE connection state
+	// This will notify you when the peer has connected/disconnected
+	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser

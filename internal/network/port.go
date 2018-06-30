@@ -8,6 +8,7 @@ import (
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/srtp"
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"golang.org/x/net/ipv4"
 )
@@ -20,6 +21,7 @@ type authedConnection struct {
 // Port represents a UDP listener that handles incoming/outgoing traffic
 type Port struct {
 	ListeningAddr *stun.TransportAddr
+	ICEState      ice.ConnectionState
 
 	dtlsStates map[string]*dtls.State
 
@@ -39,7 +41,7 @@ type Port struct {
 }
 
 // NewPort creates a new Port
-func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) (*Port, error) {
+func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, i ICENotifier) (*Port, error) {
 	listener, err := net.ListenPacket("udp4", address)
 	if err != nil {
 		return nil, err
@@ -65,10 +67,11 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 		srtpContexts:     make(map[string]*srtp.Context),
 	}
 
-	go p.networkLoop(srcString, remoteKey, tlscfg, b)
+	go p.networkLoop(remoteKey, tlscfg, b, i)
 	return p, nil
 }
 
 // Stop closes the listening port and cleans up any state
-func (p *Port) Stop() {
+func (p *Port) Close() error {
+	return p.conn.Close()
 }

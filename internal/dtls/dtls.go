@@ -125,11 +125,11 @@ type CertPair struct {
 }
 
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
-func (d *State) HandleDTLSPacket(packet []byte, size int) (certPair *CertPair) {
+func (d *State) HandleDTLSPacket(packet []byte) (certPair *CertPair) {
 	packetRaw := C.CBytes(packet)
 	defer C.free(unsafe.Pointer(packetRaw))
 
-	if ret := C.dtls_handle_incoming(d.dtlsSession, d.rawSrc, d.rawDst, packetRaw, C.int(size)); ret != nil {
+	if ret := C.dtls_handle_incoming(d.dtlsSession, d.rawSrc, d.rawDst, packetRaw, C.int(len(packet))); ret != nil {
 		certPair = &CertPair{
 			ClientWriteKey: []byte(C.GoStringN(&ret.client_write_key[0], ret.key_length)),
 			ServerWriteKey: []byte(C.GoStringN(&ret.server_write_key[0], ret.key_length)),

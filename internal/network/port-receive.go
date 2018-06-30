@@ -5,14 +5,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/srtp"
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-func (p *Port) handleSRTP(srcString string, b BufferTransportGenerator, certPair *dtls.CertPair, buffer []byte, bufferSize int) {
+type incomingPacket struct {
+	srcAddr *net.UDPAddr
+	buffer  []byte
+}
+
+func (p *Port) handleSRTP(b BufferTransportGenerator, certPair *dtls.CertPair, buffer []byte) {
 	if len(buffer) > 4 {
 		var rtcpPacketType uint8
 
@@ -28,18 +35,13 @@ func (p *Port) handleSRTP(srcString string, b BufferTransportGenerator, certPair
 		}
 	}
 
-	// Make copy of packet
-	// buffer[:n] can't be modified outside of network loop
-	rawPacket := make([]byte, bufferSize)
-	copy(rawPacket, buffer[:bufferSize])
-
 	packet := &rtp.Packet{}
-	if err := packet.Unmarshal(rawPacket); err != nil {
+	if err := packet.Unmarshal(buffer); err != nil {
 		fmt.Println("Failed to unmarshal RTP packet")
 		return
 	}
 
-	contextMapKey := srcString + ":" + fmt.Sprint(packet.SSRC)
+	contextMapKey := p.ListeningAddr.String() + ":" + fmt.Sprint(packet.SSRC)
 	p.srtpContextsLock.Lock()
 	srtpContext, ok := p.srtpContexts[contextMapKey]
 	if !ok {
@@ -63,7 +65,6 @@ func (p *Port) handleSRTP(srcString string, b BufferTransportGenerator, certPair
 	if bufferTransport == nil {
 		bufferTransport = b(packet.SSRC)
 		if bufferTransport == nil {
-			fmt.Println("Failed to generate buffer transport, onTrack should be defined")
 			return
 		}
 		p.bufferTransports[packet.SSRC] = bufferTransport
@@ -71,67 +72,99 @@ func (p *Port) handleSRTP(srcString string, b BufferTransportGenerator, certPair
 	bufferTransport <- packet
 }
 
-func (p *Port) networkLoop(srcString string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator) {
-	const MTU = 8192
-	buffer := make([]byte, MTU)
-
-	var certPair *dtls.CertPair
-	for {
-		n, _, rawDstAddr, err := p.conn.ReadFrom(buffer)
-		if err != nil {
-			fmt.Printf("Failed to read packet: %s \n", err.Error())
-			continue
-		}
-
-		d, haveHandshaked := p.dtlsStates[rawDstAddr.String()]
-		if haveHandshaked && buffer[0] >= 20 && buffer[0] <= 64 {
-			tmpCertPair := d.HandleDTLSPacket(buffer, n)
-			if tmpCertPair != nil {
-				certPair = tmpCertPair
-				p.authedConnections = append(p.authedConnections, &authedConnection{
-					pair: certPair,
-					peer: rawDstAddr,
-				})
-			}
-			continue
-		}
-
-		if packetType, err := stun.GetPacketType(buffer[:n]); err == nil && packetType == stun.PacketTypeSTUN {
-			if m, err := stun.NewMessage(buffer[:n]); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
-				dstAddr := &stun.TransportAddr{IP: rawDstAddr.(*net.UDPAddr).IP, Port: rawDstAddr.(*net.UDPAddr).Port}
-				if err := stun.BuildAndSend(p.conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
-					&stun.XorMappedAddress{
-						XorAddress: stun.XorAddress{
-							IP:   dstAddr.IP,
-							Port: dstAddr.Port,
-						},
-					},
-					&stun.MessageIntegrity{
-						Key: remoteKey,
-					},
-					&stun.Fingerprint{},
-				); err != nil {
-					fmt.Println(err)
-				}
-			}
+func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Timer, iceNotifier ICENotifier) {
+	if m, err := stun.NewMessage(in.buffer); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
+		dstAddr := &stun.TransportAddr{IP: in.srcAddr.IP, Port: in.srcAddr.Port}
+		if err := stun.BuildAndSend(p.conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+			&stun.XorMappedAddress{
+				XorAddress: stun.XorAddress{
+					IP:   dstAddr.IP,
+					Port: dstAddr.Port,
+				},
+			},
+			&stun.MessageIntegrity{
+				Key: remoteKey,
+			},
+			&stun.Fingerprint{},
+		); err != nil {
+			fmt.Println(err)
 		} else {
-			if certPair == nil {
-				fmt.Println("SRTP packet, but unable to handle DTLS handshake has not completed")
-				continue
-			}
-			p.handleSRTP(srcString, b, certPair, buffer, n)
-		}
-
-		if !haveHandshaked {
-			d, err := dtls.NewState(tlscfg, true, srcString, rawDstAddr.String())
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			d.DoHandshake()
-			p.dtlsStates[rawDstAddr.String()] = d
+			p.ICEState = ice.Completed
+			iceTimer.Reset(iceTimeout)
+			iceNotifier(p)
 		}
 	}
+}
 
+const iceTimeout = time.Second * 10
+const MTU = 8192
+
+func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, iceNotifier ICENotifier) {
+	incomingPackets := make(chan *incomingPacket, 15)
+	go func() {
+		buffer := make([]byte, MTU)
+		for {
+			n, _, srcAddr, err := p.conn.ReadFrom(buffer)
+			if err != nil {
+				close(incomingPackets)
+				break
+			}
+
+			bufferCopy := make([]byte, n)
+			copy(bufferCopy, buffer[:n])
+
+			select {
+			case incomingPackets <- &incomingPacket{buffer: bufferCopy, srcAddr: srcAddr.(*net.UDPAddr)}:
+			default:
+			}
+		}
+	}()
+
+	var certPair *dtls.CertPair
+	iceTimer := time.NewTimer(iceTimeout)
+	for {
+		select {
+		case <-iceTimer.C:
+			p.ICEState = ice.Failed
+			iceNotifier(p)
+		case in, inValid := <-incomingPackets:
+			if !inValid {
+				// incomingPackets channel has closed, this port is finished processing
+				return
+			}
+
+			dtlsState := p.dtlsStates[in.srcAddr.String()]
+			if dtlsState != nil && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
+				tmpCertPair := dtlsState.HandleDTLSPacket(in.buffer)
+				if tmpCertPair != nil {
+					certPair = tmpCertPair
+					p.authedConnections = append(p.authedConnections, &authedConnection{
+						pair: certPair,
+						peer: in.srcAddr,
+					})
+				}
+				continue
+			}
+
+			if packetType, err := stun.GetPacketType(in.buffer); err == nil && packetType == stun.PacketTypeSTUN {
+				p.handleICE(in, remoteKey, iceTimer, iceNotifier)
+			} else if certPair == nil {
+				fmt.Println("SRTP packet, but unable to handle DTLS handshake has not completed")
+			} else {
+				p.handleSRTP(b, certPair, in.buffer)
+			}
+
+			if dtlsState == nil {
+				d, err := dtls.NewState(tlscfg, true, p.ListeningAddr.String(), in.srcAddr.String())
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				d.DoHandshake()
+				p.dtlsStates[in.srcAddr.String()] = d
+
+			}
+		}
+	}
 }

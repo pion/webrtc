@@ -3,12 +3,13 @@ package webrtc
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 
 	"github.com/pions/webrtc/internal/dtls"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/internal/util"
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 
 	"github.com/pkg/errors"
@@ -30,16 +31,18 @@ const (
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
-	Ontrack          func(mediaType TrackType, buffers <-chan *rtp.Packet)
-	LocalDescription *sdp.SessionDescription
+	Ontrack                    func(mediaType TrackType, buffers <-chan *rtp.Packet)
+	LocalDescription           *sdp.SessionDescription
+	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
 
 	tlscfg *dtls.TLSCfg
 
 	iceUsername string
 	icePassword string
+	iceState    ice.ConnectionState
 
-	// TODO mutex
-	ports []*network.Port
+	portsLock sync.RWMutex
+	ports     []*network.Port
 }
 
 // Public
@@ -56,14 +59,18 @@ func (r *RTCPeerConnection) CreateOffer() error {
 	if r.tlscfg != nil {
 		return errors.Errorf("tlscfg is already defined, CreateOffer can only be called once")
 	}
+
 	r.tlscfg = dtls.NewTLSCfg()
 	r.iceUsername = util.RandSeq(16)
 	r.icePassword = util.RandSeq(32)
 
+	r.portsLock.Lock()
+	defer r.portsLock.Unlock()
+
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 	for id, c := range ice.HostInterfaces() {
-		port, err := network.NewPort(c+":0", []byte(r.icePassword), r.tlscfg, r.generateChannel)
+		port, err := network.NewPort(c+":0", []byte(r.icePassword), r.tlscfg, r.generateChannel, r.iceStateChange)
 		if err != nil {
 			return err
 		}
@@ -96,6 +103,21 @@ func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte
 	return trackInput, nil
 }
 
+// Close ends the RTCPeerConnection
+func (r *RTCPeerConnection) Close() error {
+	r.portsLock.Lock()
+	defer r.portsLock.Unlock()
+
+	// Walk all ports remove and close them
+	for _, p := range r.ports {
+		if err := p.Close(); err != nil {
+			return err
+		}
+	}
+	r.ports = nil
+	return nil
+}
+
 // Private
 func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan<- *rtp.Packet) {
 	if r.Ontrack == nil {
@@ -105,4 +127,34 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan<- *rtp.Pa
 	bufferTransport := make(chan *rtp.Packet, 15)
 	go r.Ontrack(VP8, bufferTransport) // TODO look up media via SSRC in remote SD
 	return bufferTransport
+}
+
+// Private
+func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
+	updateAndNotify := func(newState ice.ConnectionState) {
+		if r.OnICEConnectionStateChange != nil && r.iceState != newState {
+			r.OnICEConnectionStateChange(newState)
+		}
+		r.iceState = newState
+	}
+
+	if p.ICEState == ice.Failed {
+		if err := p.Close(); err != nil {
+			fmt.Println(errors.Wrap(err, "Failed to close Port when ICE went to failed"))
+		}
+
+		r.portsLock.Lock()
+		defer r.portsLock.Unlock()
+		for i := len(r.ports) - 1; i >= 0; i-- {
+			if r.ports[i] == p {
+				r.ports = append(r.ports[:i], r.ports[i+1:]...)
+			}
+		}
+
+		if len(r.ports) == 0 {
+			updateAndNotify(ice.Disconnected)
+		}
+	} else {
+		updateAndNotify(ice.Connected)
+	}
 }
