@@ -71,7 +71,7 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 	return p, nil
 }
 
-// Stop closes the listening port and cleans up any state
+// Close closes the listening port and cleans up any state
 func (p *Port) Close() error {
 	return p.conn.Close()
 }

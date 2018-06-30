@@ -97,12 +97,12 @@ func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Ti
 }
 
 const iceTimeout = time.Second * 10
-const MTU = 8192
+const receiveMTU = 8192
 
 func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, iceNotifier ICENotifier) {
 	incomingPackets := make(chan *incomingPacket, 15)
 	go func() {
-		buffer := make([]byte, MTU)
+		buffer := make([]byte, receiveMTU)
 		for {
 			n, _, srcAddr, err := p.conn.ReadFrom(buffer)
 			if err != nil {

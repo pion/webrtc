@@ -2,7 +2,7 @@ package ice
 
 import "net"
 
-// State is an enum showing the state of a ICE Connection
+// ConnectionState is an enum showing the state of a ICE Connection
 type ConnectionState int
 
 // List of supported States
