@@ -67,6 +67,7 @@ func BaseSessionDescription(iceUsername, icePassword, fingerprint string, candid
 	}
 }
 
+// GetCodecForPayloadType scans the SessionDescription for the given payloadType and returns the codec
 func GetCodecForPayloadType(payloadType uint8, sd *SessionDescription) (ok bool, codec string) {
 	for _, m := range sd.MediaDescriptions {
 		for _, a := range m.Attributes {
