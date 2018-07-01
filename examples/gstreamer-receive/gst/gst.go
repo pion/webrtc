@@ -9,7 +9,13 @@ package gst
 import "C"
 import (
 	"unsafe"
+
+	"github.com/pions/webrtc"
 )
+
+func init() {
+	go C.gstreamer_recieve_mainloop()
+}
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
@@ -17,8 +23,22 @@ type Pipeline struct {
 }
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline() *Pipeline {
-	return &Pipeline{Pipeline: C.gstreamer_recieve_create_pipeline()}
+func CreatePipeline(codec webrtc.TrackType) *Pipeline {
+	pipelineStr := "appsrc format=time is-live=true do-timestamp=true name=src ! application/x-rtp"
+	switch codec {
+	case webrtc.VP8:
+		pipelineStr += ", encoding-name=VP8-DRAFT-IETF-01 ! rtpvp8depay ! decodebin ! autovideosink"
+	case webrtc.Opus:
+		pipelineStr += ", payload=96, encoding-name=OPUS ! rtpopusdepay ! decodebin ! autoaudiosink"
+	case webrtc.VP9:
+		pipelineStr += " ! rtpvp9depay ! decodebin ! autovideosink"
+	default:
+		panic("Unhandled codec " + codec.String())
+	}
+
+	pipelineStrUnsafe := C.CString(pipelineStr)
+	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
+	return &Pipeline{Pipeline: C.gstreamer_recieve_create_pipeline(pipelineStrUnsafe)}
 }
 
 // Start starts the GStreamer Pipeline

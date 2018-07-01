@@ -5,25 +5,20 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"sync/atomic"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-var trackCount uint64
-
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Print("Browser base64 Session Description: ")
 	rawSd, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("\nGolang base64 Session Description: ")
 
+	fmt.Println("")
 	sd, err := base64.StdEncoding.DecodeString(rawSd)
 	if err != nil {
 		panic(err)
@@ -38,15 +33,15 @@ func main() {
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
 	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
-		track := atomic.AddUint64(&trackCount, 1)
-		fmt.Printf("Track %d has started \n", track)
-
-		i, err := newIVFWriter(fmt.Sprintf("output-%d.ivf", track))
-		if err != nil {
-			panic(err)
-		}
-		for {
-			i.addPacket(<-packets)
+		if mediaType == webrtc.VP8 {
+			fmt.Println("Got VP8 track, saving to disk as output.ivf")
+			i, err := newIVFWriter("output.ivf")
+			if err != nil {
+				panic(err)
+			}
+			for {
+				i.addPacket(<-packets)
+			}
 		}
 	}
 

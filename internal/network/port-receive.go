@@ -63,13 +63,18 @@ func (p *Port) handleSRTP(b BufferTransportGenerator, certPair *dtls.CertPair, b
 
 	bufferTransport := p.bufferTransports[packet.SSRC]
 	if bufferTransport == nil {
-		bufferTransport = b(packet.SSRC)
+		bufferTransport = b(packet.SSRC, packet.PayloadType)
 		if bufferTransport == nil {
 			return
 		}
 		p.bufferTransports[packet.SSRC] = bufferTransport
 	}
-	bufferTransport <- packet
+
+	select {
+	case bufferTransport <- packet:
+	default:
+	}
+
 }
 
 func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Timer, iceNotifier ICENotifier) {
@@ -121,7 +126,8 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 	}()
 
 	var certPair *dtls.CertPair
-	iceTimer := time.NewTimer(iceTimeout)
+	// Never timeout originally, only start timer after we get an ICE ping
+	iceTimer := time.NewTimer(time.Hour * 8760)
 	for {
 		select {
 		case <-iceTimer.C:

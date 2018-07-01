@@ -8,10 +8,10 @@ go get github.com/pions/webrtc/examples/save-to-disk
 ```
 
 ### Open save-to-disk example page
-[jsfiddle.net](https://jsfiddle.net/tr2uq31e/1/) you should see your Webcam, two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/usd3xmtz/2/) you should see your Webcam, two text-areas and a 'Start Session' button
 
-### Run save-to-disk, input browser's SessionDescription
-In the jsfiddle the top textarea is your browsers, copy that and paste into `save-to-disk` and press enter
+### Run save-to-disk, with your browsers SessionDescription as stdin
+In the jsfiddle the top textarea is your browsers, copy that and run `echo $BROWSER_SDP | gstreamer-send`
 
 ### Input save-to-disk's SessionDescription into your browser
 Copy the text that `save-to-disk` just emitted and copy into second text area

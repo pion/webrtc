@@ -20,14 +20,23 @@ type TrackType int
 
 // List of supported TrackTypes
 const (
-	G711 TrackType = iota
-	G722
-	ILBC
-	ISAC
-	H264
-	VP8
+	VP8 TrackType = iota + 1
+	VP9
 	Opus
 )
+
+func (t TrackType) String() string {
+	switch t {
+	case VP8:
+		return "VP8"
+	case VP9:
+		return "VP9"
+	case Opus:
+		return "Opus"
+	default:
+		return "Unknown"
+	}
+}
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
@@ -43,13 +52,20 @@ type RTCPeerConnection struct {
 
 	portsLock sync.RWMutex
 	ports     []*network.Port
+
+	remoteDescription *sdp.SessionDescription
 }
 
 // Public
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
-func (r *RTCPeerConnection) SetRemoteDescription(string) error {
-	return nil
+func (r *RTCPeerConnection) SetRemoteDescription(rawSessionDescription string) error {
+	if r.remoteDescription != nil {
+		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
+	}
+
+	r.remoteDescription = &sdp.SessionDescription{}
+	return r.remoteDescription.Unmarshal(rawSessionDescription)
 }
 
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
@@ -79,7 +95,7 @@ func (r *RTCPeerConnection) CreateOffer() error {
 		r.ports = append(r.ports, port)
 	}
 
-	r.LocalDescription = sdp.VP8OnlyDescription(r.iceUsername, r.icePassword, r.tlscfg.Fingerprint(), candidates)
+	r.LocalDescription = sdp.BaseSessionDescription(r.iceUsername, r.icePassword, r.tlscfg.Fingerprint(), candidates)
 
 	return nil
 }
@@ -119,13 +135,32 @@ func (r *RTCPeerConnection) Close() error {
 }
 
 // Private
-func (r *RTCPeerConnection) generateChannel(ssrc uint32) (buffers chan<- *rtp.Packet) {
+func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
 	if r.Ontrack == nil {
 		return nil
 	}
 
+	var codec TrackType
+	ok, codecStr := sdp.GetCodecForPayloadType(payloadType, r.remoteDescription)
+	if !ok {
+		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+		return nil
+	}
+
+	switch codecStr {
+	case "VP8":
+		codec = VP8
+	case "VP9":
+		codec = VP9
+	case "opus":
+		codec = Opus
+	default:
+		fmt.Printf("Codec %s in not supported by pion-WebRTC \n", codecStr)
+		return nil
+	}
+
 	bufferTransport := make(chan *rtp.Packet, 15)
-	go r.Ontrack(VP8, bufferTransport) // TODO look up media via SSRC in remote SD
+	go r.Ontrack(codec, bufferTransport)
 	return bufferTransport
 }
 

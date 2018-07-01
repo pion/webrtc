@@ -2,14 +2,19 @@
 
 #include <gst/app/gstappsrc.h>
 
-static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
-  GMainLoop *loop = (GMainLoop *)data;
+GMainLoop *main_loop = NULL;
+void gstreamer_recieve_mainloop(void) {
+  main_loop = g_main_loop_new(NULL, FALSE);
 
+  g_main_loop_run(main_loop);
+}
+
+static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   switch (GST_MESSAGE_TYPE(msg)) {
 
   case GST_MESSAGE_EOS:
     g_print("End of stream\n");
-    g_main_loop_quit(loop);
+    exit(1);
     break;
 
   case GST_MESSAGE_ERROR: {
@@ -21,8 +26,7 @@ static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointe
 
     g_printerr("Error: %s\n", error->message);
     g_error_free(error);
-
-    g_main_loop_quit(loop);
+    exit(1);
     break;
   }
   default:
@@ -32,37 +36,22 @@ static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointe
   return TRUE;
 }
 
-GstElement *gstreamer_recieve_create_pipeline() {
+GstElement *gstreamer_recieve_create_pipeline(char *pipeline) {
   gst_init(NULL, NULL);
   GError *error = NULL;
-#define PIPELINE                                                                                                       \
-  "appsrc format=time is-live=true do-timestamp=true name=src ! application/x-rtp, "                                   \
-  "encoding-name=(string)VP8-DRAFT-IETF-01 "                                                                           \
-  "! queue ! rtpvp8depay ! vp8dec ! videoconvert ! autovideosink"
-  return gst_parse_launch(PIPELINE, &error);
+  return gst_parse_launch(pipeline, &error);
 }
 
 void gstreamer_recieve_start_pipeline(GstElement *pipeline) {
-  GMainLoop *loop;
   GstElement *source, *demuxer, *decoder, *conv, *sink;
   GstBus *bus;
   guint bus_watch_id;
 
-  loop = g_main_loop_new(NULL, FALSE);
-
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, loop);
+  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, main_loop);
   gst_object_unref(bus);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
-
-  g_main_loop_run(loop);
-
-  gst_element_set_state(pipeline, GST_STATE_NULL);
-
-  gst_object_unref(GST_OBJECT(pipeline));
-  g_source_remove(bus_watch_id);
-  g_main_loop_unref(loop);
 }
 
 void gstreamer_recieve_stop_pipeline(GstElement *pipeline) { gst_element_set_state(pipeline, GST_STATE_NULL); }

@@ -16,8 +16,8 @@ go get github.com/pions/webrtc/examples/gstreamer-send
 ### Open gstreamer-send example page
 [jsfiddle.net](https://jsfiddle.net/t8orse13/12/) you should see two text-areas and a 'Start Session' button
 
-### Run gstreamer-send, input browser's SessionDescription
-In the jsfiddle the top textarea is your browsers, copy that and paste into `gstreamer-send` and press enter
+### Run gstreamer-send with your browsers SessionDescription as stdin
+In the jsfiddle the top textarea is your browser, copy that and run `echo $BROWSER_SDP | gstreamer-send`
 
 ### Input gstreamer-send's SessionDescription into your browser
 Copy the text that `gstreamer-send` just emitted and copy into second text area

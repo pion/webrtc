@@ -6,7 +6,6 @@ import (
 
 	"bufio"
 	"encoding/base64"
-	"sync/atomic"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/gstreamer-receive/gst"
@@ -14,18 +13,14 @@ import (
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-var trackCount uint64
-
-func startWebrtc(pipeline *gst.Pipeline) {
+func main() {
 	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Print("Browser base64 Session Description: ")
 	rawSd, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("\nGolang base64 Session Description: ")
 
+	fmt.Println("")
 	sd, err := base64.StdEncoding.DecodeString(rawSd)
 	if err != nil {
 		panic(err)
@@ -36,16 +31,15 @@ func startWebrtc(pipeline *gst.Pipeline) {
 	// Create a new RTCPeerConnection
 	peerConnection := &webrtc.RTCPeerConnection{}
 
-	// Set a handler for when a new remote track starts, this handler starts a gstreamer pipeline
-	// with the first track and assumes it is VP8 video data.
+	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
+	// for the given codec
 	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
-		track := atomic.AddUint64(&trackCount, 1)
-		fmt.Printf("Track %d has started \n", track)
-		if track == 1 && mediaType == webrtc.VP8 {
-			for {
-				p := <-packets
-				pipeline.Push(p.Raw)
-			}
+		fmt.Printf("Track has started, of type %s \n", mediaType.String())
+		pipeline := gst.CreatePipeline(mediaType)
+		pipeline.Start()
+		for {
+			p := <-packets
+			pipeline.Push(p.Raw)
 		}
 	}
 
@@ -69,10 +63,4 @@ func startWebrtc(pipeline *gst.Pipeline) {
 	localDescriptionStr := peerConnection.LocalDescription.Marshal()
 	fmt.Println(base64.StdEncoding.EncodeToString([]byte(localDescriptionStr)))
 	select {}
-}
-
-func main() {
-	p := gst.CreatePipeline()
-	go startWebrtc(p)
-	p.Start()
 }
