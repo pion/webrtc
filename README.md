@@ -36,7 +36,13 @@ your platform before using pion-WebRTC.
 `sudo apt-get install libssl-dev`
 
 #### OSX
-`brew install openssl`
+
+```
+brew install openssl
+export CPATH=`brew --prefix`/opt/openssl/include
+export LIBRARY_PATH=`brew --prefix`/opt/openssl/lib
+go get -u github.com/pions/webrtc
+```
 
 #### Fedora
 `sudo yum install openssl-devel`
