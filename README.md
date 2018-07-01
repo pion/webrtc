@@ -50,7 +50,7 @@ your platform before using pion-WebRTC.
 
 ### Example Programs
 Examples for common use cases, extend and modify to quickly get started.
-* [gstreamer-receive](examples/gstreamer-receive/README.md) Play video from your Webcam live using GStreamer
+* [gstreamer-receive](examples/gstreamer-receive/README.md) Play video and audio from your Webcam live using GStreamer
 * [save-to-disk](examples/save-to-disk/README.md) Save video from your Webcam to disk
 
 ### Writing your own application
