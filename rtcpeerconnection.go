@@ -53,12 +53,52 @@ func (t TrackType) String() string {
 	}
 }
 
+// RTCCredentialType specifies the type of credentials provided
+type RTCCredentialType string
+
+var (
+	// RTCCredentialTypePassword describes username+pasword based credentials
+	RTCCredentialTypePassword RTCCredentialType = "password"
+	// RTCCredentialTypeToken describes token based credentials
+	RTCCredentialTypeToken RTCCredentialType = "token"
+)
+
+// RTCICEServer describes a single ICE server, as well as required credentials
+type RTCICEServer struct {
+	CredentialType RTCCredentialType
+	URLs           []string
+	Username       string
+	Credential     string
+}
+
+func (c RTCICEServer) isSTUN() bool {
+	for _, url := range c.URLs {
+		if strings.HasPrefix(url, "stun:") {
+			return true
+		}
+	}
+	return false
+}
+
+// RTCConfiguration contains RTCPeerConfiguration options
+type RTCConfiguration struct {
+	ICEServers []RTCICEServer // An array of RTCIceServer objects, each describing one server which may be used by the ICE agent; these are typically STUN and/or TURN servers. If this isn't specified, the ICE agent may choose to use its own ICE servers; otherwise, the connection attempt will be made with no STUN or TURN server available, which limits the connection to local peers.
+}
+
+// New creates a new RTCPeerConfiguration with the provided configuration
+func New(config *RTCConfiguration) (*RTCPeerConnection, error) {
+	return &RTCPeerConnection{
+		config: config,
+	}, nil
+}
+
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
 	Ontrack                    func(mediaType TrackType, buffers <-chan *rtp.Packet)
 	LocalDescription           *sdp.SessionDescription
 	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
 
+	config *RTCConfiguration
 	tlscfg *dtls.TLSCfg
 
 	iceUsername string
