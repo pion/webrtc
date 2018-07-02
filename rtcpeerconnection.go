@@ -3,6 +3,7 @@ package webrtc
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -101,9 +102,9 @@ type RTCPeerConnection struct {
 	config *RTCConfiguration
 	tlscfg *dtls.TLSCfg
 
-	iceUsername string
-	icePassword string
-	iceState    ice.ConnectionState
+	iceUfrag string
+	icePwd   string
+	iceState ice.ConnectionState
 
 	portsLock sync.RWMutex
 	ports     []*network.Port
@@ -137,8 +138,8 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 	}
 
 	r.tlscfg = dtls.NewTLSCfg()
-	r.iceUsername = util.RandSeq(16)
-	r.icePassword = util.RandSeq(32)
+	r.iceUfrag = util.RandSeq(16)
+	r.icePwd = util.RandSeq(32)
 
 	r.portsLock.Lock()
 	defer r.portsLock.Unlock()
@@ -146,7 +147,7 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 	for id, c := range ice.HostInterfaces() {
-		port, err := network.NewPort(c+":0", []byte(r.icePassword), r.tlscfg, r.generateChannel, r.iceStateChange)
+		port, err := network.NewPort(c+":0", []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
 		if err != nil {
 			return err
 		}
@@ -156,8 +157,8 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 	}
 
 	r.LocalDescription = sdp.BaseSessionDescription(&sdp.SessionBuilder{
-		IceUsername: r.iceUsername,
-		IcePassword: r.icePassword,
+		IceUsername: r.iceUfrag,
+		IcePassword: r.icePwd,
 		Fingerprint: r.tlscfg.Fingerprint(),
 		Candidates:  candidates,
 		Tracks:      r.localTracks,
