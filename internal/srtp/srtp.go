@@ -3,6 +3,8 @@ package srtp
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/sha1"
 	"encoding/binary"
 
 	"github.com/pions/webrtc/pkg/rtp"
@@ -14,9 +16,8 @@ const (
 	labelSalt              = 0x02
 	labelAuthenticationTag = 0x01
 
-	keyLen               = 16
-	saltLen              = 14
-	authenticationTagLen = 20
+	keyLen  = 16
+	saltLen = 14
 
 	maxROCDisorder    = 100
 	maxSequenceNumber = 65535
@@ -217,7 +218,49 @@ func (c *Context) DecryptPacket(packet *rtp.Packet) bool {
 	return true
 }
 
+func (c *Context) addAuthTag(packet *rtp.Packet) error {
+	// https://tools.ietf.org/html/rfc3711#section-4.2
+	// In the case of SRTP, M SHALL consist of the Authenticated
+	// Portion of the packet (as specified in Figure 1) concatenated with
+	// the ROC, M = Authenticated Portion || ROC;
+	//
+	// The pre-defined authentication transform for SRTP is HMAC-SHA1
+	// [RFC2104].  With HMAC-SHA1, the SRTP_PREFIX_LENGTH (Figure 3) SHALL
+	// be 0.  For SRTP (respectively SRTCP), the HMAC SHALL be applied to
+	// the session authentication key and M as specified above, i.e.,
+	// HMAC(k_a, M).  The HMAC output SHALL then be truncated to the n_tag
+	// left-most bits.
+	// - Authenticated portion of the packet is everything BEFORE MKI
+	// - k_a is the session message authentication key
+	// - n_tag is the bit-length of the output authentication tag
+
+	mac := hmac.New(sha1.New, c.sessionAuthTag)
+	fullPkt, err := packet.Marshal()
+	if err != nil {
+		panic(err)
+	}
+
+	fullPkt = append(fullPkt, make([]byte, 4)...)
+	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], c.rolloverCounter)
+
+	if _, err := mac.Write(fullPkt); err != nil {
+		panic(err)
+	}
+
+	packet.Payload = append(packet.Payload, mac.Sum(nil)[0:10]...)
+	return nil
+}
+
 // EncryptPacket Encrypts a SRTP packet in place
 func (c *Context) EncryptPacket(packet *rtp.Packet) bool {
-	return false
+	c.updateRolloverCount(packet.SequenceNumber)
+
+	stream := cipher.NewCTR(c.block, c.generateCounter(packet.SequenceNumber))
+	stream.XORKeyStream(packet.Payload, packet.Payload)
+
+	if err := c.addAuthTag(packet); err != nil {
+		return false
+	}
+
+	return true
 }
