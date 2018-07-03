@@ -31,7 +31,7 @@ func main() {
 	peerConnection := &webrtc.RTCPeerConnection{}
 
 	// Create a video track, and start pushing buffers
-	in, err := peerConnection.AddTrack(webrtc.VP8)
+	in, err := peerConnection.AddTrack(webrtc.Opus)
 	if err != nil {
 		panic(err)
 	}
@@ -56,6 +56,6 @@ func main() {
 	localDescriptionStr := peerConnection.LocalDescription.Marshal()
 	fmt.Println(base64.StdEncoding.EncodeToString([]byte(localDescriptionStr)))
 
-	gst.CreatePipeline(in).Start()
+	gst.CreatePipeline(webrtc.Opus, in).Start()
 	select {}
 }

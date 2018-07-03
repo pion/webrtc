@@ -21,6 +21,11 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+type RTCSample struct {
+	Data []byte
+	Samples uint32
+}
+
 // TrackType determines the type of media we are sending receiving
 type TrackType int
 
@@ -117,23 +122,33 @@ func (r *RTCPeerConnection) CreateOffer() error {
 // AddTrack adds a new track to the RTCPeerConnection
 // This function returns a channel to push buffers on, and an error if the channel can't be added
 // Closing the channel ends this stream
-func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte, err error) {
-	if mediaType != VP8 {
+func (r *RTCPeerConnection) AddTrack(mediaType TrackType, clockRate uint32) (samples chan<- RTCSample, err error) {
+	if mediaType != VP8 && mediaType != Opus {
 		panic("TODO Discarding packet, need media parsing")
 	}
 
-	trackInput := make(chan []byte, 15)
+	trackInput := make(chan RTCSample, 15)
 	go func() {
 		ssrc := rand.Uint32()
 		sdpTrack := &sdp.SessionBuilderTrack{SSRC: ssrc}
-		if mediaType == Opus {
+		var payloader rtp.Payloader
+		var payloadType uint8
+		switch mediaType {
+		case Opus:
 			sdpTrack.IsAudio = true
+			payloader = &codecs.OpusPayloader{}
+			payloadType = 111
+
+		case VP8:
+			payloader = &codecs.VP8Payloader{}
+			payloadType = 96
 		}
 
 		r.localTracks = append(r.localTracks, sdpTrack)
-		packetizer := rtp.NewPacketizer(1500, 96, ssrc, &codecs.VP8Payloader{}, rtp.NewRandomSequencer())
+		packetizer := rtp.NewPacketizer(1500, payloadType, ssrc, payloader, rtp.NewRandomSequencer(), clockRate)
 		for {
-			packets := packetizer.Packetize(<-trackInput)
+			in := <-trackInput
+			packets := packetizer.Packetize(in.Data, in.Samples)
 			for _, p := range packets {
 				for _, port := range r.ports {
 					port.Send(p)

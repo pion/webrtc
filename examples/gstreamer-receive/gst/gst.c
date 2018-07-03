@@ -43,7 +43,6 @@ GstElement *gstreamer_recieve_create_pipeline(char *pipeline) {
 }
 
 void gstreamer_recieve_start_pipeline(GstElement *pipeline) {
-  GstElement *source, *demuxer, *decoder, *conv, *sink;
   GstBus *bus;
   guint bus_watch_id;
 

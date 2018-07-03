@@ -2,8 +2,6 @@
 
 #include <gst/app/gstappsrc.h>
 
-#define PIPELINE "videotestsrc ! vp8enc ! appsink name=appsink"
-
 static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   GMainLoop *loop = (GMainLoop *)data;
 
@@ -52,10 +50,10 @@ GstFlowReturn gstreamer_send_new_sample_handler(GstElement *object, gpointer use
   return GST_FLOW_OK;
 }
 
-GstElement *gstreamer_send_create_pipeline() {
+GstElement *gstreamer_send_create_pipeline(char *pipeline) {
   gst_init(NULL, NULL);
   GError *error = NULL;
-  return gst_parse_launch(PIPELINE, &error);
+  return gst_parse_launch(pipeline, &error);
 }
 
 void gstreamer_send_start_pipeline(GstElement *pipeline) {

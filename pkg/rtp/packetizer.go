@@ -7,7 +7,7 @@ type Payloader interface {
 
 // Packetizer packetizes a payload
 type Packetizer interface {
-	Packetize(payload []byte) []*Packet
+	Packetize(payload []byte, samples uint32) []*Packet
 }
 
 type packetizer struct {
@@ -17,10 +17,11 @@ type packetizer struct {
 	Payloader   Payloader
 	Sequencer   Sequencer
 	Timestamp   uint32
+	ClockRate   uint32
 }
 
 // NewPacketizer returns a new instance of a Packetizer for a specific payloader
-func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer) Packetizer {
+func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer, clockRate uint32) Packetizer {
 	return &packetizer{
 		mtu,
 		pt,
@@ -28,11 +29,12 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 		payloader,
 		sequencer,
 		0,
+		clockRate,
 	}
 }
 
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
-func (p *packetizer) Packetize(payload []byte) []*Packet {
+func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	payloads := p.Payloader.Payload(p.MTU-12, payload)
 	packets := make([]*Packet, len(payloads))
 
@@ -48,7 +50,7 @@ func (p *packetizer) Packetize(payload []byte) []*Packet {
 			SSRC:           p.SSRC,
 			Payload:        pp,
 		}
-		p.Timestamp++
+		p.Timestamp += samples
 	}
 
 	return packets

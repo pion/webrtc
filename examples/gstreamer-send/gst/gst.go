@@ -9,27 +9,45 @@ package gst
 import "C"
 import (
 	"fmt"
+	"github.com/pions/webrtc"
 	"unsafe"
 )
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline *C.GstElement
-	in       chan<- []byte
+	in       chan<- webrtc.RTCSample
+	samples  uint32
 }
 
-// This allows cgo to access pipeline, this will not work if you want multiple
-var globalPipeline *Pipeline
-
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(in chan<- []byte) *Pipeline {
+func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipeline {
+	pipelineStr := "appsink name=appsink"
+	var samples uint32
+	switch codec {
+	case webrtc.VP8:
+		pipelineStr = "videotestsrc ! vp8enc ! " + pipelineStr
+	case webrtc.VP9:
+		pipelineStr = "videotestsrc ! vp9enc ! " + pipelineStr
+	case webrtc.Opus:
+		pipelineStr = "audiotestsrc ! opusenc ! " + pipelineStr
+	default:
+		panic("Unhandled codec " + codec.String())
+	}
+
+	pipelineStrUnsafe := C.CString(pipelineStr)
+	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
 	globalPipeline = &Pipeline{
-		Pipeline: C.gstreamer_send_create_pipeline(),
+		Pipeline: C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
 		in:       in,
+		samples:  samples,
 	}
 
 	return globalPipeline
 }
+
+// This allows cgo to access pipeline, this will not work if you want multiple
+var globalPipeline *Pipeline
 
 // Start starts the GStreamer Pipeline
 func (p *Pipeline) Start() {
@@ -42,9 +60,9 @@ func (p *Pipeline) Stop() {
 }
 
 //export goHandlePipelineBuffer
-func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int) {
+func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, samples C.int) {
 	if globalPipeline != nil {
-		globalPipeline.in <- C.GoBytes(buffer, bufferLen)
+		globalPipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), samples}
 	} else {
 		fmt.Println("discarding buffer, globalPipeline not set")
 	}
