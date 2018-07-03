@@ -16,8 +16,8 @@ go get github.com/pions/webrtc/examples/gstreamer-receive
 ### Open gstreamer-receive example page
 [jsfiddle.net](https://jsfiddle.net/usd3xmtz/2/) you should see your Webcam, two text-areas and a 'Start Session' button
 
-### Run gstreamer-receive, input browser's SessionDescription
-In the jsfiddle the top textarea is your browsers, copy that and paste into `gstreamer-receive` and press enter
+### Run gstreamer-receive with your browsers SessionDescription as stdin
+In the jsfiddle the top textarea is your browser, copy that and run `echo $BROWSER_SDP | gstreamer-receive`
 
 ### Input gstreamer-receive's SessionDescription into your browser
 Copy the text that `gstreamer-receive` just emitted and copy into second text area

@@ -57,6 +57,7 @@ go get -u github.com/pions/webrtc
 ### Example Programs
 Examples for common use cases, extend and modify to quickly get started.
 * [gstreamer-receive](examples/gstreamer-receive/README.md) Play video and audio from your Webcam live using GStreamer
+* [gstreamer-send](examples/gstreamer-send/README.md) Send video generated from GStreamer to your browser
 * [save-to-disk](examples/save-to-disk/README.md) Save video from your Webcam to disk
 
 ### Writing your own application

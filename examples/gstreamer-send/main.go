@@ -14,14 +14,12 @@ import (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Print("Browser base64 Session Description: ")
 	rawSd, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("\nGolang base64 Session Description: ")
 
+	fmt.Println("")
 	sd, err := base64.StdEncoding.DecodeString(rawSd)
 	if err != nil {
 		panic(err)
