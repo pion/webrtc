@@ -30,6 +30,7 @@ func TestValidSessionKeys(t *testing.T) {
 
 	expectedSessionKey := []byte{0xC6, 0x1E, 0x7A, 0x93, 0x74, 0x4F, 0x39, 0xEE, 0x10, 0x73, 0x4A, 0xFE, 0x3F, 0xF7, 0xA0, 0x87}
 	expectedSessionSalt := []byte{0x30, 0xCB, 0xBC, 0x08, 0x86, 0x3D, 0x8C, 0x85, 0xD4, 0x9D, 0xB3, 0x4A, 0x9A, 0xE1}
+	expectedSessionAuthTag := []byte{0xCE, 0xBE, 0x32, 0x1F, 0x6F, 0xF7, 0x71, 0x6B, 0x6F, 0xD4, 0xAB, 0x49, 0xAF, 0x25, 0x6A, 0x15, 0x6D, 0x38, 0xBA, 0xA4}
 
 	c, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
 	if err != nil {
@@ -39,19 +40,24 @@ func TestValidSessionKeys(t *testing.T) {
 	sessionKey, err := c.generateSessionKey()
 	if err != nil {
 		t.Error(errors.Wrap(err, "generateSessionKey failed"))
-	}
-
-	if !bytes.Equal(sessionKey, expectedSessionKey) {
+	} else if !bytes.Equal(sessionKey, expectedSessionKey) {
 		t.Errorf("Session Key % 02x does not match expected % 02x", sessionKey, expectedSessionKey)
 	}
 
 	sessionSalt, err := c.generateSessionSalt()
 	if err != nil {
 		t.Error(errors.Wrap(err, "generateSessionSalt failed"))
-	}
-	if !bytes.Equal(sessionSalt, expectedSessionSalt) {
+	} else if !bytes.Equal(sessionSalt, expectedSessionSalt) {
 		t.Errorf("Session Salt % 02x does not match expected % 02x", sessionSalt, expectedSessionSalt)
 	}
+
+	sessionAuthTag, err := c.generateSessionAuthTag()
+	if err != nil {
+		t.Error(errors.Wrap(err, "generateSessionAuthTag failed"))
+	} else if !bytes.Equal(sessionAuthTag, expectedSessionAuthTag) {
+		t.Errorf("Session Auth Tag % 02x does not match expected % 02x", sessionAuthTag, expectedSessionAuthTag)
+	}
+
 }
 
 func TestValidPacketCounter(t *testing.T) {

@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	labelEncryption = 0x00
-	labelSalt       = 0x02
+	labelEncryption        = 0x00
+	labelSalt              = 0x02
+	labelAuthenticationTag = 0x01
 
-	keyLen  = 16
-	saltLen = 14
+	keyLen               = 16
+	saltLen              = 14
+	authenticationTagLen = 20
 
 	maxROCDisorder    = 100
 	maxSequenceNumber = 65535
@@ -32,9 +34,11 @@ type Context struct {
 	masterKey  []byte
 	masterSalt []byte
 
-	sessionKey  []byte
-	sessionSalt []byte
-	block       cipher.Block
+	sessionKey     []byte
+	sessionSalt    []byte
+	sessionAuthTag []byte
+
+	block cipher.Block
 }
 
 /*
@@ -62,6 +66,10 @@ func CreateContext(masterKey, masterSalt []byte, profile string, ssrc uint32) (c
 	}
 
 	if c.sessionSalt, err = c.generateSessionSalt(); err != nil {
+		return nil, err
+	}
+
+	if c.sessionAuthTag, err = c.generateSessionAuthTag(); err != nil {
 		return nil, err
 	}
 
@@ -120,6 +128,31 @@ func (c *Context) generateSessionSalt() ([]byte, error) {
 
 	block.Encrypt(sessionSalt, sessionSalt)
 	return sessionSalt[0:saltLen], nil
+}
+func (c *Context) generateSessionAuthTag() ([]byte, error) {
+	// https://tools.ietf.org/html/rfc3711#appendix-B.3
+	// We now show how the auth key is generated.  The input block for AES-
+	// CM is generated as above, but using the authentication key label.
+	sessionAuthTag := make([]byte, len(c.masterSalt))
+	copy(sessionAuthTag, c.masterSalt)
+
+	labelAndIndexOverKdr := []byte{labelAuthenticationTag, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	for i, j := len(labelAndIndexOverKdr)-1, len(sessionAuthTag)-1; i >= 0; i, j = i-1, j-1 {
+		sessionAuthTag[j] = sessionAuthTag[j] ^ labelAndIndexOverKdr[i]
+	}
+
+	// That value is padded and encrypted as above.
+	// - We need to do multiple runs at key size (20) is larger then source
+	firstRun := append(sessionAuthTag, []byte{0x00, 0x00}...)
+	secondRun := append(sessionAuthTag, []byte{0x00, 0x01}...)
+	block, err := aes.NewCipher(c.masterKey)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Encrypt(firstRun, firstRun)
+	block.Encrypt(secondRun, secondRun)
+	return append(firstRun, secondRun[:4]...), nil
 }
 
 // Generate IV https://tools.ietf.org/html/rfc3711#section-4.1.1
