@@ -11,17 +11,17 @@ type Packetizer interface {
 }
 
 type packetizer struct {
-	MTU int
+	MTU         int
 	PayloadType uint8
-	SSRC uint32
-	Payloader Payloader
-	Sequencer Sequencer
-	Timestamp uint32
+	SSRC        uint32
+	Payloader   Payloader
+	Sequencer   Sequencer
+	Timestamp   uint32
 }
 
 // NewPacketizer returns a new instance of a Packetizer for a specific payloader
 func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer) Packetizer {
-	return &packetizer {
+	return &packetizer{
 		mtu,
 		pt,
 		ssrc,
@@ -33,20 +33,20 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
 func (p *packetizer) Packetize(payload []byte) []*Packet {
-	payloads := p.Payloader.Payload(p.MTU - 12, payload)
+	payloads := p.Payloader.Payload(p.MTU-12, payload)
 	packets := make([]*Packet, len(payloads))
 
 	for i, pp := range payloads {
 		packets[i] = &Packet{
-			Version: 2,
-			Padding: false,
-			Extension: false,
-			Marker: i == len(payloads) - 1,
-			PayloadType: p.PayloadType,
+			Version:        2,
+			Padding:        false,
+			Extension:      false,
+			Marker:         i == len(payloads)-1,
+			PayloadType:    p.PayloadType,
 			SequenceNumber: p.Sequencer.NextSequenceNumber(),
-			Timestamp: p.Timestamp, // Figure out how to do timestamps
-			SSRC: p.SSRC,
-			Payload: pp,
+			Timestamp:      p.Timestamp, // Figure out how to do timestamps
+			SSRC:           p.SSRC,
+			Payload:        pp,
 		}
 		p.Timestamp++
 	}
