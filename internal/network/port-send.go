@@ -17,7 +17,7 @@ func (p *Port) Send(packet *rtp.Packet) {
 		p.srtpContextsLock.Lock()
 		srtpContext, ok := p.srtpContexts[contextMapKey]
 		if !ok {
-			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ClientWriteKey[0:16]), []byte(authed.pair.ClientWriteKey[16:]), authed.pair.Profile, 2581832418)
+			srtpContext, err = srtp.CreateContext([]byte(authed.pair.ClientWriteKey[0:16]), []byte(authed.pair.ClientWriteKey[16:]), authed.pair.Profile, packet.SSRC)
 			if err != nil {
 				fmt.Println("Failed to build SRTP context")
 				continue

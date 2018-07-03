@@ -1,15 +1,31 @@
 package sdp
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
 )
 
+// SessionBuilderTrack represents a single track in a SessionBuilder
+type SessionBuilderTrack struct {
+	SSRC    uint32
+	IsAudio bool
+}
+
+// SessionBuilder provides an easy way to build an SDP for an RTCPeerConnection
+type SessionBuilder struct {
+	IceUsername, IcePassword, Fingerprint string
+
+	Candidates []string
+
+	Tracks []*SessionBuilderTrack
+}
+
 // BaseSessionDescription generates a default SDP response that is ice-lite, initiates the DTLS session and supports VP8, VP9 and Opus
-func BaseSessionDescription(iceUsername, icePassword, fingerprint string, candidates []string) *SessionDescription {
+func BaseSessionDescription(b *SessionBuilder) *SessionDescription {
 	addMediaCandidates := func(m *MediaDescription) *MediaDescription {
-		m.Attributes = append(m.Attributes, candidates...)
+		m.Attributes = append(m.Attributes, b.Candidates...)
 		m.Attributes = append(m.Attributes, "end-of-candidates")
 		return m
 	}
@@ -21,10 +37,10 @@ func BaseSessionDescription(iceUsername, icePassword, fingerprint string, candid
 			"setup:active",
 			"mid:audio",
 			"sendrecv",
-			"ice-ufrag:" + iceUsername,
-			"ice-pwd:" + icePassword,
+			"ice-ufrag:" + b.IceUsername,
+			"ice-pwd:" + b.IcePassword,
 			"ice-lite",
-			"fingerprint:sha-256 " + fingerprint,
+			"fingerprint:sha-256 " + b.Fingerprint,
 			"rtcp-mux",
 			"rtcp-rsize",
 			"rtpmap:111 opus/48000/2",
@@ -39,15 +55,35 @@ func BaseSessionDescription(iceUsername, icePassword, fingerprint string, candid
 			"setup:active",
 			"mid:video",
 			"sendrecv",
-			"ice-ufrag:" + iceUsername,
-			"ice-pwd:" + icePassword,
+			"ice-ufrag:" + b.IceUsername,
+			"ice-pwd:" + b.IcePassword,
 			"ice-lite",
-			"fingerprint:sha-256 " + fingerprint,
+			"fingerprint:sha-256 " + b.Fingerprint,
 			"rtcp-mux",
 			"rtcp-rsize",
 			"rtpmap:96 VP8/90000",
 			"rtpmap:98 VP9/90000",
 		},
+	}
+
+	mediaStreamsAttribute := "msid-semantic: WMS"
+	for i, track := range b.Tracks {
+		var attributes *[]string
+		if track.IsAudio {
+			attributes = &audioMediaDescription.Attributes
+		} else {
+			attributes = &videoMediaDescription.Attributes
+		}
+		appendAttr := func(attr string) {
+			*attributes = append(*attributes, attr)
+		}
+
+		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " cname:pion" + strconv.Itoa(i))
+		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " msid:pion" + strconv.Itoa(i) + " pion" + strconv.Itoa(i))
+		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " mslabel:pion" + strconv.Itoa(i))
+		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " label:pion" + strconv.Itoa(i))
+
+		mediaStreamsAttribute += " pion" + strconv.Itoa(i)
 	}
 
 	sessionID := strconv.FormatUint(uint64(rand.Uint32())<<32+uint64(rand.Uint32()), 10)
@@ -58,7 +94,7 @@ func BaseSessionDescription(iceUsername, icePassword, fingerprint string, candid
 		Timing:          []string{"0 0"},
 		Attributes: []string{
 			"group:BUNDLE audio video",
-			"msid-semantic: WMS",
+			mediaStreamsAttribute,
 		},
 		MediaDescriptions: []*MediaDescription{
 			addMediaCandidates(audioMediaDescription),

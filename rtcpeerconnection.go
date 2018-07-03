@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/network"
@@ -11,10 +12,14 @@ import (
 	"github.com/pions/webrtc/internal/util"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
-
 	"github.com/pions/webrtc/pkg/rtp/codecs"
+
 	"github.com/pkg/errors"
 )
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
 
 // TrackType determines the type of media we are sending receiving
 type TrackType int
@@ -55,6 +60,8 @@ type RTCPeerConnection struct {
 	ports     []*network.Port
 
 	remoteDescription *sdp.SessionDescription
+
+	localTracks []*sdp.SessionBuilderTrack
 }
 
 // Public
@@ -96,7 +103,13 @@ func (r *RTCPeerConnection) CreateOffer() error {
 		r.ports = append(r.ports, port)
 	}
 
-	r.LocalDescription = sdp.BaseSessionDescription(r.iceUsername, r.icePassword, r.tlscfg.Fingerprint(), candidates)
+	r.LocalDescription = sdp.BaseSessionDescription(&sdp.SessionBuilder{
+		IceUsername: r.iceUsername,
+		IcePassword: r.icePassword,
+		Fingerprint: r.tlscfg.Fingerprint(),
+		Candidates:  candidates,
+		Tracks:      r.localTracks,
+	})
 
 	return nil
 }
@@ -105,20 +118,26 @@ func (r *RTCPeerConnection) CreateOffer() error {
 // This function returns a channel to push buffers on, and an error if the channel can't be added
 // Closing the channel ends this stream
 func (r *RTCPeerConnection) AddTrack(mediaType TrackType) (buffers chan<- []byte, err error) {
+	if mediaType != VP8 {
+		panic("TODO Discarding packet, need media parsing")
+	}
+
 	trackInput := make(chan []byte, 15)
 	go func() {
-		packetizer := rtp.NewPacketizer(1500, 96, 123, &codecs.VP8Payloader{}, rtp.NewRandomSequencer())
+		ssrc := rand.Uint32()
+		sdpTrack := &sdp.SessionBuilderTrack{SSRC: ssrc}
+		if mediaType == Opus {
+			sdpTrack.IsAudio = true
+		}
+
+		r.localTracks = append(r.localTracks, sdpTrack)
+		packetizer := rtp.NewPacketizer(1500, 96, ssrc, &codecs.VP8Payloader{}, rtp.NewRandomSequencer())
 		for {
-			if mediaType == VP8 {
-				packets := packetizer.Packetize(<-trackInput)
-				for _, p := range packets {
-					for _, port := range r.ports {
-						port.Send(p)
-					}
+			packets := packetizer.Packetize(<-trackInput)
+			for _, p := range packets {
+				for _, port := range r.ports {
+					port.Send(p)
 				}
-			} else {
-				<-trackInput
-				fmt.Println("TODO Discarding packet, need media parsing")
 			}
 		}
 	}()
