@@ -77,20 +77,20 @@ const (
 )
 
 //export goHandlePipelineBuffer
-func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineId C.int) {
+func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineID C.int) {
 	pipelinesLock.Lock()
 	defer pipelinesLock.Unlock()
 
-	if pipeline, ok := pipelines[int(pipelineId)]; ok {
+	if pipeline, ok := pipelines[int(pipelineID)]; ok {
 		var samples uint32
 		if pipeline.codec == webrtc.Opus {
 			samples = uint32(audioClockRate * (float32(duration) / 1000000000))
 		} else {
 			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
 		}
-		pipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), samples}
+		pipeline.in <- webrtc.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}
 	} else {
-		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineId))
+		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineID))
 	}
 	C.free(buffer)
 }
