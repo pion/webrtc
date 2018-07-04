@@ -101,20 +101,14 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 	defer r.portsLock.Unlock()
 
 
-	// https://github.com/pions/webrtc/issues/27
-	interfaces := ice.HostInterfaces()
-	if len(interfaces) == 1 {
-		interfaces = append(interfaces, interfaces...)
-	}
-
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	for id, c := range interfaces {
+	for id, c := range ice.HostInterfaces() {
 		port, err := network.NewPort(c+":0", []byte(r.icePassword), r.tlscfg, r.generateChannel, r.iceStateChange)
 		if err != nil {
 			return err
 		}
-		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id, basePriority, c, port.ListeningAddr.Port))
+		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id+1, basePriority, c, port.ListeningAddr.Port))
 		basePriority = basePriority + 1
 		r.ports = append(r.ports, port)
 	}
