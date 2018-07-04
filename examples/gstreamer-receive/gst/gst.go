@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	go C.gstreamer_recieve_mainloop()
+	go C.gstreamer_recieve_start_mainloop()
 }
 
 // Pipeline is a wrapper for a GStreamer Pipeline

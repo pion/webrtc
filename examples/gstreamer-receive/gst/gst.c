@@ -2,11 +2,11 @@
 
 #include <gst/app/gstappsrc.h>
 
-GMainLoop *main_loop = NULL;
-void gstreamer_recieve_mainloop(void) {
-  main_loop = g_main_loop_new(NULL, FALSE);
+GMainLoop *gstreamer_recieve_main_loop = NULL;
+void gstreamer_recieve_start_mainloop(void) {
+  gstreamer_recieve_main_loop = g_main_loop_new(NULL, FALSE);
 
-  g_main_loop_run(main_loop);
+  g_main_loop_run(gstreamer_recieve_main_loop);
 }
 
 static gboolean gstreamer_recieve_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
@@ -47,7 +47,7 @@ void gstreamer_recieve_start_pipeline(GstElement *pipeline) {
   guint bus_watch_id;
 
   bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, main_loop);
+  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, NULL);
   gst_object_unref(bus);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
