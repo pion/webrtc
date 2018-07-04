@@ -9,21 +9,29 @@ package gst
 import "C"
 import (
 	"fmt"
-	"github.com/pions/webrtc"
+	"sync"
 	"unsafe"
+
+	"github.com/pions/webrtc"
 )
+
+func init() {
+	go C.gstreamer_send_mainloop()
+}
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline *C.GstElement
 	in       chan<- webrtc.RTCSample
-	samples  uint32
+	id       int
 }
+
+var pipelines = make(map[int]*Pipeline)
+var pipelinesLock sync.Mutex
 
 // CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipeline {
 	pipelineStr := "appsink name=appsink"
-	var samples uint32
 	switch codec {
 	case webrtc.VP8:
 		pipelineStr = "videotestsrc ! vp8enc ! " + pipelineStr
@@ -37,21 +45,23 @@ func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipelin
 
 	pipelineStrUnsafe := C.CString(pipelineStr)
 	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
-	globalPipeline = &Pipeline{
+
+	pipelinesLock.Lock()
+	defer pipelinesLock.Unlock()
+
+	pipeline := &Pipeline{
 		Pipeline: C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
 		in:       in,
-		samples:  samples,
+		id:       len(pipelines),
 	}
 
-	return globalPipeline
+	pipelines[pipeline.id] = pipeline
+	return pipeline
 }
-
-// This allows cgo to access pipeline, this will not work if you want multiple
-var globalPipeline *Pipeline
 
 // Start starts the GStreamer Pipeline
 func (p *Pipeline) Start() {
-	C.gstreamer_send_start_pipeline(p.Pipeline)
+	C.gstreamer_send_start_pipeline(p.Pipeline, C.int(p.id))
 }
 
 // Stop stops the GStreamer Pipeline
@@ -60,11 +70,14 @@ func (p *Pipeline) Stop() {
 }
 
 //export goHandlePipelineBuffer
-func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, samples C.int) {
-	if globalPipeline != nil {
-		globalPipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), samples}
+func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, samples C.int, pipelineId C.int) {
+	pipelinesLock.Lock()
+	defer pipelinesLock.Unlock()
+
+	if pipeline, ok := pipelines[int(pipelineId)]; ok {
+		pipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), uint32(samples)}
 	} else {
-		fmt.Println("discarding buffer, globalPipeline not set")
+		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineId))
 	}
 	C.free(buffer)
 }

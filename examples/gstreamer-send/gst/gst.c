@@ -2,6 +2,17 @@
 
 #include <gst/app/gstappsrc.h>
 
+typedef struct SampleHandlerUserData {
+  int pipelineId;
+} SampleHandlerUserData;
+
+GMainLoop *main_loop = NULL;
+void gstreamer_send_mainloop(void) {
+  main_loop = g_main_loop_new(NULL, FALSE);
+
+  g_main_loop_run(main_loop);
+}
+
 static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
   GMainLoop *loop = (GMainLoop *)data;
 
@@ -36,13 +47,14 @@ GstFlowReturn gstreamer_send_new_sample_handler(GstElement *object, gpointer use
   GstBuffer *buffer = NULL;
   gpointer copy = NULL;
   gsize copy_size = 0;
+  SampleHandlerUserData *s = (SampleHandlerUserData *)user_data;
 
   g_signal_emit_by_name (object, "pull-sample", &sample);
   if (sample) {
     buffer = gst_sample_get_buffer(sample);
     if (buffer) {
       gst_buffer_extract_dup(buffer, 0, gst_buffer_get_size(buffer), &copy, &copy_size);
-      goHandlePipelineBuffer(copy, copy_size);
+      goHandlePipelineBuffer(copy, copy_size, 0, s->pipelineId);
     }
     gst_sample_unref (sample);
   }
@@ -56,8 +68,11 @@ GstElement *gstreamer_send_create_pipeline(char *pipeline) {
   return gst_parse_launch(pipeline, &error);
 }
 
-void gstreamer_send_start_pipeline(GstElement *pipeline) {
+void gstreamer_send_start_pipeline(GstElement *pipeline, int pipelineId) {
   GMainLoop *loop = g_main_loop_new(NULL, FALSE);
+
+  SampleHandlerUserData *s = calloc(1, sizeof(SampleHandlerUserData));
+  s->pipelineId = pipelineId;
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
   guint bus_watch_id = gst_bus_add_watch(bus, gstreamer_send_bus_call, loop);
@@ -65,17 +80,9 @@ void gstreamer_send_start_pipeline(GstElement *pipeline) {
 
   GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
   g_object_set(appsink, "emit-signals", TRUE, NULL);
-  g_signal_connect(appsink, "new-sample", G_CALLBACK(gstreamer_send_new_sample_handler), appsink);
+  g_signal_connect(appsink, "new-sample", G_CALLBACK(gstreamer_send_new_sample_handler), s);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
-
-  g_main_loop_run(loop);
-
-  gst_element_set_state(pipeline, GST_STATE_NULL);
-
-  gst_object_unref(GST_OBJECT(pipeline));
-  g_source_remove(bus_watch_id);
-  g_main_loop_unref(loop);
 }
 
 void gstreamer_send_stop_pipeline(GstElement *pipeline) {

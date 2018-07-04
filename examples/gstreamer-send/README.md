@@ -14,7 +14,7 @@ go get github.com/pions/webrtc/examples/gstreamer-send
 ```
 
 ### Open gstreamer-send example page
-[jsfiddle.net](http://jsfiddle.net/12kan4j5/) you should see two text-areas and a 'Start Session' button
+[jsfiddle.net](http://jsfiddle.net/12kan4j5/4/) you should see two text-areas and a 'Start Session' button
 
 ### Run gstreamer-send with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser, copy that and:
