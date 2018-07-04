@@ -83,9 +83,12 @@ func (r *RTCPeerConnection) SetRemoteDescription(rawSessionDescription string) e
 }
 
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
-// The order of CreateOffer/SetRemoteDescription determines if we are the offerer or the answerer
-// Once the RemoteDescription has been set network activity will start
 func (r *RTCPeerConnection) CreateOffer() error {
+	return errors.Errorf("CreateOffer is not implemented")
+}
+
+// CreateAnswer starts the RTCPeerConnection and generates the localDescription
+func (r *RTCPeerConnection) CreateAnswer() error {
 	if r.tlscfg != nil {
 		return errors.Errorf("tlscfg is already defined, CreateOffer can only be called once")
 	}

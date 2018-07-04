@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
-	if err := peerConnection.CreateOffer(); err != nil {
+	if err := peerConnection.CreateAnswer(); err != nil {
 		panic(err)
 	}
 
