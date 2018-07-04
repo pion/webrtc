@@ -100,7 +100,6 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 	r.portsLock.Lock()
 	defer r.portsLock.Unlock()
 
-
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 	for id, c := range ice.HostInterfaces() {
