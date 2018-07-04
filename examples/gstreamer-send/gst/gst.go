@@ -24,6 +24,7 @@ type Pipeline struct {
 	Pipeline *C.GstElement
 	in       chan<- webrtc.RTCSample
 	id       int
+	codec    webrtc.TrackType
 }
 
 var pipelines = make(map[int]*Pipeline)
@@ -53,6 +54,7 @@ func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipelin
 		Pipeline: C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
 		in:       in,
 		id:       len(pipelines),
+		codec:    codec,
 	}
 
 	pipelines[pipeline.id] = pipeline
@@ -69,13 +71,24 @@ func (p *Pipeline) Stop() {
 	C.gstreamer_send_stop_pipeline(p.Pipeline)
 }
 
+const (
+	videoClockRate = 90000
+	audioClockRate = 48000
+)
+
 //export goHandlePipelineBuffer
-func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, samples C.int, pipelineId C.int) {
+func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineId C.int) {
 	pipelinesLock.Lock()
 	defer pipelinesLock.Unlock()
 
 	if pipeline, ok := pipelines[int(pipelineId)]; ok {
-		pipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), uint32(samples)}
+		var samples uint32
+		if pipeline.codec == webrtc.Opus {
+			samples = uint32(audioClockRate * (float32(duration) / 1000000000))
+		} else {
+			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
+		}
+		pipeline.in <- webrtc.RTCSample{C.GoBytes(buffer, bufferLen), samples}
 	} else {
 		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineId))
 	}

@@ -43,11 +43,8 @@ GstElement *gstreamer_recieve_create_pipeline(char *pipeline) {
 }
 
 void gstreamer_recieve_start_pipeline(GstElement *pipeline) {
-  GstBus *bus;
-  guint bus_watch_id;
-
-  bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  bus_watch_id = gst_bus_add_watch(bus, gstreamer_recieve_bus_call, NULL);
+  GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+  gst_bus_add_watch(bus, gstreamer_recieve_bus_call, NULL);
   gst_object_unref(bus);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
