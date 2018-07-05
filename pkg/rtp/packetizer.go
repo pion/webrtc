@@ -1,5 +1,10 @@
 package rtp
 
+import (
+	"math/rand"
+	"time"
+)
+
 // Payloader payloads a byte array for use as rtp.Packet payloads
 type Payloader interface {
 	Payload(mtu int, payload []byte) [][]byte
@@ -22,13 +27,16 @@ type packetizer struct {
 
 // NewPacketizer returns a new instance of a Packetizer for a specific payloader
 func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer, clockRate uint32) Packetizer {
+	rs := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(rs)
+
 	return &packetizer{
 		mtu,
 		pt,
 		ssrc,
 		payloader,
 		sequencer,
-		0,
+		r.Uint32(),
 		clockRate,
 	}
 }
