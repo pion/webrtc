@@ -9,13 +9,6 @@ const (
 	vp8HeaderSize = 1
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // Payload fragments a VP8 packet across one or more byte arrays
 func (p *VP8Payloader) Payload(mtu int, payload []byte) [][]byte {
 
