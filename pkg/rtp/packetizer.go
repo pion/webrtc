@@ -58,8 +58,8 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 			SSRC:           p.SSRC,
 			Payload:        pp,
 		}
-		p.Timestamp += samples
 	}
+	p.Timestamp += samples
 
 	return packets
 }
