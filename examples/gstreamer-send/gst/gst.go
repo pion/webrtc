@@ -38,6 +38,8 @@ func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipelin
 		pipelineStr = "videotestsrc ! vp8enc ! " + pipelineStr
 	case webrtc.VP9:
 		pipelineStr = "videotestsrc ! vp9enc ! " + pipelineStr
+	case webrtc.H264:
+		pipelineStr = "videotestsrc ! video/x-raw,format=I420 ! x264enc bframes=0 speed-preset=veryfast key-int-max=60 ! video/x-h264,stream-format=byte-stream ! " + pipelineStr
 	case webrtc.Opus:
 		pipelineStr = "audiotestsrc ! opusenc ! " + pipelineStr
 	default:
