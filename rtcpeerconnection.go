@@ -146,10 +146,14 @@ func (r *RTCPeerConnection) AddTrack(mediaType TrackType, clockRate uint32) (sam
 		case VP8:
 			payloader = &codecs.VP8Payloader{}
 			payloadType = 96
+
+		case H264:
+			payloader = &codecs.H264Payloader{}
+			payloadType = 100
 		}
 
 		r.localTracks = append(r.localTracks, sdpTrack)
-		packetizer := rtp.NewPacketizer(1500, payloadType, ssrc, payloader, rtp.NewRandomSequencer(), clockRate)
+		packetizer := rtp.NewPacketizer(1400, payloadType, ssrc, payloader, rtp.NewRandomSequencer(), clockRate)
 		for {
 			in := <-trackInput
 			packets := packetizer.Packetize(in.Data, in.Samples)
