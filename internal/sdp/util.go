@@ -22,7 +22,8 @@ type SessionBuilder struct {
 	Tracks []*SessionBuilderTrack
 }
 
-// BaseSessionDescription generates a default SDP response that is ice-lite, initiates the DTLS session and supports VP8, VP9 and Opus
+// BaseSessionDescription generates a default SDP response that is ice-lite, initiates the DTLS session and
+// supports VP8, VP9, H264 and Opus
 func BaseSessionDescription(b *SessionBuilder) *SessionDescription {
 	addMediaCandidates := func(m *MediaDescription) *MediaDescription {
 		m.Attributes = append(m.Attributes, b.Candidates...)
@@ -49,7 +50,7 @@ func BaseSessionDescription(b *SessionBuilder) *SessionDescription {
 	}
 
 	videoMediaDescription := &MediaDescription{
-		MediaName:      "video 9 RTP/SAVPF 96 98",
+		MediaName:      "video 9 RTP/SAVPF 96 98 100",
 		ConnectionData: "IN IP4 127.0.0.1",
 		Attributes: []string{
 			"setup:active",
@@ -63,6 +64,8 @@ func BaseSessionDescription(b *SessionBuilder) *SessionDescription {
 			"rtcp-rsize",
 			"rtpmap:96 VP8/90000",
 			"rtpmap:98 VP9/90000",
+			"rtpmap:100 H264/90000",
+			"fmtp:100 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
 		},
 	}
 

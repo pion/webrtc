@@ -32,6 +32,8 @@ func CreatePipeline(codec webrtc.TrackType) *Pipeline {
 		pipelineStr += ", payload=96, encoding-name=OPUS ! rtpopusdepay ! decodebin ! autoaudiosink"
 	case webrtc.VP9:
 		pipelineStr += " ! rtpvp9depay ! decodebin ! autovideosink"
+	case webrtc.H264:
+		pipelineStr += " ! rtph264depay ! decodebin ! autovideosink"
 	default:
 		panic("Unhandled codec " + codec.String())
 	}
