@@ -2,13 +2,23 @@
 
 #define ONE_YEAR 60 * 60 * 24 * 365
 
+bool openssl_global_init() {
+  OpenSSL_add_ssl_algorithms();
+  SSL_load_error_strings();
+  return SSL_library_init();
+}
+
 int dtls_trivial_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
   (void)preverify_ok;
   (void)ctx;
   return 1;
 }
 
-SSL_CTX *dtls_ctx_init(tlscfg *cfg) {
+SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
+  if (cfg == NULL) {
+    return NULL;
+  }
+
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
   SSL_CTX *ctx = SSL_CTX_new(DTLS_method());
 #elif (OPENSSL_VERSION_NUMBER >= 0x10001000L)
@@ -60,12 +70,15 @@ error:
   return NULL;
 }
 
-dtls_sess *dtls_sess_new(SSL_CTX *sslcfg, int con_state) {
+dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_server, char *src, char *dst) {
   dtls_sess *sess = (dtls_sess *)calloc(1, sizeof(dtls_sess));
   BIO *rbio = NULL;
   BIO *wbio = NULL;
 
-  sess->state = con_state;
+  sess->state = is_server;
+
+  sess->local_address = strdup(src);
+  sess->peer_address = strdup(dst);
 
   if (NULL == (sess->ssl = SSL_new(sslcfg))) {
     goto error;
@@ -116,7 +129,7 @@ void dtls_sess_free(dtls_sess *sess) {
 }
 
 extern void go_handle_sendto(const char *src, const char *dst, char *buf, int len);
-ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, const char *src, const char *dst) {
+ptrdiff_t dtls_sess_send_pending(dtls_sess *sess) {
   if (sess->ssl == NULL) {
     return -2;
   }
@@ -128,51 +141,15 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, const char *src, const char *d
     len = BIO_read(wbio, buf, pending);
     buf = realloc(buf, len);
 
-    go_handle_sendto(src, dst, buf, len);
+    go_handle_sendto(sess->local_address, sess->peer_address, buf, len);
     return len;
   }
   return 0;
 }
 
-ptrdiff_t dtls_sess_put_packet(dtls_sess *sess, const char *src, const char *dst, const void *buf, size_t len) {
-  if (sess->ssl == NULL) {
-    return -1;
-  }
-
-  ptrdiff_t ret = 0;
-  char dummy[len];
-
-  pthread_mutex_lock(&sess->lock);
-  pthread_mutex_unlock(&sess->lock);
-
-  BIO *rbio = SSL_get_rbio(sess->ssl);
-
-  if (sess->state == DTLS_CONSTATE_ACTPASS) {
-    sess->state = DTLS_CONSTATE_PASS;
-    SSL_set_accept_state(sess->ssl);
-  }
-
-  dtls_sess_send_pending(sess, src, dst);
-
-  BIO_write(rbio, buf, len);
-  ret = SSL_read(sess->ssl, dummy, len);
-
-  if ((ret < 0) && SSL_get_error(sess->ssl, ret) == SSL_ERROR_SSL) {
-    return ret;
-  }
-
-  ret = dtls_sess_send_pending(sess, src, dst);
-
-  if (SSL_is_init_finished(sess->ssl)) {
-    sess->type = DTLS_CONTYPE_EXISTING;
-  }
-
-  return ret;
-}
-
 static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) { return sess->state; }
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst) {
+ptrdiff_t dtls_do_handshake(dtls_sess *sess) {
   if (sess->ssl == NULL ||
       (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT && dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
     return -2;
@@ -182,7 +159,7 @@ ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst) {
   }
   SSL_do_handshake(sess->ssl);
   pthread_mutex_lock(&sess->lock);
-  ptrdiff_t ret = dtls_sess_send_pending(sess, src, dst);
+  ptrdiff_t ret = dtls_sess_send_pending(sess);
   pthread_mutex_unlock(&sess->lock);
   return ret;
 }
@@ -267,21 +244,6 @@ error:
   return NULL;
 }
 
-SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
-  if (cfg == NULL) {
-    return NULL;
-  }
-
-  return dtls_ctx_init(cfg);
-}
-
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server) { return dtls_sess_new(cfg, is_server); }
-
-bool openssl_global_init() {
-  OpenSSL_add_ssl_algorithms();
-  SSL_load_error_strings();
-  return SSL_library_init();
-}
 
 void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session) {
   if (dtls_session) {
@@ -305,49 +267,48 @@ void dtls_tlscfg_cleanup(tlscfg *cfg) {
   }
 }
 
-dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *src, const char *dst, void *buf,
-                                                  int len) {
-  ptrdiff_t stat = dtls_sess_put_packet(sess, src, dst, buf, len);
-  if (SSL_get_error(sess->ssl, stat) == SSL_ERROR_SSL) {
-    fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
-            ERR_reason_error_string(ERR_get_error()));
+dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
+  if (sess->ssl == NULL) {
     return NULL;
   }
 
-  if (sess->type == DTLS_CONTYPE_EXISTING) {
-    unsigned char dtls_buffer[SRTP_MASTER_KEY_KEY_LEN * 2 + SRTP_MASTER_KEY_SALT_LEN * 2];
+  int decrypted_len = 0;
+  void *decrypted = calloc(1, len);
+  dtls_decrypted *ret = NULL;
 
-    const char *label = "EXTRACTOR-dtls_srtp";
-    if (!SSL_export_keying_material(sess->ssl, dtls_buffer, sizeof(dtls_buffer), label, strlen(label), NULL, 0, 0)) {
-      fprintf(stderr, "SSL_export_keying_material failed");
-      return NULL;
-    }
+  BIO *rbio = SSL_get_rbio(sess->ssl);
 
-    size_t offset = 0;
-    dtls_handle_incoming_return *ret = calloc(1, sizeof(dtls_handle_incoming_return));
-    ret->key_length = SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN;
-
-    memcpy(&ret->client_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
-    offset += SRTP_MASTER_KEY_KEY_LEN;
-    memcpy(&ret->server_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
-    offset += SRTP_MASTER_KEY_KEY_LEN;
-    memcpy(&ret->client_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
-    offset += SRTP_MASTER_KEY_SALT_LEN;
-    memcpy(&ret->server_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
-
-    switch (SSL_get_selected_srtp_profile(sess->ssl)->id) {
-    case SRTP_AES128_CM_SHA1_80:
-      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
-      break;
-    case SRTP_AES128_CM_SHA1_32:
-      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_32", strlen("SRTP_AES128_CM_SHA1_32"));
-      break;
-    }
-
-    return ret;
+  if (sess->state == DTLS_CONSTATE_ACTPASS) {
+    sess->state = DTLS_CONSTATE_PASS;
+    SSL_set_accept_state(sess->ssl);
   }
 
-  return NULL;
+  dtls_sess_send_pending(sess);
+
+  BIO_write(rbio, buf, len);
+  decrypted_len = SSL_read(sess->ssl, decrypted, len);
+
+  if ((decrypted_len < 0) && SSL_get_error(sess->ssl, decrypted_len) == SSL_ERROR_SSL) {
+     fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
+             ERR_reason_error_string(ERR_get_error()));
+     free(decrypted);
+     return ret;
+  }
+
+  dtls_sess_send_pending(sess);
+  if (SSL_is_init_finished(sess->ssl)) {
+    sess->type = DTLS_CONTYPE_EXISTING;
+  }
+
+  if (decrypted_len > 1) {
+    ret = (dtls_decrypted *)calloc(1, sizeof(dtls_decrypted));
+    ret->buf = decrypted;
+    ret->len = decrypted_len;
+  } else {
+    free(decrypted);
+  }
+
+  return ret;
 }
 
 char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
@@ -370,4 +331,40 @@ char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
   }
   *(curr - 1) = '\0';
   return hex_fingeprint;
+}
+
+dtls_cert_pair *dtls_get_certpair(dtls_sess *sess) {
+  if (sess->type == DTLS_CONTYPE_EXISTING) {
+    unsigned char dtls_buffer[SRTP_MASTER_KEY_KEY_LEN * 2 + SRTP_MASTER_KEY_SALT_LEN * 2];
+
+    const char *label = "EXTRACTOR-dtls_srtp";
+    if (!SSL_export_keying_material(sess->ssl, dtls_buffer, sizeof(dtls_buffer), label, strlen(label), NULL, 0, 0)) {
+      fprintf(stderr, "SSL_export_keying_material failed");
+      return NULL;
+    }
+
+    size_t offset = 0;
+    dtls_cert_pair *ret = calloc(1, sizeof(dtls_cert_pair));
+    ret->key_length = SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN;
+
+    memcpy(&ret->client_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
+    offset += SRTP_MASTER_KEY_KEY_LEN;
+    memcpy(&ret->server_write_key[0], &dtls_buffer[offset], SRTP_MASTER_KEY_KEY_LEN);
+    offset += SRTP_MASTER_KEY_KEY_LEN;
+    memcpy(&ret->client_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
+    offset += SRTP_MASTER_KEY_SALT_LEN;
+    memcpy(&ret->server_write_key[SRTP_MASTER_KEY_KEY_LEN], &dtls_buffer[offset], SRTP_MASTER_KEY_SALT_LEN);
+
+    switch (SSL_get_selected_srtp_profile(sess->ssl)->id) {
+    case SRTP_AES128_CM_SHA1_80:
+      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_80", strlen("SRTP_AES128_CM_SHA1_80"));
+      break;
+    case SRTP_AES128_CM_SHA1_32:
+      memcpy(&ret->profile, "SRTP_AES128_CM_SHA1_32", strlen("SRTP_AES128_CM_SHA1_32"));
+      break;
+    }
+
+    return ret;
+  }
+  return NULL;
 }
