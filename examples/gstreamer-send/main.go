@@ -28,7 +28,10 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Create a new RTCPeerConnection
-	peerConnection, _ := webrtc.New(&webrtc.RTCConfiguration{})
+	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{})
+	if err != nil {
+		panic(err)
+	}
 
 	// Create a audio track
 	opusIn, err := peerConnection.AddTrack(webrtc.Opus, 48000)

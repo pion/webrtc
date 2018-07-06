@@ -27,7 +27,10 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Create a new RTCPeerConnection
-	peerConnection, _ := webrtc.New(&webrtc.RTCConfiguration{})
+	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{})
+	if err != nil {
+		panic(err)
+	}
 
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
