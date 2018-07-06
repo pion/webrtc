@@ -144,7 +144,7 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 			if dtlsState != nil && len(in.buffer) > 0 && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
 				decrypted := dtlsState.HandleDTLSPacket(in.buffer)
 				if len(decrypted) > 0 {
-					sctp.HandlePacket(decrypted)
+					sctp.Parse(decrypted)
 				}
 
 				if certPair == nil {
