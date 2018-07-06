@@ -122,13 +122,15 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 		basePriority = basePriority + 1
 		r.ports = append(r.ports, port)
 	}
-	for id, server := range r.config.ICEServers {
-		if server.serverType() != RTCServerTypeSTUN {
-			continue
+	if r.config != nil {
+		for id, server := range r.config.ICEServers {
+			if server.serverType() != RTCServerTypeSTUN {
+				continue
+			}
+			// TODO connect to STUN server
+			_ = id
+			_ = server
 		}
-		// TODO connect to STUN server
-		_ = id
-		_ = server
 	}
 
 	r.LocalDescription = sdp.BaseSessionDescription(&sdp.SessionBuilder{
