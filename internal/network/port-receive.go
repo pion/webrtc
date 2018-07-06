@@ -9,6 +9,7 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -140,14 +141,20 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 			}
 
 			dtlsState := p.dtlsStates[in.srcAddr.String()]
-			if dtlsState != nil && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
-				tmpCertPair := dtlsState.HandleDTLSPacket(in.buffer)
-				if tmpCertPair != nil {
-					certPair = tmpCertPair
-					p.authedConnections = append(p.authedConnections, &authedConnection{
-						pair: certPair,
-						peer: in.srcAddr,
-					})
+			if dtlsState != nil && len(in.buffer) > 0 && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
+				decrypted := dtlsState.HandleDTLSPacket(in.buffer)
+				if len(decrypted) > 0 {
+					sctp.HandlePacket(decrypted)
+				}
+
+				if certPair == nil {
+					certPair = dtlsState.GetCertPair()
+					if certPair != nil {
+						p.authedConnections = append(p.authedConnections, &authedConnection{
+							pair: certPair,
+							peer: in.srcAddr,
+						})
+					}
 				}
 				continue
 			}
@@ -172,5 +179,9 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 
 			}
 		}
+	}
+	dtls.RemoveListener(p.ListeningAddr.String())
+	for _, d := range p.dtlsStates {
+		d.Close()
 	}
 }

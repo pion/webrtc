@@ -105,7 +105,7 @@ func NewState(tlscfg *TLSCfg, isClient bool, src, dst string) (d *State, err err
 	}
 
 	d.sslctx = C.dtls_build_sslctx(d.tlscfg)
-	d.dtlsSession = C.dtls_build_session(d.sslctx, C.bool(!isClient))
+	d.dtlsSession = C.dtls_build_session(d.sslctx, C.bool(!isClient), d.rawSrc, d.rawDst)
 
 	return d, err
 }
@@ -125,25 +125,36 @@ type CertPair struct {
 }
 
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
-func (d *State) HandleDTLSPacket(packet []byte) (certPair *CertPair) {
+func (d *State) HandleDTLSPacket(packet []byte) []byte {
 	packetRaw := C.CBytes(packet)
 	defer C.free(unsafe.Pointer(packetRaw))
 
-	if ret := C.dtls_handle_incoming(d.dtlsSession, d.rawSrc, d.rawDst, packetRaw, C.int(len(packet))); ret != nil {
-		certPair = &CertPair{
+	if ret := C.dtls_handle_incoming(d.dtlsSession, packetRaw, C.int(len(packet))); ret != nil {
+		defer func() {
+			C.free(unsafe.Pointer(ret.buf))
+			C.free(unsafe.Pointer(ret))
+		}()
+		return []byte(C.GoBytes(ret.buf, ret.len))
+	}
+	return nil
+}
+
+// GetCertPair gets the current CertPair if DTLS has finished
+func (d *State) GetCertPair() *CertPair {
+	if ret := C.dtls_get_certpair(d.dtlsSession); ret != nil {
+		defer C.free(unsafe.Pointer(ret))
+		return &CertPair{
 			ClientWriteKey: []byte(C.GoStringN(&ret.client_write_key[0], ret.key_length)),
 			ServerWriteKey: []byte(C.GoStringN(&ret.server_write_key[0], ret.key_length)),
 			Profile:        C.GoString(&ret.profile[0]),
 		}
-		C.free(unsafe.Pointer(ret))
 	}
-
-	return certPair
+	return nil
 }
 
 // DoHandshake sends the DTLS handshake it the remote peer
 func (d *State) DoHandshake() {
-	C.dtls_do_handshake(d.dtlsSession, d.rawSrc, d.rawDst)
+	C.dtls_do_handshake(d.dtlsSession)
 }
 
 // AddListener adds the socket to a map that can be accessed by OpenSSL for sending
@@ -157,4 +168,7 @@ func AddListener(src string, conn *ipv4.PacketConn) {
 // RemoveListener removes the socket from a map that can be accessed by OpenSSL for sending
 // This only needed until DTLS is rewritten in native Go
 func RemoveListener(src string) {
+	listenerMapLock.Lock()
+	delete(listenerMap, src)
+	listenerMapLock.Unlock()
 }

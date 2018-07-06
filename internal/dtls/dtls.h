@@ -32,31 +32,42 @@ typedef struct tlscfg {
 
 typedef struct dtls_sess {
   SSL *ssl;
+
+  char *local_address;
+  char *peer_address;
+
   enum dtls_con_state state;
   enum dtls_con_type type;
   pthread_mutex_t lock;
 } dtls_sess;
 
+typedef struct dtls_decrypted {
+  void *buf;
+  int len;
+} dtls_decrypted;
+
 #define PROFILE_STRING_LENGTH 23
 #define SRTP_MASTER_KEY_KEY_LEN 16
 #define SRTP_MASTER_KEY_SALT_LEN 14
 
-typedef struct dtls_handle_incoming_return {
+typedef struct dtls_cert_pair {
   char client_write_key[SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN];
   char server_write_key[SRTP_MASTER_KEY_KEY_LEN + SRTP_MASTER_KEY_SALT_LEN];
   char profile[PROFILE_STRING_LENGTH];
   int key_length;
-} dtls_handle_incoming_return;
+} dtls_cert_pair;
 
 bool openssl_global_init();
 
 tlscfg *dtls_build_tlscfg();
 SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server);
+dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server, char *src, char *dst);
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess, const char *src, const char *dst);
-dtls_handle_incoming_return *dtls_handle_incoming(dtls_sess *sess, const char *src, const char *dst, void *buf,
-                                                  int len);
+ptrdiff_t dtls_do_handshake(dtls_sess *sess);
+dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len);
+void dtls_handle_outgoing(dtls_sess *sess, void *buf, int len);
+
+dtls_cert_pair *dtls_get_certpair(dtls_sess *sess);
 char *dtls_tlscfg_fingerprint(tlscfg *cfg);
 
 void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session);
