@@ -29,7 +29,7 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Create a new RTCPeerConnection
-	peerConnection := &webrtc.RTCPeerConnection{}
+	peerConnection, _ := webrtc.New(&webrtc.RTCConfiguration{})
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
