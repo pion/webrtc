@@ -113,6 +113,33 @@ func (p *Port) handleSCTP(raw []byte) {
 	fmt.Println(s)
 }
 
+func (p *Port) handleDTLS(raw []byte, srcAddr *net.UDPAddr, certPair *dtls.CertPair) bool {
+	if len(raw) < 0 || (raw[0] < 19 || raw[0] > 65) {
+		return false
+	}
+
+	dtlsState := p.dtlsStates[srcAddr.String()]
+	if dtlsState == nil {
+		return true
+	}
+
+	if decrypted := dtlsState.HandleDTLSPacket(raw); len(decrypted) > 0 {
+		p.handleSCTP(decrypted)
+	}
+
+	if certPair == nil {
+		certPair = dtlsState.GetCertPair()
+		if certPair != nil {
+			p.authedConnections = append(p.authedConnections, &authedConnection{
+				pair: certPair,
+				peer: srcAddr,
+			})
+		}
+	}
+
+	return true
+}
+
 const iceTimeout = time.Second * 10
 const receiveMTU = 8192
 
@@ -148,25 +175,14 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 		case in, inValid := <-incomingPackets:
 			if !inValid {
 				// incomingPackets channel has closed, this port is finished processing
-				return
+				dtls.RemoveListener(p.ListeningAddr.String())
+				for _, d := range p.dtlsStates {
+					d.Close()
+				}
+				break
 			}
 
-			dtlsState := p.dtlsStates[in.srcAddr.String()]
-			if dtlsState != nil && len(in.buffer) > 0 && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
-				decrypted := dtlsState.HandleDTLSPacket(in.buffer)
-				if len(decrypted) > 0 {
-					p.handleSCTP(decrypted)
-				}
-
-				if certPair == nil {
-					certPair = dtlsState.GetCertPair()
-					if certPair != nil {
-						p.authedConnections = append(p.authedConnections, &authedConnection{
-							pair: certPair,
-							peer: in.srcAddr,
-						})
-					}
-				}
+			if p.handleDTLS(in.buffer, in.srcAddr, certPair) {
 				continue
 			}
 
@@ -178,7 +194,7 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 				p.handleSRTP(b, certPair, in.buffer)
 			}
 
-			if dtlsState == nil {
+			if _, ok := p.dtlsStates[in.srcAddr.String()]; !ok {
 				d, err := dtls.NewState(tlscfg, true, p.ListeningAddr.String(), in.srcAddr.String())
 				if err != nil {
 					fmt.Println(err)
@@ -190,9 +206,5 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 
 			}
 		}
-	}
-	dtls.RemoveListener(p.ListeningAddr.String())
-	for _, d := range p.dtlsStates {
-		d.Close()
 	}
 }
