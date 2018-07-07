@@ -13,6 +13,7 @@ import (
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pkg/errors"
 )
 
 type incomingPacket struct {
@@ -102,6 +103,16 @@ func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Ti
 	}
 }
 
+func (p *Port) handleSCTP(raw []byte) {
+	s := &sctp.Packet{}
+	err := s.Unmarshal(raw)
+	if err != nil {
+		fmt.Println(errors.Wrap(err, "Failed to Unmarshal SCTP packet"))
+	}
+
+	fmt.Println(s)
+}
+
 const iceTimeout = time.Second * 10
 const receiveMTU = 8192
 
@@ -144,7 +155,7 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 			if dtlsState != nil && len(in.buffer) > 0 && in.buffer[0] >= 20 && in.buffer[0] <= 64 {
 				decrypted := dtlsState.HandleDTLSPacket(in.buffer)
 				if len(decrypted) > 0 {
-					sctp.Parse(decrypted)
+					p.handleSCTP(decrypted)
 				}
 
 				if certPair == nil {
