@@ -7,11 +7,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ChunkType is an enum for SCTP Chunk Type field
+// This field identifies the type of information contained in the
+// Chunk Value field.
 type ChunkType uint8
 
+// List of known ChunkType enums
 const (
-	DATA = 0
-	INIT = 1
+	DATA ChunkType = 0
+	INIT ChunkType = 1
 )
 
 func (c ChunkType) String() string {
@@ -53,6 +57,7 @@ const (
 	chunkHeaderSize = 4
 )
 
+// Unmarshal populates a Chunk from a raw buffer
 func (c *Chunk) Unmarshal(raw []byte) error {
 	if len(raw) < chunkHeaderSize {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP chunk", len(raw), chunkHeaderSize)
