@@ -54,6 +54,10 @@ const (
 )
 
 func (c *Chunk) Unmarshal(raw []byte) error {
+	if len(raw) < chunkHeaderSize {
+		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP chunk", len(raw), chunkHeaderSize)
+	}
+
 	c.Type = ChunkType(raw[0])
 	c.Flags = byte(raw[1])
 	c.Length = binary.BigEndian.Uint16(raw[2:])
