@@ -1,0 +1,5 @@
+---
+ name: gstreamer-send
+ description: Example of using pion-WebRTC to send video to your browser using GStreamer
+ authors:
+   - Sean DuBois
