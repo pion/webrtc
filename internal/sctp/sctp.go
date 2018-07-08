@@ -45,7 +45,7 @@ type Packet struct {
 	DestinationPort uint16
 	VerificationTag uint32
 	Checksum        uint32
-	Chunks          []*Chunk
+	Chunks          []Chunk
 }
 
 const (
@@ -72,14 +72,20 @@ func (p *Packet) Unmarshal(raw []byte) error {
 			return errors.Errorf("Unable to parse SCTP chunk, not enough data for complete header: offset %d remaining %d", offset, len(raw))
 		}
 
-		c := &Chunk{}
+		var c Chunk
+		switch ChunkType(raw[offset]) {
+		case INIT:
+			c = &Init{}
+		default:
+			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %d", raw[offset])
+		}
+
 		if err := c.Unmarshal(raw[offset:]); err != nil {
 			return err
 		}
 		p.Chunks = append(p.Chunks, c)
-
-		chunkValuePadding := len(c.Value) % 4
-		offset += chunkHeaderSize + len(c.Value) + chunkValuePadding
+		chunkValuePadding := c.valueLength() % 4
+		offset += chunkHeaderSize + c.valueLength() + chunkValuePadding
 	}
 	return nil
 }

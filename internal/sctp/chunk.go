@@ -14,8 +14,9 @@ type ChunkType uint8
 
 // List of known ChunkType enums
 const (
-	DATA ChunkType = 0
-	INIT ChunkType = 1
+	DATA    ChunkType = 0
+	INIT    ChunkType = 1
+	INITACK ChunkType = 2
 )
 
 func (c ChunkType) String() string {
@@ -24,13 +25,15 @@ func (c ChunkType) String() string {
 		return "Payload data"
 	case INIT:
 		return "Initiation"
+	case INITACK:
+		return "Initiation Acknowledgement"
 	default:
 		return fmt.Sprintf("Unknown ChunkType: %d", c)
 	}
 }
 
 /*
-Chunk represents a SCTP Chunk, defined in https://tools.ietf.org/html/rfc4960#section-3.2
+ChunkHeader represents a SCTP Chunk header, defined in https://tools.ietf.org/html/rfc4960#section-3.2
 The figure below illustrates the field format for the chunks to be
 transmitted in the SCTP packet.  Each chunk is formatted with a Chunk
 Type field, a chunk-specific Flag field, a Chunk Length field, and a
@@ -46,7 +49,7 @@ Value field.
 |                                                               |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
-type Chunk struct {
+type ChunkHeader struct {
 	Type   ChunkType
 	Flags  byte
 	Length uint16
@@ -57,8 +60,7 @@ const (
 	chunkHeaderSize = 4
 )
 
-// Unmarshal populates a Chunk from a raw buffer
-func (c *Chunk) Unmarshal(raw []byte) error {
+func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
 	if len(raw) < chunkHeaderSize {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP chunk", len(raw), chunkHeaderSize)
 	}
@@ -93,4 +95,16 @@ func (c *Chunk) Unmarshal(raw []byte) error {
 
 	c.Value = raw[chunkHeaderSize : chunkHeaderSize+valueLength]
 	return nil
+}
+
+func (c *ChunkHeader) valueLength() int {
+	return len(c.Value)
+}
+
+// Chunk represents an SCTP chunk
+type Chunk interface {
+	Unmarshal(raw []byte) error
+	Marshal() ([]byte, error)
+
+	valueLength() int
 }
