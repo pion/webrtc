@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 
 	"fmt"
+	"github.com/pions/webrtc/internal/sctp/params"
 	"github.com/pkg/errors"
 )
 
@@ -109,12 +110,11 @@ func (i *Init) Unmarshal(raw []byte) error {
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	*/
 
-	fmt.Printf("Packet %v\n", i.Value)
 	offset := initChunkMinLength
 	remaining := len(i.Value) - offset
 	for remaining >= 0 {
 		if remaining > initOptionalVarHeaderLength {
-			paramType := ParamType(binary.BigEndian.Uint16(i.Value[offset:]))
+			paramType := params.ParamType(binary.BigEndian.Uint16(i.Value[offset:]))
 			paramLength := binary.BigEndian.Uint16(i.Value[offset+2:])
 			paramLengthPlusPadding := paramLength + getParamPadding(paramLength, 4)
 			fmt.Printf("Param Type: %v:, Param Length: %v\n", paramType, paramLength)
