@@ -3,6 +3,7 @@ package sctp
 import (
 	"encoding/binary"
 
+	"fmt"
 	"github.com/pkg/errors"
 )
 
@@ -57,9 +58,13 @@ type Init struct {
 }
 
 const (
-	initChunkMinLength = 16
-	// initOptionalVarHeaderLength = 4
+	initChunkMinLength          = 16
+	initOptionalVarHeaderLength = 4
 )
+
+func getParamPadding(len uint16, multiple uint16) uint16 {
+	return (multiple - (len % multiple)) % multiple
+}
 
 // Unmarshal populates a Init Chunk from a byte slice
 func (i *Init) Unmarshal(raw []byte) error {
@@ -72,6 +77,14 @@ func (i *Init) Unmarshal(raw []byte) error {
 	} else if len(i.Value) < initChunkMinLength {
 		return errors.Errorf("Chunk Value isn't long enough for mandatory parameters exp: %d actual: %d", initChunkMinLength, len(i.Value))
 	}
+
+	// The Chunk Flags field in INIT is reserved, and all bits in it should
+	// be set to 0 by the sender and ignored by the receiver.  The sequence
+	// of parameters within an INIT can be processed in any order.
+	if i.Flags != 0 {
+		return errors.New("ChunkType of type INIT flags must be all 0")
+	}
+
 	i.initiateTag = binary.BigEndian.Uint32(i.Value[0:])
 	i.advertisedReceiverWindowCredit = binary.BigEndian.Uint32(i.Value[4:])
 	i.numOutboundStreams = binary.BigEndian.Uint16(i.Value[8:])
@@ -95,6 +108,22 @@ func (i *Init) Unmarshal(raw []byte) error {
 		|                                                               |
 		+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	*/
+
+	fmt.Printf("Packet %v\n", i.Value)
+	offset := initChunkMinLength
+	remaining := len(i.Value) - offset
+	for remaining >= 0 {
+		if remaining > initOptionalVarHeaderLength {
+			paramType := ParamType(binary.BigEndian.Uint16(i.Value[offset:]))
+			paramLength := binary.BigEndian.Uint16(i.Value[offset+2:])
+			paramLengthPlusPadding := paramLength + getParamPadding(paramLength, 4)
+			fmt.Printf("Param Type: %v:, Param Length: %v\n", paramType, paramLength)
+			offset += int(paramLengthPlusPadding)
+			remaining -= int(paramLengthPlusPadding)
+		} else {
+			break
+		}
+	}
 	// TODO Sean-Der
 	// offset := initChunkMinLength
 	// for {
