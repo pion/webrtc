@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"hash/crc32"
 
 	"github.com/pkg/errors"
 )
@@ -44,7 +45,6 @@ type Packet struct {
 	SourcePort      uint16
 	DestinationPort uint16
 	VerificationTag uint32
-	Checksum        uint32
 	Chunks          []Chunk
 }
 
@@ -61,7 +61,6 @@ func (p *Packet) Unmarshal(raw []byte) error {
 	p.SourcePort = binary.BigEndian.Uint16(raw[0:])
 	p.DestinationPort = binary.BigEndian.Uint16(raw[2:])
 	p.VerificationTag = binary.BigEndian.Uint32(raw[4:])
-	p.Checksum = binary.BigEndian.Uint32(raw[8:])
 
 	offset := packetHeaderSize
 	for {
@@ -87,5 +86,27 @@ func (p *Packet) Unmarshal(raw []byte) error {
 		chunkValuePadding := c.valueLength() % 4
 		offset += chunkHeaderSize + c.valueLength() + chunkValuePadding
 	}
+	theirChecksum := binary.LittleEndian.Uint32(raw[8:])
+	ourChecksum := generatePacketChecksum(raw)
+	if theirChecksum != ourChecksum {
+		return errors.Errorf("Checksum mismatch theirs: %d ours: %d", theirChecksum, ourChecksum)
+	}
 	return nil
+}
+
+// Marshal populates a raw buffer from a packet
+func (p *Packet) Marshal() ([]byte, error) {
+	return nil, errors.Errorf("Unimplemented")
+}
+
+func generatePacketChecksum(raw []byte) uint32 {
+	rawCopy := make([]byte, len(raw))
+	copy(rawCopy, raw)
+
+	// Clear existing checksum
+	for offset := 8; offset <= 11; offset++ {
+		rawCopy[offset] = 0x00
+	}
+
+	return crc32.Checksum(rawCopy, crc32.MakeTable(crc32.Castagnoli))
 }
