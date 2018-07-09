@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
@@ -113,7 +114,8 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	for id, c := range ice.HostInterfaces() {
+	id := 0
+	for _, c := range ice.HostInterfaces() {
 		port, err := network.NewPort(c+":0", []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
 		if err != nil {
 			return err
@@ -121,15 +123,49 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id+1, basePriority, c, port.ListeningAddr.Port))
 		basePriority = basePriority + 1
 		r.ports = append(r.ports, port)
+		id++
 	}
 	if r.config != nil {
-		for id, server := range r.config.ICEServers {
+		for _, server := range r.config.ICEServers {
 			if server.serverType() != RTCServerTypeSTUN {
 				continue
 			}
-			// TODO connect to STUN server
-			_ = id
-			_ = server
+
+			for _, url := range server.URLs {
+				proto, host, err := protocolAndHost(url)
+				// TODO if one of the URLs does not work we should just ignore it.
+				if err != nil {
+					return err
+				}
+				// TODO Do we want the timeout to be configurable?
+				client, err := stun.NewClient(proto, host, time.Second*5)
+				if err != nil {
+					return err
+				}
+				resp, err := client.Request()
+				if err := client.Close(); err != nil {
+					return err
+				}
+				if err != nil {
+					return err
+				}
+				attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
+				if !ok {
+					continue
+				}
+				var addr stun.XorAddress
+				if err := addr.Unpack(resp, attr); err != nil {
+					return err
+				}
+				port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%d", addr.Port), []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
+				if err != nil {
+					return err
+				}
+				candidates = append(candidates, fmt.Sprintf("candidate:%scandidate %d %s %d %s %d typ srflx", proto, id+1, proto, basePriority, addr.IP.String(), addr.Port))
+				basePriority = basePriority + 1
+				r.ports = append(r.ports, port)
+				id++
+			}
 		}
 	}
 
