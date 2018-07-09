@@ -14,19 +14,52 @@ type ChunkType uint8
 
 // List of known ChunkType enums
 const (
-	DATA    ChunkType = 0
-	INIT    ChunkType = 1
-	INITACK ChunkType = 2
+	Data             ChunkType = 0
+	INIT             ChunkType = 1
+	INITACK          ChunkType = 2
+	SACK             ChunkType = 3
+	HEARTBEAT        ChunkType = 4
+	HEARTBEATACK     ChunkType = 5
+	ABORT            ChunkType = 6
+	SHUTDOWN         ChunkType = 7
+	SHUTDOWNACK      ChunkType = 8
+	ERROR            ChunkType = 9
+	COOKIEECHO       ChunkType = 10
+	COOKIEACK        ChunkType = 11
+	CWR              ChunkType = 13
+	SHUTDOWNCOMPLETE ChunkType = 14
 )
 
 func (c ChunkType) String() string {
 	switch c {
-	case DATA:
+	case Data:
 		return "Payload data"
 	case INIT:
 		return "Initiation"
 	case INITACK:
 		return "Initiation Acknowledgement"
+	case SACK:
+		return "Selective Acknowledgement"
+	case HEARTBEAT:
+		return "Heartbeat"
+	case HEARTBEATACK:
+		return "Heartbeat Acknowledgement"
+	case ABORT:
+		return "Abort"
+	case SHUTDOWN:
+		return "Shutdown"
+	case SHUTDOWNACK:
+		return "Shutdown Acknowledgement"
+	case ERROR:
+		return "Error"
+	case COOKIEECHO:
+		return "Cookie Echo"
+	case COOKIEACK:
+		return "Cookie Acknowledgement"
+	case CWR:
+		return "Congestion Window Reduced"
+	case SHUTDOWNCOMPLETE:
+		return "Shutdown Complete"
 	default:
 		return fmt.Sprintf("Unknown ChunkType: %d", c)
 	}

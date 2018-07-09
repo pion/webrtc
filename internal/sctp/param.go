@@ -1,8 +1,30 @@
-package params
+package sctp
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/pkg/errors"
+)
 
 type ParamType uint16
+
+type Param interface{}
+
+func BuildParam(t ParamType, rawParam []byte) (Param, error) {
+	switch t {
+	case ForwardTSNSupp:
+		return (&ParamForwardTSNSupported{}).Unmarshal(rawParam)
+	case SupportedExt:
+		return (&ParamSupportedExtensions{}).Unmarshal(rawParam)
+	case Random:
+		return (&ParamRandom{}).Unmarshal(rawParam)
+	case ReqHMACAlgo:
+		return (&ParamRequestedHMACAlgorithm{}).Unmarshal(rawParam)
+	case ChunkList:
+		return (&ParamChunkList{}).Unmarshal(rawParam)
+	}
+
+	return nil, errors.Errorf("Unhandled ParamType %v", t)
+}
 
 const (
 	HeartbeanInfo      ParamType = 1     //Heartbeat Info	[RFC4960]
