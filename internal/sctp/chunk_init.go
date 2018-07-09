@@ -72,8 +72,8 @@ func (i *Init) Unmarshal(raw []byte) error {
 		return err
 	}
 
-	if i.Type != INIT {
-		return errors.Errorf("ChunkType is not of type INIT, actually is %s", i.Type.String())
+	if i.typ != INIT {
+		return errors.Errorf("ChunkType is not of type INIT, actually is %s", i.typ.String())
 	} else if len(i.Value) < initChunkMinLength {
 		return errors.Errorf("Chunk Value isn't long enough for mandatory parameters exp: %d actual: %d", initChunkMinLength, len(i.Value))
 	}
@@ -150,4 +150,33 @@ func (i *Init) Unmarshal(raw []byte) error {
 // Marshal generates raw data from a Init struct
 func (i *Init) Marshal() ([]byte, error) {
 	return nil, errors.Errorf("Unimplemented")
+}
+
+func (i *Init) Check() error {
+	// Defines the maximum number of streams the sender of this INIT
+	// chunk allows the peer end to create in this association.  The
+	// value 0 MUST NOT be used.
+	//
+	// Note: There is no negotiation of the actual number of streams but
+	// instead the two endpoints will use the min(requested, offered).
+	// See Section 5.1.1 for details.
+	//
+	// Note: A receiver of an INIT with the MIS value of 0 SHOULD abort
+	// the association.
+	if i.numInboundStreams == 0 {
+		return errors.New("INIT inbound stream request must be > 0")
+	}
+
+	// Defines the number of outbound streams the sender of this INIT
+	// chunk wishes to create in this association.  The value of 0 MUST
+	// NOT be used.
+	//
+	// Note: A receiver of an INIT with the OS value set to 0 SHOULD
+	// abort the association.
+
+	if i.numOutboundStreams == 0 {
+		return errors.New("INIT outbound stream request must be > 0")
+	}
+
+	return nil
 }
