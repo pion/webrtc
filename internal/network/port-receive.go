@@ -103,7 +103,7 @@ func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Ti
 	}
 }
 
-func (p *Port) handleSCTP(raw []byte) {
+func (p *Port) handleSCTP(raw []byte, dtlsState *dtls.State) {
 	s := &sctp.Packet{}
 	if err := s.Unmarshal(raw); err != nil {
 		fmt.Println(errors.Wrap(err, "Failed to Unmarshal SCTP packet"))
@@ -114,6 +114,7 @@ func (p *Port) handleSCTP(raw []byte) {
 		switch v := c.(type) {
 		case *sctp.Init:
 			fmt.Println("Got an init chunk")
+			dtlsState.Send([]byte{0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x08})
 		default:
 			fmt.Println("Unhandled chunk!", v)
 		}
@@ -131,7 +132,7 @@ func (p *Port) handleDTLS(raw []byte, srcAddr *net.UDPAddr, certPair *dtls.CertP
 	}
 
 	if decrypted := dtlsState.HandleDTLSPacket(raw); len(decrypted) > 0 {
-		p.handleSCTP(decrypted)
+		p.handleSCTP(decrypted, dtlsState)
 	}
 
 	if certPair == nil {
