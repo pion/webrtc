@@ -83,7 +83,7 @@ Value field.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 type ChunkHeader struct {
-	Type   ChunkType
+	typ    ChunkType
 	Flags  byte
 	Length uint16
 	Value  []byte
@@ -98,7 +98,7 @@ func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP chunk", len(raw), chunkHeaderSize)
 	}
 
-	c.Type = ChunkType(raw[0])
+	c.typ = ChunkType(raw[0])
 	c.Flags = byte(raw[1])
 	c.Length = binary.BigEndian.Uint16(raw[2:])
 
@@ -130,6 +130,10 @@ func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
 	return nil
 }
 
+func (c *ChunkHeader) Type() ChunkType {
+	return c.typ
+}
+
 func (c *ChunkHeader) valueLength() int {
 	return len(c.Value)
 }
@@ -138,6 +142,8 @@ func (c *ChunkHeader) valueLength() int {
 type Chunk interface {
 	Unmarshal(raw []byte) error
 	Marshal() ([]byte, error)
+	Type() ChunkType
+	Check() error
 
 	valueLength() int
 }

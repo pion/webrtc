@@ -7,6 +7,7 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -36,6 +37,8 @@ type Port struct {
 	// contexts are keyed by IP:PORT:SSRC
 	srtpContextsLock *sync.Mutex
 	srtpContexts     map[string]*srtp.Context
+
+	association *sctp.Association
 
 	conn *ipv4.PacketConn
 }
