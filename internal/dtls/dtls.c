@@ -2,6 +2,18 @@
 
 #define ONE_YEAR 60 * 60 * 24 * 365
 
+// strdup is POSIX extension
+char *dtls_strdup(char *src) {
+  char *str;
+  size_t len = strlen(src) + 1;
+
+  str = malloc(len);
+  if (str) {
+    memcpy(str, src, len);
+  }
+  return str;
+}
+
 bool openssl_global_init() {
   OpenSSL_add_ssl_algorithms();
   SSL_load_error_strings();
@@ -77,8 +89,8 @@ dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_server, char *src, char *
 
   sess->state = is_server;
 
-  sess->local_address = strdup(src);
-  sess->peer_address = strdup(dst);
+  sess->local_address = dtls_strdup(src);
+  sess->peer_address = dtls_strdup(dst);
 
   if (NULL == (sess->ssl = SSL_new(sslcfg))) {
     goto error;
@@ -309,6 +321,23 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
   }
 
   return ret;
+}
+
+bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len) {
+  if (sess->ssl == NULL) {
+    return false;
+  }
+
+  int written = SSL_write(sess->ssl, buf, len);
+  if (written != len) {
+    if (SSL_get_error(sess->ssl, written) == SSL_ERROR_SSL) {
+      fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
+          ERR_reason_error_string(ERR_get_error()));
+    }
+    return false;
+  }
+
+  return true;
 }
 
 char *dtls_tlscfg_fingerprint(tlscfg *cfg) {

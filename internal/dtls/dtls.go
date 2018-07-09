@@ -125,6 +125,7 @@ type CertPair struct {
 }
 
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
+// If there is any data after decoding we pass back to the caller to handler
 func (d *State) HandleDTLSPacket(packet []byte) []byte {
 	packetRaw := C.CBytes(packet)
 	defer C.free(unsafe.Pointer(packetRaw))
@@ -137,6 +138,13 @@ func (d *State) HandleDTLSPacket(packet []byte) []byte {
 		return []byte(C.GoBytes(ret.buf, ret.len))
 	}
 	return nil
+}
+
+// Send takes a un-encrypted packet and sends via DTLS
+func (d *State) Send(packet []byte) bool {
+	packetRaw := C.CBytes(packet)
+	defer C.free(unsafe.Pointer(packetRaw))
+	return bool(C.dtls_handle_outgoing(d.dtlsSession, packetRaw, C.int(len(packet))))
 }
 
 // GetCertPair gets the current CertPair if DTLS has finished
