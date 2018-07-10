@@ -130,6 +130,7 @@ func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
 	return nil
 }
 
+// Type returns the type of Chunk
 func (c *ChunkHeader) Type() ChunkType {
 	return c.typ
 }

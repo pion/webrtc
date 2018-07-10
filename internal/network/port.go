@@ -24,7 +24,8 @@ type Port struct {
 	ListeningAddr *stun.TransportAddr
 	ICEState      ice.ConnectionState
 
-	dtlsStates map[string]*dtls.State
+	dtlsStates      map[string]*dtls.State
+	sctpAssocations map[string]*sctp.Association
 
 	authedConnectionsLock *sync.Mutex
 	authedConnections     []*authedConnection
@@ -60,9 +61,11 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 	dtls.AddListener(srcString, conn)
 
 	p := &Port{
-		ListeningAddr:         addr,
-		conn:                  conn,
-		dtlsStates:            make(map[string]*dtls.State),
+		ListeningAddr:   addr,
+		conn:            conn,
+		dtlsStates:      make(map[string]*dtls.State),
+		sctpAssocations: make(map[string]*sctp.Association),
+
 		bufferTransports:      make(map[uint32]chan<- *rtp.Packet),
 		authedConnectionsLock: &sync.Mutex{},
 
