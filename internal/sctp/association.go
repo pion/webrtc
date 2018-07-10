@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"math"
 )
 
 // AssociationState is an enum for the states that an Association will transition
@@ -104,6 +105,8 @@ func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Ass
 		outboundHandler: outboundHandler,
 		dataHandler:     dataHandler,
 		State:           Open,
+		myMaxNumOutboundStreams: math.MaxUint16,
+		myMaxNumInboundStreams:  math.MaxUint16,
 	}
 }
 
@@ -135,7 +138,7 @@ func min(a, b uint16) uint16 {
 }
 
 func (a *Association) handleChunk(c Chunk) error {
-	if err := c.Check(); err != nil {
+	if _, err := c.Check(); err != nil {
 		errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
 	}
@@ -146,12 +149,12 @@ func (a *Association) handleChunk(c Chunk) error {
 		case Open:
 			a.myMaxNumInboundStreams = min(ct.numInboundStreams, a.myMaxNumInboundStreams)
 			a.myMaxNumOutboundStreams = min(ct.numOutboundStreams, a.myMaxNumOutboundStreams)
-			a.State = CookieEchoed
 
 			// TODO send packet attributes + append InitAck
 			// We should also cache the InitAck to handle CookieEchoed when we get Init
 			outbound := &Packet{}
 			a.outboundHandler(outbound)
+
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
