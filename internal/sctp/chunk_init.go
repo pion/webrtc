@@ -128,22 +128,6 @@ func (i *Init) Unmarshal(raw []byte) error {
 			break
 		}
 	}
-
-	// TODO Sean-Der
-	// offset := initChunkMinLength
-	// for {
-	// 	remaining := len(i.Value) - offset
-	// 	if remaining == 0 {
-	// 		break
-	// 	} else if remaining < initOptionalVarHeaderLength {
-	// 		return errors.Errorf("%d bytes remain in init chunk value, not enough to build optional var header", remaining)
-	// 	}
-
-	// 	attributeType := binary.BigEndian.Uint16(i.Value[offset:])
-	// 	attributeLength := int(binary.BigEndian.Uint16(i.Value[offset+2:]))
-
-	// 	offset += attributeLength
-	// }
 	return nil
 }
 
@@ -152,6 +136,7 @@ func (i *Init) Marshal() ([]byte, error) {
 	return nil, errors.Errorf("Unimplemented")
 }
 
+// Check asserts the validity of this structs values
 func (i *Init) Check() error {
 	// Defines the maximum number of streams the sender of this INIT
 	// chunk allows the peer end to create in this association.  The

@@ -213,9 +213,8 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 				p.sctpAssocations[in.srcAddr.String()] = sctp.NewAssocation(func(pkt *sctp.Packet) {
 					fmt.Printf("Handle packet %v \n", pkt)
 				}, func(data []byte) {
-
+					fmt.Printf("Handle data %v \n", data)
 				})
-
 			}
 		}
 	}
