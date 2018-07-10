@@ -1,6 +1,10 @@
 package sctp
 
-import "github.com/pkg/errors"
+import (
+	"encoding/binary"
+
+	"github.com/pkg/errors"
+)
 
 /*
 InitAck represents an SCTP Chunk of type INIT ACK
@@ -47,17 +51,16 @@ Host Name Address (Note 3)          Optional    11<Paste>
 */
 type InitAck struct {
 	ChunkHeader
-	// initiateTag                    uint32
-	// advertisedReceiverWindowCredit uint32
-	// numOutboundStreams             uint16
-	// numInboundStreams              uint16
-	// initialTSN                     uint32
-	// optionalParams                 []byte
+	initiateTag                    uint32
+	advertisedReceiverWindowCredit uint32
+	numOutboundStreams             uint16
+	numInboundStreams              uint16
+	initialTSN                     uint32
+	params                         []Param
 }
 
 const (
-// initAckChunkMinLength          = 16
-// initAckOptionalVarHeaderLength = 4
+	initAckChunkMinLength = 16
 )
 
 // Unmarshal populates a InitAck Chunk from a byte slice
@@ -67,5 +70,18 @@ func (i *InitAck) Unmarshal(raw []byte) error {
 
 // Marshal serializes a InitAck to bytes
 func (i *InitAck) Marshal() ([]byte, error) {
-	return nil, errors.Errorf("Unimplemented")
+	out := make([]byte, initAckChunkMinLength)
+	binary.BigEndian.PutUint32(out[0:], i.initiateTag)
+	binary.BigEndian.PutUint32(out[4:], i.advertisedReceiverWindowCredit)
+	binary.BigEndian.PutUint16(out[8:], i.numOutboundStreams)
+	binary.BigEndian.PutUint16(out[10:], i.numInboundStreams)
+	binary.BigEndian.PutUint32(out[12:], i.initialTSN)
+
+	// TODO fill in params
+	return out, nil
+}
+
+// Check asserts the validity of this structs values
+func (i *InitAck) Check() error {
+	return nil
 }

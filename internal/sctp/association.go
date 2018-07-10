@@ -25,6 +25,8 @@ const (
 
 func (a AssociationState) String() string {
 	switch a {
+	case Open:
+		return "Open"
 	case CookieEchoed:
 		return "CookieEchoed"
 	case CookieWait:
@@ -70,6 +72,8 @@ type Association struct {
 	myMaxNumInboundStreams  uint16
 	myMaxNumOutboundStreams uint16
 
+	// TODO are these better as channels
+	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func(*Packet)
 	dataHandler     func([]byte)
 }
@@ -143,6 +147,11 @@ func (a *Association) handleChunk(c Chunk) error {
 			a.myMaxNumInboundStreams = min(ct.numInboundStreams, a.myMaxNumInboundStreams)
 			a.myMaxNumOutboundStreams = min(ct.numOutboundStreams, a.myMaxNumOutboundStreams)
 			a.State = CookieEchoed
+
+			// TODO send packet attributes + append InitAck
+			// We should also cache the InitAck to handle CookieEchoed when we get Init
+			outbound := &Packet{}
+			a.outboundHandler(outbound)
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
