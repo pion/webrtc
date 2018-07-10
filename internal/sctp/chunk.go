@@ -144,7 +144,7 @@ type Chunk interface {
 	Unmarshal(raw []byte) error
 	Marshal() ([]byte, error)
 	Type() ChunkType
-	Check() error
+	Check() (bool, error)
 
 	valueLength() int
 }
