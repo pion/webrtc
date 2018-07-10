@@ -103,14 +103,16 @@ func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Ti
 	}
 }
 
-func (p *Port) handleSCTP(raw []byte, dtlsState *dtls.State) {
-	p := &sctp.Packet{}
-	if err := p.Unmarshal(raw); err != nil {
+func (p *Port) handleSCTP(raw []byte, a *sctp.Association) {
+	pkt := &sctp.Packet{}
+	if err := pkt.Unmarshal(raw); err != nil {
 		fmt.Println(errors.Wrap(err, "Failed to Unmarshal SCTP packet"))
 		return
 	}
 
-	p.association.PushPacket(p)
+	if err := a.PushPacket(pkt); err != nil {
+		fmt.Println(errors.Wrap(err, "Failed to push SCTP packet"))
+	}
 }
 
 func (p *Port) handleDTLS(raw []byte, srcAddr *net.UDPAddr, certPair *dtls.CertPair) bool {
@@ -119,12 +121,14 @@ func (p *Port) handleDTLS(raw []byte, srcAddr *net.UDPAddr, certPair *dtls.CertP
 	}
 
 	dtlsState := p.dtlsStates[srcAddr.String()]
-	if dtlsState == nil {
+	association := p.sctpAssocations[srcAddr.String()]
+	if dtlsState == nil || association == nil {
+		fmt.Printf("Got DTLS packet but no DTLS/SCTP state to handle it %v %v \n", dtlsState, association)
 		return true
 	}
 
 	if decrypted := dtlsState.HandleDTLSPacket(raw); len(decrypted) > 0 {
-		p.handleSCTP(decrypted, dtlsState)
+		p.handleSCTP(decrypted, association)
 	}
 
 	if certPair == nil {
@@ -175,10 +179,13 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 		case in, inValid := <-incomingPackets:
 			if !inValid {
 				// incomingPackets channel has closed, this port is finished processing
-				dtls.RemoveListener(p.ListeningAddr.String())
+				for _, a := range p.sctpAssocations {
+					a.Close()
+				}
 				for _, d := range p.dtlsStates {
 					d.Close()
 				}
+				dtls.RemoveListener(p.ListeningAddr.String())
 				break
 			}
 
@@ -203,6 +210,11 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 
 				d.DoHandshake()
 				p.dtlsStates[in.srcAddr.String()] = d
+				p.sctpAssocations[in.srcAddr.String()] = sctp.NewAssocation(func(pkt *sctp.Packet) {
+					fmt.Printf("Handle packet %v \n", pkt)
+				}, func(data []byte) {
+
+				})
 
 			}
 		}
