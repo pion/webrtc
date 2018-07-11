@@ -13,6 +13,7 @@ type Param interface {
 	Length() int
 }
 
+// BuildParam delegates the building of a parameter from raw bytes to the correct structure
 func BuildParam(t ParamType, rawParam []byte) (Param, error) {
 	switch t {
 	case ForwardTSNSupp:
@@ -30,6 +31,7 @@ func BuildParam(t ParamType, rawParam []byte) (Param, error) {
 	return nil, errors.Errorf("Unhandled ParamType %v", t)
 }
 
+// Parameter Types
 const (
 	HeartbeanInfo      ParamType = 1     //Heartbeat Info	[RFC4960]
 	IPV4Addr           ParamType = 5     //IPv4 Address	[RFC4960]
