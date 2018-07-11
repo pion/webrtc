@@ -5,6 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 	"math"
+	"math/rand"
+	"time"
 )
 
 // AssociationState is an enum for the states that an Association will transition
@@ -65,14 +67,30 @@ func (a AssociationState) String() string {
 //               Note: No "CLOSED" state is illustrated since if a
 //               association is "CLOSED" its TCB SHOULD be removed.
 type Association struct {
-	PeerVerificationTag uint32
-	MyVerificationTag   uint32
-	State               AssociationState
+	peerVerificationTag uint32
+	myVerificationTag   uint32
+	state               AssociationState
+	//peerTransportList
+	//primaryPath
+	//overallErrorCount
+	//overallErrorThreshold
+	//peerReceiverWindow (peerRwnd)
+	myNextTSN   uint32 // nextTSN
+	peerLastTSN uint32 // lastRcvdTSN
+	//peerMissingTSN (MappingArray)
+	//ackState
+	//inboundStreams
+	//outboundStreams
+	//reassemblyQueue
+	//localTransportAddressList
+	//associationPTMU
 
 	// Non-RFC internal data
+	sourcePort              uint16
+	destinationPort         uint16
 	myMaxNumInboundStreams  uint16
 	myMaxNumOutboundStreams uint16
-
+	myRreceiverWindowCredit uint32
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func(*Packet)
@@ -86,7 +104,7 @@ func (a *Association) PushPacket(p *Packet) error {
 	}
 
 	for _, c := range p.Chunks {
-		if err := a.handleChunk(c); err != nil {
+		if err := a.handleChunk(p, c); err != nil {
 			return errors.Wrap(err, "Failed handling chunk")
 		}
 	}
@@ -101,16 +119,40 @@ func (a *Association) Close() error {
 
 // NewAssocation creates a new Association and the state needed to manage it
 func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Association {
+	rs := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(rs)
+
 	return &Association{
-		outboundHandler: outboundHandler,
-		dataHandler:     dataHandler,
-		State:           Open,
+		myVerificationTag: r.Uint32(),
+		myNextTSN:         r.Uint32(),
+		outboundHandler:   outboundHandler,
+		dataHandler:       dataHandler,
+		state:             Open,
 		myMaxNumOutboundStreams: math.MaxUint16,
 		myMaxNumInboundStreams:  math.MaxUint16,
 	}
 }
 
 func checkPacket(p *Packet) error {
+	// All packets must adhere to these rules
+
+	// This is the SCTP sender's port number.  It can be used by the
+	// receiver in combination with the source IP address, the SCTP
+	// destination port, and possibly the destination IP address to
+	// identify the association to which this packet belongs.  The port
+	// number 0 MUST NOT be used.
+	if p.SourcePort == 0 {
+		return errors.New("SCTP Packet must not have a source port of 0")
+	}
+
+	// This is the SCTP port number to which this packet is destined.
+	// The receiving host will use this port number to de-multiplex the
+	// SCTP packet to the correct receiving endpoint/application.  The
+	// port number 0 MUST NOT be used.
+	if p.DestinationPort == 0 {
+		return errors.New("SCTP Packet must not have a destination port of 0")
+	}
+
 	for _, c := range p.Chunks {
 		switch c.(type) {
 		case *Init:
@@ -121,6 +163,8 @@ func checkPacket(p *Packet) error {
 				return errors.New("INIT chunk must not be bundled with any other chunk")
 			}
 
+			// A packet containing an INIT chunk MUST have a zero Verification
+			// Tag.
 			if p.VerificationTag != 0 {
 				return errors.Errorf("INIT chunk expects a verification tag of 0 on the packet when out-of-the-blue")
 			}
@@ -137,7 +181,38 @@ func min(a, b uint16) uint16 {
 	return b
 }
 
-func (a *Association) handleChunk(c Chunk) error {
+func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
+
+	// Should we be setting any of these permanently until we've ACKed further?
+	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
+	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
+	a.peerVerificationTag = i.initiateTag
+	a.sourcePort = p.DestinationPort
+	a.destinationPort = p.SourcePort
+
+	// 13.2 This is the last TSN received in sequence.  This value
+	// is set initially by taking the peer's initial TSN,
+	// received in the INIT or INIT ACK chunk, and
+	// subtracting one from it.
+	a.peerLastTSN = i.initialTSN - 1
+
+	outbound := &Packet{}
+	outbound.VerificationTag = a.peerVerificationTag
+	outbound.SourcePort = a.sourcePort
+	outbound.DestinationPort = a.destinationPort
+	outbound.Chunks = []Chunk{&InitAck{ChunkHeader{}, InitCommon{
+		initialTSN:                     a.myNextTSN,
+		numOutboundStreams:             a.myMaxNumOutboundStreams,
+		numInboundStreams:              a.myMaxNumInboundStreams,
+		initiateTag:                    a.myVerificationTag,
+		advertisedReceiverWindowCredit: a.myRreceiverWindowCredit,
+	}}}
+
+	return outbound, nil
+
+}
+
+func (a *Association) handleChunk(p *Packet, c Chunk) error {
 	if _, err := c.Check(); err != nil {
 		errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
@@ -145,26 +220,24 @@ func (a *Association) handleChunk(c Chunk) error {
 
 	switch ct := c.(type) {
 	case *Init:
-		switch a.State {
+		switch a.state {
 		case Open:
-			a.myMaxNumInboundStreams = min(ct.numInboundStreams, a.myMaxNumInboundStreams)
-			a.myMaxNumOutboundStreams = min(ct.numOutboundStreams, a.myMaxNumOutboundStreams)
-
-			// TODO send packet attributes + append InitAck
-			// We should also cache the InitAck to handle CookieEchoed when we get Init
-			outbound := &Packet{}
-			a.outboundHandler(outbound)
-
+			p, err := a.handleInit(p, ct)
+			if err != nil {
+				return errors.Wrap(err, "Failure handling INIT")
+			}
+			a.outboundHandler(p)
+			return nil
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
 			// respond with an INIT ACK using the same parameters it sent in its
 			// original INIT chunk (including its Initiate Tag, unchanged)
-			return errors.Errorf("TODO respond with original cookie %s", a.State)
+			return errors.Errorf("TODO respond with original cookie %s", a.state)
 		default:
 			// 5.2.2.  Unexpected INIT in States Other than CLOSED, COOKIE-ECHOED,
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
-			return errors.Errorf("TODO Handle Init when in state %s", a.State)
+			return errors.Errorf("TODO Handle Init when in state %s", a.state)
 		}
 	}
 
