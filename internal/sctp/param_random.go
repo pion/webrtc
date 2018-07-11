@@ -1,19 +1,16 @@
 package sctp
 
-import "github.com/pkg/errors"
-
 type ParamRandom struct {
-	Raw []byte
+	ParamHeader
+	RandomData []byte
 }
 
 func (r *ParamRandom) Marshal() ([]byte, error) {
-	return nil, errors.New("Not implemented")
+	return r.ParamHeader.Marshal(Random, r.RandomData)
 }
 
 func (r *ParamRandom) Unmarshal(raw []byte) (Param, error) {
-	r.Raw = raw
-
+	r.ParamHeader.Unmarshal(raw)
+	r.RandomData = r.raw
 	return r, nil
 }
-
-func (r *ParamRandom) Value() []byte { return r.Raw }

@@ -1,19 +1,22 @@
 package sctp
 
-import "github.com/pkg/errors"
-
 type ParamChunkList struct {
-	Raw        []byte
+	ParamHeader
 	ChunkTypes []ChunkType
 }
 
 func (c *ParamChunkList) Marshal() ([]byte, error) {
-	return nil, errors.New("Not implemented")
+	r := make([]byte, len(c.ChunkTypes))
+	for i, t := range c.ChunkTypes {
+		r[i] = byte(t)
+	}
+
+	return c.ParamHeader.Marshal(ChunkList, r)
 }
 
 func (c *ParamChunkList) Unmarshal(raw []byte) (Param, error) {
-	c.Raw = raw
-	for t := range raw {
+	c.ParamHeader.Unmarshal(raw)
+	for t := range c.raw {
 		c.ChunkTypes = append(c.ChunkTypes, ChunkType(t))
 	}
 

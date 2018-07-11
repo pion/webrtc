@@ -1,17 +1,15 @@
 package sctp
 
-import "github.com/pkg/errors"
-
 type ParamForwardTSNSupported struct {
-	Raw        []byte
+	ParamHeader
 	ChunkTypes []ChunkType
 }
 
 func (f *ParamForwardTSNSupported) Marshal() ([]byte, error) {
-	return nil, errors.New("Not implemented")
+	return f.ParamHeader.Marshal(ForwardTSNSupp, []byte{})
 }
 
 func (f *ParamForwardTSNSupported) Unmarshal(raw []byte) (Param, error) {
-	f.Raw = raw
+	f.ParamHeader.Unmarshal(raw)
 	return f, nil
 }

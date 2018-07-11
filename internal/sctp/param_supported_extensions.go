@@ -1,21 +1,31 @@
 package sctp
 
-import "github.com/pkg/errors"
+import (
+	"fmt"
+)
 
 type ParamSupportedExtensions struct {
+	ParamHeader
 	Raw        []byte
 	ChunkTypes []ChunkType
 }
 
 func (s *ParamSupportedExtensions) Marshal() ([]byte, error) {
-	return nil, errors.New("Not implemented")
+	r := make([]byte, len(s.ChunkTypes))
+	for i, c := range s.ChunkTypes {
+		r[i] = byte(c)
+	}
+
+	return s.ParamHeader.Marshal(SupportedExt, r)
 }
 
 func (s *ParamSupportedExtensions) Unmarshal(raw []byte) (Param, error) {
-	s.Raw = raw
-	for t := range raw {
+	s.ParamHeader.Unmarshal(raw)
+
+	for t := range s.raw {
 		s.ChunkTypes = append(s.ChunkTypes, ChunkType(t))
 	}
+	fmt.Print(s.ChunkTypes)
 
 	return s, nil
 }
