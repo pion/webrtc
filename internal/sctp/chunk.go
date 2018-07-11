@@ -83,27 +83,27 @@ Value field.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 type ChunkHeader struct {
-	typ    ChunkType
-	Flags  byte
-	Length uint16
-	Value  []byte
+	typ   ChunkType
+	Flags byte
+	Value []byte
 }
 
 const (
 	chunkHeaderSize = 4
 )
 
-func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
+// Unmarshal populates a ChunkHeader from a raw byte[]
+func (c *ChunkHeader) Unmarshal(raw []byte) error {
 	if len(raw) < chunkHeaderSize {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP chunk", len(raw), chunkHeaderSize)
 	}
 
 	c.typ = ChunkType(raw[0])
 	c.Flags = byte(raw[1])
-	c.Length = binary.BigEndian.Uint16(raw[2:])
+	length := binary.BigEndian.Uint16(raw[2:])
 
 	// Length includes Chunk header
-	valueLength := int(c.Length - chunkHeaderSize)
+	valueLength := int(length - chunkHeaderSize)
 	lengthAfterValue := len(raw) - (chunkHeaderSize + int(valueLength))
 
 	if lengthAfterValue < 0 {
@@ -128,6 +128,16 @@ func (c *ChunkHeader) unmarshalHeader(raw []byte) error {
 
 	c.Value = raw[chunkHeaderSize : chunkHeaderSize+valueLength]
 	return nil
+}
+
+// Marshal populates a raw byte[] from a ChunkHeader
+func (c *ChunkHeader) Marshal(valueLength int) ([]byte, error) {
+	raw := make([]byte, 4)
+
+	raw[0] = uint8(c.typ)
+	raw[1] = c.Flags
+	binary.BigEndian.PutUint16(raw[2:], uint16(valueLength+4))
+	return raw, nil
 }
 
 // Type returns the type of Chunk

@@ -1,6 +1,7 @@
 package sctp
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -33,5 +34,21 @@ func TestPacketUnmarshal(t *testing.T) {
 
 	if err := pkt.Unmarshal(rawChunk); err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal failed, has chunk"))
+	}
+}
+
+func TestPacketMarshal(t *testing.T) {
+	pkt := &Packet{}
+
+	headerOnly := []byte{0x13, 0x88, 0x13, 0x88, 0x00, 0x00, 0x00, 0x00, 0x06, 0xa9, 0x00, 0xe1}
+	if err := pkt.Unmarshal(headerOnly); err != nil {
+		t.Error(errors.Wrap(err, "Unmarshal failed for SCTP packet with no chunks"))
+	}
+
+	headerOnlyMarshaled, err := pkt.Marshal()
+	if err != nil {
+		t.Error(errors.Wrap(err, "Marshal failed for SCTP packet with no chunks"))
+	} else if !bytes.Equal(headerOnly, headerOnlyMarshaled) {
+		t.Error(errors.Errorf("Unmarshal/Marshaled header only packet did not match \nheaderOnly: % 02x \nheaderOnlyMarshaled % 02x", headerOnly, headerOnlyMarshaled))
 	}
 }

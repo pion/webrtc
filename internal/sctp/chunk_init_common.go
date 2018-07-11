@@ -2,11 +2,12 @@ package sctp
 
 import (
 	"encoding/binary"
+
 	"github.com/pkg/errors"
 )
 
 /*
-Init represents an SCTP Chunk body of type INIT and INIT ACK
+InitCommon represents an SCTP Chunk body of type INIT and INIT ACK
 
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
