@@ -1,46 +1,23 @@
 package sctp
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
-// Init represents an SCTP Chunk of type INIT
-//
-//  0                   1                   2                   3
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |   Type = 1    |  Chunk Flags  |      Chunk Length             |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                         Initiate Tag                          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |           Advertised Receiver Window Credit (a_rwnd)          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |  Number of Outbound Streams   |  Number of Inbound Streams    |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                          Initial TSN                          |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                                                               |
-// |              Optional/Variable-Length Parameters              |
-// |                                                               |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-// The INIT chunk contains the following parameters.  Unless otherwise
-// noted, each parameter MUST only be included once in the INIT chunk.
-//
-// Fixed Parameters                     Status
-// ----------------------------------------------
-// Initiate Tag                        Mandatory
-// Advertised Receiver Window Credit   Mandatory
-// Number of Outbound Streams          Mandatory
-// Number of Inbound Streams           Mandatory
-// Initial TSN                         Mandatory
-//
-// Variable Parameters                  Status     Type Value
-// -------------------------------------------------------------
-// IPv4 Address (Note 1)               Optional    5
-// IPv6 Address (Note 1)               Optional    6
-// Cookie Preservative                 Optional    9
-// Reserved for ECN Capable (Note 2)   Optional    32768 (0x8000)
-// Host Name Address (Note 3)          Optional    11
-// Supported Address Types (Note 4)    Optional    12
+/*
+Init represents an SCTP Chunk of type INIT
+
+See InitCommon for the fixed headers
+
+Variable Parameters                  Status     Type Value
+-------------------------------------------------------------
+IPv4 Address (Note 1)               Optional    5
+IPv6 Address (Note 1)               Optional    6
+Cookie Preservative                 Optional    9
+Reserved for ECN Capable (Note 2)   Optional    32768 (0x8000)
+Host Name Address (Note 3)          Optional    11
+Supported Address Types (Note 4)    Optional    12
+*/
 type Init struct {
 	ChunkHeader
 	InitCommon
@@ -48,7 +25,7 @@ type Init struct {
 
 // Unmarshal populates a Init Chunk from a byte slice
 func (i *Init) Unmarshal(raw []byte) error {
-	if err := i.unmarshalHeader(raw); err != nil {
+	if err := i.ChunkHeader.Unmarshal(raw); err != nil {
 		return err
 	}
 

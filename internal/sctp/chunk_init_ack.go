@@ -7,35 +7,7 @@ import (
 /*
 InitAck represents an SCTP Chunk of type INIT ACK
 
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   Type = 2    |  Chunk Flags  |      Chunk Length             |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Initiate Tag                          |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|              Advertised Receiver Window Credit                |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|  Number of Outbound Streams   |  Number of Inbound Streams    |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          Initial TSN                          |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                                                               |
-|              Optional/Variable-Length Parameters              |
-|                                                               |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-
-The INIT ACK chunk contains the following parameters.  Unless otherwise
-noted, each parameter MUST only be included once in the INIT ACK chunk.
-
-Fixed Parameters                     Status
-----------------------------------------------
-Initiate Tag                        Mandatory
-Advertised Receiver Window Credit   Mandatory
-Number of Outbound Streams          Mandatory
-Number of Inbound Streams           Mandatory
-Initial TSN                         Mandatory
+See InitCommon for the fixed headers
 
 Variable Parameters                  Status     Type Value
 -------------------------------------------------------------
@@ -54,7 +26,7 @@ type InitAck struct {
 
 // Unmarshal populates a Init Chunk from a byte slice
 func (i *InitAck) Unmarshal(raw []byte) error {
-	if err := i.unmarshalHeader(raw); err != nil {
+	if err := i.ChunkHeader.Unmarshal(raw); err != nil {
 		return err
 	}
 
@@ -80,13 +52,17 @@ func (i *InitAck) Unmarshal(raw []byte) error {
 
 // Marshal generates raw data from a Init struct
 func (i *InitAck) Marshal() ([]byte, error) {
-	out, err := i.InitCommon.Marshal()
+	initShared, err := i.InitCommon.Marshal()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed marshalling INIT common data")
 	}
 
-	// Serialize the INIT params
-	return out, nil
+	chunkHeader, err := i.ChunkHeader.Marshal(len(initShared))
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed marshalling InitAck Chunk Header")
+	}
+
+	return append(chunkHeader, initShared...), nil
 }
 
 // Check asserts the validity of this structs values

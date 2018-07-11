@@ -3,10 +3,11 @@ package sctp
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // AssociationState is an enum for the states that an Association will transition

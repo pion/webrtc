@@ -76,7 +76,7 @@ func (p *Packet) Unmarshal(raw []byte) error {
 		case INIT:
 			c = &Init{}
 		default:
-			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %d", raw[offset])
+			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", ChunkType(raw[offset]).String())
 		}
 
 		if err := c.Unmarshal(raw[offset:]); err != nil {
@@ -96,7 +96,32 @@ func (p *Packet) Unmarshal(raw []byte) error {
 
 // Marshal populates a raw buffer from a packet
 func (p *Packet) Marshal() ([]byte, error) {
-	return nil, errors.Errorf("Unimplemented")
+	raw := make([]byte, packetHeaderSize)
+
+	// Populate static headers
+	// 8-12 is Checksum which will be populated when packet is complete
+	binary.BigEndian.PutUint16(raw[0:], p.SourcePort)
+	binary.BigEndian.PutUint16(raw[2:], p.DestinationPort)
+	binary.BigEndian.PutUint32(raw[4:], p.VerificationTag)
+
+	// Populate chunks
+	for _, c := range p.Chunks {
+		chunkRaw, err := c.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		raw = append(raw, chunkRaw...)
+	}
+
+	paddingNeeded := len(raw) % 4
+	if paddingNeeded != 0 {
+		raw = append(raw, make([]byte, paddingNeeded)...)
+	}
+
+	// Checksum is already in BigEndian
+	// Using LittleEndian.PutUint32 stops it from being flipped
+	binary.LittleEndian.PutUint32(raw[8:], generatePacketChecksum(raw))
+	return raw, nil
 }
 
 func generatePacketChecksum(raw []byte) uint32 {
