@@ -3,6 +3,8 @@ package webrtc
 import (
 	"fmt"
 	"math/rand"
+	"net"
+	"net/url"
 	"sync"
 	"time"
 
@@ -131,8 +133,8 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 				continue
 			}
 
-			for _, url := range server.URLs {
-				proto, host, err := protocolAndHost(url)
+			for _, iceURL := range server.URLs {
+				proto, host, err := protocolAndHost(iceURL)
 				// TODO if one of the URLs does not work we should just ignore it.
 				if err != nil {
 					return err
@@ -142,6 +144,9 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 				if err != nil {
 					return err
 				}
+				u, _ := url.Parse(client.LocalAddr().String())
+				_, localPort, _ := net.SplitHostPort(u.Host)
+
 				resp, err := client.Request()
 				if err := client.Close(); err != nil {
 					return err
@@ -157,11 +162,11 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 				if err := addr.Unpack(resp, attr); err != nil {
 					return err
 				}
-				port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%d", addr.Port), []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
+				port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%s", localPort), []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
 				if err != nil {
 					return err
 				}
-				candidates = append(candidates, fmt.Sprintf("candidate:%scandidate %d %s %d %s %d typ srflx", proto, id+1, proto, basePriority, addr.IP.String(), addr.Port))
+				candidates = append(candidates, fmt.Sprintf("candidate:%scandidate %d %s %d %s %s typ srflx", proto, id+1, proto, basePriority, addr.IP.String(), localPort))
 				basePriority = basePriority + 1
 				r.ports = append(r.ports, port)
 				id++
