@@ -31,20 +31,27 @@ func (c HMACAlgorithm) String() string {
 }
 
 type ParamRequestedHMACAlgorithm struct {
-	Raw                 []byte
+	ParamHeader
 	AvailableAlgorithms []HMACAlgorithm
 }
 
 func (r *ParamRequestedHMACAlgorithm) Marshal() ([]byte, error) {
-	return nil, errors.New("Not implemented")
+	rawParam := make([]byte, len(r.AvailableAlgorithms)*2)
+	i := 0
+	for _, a := range r.AvailableAlgorithms {
+		binary.BigEndian.PutUint16(rawParam[i:], uint16(a))
+		i += 2
+	}
+
+	return r.ParamHeader.Marshal(ReqHMACAlgo, rawParam)
 }
 
 func (r *ParamRequestedHMACAlgorithm) Unmarshal(raw []byte) (Param, error) {
-	r.Raw = raw
+	r.ParamHeader.Unmarshal(raw)
 
 	i := 0
-	for i < len(raw) {
-		a := HMACAlgorithm(binary.BigEndian.Uint16(raw[i:]))
+	for i < len(r.raw) {
+		a := HMACAlgorithm(binary.BigEndian.Uint16(r.raw[i:]))
 		switch a {
 		case HMACSHA128:
 			fallthrough

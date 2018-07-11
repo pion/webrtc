@@ -88,16 +88,13 @@ func (i *InitCommon) Unmarshal(raw []byte) error {
 	for remaining > 0 {
 		if remaining > initOptionalVarHeaderLength {
 			paramType := ParamType(binary.BigEndian.Uint16(raw[offset:]))
-			paramLengthPlusHeader := binary.BigEndian.Uint16(raw[offset+2:])
-			paramLengthPlusPadding := paramLengthPlusHeader + getParamPadding(paramLengthPlusHeader, 4)
-			paramLength := paramLengthPlusHeader - initOptionalVarHeaderLength
-			p, err := BuildParam(paramType, raw[offset+4:offset+4+int(paramLength)])
+			p, err := BuildParam(paramType, raw[offset:])
 			if err != nil {
 				return errors.Wrap(err, "Failed unmarshalling param in Init Chunk")
 			}
 			i.params = append(i.params, p)
-			offset += int(paramLengthPlusPadding)
-			remaining -= int(paramLengthPlusPadding)
+			offset += int(p.Length())
+			remaining -= int(p.Length())
 		} else {
 			break
 		}

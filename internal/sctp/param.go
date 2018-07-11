@@ -5,9 +5,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ParamType represents a SCTP INIT/INITACK parameter
 type ParamType uint16
 
-type Param interface{}
+// Param interface
+type Param interface {
+	Length() int
+}
 
 func BuildParam(t ParamType, rawParam []byte) (Param, error) {
 	switch t {
