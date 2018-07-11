@@ -4,6 +4,21 @@ import (
 	"fmt"
 )
 
+func chunkTypeIntersect(l, r []ChunkType) (c []ChunkType) {
+	m := make(map[ChunkType]bool)
+
+	for _, ct := range l {
+		m[ct] = true
+	}
+
+	for _, ct := range r {
+		if _, ok := m[ct]; ok {
+			c = append(c, ct)
+		}
+	}
+	return
+}
+
 type ParamSupportedExtensions struct {
 	ParamHeader
 	Raw        []byte

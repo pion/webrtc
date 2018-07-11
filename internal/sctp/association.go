@@ -201,13 +201,17 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 	outbound.VerificationTag = a.peerVerificationTag
 	outbound.SourcePort = a.sourcePort
 	outbound.DestinationPort = a.destinationPort
-	outbound.Chunks = []Chunk{&InitAck{ChunkHeader{}, InitCommon{
-		initialTSN:                     a.myNextTSN,
-		numOutboundStreams:             a.myMaxNumOutboundStreams,
-		numInboundStreams:              a.myMaxNumInboundStreams,
-		initiateTag:                    a.myVerificationTag,
-		advertisedReceiverWindowCredit: a.myRreceiverWindowCredit,
-	}}}
+
+	initAck := &InitAck{}
+
+	initAck.initialTSN = a.myNextTSN
+	initAck.numOutboundStreams = a.myMaxNumOutboundStreams
+	initAck.numInboundStreams = a.myMaxNumInboundStreams
+	initAck.initiateTag = a.myVerificationTag
+	initAck.advertisedReceiverWindowCredit = a.myRreceiverWindowCredit
+
+	//initAck.params = append(initAck.params, )
+	outbound.Chunks = []Chunk{}
 
 	return outbound, nil
 
