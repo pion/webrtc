@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"net/url"
 	"sync"
 	"time"
 
@@ -116,16 +115,14 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 
 	candidates := []string{}
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	id := 0
 	for _, c := range ice.HostInterfaces() {
 		port, err := network.NewPort(c+":0", []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
 		if err != nil {
 			return err
 		}
-		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate %d udp %d %s %d typ host", id+1, basePriority, c, port.ListeningAddr.Port))
+		candidates = append(candidates, fmt.Sprintf("candidate:udpcandidate 1 udp %d %s %d typ host", basePriority, c, port.ListeningAddr.Port))
 		basePriority = basePriority + 1
 		r.ports = append(r.ports, port)
-		id++
 	}
 	if r.config != nil {
 		for _, server := range r.config.ICEServers {
@@ -137,39 +134,44 @@ func (r *RTCPeerConnection) CreateAnswer() error {
 				proto, host, err := protocolAndHost(iceURL)
 				// TODO if one of the URLs does not work we should just ignore it.
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "Failed to parse ICE URL")
 				}
 				// TODO Do we want the timeout to be configurable?
 				client, err := stun.NewClient(proto, host, time.Second*5)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "Failed to create STUN client")
 				}
-				u, _ := url.Parse(client.LocalAddr().String())
-				_, localPort, _ := net.SplitHostPort(u.Host)
+				localAddr, ok := client.LocalAddr().(*net.UDPAddr)
+				if !ok {
+					return errors.Errorf("Failed to cast STUN client to UDPAddr")
+				}
 
 				resp, err := client.Request()
-				if err := client.Close(); err != nil {
-					return err
-				}
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "Failed to make STUN request")
 				}
+
+				if err := client.Close(); err != nil {
+					return errors.Wrapf(err, "Failed to close STUN client")
+				}
+
 				attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
 				if !ok {
-					continue
+					return errors.Errorf("Got respond from STUN server that did not contain XORAddress")
 				}
+
 				var addr stun.XorAddress
 				if err := addr.Unpack(resp, attr); err != nil {
-					return err
+					return errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 				}
-				port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%s", localPort), []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
+
+				port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%d", localAddr.Port), []byte(r.icePwd), r.tlscfg, r.generateChannel, r.iceStateChange)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "Failed to build network/port")
 				}
-				candidates = append(candidates, fmt.Sprintf("candidate:%scandidate %d %s %d %s %s typ srflx", proto, id+1, proto, basePriority, addr.IP.String(), localPort))
+				candidates = append(candidates, fmt.Sprintf("candidate:%scandidate 1 %s %d %s %d typ srflx", proto, proto, basePriority, addr.IP.String(), localAddr.Port))
 				basePriority = basePriority + 1
 				r.ports = append(r.ports, port)
-				id++
 			}
 		}
 	}
