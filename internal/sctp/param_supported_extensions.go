@@ -1,9 +1,5 @@
 package sctp
 
-import (
-	"fmt"
-)
-
 func chunkTypeIntersect(l, r []ChunkType) (c []ChunkType) {
 	m := make(map[ChunkType]bool)
 
@@ -19,9 +15,12 @@ func chunkTypeIntersect(l, r []ChunkType) (c []ChunkType) {
 	return
 }
 
+func NewEmptySupportedExtensions() *ParamSupportedExtensions {
+	return &ParamSupportedExtensions{}
+}
+
 type ParamSupportedExtensions struct {
 	ParamHeader
-	Raw        []byte
 	ChunkTypes []ChunkType
 }
 
@@ -40,7 +39,6 @@ func (s *ParamSupportedExtensions) Unmarshal(raw []byte) (Param, error) {
 	for t := range s.raw {
 		s.ChunkTypes = append(s.ChunkTypes, ChunkType(t))
 	}
-	fmt.Print(s.ChunkTypes)
 
 	return s, nil
 }

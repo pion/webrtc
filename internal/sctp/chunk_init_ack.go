@@ -57,6 +57,7 @@ func (i *InitAck) Marshal() ([]byte, error) {
 		return nil, errors.Wrap(err, "Failed marshalling INIT common data")
 	}
 
+	i.ChunkHeader.typ = INITACK
 	chunkHeader, err := i.ChunkHeader.Marshal(len(initShared))
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed marshalling InitAck Chunk Header")
