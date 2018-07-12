@@ -111,6 +111,13 @@ func (i *InitCommon) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint16(out[8:], i.numOutboundStreams)
 	binary.BigEndian.PutUint16(out[10:], i.numInboundStreams)
 	binary.BigEndian.PutUint32(out[12:], i.initialTSN)
+	for _, p := range i.params {
+		pp, err := p.Marshal()
+		if err != nil {
+			return nil, errors.Wrap(err, "Unable to marshal parameter for INIT/INITACK")
+		}
+		out = append(out, pp...)
+	}
 
 	return out, nil
 }

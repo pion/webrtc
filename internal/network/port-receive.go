@@ -213,10 +213,11 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 				p.sctpAssocations[in.srcAddr.String()] = sctp.NewAssocation(func(pkt *sctp.Packet) {
 					raw, err := pkt.Marshal()
 					if err != nil {
-						fmt.Println(errors.Wrap(err, "Failed to Unmarshal SCTP packet"))
+						fmt.Println(errors.Wrap(err, "Failed to Marshal SCTP packet"))
 						return
 					}
-					fmt.Println(raw)
+					fmt.Printf("Out: %v\n", raw)
+					d.Send(raw)
 				}, func(data []byte) {
 					fmt.Printf("Handle data %v \n", data)
 				})

@@ -10,6 +10,7 @@ type ParamType uint16
 
 // Param interface
 type Param interface {
+	Marshal() ([]byte, error)
 	Length() int
 }
 
@@ -26,6 +27,8 @@ func BuildParam(t ParamType, rawParam []byte) (Param, error) {
 		return (&ParamRequestedHMACAlgorithm{}).Unmarshal(rawParam)
 	case ChunkList:
 		return (&ParamChunkList{}).Unmarshal(rawParam)
+	case StateCookie:
+		return (&ParamStateCookie{}).Unmarshal(rawParam)
 	}
 
 	return nil, errors.Errorf("Unhandled ParamType %v", t)

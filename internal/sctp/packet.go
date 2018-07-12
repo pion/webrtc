@@ -75,6 +75,8 @@ func (p *Packet) Unmarshal(raw []byte) error {
 		switch ChunkType(raw[offset]) {
 		case INIT:
 			c = &Init{}
+		case INITACK:
+			c = &InitAck{}
 		default:
 			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", ChunkType(raw[offset]).String())
 		}
@@ -82,6 +84,7 @@ func (p *Packet) Unmarshal(raw []byte) error {
 		if err := c.Unmarshal(raw[offset:]); err != nil {
 			return err
 		}
+
 		p.Chunks = append(p.Chunks, c)
 		chunkValuePadding := c.valueLength() % 4
 		offset += chunkHeaderSize + c.valueLength() + chunkValuePadding
@@ -113,7 +116,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 		raw = append(raw, chunkRaw...)
 	}
 
-	paddingNeeded := len(raw) % 4
+	paddingNeeded := getPadding(len(raw), 4)
 	if paddingNeeded != 0 {
 		raw = append(raw, make([]byte, paddingNeeded)...)
 	}

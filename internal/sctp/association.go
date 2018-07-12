@@ -210,8 +210,9 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 	initAck.initiateTag = a.myVerificationTag
 	initAck.advertisedReceiverWindowCredit = a.myRreceiverWindowCredit
 
-	//initAck.params = append(initAck.params, )
-	outbound.Chunks = []Chunk{}
+	initAck.params = []Param{NewRandomStateCookie(), NewEmptySupportedExtensions()}
+
+	outbound.Chunks = []Chunk{initAck}
 
 	return outbound, nil
 
