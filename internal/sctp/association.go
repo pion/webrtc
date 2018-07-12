@@ -245,6 +245,11 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state)
 		}
+	case *Abort:
+		fmt.Println("Abort chunk, with errors")
+		for _, e := range ct.ErrorCauses {
+			fmt.Println(e.errorCauseCode())
+		}
 	}
 
 	return nil

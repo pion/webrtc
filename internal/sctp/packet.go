@@ -77,6 +77,8 @@ func (p *Packet) Unmarshal(raw []byte) error {
 			c = &Init{}
 		case INITACK:
 			c = &InitAck{}
+		case ABORT:
+			c = &Abort{}
 		default:
 			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", ChunkType(raw[offset]).String())
 		}
