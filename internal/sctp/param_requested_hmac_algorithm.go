@@ -36,14 +36,15 @@ type ParamRequestedHMACAlgorithm struct {
 }
 
 func (r *ParamRequestedHMACAlgorithm) Marshal() ([]byte, error) {
-	rawParam := make([]byte, len(r.AvailableAlgorithms)*2)
+	r.typ = ReqHMACAlgo
+	r.raw = make([]byte, len(r.AvailableAlgorithms)*2)
 	i := 0
 	for _, a := range r.AvailableAlgorithms {
-		binary.BigEndian.PutUint16(rawParam[i:], uint16(a))
+		binary.BigEndian.PutUint16(r.raw[i:], uint16(a))
 		i += 2
 	}
 
-	return r.ParamHeader.Marshal(ReqHMACAlgo, rawParam)
+	return r.ParamHeader.Marshal()
 }
 
 func (r *ParamRequestedHMACAlgorithm) Unmarshal(raw []byte) (Param, error) {

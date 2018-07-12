@@ -6,7 +6,9 @@ type ParamRandom struct {
 }
 
 func (r *ParamRandom) Marshal() ([]byte, error) {
-	return r.ParamHeader.Marshal(Random, r.RandomData)
+	r.typ = Random
+	r.raw = r.RandomData
+	return r.ParamHeader.Marshal()
 }
 
 func (r *ParamRandom) Unmarshal(raw []byte) (Param, error) {
