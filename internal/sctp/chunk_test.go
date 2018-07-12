@@ -3,7 +3,6 @@ package sctp
 import (
 	"testing"
 
-	"fmt"
 	"github.com/pkg/errors"
 )
 
@@ -47,13 +46,10 @@ func TestInitAck(t *testing.T) {
 		t.Error(errors.Wrap(err, "Unmarshal failed, has chunk"))
 	}
 
-	i, ok := pkt.Chunks[0].(*InitAck)
+	_, ok := pkt.Chunks[0].(*InitAck)
 	if !ok {
 		t.Error("Failed to cast Chunk -> Init")
-	}
-
-	fmt.Printf("Init ack: %v\n", i)
-	if err != nil {
+	} else if err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal init Chunk failed"))
 	}
 }
