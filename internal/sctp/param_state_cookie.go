@@ -24,7 +24,9 @@ func NewRandomStateCookie() *ParamStateCookie {
 }
 
 func (s *ParamStateCookie) Marshal() ([]byte, error) {
-	return s.ParamHeader.Marshal(StateCookie, s.Cookie)
+	s.typ = StateCookie
+	s.raw = s.Cookie
+	return s.ParamHeader.Marshal()
 }
 
 func (s *ParamStateCookie) Unmarshal(raw []byte) (Param, error) {

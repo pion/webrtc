@@ -6,12 +6,13 @@ type ParamChunkList struct {
 }
 
 func (c *ParamChunkList) Marshal() ([]byte, error) {
-	r := make([]byte, len(c.ChunkTypes))
+	c.typ = ChunkList
+	c.raw = make([]byte, len(c.ChunkTypes))
 	for i, t := range c.ChunkTypes {
-		r[i] = byte(t)
+		c.raw[i] = byte(t)
 	}
 
-	return c.ParamHeader.Marshal(ChunkList, r)
+	return c.ParamHeader.Marshal()
 }
 
 func (c *ParamChunkList) Unmarshal(raw []byte) (Param, error) {

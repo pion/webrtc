@@ -25,12 +25,13 @@ type ParamSupportedExtensions struct {
 }
 
 func (s *ParamSupportedExtensions) Marshal() ([]byte, error) {
-	r := make([]byte, len(s.ChunkTypes))
+	s.typ = SupportedExt
+	s.raw = make([]byte, len(s.ChunkTypes))
 	for i, c := range s.ChunkTypes {
-		r[i] = byte(c)
+		s.raw[i] = byte(c)
 	}
 
-	return s.ParamHeader.Marshal(SupportedExt, r)
+	return s.ParamHeader.Marshal()
 }
 
 func (s *ParamSupportedExtensions) Unmarshal(raw []byte) (Param, error) {

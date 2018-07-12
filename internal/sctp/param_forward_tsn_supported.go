@@ -6,7 +6,9 @@ type ParamForwardTSNSupported struct {
 }
 
 func (f *ParamForwardTSNSupported) Marshal() ([]byte, error) {
-	return f.ParamHeader.Marshal(ForwardTSNSupp, []byte{})
+	f.typ = ForwardTSNSupp
+	f.raw = []byte{}
+	return f.ParamHeader.Marshal()
 }
 
 func (f *ParamForwardTSNSupported) Unmarshal(raw []byte) (Param, error) {
