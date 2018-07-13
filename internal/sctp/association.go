@@ -131,6 +131,7 @@ func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Ass
 		state:             Open,
 		myMaxNumOutboundStreams: math.MaxUint16,
 		myMaxNumInboundStreams:  math.MaxUint16,
+		myRreceiverWindowCredit: 1024,
 	}
 }
 
@@ -210,7 +211,20 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 	initAck.initiateTag = a.myVerificationTag
 	initAck.advertisedReceiverWindowCredit = a.myRreceiverWindowCredit
 
-	initAck.params = []Param{NewRandomStateCookie(), NewEmptySupportedExtensions()}
+	var rawParams []byte
+	for _, p := range i.params {
+		pp, err := p.Marshal()
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to remarshal unknown parameter")
+		}
+		rawParams = append(rawParams, pp...)
+	}
+
+	unrecogParam := &ParamUnrecognizedParameter{
+		RawParams: rawParams,
+	}
+
+	initAck.params = []Param{NewRandomStateCookie(), unrecogParam}
 
 	outbound.Chunks = []Chunk{initAck}
 

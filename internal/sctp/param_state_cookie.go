@@ -14,8 +14,13 @@ type ParamStateCookie struct {
 func NewRandomStateCookie() *ParamStateCookie {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
-	randCookie := make([]byte, 4)
-	binary.BigEndian.PutUint32(randCookie, r.Uint32())
+	randCookie := make([]byte, 32)
+	i := 0
+	for i < 4 {
+		binary.BigEndian.PutUint64(randCookie[i*4:], r.Uint64())
+		i++
+	}
+
 	s := &ParamStateCookie{
 		Cookie: randCookie,
 	}
