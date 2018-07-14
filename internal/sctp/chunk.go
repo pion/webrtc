@@ -85,7 +85,7 @@ Value field.
 type ChunkHeader struct {
 	typ   ChunkType
 	Flags byte
-	Value []byte
+	raw   []byte
 }
 
 const (
@@ -126,17 +126,18 @@ func (c *ChunkHeader) Unmarshal(raw []byte) error {
 		}
 	}
 
-	c.Value = raw[chunkHeaderSize : chunkHeaderSize+valueLength]
+	c.raw = raw[chunkHeaderSize : chunkHeaderSize+valueLength]
 	return nil
 }
 
 // Marshal populates a raw byte[] from a ChunkHeader
-func (c *ChunkHeader) Marshal(valueLength int) ([]byte, error) {
-	raw := make([]byte, 4)
+func (c *ChunkHeader) Marshal() ([]byte, error) {
+	raw := make([]byte, 4+len(c.raw))
 
 	raw[0] = uint8(c.typ)
 	raw[1] = c.Flags
-	binary.BigEndian.PutUint16(raw[2:], uint16(valueLength+4))
+	binary.BigEndian.PutUint16(raw[2:], uint16(len(c.raw)+chunkHeaderSize))
+	copy(raw[4:], c.raw)
 	return raw, nil
 }
 
@@ -146,7 +147,7 @@ func (c *ChunkHeader) Type() ChunkType {
 }
 
 func (c *ChunkHeader) valueLength() int {
-	return len(c.Value)
+	return len(c.raw)
 }
 
 // Chunk represents an SCTP chunk
