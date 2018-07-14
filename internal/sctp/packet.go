@@ -116,11 +116,11 @@ func (p *Packet) Marshal() ([]byte, error) {
 			return nil, err
 		}
 		raw = append(raw, chunkRaw...)
-	}
 
-	paddingNeeded := getPadding(len(raw), 4)
-	if paddingNeeded != 0 {
-		raw = append(raw, make([]byte, paddingNeeded)...)
+		paddingNeeded := getPadding(len(raw), 4)
+		if paddingNeeded != 0 {
+			raw = append(raw, make([]byte, paddingNeeded)...)
+		}
 	}
 
 	// Checksum is already in BigEndian
