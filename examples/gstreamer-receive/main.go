@@ -29,13 +29,7 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{
-		ICEServers: []webrtc.RTCICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	})
+	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{})
 	if err != nil {
 		panic(err)
 	}
