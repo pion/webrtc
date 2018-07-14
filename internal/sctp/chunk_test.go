@@ -3,8 +3,8 @@ package sctp
 import (
 	"testing"
 
-	"github.com/gotestyourself/gotestyourself/assert"
 	"github.com/pkg/errors"
+	"gotest.tools/assert"
 )
 
 func TestInitChunk(t *testing.T) {
