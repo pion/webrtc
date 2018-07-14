@@ -1,6 +1,7 @@
 package sctp
 
 import (
+	"bytes"
 	"fmt"
 
 	"math"
@@ -92,6 +93,8 @@ type Association struct {
 	myMaxNumInboundStreams  uint16
 	myMaxNumOutboundStreams uint16
 	myReceiverWindowCredit  uint32
+	myCookie                *ParamStateCookie
+
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func(*Packet)
@@ -212,7 +215,11 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 	initAck.initiateTag = a.myVerificationTag
 	initAck.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
 
-	initAck.params = []Param{NewRandomStateCookie()}
+	if a.myCookie == nil {
+		a.myCookie = NewRandomStateCookie()
+	}
+
+	initAck.params = []Param{a.myCookie}
 
 	outbound.Chunks = []Chunk{initAck}
 
@@ -251,6 +258,17 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 		fmt.Println("Abort chunk, with errors")
 		for _, e := range ct.ErrorCauses {
 			fmt.Println(e.errorCauseCode())
+		}
+	case *CookieEcho:
+		if bytes.Equal(a.myCookie.Cookie, ct.Cookie) {
+			a.outboundHandler(&Packet{
+				VerificationTag: a.peerVerificationTag,
+				SourcePort:      a.sourcePort,
+				DestinationPort: a.destinationPort,
+				Chunks:          []Chunk{&CookieAck{}},
+			})
+		} else {
+			// TODO Abort
 		}
 	}
 
