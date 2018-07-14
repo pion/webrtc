@@ -186,7 +186,7 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 					d.Close()
 				}
 				dtls.RemoveListener(p.ListeningAddr.String())
-				break
+				return
 			}
 
 			if p.handleDTLS(in.buffer, in.srcAddr, certPair) {

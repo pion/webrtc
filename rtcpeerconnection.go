@@ -151,6 +151,7 @@ func (r *RTCPeerConnection) Close() error {
 		}
 	}
 	r.ports = nil
+	r.tlscfg.Close()
 	return nil
 }
 
