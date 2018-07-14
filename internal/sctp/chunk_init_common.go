@@ -53,10 +53,6 @@ const (
 	initOptionalVarHeaderLength = 4
 )
 
-func getParamPadding(len uint16, multiple uint16) uint16 {
-	return (multiple - (len % multiple)) % multiple
-}
-
 // Unmarshal populates a Init Chunk from a byte slice
 func (i *InitCommon) Unmarshal(raw []byte) error {
 
@@ -93,8 +89,9 @@ func (i *InitCommon) Unmarshal(raw []byte) error {
 				return errors.Wrap(err, "Failed unmarshalling param in Init Chunk")
 			}
 			i.params = append(i.params, p)
-			offset += int(p.Length())
-			remaining -= int(p.Length())
+			padding := getPadding(p.Length(), 4)
+			offset += int(p.Length() + padding)
+			remaining -= int(p.Length() + padding)
 		} else {
 			break
 		}
@@ -111,12 +108,17 @@ func (i *InitCommon) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint16(out[8:], i.numOutboundStreams)
 	binary.BigEndian.PutUint16(out[10:], i.numInboundStreams)
 	binary.BigEndian.PutUint32(out[12:], i.initialTSN)
-	for _, p := range i.params {
+	for idx, p := range i.params {
 		pp, err := p.Marshal()
 		if err != nil {
 			return nil, errors.Wrap(err, "Unable to marshal parameter for INIT/INITACK")
 		}
+
 		out = append(out, pp...)
+		if idx != len(i.params)-1 {
+			padding := make([]byte, getPadding(len(pp), 4))
+			out = append(out, padding...)
+		}
 	}
 
 	return out, nil

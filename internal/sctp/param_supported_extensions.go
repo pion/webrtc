@@ -37,7 +37,7 @@ func (s *ParamSupportedExtensions) Marshal() ([]byte, error) {
 func (s *ParamSupportedExtensions) Unmarshal(raw []byte) (Param, error) {
 	s.ParamHeader.Unmarshal(raw)
 
-	for t := range s.raw {
+	for _, t := range s.raw {
 		s.ChunkTypes = append(s.ChunkTypes, ChunkType(t))
 	}
 
