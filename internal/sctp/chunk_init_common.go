@@ -115,6 +115,14 @@ func (i *InitCommon) Marshal() ([]byte, error) {
 		}
 
 		out = append(out, pp...)
+
+		// Chunks (including Type, Length, and Value fields) are padded out
+		// by the sender with all zero bytes to be a multiple of 4 bytes
+		// long.  This padding MUST NOT be more than 3 bytes in total.  The
+		// Chunk Length value does not include terminating padding of the
+		// chunk.  *However, it does include padding of any variable-length
+		// parameter except the last parameter in the chunk.*  The receiver
+		// MUST ignore the padding.
 		if idx != len(i.params)-1 {
 			padding := make([]byte, getPadding(len(pp), 4))
 			out = append(out, padding...)
