@@ -41,7 +41,8 @@ type Port struct {
 
 	association *sctp.Association
 
-	conn *ipv4.PacketConn
+	conn     *ipv4.PacketConn
+	certPair *dtls.CertPair
 }
 
 // NewPort creates a new Port
