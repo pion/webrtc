@@ -91,7 +91,7 @@ type Association struct {
 	destinationPort         uint16
 	myMaxNumInboundStreams  uint16
 	myMaxNumOutboundStreams uint16
-	myRreceiverWindowCredit uint32
+	myReceiverWindowCredit  uint32
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func(*Packet)
@@ -131,7 +131,7 @@ func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Ass
 		state:             Open,
 		myMaxNumOutboundStreams: math.MaxUint16,
 		myMaxNumInboundStreams:  math.MaxUint16,
-		myRreceiverWindowCredit: 1024,
+		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
 	}
 }
 
@@ -209,22 +209,9 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 	initAck.numOutboundStreams = a.myMaxNumOutboundStreams
 	initAck.numInboundStreams = a.myMaxNumInboundStreams
 	initAck.initiateTag = a.myVerificationTag
-	initAck.advertisedReceiverWindowCredit = a.myRreceiverWindowCredit
+	initAck.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
 
-	var rawParams []byte
-	for _, p := range i.params {
-		pp, err := p.Marshal()
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to remarshal unknown parameter")
-		}
-		rawParams = append(rawParams, pp...)
-	}
-
-	unrecogParam := &ParamUnrecognizedParameter{
-		RawParams: rawParams,
-	}
-
-	initAck.params = []Param{NewRandomStateCookie(), unrecogParam}
+	initAck.params = []Param{NewRandomStateCookie()}
 
 	outbound.Chunks = []Chunk{initAck}
 

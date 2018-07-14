@@ -110,5 +110,14 @@ func (i *InitAck) Check() (abort bool, err error) {
 		return abort, errors.New("INIT ACK outbound stream request must be > 0")
 	}
 
+	// An SCTP receiver MUST be able to receive a minimum of 1500 bytes in
+	// one SCTP packet.  This means that an SCTP endpoint MUST NOT indicate
+	// less than 1500 bytes in its initial a_rwnd sent in the INIT or INIT
+	// ACK.
+	if i.advertisedReceiverWindowCredit < 1500 {
+		abort = true
+		return abort, errors.New("INIT ACK Advertised Receiver Window Credit (a_rwnd) must be >= 1500")
+	}
+
 	return false, nil
 }

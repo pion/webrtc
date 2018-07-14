@@ -76,7 +76,7 @@ func (i *Init) Check() (abort bool, err error) {
 	// association by transmitting an ABORT.
 	if i.initiateTag == 0 {
 		abort = true
-		return abort, errors.New("ChunkType of type INIT ACK InitiateTag must not be 0")
+		return abort, errors.New("ChunkType of type INIT InitiateTag must not be 0")
 	}
 
 	// Defines the maximum number of streams the sender of this INIT
@@ -104,6 +104,15 @@ func (i *Init) Check() (abort bool, err error) {
 	if i.numOutboundStreams == 0 {
 		abort = true
 		return abort, errors.New("INIT outbound stream request must be > 0")
+	}
+
+	// An SCTP receiver MUST be able to receive a minimum of 1500 bytes in
+	// one SCTP packet.  This means that an SCTP endpoint MUST NOT indicate
+	// less than 1500 bytes in its initial a_rwnd sent in the INIT or INIT
+	// ACK.
+	if i.advertisedReceiverWindowCredit < 1500 {
+		abort = true
+		return abort, errors.New("INIT Advertised Receiver Window Credit (a_rwnd) must be >= 1500")
 	}
 
 	return false, nil
