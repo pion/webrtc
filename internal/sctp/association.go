@@ -155,6 +155,7 @@ func checkPacket(p *Packet) error {
 		return errors.New("SCTP Packet must not have a destination port of 0")
 	}
 
+	// Check values on the packet that are specific to a particular chunk type
 	for _, c := range p.Chunks {
 		switch c.(type) {
 		case *Init:
