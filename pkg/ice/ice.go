@@ -7,46 +7,73 @@ type ConnectionState int
 
 // List of supported States
 const (
-	// New ICE agent is gathering addresses
-	New = iota + 1
+	// ConnectionStateNew ICE agent is gathering addresses
+	ConnectionStateNew = iota + 1
 
-	// Checking ICE agent has been given local and remote candidates, and is attempting to find a match
-	Checking
+	// ConnectionStateChecking ICE agent has been given local and remote candidates, and is attempting to find a match
+	ConnectionStateChecking
 
-	// Connected ICE agent has a pairing, but is still checking other pairs
-	Connected
+	// ConnectionStateConnected ICE agent has a pairing, but is still checking other pairs
+	ConnectionStateConnected
 
-	// Completed ICE agent has finished
-	Completed
+	// ConnectionStateCompleted ICE agent has finished
+	ConnectionStateCompleted
 
-	// Failed ICE agent never could sucessfully connect
-	Failed
+	// ConnectionStateFailed ICE agent never could sucessfully connect
+	ConnectionStateFailed
 
-	// Failed ICE agent connected sucessfully, but has entered a failed state
-	Disconnected
+	// ConnectionStateDisconnected ICE agent connected sucessfully, but has entered a failed state
+	ConnectionStateDisconnected
 
-	// Closed ICE agent has finished and is no longer handling requests
-	Closed
+	// ConnectionStateClosed ICE agent has finished and is no longer handling requests
+	ConnectionStateClosed
 )
 
 func (c ConnectionState) String() string {
 	switch c {
-	case New:
+	case ConnectionStateNew:
 		return "New"
-	case Checking:
+	case ConnectionStateChecking:
 		return "Checking"
-	case Connected:
+	case ConnectionStateConnected:
 		return "Connected"
-	case Completed:
+	case ConnectionStateCompleted:
 		return "Completed"
-	case Failed:
+	case ConnectionStateFailed:
 		return "Failed"
-	case Disconnected:
+	case ConnectionStateDisconnected:
 		return "Disconnected"
-	case Closed:
+	case ConnectionStateClosed:
 		return "Closed"
 	default:
 		return "Invalid"
+	}
+}
+
+// GatheringState describes the state of the candidate gathering process
+type GatheringState int
+
+const (
+	// GatheringStateNew indicates candidate gatering is not yet started
+	GatheringStateNew GatheringState = iota + 1
+
+	// GatheringStateGathering indicates candidate gatering is ongoing
+	GatheringStateGathering
+
+	// GatheringStateComplete indicates candidate gatering has been completed
+	GatheringStateComplete
+)
+
+func (t GatheringState) String() string {
+	switch t {
+	case GatheringStateNew:
+		return "new"
+	case GatheringStateGathering:
+		return "gathering"
+	case GatheringStateComplete:
+		return "complete"
+	default:
+		return "Unknown"
 	}
 }
 

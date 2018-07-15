@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"bufio"
@@ -10,13 +11,12 @@ import (
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/gstreamer-receive/gst"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	rawSd, err := reader.ReadString('\n')
-	if err != nil {
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 
@@ -28,20 +28,25 @@ func main() {
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
+	// Setup the codecs you want to use.
+	// We'll use the default ones but you can also define your own
+	webrtc.RegisterDefaultCodecs()
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{})
+	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})
 	if err != nil {
 		panic(err)
 	}
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
-	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
-		fmt.Printf("Track has started, of type %s \n", mediaType.String())
-		pipeline := gst.CreatePipeline(mediaType)
+	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
+		codec := track.Codec
+		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType, codec.Name)
+		pipeline := gst.CreatePipeline(codec.Name)
 		pipeline.Start()
 		for {
-			p := <-packets
+			p := <-track.Packets
 			pipeline.Push(p.Raw)
 		}
 	}
@@ -53,17 +58,21 @@ func main() {
 	}
 
 	// Set the remote SessionDescription
-	if err := peerConnection.SetRemoteDescription(string(sd)); err != nil {
+	offer := webrtc.RTCSessionDescription{
+		Typ: webrtc.RTCSdpTypeOffer,
+		Sdp: string(sd),
+	}
+	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
-	if err := peerConnection.CreateAnswer(); err != nil {
+	answer, err := peerConnection.CreateAnswer(nil)
+	if err != nil {
 		panic(err)
 	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	localDescriptionStr := peerConnection.LocalDescription.Marshal()
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(localDescriptionStr)))
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
 	select {}
 }
