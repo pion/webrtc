@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -29,14 +30,15 @@ func BuildParam(t ParamType, rawParam []byte) (Param, error) {
 		return (&ParamChunkList{}).Unmarshal(rawParam)
 	case StateCookie:
 		return (&ParamStateCookie{}).Unmarshal(rawParam)
+	case HeartbeatInfo:
+		return (&ParamHeartbeatInfo{}).Unmarshal(rawParam)
 	}
-
 	return nil, errors.Errorf("Unhandled ParamType %v", t)
 }
 
 // Parameter Types
 const (
-	HeartbeanInfo      ParamType = 1     //Heartbeat Info	[RFC4960]
+	HeartbeatInfo      ParamType = 1     //Heartbeat Info	[RFC4960]
 	IPV4Addr           ParamType = 5     //IPv4 Address	[RFC4960]
 	IPV6Addr           ParamType = 6     //IPv6 Address	[RFC4960]
 	StateCookie        ParamType = 7     //State Cookie	[RFC4960]
@@ -66,7 +68,7 @@ const (
 
 func (p ParamType) String() string {
 	switch p {
-	case HeartbeanInfo:
+	case HeartbeatInfo:
 		return "Heartbeat Info"
 	case IPV4Addr:
 		return "IPv4 Address"

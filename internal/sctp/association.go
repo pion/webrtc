@@ -233,11 +233,11 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 		// TODO: Create ABORT
 	}
 
-	switch ct := c.(type) {
+	switch c := c.(type) {
 	case *Init:
 		switch a.state {
 		case Open:
-			p, err := a.handleInit(p, ct)
+			p, err := a.handleInit(p, c)
 			if err != nil {
 				return errors.Wrap(err, "Failure handling INIT")
 			}
@@ -256,11 +256,29 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 		}
 	case *Abort:
 		fmt.Println("Abort chunk, with errors")
-		for _, e := range ct.ErrorCauses {
+		for _, e := range c.ErrorCauses {
 			fmt.Println(e.errorCauseCode())
 		}
+	case *Heartbeat:
+		hbi, ok := c.params[0].(*ParamHeartbeatInfo)
+		if !ok {
+			fmt.Println("Failed to handle Heartbeat, no ParamHeartbeatInfo")
+		}
+
+		a.outboundHandler(&Packet{
+			VerificationTag: a.peerVerificationTag,
+			SourcePort:      a.sourcePort,
+			DestinationPort: a.destinationPort,
+			Chunks: []Chunk{&HeartbeatAck{
+				params: []Param{
+					&ParamHeartbeatInfo{
+						HeartbeatInformation: hbi.HeartbeatInformation,
+					},
+				},
+			}},
+		})
 	case *CookieEcho:
-		if bytes.Equal(a.myCookie.Cookie, ct.Cookie) {
+		if bytes.Equal(a.myCookie.Cookie, c.Cookie) {
 			a.outboundHandler(&Packet{
 				VerificationTag: a.peerVerificationTag,
 				SourcePort:      a.sourcePort,
