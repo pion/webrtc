@@ -83,7 +83,7 @@ type Association struct {
 	//ackState
 	//inboundStreams
 	//outboundStreams
-	reassemblyQueue []*PayloadData
+	//reassemblyQueue
 	//localTransportAddressList
 	//associationPTMU
 
@@ -94,6 +94,8 @@ type Association struct {
 	myMaxNumOutboundStreams uint16
 	myReceiverWindowCredit  uint32
 	myCookie                *ParamStateCookie
+	payloadQueue            *PayloadQueue
+	myMaxMTU                uint16
 
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
@@ -135,6 +137,8 @@ func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Ass
 		myMaxNumOutboundStreams: math.MaxUint16,
 		myMaxNumInboundStreams:  math.MaxUint16,
 		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
+		payloadQueue:            &PayloadQueue{},
+		myMaxMTU:                1200,
 	}
 }
 
@@ -229,33 +233,31 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 
 func (a *Association) handleData(p *Packet, d *PayloadData) (*Packet, error) {
 
-	if a.peerLastTSN+1 == d.TSN {
-		// This is the next TSN
-		outbound := &Packet{}
-		outbound.VerificationTag = a.peerVerificationTag
-		outbound.SourcePort = a.sourcePort
-		outbound.DestinationPort = a.destinationPort
+	a.payloadQueue.Push(d, a.peerLastTSN)
 
-		sack := &SelectiveAck{}
-
-		sack.cumulativeTSNAck = d.TSN
-		sack.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
-
-		outbound.Chunks = []Chunk{sack}
-
-		a.peerLastTSN = d.TSN
-
-		return outbound, nil
-	} else if d.TSN <= a.peerLastTSN {
-		// Log duplicate for next SACK
-		return nil, errors.Errorf("Duplicate TSN %v", d.TSN)
-	} else {
-		// Check if already exists? Log duplicate for next SACK
-		// If new, append to reassemblyQueue and sort
-		// When generating new SACK, generate ACkGaps based on reassemblyQueue
-		//a.reassemblyQueue = append(a.reassemblyQueue, d)
-		return nil, errors.Errorf("GAP in TSN %v (expected) != %v", a.peerLastTSN+1, d.TSN)
+	pd, ok := a.payloadQueue.Pop(a.peerLastTSN + 1)
+	for ok {
+		fmt.Printf("Found packet %v len %v", pd.TSN, len(pd.userData))
+		a.dataHandler(pd.userData)
+		a.peerLastTSN++
+		pd, ok = a.payloadQueue.Pop(a.peerLastTSN + 1)
 	}
+
+	outbound := &Packet{}
+	outbound.VerificationTag = a.peerVerificationTag
+	outbound.SourcePort = a.sourcePort
+	outbound.DestinationPort = a.destinationPort
+
+	sack := &SelectiveAck{}
+
+	sack.cumulativeTSNAck = a.peerLastTSN
+	sack.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
+	sack.duplicateTSN = a.payloadQueue.PopDuplicates()
+	sack.gapAckBlocks = a.payloadQueue.GetGapAckBlocks(a.peerLastTSN)
+	outbound.Chunks = []Chunk{sack}
+
+	return outbound, nil
+
 }
 
 func (a *Association) handleChunk(p *Packet, c Chunk) error {
