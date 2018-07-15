@@ -83,7 +83,7 @@ type Association struct {
 	//ackState
 	//inboundStreams
 	//outboundStreams
-	//reassemblyQueue
+	reassemblyQueue []*PayloadData
 	//localTransportAddressList
 	//associationPTMU
 
@@ -227,6 +227,37 @@ func (a *Association) handleInit(p *Packet, i *Init) (*Packet, error) {
 
 }
 
+func (a *Association) handleData(p *Packet, d *PayloadData) (*Packet, error) {
+
+	if a.peerLastTSN+1 == d.TSN {
+		// This is the next TSN
+		outbound := &Packet{}
+		outbound.VerificationTag = a.peerVerificationTag
+		outbound.SourcePort = a.sourcePort
+		outbound.DestinationPort = a.destinationPort
+
+		sack := &SelectiveAck{}
+
+		sack.cumulativeTSNAck = d.TSN
+		sack.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
+
+		outbound.Chunks = []Chunk{sack}
+
+		a.peerLastTSN = d.TSN
+
+		return outbound, nil
+	} else if d.TSN <= a.peerLastTSN {
+		// Log duplicate for next SACK
+		return nil, errors.Errorf("Duplicate TSN %v", d.TSN)
+	} else {
+		// Check if already exists? Log duplicate for next SACK
+		// If new, append to reassemblyQueue and sort
+		// When generating new SACK, generate ACkGaps based on reassemblyQueue
+		//a.reassemblyQueue = append(a.reassemblyQueue, d)
+		return nil, errors.Errorf("GAP in TSN %v (expected) != %v", a.peerLastTSN+1, d.TSN)
+	}
+}
+
 func (a *Association) handleChunk(p *Packet, c Chunk) error {
 	if _, err := c.Check(); err != nil {
 		errors.Wrap(err, "Failed validating chunk")
@@ -288,6 +319,12 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 		} else {
 			// TODO Abort
 		}
+	case *PayloadData:
+		p, err := a.handleData(p, c)
+		if err != nil {
+			return errors.Wrap(err, "Failure handling DATA")
+		}
+		a.outboundHandler(p)
 	}
 
 	return nil
