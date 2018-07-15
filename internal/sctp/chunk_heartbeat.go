@@ -40,7 +40,7 @@ type Heartbeat struct {
 	params []Param
 }
 
-// Unmarshal populates a Abort Chunk from a byte slice
+// Unmarshal populates a Heartbeat Chunk from a byte slice
 func (h *Heartbeat) Unmarshal(raw []byte) error {
 	if err := h.ChunkHeader.Unmarshal(raw); err != nil {
 		return err
@@ -66,7 +66,7 @@ func (h *Heartbeat) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal generates raw data from a Abort struct
+// Marshal generates raw data from a Heartbeat struct
 func (h *Heartbeat) Marshal() ([]byte, error) {
 	return nil, errors.Errorf("Unimplemented")
 }

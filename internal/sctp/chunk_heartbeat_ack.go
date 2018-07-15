@@ -38,12 +38,12 @@ type HeartbeatAck struct {
 	params []Param
 }
 
-// Unmarshal populates a Abort Chunk from a byte slice
+// Unmarshal populates a HeartbeatAck Chunk from a byte slice
 func (h *HeartbeatAck) Unmarshal(raw []byte) error {
 	return errors.Errorf("Unimplemented")
 }
 
-// Marshal generates raw data from a Abort struct
+// Marshal generates raw data from a HeartbeatAck struct
 func (h *HeartbeatAck) Marshal() ([]byte, error) {
 	if len(h.params) != 1 {
 		return nil, errors.Errorf("HeartbeatAck must have one param")
