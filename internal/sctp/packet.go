@@ -83,6 +83,8 @@ func (p *Packet) Unmarshal(raw []byte) error {
 			c = &CookieEcho{}
 		case HEARTBEAT:
 			c = &Heartbeat{}
+		case PAYLOADDATA:
+			c = &PayloadData{}
 		default:
 			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", ChunkType(raw[offset]).String())
 		}
