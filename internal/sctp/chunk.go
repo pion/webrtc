@@ -14,7 +14,7 @@ type ChunkType uint8
 
 // List of known ChunkType enums
 const (
-	Data             ChunkType = 0
+	PAYLOADDATA      ChunkType = 0
 	INIT             ChunkType = 1
 	INITACK          ChunkType = 2
 	SACK             ChunkType = 3
@@ -32,7 +32,7 @@ const (
 
 func (c ChunkType) String() string {
 	switch c {
-	case Data:
+	case PAYLOADDATA:
 		return "Payload data"
 	case INIT:
 		return "Initiation"
