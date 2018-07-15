@@ -1,7 +1,6 @@
 package sctp
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -143,9 +142,8 @@ func TestPayloadDataMarshalUnmarshal(t *testing.T) {
 		t.Error(errors.Wrap(err, "Unmarshal failed, has chunk"))
 	}
 
-	payloadData, ok := pkt.Chunks[1].(*PayloadData)
+	_, ok := pkt.Chunks[1].(*PayloadData)
 	if !ok {
 		t.Error("Failed to cast Chunk -> PayloadData")
 	}
-	fmt.Println(payloadData)
 }
