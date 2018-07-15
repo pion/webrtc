@@ -50,10 +50,6 @@ func (m *mediaEngine) RegisterCodec(codec *RTCRtpCodec) uint8 {
 	return codec.PayloadType
 }
 
-func (m *mediaEngine) ClearCodecs() {
-	m.codecs = nil
-}
-
 func (m *mediaEngine) getCodec(payloadType uint8) (*RTCRtpCodec, error) {
 	for _, codec := range m.codecs {
 		if codec.PayloadType == payloadType {
