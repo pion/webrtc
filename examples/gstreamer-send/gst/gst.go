@@ -21,19 +21,19 @@ func init() {
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
-	Pipeline *C.GstElement
-	in       chan<- webrtc.RTCSample
-	id       int
-	codec    webrtc.TrackType
+	Pipeline  *C.GstElement
+	in        chan<- webrtc.RTCSample
+	id        int
+	codecName string
 }
 
 var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipeline {
+func CreatePipeline(codecName string, in chan<- webrtc.RTCSample) *Pipeline {
 	pipelineStr := "appsink name=appsink"
-	switch codec {
+	switch codecName {
 	case webrtc.VP8:
 		pipelineStr = "videotestsrc ! vp8enc ! " + pipelineStr
 	case webrtc.VP9:
@@ -43,7 +43,7 @@ func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipelin
 	case webrtc.Opus:
 		pipelineStr = "audiotestsrc ! opusenc ! " + pipelineStr
 	default:
-		panic("Unhandled codec " + codec.String())
+		panic("Unhandled codec " + codecName)
 	}
 
 	pipelineStrUnsafe := C.CString(pipelineStr)
@@ -53,10 +53,10 @@ func CreatePipeline(codec webrtc.TrackType, in chan<- webrtc.RTCSample) *Pipelin
 	defer pipelinesLock.Unlock()
 
 	pipeline := &Pipeline{
-		Pipeline: C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
-		in:       in,
-		id:       len(pipelines),
-		codec:    codec,
+		Pipeline:  C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
+		in:        in,
+		id:        len(pipelines),
+		codecName: codecName,
 	}
 
 	pipelines[pipeline.id] = pipeline
@@ -85,7 +85,7 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 
 	if pipeline, ok := pipelines[int(pipelineID)]; ok {
 		var samples uint32
-		if pipeline.codec == webrtc.Opus {
+		if pipeline.codecName == webrtc.Opus {
 			samples = uint32(audioClockRate * (float32(duration) / 1000000000))
 		} else {
 			samples = uint32(videoClockRate * (float32(duration) / 1000000000))

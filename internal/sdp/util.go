@@ -1,6 +1,7 @@
 package sdp
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -22,102 +23,99 @@ type SessionBuilder struct {
 	Tracks []*SessionBuilderTrack
 }
 
-// BaseSessionDescription generates a default SDP response that is ice-lite, initiates the DTLS session and
-// supports VP8, VP9, H264 and Opus
-func BaseSessionDescription(b *SessionBuilder) *SessionDescription {
-	addMediaCandidates := func(m *MediaDescription) *MediaDescription {
-		m.Attributes = append(m.Attributes, b.Candidates...)
-		m.Attributes = append(m.Attributes, "end-of-candidates")
-		return m
-	}
+// ConnectionRole indicates which of the end points should initiate the connection establishment
+type ConnectionRole int
 
-	audioMediaDescription := &MediaDescription{
-		MediaName:      "audio 9 RTP/SAVPF 111",
-		ConnectionData: "IN IP4 127.0.0.1",
-		Attributes: []string{
-			"setup:active",
-			"mid:audio",
-			"sendrecv",
-			"ice-ufrag:" + b.IceUsername,
-			"ice-pwd:" + b.IcePassword,
-			"ice-lite",
-			"fingerprint:sha-256 " + b.Fingerprint,
-			"rtcp-mux",
-			"rtcp-rsize",
-			"rtpmap:111 opus/48000/2",
-			"fmtp:111 minptime=10;useinbandfec=1",
-		},
-	}
+const (
 
-	videoMediaDescription := &MediaDescription{
-		MediaName:      "video 9 RTP/SAVPF 96 98 100",
-		ConnectionData: "IN IP4 127.0.0.1",
-		Attributes: []string{
-			"setup:active",
-			"mid:video",
-			"sendrecv",
-			"ice-ufrag:" + b.IceUsername,
-			"ice-pwd:" + b.IcePassword,
-			"ice-lite",
-			"fingerprint:sha-256 " + b.Fingerprint,
-			"rtcp-mux",
-			"rtcp-rsize",
-			"rtpmap:96 VP8/90000",
-			"rtpmap:98 VP9/90000",
-			"rtpmap:100 H264/90000",
-			"fmtp:100 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
-		},
-	}
+	// ConnectionRoleActive indicates the endpoint will initiate an outgoing connection.
+	ConnectionRoleActive ConnectionRole = iota + 1
 
-	mediaStreamsAttribute := "msid-semantic: WMS"
-	for i, track := range b.Tracks {
-		var attributes *[]string
-		if track.IsAudio {
-			attributes = &audioMediaDescription.Attributes
-		} else {
-			attributes = &videoMediaDescription.Attributes
-		}
-		appendAttr := func(attr string) {
-			*attributes = append(*attributes, attr)
-		}
+	// ConnectionRolePassive indicates the endpoint will accept an incoming connection.
+	ConnectionRolePassive
 
-		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " cname:pion" + strconv.Itoa(i))
-		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " msid:pion" + strconv.Itoa(i) + " pion" + strconv.Itoa(i))
-		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " mslabel:pion" + strconv.Itoa(i))
-		appendAttr("ssrc:" + fmt.Sprint(track.SSRC) + " label:pion" + strconv.Itoa(i))
+	// ConnectionRoleActpass indicates the endpoint is willing to accept an incoming connection or to initiate an outgoing connection.
+	ConnectionRoleActpass
 
-		mediaStreamsAttribute += " pion" + strconv.Itoa(i)
-	}
+	// ConnectionRoleHoldconn indicates the endpoint does not want the connection to be established for the time being.
+	ConnectionRoleHoldconn
+)
 
-	sessionID := strconv.FormatUint(uint64(rand.Uint32())<<32+uint64(rand.Uint32()), 10)
-	return &SessionDescription{
-		ProtocolVersion: 0,
-		Origin:          "pion-webrtc " + sessionID + " 2 IN IP4 0.0.0.0",
-		SessionName:     "-",
-		Timing:          []string{"0 0"},
-		Attributes: []string{
-			"group:BUNDLE audio video",
-			mediaStreamsAttribute,
-		},
-		MediaDescriptions: []*MediaDescription{
-			addMediaCandidates(audioMediaDescription),
-			addMediaCandidates(videoMediaDescription),
-		},
+func (t ConnectionRole) String() string {
+	switch t {
+	case ConnectionRoleActive:
+		return "active"
+	case ConnectionRolePassive:
+		return "passive"
+	case ConnectionRoleActpass:
+		return "actpass"
+	case ConnectionRoleHoldconn:
+		return "holdconn"
+	default:
+		return "Unknown"
 	}
 }
 
+func newSessionID() uint64 {
+	return uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
+}
+
+// Codec represents a codec
+type Codec struct {
+	PayloadType        uint8
+	Name               string
+	ClockRate          uint32
+	EncodingParameters string
+	Fmtp               string
+}
+
+func (c Codec) String() string {
+	return fmt.Sprintf("%d %s/%d/%s", c.PayloadType, c.Name, c.ClockRate, c.EncodingParameters)
+}
+
 // GetCodecForPayloadType scans the SessionDescription for the given payloadType and returns the codec
-func GetCodecForPayloadType(payloadType uint8, sd *SessionDescription) (ok bool, codec string) {
+func (sd *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, error) {
+	codec := Codec{
+		PayloadType: payloadType,
+	}
+
+	found := false
+	payloadTypeString := strconv.Itoa(int(payloadType))
+	rtpmapPrefix := "rtpmap:" + payloadTypeString
+	fmtpPrefix := "fmtp:" + payloadTypeString
+
 	for _, m := range sd.MediaDescriptions {
 		for _, a := range m.Attributes {
-			if strings.Contains(a, "rtpmap:"+strconv.Itoa(int(payloadType))) {
+			if strings.HasPrefix(a, rtpmapPrefix) {
+				found = true
+				// a=rtpmap:<payload type> <encoding name>/<clock rate> [/<encoding parameters>]
 				split := strings.Split(a, " ")
 				if len(split) == 2 {
 					split := strings.Split(split[1], "/")
-					return true, split[0]
+					codec.Name = split[0]
+					parts := len(split)
+					if parts > 1 {
+						rate, err := strconv.Atoi(split[1])
+						if err != nil {
+							return codec, err
+						}
+						codec.ClockRate = uint32(rate)
+					}
+					if parts > 2 {
+						codec.EncodingParameters = split[2]
+					}
+				}
+			} else if strings.HasPrefix(a, fmtpPrefix) {
+				// a=fmtp:<format> <format specific parameters>
+				split := strings.Split(a, " ")
+				if len(split) == 2 {
+					codec.Fmtp = split[1]
 				}
 			}
 		}
+		if found {
+			return codec, nil
+		}
 	}
-	return false, ""
+	return codec, errors.New("payload type not found")
 }

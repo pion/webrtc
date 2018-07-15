@@ -4,17 +4,17 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	rawSd, err := reader.ReadString('\n')
-	if err != nil {
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 
@@ -26,8 +26,13 @@ func main() {
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
+	// Setup the codecs you want to use.
+	// We'll use a VP8 codec but you can also define your own
+	webrtc.RegisterCodec(webrtc.NewRTCRtpOpusCodec(webrtc.PayloadTypeOpus, 48000, 2))
+	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.PayloadTypeVP8, 90000))
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(&webrtc.RTCConfiguration{})
+	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})
 	if err != nil {
 		panic(err)
 	}
@@ -35,15 +40,15 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.Ontrack = func(mediaType webrtc.TrackType, packets <-chan *rtp.Packet) {
-		if mediaType == webrtc.VP8 {
+	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
+		if track.Codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			i, err := newIVFWriter("output.ivf")
 			if err != nil {
 				panic(err)
 			}
 			for {
-				i.addPacket(<-packets)
+				i.addPacket(<-track.Packets)
 			}
 		}
 	}
@@ -55,17 +60,21 @@ func main() {
 	}
 
 	// Set the remote SessionDescription
-	if err := peerConnection.SetRemoteDescription(string(sd)); err != nil {
+	offer := webrtc.RTCSessionDescription{
+		Typ: webrtc.RTCSdpTypeOffer,
+		Sdp: string(sd),
+	}
+	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
-	if err := peerConnection.CreateAnswer(); err != nil {
+	answer, err := peerConnection.CreateAnswer(nil)
+	if err != nil {
 		panic(err)
 	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	localDescriptionStr := peerConnection.LocalDescription.Marshal()
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(localDescriptionStr)))
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
 	select {}
 }

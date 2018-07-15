@@ -94,7 +94,7 @@ func (p *Port) handleICE(in *incomingPacket, remoteKey []byte, iceTimer *time.Ti
 		); err != nil {
 			fmt.Println(err)
 		} else {
-			p.ICEState = ice.Completed
+			p.ICEState = ice.ConnectionStateCompleted
 			iceTimer.Reset(iceTimeout)
 			iceNotifier(p)
 		}
@@ -131,7 +131,7 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 	for {
 		select {
 		case <-iceTimer.C:
-			p.ICEState = ice.Failed
+			p.ICEState = ice.ConnectionStateFailed
 			iceNotifier(p)
 		case in, inValid := <-incomingPackets:
 			if !inValid {

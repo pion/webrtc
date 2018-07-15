@@ -23,9 +23,9 @@ type Pipeline struct {
 }
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(codec webrtc.TrackType) *Pipeline {
+func CreatePipeline(codecName string) *Pipeline {
 	pipelineStr := "appsrc format=time is-live=true do-timestamp=true name=src ! application/x-rtp"
-	switch codec {
+	switch codecName {
 	case webrtc.VP8:
 		pipelineStr += ", encoding-name=VP8-DRAFT-IETF-01 ! rtpvp8depay ! decodebin ! autovideosink"
 	case webrtc.Opus:
@@ -35,7 +35,7 @@ func CreatePipeline(codec webrtc.TrackType) *Pipeline {
 	case webrtc.H264:
 		pipelineStr += " ! rtph264depay ! decodebin ! autovideosink"
 	default:
-		panic("Unhandled codec " + codec.String())
+		panic("Unhandled codec " + codecName)
 	}
 
 	pipelineStrUnsafe := C.CString(pipelineStr)
