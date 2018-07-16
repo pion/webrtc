@@ -131,8 +131,8 @@ func (t RTCSdpType) String() string {
 
 // RTCSessionDescription is used to expose local and remote session descriptions.
 type RTCSessionDescription struct {
-	Typ RTCSdpType
-	Sdp string
+	Type RTCSdpType
+	Sdp  string
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
@@ -179,8 +179,8 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 			continue
 		}
 		track := tranceiver.Sender.Track
-		cname := "poins"      // TODO: Support RTP streams synchronisation
-		steamlabel := "poins" // TODO: Support steam labels
+		cname := "pion"      // TODO: Support RTP streams synchronisation
+		steamlabel := "pion" // TODO: Support steam labels
 		codec, err := rtcMediaEngine.getCodec(track.PayloadType)
 		if err != nil {
 			return RTCSessionDescription{}, err
@@ -213,8 +213,8 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 	d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+streamlabels)
 
 	return RTCSessionDescription{
-		Typ: RTCSdpTypeOffer,
-		Sdp: d.Marshal(),
+		Type: RTCSdpTypeOffer,
+		Sdp:  d.Marshal(),
 	}, nil
 }
 
@@ -255,19 +255,19 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDe
 	d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+audioStreamLabels+videoStreamLabels)
 
 	return RTCSessionDescription{
-		Typ: RTCSdpTypeAnswer,
-		Sdp: d.Marshal(),
+		Type: RTCSdpTypeAnswer,
+		Sdp:  d.Marshal(),
 	}, nil
 }
 
-func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, typ RTCRtpCodecType) (string, error) {
+func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType) (string, error) {
 	added := false
 
 	var streamlabels string
 	for _, tranceiver := range r.rtpTransceivers {
 		if tranceiver.Sender == nil ||
 			tranceiver.Sender.Track == nil ||
-			tranceiver.Sender.Track.Kind != typ {
+			tranceiver.Sender.Track.Kind != codecType {
 			continue
 		}
 		track := tranceiver.Sender.Track
@@ -305,16 +305,16 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, typ RTCRtp
 
 	if !added {
 		// Add media line to advertise capabilities
-		media := sdp.NewJSEPMediaDescription(typ.String(), []string{}).
+		media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, typ.String()).
+			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
 			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd). // TODO: get credendials form ICE agent
 			WithPropertyAttribute(sdp.AttrKeyICELite).            // TODO: get ICE type from ICE Agent (#23)
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).            // TODO: support RTCP fallback
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize)           // TODO: Support Reduced-Size RTCP?
 
-		for _, codec := range rtcMediaEngine.getCodecsByKind(typ) {
+		for _, codec := range rtcMediaEngine.getCodecsByKind(codecType) {
 			media.WithCodec(
 				codec.PayloadType,
 				codec.Name,

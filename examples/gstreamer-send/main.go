@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// Create a audio track
-	opusTrack, err := peerConnection.NewRTCTrack(webrtc.PayloadTypeOpus, "audio", "pions1")
+	opusTrack, err := peerConnection.NewRTCTrack(webrtc.PayloadTypeOpus, "audio", "pion1")
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Create a video track
-	vp8Track, err := peerConnection.NewRTCTrack(webrtc.PayloadTypeVP8, "video", "pions2")
+	vp8Track, err := peerConnection.NewRTCTrack(webrtc.PayloadTypeVP8, "video", "pion2")
 	if err != nil {
 		panic(err)
 	}
@@ -66,8 +66,8 @@ func main() {
 
 	// Set the remote SessionDescription
 	offer := webrtc.RTCSessionDescription{
-		Typ: webrtc.RTCSdpTypeOffer,
-		Sdp: string(sd),
+		Type: webrtc.RTCSdpTypeOffer,
+		Sdp:  string(sd),
 	}
 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)

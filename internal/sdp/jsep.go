@@ -75,10 +75,10 @@ func (d *SessionDescription) WithMedia(md *MediaDescription) *SessionDescription
 
 // NewJSEPMediaDescription creates a new MediaDescription with
 // some settings that are required by the JSEP spec.
-func NewJSEPMediaDescription(typ string, codecPrefs []string) *MediaDescription {
+func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescription {
 	// TODO: handle codecPrefs
 	d := &MediaDescription{
-		MediaName:      fmt.Sprintf("%s 9 UDP/TLS/RTP/SAVPF", typ), // TODO: other transports?
+		MediaName:      fmt.Sprintf("%s 9 UDP/TLS/RTP/SAVPF", codecType), // TODO: other transports?
 		ConnectionData: "IN IP4 0.0.0.0",
 		Attributes:     []string{},
 	}

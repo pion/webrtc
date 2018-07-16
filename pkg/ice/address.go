@@ -74,7 +74,7 @@ func (t TransportType) String() string {
 	}
 }
 
-// URL represents a STUN (rfc7064) or TRUN (rfc7065) URL
+// URL represents a STUN (rfc7064) or TURN (rfc7065) URL
 type URL struct {
 	Type          ServerType
 	Secure        bool
@@ -83,7 +83,7 @@ type URL struct {
 	TransportType TransportType
 }
 
-// NewURL creates a new URL by parsing a STUN (rfc7064) or TRUN (rfc7065) uri string
+// NewURL creates a new URL by parsing a STUN (rfc7064) or TURN (rfc7065) uri string
 func NewURL(address string) (URL, error) {
 	var result URL
 

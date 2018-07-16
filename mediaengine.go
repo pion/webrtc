@@ -164,7 +164,7 @@ type RTCRtpCodec struct {
 
 // NewRTCRtpCodec is used to define a new codec
 func NewRTCRtpCodec(
-	typ RTCRtpCodecType,
+	codecType RTCRtpCodecType,
 	name string,
 	clockrate uint32,
 	channels uint16,
@@ -174,14 +174,14 @@ func NewRTCRtpCodec(
 ) *RTCRtpCodec {
 	return &RTCRtpCodec{
 		RTCRtpCodecCapability: RTCRtpCodecCapability{
-			MimeType:    typ.String() + "/" + name,
+			MimeType:    codecType.String() + "/" + name,
 			ClockRate:   clockrate,
 			Channels:    channels,
 			SdpFmtpLine: fmtp,
 		},
 		PayloadType: payloadType,
 		Payloader:   payloader,
-		Type:        typ,
+		Type:        codecType,
 		Name:        name,
 	}
 }

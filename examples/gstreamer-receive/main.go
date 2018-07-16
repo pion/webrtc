@@ -59,8 +59,8 @@ func main() {
 
 	// Set the remote SessionDescription
 	offer := webrtc.RTCSessionDescription{
-		Typ: webrtc.RTCSdpTypeOffer,
-		Sdp: string(sd),
+		Type: webrtc.RTCSdpTypeOffer,
+		Sdp:  string(sd),
 	}
 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
