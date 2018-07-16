@@ -121,10 +121,10 @@ func (d *MediaDescription) WithCodec(payloadType uint8, name string, clockrate u
 // WithMediaSource adds media source information to the media description
 func (d *MediaDescription) WithMediaSource(ssrc uint32, cname, streamLabel, label string) *MediaDescription {
 	return d.
-		WithValueAttribute("ssrc", fmt.Sprintf("%d cname:%s", ssrc, cname)). // Deprecated but not pased out?
+		WithValueAttribute("ssrc", fmt.Sprintf("%d cname:%s", ssrc, cname)). // Deprecated but not phased out?
 		WithValueAttribute("ssrc", fmt.Sprintf("%d msid:%s %s", ssrc, streamLabel, label)).
-		WithValueAttribute("ssrc", fmt.Sprintf("%d mslabel:%s", ssrc, streamLabel)). // Deprecated but not pased out?
-		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label))          // Deprecated but not pased out?
+		WithValueAttribute("ssrc", fmt.Sprintf("%d mslabel:%s", ssrc, streamLabel)). // Deprecated but not phased out?
+		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label))          // Deprecated but not phased out?
 }
 
 // WithCandidate adds an ICE candidate to the media description

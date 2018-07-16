@@ -151,7 +151,7 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 // RTCOfferOptions describes the options used to control the offer creation process
 type RTCOfferOptions struct {
 	VoiceActivityDetection bool
-	IceRestart             bool
+	ICERestart             bool
 }
 
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
@@ -181,7 +181,7 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 		track := tranceiver.Sender.Track
 		cname := "pion"      // TODO: Support RTP streams synchronisation
 		steamlabel := "pion" // TODO: Support steam labels
-		codec, err := rtcMediaEngine.getCodec(track.PayloadType)
+		codec, err := r.mediaEngine.getCodec(track.PayloadType)
 		if err != nil {
 			return RTCSessionDescription{}, err
 		}
@@ -273,7 +273,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 		track := tranceiver.Sender.Track
 		cname := track.Label      // TODO: Support RTP streams synchronisation
 		steamlabel := track.Label // TODO: Support steam labels
-		codec, err := rtcMediaEngine.getCodec(track.PayloadType)
+		codec, err := r.mediaEngine.getCodec(track.PayloadType)
 		if err != nil {
 			return "", err
 		}
@@ -314,7 +314,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).            // TODO: support RTCP fallback
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize)           // TODO: Support Reduced-Size RTCP?
 
-		for _, codec := range rtcMediaEngine.getCodecsByKind(codecType) {
+		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
 			media.WithCodec(
 				codec.PayloadType,
 				codec.Name,

@@ -28,8 +28,8 @@ func main() {
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 codec but you can also define your own
-	webrtc.RegisterCodec(webrtc.NewRTCRtpOpusCodec(webrtc.PayloadTypeOpus, 48000, 2))
-	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.PayloadTypeVP8, 90000))
+	webrtc.RegisterCodec(webrtc.NewRTCRtpOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
+	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})

@@ -67,7 +67,7 @@ var (
 	ErrModPeerIdentity         = errors.New("peer identity cannot be modified")
 	ErrModCertificates         = errors.New("certificates cannot be modified")
 	ErrModRtcpMuxPolicy        = errors.New("rtcp mux policy cannot be modified")
-	ErrModIceCandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
+	ErrModICECandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
 )
 
 // InvalidModificationError indicates the object can not be modified in this way.
