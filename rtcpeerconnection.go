@@ -155,7 +155,7 @@ func (r *RTCPeerConnection) Close() error {
 	return nil
 }
 
-// Private
+/* Everything below is private */
 func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
 	if r.Ontrack == nil {
 		return nil
@@ -190,7 +190,6 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 	return bufferTransport
 }
 
-// Private
 func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
 	updateAndNotify := func(newState ice.ConnectionState) {
 		if r.OnICEConnectionStateChange != nil && r.iceState != newState {
@@ -218,4 +217,8 @@ func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
 	} else {
 		updateAndNotify(ice.ConnectionStateConnected)
 	}
+}
+
+func (r *RTCPeerConnection) dataChannelEventHandler(e *network.DataChannelEvent) {
+	fmt.Println("Event!")
 }

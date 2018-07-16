@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pions/pkg/stun"
+	"github.com/pions/webrtc/internal/datachannel"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
@@ -214,10 +215,22 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 						fmt.Println(errors.Wrap(err, "Failed to Marshal SCTP packet"))
 						return
 					}
-					fmt.Printf("Out: %v\n", raw)
+					// fmt.Printf("Out: %v\n", raw)
 					d.Send(raw)
 				}, func(data []byte) {
-					fmt.Printf("Handle data %v \n", data)
+					msg, err := datachannel.Parse(data)
+					if err != nil {
+						fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
+						return
+					}
+					switch m := msg.(type) {
+					case *datachannel.ChannelOpen:
+						fmt.Printf("Channel with label %s opened \n", m.Label)
+					case *datachannel.Data:
+						fmt.Printf("Got message with content %s \n", m.Data)
+					default:
+						fmt.Println("Unhandled DataChannel message", m)
+					}
 				})
 			}
 		}

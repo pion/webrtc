@@ -45,9 +45,22 @@ type Port struct {
 	certPair *dtls.CertPair
 }
 
+// PortArguments are all the mandatory arguments when creating a new port for send/recv of traffic
+type PortArguments struct {
+	Address   string
+	RemoteKey []byte
+	TLSCfg    *dtls.TLSCfg
+
+	BufferTransportGenerator BufferTransportGenerator
+
+	ICENotifier ICENotifier
+
+	DataChannelEventHandler DataChannelEventHandler
+}
+
 // NewPort creates a new Port
-func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, i ICENotifier) (*Port, error) {
-	listener, err := net.ListenPacket("udp4", address)
+func NewPort(args *PortArguments) (*Port, error) {
+	listener, err := net.ListenPacket("udp4", args.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +87,7 @@ func NewPort(address string, remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTran
 		srtpContexts:     make(map[string]*srtp.Context),
 	}
 
-	go p.networkLoop(remoteKey, tlscfg, b, i)
+	go p.networkLoop(args.RemoteKey, args.TLSCfg, args.BufferTransportGenerator, args.ICENotifier)
 	return p, nil
 }
 

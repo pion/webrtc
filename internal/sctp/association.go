@@ -237,7 +237,6 @@ func (a *Association) handleData(p *Packet, d *PayloadData) (*Packet, error) {
 
 	pd, ok := a.payloadQueue.Pop(a.peerLastTSN + 1)
 	for ok {
-		fmt.Printf("Found packet %v len %v", pd.TSN, len(pd.userData))
 		a.dataHandler(pd.userData)
 		a.peerLastTSN++
 		pd, ok = a.payloadQueue.Pop(a.peerLastTSN + 1)
