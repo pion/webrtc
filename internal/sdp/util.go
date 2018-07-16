@@ -8,21 +8,6 @@ import (
 	"strings"
 )
 
-// SessionBuilderTrack represents a single track in a SessionBuilder
-type SessionBuilderTrack struct {
-	SSRC    uint32
-	IsAudio bool
-}
-
-// SessionBuilder provides an easy way to build an SDP for an RTCPeerConnection
-type SessionBuilder struct {
-	IceUsername, IcePassword, Fingerprint string
-
-	Candidates []string
-
-	Tracks []*SessionBuilderTrack
-}
-
 // ConnectionRole indicates which of the end points should initiate the connection establishment
 type ConnectionRole int
 

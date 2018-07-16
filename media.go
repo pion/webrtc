@@ -133,7 +133,7 @@ type RTCTrack struct {
 
 // NewRTCTrack is used to create a new RTCTrack
 func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
-	codec, err := rtcMediaEngine.getCodec(payloadType)
+	codec, err := r.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
 	}

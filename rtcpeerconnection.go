@@ -100,13 +100,15 @@ type RTCPeerConnection struct {
 	connectionState RTCPeerConnectionState
 
 	// Media
+	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
 	Ontrack         func(*RTCTrack)
 }
 
+// Public
+
 // New creates a new RTCPeerConfiguration with the provided configuration
 func New(config RTCConfiguration) (*RTCPeerConnection, error) {
-
 	r := &RTCPeerConnection{
 		config:             config,
 		signalingState:     RTCSignalingStateStable,
@@ -114,6 +116,7 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		iceGatheringState:  ice.GatheringStateNew,
 		iceConnectionState: ice.ConnectionStateNew,
 		connectionState:    RTCPeerConnectionStateNew,
+		mediaEngine:        DefaultMediaEngine,
 	}
 	err := r.SetConfiguration(config)
 	if err != nil {
@@ -122,12 +125,14 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 
 	r.tlscfg = dtls.NewTLSCfg()
 
-	// TODO: Initialize ICE Agent
-
 	return r, nil
 }
 
-// Public
+// SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
+// This enables RTCPeerConnection with support for different codecs
+func (r *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
+	r.mediaEngine = m
+}
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
 func (r *RTCPeerConnection) SetIdentityProvider(provider string) error {
@@ -161,7 +166,7 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 		return nil
 	}
 
-	codec, err := rtcMediaEngine.getCodecSDP(sdpCodec)
+	codec, err := r.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
 		fmt.Printf("Codec %s in not registered\n", sdpCodec)
 	}

@@ -231,7 +231,7 @@ func (r *RTCPeerConnection) validateICECandidatePoolSize(config RTCConfiguration
 	current := r.config
 	if r.LocalDescription != nil &&
 		config.ICECandidatePoolSize != current.ICECandidatePoolSize {
-		return &InvalidModificationError{Err: ErrModIceCandidatePoolSize}
+		return &InvalidModificationError{Err: ErrModICECandidatePoolSize}
 	}
 	return nil
 }
@@ -265,22 +265,27 @@ func parseICEServer(server RTCICEServer, rawURL string) (ice.URL, error) {
 		return iceurl, &SyntaxError{Err: err}
 	}
 
-	_, isPass := server.Credential.(string)
-	_, isOauth := server.Credential.(RTCOAuthCredential)
-	noPass := !isPass && !isOauth
-
 	if iceurl.Type == ice.ServerTypeTURN {
-		if server.Username == "" ||
-			noPass {
+		if server.Username == "" {
 			return iceurl, &InvalidAccessError{Err: ErrNoTurnCred}
 		}
-		if server.CredentialType == RTCICECredentialTypePassword &&
-			!isPass {
+
+		switch t := server.Credential.(type) {
+		case string:
+			if t == "" {
+				return iceurl, &InvalidAccessError{Err: ErrNoTurnCred}
+			} else if server.CredentialType != RTCICECredentialTypePassword {
+				return iceurl, &InvalidAccessError{Err: ErrTurnCred}
+			}
+
+		case RTCOAuthCredential:
+			if server.CredentialType != RTCICECredentialTypeOauth {
+				return iceurl, &InvalidAccessError{Err: ErrTurnCred}
+			}
+
+		default:
 			return iceurl, &InvalidAccessError{Err: ErrTurnCred}
-		}
-		if server.CredentialType == RTCICECredentialTypeOauth &&
-			!isOauth {
-			return iceurl, &InvalidAccessError{Err: ErrTurnCred}
+
 		}
 	}
 	return iceurl, nil
