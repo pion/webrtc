@@ -26,7 +26,10 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Create a new RTCPeerConnection
-	peerConnection := &webrtc.RTCPeerConnection{}
+	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})
+	if err != nil {
+		panic(err)
+	}
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -42,17 +45,21 @@ func main() {
 	}
 
 	// Set the remote SessionDescription
-	if err := peerConnection.SetRemoteDescription(string(sd)); err != nil {
+	offer := webrtc.RTCSessionDescription{
+		Type: webrtc.RTCSdpTypeOffer,
+		Sdp:  string(sd),
+	}
+	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
-	if err := peerConnection.CreateAnswer(); err != nil {
+	answer, err := peerConnection.CreateAnswer(nil)
+	if err != nil {
 		panic(err)
 	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	localDescriptionStr := peerConnection.LocalDescription.Marshal()
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(localDescriptionStr)))
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
 	select {}
 }
