@@ -100,7 +100,7 @@ type Association struct {
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func(*Packet)
-	dataHandler     func([]byte)
+	dataHandler     func([]byte, uint16)
 }
 
 // PushPacket pushes a SCTP packet onto the assocation
@@ -124,7 +124,7 @@ func (a *Association) Close() error {
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte)) *Association {
+func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte, uint16)) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
@@ -237,7 +237,7 @@ func (a *Association) handleData(p *Packet, d *PayloadData) (*Packet, error) {
 
 	pd, ok := a.payloadQueue.Pop(a.peerLastTSN + 1)
 	for ok {
-		a.dataHandler(pd.userData)
+		a.dataHandler(pd.userData, pd.streamIdentifier)
 		a.peerLastTSN++
 		pd, ok = a.payloadQueue.Pop(a.peerLastTSN + 1)
 	}

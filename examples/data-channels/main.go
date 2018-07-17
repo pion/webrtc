@@ -34,6 +34,13 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
+	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
+		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
+		d.Onmessage = func(message []byte) {
+			fmt.Printf("Message from DataChannel %s '%s'\n", d.Label, string(message))
+		}
+	}
+
 	// Set the remote SessionDescription
 	if err := peerConnection.SetRemoteDescription(string(sd)); err != nil {
 		panic(err)

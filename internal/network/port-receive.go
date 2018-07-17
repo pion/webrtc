@@ -145,7 +145,7 @@ func (p *Port) handleDTLS(raw []byte, srcAddr *net.UDPAddr) {
 const iceTimeout = time.Second * 10
 const receiveMTU = 8192
 
-func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, iceNotifier ICENotifier) {
+func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransportGenerator, iceNotifier ICENotifier, dceh DataChannelEventHandler) {
 	incomingPackets := make(chan *incomingPacket, 15)
 	go func() {
 		buffer := make([]byte, receiveMTU)
@@ -215,9 +215,8 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 						fmt.Println(errors.Wrap(err, "Failed to Marshal SCTP packet"))
 						return
 					}
-					// fmt.Printf("Out: %v\n", raw)
 					d.Send(raw)
-				}, func(data []byte) {
+				}, func(data []byte, streamIdentifier uint16) {
 					msg, err := datachannel.Parse(data)
 					if err != nil {
 						fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
@@ -225,9 +224,9 @@ func (p *Port) networkLoop(remoteKey []byte, tlscfg *dtls.TLSCfg, b BufferTransp
 					}
 					switch m := msg.(type) {
 					case *datachannel.ChannelOpen:
-						fmt.Printf("Channel with label %s opened \n", m.Label)
+						dceh(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(m.Label)})
 					case *datachannel.Data:
-						fmt.Printf("Got message with content %s \n", m.Data)
+						dceh(&DataChannelMessage{streamIdentifier: streamIdentifier, Body: m.Data})
 					default:
 						fmt.Println("Unhandled DataChannel message", m)
 					}
