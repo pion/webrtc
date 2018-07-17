@@ -12,7 +12,7 @@ type BufferTransportGenerator func(uint32, uint8) chan<- *rtp.Packet
 type ICENotifier func(*Port)
 
 // DataChannelEventHandler notifies the RTCPeerConnection of events relating to DataChannels
-type DataChannelEventHandler func(*DataChannelEvent)
+type DataChannelEventHandler func(DataChannelEvent)
 
 // DataChannelEventType is the enum used to represent different types of DataChannelEvent
 type DataChannelEventType int
@@ -25,16 +25,27 @@ const (
 
 // DataChannelEvent is the interface for all events that flow across the DataChannelEventHandler
 type DataChannelEvent interface {
-	Type() DataChannelEventType
+	StreamIdentifier() uint16
 }
 
 // DataChannelCreated is emitted when a new DataChannel is created
 type DataChannelCreated struct {
-	Label string
+	Label            string
+	streamIdentifier uint16
+}
+
+// StreamIdentifier returns the streamIdentifier
+func (d *DataChannelCreated) StreamIdentifier() uint16 {
+	return d.streamIdentifier
 }
 
 // DataChannelMessage is emitted when a DataChannel recieves a message
 type DataChannelMessage struct {
-	Label   string
-	Message []byte
+	Body             []byte
+	streamIdentifier uint16
+}
+
+// StreamIdentifier returns the streamIdentifier
+func (d *DataChannelMessage) StreamIdentifier() uint16 {
+	return d.streamIdentifier
 }

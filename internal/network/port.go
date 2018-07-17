@@ -87,7 +87,7 @@ func NewPort(args *PortArguments) (*Port, error) {
 		srtpContexts:     make(map[string]*srtp.Context),
 	}
 
-	go p.networkLoop(args.RemoteKey, args.TLSCfg, args.BufferTransportGenerator, args.ICENotifier)
+	go p.networkLoop(args.RemoteKey, args.TLSCfg, args.BufferTransportGenerator, args.ICENotifier, args.DataChannelEventHandler)
 	return p, nil
 }
 

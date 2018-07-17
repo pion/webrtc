@@ -5,4 +5,6 @@ package webrtc
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
 type RTCDataChannel struct {
 	Onmessage func([]byte)
+	ID        uint16
+	Label     string
 }

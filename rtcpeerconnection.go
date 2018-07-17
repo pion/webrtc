@@ -219,6 +219,31 @@ func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
 	}
 }
 
-func (r *RTCPeerConnection) dataChannelEventHandler(e *network.DataChannelEvent) {
-	fmt.Println("Event!")
+func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+	if r.dataChannels == nil {
+		r.dataChannels = make(map[uint16]*RTCDataChannel)
+	}
+	switch event := e.(type) {
+	case *network.DataChannelCreated:
+		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label}
+		r.dataChannels[e.StreamIdentifier()] = newDataChannel
+		if r.Ondatachannel != nil {
+			go r.Ondatachannel(newDataChannel)
+		} else {
+			fmt.Println("Ondatachannel is unset, discarding message")
+		}
+	case *network.DataChannelMessage:
+		if datachannel, ok := r.dataChannels[e.StreamIdentifier()]; ok {
+			if datachannel.Onmessage != nil {
+				go datachannel.Onmessage(event.Body)
+			} else {
+				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+			}
+		} else {
+			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+
+		}
+	default:
+		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+	}
 }
