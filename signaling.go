@@ -173,12 +173,12 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 		WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video") // TODO: Support BUNDLE
 
 	var streamlabels string
-	for _, tranceiver := range r.rtpTransceivers {
-		if tranceiver.Sender == nil ||
-			tranceiver.Sender.Track == nil {
+	for _, transceiver := range r.rtpTransceivers {
+		if transceiver.Sender == nil ||
+			transceiver.Sender.Track == nil {
 			continue
 		}
-		track := tranceiver.Sender.Track
+		track := transceiver.Sender.Track
 		cname := "pion"      // TODO: Support RTP streams synchronisation
 		steamlabel := "pion" // TODO: Support steam labels
 		codec, err := r.mediaEngine.getCodec(track.PayloadType)
@@ -187,8 +187,8 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 		}
 		media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, tranceiver.Mid).
-			WithPropertyAttribute(tranceiver.Direction.String()).
+			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
+			WithPropertyAttribute(transceiver.Direction.String()).
 			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
 			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
@@ -343,7 +343,14 @@ func (r *RTCPeerConnection) addICECandidates(d *sdp.MediaDescription) error {
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
 
 	for _, c := range ice.HostInterfaces() {
-		port, err := network.NewPort(c+":0", []byte(r.iceAgent.Pwd), r.tlscfg, r.generateChannel, r.iceStateChange)
+		port, err := network.NewPort(&network.PortArguments{
+			Address:   c + ":0",
+			RemoteKey: []byte(r.iceAgent.Pwd),
+			TLSCfg:    r.tlscfg,
+			BufferTransportGenerator: r.generateChannel,
+			ICENotifier:              r.iceStateChange,
+			DataChannelEventHandler:  r.dataChannelEventHandler,
+		})
 		if err != nil {
 			return err
 		}
@@ -389,7 +396,14 @@ func (r *RTCPeerConnection) addICECandidates(d *sdp.MediaDescription) error {
 				return errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 			}
 
-			port, err := network.NewPort(fmt.Sprintf("0.0.0.0:%d", localAddr.Port), []byte(r.iceAgent.Pwd), r.tlscfg, r.generateChannel, r.iceStateChange)
+			port, err := network.NewPort(&network.PortArguments{
+				Address:   fmt.Sprintf("0.0.0.0:%d", localAddr.Port),
+				RemoteKey: []byte(r.iceAgent.Pwd),
+				TLSCfg:    r.tlscfg,
+				BufferTransportGenerator: r.generateChannel,
+				ICENotifier:              r.iceStateChange,
+				DataChannelEventHandler:  r.dataChannelEventHandler,
+			})
 			if err != nil {
 				return errors.Wrapf(err, "Failed to build network/port")
 			}

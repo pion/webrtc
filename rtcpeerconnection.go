@@ -103,6 +103,10 @@ type RTCPeerConnection struct {
 	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
 	Ontrack         func(*RTCTrack)
+
+	// DataChannels
+	dataChannels  map[uint16]*RTCDataChannel
+	Ondatachannel func(*RTCDataChannel)
 }
 
 // Public
@@ -117,6 +121,7 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		iceConnectionState: ice.ConnectionStateNew,
 		connectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
+		dataChannels:       make(map[uint16]*RTCDataChannel),
 	}
 	err := r.SetConfiguration(config)
 	if err != nil {
@@ -220,9 +225,6 @@ func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	if r.dataChannels == nil {
-		r.dataChannels = make(map[uint16]*RTCDataChannel)
-	}
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
 		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label}
