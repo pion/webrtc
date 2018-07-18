@@ -95,7 +95,10 @@ type Association struct {
 	myReceiverWindowCredit  uint32
 	myCookie                *ParamStateCookie
 	payloadQueue            *PayloadQueue
+	inflightQueue *PayloadQueue
 	myMaxMTU                uint16
+	firstSack bool
+	peerCumulativeTSNAckPoint uint32
 
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
@@ -139,6 +142,7 @@ func NewAssocation(outboundHandler func(*Packet), dataHandler func([]byte, uint1
 		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
 		payloadQueue:            &PayloadQueue{},
 		myMaxMTU:                1200,
+		firstSack: true,
 	}
 }
 
@@ -259,6 +263,52 @@ func (a *Association) handleData(p *Packet, d *PayloadData) (*Packet, error) {
 
 }
 
+func (a *Association) handleSack(p *Packet, d *SelectiveAck) ([]*Packet, error) {
+	// i) If Cumulative TSN Ack is less than the Cumulative TSN Ack
+	// Point, then drop the SACK.  Since Cumulative TSN Ack is
+	// monotonically increasing, a SACK whose Cumulative TSN Ack is
+	// less than the Cumulative TSN Ack Point indicates an out-of-
+	// order SACK.
+	if a.firstSack {
+		a.firstSack = false
+		a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck
+	}
+
+	// This is an old SACK, toss
+	if a.peerCumulativeTSNAckPoint >= d.cumulativeTSNAck {
+		return nil, errors.Errorf("SACK Cumulative ACK %v is older than ACK point %v",
+			d.cumulativeTSNAck, a.peerCumulativeTSNAckPoint)
+	} else {
+		// New ack point, so pop all ACKed packets from inflightQueue
+		for i := a.peerCumulativeTSNAckPoint; i <= d.cumulativeTSNAck; i++ {
+			_, ok := a.inflightQueue.Pop(i)
+			if !ok {
+				return nil, errors.Errorf("TSN %v unable to be popped from inflight queue", i)
+			}
+		}
+		a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck
+	}
+
+	var sackDataPackets []*Packet
+	prev := GapAckBlock{start: 0, end: 0}
+	for _, g := range d.gapAckBlocks {
+		for i := prev.end+1; i < g.start; i++ {
+			pp, ok := a.payloadQueue.Get(d.cumulativeTSNAck + uint32(i))
+			if !ok {
+				return nil, errors.Errorf("Requested non-existent TSN %v", d.cumulativeTSNAck + uint32(i))
+			}
+			sackDataPackets = append(sackDataPackets, &Packet{
+				VerificationTag: a.peerVerificationTag,
+				SourcePort:      a.sourcePort,
+				DestinationPort: a.destinationPort,
+				Chunks: []Chunk{pp},
+			})
+		}
+	}
+
+	return sackDataPackets, nil
+}
+
 func (a *Association) handleChunk(p *Packet, c Chunk) error {
 	if _, err := c.Check(); err != nil {
 		errors.Wrap(err, "Failed validating chunk")
@@ -326,6 +376,14 @@ func (a *Association) handleChunk(p *Packet, c Chunk) error {
 			return errors.Wrap(err, "Failure handling DATA")
 		}
 		a.outboundHandler(p)
+	case *SelectiveAck:
+		p, err := a.handleSack(p, c)
+		if err != nil {
+			return errors.Wrap(err, "Failure handling SACK")
+		}
+		for _, pp := range p {
+			a.outboundHandler(pp)
+		}
 	}
 
 	return nil

@@ -49,6 +49,10 @@ func (r *PayloadQueue) Pop(tsn uint32) (*PayloadData, bool) {
 	return nil, false
 }
 
+func (r *PayloadQueue) Get(tsn uint32) (*PayloadData, bool) {
+	return r.orderedPackets.Search(tsn)
+}
+
 func (r *PayloadQueue) PopDuplicates() []uint32 {
 	dups := r.dupTSN
 	r.dupTSN = []uint32{}
