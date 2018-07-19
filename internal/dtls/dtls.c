@@ -82,15 +82,12 @@ error:
   return NULL;
 }
 
-dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_server, char *src, char *dst) {
+dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_server) {
   dtls_sess *sess = (dtls_sess *)calloc(1, sizeof(dtls_sess));
   BIO *rbio = NULL;
   BIO *wbio = NULL;
 
   sess->state = is_server;
-
-  sess->local_address = dtls_strdup(src);
-  sess->peer_address = dtls_strdup(dst);
 
   if (NULL == (sess->ssl = SSL_new(sslcfg))) {
     goto error;
@@ -119,7 +116,6 @@ dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_server, char *src, char *
   }
   sess->type = DTLS_CONTYPE_NEW;
 
-  pthread_mutex_init(&sess->lock, NULL);
   return sess;
 
 error:
@@ -131,8 +127,8 @@ error:
   return NULL;
 }
 
-extern void go_handle_sendto(const char *src, const char *dst, char *buf, int len);
-ptrdiff_t dtls_sess_send_pending(dtls_sess *sess) {
+extern void go_handle_sendto(const char *local, const char *remote, char *buf, int len);
+ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, char *local, char *remote) {
   if (sess->ssl == NULL) {
     return -2;
   }
@@ -144,7 +140,7 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess *sess) {
     len = BIO_read(wbio, buf, pending);
     buf = realloc(buf, len);
 
-    go_handle_sendto(sess->local_address, sess->peer_address, buf, len);
+    go_handle_sendto(local, remote, buf, len);
     return len;
   }
   return 0;
@@ -152,7 +148,7 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess *sess) {
 
 static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) { return sess->state; }
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess) {
+ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote) {
   if (sess->ssl == NULL ||
       (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT && dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
     return -2;
@@ -161,10 +157,7 @@ ptrdiff_t dtls_do_handshake(dtls_sess *sess) {
     sess->state = DTLS_CONSTATE_ACT;
   }
   SSL_do_handshake(sess->ssl);
-  pthread_mutex_lock(&sess->lock);
-  ptrdiff_t ret = dtls_sess_send_pending(sess);
-  pthread_mutex_unlock(&sess->lock);
-  return ret;
+  return dtls_sess_send_pending(sess, local, remote);
 }
 
 tlscfg *dtls_build_tlscfg() {
@@ -255,7 +248,6 @@ void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session) {
       dtls_session->ssl = NULL;
     }
 
-    pthread_mutex_destroy(&dtls_session->lock);
     free(dtls_session);
   }
 
@@ -277,7 +269,7 @@ void dtls_tlscfg_cleanup(tlscfg *cfg) {
   }
 }
 
-dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
+dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *local, char *remote) {
   if (sess->ssl == NULL) {
     return NULL;
   }
@@ -293,9 +285,7 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
     SSL_set_accept_state(sess->ssl);
   }
 
-  pthread_mutex_lock(&sess->lock);
-  dtls_sess_send_pending(sess);
-  pthread_mutex_unlock(&sess->lock);
+  dtls_sess_send_pending(sess, local, remote);
 
   BIO_write(rbio, buf, len);
   decrypted_len = SSL_read(sess->ssl, decrypted, len);
@@ -307,9 +297,7 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
      return ret;
   }
 
-  pthread_mutex_lock(&sess->lock);
-  dtls_sess_send_pending(sess);
-  pthread_mutex_unlock(&sess->lock);
+  dtls_sess_send_pending(sess, local, remote);
 
   if (SSL_is_init_finished(sess->ssl)) {
     sess->type = DTLS_CONTYPE_EXISTING;
@@ -326,7 +314,7 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len) {
   return ret;
 }
 
-bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len) {
+bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char *remote) {
   if (sess->ssl == NULL) {
     return false;
   }
@@ -339,6 +327,8 @@ bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len) {
     }
     return false;
   }
+
+  dtls_sess_send_pending(sess, local, remote);
 
   return true;
 }

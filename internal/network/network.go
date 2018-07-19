@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
@@ -8,8 +9,8 @@ import (
 // This channel is used to send RTP packets to users of pion-WebRTC
 type BufferTransportGenerator func(uint32, uint8) chan<- *rtp.Packet
 
-// ICENotifier notifies the RTCPeerConnection if ICE state has changed for this port
-type ICENotifier func(*Port)
+// ICENotifier notifies the RTCPeerConnection if ICE state has changed
+type ICENotifier func(ice.ConnectionState)
 
 // DataChannelEventHandler notifies the RTCPeerConnection of events relating to DataChannels
 type DataChannelEventHandler func(DataChannelEvent)

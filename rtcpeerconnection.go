@@ -3,16 +3,12 @@ package webrtc
 import (
 	"fmt"
 	"math/rand"
-	"sync"
 	"time"
 
-	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
-
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -68,7 +64,6 @@ type RTCPeerConnection struct {
 	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
 
 	config RTCConfiguration
-	tlscfg *dtls.TLSCfg
 
 	// ICE: TODO: Move to ICEAgent
 	iceAgent           *ice.Agent
@@ -76,8 +71,7 @@ type RTCPeerConnection struct {
 	iceGatheringState  ice.GatheringState
 	iceConnectionState ice.ConnectionState
 
-	portsLock sync.RWMutex
-	ports     []*network.Port
+	networkManager *network.Manager
 
 	// Signaling
 	// pendingLocalDescription *RTCSessionDescription
@@ -128,7 +122,10 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		return nil, err
 	}
 
-	r.tlscfg = dtls.NewTLSCfg()
+	r.networkManager, err = network.NewManager([]byte(r.iceAgent.Pwd), r.generateChannel, r.dataChannelEventHandler)
+	if err != nil {
+		return nil, err
+	}
 
 	return r, nil
 }
@@ -146,17 +143,6 @@ func (r *RTCPeerConnection) SetIdentityProvider(provider string) error {
 
 // Close ends the RTCPeerConnection
 func (r *RTCPeerConnection) Close() error {
-	r.portsLock.Lock()
-	defer r.portsLock.Unlock()
-
-	// Walk all ports remove and close them
-	for _, p := range r.ports {
-		if err := p.Close(); err != nil {
-			return err
-		}
-	}
-	r.ports = nil
-	r.tlscfg.Close()
 	return nil
 }
 
@@ -195,33 +181,23 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 	return bufferTransport
 }
 
-func (r *RTCPeerConnection) iceStateChange(p *network.Port) {
-	updateAndNotify := func(newState ice.ConnectionState) {
-		if r.OnICEConnectionStateChange != nil && r.iceState != newState {
-			r.OnICEConnectionStateChange(newState)
-		}
-		r.iceState = newState
-	}
+func (r *RTCPeerConnection) iceStateChange(state ice.ConnectionState) {
+	fmt.Println(state)
+	// updateAndNotify := func(newState ice.ConnectionState) {
+	// 	if r.OnICEConnectionStateChange != nil && r.iceState != newState {
+	// 		r.OnICEConnectionStateChange(newState)
+	// 	}
+	// 	r.iceState = newState
+	// }
 
-	if p.ICEState == ice.ConnectionStateFailed {
-		if err := p.Close(); err != nil {
-			fmt.Println(errors.Wrap(err, "Failed to close Port when ICE went to failed"))
-		}
+	// if p.ICEState == ice.ConnectionStateFailed {
+	// 	if err := p.Close(); err != nil {
+	// 		fmt.Println(errors.Wrap(err, "Failed to close Port when ICE went to failed"))
+	// 	}
 
-		r.portsLock.Lock()
-		defer r.portsLock.Unlock()
-		for i := len(r.ports) - 1; i >= 0; i-- {
-			if r.ports[i] == p {
-				r.ports = append(r.ports[:i], r.ports[i+1:]...)
-			}
-		}
-
-		if len(r.ports) == 0 {
-			updateAndNotify(ice.ConnectionStateDisconnected)
-		}
-	} else {
-		updateAndNotify(ice.ConnectionStateConnected)
-	}
+	// } else {
+	// 	updateAndNotify(ice.ConnectionStateConnected)
+	// }
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {

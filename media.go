@@ -157,9 +157,7 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 			in := <-trackInput
 			packets := packetizer.Packetize(in.Data, in.Samples)
 			for _, p := range packets {
-				for _, port := range r.ports {
-					port.Send(p)
-				}
+				r.networkManager.SendRTP(p)
 			}
 		}
 	}()

@@ -18,7 +18,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
 
@@ -32,16 +31,16 @@ var listenerMap = make(map[string]*ipv4.PacketConn)
 var listenerMapLock = &sync.Mutex{}
 
 //export go_handle_sendto
-func go_handle_sendto(rawSrc *C.char, rawDst *C.char, rawBuf *C.char, rawBufLen C.int) {
-	src := C.GoString(rawSrc)
-	dst := C.GoString(rawDst)
+func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBufLen C.int) {
+	local := C.GoString(rawLocal)
+	remote := C.GoString(rawRemote)
 	buf := []byte(C.GoStringN(rawBuf, rawBufLen))
 	C.free(unsafe.Pointer(rawBuf))
 
 	listenerMapLock.Lock()
 	defer listenerMapLock.Unlock()
-	if conn, ok := listenerMap[src]; ok {
-		strIP, strPort, err := net.SplitHostPort(dst)
+	if conn, ok := listenerMap[local]; ok {
+		strIP, strPort, err := net.SplitHostPort(remote)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -56,65 +55,42 @@ func go_handle_sendto(rawSrc *C.char, rawDst *C.char, rawBuf *C.char, rawBufLen 
 			fmt.Println(err)
 		}
 	} else {
-		fmt.Printf("Could not find ipv4.PacketConn for %s \n", src)
+		fmt.Printf("Could not find ipv4.PacketConn for %s \n", local)
 	}
-}
-
-// TLSCfg holds the Certificate/PrivateKey used for a single RTCPeerConnection
-type TLSCfg struct {
-	tlscfg *_Ctype_struct_tlscfg
-}
-
-// NewTLSCfg creates a new TLSCfg
-func NewTLSCfg() *TLSCfg {
-	return &TLSCfg{
-		tlscfg: C.dtls_build_tlscfg(),
-	}
-}
-
-// Fingerprint generates a SHA-256 fingerprint of the certificate
-func (t *TLSCfg) Fingerprint() string {
-	rawFingerprint := C.dtls_tlscfg_fingerprint(t.tlscfg)
-	defer C.free(unsafe.Pointer(rawFingerprint))
-	return C.GoString(rawFingerprint)
-}
-
-// Close cleans up the associated OpenSSL resources
-func (t *TLSCfg) Close() {
-	C.dtls_tlscfg_cleanup(t.tlscfg)
 }
 
 // State represents all the state needed for a DTLS session
 type State struct {
-	*TLSCfg
-	sslctx         *_Ctype_struct_ssl_ctx_st
-	dtlsSession    *_Ctype_struct_dtls_sess
-	rawSrc, rawDst *_Ctype_char
+	sync.Mutex
+
+	tlscfg      *_Ctype_struct_tlscfg
+	sslctx      *_Ctype_struct_ssl_ctx_st
+	dtlsSession *_Ctype_struct_dtls_sess
 }
 
 // NewState creates a new DTLS session
-func NewState(tlscfg *TLSCfg, isClient bool, src, dst string) (d *State, err error) {
-	if tlscfg == nil || tlscfg.tlscfg == nil {
-		return d, errors.Errorf("TLSCfg must not be nil")
+func NewState(isClient bool) (s *State, err error) {
+	s = &State{
+		tlscfg: C.dtls_build_tlscfg(),
 	}
 
-	d = &State{
-		TLSCfg: tlscfg,
-		rawSrc: C.CString(src),
-		rawDst: C.CString(dst),
-	}
+	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
+	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(!isClient))
 
-	d.sslctx = C.dtls_build_sslctx(d.tlscfg)
-	d.dtlsSession = C.dtls_build_session(d.sslctx, C.bool(!isClient), d.rawSrc, d.rawDst)
-
-	return d, err
+	return s, err
 }
 
 // Close cleans up the associated OpenSSL resources
-func (d *State) Close() {
-	C.free(unsafe.Pointer(d.rawSrc))
-	C.free(unsafe.Pointer(d.rawDst))
-	C.dtls_session_cleanup(d.sslctx, d.dtlsSession)
+func (s *State) Close() {
+	C.dtls_session_cleanup(s.sslctx, s.dtlsSession)
+	C.dtls_tlscfg_cleanup(s.tlscfg)
+}
+
+// Fingerprint generates a SHA-256 fingerprint of the certificate
+func (s *State) Fingerprint() string {
+	rawFingerprint := C.dtls_tlscfg_fingerprint(s.tlscfg)
+	defer C.free(unsafe.Pointer(rawFingerprint))
+	return C.GoString(rawFingerprint)
 }
 
 // CertPair is the client+server key and profile extracted for SRTP
@@ -126,11 +102,20 @@ type CertPair struct {
 
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
 // If there is any data after decoding we pass back to the caller to handler
-func (d *State) HandleDTLSPacket(packet []byte) []byte {
-	packetRaw := C.CBytes(packet)
-	defer C.free(unsafe.Pointer(packetRaw))
+func (s *State) HandleDTLSPacket(packet []byte, local, remote string) []byte {
+	s.Lock()
+	defer s.Unlock()
 
-	if ret := C.dtls_handle_incoming(d.dtlsSession, packetRaw, C.int(len(packet))); ret != nil {
+	rawLocal := C.CString(local)
+	rawRemote := C.CString(remote)
+	packetRaw := C.CBytes(packet)
+	defer func() {
+		C.free(unsafe.Pointer(rawLocal))
+		C.free(unsafe.Pointer(rawRemote))
+		C.free(unsafe.Pointer(packetRaw))
+	}()
+
+	if ret := C.dtls_handle_incoming(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote); ret != nil {
 		defer func() {
 			C.free(unsafe.Pointer(ret.buf))
 			C.free(unsafe.Pointer(ret))
@@ -141,15 +126,25 @@ func (d *State) HandleDTLSPacket(packet []byte) []byte {
 }
 
 // Send takes a un-encrypted packet and sends via DTLS
-func (d *State) Send(packet []byte) bool {
+func (s *State) Send(packet []byte, local, remote string) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	rawLocal := C.CString(local)
+	rawRemote := C.CString(remote)
 	packetRaw := C.CBytes(packet)
-	defer C.free(unsafe.Pointer(packetRaw))
-	return bool(C.dtls_handle_outgoing(d.dtlsSession, packetRaw, C.int(len(packet))))
+	defer func() {
+		C.free(unsafe.Pointer(rawLocal))
+		C.free(unsafe.Pointer(rawRemote))
+		C.free(unsafe.Pointer(packetRaw))
+	}()
+
+	return bool(C.dtls_handle_outgoing(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote))
 }
 
 // GetCertPair gets the current CertPair if DTLS has finished
-func (d *State) GetCertPair() *CertPair {
-	if ret := C.dtls_get_certpair(d.dtlsSession); ret != nil {
+func (s *State) GetCertPair() *CertPair {
+	if ret := C.dtls_get_certpair(s.dtlsSession); ret != nil {
 		defer C.free(unsafe.Pointer(ret))
 		return &CertPair{
 			ClientWriteKey: []byte(C.GoStringN(&ret.client_write_key[0], ret.key_length)),
@@ -161,8 +156,18 @@ func (d *State) GetCertPair() *CertPair {
 }
 
 // DoHandshake sends the DTLS handshake it the remote peer
-func (d *State) DoHandshake() {
-	C.dtls_do_handshake(d.dtlsSession)
+func (s *State) DoHandshake(local, remote string) {
+	s.Lock()
+	defer s.Unlock()
+
+	rawLocal := C.CString(local)
+	rawRemote := C.CString(remote)
+	defer func() {
+		C.free(unsafe.Pointer(rawLocal))
+		C.free(unsafe.Pointer(rawRemote))
+	}()
+
+	C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
 }
 
 // AddListener adds the socket to a map that can be accessed by OpenSSL for sending
