@@ -33,12 +33,8 @@ typedef struct tlscfg {
 typedef struct dtls_sess {
   SSL *ssl;
 
-  char *local_address;
-  char *peer_address;
-
   enum dtls_con_state state;
   enum dtls_con_type type;
-  pthread_mutex_t lock;
 } dtls_sess;
 
 typedef struct dtls_decrypted {
@@ -61,11 +57,11 @@ bool openssl_global_init();
 
 tlscfg *dtls_build_tlscfg();
 SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server, char *src, char *dst);
+dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server);
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess);
-dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len);
-bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len);
+ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote);
+dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *local, char *remote);
+bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char *remote);
 
 dtls_cert_pair *dtls_get_certpair(dtls_sess *sess);
 char *dtls_tlscfg_fingerprint(tlscfg *cfg);

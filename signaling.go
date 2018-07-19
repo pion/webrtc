@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/pions/pkg/stun"
-	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pkg/errors"
@@ -154,68 +154,78 @@ type RTCOfferOptions struct {
 	ICERestart             bool
 }
 
+// TODO
+type candidate struct {
+	transport    string
+	basePriority uint16
+	ip           string
+	port         int
+	typ          string
+}
+
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
 func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
-	if options != nil {
-		panic("TODO handle options")
-	}
-	if r.IsClosed {
-		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
-	}
-	useIdentity := r.idpLoginURL != nil
-	if useIdentity {
-		panic("TODO handle identity provider")
-	}
+	panic("TODO")
+	// if options != nil {
+	// 	panic("TODO handle options")
+	// }
+	// if r.IsClosed {
+	// 	return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+	// }
+	// useIdentity := r.idpLoginURL != nil
+	// if useIdentity {
+	// 	panic("TODO handle identity provider")
+	// }
 
-	d := sdp.NewJSEPSessionDescription(
-		r.tlscfg.Fingerprint(),
-		useIdentity).
-		WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video") // TODO: Support BUNDLE
+	// d := sdp.NewJSEPSessionDescription(
+	// 	r.tlscfg.Fingerprint(),
+	// 	useIdentity).
+	// 	WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video") // TODO: Support BUNDLE
 
-	var streamlabels string
-	for _, transceiver := range r.rtpTransceivers {
-		if transceiver.Sender == nil ||
-			transceiver.Sender.Track == nil {
-			continue
-		}
-		track := transceiver.Sender.Track
-		cname := "pion"      // TODO: Support RTP streams synchronisation
-		steamlabel := "pion" // TODO: Support steam labels
-		codec, err := r.mediaEngine.getCodec(track.PayloadType)
-		if err != nil {
-			return RTCSessionDescription{}, err
-		}
-		media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
-			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
-			WithPropertyAttribute(transceiver.Direction.String()).
-			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
-			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
-			WithPropertyAttribute(sdp.AttrKeyRtcpRsize). // TODO: Support Reduced-Size RTCP?
-			WithCodec(
-				codec.PayloadType,
-				codec.Name,
-				codec.ClockRate,
-				codec.Channels,
-				codec.SdpFmtpLine,
-			).
-			WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
-		err = r.addICECandidates(media)
-		if err != nil {
-			return RTCSessionDescription{}, err
-		}
-		streamlabels = streamlabels + " " + steamlabel
+	// var streamlabels string
+	// for _, transceiver := range r.rtpTransceivers {
+	// 	if transceiver.Sender == nil ||
+	// 		transceiver.Sender.Track == nil {
+	// 		continue
+	// 	}
+	// 	track := transceiver.Sender.Track
+	// 	cname := "pion"      // TODO: Support RTP streams synchronisation
+	// 	steamlabel := "pion" // TODO: Support steam labels
+	// 	codec, err := r.mediaEngine.getCodec(track.PayloadType)
+	// 	if err != nil {
+	// 		return RTCSessionDescription{}, err
+	// 	}
+	// 	media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
+	// 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
+	// 		WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
+	// 		WithPropertyAttribute(transceiver.Direction.String()).
+	// 		WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
+	// 		WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
+	// 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
+	// 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize). // TODO: Support Reduced-Size RTCP?
+	// 		WithCodec(
+	// 			codec.PayloadType,
+	// 			codec.Name,
+	// 			codec.ClockRate,
+	// 			codec.Channels,
+	// 			codec.SdpFmtpLine,
+	// 		).
+	// 		WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
+	// 	err = r.addICECandidates(media)
+	// 	if err != nil {
+	// 		return RTCSessionDescription{}, err
+	// 	}
+	// 	streamlabels = streamlabels + " " + steamlabel
 
-		d.WithMedia(media)
-	}
+	// 	d.WithMedia(media)
+	// }
 
-	d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+streamlabels)
+	// d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+streamlabels)
 
-	return RTCSessionDescription{
-		Type: RTCSdpTypeOffer,
-		Sdp:  d.Marshal(),
-	}, nil
+	// return RTCSessionDescription{
+	// 	Type: RTCSdpTypeOffer,
+	// 	Sdp:  d.Marshal(),
+	// }, nil
 }
 
 // RTCAnswerOptions describes the options used to control the answer creation process
@@ -236,31 +246,44 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDe
 		panic("TODO handle identity provider")
 	}
 
+	candidates, err := r.buildCandidates()
+	if err != nil {
+		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+	}
+
 	d := sdp.NewJSEPSessionDescription(
-		r.tlscfg.Fingerprint(),
-		useIdentity).
-		WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video") // TODO: Support BUNDLE
+		r.networkManager.DTLSFingerprint(),
+		useIdentity)
 
-	// TODO: Actually reply based on the offer (#21)
-	// TODO: Media lines should be in the same order as the offer
+	bundleValue := "BUNDLE"
+	for _, remoteMedia := range r.remoteDescription.MediaDescriptions {
+		if strings.HasPrefix(remoteMedia.MediaName, "audio") {
+			bundleValue += " audio"
+			_, err := r.addAnswerMedia(d, RTCRtpCodecTypeAudio, candidates)
+			if err != nil {
+				return RTCSessionDescription{}, err
+			}
+		} else if strings.HasPrefix(remoteMedia.MediaName, "video") {
+			bundleValue += " video"
+			_, err := r.addAnswerMedia(d, RTCRtpCodecTypeVideo, candidates)
+			if err != nil {
+				return RTCSessionDescription{}, err
+			}
 
-	audioStreamLabels, err := r.addAnswerMedia(d, RTCRtpCodecTypeAudio)
-	if err != nil {
-		return RTCSessionDescription{}, err
+		} else if strings.HasPrefix(remoteMedia.MediaName, "application") {
+			bundleValue += " data"
+			r.addAnswerData(d, candidates)
+		}
 	}
-	videoStreamLabels, err := r.addAnswerMedia(d, RTCRtpCodecTypeVideo)
-	if err != nil {
-		return RTCSessionDescription{}, err
-	}
-	d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+audioStreamLabels+videoStreamLabels)
 
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 	return RTCSessionDescription{
 		Type: RTCSdpTypeAnswer,
 		Sdp:  d.Marshal(),
 	}, nil
 }
 
-func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType) (string, error) {
+func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType, candidates []candidate) (string, error) {
 	added := false
 
 	var streamlabels string
@@ -294,10 +317,10 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			).
 			WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
 
-		err = r.addICECandidates(media)
-		if err != nil {
-			return "", err
+		for _, c := range candidates {
+			media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
 		}
+		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 		d.WithMedia(media)
 		streamlabels = streamlabels + " " + steamlabel
 		added = true
@@ -324,41 +347,56 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			)
 		}
 
-		err := r.addICECandidates(media)
-		if err != nil {
-			return "", err
+		for _, c := range candidates {
+			media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
 		}
+		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 		d.WithMedia(media)
 	}
 
 	return streamlabels, nil
+
 }
 
-func (r *RTCPeerConnection) addICECandidates(d *sdp.MediaDescription) error {
-	r.portsLock.Lock()
-	defer r.portsLock.Unlock()
+func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates []candidate) {
+	media := (&sdp.MediaDescription{
+		MediaName:      "application 9 DTLS/SCTP 5000",
+		ConnectionData: "IN IP4 0.0.0.0",
+		Attributes:     []string{},
+	}).
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyMID, "data").
+		WithValueAttribute("sctpmap:5000", "webrtc-datachannel 1024").
+		WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
+		WithPropertyAttribute(sdp.AttrKeyICELite) // TODO: get ICE type from ICE Agent
 
-	// TODO: Move gathering to ice.Agent
+	for _, c := range candidates {
+		media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
+	}
+	media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 
+	d.WithMedia(media)
+}
+
+func (r *RTCPeerConnection) buildCandidates() ([]candidate, error) {
 	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
+	candidates := make([]candidate, 0)
 
 	for _, c := range ice.HostInterfaces() {
-		port, err := network.NewPort(&network.PortArguments{
-			Address:   c + ":0",
-			RemoteKey: []byte(r.iceAgent.Pwd),
-			TLSCfg:    r.tlscfg,
-			BufferTransportGenerator: r.generateChannel,
-			ICENotifier:              r.iceStateChange,
-			DataChannelEventHandler:  r.dataChannelEventHandler,
-		})
+		boundAddress, err := r.networkManager.Listen(c + ":0")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		d.WithCandidate(1, "udp", basePriority, c, port.ListeningAddr.Port, "host")
+		candidates = append(candidates, candidate{
+			transport:    "udp",
+			basePriority: basePriority,
+			ip:           boundAddress.IP.String(),
+			port:         boundAddress.Port,
+			typ:          "host",
+		})
 
 		basePriority = basePriority + 1
-		r.ports = append(r.ports, port)
 	}
 
 	for _, servers := range r.iceAgent.Servers {
@@ -370,52 +408,48 @@ func (r *RTCPeerConnection) addICECandidates(d *sdp.MediaDescription) error {
 			proto := server.TransportType.String()
 			client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", server.Host, server.Port), time.Second*5)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to create STUN client")
+				return nil, errors.Wrapf(err, "Failed to create STUN client")
 			}
 			localAddr, ok := client.LocalAddr().(*net.UDPAddr)
 			if !ok {
-				return errors.Errorf("Failed to cast STUN client to UDPAddr")
+				return nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
 			}
 
 			resp, err := client.Request()
 			if err != nil {
-				return errors.Wrapf(err, "Failed to make STUN request")
+				return nil, errors.Wrapf(err, "Failed to make STUN request")
 			}
 
 			if err := client.Close(); err != nil {
-				return errors.Wrapf(err, "Failed to close STUN client")
+				return nil, errors.Wrapf(err, "Failed to close STUN client")
 			}
 
 			attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
 			if !ok {
-				return errors.Errorf("Got respond from STUN server that did not contain XORAddress")
+				return nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
 			}
 
 			var addr stun.XorAddress
 			if err := addr.Unpack(resp, attr); err != nil {
-				return errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
+				return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 			}
 
-			port, err := network.NewPort(&network.PortArguments{
-				Address:   fmt.Sprintf("0.0.0.0:%d", localAddr.Port),
-				RemoteKey: []byte(r.iceAgent.Pwd),
-				TLSCfg:    r.tlscfg,
-				BufferTransportGenerator: r.generateChannel,
-				ICENotifier:              r.iceStateChange,
-				DataChannelEventHandler:  r.dataChannelEventHandler,
-			})
+			boundAddress, err := r.networkManager.Listen(fmt.Sprintf("0.0.0.0:%d", localAddr.Port))
 			if err != nil {
-				return errors.Wrapf(err, "Failed to build network/port")
+				return nil, err
 			}
 
-			d.WithCandidate(1, proto, basePriority, addr.IP.String(), localAddr.Port, "srflx")
+			candidates = append(candidates, candidate{
+				transport:    "udp",
+				basePriority: basePriority,
+				ip:           addr.IP.String(),
+				port:         boundAddress.Port,
+				typ:          "srflx",
+			})
 
 			basePriority = basePriority + 1
-			r.ports = append(r.ports, port)
 		}
 	}
 
-	d.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
-
-	return nil
+	return candidates, nil
 }

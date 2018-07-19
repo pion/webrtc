@@ -1,7 +1,6 @@
 package ice
 
 import (
-	"log"
 	"strconv"
 	"strings"
 
@@ -151,7 +150,6 @@ func NewURL(address string) (URL, error) {
 	} else if i := strings.IndexByte(address, ']'); i != -1 {
 		host = strings.TrimPrefix(address[:i], "[")
 		port = address[i+1+len(":"):]
-		log.Println(port)
 	} else {
 		host = address[:colon]
 		port = address[colon+len(":"):]
