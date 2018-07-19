@@ -6,7 +6,7 @@ import (
 )
 
 /*
-SelectiveAck represents an SCTP Chunk of type SACK
+chunkSelectiveAck represents an SCTP Chunk of type SACK
 
 This chunk is sent to the peer endpoint to acknowledge received DATA
 chunks and to inform the peer endpoint of gaps in the received
@@ -40,16 +40,16 @@ subsequences of DATA chunks as represented by their TSNs.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 
-type GapAckBlock struct {
+type gapAckBlock struct {
 	start uint16
 	end   uint16
 }
 
-type SelectiveAck struct {
-	ChunkHeader
+type chunkSelectiveAck struct {
+	chunkHeader
 	cumulativeTSNAck               uint32
 	advertisedReceiverWindowCredit uint32
-	gapAckBlocks                   []*GapAckBlock
+	gapAckBlocks                   []*gapAckBlock
 	duplicateTSN                   []uint32
 }
 
@@ -57,9 +57,8 @@ const (
 	selectiveAckHeaderSize = 12
 )
 
-// Unmarshal populates a Abort Chunk from a byte slice
-func (s *SelectiveAck) Unmarshal(raw []byte) error {
-	if err := s.ChunkHeader.Unmarshal(raw); err != nil {
+func (s *chunkSelectiveAck) unmarshal(raw []byte) error {
+	if err := s.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
@@ -74,7 +73,7 @@ func (s *SelectiveAck) Unmarshal(raw []byte) error {
 
 	s.cumulativeTSNAck = binary.BigEndian.Uint32(s.raw[0:])
 	s.advertisedReceiverWindowCredit = binary.BigEndian.Uint32(s.raw[4:])
-	s.gapAckBlocks = make([]*GapAckBlock, binary.BigEndian.Uint16(s.raw[8:]))
+	s.gapAckBlocks = make([]*gapAckBlock, binary.BigEndian.Uint16(s.raw[8:]))
 	s.duplicateTSN = make([]uint32, binary.BigEndian.Uint16(s.raw[10:]))
 
 	if len(s.raw) != selectiveAckHeaderSize+(4*len(s.gapAckBlocks)+(4*len(s.duplicateTSN))) {
@@ -82,12 +81,12 @@ func (s *SelectiveAck) Unmarshal(raw []byte) error {
 	}
 
 	offset := selectiveAckHeaderSize
-	for i, _ := range s.gapAckBlocks {
+	for i := range s.gapAckBlocks {
 		s.gapAckBlocks[i].start = binary.BigEndian.Uint16(s.raw[offset:])
 		s.gapAckBlocks[i].end = binary.BigEndian.Uint16(s.raw[offset+2:])
 		offset += 4
 	}
-	for i, _ := range s.duplicateTSN {
+	for i := range s.duplicateTSN {
 		s.duplicateTSN[i] = binary.BigEndian.Uint32(s.raw[offset:])
 		offset += 4
 	}
@@ -95,8 +94,7 @@ func (s *SelectiveAck) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal generates raw data from a Abort struct
-func (s *SelectiveAck) Marshal() ([]byte, error) {
+func (s *chunkSelectiveAck) marshal() ([]byte, error) {
 	sackRaw := make([]byte, selectiveAckHeaderSize+(4*len(s.gapAckBlocks)+(4*len(s.duplicateTSN))))
 	binary.BigEndian.PutUint32(sackRaw[0:], s.cumulativeTSNAck)
 	binary.BigEndian.PutUint32(sackRaw[4:], s.advertisedReceiverWindowCredit)
@@ -113,12 +111,11 @@ func (s *SelectiveAck) Marshal() ([]byte, error) {
 		offset += 4
 	}
 
-	s.ChunkHeader.typ = SACK
-	s.ChunkHeader.raw = sackRaw
-	return s.ChunkHeader.Marshal()
+	s.chunkHeader.typ = SACK
+	s.chunkHeader.raw = sackRaw
+	return s.chunkHeader.marshal()
 }
 
-// Check asserts the validity of this structs values
-func (s *SelectiveAck) Check() (abort bool, err error) {
+func (s *chunkSelectiveAck) check() (abort bool, err error) {
 	return false, nil
 }

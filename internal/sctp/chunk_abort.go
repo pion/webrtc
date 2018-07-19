@@ -25,14 +25,13 @@ the receiver.
 |                                                               |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
-type Abort struct {
-	ChunkHeader
-	ErrorCauses []ErrorCause
+type chunkAbort struct {
+	chunkHeader
+	errorCauses []errorCause
 }
 
-// Unmarshal populates a Abort Chunk from a byte slice
-func (a *Abort) Unmarshal(raw []byte) error {
-	if err := a.ChunkHeader.Unmarshal(raw); err != nil {
+func (a *chunkAbort) unmarshal(raw []byte) error {
+	if err := a.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
@@ -46,23 +45,20 @@ func (a *Abort) Unmarshal(raw []byte) error {
 			break
 		}
 
-		e, err := BuildErrorCause(raw[offset:])
+		e, err := buildErrorCause(raw[offset:])
 		if err != nil {
 			return errors.Wrap(err, "Failed build Abort Chunk")
 		}
 
-		offset += int(e.Length())
-		a.ErrorCauses = append(a.ErrorCauses, e)
+		offset += int(e.length())
+		a.errorCauses = append(a.errorCauses, e)
 	}
 	return nil
 }
-
-// Marshal generates raw data from a Abort struct
-func (a *Abort) Marshal() ([]byte, error) {
+func (a *chunkAbort) marshal() ([]byte, error) {
 	return nil, errors.Errorf("Unimplemented")
 }
 
-// Check asserts the validity of this structs values
-func (a *Abort) Check() (abort bool, err error) {
+func (a *chunkAbort) check() (abort bool, err error) {
 	return false, nil
 }

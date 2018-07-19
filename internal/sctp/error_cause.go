@@ -7,82 +7,81 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ErrorCauseCode is a cause code that appears in either a ERROR or ABORT chunk
-type ErrorCauseCode uint16
+// errorCauseCode is a cause code that appears in either a ERROR or ABORT chunk
+type errorCauseCode uint16
 
-// ErrorCause interface
-type ErrorCause interface {
-	Unmarshal([]byte) error
-	Marshal() ([]byte, error)
-	Length() uint16
+type errorCause interface {
+	unmarshal([]byte) error
+	marshal() ([]byte, error)
+	length() uint16
 
-	errorCauseCode() ErrorCauseCode
+	errorCauseCode() errorCauseCode
 }
 
-// BuildErrorCause delegates the building of a error cause from raw bytes to the correct structure
-func BuildErrorCause(raw []byte) (ErrorCause, error) {
-	var e ErrorCause
+// buildErrorCause delegates the building of a error cause from raw bytes to the correct structure
+func buildErrorCause(raw []byte) (errorCause, error) {
+	var e errorCause
 
-	c := ErrorCauseCode(binary.BigEndian.Uint16(raw[0:]))
+	c := errorCauseCode(binary.BigEndian.Uint16(raw[0:]))
 	switch c {
-	case InvalidMandatoryParameter:
-		e = &ErrorCauseInvalidMandatoryParameter{}
-	case UnrecognizedChunkType:
-		e = &ErrorCauseUnrecognizedChunkType{}
+	case invalidMandatoryParameter:
+		e = &errorCauseInvalidMandatoryParameter{}
+	case unrecognizedChunkType:
+		e = &errorCauseUnrecognizedChunkType{}
 	default:
 		return nil, errors.Errorf("BuildErrorCause does not handle %s", c.String())
 	}
 
-	if err := e.Unmarshal(raw); err != nil {
+	if err := e.unmarshal(raw); err != nil {
 		return nil, err
 	}
 	return e, nil
 }
 
-// ErrorCause Codes
 const (
-	InvalidStreamIdentifier                ErrorCauseCode = 1
-	MissingMandatoryParameter              ErrorCauseCode = 2
-	StaleCookieError                       ErrorCauseCode = 3
-	OutOfResource                          ErrorCauseCode = 4
-	UnresolvableAddress                    ErrorCauseCode = 5
-	UnrecognizedChunkType                  ErrorCauseCode = 6
-	InvalidMandatoryParameter              ErrorCauseCode = 7
-	UnrecognizedParameters                 ErrorCauseCode = 8
-	NoUserData                             ErrorCauseCode = 9
-	CookieReceivedWhileShuttingDown        ErrorCauseCode = 10
-	RestartOfAnAssociationWithNewAddresses ErrorCauseCode = 11
-	UserInitiatedAbort                     ErrorCauseCode = 12
-	ProtocolViolation                      ErrorCauseCode = 13
+	invalidStreamIdentifier                errorCauseCode = 1
+	missingMandatoryParameter              errorCauseCode = 2
+	staleCookieError                       errorCauseCode = 3
+	outOfResource                          errorCauseCode = 4
+	unresolvableAddress                    errorCauseCode = 5
+	unrecognizedChunkType                  errorCauseCode = 6
+	invalidMandatoryParameter              errorCauseCode = 7
+	unrecognizedParameters                 errorCauseCode = 8
+	noUserData                             errorCauseCode = 9
+	cookieReceivedWhileShuttingDown        errorCauseCode = 10
+	restartOfAnAssociationWithNewAddresses errorCauseCode = 11
+	userInitiatedAbort                     errorCauseCode = 12
+	protocolViolation                      errorCauseCode = 13
 )
 
-func (e ErrorCauseCode) String() string {
+// nolint: gocyclo
+func (e errorCauseCode) String() string {
 	switch e {
-	case InvalidStreamIdentifier:
+	case invalidStreamIdentifier:
 		return "Invalid Stream Identifier"
-	case MissingMandatoryParameter:
+	case missingMandatoryParameter:
 		return "Missing Mandatory Parameter"
-	case StaleCookieError:
+	case staleCookieError:
 		return "Stale Cookie Error"
-	case OutOfResource:
+	case outOfResource:
 		return "Out Of Resource"
-	case UnresolvableAddress:
+	case unresolvableAddress:
 		return "Unresolvable Address"
-	case UnrecognizedChunkType:
+	case unrecognizedChunkType:
 		return "Unrecognized Chunk Type"
-	case InvalidMandatoryParameter:
+	case invalidMandatoryParameter:
 		return "Invalid Mandatory Parameter"
-	case UnrecognizedParameters:
+	case unrecognizedParameters:
 		return "Unrecognized Parameters"
-	case NoUserData:
+	case noUserData:
 		return "No User Data"
-	case CookieReceivedWhileShuttingDown:
+	case cookieReceivedWhileShuttingDown:
 		return "Cookie Received While Shutting Down"
-	case RestartOfAnAssociationWithNewAddresses:
+	case restartOfAnAssociationWithNewAddresses:
 		return "Restart Of An Association With New Addresses"
-	case UserInitiatedAbort:
+	case userInitiatedAbort:
 		return "User Initiated Abort"
-	case ProtocolViolation:
+	case protocolViolation:
 		return "Protocol Violation"
 	default:
 		return fmt.Sprintf("Unknown CauseCode: %d", e)

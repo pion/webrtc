@@ -5,7 +5,7 @@ import (
 )
 
 /*
-CookieAck represents an SCTP Chunk of type CookieAck
+chunkCookieAck represents an SCTP Chunk of type chunkCookieAck
 
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -13,13 +13,12 @@ CookieAck represents an SCTP Chunk of type CookieAck
 |   Type = 11   |Chunk  Flags   |     Length = 4                |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
-type CookieAck struct {
-	ChunkHeader
+type chunkCookieAck struct {
+	chunkHeader
 }
 
-// Unmarshal populates a CookieAck Chunk from a byte slice
-func (c *CookieAck) Unmarshal(raw []byte) error {
-	if err := c.ChunkHeader.Unmarshal(raw); err != nil {
+func (c *chunkCookieAck) unmarshal(raw []byte) error {
+	if err := c.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
@@ -30,13 +29,11 @@ func (c *CookieAck) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal generates raw data from a CookieAck struct
-func (c *CookieAck) Marshal() ([]byte, error) {
-	c.ChunkHeader.typ = COOKIEACK
-	return c.ChunkHeader.Marshal()
+func (c *chunkCookieAck) Marshal() ([]byte, error) {
+	c.chunkHeader.typ = COOKIEACK
+	return c.chunkHeader.marshal()
 }
 
-// Check asserts the validity of this structs values
-func (c *CookieAck) Check() (abort bool, err error) {
+func (c *chunkCookieAck) check() (abort bool, err error) {
 	return false, nil
 }

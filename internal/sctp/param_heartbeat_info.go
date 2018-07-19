@@ -1,18 +1,18 @@
 package sctp
 
-type ParamHeartbeatInfo struct {
-	ParamHeader
-	HeartbeatInformation []byte
+type paramHeartbeatInfo struct {
+	paramHeader
+	heartbeatInformation []byte
 }
 
-func (h *ParamHeartbeatInfo) Marshal() ([]byte, error) {
-	h.typ = HeartbeatInfo
-	h.raw = h.HeartbeatInformation
-	return h.ParamHeader.Marshal()
+func (h *paramHeartbeatInfo) marshal() ([]byte, error) {
+	h.typ = heartbeatInfo
+	h.raw = h.heartbeatInformation
+	return h.paramHeader.marshal()
 }
 
-func (h *ParamHeartbeatInfo) Unmarshal(raw []byte) (Param, error) {
-	h.ParamHeader.Unmarshal(raw)
-	h.HeartbeatInformation = h.raw
+func (h *paramHeartbeatInfo) unmarshal(raw []byte) (param, error) {
+	h.paramHeader.unmarshal(raw)
+	h.heartbeatInformation = h.raw
 	return h, nil
 }

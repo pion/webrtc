@@ -6,119 +6,117 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ParamType represents a SCTP INIT/INITACK parameter
-type ParamType uint16
+// paramType represents a SCTP INIT/INITACK parameter
+type paramType uint16
 
-// Param interface
-type Param interface {
-	Marshal() ([]byte, error)
-	Length() int
+type param interface {
+	marshal() ([]byte, error)
+	length() int
 }
 
-// BuildParam delegates the building of a parameter from raw bytes to the correct structure
-func BuildParam(t ParamType, rawParam []byte) (Param, error) {
+func buildParam(t paramType, rawParam []byte) (param, error) {
 	switch t {
-	case ForwardTSNSupp:
-		return (&ParamForwardTSNSupported{}).Unmarshal(rawParam)
-	case SupportedExt:
-		return (&ParamSupportedExtensions{}).Unmarshal(rawParam)
-	case Random:
-		return (&ParamRandom{}).Unmarshal(rawParam)
-	case ReqHMACAlgo:
-		return (&ParamRequestedHMACAlgorithm{}).Unmarshal(rawParam)
-	case ChunkList:
-		return (&ParamChunkList{}).Unmarshal(rawParam)
-	case StateCookie:
-		return (&ParamStateCookie{}).Unmarshal(rawParam)
-	case HeartbeatInfo:
-		return (&ParamHeartbeatInfo{}).Unmarshal(rawParam)
+	case forwardTSNSupp:
+		return (&paramForwardTSNSupported{}).unmarshal(rawParam)
+	case supportedExt:
+		return (&paramSupportedExtensions{}).unmarshal(rawParam)
+	case random:
+		return (&paramRandom{}).unmarshal(rawParam)
+	case reqHMACAlgo:
+		return (&paramRequestedHMACAlgorithm{}).unmarshal(rawParam)
+	case chunkList:
+		return (&paramChunkList{}).unmarshal(rawParam)
+	case stateCookie:
+		return (&paramStateCookie{}).unmarshal(rawParam)
+	case heartbeatInfo:
+		return (&paramHeartbeatInfo{}).unmarshal(rawParam)
 	}
 	return nil, errors.Errorf("Unhandled ParamType %v", t)
 }
 
-// Parameter Types
 const (
-	HeartbeatInfo      ParamType = 1     //Heartbeat Info	[RFC4960]
-	IPV4Addr           ParamType = 5     //IPv4 Address	[RFC4960]
-	IPV6Addr           ParamType = 6     //IPv6 Address	[RFC4960]
-	StateCookie        ParamType = 7     //State Cookie	[RFC4960]
-	UnrecognizedParam  ParamType = 8     //Unrecognized Parameters	[RFC4960]
-	CookiePreservative ParamType = 9     //Cookie Preservative	[RFC4960]
-	HostNameAddr       ParamType = 11    //Host Name Address	[RFC4960]
-	SupportedAddrTypes ParamType = 12    //Supported Address Types	[RFC4960]
-	OutSSNResetReq     ParamType = 13    //Outgoing SSN Reset Request Parameter	[RFC6525]
-	IncSSNResetReq     ParamType = 14    //Incoming SSN Reset Request Parameter	[RFC6525]
-	SSNTSNResetReq     ParamType = 15    //SSN/TSN Reset Request Parameter	[RFC6525]
-	ReconfigResp       ParamType = 16    //Re-configuration Response Parameter	[RFC6525]
-	AddOutStreamsReq   ParamType = 17    //Add Outgoing Streams Request Parameter	[RFC6525]
-	AddIncStreamsReq   ParamType = 18    //Add Incoming Streams Request Parameter	[RFC6525]
-	Random             ParamType = 32770 //Random (0x8002)	[RFC4805]
-	ChunkList          ParamType = 32771 //Chunk List (0x8003)	[RFC4895]
-	ReqHMACAlgo        ParamType = 32772 //Requested HMAC Algorithm Parameter (0x8004)	[RFC4895]
-	Padding            ParamType = 32773 //Padding (0x8005)
-	SupportedExt       ParamType = 32776 //Supported Extensions (0x8008)	[RFC5061]
-	ForwardTSNSupp     ParamType = 49152 //Forward TSN supported (0xC000)	[RFC3758]
-	AddIPAddr          ParamType = 49153 //Add IP Address (0xC001)	[RFC5061]
-	DelIPAddr          ParamType = 49154 //Delete IP Address (0xC002)	[RFC5061]
-	ErrClauseInd       ParamType = 49155 //Error Cause Indication (0xC003)	[RFC5061]
-	SetPriAddr         ParamType = 49156 //Set Primary Address (0xC004)	[RFC5061]
-	SuccessInd         ParamType = 49157 //Success Indication (0xC005)	[RFC5061]
-	AdaptLayerInd      ParamType = 49158 //Adaptation Layer Indication (0xC006)	[RFC5061]
+	heartbeatInfo      paramType = 1     // Heartbeat Info	[RFC4960]
+	ipV4Addr           paramType = 5     // IPv4 Address	[RFC4960]
+	ipV6Addr           paramType = 6     // IPv6 Address	[RFC4960]
+	stateCookie        paramType = 7     // State Cookie	[RFC4960]
+	unrecognizedParam  paramType = 8     // Unrecognized Parameters	[RFC4960]
+	cookiePreservative paramType = 9     // Cookie Preservative	[RFC4960]
+	hostNameAddr       paramType = 11    // Host Name Address	[RFC4960]
+	supportedAddrTypes paramType = 12    // Supported Address Types	[RFC4960]
+	outSSNResetReq     paramType = 13    // Outgoing SSN Reset Request Parameter	[RFC6525]
+	incSSNResetReq     paramType = 14    // Incoming SSN Reset Request Parameter	[RFC6525]
+	ssnTSNResetReq     paramType = 15    // SSN/TSN Reset Request Parameter	[RFC6525]
+	reconfigResp       paramType = 16    // Re-configuration Response Parameter	[RFC6525]
+	addOutStreamsReq   paramType = 17    // Add Outgoing Streams Request Parameter	[RFC6525]
+	addIncStreamsReq   paramType = 18    // Add Incoming Streams Request Parameter	[RFC6525]
+	random             paramType = 32770 // Random (0x8002)	[RFC4805]
+	chunkList          paramType = 32771 // Chunk List (0x8003)	[RFC4895]
+	reqHMACAlgo        paramType = 32772 // Requested HMAC Algorithm Parameter (0x8004)	[RFC4895]
+	padding            paramType = 32773 // Padding (0x8005)
+	supportedExt       paramType = 32776 // Supported Extensions (0x8008)	[RFC5061]
+	forwardTSNSupp     paramType = 49152 // Forward TSN supported (0xC000)	[RFC3758]
+	addIPAddr          paramType = 49153 // Add IP Address (0xC001)	[RFC5061]
+	delIPAddr          paramType = 49154 // Delete IP Address (0xC002)	[RFC5061]
+	errClauseInd       paramType = 49155 // Error Cause Indication (0xC003)	[RFC5061]
+	setPriAddr         paramType = 49156 // Set Primary Address (0xC004)	[RFC5061]
+	successInd         paramType = 49157 // Success Indication (0xC005)	[RFC5061]
+	adaptLayerInd      paramType = 49158 // Adaptation Layer Indication (0xC006)	[RFC5061]
 )
 
-func (p ParamType) String() string {
+// nolint: gocyclo
+func (p paramType) String() string {
 	switch p {
-	case HeartbeatInfo:
+	case heartbeatInfo:
 		return "Heartbeat Info"
-	case IPV4Addr:
+	case ipV4Addr:
 		return "IPv4 Address"
-	case IPV6Addr:
+	case ipV6Addr:
 		return "IPv6 Address"
-	case StateCookie:
+	case stateCookie:
 		return "State Cookie"
-	case UnrecognizedParam:
+	case unrecognizedParam:
 		return "Unrecognized Parameters"
-	case CookiePreservative:
+	case cookiePreservative:
 		return "Cookie Preservative"
-	case HostNameAddr:
+	case hostNameAddr:
 		return "Host Name Address"
-	case SupportedAddrTypes:
+	case supportedAddrTypes:
 		return "Supported Address Types"
-	case OutSSNResetReq:
+	case outSSNResetReq:
 		return "Outgoing SSN Reset Request Parameter"
-	case IncSSNResetReq:
+	case incSSNResetReq:
 		return "Incoming SSN Reset Request Parameter"
-	case SSNTSNResetReq:
+	case ssnTSNResetReq:
 		return "SSN/TSN Reset Request Parameter"
-	case ReconfigResp:
+	case reconfigResp:
 		return "Re-configuration Response Parameter"
-	case AddOutStreamsReq:
+	case addOutStreamsReq:
 		return "Add Outgoing Streams Request Parameter"
-	case AddIncStreamsReq:
+	case addIncStreamsReq:
 		return "Add Incoming Streams Request Parameter"
-	case Random:
+	case random:
 		return "Random"
-	case ChunkList:
+	case chunkList:
 		return "Chunk List"
-	case ReqHMACAlgo:
+	case reqHMACAlgo:
 		return "Requested HMAC Algorithm Parameter"
-	case Padding:
+	case padding:
 		return "Padding"
-	case SupportedExt:
+	case supportedExt:
 		return "Supported Extensions"
-	case ForwardTSNSupp:
+	case forwardTSNSupp:
 		return "Forward TSN supported"
-	case AddIPAddr:
+	case addIPAddr:
 		return "Add IP Address"
-	case DelIPAddr:
+	case delIPAddr:
 		return "Delete IP Address"
-	case ErrClauseInd:
+	case errClauseInd:
 		return "Error Cause Indication"
-	case SetPriAddr:
+	case setPriAddr:
 		return "Set Primary Address"
-	case SuccessInd:
+	case successInd:
 		return "Success Indication"
-	case AdaptLayerInd:
+	case adaptLayerInd:
 		return "Adaptation Layer Indication"
 	default:
 		return fmt.Sprintf("Unknown ParamType: %d", p)

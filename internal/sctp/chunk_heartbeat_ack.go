@@ -5,7 +5,7 @@ import (
 )
 
 /*
-HeartbeatAck represents an SCTP Chunk of type HEARTBEAT ACK
+chunkHeartbeatAck represents an SCTP Chunk of type HEARTBEAT ACK
 
 An endpoint should send this chunk to its peer endpoint as a response
 to a HEARTBEAT chunk (see Section 8.3).  A HEARTBEAT ACK is always
@@ -33,35 +33,33 @@ Variable Parameters                  Status     Type Value
 Heartbeat Info                       Mandatory   1
 
 */
-type HeartbeatAck struct {
-	ChunkHeader
-	params []Param
+type chunkHeartbeatAck struct {
+	chunkHeader
+	params []param
 }
 
-// Unmarshal populates a HeartbeatAck Chunk from a byte slice
-func (h *HeartbeatAck) Unmarshal(raw []byte) error {
+func (h *chunkHeartbeatAck) unmarshal(raw []byte) error {
 	return errors.Errorf("Unimplemented")
 }
 
-// Marshal generates raw data from a HeartbeatAck struct
-func (h *HeartbeatAck) Marshal() ([]byte, error) {
+func (h *chunkHeartbeatAck) marshal() ([]byte, error) {
 	if len(h.params) != 1 {
-		return nil, errors.Errorf("HeartbeatAck must have one param")
+		return nil, errors.Errorf("Heartbeat Ack must have one param")
 	}
 
 	switch h.params[0].(type) {
-	case *ParamHeartbeatInfo:
+	case *paramHeartbeatInfo:
 		// ParamHeartbeatInfo is valid
 	default:
-		return nil, errors.Errorf("HeartbeatAck must have one param, and it should be a HeartbeatInfo")
+		return nil, errors.Errorf("Heartbeat Ack must have one param, and it should be a HeartbeatInfo")
 
 	}
 
 	out := make([]byte, 0)
 	for idx, p := range h.params {
-		pp, err := p.Marshal()
+		pp, err := p.marshal()
 		if err != nil {
-			return nil, errors.Wrap(err, "Unable to marshal parameter for HeartbeatAck")
+			return nil, errors.Wrap(err, "Unable to marshal parameter for Heartbeat Ack")
 		}
 
 		out = append(out, pp...)
@@ -79,13 +77,12 @@ func (h *HeartbeatAck) Marshal() ([]byte, error) {
 		}
 	}
 
-	h.ChunkHeader.typ = HEARTBEATACK
-	h.ChunkHeader.raw = out
+	h.chunkHeader.typ = HEARTBEATACK
+	h.chunkHeader.raw = out
 
-	return h.ChunkHeader.Marshal()
+	return h.chunkHeader.marshal()
 }
 
-// Check asserts the validity of this structs values
-func (h *HeartbeatAck) Check() (abort bool, err error) {
+func (h *chunkHeartbeatAck) check() (abort bool, err error) {
 	return false, nil
 }
