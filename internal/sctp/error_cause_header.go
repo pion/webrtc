@@ -10,7 +10,12 @@ import (
 type errorCauseHeader struct {
 	code errorCauseCode
 	len  uint16
+	raw  []byte
 }
+
+const (
+	errorCauseHeaderLength = 4
+)
 
 func (e *errorCauseHeader) marshal() ([]byte, error) {
 	return nil, errors.Errorf("Unimplemented")
@@ -19,6 +24,8 @@ func (e *errorCauseHeader) marshal() ([]byte, error) {
 func (e *errorCauseHeader) unmarshal(raw []byte) error {
 	e.code = errorCauseCode(binary.BigEndian.Uint16(raw[0:]))
 	e.len = binary.BigEndian.Uint16(raw[2:])
+	valueLength := e.len - errorCauseHeaderLength
+	e.raw = raw[errorCauseHeaderLength : errorCauseHeaderLength+valueLength]
 	return nil
 }
 

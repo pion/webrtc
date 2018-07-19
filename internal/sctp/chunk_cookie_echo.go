@@ -30,7 +30,7 @@ func (c *chunkCookieEcho) unmarshal(raw []byte) error {
 	if c.typ != COOKIEECHO {
 		return errors.Errorf("ChunkType is not of type COOKIEECHO, actually is %s", c.typ.String())
 	}
-	c.cookie = raw[chunkHeaderSize:]
+	c.cookie = c.raw
 
 	return nil
 }
