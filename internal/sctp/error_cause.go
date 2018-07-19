@@ -28,6 +28,8 @@ func buildErrorCause(raw []byte) (errorCause, error) {
 		e = &errorCauseInvalidMandatoryParameter{}
 	case unrecognizedChunkType:
 		e = &errorCauseUnrecognizedChunkType{}
+	case protocolViolation:
+		e = &errorCauseProtocolViolation{}
 	default:
 		return nil, errors.Errorf("BuildErrorCause does not handle %s", c.String())
 	}

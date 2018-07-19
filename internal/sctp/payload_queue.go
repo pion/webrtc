@@ -62,6 +62,10 @@ func (r *payloadQueue) popDuplicates() []uint32 {
 func (r *payloadQueue) getGapAckBlocks(cumulativeTSN uint32) (gapAckBlocks []*gapAckBlock) {
 	var b gapAckBlock
 
+	if len(r.orderedPackets) == 0 {
+		return []*gapAckBlock{}
+	}
+
 	for i, p := range r.orderedPackets {
 		if i == 0 {
 			b.start = uint16(r.orderedPackets[0].tsn - cumulativeTSN)
