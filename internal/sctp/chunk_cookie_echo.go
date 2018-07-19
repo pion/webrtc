@@ -17,33 +17,30 @@ CookieEcho represents an SCTP Chunk of type CookieEcho
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 */
-type CookieEcho struct {
-	ChunkHeader
-	Cookie []byte
+type chunkCookieEcho struct {
+	chunkHeader
+	cookie []byte
 }
 
-// Unmarshal populates a CookieEcho Chunk from a byte slice
-func (c *CookieEcho) Unmarshal(raw []byte) error {
-	if err := c.ChunkHeader.Unmarshal(raw); err != nil {
+func (c *chunkCookieEcho) unmarshal(raw []byte) error {
+	if err := c.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
 	if c.typ != COOKIEECHO {
 		return errors.Errorf("ChunkType is not of type COOKIEECHO, actually is %s", c.typ.String())
 	}
-	c.Cookie = raw[chunkHeaderSize:]
+	c.cookie = raw[chunkHeaderSize:]
 
 	return nil
 }
 
-// Marshal generates raw data from a CookieEcho struct
-func (c *CookieEcho) Marshal() ([]byte, error) {
-	c.ChunkHeader.typ = COOKIEECHO
-	c.ChunkHeader.raw = c.Cookie
-	return c.ChunkHeader.Marshal()
+func (c *chunkCookieEcho) marshal() ([]byte, error) {
+	c.chunkHeader.typ = COOKIEECHO
+	c.chunkHeader.raw = c.cookie
+	return c.chunkHeader.marshal()
 }
 
-// Check asserts the validity of this structs values
-func (c *CookieEcho) Check() (abort bool, err error) {
+func (c *chunkCookieEcho) check() (abort bool, err error) {
 	return false, nil
 }

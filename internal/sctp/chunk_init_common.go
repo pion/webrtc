@@ -7,7 +7,7 @@ import (
 )
 
 /*
-InitCommon represents an SCTP Chunk body of type INIT and INIT ACK
+chunkInitCommon represents an SCTP Chunk body of type INIT and INIT ACK
 
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -39,13 +39,13 @@ Number of Inbound Streams           Mandatory
 Initial TSN                         Mandatory
 */
 
-type InitCommon struct {
+type chunkInitCommon struct {
 	initiateTag                    uint32
 	advertisedReceiverWindowCredit uint32
 	numOutboundStreams             uint16
 	numInboundStreams              uint16
 	initialTSN                     uint32
-	params                         []Param
+	params                         []param
 }
 
 const (
@@ -53,8 +53,7 @@ const (
 	initOptionalVarHeaderLength = 4
 )
 
-// Unmarshal populates a Init Chunk from a byte slice
-func (i *InitCommon) Unmarshal(raw []byte) error {
+func (i *chunkInitCommon) unmarshal(raw []byte) error {
 
 	i.initiateTag = binary.BigEndian.Uint32(raw[0:])
 	i.advertisedReceiverWindowCredit = binary.BigEndian.Uint32(raw[4:])
@@ -83,15 +82,15 @@ func (i *InitCommon) Unmarshal(raw []byte) error {
 	remaining := len(raw) - offset
 	for remaining > 0 {
 		if remaining > initOptionalVarHeaderLength {
-			paramType := ParamType(binary.BigEndian.Uint16(raw[offset:]))
-			p, err := BuildParam(paramType, raw[offset:])
+			paramType := paramType(binary.BigEndian.Uint16(raw[offset:]))
+			p, err := buildParam(paramType, raw[offset:])
 			if err != nil {
 				return errors.Wrap(err, "Failed unmarshalling param in Init Chunk")
 			}
 			i.params = append(i.params, p)
-			padding := getPadding(p.Length(), 4)
-			offset += int(p.Length() + padding)
-			remaining -= int(p.Length() + padding)
+			padding := getPadding(p.length(), 4)
+			offset += int(p.length() + padding)
+			remaining -= int(p.length() + padding)
 		} else {
 			break
 		}
@@ -100,8 +99,7 @@ func (i *InitCommon) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal generates raw data from a Init struct
-func (i *InitCommon) Marshal() ([]byte, error) {
+func (i *chunkInitCommon) marshal() ([]byte, error) {
 	out := make([]byte, initChunkMinLength)
 	binary.BigEndian.PutUint32(out[0:], i.initiateTag)
 	binary.BigEndian.PutUint32(out[4:], i.advertisedReceiverWindowCredit)
@@ -109,7 +107,7 @@ func (i *InitCommon) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint16(out[10:], i.numInboundStreams)
 	binary.BigEndian.PutUint32(out[12:], i.initialTSN)
 	for idx, p := range i.params {
-		pp, err := p.Marshal()
+		pp, err := p.marshal()
 		if err != nil {
 			return nil, errors.Wrap(err, "Unable to marshal parameter for INIT/INITACK")
 		}

@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-type ParamStateCookie struct {
-	ParamHeader
-	Cookie []byte
+type paramStateCookie struct {
+	paramHeader
+	cookie []byte
 }
 
-func NewRandomStateCookie() *ParamStateCookie {
+func newRandomStateCookie() *paramStateCookie {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 	randCookie := make([]byte, 32)
@@ -21,21 +21,21 @@ func NewRandomStateCookie() *ParamStateCookie {
 		i++
 	}
 
-	s := &ParamStateCookie{
-		Cookie: randCookie,
+	s := &paramStateCookie{
+		cookie: randCookie,
 	}
 
 	return s
 }
 
-func (s *ParamStateCookie) Marshal() ([]byte, error) {
-	s.typ = StateCookie
-	s.raw = s.Cookie
-	return s.ParamHeader.Marshal()
+func (s *paramStateCookie) marshal() ([]byte, error) {
+	s.typ = stateCookie
+	s.raw = s.cookie
+	return s.paramHeader.marshal()
 }
 
-func (s *ParamStateCookie) Unmarshal(raw []byte) (Param, error) {
-	s.ParamHeader.Unmarshal(raw)
-	s.Cookie = s.raw
+func (s *paramStateCookie) unmarshal(raw []byte) (param, error) {
+	s.paramHeader.unmarshal(raw)
+	s.cookie = s.raw
 	return s, nil
 }

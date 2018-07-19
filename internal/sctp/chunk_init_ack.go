@@ -5,9 +5,9 @@ import (
 )
 
 /*
-InitAck represents an SCTP Chunk of type INIT ACK
+chunkInitAck represents an SCTP Chunk of type INIT ACK
 
-See InitCommon for the fixed headers
+See chunkInitCommon for the fixed headers
 
 Variable Parameters                  Status     Type Value
 -------------------------------------------------------------
@@ -19,14 +19,13 @@ Reserved for ECN Capable (Note 2)   Optional    32768 (0x8000)
 Host Name Address (Note 3)          Optional    11<Paste>
 
 */
-type InitAck struct {
-	ChunkHeader
-	InitCommon
+type chunkInitAck struct {
+	chunkHeader
+	chunkInitCommon
 }
 
-// Unmarshal populates a Init Chunk from a byte slice
-func (i *InitAck) Unmarshal(raw []byte) error {
-	if err := i.ChunkHeader.Unmarshal(raw); err != nil {
+func (i *chunkInitAck) unmarshal(raw []byte) error {
+	if err := i.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
@@ -39,31 +38,29 @@ func (i *InitAck) Unmarshal(raw []byte) error {
 	// The Chunk Flags field in INIT is reserved, and all bits in it should
 	// be set to 0 by the sender and ignored by the receiver.  The sequence
 	// of parameters within an INIT can be processed in any order.
-	if i.Flags != 0 {
+	if i.flags != 0 {
 		return errors.New("ChunkType of type INIT ACK flags must be all 0")
 	}
 
-	if err := i.InitCommon.Unmarshal(i.raw); err != nil {
+	if err := i.chunkInitCommon.unmarshal(i.raw); err != nil {
 		errors.Wrap(err, "Failed to unmarshal INIT body")
 	}
 
 	return nil
 }
 
-// Marshal generates raw data from a Init struct
-func (i *InitAck) Marshal() ([]byte, error) {
-	initShared, err := i.InitCommon.Marshal()
+func (i *chunkInitAck) marshal() ([]byte, error) {
+	initShared, err := i.chunkInitCommon.marshal()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed marshalling INIT common data")
 	}
 
-	i.ChunkHeader.typ = INITACK
-	i.ChunkHeader.raw = initShared
-	return i.ChunkHeader.Marshal()
+	i.chunkHeader.typ = INITACK
+	i.chunkHeader.raw = initShared
+	return i.chunkHeader.marshal()
 }
 
-// Check asserts the validity of this structs values
-func (i *InitAck) Check() (abort bool, err error) {
+func (i *chunkInitAck) check() (abort bool, err error) {
 
 	// The receiver of the INIT ACK records the value of the Initiate Tag
 	// parameter.  This value MUST be placed into the Verification Tag

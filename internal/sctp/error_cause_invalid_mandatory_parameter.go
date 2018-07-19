@@ -1,16 +1,14 @@
 package sctp
 
-// ErrorCauseInvalidMandatoryParameter represents an SCTP error cause
-type ErrorCauseInvalidMandatoryParameter struct {
-	ErrorCauseHeader
+// errorCauseInvalidMandatoryParameter represents an SCTP error cause
+type errorCauseInvalidMandatoryParameter struct {
+	errorCauseHeader
 }
 
-// Marshal populates a []byte from a struct
-func (e *ErrorCauseInvalidMandatoryParameter) Marshal() ([]byte, error) {
-	return e.ErrorCauseHeader.Marshal()
+func (e *errorCauseInvalidMandatoryParameter) marshal() ([]byte, error) {
+	return e.errorCauseHeader.marshal()
 }
 
-// Unmarshal populates a ErrorCauseUnrecognizedChunkType from raw data
-func (e *ErrorCauseInvalidMandatoryParameter) Unmarshal(raw []byte) error {
-	return e.ErrorCauseHeader.Unmarshal(raw)
+func (e *errorCauseInvalidMandatoryParameter) unmarshal(raw []byte) error {
+	return e.errorCauseHeader.unmarshal(raw)
 }

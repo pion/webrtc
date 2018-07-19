@@ -41,26 +41,26 @@ contains either control information or user data.
 
 
 */
-type Packet struct {
-	SourcePort      uint16
-	DestinationPort uint16
-	VerificationTag uint32
-	Chunks          []Chunk
+type packet struct {
+	sourcePort      uint16
+	destinationPort uint16
+	verificationTag uint32
+	chunks          []chunk
 }
 
 const (
 	packetHeaderSize = 12
 )
 
-// Unmarshal populates a Packet from a raw buffer
-func (p *Packet) Unmarshal(raw []byte) error {
+// nolint: gocyclo
+func (p *packet) unmarshal(raw []byte) error {
 	if len(raw) < packetHeaderSize {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP packet", len(raw), packetHeaderSize)
 	}
 
-	p.SourcePort = binary.BigEndian.Uint16(raw[0:])
-	p.DestinationPort = binary.BigEndian.Uint16(raw[2:])
-	p.VerificationTag = binary.BigEndian.Uint32(raw[4:])
+	p.sourcePort = binary.BigEndian.Uint16(raw[0:])
+	p.destinationPort = binary.BigEndian.Uint16(raw[2:])
+	p.verificationTag = binary.BigEndian.Uint32(raw[4:])
 
 	offset := packetHeaderSize
 	for {
@@ -71,29 +71,29 @@ func (p *Packet) Unmarshal(raw []byte) error {
 			return errors.Errorf("Unable to parse SCTP chunk, not enough data for complete header: offset %d remaining %d", offset, len(raw))
 		}
 
-		var c Chunk
-		switch ChunkType(raw[offset]) {
+		var c chunk
+		switch chunkType(raw[offset]) {
 		case INIT:
-			c = &Init{}
+			c = &chunkInit{}
 		case INITACK:
-			c = &InitAck{}
+			c = &chunkInitAck{}
 		case ABORT:
-			c = &Abort{}
+			c = &chunkAbort{}
 		case COOKIEECHO:
-			c = &CookieEcho{}
+			c = &chunkCookieEcho{}
 		case HEARTBEAT:
-			c = &Heartbeat{}
+			c = &chunkHeartbeat{}
 		case PAYLOADDATA:
-			c = &PayloadData{}
+			c = &chunkPayloadData{}
 		default:
-			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", ChunkType(raw[offset]).String())
+			return errors.Errorf("Failed to unmarshal, contains unknown chunk type %s", chunkType(raw[offset]).String())
 		}
 
-		if err := c.Unmarshal(raw[offset:]); err != nil {
+		if err := c.unmarshal(raw[offset:]); err != nil {
 			return err
 		}
 
-		p.Chunks = append(p.Chunks, c)
+		p.chunks = append(p.chunks, c)
 		chunkValuePadding := getPadding(c.valueLength(), 4)
 		offset += chunkHeaderSize + c.valueLength() + chunkValuePadding
 	}
@@ -105,19 +105,18 @@ func (p *Packet) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal populates a raw buffer from a packet
-func (p *Packet) Marshal() ([]byte, error) {
+func (p *packet) marshal() ([]byte, error) {
 	raw := make([]byte, packetHeaderSize)
 
 	// Populate static headers
 	// 8-12 is Checksum which will be populated when packet is complete
-	binary.BigEndian.PutUint16(raw[0:], p.SourcePort)
-	binary.BigEndian.PutUint16(raw[2:], p.DestinationPort)
-	binary.BigEndian.PutUint32(raw[4:], p.VerificationTag)
+	binary.BigEndian.PutUint16(raw[0:], p.sourcePort)
+	binary.BigEndian.PutUint16(raw[2:], p.destinationPort)
+	binary.BigEndian.PutUint32(raw[4:], p.verificationTag)
 
 	// Populate chunks
-	for _, c := range p.Chunks {
-		chunkRaw, err := c.Marshal()
+	for _, c := range p.chunks {
+		chunkRaw, err := c.marshal()
 		if err != nil {
 			return nil, err
 		}

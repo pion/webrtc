@@ -53,13 +53,7 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(func(pkt *sctp.Packet) {
-		raw, err := pkt.Marshal()
-		if err != nil {
-			fmt.Println(errors.Wrap(err, "Failed to Marshal SCTP packet"))
-			return
-		}
-
+	m.sctpAssociation = sctp.NewAssocation(func(raw []byte) {
 		for _, p := range m.ports {
 			if p.iceState == ice.ConnectionStateCompleted {
 				p.sendSCTP(raw)

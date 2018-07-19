@@ -112,6 +112,7 @@ func (s *SessionDescription) Unmarshal(raw string) error {
 	return s.unmarshalOptionalAttributes(scanner)
 }
 
+// nolint: gocyclo
 func (s *SessionDescription) unmarshalOptionalAttributes(scanner *bufio.Scanner) error {
 	orderedSessionAttributes := []*attributeStatus{
 		{value: "v"},

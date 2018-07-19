@@ -8,22 +8,22 @@ import (
 )
 
 func TestPacketUnmarshal(t *testing.T) {
-	pkt := &Packet{}
+	pkt := &packet{}
 
-	if err := pkt.Unmarshal([]byte{}); err == nil {
+	if err := pkt.unmarshal([]byte{}); err == nil {
 		t.Errorf("Unmarshal should fail when a packet is too small to be SCTP")
 	}
 
 	headerOnly := []byte{0x13, 0x88, 0x13, 0x88, 0x00, 0x00, 0x00, 0x00, 0x06, 0xa9, 0x00, 0xe1}
-	err := pkt.Unmarshal(headerOnly)
+	err := pkt.unmarshal(headerOnly)
 	if err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal failed for SCTP packet with no chunks"))
-	} else if pkt.SourcePort != 5000 {
-		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect source port exp: %d act: %d", 5000, pkt.SourcePort))
-	} else if pkt.DestinationPort != 5000 {
-		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect destination port exp: %d act: %d", 5000, pkt.DestinationPort))
-	} else if pkt.VerificationTag != 0 {
-		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect verification tag exp: %d act: %d", 0, pkt.VerificationTag))
+	} else if pkt.sourcePort != 5000 {
+		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect source port exp: %d act: %d", 5000, pkt.sourcePort))
+	} else if pkt.destinationPort != 5000 {
+		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect destination port exp: %d act: %d", 5000, pkt.destinationPort))
+	} else if pkt.verificationTag != 0 {
+		t.Error(errors.Errorf("Unmarshal passed for SCTP packet, but got incorrect verification tag exp: %d act: %d", 0, pkt.verificationTag))
 	}
 
 	rawChunk := []byte{0x13, 0x88, 0x13, 0x88, 0x00, 0x00, 0x00, 0x00, 0x81, 0x46, 0x9d, 0xfc, 0x01, 0x00, 0x00, 0x56, 0x55,
@@ -32,20 +32,20 @@ func TestPacketUnmarshal(t *testing.T) {
 		0xc9, 0xbf, 0x75, 0x9c, 0xb1, 0x2c, 0x57, 0x4f, 0xa4, 0x5a, 0x51, 0xba, 0x60, 0x17, 0x78, 0x27, 0x94, 0x5c, 0x31, 0xe6,
 		0x5d, 0x5b, 0x09, 0x47, 0xe2, 0x22, 0x06, 0x80, 0x04, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x80, 0x03, 0x00, 0x06, 0x80, 0xc1, 0x00, 0x00}
 
-	if err := pkt.Unmarshal(rawChunk); err != nil {
+	if err := pkt.unmarshal(rawChunk); err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal failed, has chunk"))
 	}
 }
 
 func TestPacketMarshal(t *testing.T) {
-	pkt := &Packet{}
+	pkt := &packet{}
 
 	headerOnly := []byte{0x13, 0x88, 0x13, 0x88, 0x00, 0x00, 0x00, 0x00, 0x06, 0xa9, 0x00, 0xe1}
-	if err := pkt.Unmarshal(headerOnly); err != nil {
+	if err := pkt.unmarshal(headerOnly); err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal failed for SCTP packet with no chunks"))
 	}
 
-	headerOnlyMarshaled, err := pkt.Marshal()
+	headerOnlyMarshaled, err := pkt.marshal()
 	if err != nil {
 		t.Error(errors.Wrap(err, "Marshal failed for SCTP packet with no chunks"))
 	} else if !bytes.Equal(headerOnly, headerOnlyMarshaled) {

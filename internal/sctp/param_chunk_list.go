@@ -1,27 +1,27 @@
 package sctp
 
-type ParamChunkList struct {
-	ParamHeader
-	ChunkTypes []ChunkType
+type paramChunkList struct {
+	paramHeader
+	chunkTypes []chunkType
 }
 
-func (c *ParamChunkList) Marshal() ([]byte, error) {
-	c.typ = ChunkList
-	c.raw = make([]byte, len(c.ChunkTypes))
-	for i, t := range c.ChunkTypes {
+func (c *paramChunkList) marshal() ([]byte, error) {
+	c.typ = chunkList
+	c.raw = make([]byte, len(c.chunkTypes))
+	for i, t := range c.chunkTypes {
 		c.raw[i] = byte(t)
 	}
 
-	return c.ParamHeader.Marshal()
+	return c.paramHeader.marshal()
 }
 
-func (c *ParamChunkList) Unmarshal(raw []byte) (Param, error) {
-	c.ParamHeader.Unmarshal(raw)
+func (c *paramChunkList) unmarshal(raw []byte) (param, error) {
+	c.paramHeader.unmarshal(raw)
 	for _, t := range c.raw {
-		c.ChunkTypes = append(c.ChunkTypes, ChunkType(t))
+		c.chunkTypes = append(c.chunkTypes, chunkType(t))
 	}
 
 	return c, nil
 }
 
-func (c *ParamChunkList) Types() []ChunkType { return c.Types() }
+func (c *paramChunkList) Types() []chunkType { return c.Types() }

@@ -76,7 +76,7 @@ func (sd *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, 
 				// a=rtpmap:<payload type> <encoding name>/<clock rate> [/<encoding parameters>]
 				split := strings.Split(a, " ")
 				if len(split) == 2 {
-					split := strings.Split(split[1], "/")
+					split = strings.Split(split[1], "/")
 					codec.Name = split[0]
 					parts := len(split)
 					if parts > 1 {

@@ -1,7 +1,7 @@
 package sctp
 
-func chunkTypeIntersect(l, r []ChunkType) (c []ChunkType) {
-	m := make(map[ChunkType]bool)
+func chunkTypeIntersect(l, r []chunkType) (c []chunkType) {
+	m := make(map[chunkType]bool)
 
 	for _, ct := range l {
 		m[ct] = true
@@ -15,33 +15,33 @@ func chunkTypeIntersect(l, r []ChunkType) (c []ChunkType) {
 	return
 }
 
-func NewEmptySupportedExtensions() *ParamSupportedExtensions {
-	return &ParamSupportedExtensions{}
+func newEmptySupportedExtensions() *paramSupportedExtensions {
+	return &paramSupportedExtensions{}
 }
 
-type ParamSupportedExtensions struct {
-	ParamHeader
-	ChunkTypes []ChunkType
+type paramSupportedExtensions struct {
+	paramHeader
+	ChunkTypes []chunkType
 }
 
-func (s *ParamSupportedExtensions) Marshal() ([]byte, error) {
-	s.typ = SupportedExt
+func (s *paramSupportedExtensions) marshal() ([]byte, error) {
+	s.typ = supportedExt
 	s.raw = make([]byte, len(s.ChunkTypes))
 	for i, c := range s.ChunkTypes {
 		s.raw[i] = byte(c)
 	}
 
-	return s.ParamHeader.Marshal()
+	return s.paramHeader.marshal()
 }
 
-func (s *ParamSupportedExtensions) Unmarshal(raw []byte) (Param, error) {
-	s.ParamHeader.Unmarshal(raw)
+func (s *paramSupportedExtensions) unmarshal(raw []byte) (param, error) {
+	s.paramHeader.unmarshal(raw)
 
 	for _, t := range s.raw {
-		s.ChunkTypes = append(s.ChunkTypes, ChunkType(t))
+		s.ChunkTypes = append(s.ChunkTypes, chunkType(t))
 	}
 
 	return s, nil
 }
 
-func (s *ParamSupportedExtensions) Types() []ChunkType { return s.Types() }
+func (s *paramSupportedExtensions) Types() []chunkType { return s.Types() }

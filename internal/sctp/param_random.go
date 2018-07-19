@@ -1,18 +1,18 @@
 package sctp
 
-type ParamRandom struct {
-	ParamHeader
-	RandomData []byte
+type paramRandom struct {
+	paramHeader
+	randomData []byte
 }
 
-func (r *ParamRandom) Marshal() ([]byte, error) {
-	r.typ = Random
-	r.raw = r.RandomData
-	return r.ParamHeader.Marshal()
+func (r *paramRandom) marshal() ([]byte, error) {
+	r.typ = random
+	r.raw = r.randomData
+	return r.paramHeader.marshal()
 }
 
-func (r *ParamRandom) Unmarshal(raw []byte) (Param, error) {
-	r.ParamHeader.Unmarshal(raw)
-	r.RandomData = r.raw
+func (r *paramRandom) unmarshal(raw []byte) (param, error) {
+	r.paramHeader.unmarshal(raw)
+	r.randomData = r.raw
 	return r, nil
 }

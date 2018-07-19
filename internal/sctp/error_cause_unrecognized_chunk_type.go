@@ -1,16 +1,14 @@
 package sctp
 
-// ErrorCauseUnrecognizedChunkType represents an SCTP error cause
-type ErrorCauseUnrecognizedChunkType struct {
-	ErrorCauseHeader
+// errorCauseUnrecognizedChunkType represents an SCTP error cause
+type errorCauseUnrecognizedChunkType struct {
+	errorCauseHeader
 }
 
-// Marshal populates a []byte from a struct
-func (e *ErrorCauseUnrecognizedChunkType) Marshal() ([]byte, error) {
-	return e.ErrorCauseHeader.Marshal()
+func (e *errorCauseUnrecognizedChunkType) marshal() ([]byte, error) {
+	return e.errorCauseHeader.marshal()
 }
 
-// Unmarshal populates a ErrorCauseUnrecognizedChunkType from raw data
-func (e *ErrorCauseUnrecognizedChunkType) Unmarshal(raw []byte) error {
-	return e.ErrorCauseHeader.Unmarshal(raw)
+func (e *errorCauseUnrecognizedChunkType) unmarshal(raw []byte) error {
+	return e.errorCauseHeader.unmarshal(raw)
 }

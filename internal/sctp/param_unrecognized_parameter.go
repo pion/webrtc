@@ -1,18 +1,18 @@
 package sctp
 
-type ParamUnrecognizedParameter struct {
-	ParamHeader
+type paramUnrecognizedParameter struct {
+	paramHeader
 	RawParams []byte
 }
 
-func (f *ParamUnrecognizedParameter) Marshal() ([]byte, error) {
-	f.typ = UnrecognizedParam
+func (f *paramUnrecognizedParameter) marshal() ([]byte, error) {
+	f.typ = unrecognizedParam
 	f.raw = f.RawParams
-	return f.ParamHeader.Marshal()
+	return f.paramHeader.marshal()
 }
 
-func (f *ParamUnrecognizedParameter) Unmarshal(raw []byte) (Param, error) {
-	f.ParamHeader.Unmarshal(raw)
+func (f *paramUnrecognizedParameter) unmarshal(raw []byte) (param, error) {
+	f.paramHeader.unmarshal(raw)
 	f.RawParams = f.raw
 	return f, nil
 }

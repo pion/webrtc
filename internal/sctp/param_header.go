@@ -2,17 +2,17 @@ package sctp
 
 import "encoding/binary"
 
-type ParamHeader struct {
-	typ    ParamType
-	length int
-	raw    []byte
+type paramHeader struct {
+	typ paramType
+	len int
+	raw []byte
 }
 
 const (
 	paramHeaderLength = 4
 )
 
-func (p *ParamHeader) Marshal() ([]byte, error) {
+func (p *paramHeader) marshal() ([]byte, error) {
 	paramLengthPlusHeader := paramHeaderLength + len(p.raw)
 
 	rawParam := make([]byte, paramLengthPlusHeader)
@@ -23,15 +23,15 @@ func (p *ParamHeader) Marshal() ([]byte, error) {
 	return rawParam, nil
 }
 
-func (p *ParamHeader) Unmarshal(raw []byte) {
+func (p *paramHeader) unmarshal(raw []byte) {
 	paramLengthPlusHeader := binary.BigEndian.Uint16(raw[2:])
 	paramLength := paramLengthPlusHeader - initOptionalVarHeaderLength
 
-	p.typ = ParamType(binary.BigEndian.Uint16(raw[0:]))
+	p.typ = paramType(binary.BigEndian.Uint16(raw[0:]))
 	p.raw = raw[paramHeaderLength : paramHeaderLength+paramLength]
-	p.length = int(paramLengthPlusHeader)
+	p.len = int(paramLengthPlusHeader)
 }
 
-func (p *ParamHeader) Length() int {
-	return p.length
+func (p *paramHeader) length() int {
+	return p.len
 }

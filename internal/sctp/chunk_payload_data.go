@@ -7,7 +7,7 @@ import (
 )
 
 /*
-PayloadData represents an SCTP Chunk of type DATA
+chunkPayloadData represents an SCTP Chunk of type DATA
 
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -42,14 +42,14 @@ a multi-fragment user message, as summarized in the following table:
 |             Table 1: Fragment Description Flags          |
 ============================================================
 */
-type PayloadData struct {
-	ChunkHeader
+type chunkPayloadData struct {
+	chunkHeader
 
 	unordered        bool
 	beginingFragment bool
 	endingFragment   bool
 
-	TSN                       uint32
+	tsn                       uint32
 	streamIdentifier          uint16
 	streamSequenceNumber      uint16
 	payloadProtocolIdentifier uint32
@@ -64,22 +64,21 @@ const (
 	payloadDataHeaderSize = 12
 )
 
-// Unmarshal populates a PayloadData Chunk from a byte slice
-func (p *PayloadData) Unmarshal(raw []byte) error {
-	if err := p.ChunkHeader.Unmarshal(raw); err != nil {
+func (p *chunkPayloadData) unmarshal(raw []byte) error {
+	if err := p.chunkHeader.unmarshal(raw); err != nil {
 		return err
 	}
 
-	p.unordered = p.Flags&payloadDataUnorderedBitmask != 0
-	p.beginingFragment = p.Flags&payloadDataBeginingFragmentBitmask != 0
-	p.endingFragment = p.Flags&payloadDataEndingFragmentBitmask != 0
+	p.unordered = p.flags&payloadDataUnorderedBitmask != 0
+	p.beginingFragment = p.flags&payloadDataBeginingFragmentBitmask != 0
+	p.endingFragment = p.flags&payloadDataEndingFragmentBitmask != 0
 	if p.unordered != false {
 		return errors.Errorf("TODO we only supported ordered Payloads")
 	} else if p.beginingFragment != true || p.endingFragment != true {
 		return errors.Errorf("TODO we only supported unfragmented Payloads")
 	}
 
-	p.TSN = binary.BigEndian.Uint32(p.raw[0:])
+	p.tsn = binary.BigEndian.Uint32(p.raw[0:])
 	p.streamIdentifier = binary.BigEndian.Uint16(p.raw[4:])
 	p.streamSequenceNumber = binary.BigEndian.Uint16(p.raw[6:])
 	p.payloadProtocolIdentifier = binary.BigEndian.Uint32(p.raw[8:])
@@ -88,12 +87,10 @@ func (p *PayloadData) Unmarshal(raw []byte) error {
 	return nil
 }
 
-// Marshal generates raw data from a PayloadData struct
-func (p *PayloadData) Marshal() ([]byte, error) {
+func (p *chunkPayloadData) marshal() ([]byte, error) {
 	return nil, nil
 }
 
-// Check asserts the validity of this structs values
-func (p *PayloadData) Check() (abort bool, err error) {
+func (p *chunkPayloadData) check() (abort bool, err error) {
 	return false, nil
 }

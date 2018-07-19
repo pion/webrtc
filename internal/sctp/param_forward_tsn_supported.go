@@ -1,17 +1,17 @@
 package sctp
 
-type ParamForwardTSNSupported struct {
-	ParamHeader
-	ChunkTypes []ChunkType
+type paramForwardTSNSupported struct {
+	paramHeader
+	chunkTypes []chunkType
 }
 
-func (f *ParamForwardTSNSupported) Marshal() ([]byte, error) {
-	f.typ = ForwardTSNSupp
+func (f *paramForwardTSNSupported) marshal() ([]byte, error) {
+	f.typ = forwardTSNSupp
 	f.raw = []byte{}
-	return f.ParamHeader.Marshal()
+	return f.paramHeader.marshal()
 }
 
-func (f *ParamForwardTSNSupported) Unmarshal(raw []byte) (Param, error) {
-	f.ParamHeader.Unmarshal(raw)
+func (f *paramForwardTSNSupported) unmarshal(raw []byte) (param, error) {
+	f.paramHeader.unmarshal(raw)
 	return f, nil
 }
