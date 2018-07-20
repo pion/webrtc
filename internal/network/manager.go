@@ -56,6 +56,9 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 	}
 
 	m.sctpAssociation = sctp.NewAssocation(func(raw []byte) {
+		m.portsLock.Lock()
+		defer m.portsLock.Unlock()
+
 		for _, p := range m.ports {
 			if p.iceState == ice.ConnectionStateCompleted {
 				p.sendSCTP(raw)
@@ -111,9 +114,27 @@ func (m *Manager) DTLSFingerprint() string {
 
 // SendRTP finds a connected port and sends the passed RTP packet
 func (m *Manager) SendRTP(packet *rtp.Packet) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
 	for _, p := range m.ports {
 		if p.iceState == ice.ConnectionStateCompleted {
 			p.sendRTP(packet)
+			return
+		}
+	}
+}
+
+// SendDataChannelMessage sends a DataChannel message to a connected peer
+func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	for _, p := range m.ports {
+		if p.iceState == ice.ConnectionStateCompleted {
+			fmt.Printf("Sending SCTP message for id %d \n", streamIdentifier)
+			// TODO send
+			// p.sendSCTP(raw)
 			return
 		}
 	}

@@ -4,11 +4,24 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/ice"
 )
+
+func randSeq(n int) string {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[r.Intn(len(letters))]
+	}
+	return string(b)
+}
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
@@ -43,7 +56,14 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
+	datachannels := make([]*webrtc.RTCDataChannel, 0)
+	var dataChannelsLock sync.RWMutex
+
 	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
+		dataChannelsLock.Lock()
+		datachannels = append(datachannels, d)
+		dataChannelsLock.Unlock()
+
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 		d.Onmessage = func(message []byte) {
 			fmt.Printf("Message from DataChannel %s '%s'\n", d.Label, string(message))
@@ -67,5 +87,16 @@ func main() {
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
 	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
-	select {}
+	fmt.Println("Random messages will now be sent to any connected DataChannels every 5 seconds")
+	for {
+		time.Sleep(5 * time.Second)
+		message := randSeq(15)
+		fmt.Printf("Sending %s \n", message)
+
+		dataChannelsLock.RLock()
+		for _, d := range datachannels {
+			d.Send([]byte(message))
+		}
+		dataChannelsLock.RUnlock()
+	}
 }
