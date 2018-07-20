@@ -48,6 +48,7 @@ type chunkPayloadData struct {
 	unordered        bool
 	beginingFragment bool
 	endingFragment   bool
+	immediateSack    bool
 
 	tsn                       uint32
 	streamIdentifier          uint16
@@ -60,6 +61,7 @@ const (
 	payloadDataEndingFragmentBitmask   = 1
 	payloadDataBeginingFragmentBitmask = 2
 	payloadDataUnorderedBitmask        = 4
+	payloadDataImmediateSACK           = 8
 
 	payloadDataHeaderSize = 12
 )
@@ -69,6 +71,7 @@ func (p *chunkPayloadData) unmarshal(raw []byte) error {
 		return err
 	}
 
+	p.immediateSack = p.flags&payloadDataImmediateSACK != 0
 	p.unordered = p.flags&payloadDataUnorderedBitmask != 0
 	p.beginingFragment = p.flags&payloadDataBeginingFragmentBitmask != 0
 	p.endingFragment = p.flags&payloadDataEndingFragmentBitmask != 0
