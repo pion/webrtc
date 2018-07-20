@@ -99,6 +99,7 @@ type Association struct {
 	myMaxMTU                  uint16
 	firstSack                 bool
 	peerCumulativeTSNAckPoint uint32
+	reassemblyQueue           map[uint16]*reassemblyQueue
 
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
@@ -246,7 +247,22 @@ func (a *Association) handleData(p *packet, d *chunkPayloadData) (*packet, error
 
 	pd, ok := a.payloadQueue.pop(a.peerLastTSN + 1)
 	for ok {
-		a.dataHandler(pd.userData, pd.streamIdentifier)
+		rq, ok := a.reassemblyQueue[pd.streamIdentifier]
+		if !ok {
+			// If this is the first time we've seen a stream identifier
+			// Expected SeqNum == 0
+			rq = &reassemblyQueue{}
+			a.reassemblyQueue[pd.streamIdentifier] = rq
+		}
+
+		rq.push(pd)
+		userData, ok := rq.pop()
+		if ok {
+			// We know the popped data will have the same stream
+			// identifier as the pushed data
+			a.dataHandler(userData, pd.streamIdentifier)
+		}
+
 		a.peerLastTSN++
 		pd, ok = a.payloadQueue.pop(a.peerLastTSN)
 	}
