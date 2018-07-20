@@ -100,10 +100,15 @@ func (m *Manager) Close() {
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
 
-	m.sctpAssociation.Close()
+	err := m.sctpAssociation.Close()
 	m.dtlsState.Close()
 	for _, p := range m.ports {
-		p.close()
+		portError := p.close()
+		if err != nil {
+			err = errors.Wrapf(portError, " also: %s", err.Error())
+		} else {
+			err = portError
+		}
 	}
 }
 
