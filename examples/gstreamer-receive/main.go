@@ -33,7 +33,13 @@ func main() {
 	webrtc.RegisterDefaultCodecs()
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})
+	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{
+		ICEServers: []webrtc.RTCICEServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	})
 	if err != nil {
 		panic(err)
 	}
