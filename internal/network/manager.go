@@ -37,16 +37,18 @@ type Manager struct {
 
 	sctpAssociation *sctp.Association
 
-	ports []*port
+	portsLock sync.RWMutex
+	ports     []*port
 }
 
 // NewManager creates a new network.Manager
-func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler) (m *Manager, err error) {
+func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
 	m = &Manager{
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: bufferTransportGenerator,
-		icePwd: icePwd,
+		icePwd:      icePwd,
+		iceNotifier: iceNotifier,
 	}
 	m.dtlsState, err = dtls.NewState(true)
 	if err != nil {
@@ -92,8 +94,14 @@ func (m *Manager) Listen(address string) (boundAddress *stun.TransportAddr, err 
 
 // Close cleans up all the allocated state
 func (m *Manager) Close() {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
 	m.sctpAssociation.Close()
 	m.dtlsState.Close()
+	for _, p := range m.ports {
+		p.close()
+	}
 }
 
 // DTLSFingerprint generates the fingerprint included in an SessionDescription
@@ -111,5 +119,20 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	}
 }
 
-func (m *Manager) iceHandler(p *port) {
+func (m *Manager) iceHandler(p *port, oldState ice.ConnectionState) {
+	// One port disconnected, scan the other ones
+	if p.iceState == ice.ConnectionStateDisconnected {
+		m.portsLock.Lock()
+		defer m.portsLock.Unlock()
+
+		for _, p := range m.ports {
+			if p.iceState == ice.ConnectionStateCompleted {
+				// Another peer is connected! We don't have to notify RTCPeerConnection
+				break
+			}
+		}
+		m.iceNotifier(p.iceState)
+	} else {
+		m.iceNotifier(p.iceState)
+	}
 }

@@ -21,6 +21,12 @@ type incomingPacket struct {
 	buffer  []byte
 }
 
+func (p *port) updateICEAndNotify(newState ice.ConnectionState) {
+	oldState := p.iceState
+	p.iceState = newState
+	p.m.iceHandler(p, oldState)
+}
+
 func (p *port) handleSRTP(buffer []byte) {
 	p.m.certPairLock.RLock()
 	defer p.m.certPairLock.RUnlock()
@@ -103,9 +109,8 @@ func (p *port) handleICE(in *incomingPacket, iceTimer *time.Timer) {
 		); err != nil {
 			fmt.Println(err)
 		} else {
-			p.iceState = ice.ConnectionStateCompleted
+			p.updateICEAndNotify(ice.ConnectionStateCompleted)
 			iceTimer.Reset(iceTimeout)
-			p.m.iceHandler(p)
 		}
 	}
 }
@@ -159,7 +164,7 @@ func (p *port) networkLoop() {
 	for {
 		select {
 		case <-iceTimer.C:
-			p.iceState = ice.ConnectionStateDisconnected
+			p.updateICEAndNotify(ice.ConnectionStateDisconnected)
 			iceTimer.Reset(noTimeout)
 		case in, socketOpen := <-incomingPackets:
 			if !socketOpen {

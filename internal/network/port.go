@@ -41,6 +41,7 @@ func newPort(address string, m *Manager) (*port, error) {
 		conn:          conn,
 		m:             m,
 		seenPeers:     make(map[string]*net.UDPAddr),
+		iceState:      ice.ConnectionStateNew,
 	}
 
 	go p.networkLoop()
