@@ -122,7 +122,7 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		return nil, err
 	}
 
-	r.networkManager, err = network.NewManager([]byte(r.iceAgent.Pwd), r.generateChannel, r.dataChannelEventHandler)
+	r.networkManager, err = network.NewManager([]byte(r.iceAgent.Pwd), r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +143,7 @@ func (r *RTCPeerConnection) SetIdentityProvider(provider string) error {
 
 // Close ends the RTCPeerConnection
 func (r *RTCPeerConnection) Close() error {
+	r.networkManager.Close()
 	return nil
 }
 
@@ -181,23 +182,11 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 	return bufferTransport
 }
 
-func (r *RTCPeerConnection) iceStateChange(state ice.ConnectionState) {
-	fmt.Println(state)
-	// updateAndNotify := func(newState ice.ConnectionState) {
-	// 	if r.OnICEConnectionStateChange != nil && r.iceState != newState {
-	// 		r.OnICEConnectionStateChange(newState)
-	// 	}
-	// 	r.iceState = newState
-	// }
-
-	// if p.ICEState == ice.ConnectionStateFailed {
-	// 	if err := p.Close(); err != nil {
-	// 		fmt.Println(errors.Wrap(err, "Failed to close Port when ICE went to failed"))
-	// 	}
-
-	// } else {
-	// 	updateAndNotify(ice.ConnectionStateConnected)
-	// }
+func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
+	if r.OnICEConnectionStateChange != nil && r.iceState != newState {
+		r.OnICEConnectionStateChange(newState)
+	}
+	r.iceState = newState
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {

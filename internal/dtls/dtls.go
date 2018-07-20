@@ -82,8 +82,7 @@ func NewState(isClient bool) (s *State, err error) {
 
 // Close cleans up the associated OpenSSL resources
 func (s *State) Close() {
-	C.dtls_session_cleanup(s.sslctx, s.dtlsSession)
-	C.dtls_tlscfg_cleanup(s.tlscfg)
+	C.dtls_session_cleanup(s.sslctx, s.dtlsSession, s.tlscfg)
 }
 
 // Fingerprint generates a SHA-256 fingerprint of the certificate

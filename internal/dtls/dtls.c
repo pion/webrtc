@@ -241,7 +241,7 @@ error:
 }
 
 
-void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session) {
+void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session, tlscfg *cfg) {
   if (dtls_session) {
     if (dtls_session->ssl != NULL) {
       SSL_free(dtls_session->ssl);
@@ -254,9 +254,7 @@ void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session) {
   if (ssl_ctx) {
     SSL_CTX_free(ssl_ctx);
   }
-}
 
-void dtls_tlscfg_cleanup(tlscfg *cfg) {
   if (cfg) {
     if (cfg->cert) {
       X509_free(cfg->cert);
