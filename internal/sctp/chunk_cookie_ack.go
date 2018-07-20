@@ -29,7 +29,7 @@ func (c *chunkCookieAck) unmarshal(raw []byte) error {
 	return nil
 }
 
-func (c *chunkCookieAck) Marshal() ([]byte, error) {
+func (c *chunkCookieAck) marshal() ([]byte, error) {
 	c.chunkHeader.typ = COOKIEACK
 	return c.chunkHeader.marshal()
 }
