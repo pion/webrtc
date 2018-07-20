@@ -192,7 +192,7 @@ func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
-		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label}
+		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: r}
 		r.dataChannels[e.StreamIdentifier()] = newDataChannel
 		if r.Ondatachannel != nil {
 			go r.Ondatachannel(newDataChannel)

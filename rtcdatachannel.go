@@ -7,4 +7,11 @@ type RTCDataChannel struct {
 	Onmessage func([]byte)
 	ID        uint16
 	Label     string
+
+	rtcPeerConnection *RTCPeerConnection
+}
+
+// Send sends the passed message to the DataChannel peer
+func (r *RTCDataChannel) Send(message []byte) {
+	r.rtcPeerConnection.networkManager.SendDataChannelMessage(message, r.ID)
 }
