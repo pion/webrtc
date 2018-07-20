@@ -2,8 +2,6 @@ package sctp
 
 import (
 	"encoding/binary"
-
-	"github.com/pkg/errors"
 )
 
 /*
@@ -75,11 +73,6 @@ func (p *chunkPayloadData) unmarshal(raw []byte) error {
 	p.unordered = p.flags&payloadDataUnorderedBitmask != 0
 	p.beginingFragment = p.flags&payloadDataBeginingFragmentBitmask != 0
 	p.endingFragment = p.flags&payloadDataEndingFragmentBitmask != 0
-	if p.unordered != false {
-		return errors.Errorf("TODO we only supported ordered Payloads")
-	} else if p.beginingFragment != true || p.endingFragment != true {
-		return errors.Errorf("TODO we only supported unfragmented Payloads")
-	}
 
 	p.tsn = binary.BigEndian.Uint32(p.raw[0:])
 	p.streamIdentifier = binary.BigEndian.Uint16(p.raw[4:])
