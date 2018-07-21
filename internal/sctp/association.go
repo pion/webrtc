@@ -202,11 +202,6 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 	r := rand.New(rs)
 
 	return &Association{
-		myVerificationTag: r.Uint32(),
-		myNextTSN:         r.Uint32(),
-		outboundHandler:   outboundHandler,
-		dataHandler:       dataHandler,
-		state:             Open,
 		myMaxNumOutboundStreams: math.MaxUint16,
 		myMaxNumInboundStreams:  math.MaxUint16,
 		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
@@ -216,6 +211,11 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 		firstSack:               true,
 		reassemblyQueue:         make(map[uint16]*reassemblyQueue),
 		outboundStreams:         make(map[uint16]uint16),
+		myVerificationTag:       r.Uint32(),
+		myNextTSN:               r.Uint32(),
+		outboundHandler:         outboundHandler,
+		dataHandler:             dataHandler,
+		state:                   Open,
 	}
 }
 

@@ -44,11 +44,11 @@ type Manager struct {
 // NewManager creates a new network.Manager
 func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
 	m = &Manager{
+		icePwd:                   icePwd,
+		iceNotifier:              iceNotifier,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: bufferTransportGenerator,
-		icePwd:      icePwd,
-		iceNotifier: iceNotifier,
 	}
 	m.dtlsState, err = dtls.NewState(true)
 	if err != nil {
