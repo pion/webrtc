@@ -73,9 +73,17 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 				fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
 				return
 			}
-			switch m := msg.(type) {
+			switch msg := msg.(type) {
 			case *datachannel.ChannelOpen:
-				dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(m.Label)})
+				// Cannot return err
+				ack := datachannel.ChannelAck{}
+				ackMsg, _ := ack.Marshal()
+				err := m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP)
+				if err != nil {
+					fmt.Println("Error sending ChannelOpen ACK", err)
+					return
+				}
+				dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
 			default:
 				fmt.Println("Unhandled DataChannel message", m)
 			}
@@ -144,7 +152,7 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
 func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) error {
-	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier)
+	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier, sctp.PayloadTypeWebRTCBinary)
 	if err != nil {
 		errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}

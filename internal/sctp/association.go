@@ -166,10 +166,10 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 	return chunks, nil
 }
 
-// HandleInbound parses incoming raw packets (Binary)
-func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16) error {
+// HandleInbound parses incoming raw packets
+func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
 
-	chunks, err := a.packetizeOutbound(raw, streamIdentifier, PayloadTypeWebRTCBinary)
+	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
 	if err != nil {
 		return errors.Wrap(err, "Unable to packetize outbound packet")
 	}
