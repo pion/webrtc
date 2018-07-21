@@ -116,7 +116,7 @@ func (p *port) handleICE(in *incomingPacket, iceTimer *time.Timer) {
 }
 
 func (p *port) handleSCTP(raw []byte, a *sctp.Association) {
-	if err := a.Push(raw); err != nil {
+	if err := a.HandleInbound(raw); err != nil {
 		fmt.Println(errors.Wrap(err, "Failed to push SCTP packet"))
 	}
 }

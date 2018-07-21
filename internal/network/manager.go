@@ -65,20 +65,32 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 				return
 			}
 		}
-	}, func(data []byte, streamIdentifier uint16) {
-		msg, err := datachannel.Parse(data)
-		if err != nil {
-			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
-			return
-		}
-		switch m := msg.(type) {
-		case *datachannel.ChannelOpen:
-			dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(m.Label)})
-		case *datachannel.Data:
-			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Body: m.Data})
+	}, func(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
+		switch payloadType {
+		case sctp.PayloadTypeWebRTCDCEP:
+			msg, err := datachannel.Parse(data)
+			if err != nil {
+				fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
+				return
+			}
+			switch m := msg.(type) {
+			case *datachannel.ChannelOpen:
+				dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(m.Label)})
+			default:
+				fmt.Println("Unhandled DataChannel message", m)
+			}
+		case sctp.PayloadTypeWebRTCString:
+			fallthrough
+		case sctp.PayloadTypeWebRTCBinary:
+			fallthrough
+		case sctp.PayloadTypeWebRTCStringEmpty:
+			fallthrough
+		case sctp.PayloadTypeWebRTCBinaryEmpty:
+			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Body: data})
 		default:
-			fmt.Println("Unhandled DataChannel message", m)
+			fmt.Println("Unhandled Payload Protocol Identifier %v", payloadType)
 		}
+
 	})
 
 	return m, err
@@ -131,18 +143,13 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 }
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
-func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-
-	for _, p := range m.ports {
-		if p.iceState == ice.ConnectionStateCompleted {
-			fmt.Printf("Sending SCTP message for id %d \n", streamIdentifier)
-			// TODO send
-			// p.sendSCTP(raw)
-			return
-		}
+func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) error {
+	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier)
+	if err != nil {
+		errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}
+
+	return nil
 }
 
 func (m *Manager) iceHandler(p *port, oldState ice.ConnectionState) {

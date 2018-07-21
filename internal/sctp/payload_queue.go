@@ -25,6 +25,11 @@ type payloadQueue struct {
 	dupTSN         []uint32
 }
 
+func (r *payloadQueue) pushNoCheck(p *chunkPayloadData) {
+	r.orderedPackets = append(r.orderedPackets, p)
+	r.orderedPackets.sort()
+}
+
 func (r *payloadQueue) push(p *chunkPayloadData, cumulativeTSN uint32) {
 	_, ok := r.orderedPackets.search(p.tsn)
 
