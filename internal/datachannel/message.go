@@ -30,8 +30,9 @@ func Parse(raw []byte) (Message, error) {
 	case DataChannelOpen:
 		msg = &ChannelOpen{}
 	default:
-		msg = &Data{}
+		return nil, errors.Errorf("Unknown MessageType %v", MessageType(raw[0]))
 	}
+
 	if err := msg.Unmarshal(raw); err != nil {
 		return nil, err
 	}

@@ -100,15 +100,16 @@ type Association struct {
 	firstSack                 bool
 	peerCumulativeTSNAckPoint uint32
 	reassemblyQueue           map[uint16]*reassemblyQueue
+	outboundStreams           map[uint16]uint16
 
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-recieve (vs callbacks)
 	outboundHandler func([]byte)
-	dataHandler     func([]byte, uint16)
+	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
 }
 
-// Push pushes a raw SCTP packet onto the assocation
-func (a *Association) Push(raw []byte) error {
+// HandleInbound parses incoming raw packets
+func (a *Association) HandleInbound(raw []byte) error {
 	p := &packet{}
 	if err := p.unmarshal(raw); err != nil {
 		return errors.Wrap(err, "Unable to parse SCTP packet")
@@ -127,13 +128,76 @@ func (a *Association) Push(raw []byte) error {
 	return nil
 }
 
+func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) ([]*chunkPayloadData, error) {
+
+	if len(raw) > math.MaxUint16 {
+		return nil, errors.Errorf("Outbound packet larger than maximum message size %v", math.MaxUint16)
+	}
+
+	seqNum, ok := a.outboundStreams[streamIdentifier]
+
+	if !ok {
+		seqNum = 0
+	}
+
+	i := uint16(0)
+	remaining := uint16(len(raw))
+
+	var chunks []*chunkPayloadData
+	for remaining != 0 {
+		l := min(a.myMaxMTU, uint16(remaining))
+		chunks = append(chunks, &chunkPayloadData{
+			streamIdentifier:     streamIdentifier,
+			userData:             raw[i : uint16(i)+l],
+			beginingFragment:     i == 0,
+			endingFragment:       uint16(remaining)-l == 0,
+			immediateSack:        false,
+			payloadType:          payloadType,
+			streamSequenceNumber: seqNum,
+			tsn:                  a.myNextTSN,
+		})
+		a.myNextTSN++
+		remaining -= l
+		i += l
+	}
+
+	a.outboundStreams[streamIdentifier] = seqNum + 1
+
+	return chunks, nil
+}
+
+// HandleInbound parses incoming raw packets (Binary)
+func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16) error {
+
+	chunks, err := a.packetizeOutbound(raw, streamIdentifier, PayloadTypeWebRTCBinary)
+	if err != nil {
+		return errors.Wrap(err, "Unable to packetize outbound packet")
+	}
+
+	for _, c := range chunks {
+		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for inbound SACK generation
+		a.inflightQueue.pushNoCheck(c)
+		fmt.Printf("Push Chunk TSN %v to inflightQueue", c.tsn)
+		p := &packet{
+			sourcePort:      a.sourcePort,
+			destinationPort: a.destinationPort,
+			verificationTag: a.peerVerificationTag,
+			chunks:          []chunk{c}}
+		if err := a.send(p); err != nil {
+			return errors.Wrap(err, "Unable to send outbound packet")
+		}
+
+	}
+	return nil
+}
+
 // Close ends the SCTP Association and cleans up any state
 func (a *Association) Close() error {
 	return nil
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16)) *Association {
+func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier)) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
@@ -147,8 +211,11 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 		myMaxNumInboundStreams:  math.MaxUint16,
 		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
 		payloadQueue:            &payloadQueue{},
+		inflightQueue:           &payloadQueue{},
 		myMaxMTU:                1200,
 		firstSack:               true,
+		reassemblyQueue:         make(map[uint16]*reassemblyQueue),
+		outboundStreams:         make(map[uint16]uint16),
 	}
 }
 
@@ -245,8 +312,9 @@ func (a *Association) handleData(p *packet, d *chunkPayloadData) (*packet, error
 
 	a.payloadQueue.push(d, a.peerLastTSN)
 
-	pd, ok := a.payloadQueue.pop(a.peerLastTSN + 1)
-	for ok {
+	pd, popOk := a.payloadQueue.pop(a.peerLastTSN + 1)
+
+	for popOk {
 		rq, ok := a.reassemblyQueue[pd.streamIdentifier]
 		if !ok {
 			// If this is the first time we've seen a stream identifier
@@ -260,11 +328,11 @@ func (a *Association) handleData(p *packet, d *chunkPayloadData) (*packet, error
 		if ok {
 			// We know the popped data will have the same stream
 			// identifier as the pushed data
-			a.dataHandler(userData, pd.streamIdentifier)
+			a.dataHandler(userData, pd.streamIdentifier, pd.payloadType)
 		}
 
 		a.peerLastTSN++
-		pd, ok = a.payloadQueue.pop(a.peerLastTSN)
+		pd, popOk = a.payloadQueue.pop(a.peerLastTSN)
 	}
 
 	outbound := &packet{}
@@ -292,7 +360,9 @@ func (a *Association) handleSack(p *packet, d *chunkSelectiveAck) ([]*packet, er
 	// order SACK.
 	if a.firstSack {
 		a.firstSack = false
-		a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck
+		// We need the ack point to be 1 less than the real one so that when we get our first CumTSN
+		// we act like it is an "new" ack point
+		a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck - 1
 	}
 
 	// This is an old SACK, toss

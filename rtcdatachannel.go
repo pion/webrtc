@@ -12,6 +12,10 @@ type RTCDataChannel struct {
 }
 
 // Send sends the passed message to the DataChannel peer
-func (r *RTCDataChannel) Send(message []byte) {
-	r.rtcPeerConnection.networkManager.SendDataChannelMessage(message, r.ID)
+func (r *RTCDataChannel) Send(message []byte) error {
+	if err := r.rtcPeerConnection.networkManager.SendDataChannelMessage(message, r.ID); err != nil {
+		return &UnknownError{Err: err}
+	}
+
+	return nil
 }
