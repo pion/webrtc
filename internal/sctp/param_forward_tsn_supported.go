@@ -2,7 +2,6 @@ package sctp
 
 type paramForwardTSNSupported struct {
 	paramHeader
-	chunkTypes []chunkType
 }
 
 func (f *paramForwardTSNSupported) marshal() ([]byte, error) {

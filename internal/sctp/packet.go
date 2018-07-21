@@ -52,7 +52,6 @@ const (
 	packetHeaderSize = 12
 )
 
-// nolint: gocyclo
 func (p *packet) unmarshal(raw []byte) error {
 	if len(raw) < packetHeaderSize {
 		return errors.Errorf("raw only %d bytes, %d is the minimum length for a SCTP packet", len(raw), packetHeaderSize)

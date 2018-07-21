@@ -63,7 +63,6 @@ const (
 	adaptLayerInd      paramType = 49158 // Adaptation Layer Indication (0xC006)	[RFC5061]
 )
 
-// nolint: gocyclo
 func (p paramType) String() string {
 	switch p {
 	case heartbeatInfo:

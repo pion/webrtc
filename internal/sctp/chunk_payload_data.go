@@ -65,8 +65,10 @@ const (
 	payloadDataHeaderSize = 12
 )
 
+// PayloadProtocolIdentifier is an enum for DataChannel payload types
 type PayloadProtocolIdentifier uint32
 
+// PayloadProtocolIdentifier enums
 const (
 	PayloadTypeWebRTCDCEP        PayloadProtocolIdentifier = 50
 	PayloadTypeWebRTCString      PayloadProtocolIdentifier = 51

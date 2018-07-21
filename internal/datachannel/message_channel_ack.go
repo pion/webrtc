@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ChannelAck is used to ACK a DataChannel open
 type ChannelAck struct{}
 
 const (

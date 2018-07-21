@@ -77,9 +77,12 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 			case *datachannel.ChannelOpen:
 				// Cannot return err
 				ack := datachannel.ChannelAck{}
-				ackMsg, _ := ack.Marshal()
-				err := m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP)
+				ackMsg, err := ack.Marshal()
 				if err != nil {
+					fmt.Println("Error Marshaling ChannelOpen ACK", err)
+					return
+				}
+				if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
 					fmt.Println("Error sending ChannelOpen ACK", err)
 					return
 				}
@@ -154,7 +157,7 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) error {
 	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier, sctp.PayloadTypeWebRTCString)
 	if err != nil {
-		errors.Wrap(err, "SCTP Association failed handling outbound packet")
+		return errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}
 
 	return nil

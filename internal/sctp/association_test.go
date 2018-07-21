@@ -1,6 +1,7 @@
 package sctp
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -12,5 +13,9 @@ func TestAssociationInit(t *testing.T) {
 		0x5d, 0x5b, 0x09, 0x47, 0xe2, 0x22, 0x06, 0x80, 0x04, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x80, 0x03, 0x00, 0x06, 0x80, 0xc1, 0x00, 0x00}
 
 	assoc := &Association{}
-	assoc.HandleInbound(rawPkt)
+	if err := assoc.HandleInbound(rawPkt); err != nil {
+		// TODO
+		fmt.Println(err)
+		// t.Error(errors.Wrap(err, "Failed to HandleInbound"))
+	}
 }
