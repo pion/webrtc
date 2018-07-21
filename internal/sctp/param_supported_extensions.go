@@ -43,5 +43,3 @@ func (s *paramSupportedExtensions) unmarshal(raw []byte) (param, error) {
 
 	return s, nil
 }
-
-func (s *paramSupportedExtensions) Types() []chunkType { return s.Types() }

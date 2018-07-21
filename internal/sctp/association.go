@@ -177,7 +177,7 @@ func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloa
 	for _, c := range chunks {
 		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for inbound SACK generation
 		a.inflightQueue.pushNoCheck(c)
-		fmt.Printf("Push Chunk TSN %v to inflightQueue", c.tsn)
+
 		p := &packet{
 			sourcePort:      a.sourcePort,
 			destinationPort: a.destinationPort,
@@ -372,22 +372,26 @@ func (a *Association) handleSack(p *packet, d *chunkSelectiveAck) ([]*packet, er
 	}
 
 	// New ack point, so pop all ACKed packets from inflightQueue
-	for i := a.peerCumulativeTSNAckPoint; i <= d.cumulativeTSNAck; i++ {
+	// We add 1 because the "currentAckPoint" has already been popped from the inflight queue
+	// For the first SACK we take care of this by setting the ackpoint to cumAck - 1
+	for i := a.peerCumulativeTSNAckPoint + 1; i <= d.cumulativeTSNAck; i++ {
 		_, ok := a.inflightQueue.pop(i)
 		if !ok {
 			return nil, errors.Errorf("TSN %v unable to be popped from inflight queue", i)
 		}
 	}
+
 	a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck
 
 	var sackDataPackets []*packet
 	var prevEnd uint16
 	for _, g := range d.gapAckBlocks {
 		for i := prevEnd + 1; i < g.start; i++ {
-			pp, ok := a.payloadQueue.get(d.cumulativeTSNAck + uint32(i))
+			pp, ok := a.inflightQueue.get(d.cumulativeTSNAck + uint32(i))
 			if !ok {
 				return nil, errors.Errorf("Requested non-existent TSN %v", d.cumulativeTSNAck+uint32(i))
 			}
+
 			sackDataPackets = append(sackDataPackets, &packet{
 				verificationTag: a.peerVerificationTag,
 				sourcePort:      a.sourcePort,
