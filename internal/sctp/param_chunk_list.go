@@ -23,5 +23,3 @@ func (c *paramChunkList) unmarshal(raw []byte) (param, error) {
 
 	return c, nil
 }
-
-func (c *paramChunkList) Types() []chunkType { return c.Types() }
