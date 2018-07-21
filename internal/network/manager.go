@@ -96,7 +96,7 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 		case sctp.PayloadTypeWebRTCBinaryEmpty:
 			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Body: data})
 		default:
-			fmt.Println("Unhandled Payload Protocol Identifier %v", payloadType)
+			fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
 		}
 
 	})
@@ -152,7 +152,7 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
 func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) error {
-	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier, sctp.PayloadTypeWebRTCBinary)
+	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier, sctp.PayloadTypeWebRTCString)
 	if err != nil {
 		errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}
