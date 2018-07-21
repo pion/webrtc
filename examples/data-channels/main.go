@@ -95,7 +95,10 @@ func main() {
 
 		dataChannelsLock.RLock()
 		for _, d := range datachannels {
-			d.Send([]byte(message))
+			err := d.Send([]byte(message))
+			if err != nil {
+				panic(err)
+			}
 		}
 		dataChannelsLock.RUnlock()
 	}

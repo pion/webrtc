@@ -166,7 +166,7 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 	return chunks, nil
 }
 
-// HandleInbound parses incoming raw packets
+// HandleOutbound parses incoming raw packets
 func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
 
 	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
@@ -416,10 +416,9 @@ func (a *Association) send(p *packet) error {
 	return nil
 }
 
-// nolint: gocyclo
 func (a *Association) handleChunk(p *packet, c chunk) error {
 	if _, err := c.check(); err != nil {
-		errors.Wrap(err, "Failed validating chunk")
+		return errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
 	}
 

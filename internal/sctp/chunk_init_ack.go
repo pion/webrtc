@@ -43,7 +43,7 @@ func (i *chunkInitAck) unmarshal(raw []byte) error {
 	}
 
 	if err := i.chunkInitCommon.unmarshal(i.raw); err != nil {
-		errors.Wrap(err, "Failed to unmarshal INIT body")
+		return errors.Wrap(err, "Failed to unmarshal INIT body")
 	}
 
 	return nil
