@@ -79,8 +79,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 ### Contributors
 
 * [John Bradley](https://github.com/kc5nra) - *Original Author*
-* [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
 * [Michael Melvin Santry](https://github.com/santrym) - *Mascot*
+* [Raphael Randschau](https://github.com/nicolai86) - *STUN*
+* [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
+* [backkem](https://github.com/nicolai86) - *SDP, Public API, Project Management*
 
 ## Project Ideas
 I am looking to support other interesting WebRTC projects, so if you have something to build please reach out!
