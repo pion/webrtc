@@ -29,8 +29,6 @@ do
 done
 unset IFS
 
-# if [ ${#errors[@]} -eq 0 ]; then
-# fi
 if [ ${#MISSING_CONTIBUTORS[@]} -ne 0 ]; then
     echo "Please add the following contributors to the README"
     for i in "${MISSING_CONTIBUTORS[@]}"
