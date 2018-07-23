@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+# Unshallow the repo, this check doesn't work with this enabled
+# https://github.com/travis-ci/travis-ci/issues/3412
+git fetch --unshallow || true
+
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 
 CONTRIBUTORS=()
