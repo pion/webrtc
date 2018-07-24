@@ -25,7 +25,7 @@ pion-WebRTC is here to help you get media/text from A<->B, here are some of the 
 
 * Send a video file to multiple browser in real time, perfectly synchronized movie watching.
 * Send a webcam on a small device to your browser, with no additional server required
-* Securely send video between two servers
+* Securely send data between two servers, without using pub/sub
 * Record your webcam and do special effects server side
 * Build a conferencing application that processes audio/video and make decisions off of it
 
@@ -59,6 +59,7 @@ Examples for common use cases, extend and modify to quickly get started.
 * [gstreamer-receive](examples/gstreamer-receive/README.md) Play video and audio from your Webcam live using GStreamer
 * [gstreamer-send](examples/gstreamer-send/README.md) Send video generated from GStreamer to your browser
 * [save-to-disk](examples/save-to-disk/README.md) Save video from your Webcam to disk
+* [data-channels](examples/data-channels/README.md) Use DataChannels to send text between pion-WebRTC and your browser
 
 ### Writing your own application
 The API should match the Javascript WebRTC API, and the [GoDoc](https://godoc.org/github.com/pions/webrtc) is actively maintained
@@ -85,7 +86,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 * [backkem](https://github.com/backkem) - *SDP, Public API, Project Management*
 
 ## Project Ideas
-I am looking to support other interesting WebRTC projects, so if you have something to build please reach out!
+We are looking to support other interesting WebRTC projects, so if you have something to build please reach out!
 pion-WebRTC would make a great foundation for.
 
 * Easy language bindings (Python)
