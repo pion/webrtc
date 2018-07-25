@@ -19,10 +19,10 @@ const (
 	// ConnectionStateCompleted ICE agent has finished
 	ConnectionStateCompleted
 
-	// ConnectionStateFailed ICE agent never could sucessfully connect
+	// ConnectionStateFailed ICE agent never could successfully connect
 	ConnectionStateFailed
 
-	// ConnectionStateDisconnected ICE agent connected sucessfully, but has entered a failed state
+	// ConnectionStateDisconnected ICE agent connected successfully, but has entered a failed state
 	ConnectionStateDisconnected
 
 	// ConnectionStateClosed ICE agent has finished and is no longer handling requests

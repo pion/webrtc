@@ -22,9 +22,8 @@ type incomingPacket struct {
 }
 
 func (p *port) updateICEAndNotify(newState ice.ConnectionState) {
-	oldState := p.iceState
 	p.iceState = newState
-	p.m.iceHandler(p, oldState)
+	p.m.iceHandler(p)
 }
 
 func (p *port) handleSRTP(buffer []byte) {
@@ -121,8 +120,8 @@ func (p *port) handleSCTP(raw []byte, a *sctp.Association) {
 	}
 }
 
-func (p *port) handleDTLS(raw []byte, srcAddr *net.UDPAddr) {
-	if decrypted := p.m.dtlsState.HandleDTLSPacket(raw, p.listeningAddr.String(), srcAddr.String()); len(decrypted) > 0 {
+func (p *port) handleDTLS(raw []byte, srcAddr string) {
+	if decrypted := p.m.dtlsState.HandleDTLSPacket(raw, p.listeningAddr.String(), srcAddr); len(decrypted) > 0 {
 		p.handleSCTP(decrypted, p.m.sctpAssociation)
 	}
 
@@ -187,7 +186,7 @@ func (p *port) networkLoop() {
 			if 127 < in.buffer[0] && in.buffer[0] < 192 {
 				p.handleSRTP(in.buffer)
 			} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
-				p.handleDTLS(in.buffer, in.srcAddr)
+				p.handleDTLS(in.buffer, in.srcAddr.String())
 			} else if in.buffer[0] < 2 {
 				p.handleICE(in, iceTimer)
 			}

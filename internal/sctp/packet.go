@@ -95,7 +95,7 @@ func (p *packet) unmarshal(raw []byte) error {
 		}
 
 		p.chunks = append(p.chunks, c)
-		chunkValuePadding := getPadding(c.valueLength(), 4)
+		chunkValuePadding := getPadding(c.valueLength())
 		offset += chunkHeaderSize + c.valueLength() + chunkValuePadding
 	}
 	theirChecksum := binary.LittleEndian.Uint32(raw[8:])
@@ -123,7 +123,7 @@ func (p *packet) marshal() ([]byte, error) {
 		}
 		raw = append(raw, chunkRaw...)
 
-		paddingNeeded := getPadding(len(raw), 4)
+		paddingNeeded := getPadding(len(raw))
 		if paddingNeeded != 0 {
 			raw = append(raw, make([]byte, paddingNeeded)...)
 		}

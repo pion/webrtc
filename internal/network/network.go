@@ -41,7 +41,7 @@ func (d *DataChannelCreated) StreamIdentifier() uint16 {
 	return d.streamIdentifier
 }
 
-// DataChannelMessage is emitted when a DataChannel recieves a message
+// DataChannelMessage is emitted when a DataChannel receives a message
 type DataChannelMessage struct {
 	Payload          datachannel.Payload
 	streamIdentifier uint16

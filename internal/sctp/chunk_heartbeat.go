@@ -51,12 +51,12 @@ func (h *chunkHeartbeat) unmarshal(raw []byte) error {
 		return errors.Errorf("Heartbeat is not long enough to contain Heartbeat Info %d", len(raw))
 	}
 
-	paramType := paramType(binary.BigEndian.Uint16(raw[chunkHeaderSize:]))
-	if paramType != heartbeatInfo {
-		return errors.Errorf("Heartbeat should only have HEARTBEAT param, instead have %s", paramType.String())
+	pType := paramType(binary.BigEndian.Uint16(raw[chunkHeaderSize:]))
+	if pType != heartbeatInfo {
+		return errors.Errorf("Heartbeat should only have HEARTBEAT param, instead have %s", pType.String())
 	}
 
-	p, err := buildParam(paramType, raw[chunkHeaderSize:])
+	p, err := buildParam(pType, raw[chunkHeaderSize:])
 	if err != nil {
 		return errors.Wrap(err, "Failed unmarshalling param in Heartbeat Chunk")
 	}

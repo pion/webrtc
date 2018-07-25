@@ -82,13 +82,13 @@ func (i *chunkInitCommon) unmarshal(raw []byte) error {
 	remaining := len(raw) - offset
 	for remaining > 0 {
 		if remaining > initOptionalVarHeaderLength {
-			paramType := paramType(binary.BigEndian.Uint16(raw[offset:]))
-			p, err := buildParam(paramType, raw[offset:])
+			pType := paramType(binary.BigEndian.Uint16(raw[offset:]))
+			p, err := buildParam(pType, raw[offset:])
 			if err != nil {
 				return errors.Wrap(err, "Failed unmarshalling param in Init Chunk")
 			}
 			i.params = append(i.params, p)
-			padding := getPadding(p.length(), 4)
+			padding := getPadding(p.length())
 			offset += int(p.length() + padding)
 			remaining -= int(p.length() + padding)
 		} else {
@@ -122,7 +122,7 @@ func (i *chunkInitCommon) marshal() ([]byte, error) {
 		// parameter except the last parameter in the chunk.*  The receiver
 		// MUST ignore the padding.
 		if idx != len(i.params)-1 {
-			padding := make([]byte, getPadding(len(pp), 4))
+			padding := make([]byte, getPadding(len(pp)))
 			out = append(out, padding...)
 		}
 	}

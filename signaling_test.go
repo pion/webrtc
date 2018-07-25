@@ -10,7 +10,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	testCases := []struct {
 		desc RTCSessionDescription
 	}{
-		{RTCSessionDescription{RTCSdpTypeOffer, sdp.NewJSEPSessionDescription("", false).Marshal()}},
+		{RTCSessionDescription{Type: RTCSdpTypeOffer, Sdp: sdp.NewJSEPSessionDescription("", false).Marshal()}},
 	}
 
 	for i, testCase := range testCases {

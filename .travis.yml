@@ -1,8 +1,8 @@
 language: go
 
 go:
-  - 1.9    # (CURRENT - 1)
-  - master
+  - "1.9"
+    #  - "master" TODO https://github.com/golangci/golangci-lint/issues/157
 
 notifications:
   email: false
@@ -10,21 +10,13 @@ notifications:
     secure: IYjXoe03KykZ3v4GgUwGzfWRepO5DnJdxB87lSQ2IMsF6PBFSc3CaOX3GUclHIlzTdchR+PHj1jtEZZVSkgfp9amZBCcqbJTBOPG1YA6hxOvTpgeWIttMH0cmMxSCuCa4RfkuRH2+UXbjREMJ3ENau2CTMKReyW4Jddh9dREZohVmYuqN6uuBqCndYpt3Lm1Hv+T+vqxwTDdE/q0hwGMiwgvQm7N3K397e1q1mg+o4tMGwqyUIPnEPjaSKcEuOBa8Rqyl96nn+HGZK0zvNqUOxlzeRMM0VBcxe2s+zY/SuLj4OwNl1zEmIfY6Qj70t2cmT3xJvJprB4pCwR7q78b4lfpNu6rqCJPIZG/qDFT+XSuhDCmLlCO/+Uhtu11pgjV8UMNLTKJth+7hurH7oLNb7jYk9VYsiKhs41LICyDjJNzS5yPatF5xj0HOujb6Uh/pfI+9a+IpPSeXv1gBo8H3oWa6TfRhuTUS3Jc48p/jriZmgWgbKa1HKTaY9ENvAdZFfxJdrRg3Y4SKnjZcAPw7ijRIx1oaM3rHYbOTm/dj4ggho7EgTO3k8toQ5PKohrbBG5RERqHJvC47SXDt0fEjeGnAfN7Xtj0Pq8YyaFIj7CmCCGoI//2sWkK3AmjnwIuW0hUMsL3GsED+p0lsu6FX9wysJwy2Z2mTfIX/CXmB6w=
 
 before_install:
-  - git clone https://github.com/cisco/libsrtp.git && cd libsrtp && ./configure --prefix=/usr && make && sudo make install && cd .. && rm -rf libsrtp
   - sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
 before_script:
-  - go get github.com/golang/lint/golint
-  - go get honnef.co/go/tools/cmd/megacheck
-  - go get github.com/fzipp/gocyclo
-  - go get -u github.com/kisielk/errcheck
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.9.1
   - go get github.com/mattn/goveralls
 
 script:
-  - test -z "$(gofmt -s -l ./..)"
+  - golangci-lint run
   - goveralls -v -race -covermode=atomic -service=travis-ci
-  - go vet ./...
-  - megacheck ./...
-  - golint -set_exit_status $(go list ./...)
-  - errcheck -asserts -blank ./...
   - bash .github/assert-contributors.sh

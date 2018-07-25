@@ -1,5 +1,9 @@
 package sctp
 
-func getPadding(len int, multiple int) int {
-	return (multiple - (len % multiple)) % multiple
+const (
+	paddingMultiple = 4
+)
+
+func getPadding(len int) int {
+	return (paddingMultiple - (len % paddingMultiple)) % paddingMultiple
 }
