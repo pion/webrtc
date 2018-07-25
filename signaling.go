@@ -189,7 +189,7 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 	// 		continue
 	// 	}
 	// 	track := transceiver.Sender.Track
-	// 	cname := "pion"      // TODO: Support RTP streams synchronisation
+	// 	cname := "pion"      // TODO: Support RTP streams synchronization
 	// 	steamlabel := "pion" // TODO: Support steam labels
 	// 	codec, err := r.mediaEngine.getCodec(track.PayloadType)
 	// 	if err != nil {
@@ -294,7 +294,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			continue
 		}
 		track := tranceiver.Sender.Track
-		cname := track.Label      // TODO: Support RTP streams synchronisation
+		cname := track.Label      // TODO: Support RTP streams synchronization
 		steamlabel := track.Label // TODO: Support steam labels
 		codec, err := r.mediaEngine.getCodec(track.PayloadType)
 		if err != nil {
@@ -420,7 +420,7 @@ func (r *RTCPeerConnection) buildCandidates() ([]candidate, error) {
 				return nil, errors.Wrapf(err, "Failed to make STUN request")
 			}
 
-			if err := client.Close(); err != nil {
+			if err = client.Close(); err != nil {
 				return nil, errors.Wrapf(err, "Failed to close STUN client")
 			}
 
@@ -430,7 +430,7 @@ func (r *RTCPeerConnection) buildCandidates() ([]candidate, error) {
 			}
 
 			var addr stun.XorAddress
-			if err := addr.Unpack(resp, attr); err != nil {
+			if err = addr.Unpack(resp, attr); err != nil {
 				return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 			}
 

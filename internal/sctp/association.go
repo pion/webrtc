@@ -51,7 +51,7 @@ func (a AssociationState) String() string {
 	}
 }
 
-// Association represents an SCTP assocation
+// Association represents an SCTP association
 // 13.2.  Parameters Necessary per Association (i.e., the TCB)
 // Peer        : Tag value to be sent in every packet and is received
 // Verification: in the INIT or INIT ACK chunk.
@@ -103,7 +103,7 @@ type Association struct {
 	outboundStreams           map[uint16]uint16
 
 	// TODO are these better as channels
-	// Put a blocking goroutine in port-recieve (vs callbacks)
+	// Put a blocking goroutine in port-receive (vs callbacks)
 	outboundHandler func([]byte)
 	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
 }
@@ -270,7 +270,7 @@ func min(a, b uint16) uint16 {
 	return b
 }
 
-func (a *Association) handleInit(p *packet, i *chunkInit) (*packet, error) {
+func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 
 	// Should we be setting any of these permanently until we've ACKed further?
 	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
@@ -306,11 +306,10 @@ func (a *Association) handleInit(p *packet, i *chunkInit) (*packet, error) {
 
 	outbound.chunks = []chunk{initAck}
 
-	return outbound, nil
-
+	return outbound
 }
 
-func (a *Association) handleData(p *packet, d *chunkPayloadData) (*packet, error) {
+func (a *Association) handleData(d *chunkPayloadData) *packet {
 
 	a.payloadQueue.push(d, a.peerLastTSN)
 
@@ -350,11 +349,10 @@ func (a *Association) handleData(p *packet, d *chunkPayloadData) (*packet, error
 	sack.gapAckBlocks = a.payloadQueue.getGapAckBlocks(a.peerLastTSN)
 	outbound.chunks = []chunk{sack}
 
-	return outbound, nil
-
+	return outbound
 }
 
-func (a *Association) handleSack(p *packet, d *chunkSelectiveAck) ([]*packet, error) {
+func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	// i) If Cumulative TSN Ack is less than the Cumulative TSN Ack
 	// Point, then drop the SACK.  Since Cumulative TSN Ack is
 	// monotonically increasing, a SACK whose Cumulative TSN Ack is
@@ -428,11 +426,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 	case *chunkInit:
 		switch a.state {
 		case Open:
-			pp, err := a.handleInit(p, c)
-			if err != nil {
-				return errors.Wrap(err, "Failure handling INIT")
-			}
-			return a.send(pp)
+			return a.send(a.handleInit(p, c))
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
@@ -479,13 +473,9 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 
 		// TODO Abort
 	case *chunkPayloadData:
-		pp, err := a.handleData(p, c)
-		if err != nil {
-			return errors.Wrap(err, "Failure handling DATA")
-		}
-		return a.send(pp)
+		return a.send(a.handleData(c))
 	case *chunkSelectiveAck:
-		p, err := a.handleSack(p, c)
+		p, err := a.handleSack(c)
 		if err != nil {
 			return errors.Wrap(err, "Failure handling SACK")
 		}

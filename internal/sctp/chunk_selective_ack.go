@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+
 	"github.com/pkg/errors"
 )
 

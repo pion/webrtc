@@ -3,6 +3,7 @@ package sctp
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/pkg/errors"
 )
 

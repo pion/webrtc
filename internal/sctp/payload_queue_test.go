@@ -19,7 +19,7 @@ func TestPayloadQueue_GetGapAckBlocks(t *testing.T) {
 	pq.push(makePayload(5), 0)
 	pq.push(makePayload(6), 0)
 
-	gab1 := []*gapAckBlock{{1, 6}}
+	gab1 := []*gapAckBlock{{start: 1, end: 6}}
 	gab2 := pq.getGapAckBlocks(0)
 	assert.NotNil(t, gab2)
 	assert.Len(t, gab2, 1)
@@ -30,7 +30,7 @@ func TestPayloadQueue_GetGapAckBlocks(t *testing.T) {
 	pq.push(makePayload(8), 0)
 	pq.push(makePayload(9), 0)
 
-	gab1 = []*gapAckBlock{{1, 6}, {8, 9}}
+	gab1 = []*gapAckBlock{{start: 1, end: 6}, {start: 8, end: 9}}
 	gab2 = pq.getGapAckBlocks(0)
 	assert.NotNil(t, gab2)
 	assert.Len(t, gab2, 2)

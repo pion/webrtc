@@ -25,6 +25,8 @@ type Manager struct {
 	certPairLock sync.RWMutex
 	certPair     *dtls.CertPair
 
+	dataChannelEventHandler DataChannelEventHandler
+
 	bufferTransportGenerator BufferTransportGenerator
 	bufferTransports         map[uint32]chan<- *rtp.Packet
 
@@ -41,6 +43,57 @@ type Manager struct {
 	ports     []*port
 }
 
+func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
+	switch payloadType {
+	case sctp.PayloadTypeWebRTCDCEP:
+		msg, err := datachannel.Parse(data)
+		if err != nil {
+			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
+			return
+		}
+		switch msg := msg.(type) {
+		case *datachannel.ChannelOpen:
+			// Cannot return err
+			ack := datachannel.ChannelAck{}
+			ackMsg, err := ack.Marshal()
+			if err != nil {
+				fmt.Println("Error Marshaling ChannelOpen ACK", err)
+				return
+			}
+			if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
+				fmt.Println("Error sending ChannelOpen ACK", err)
+				return
+			}
+			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
+		default:
+			fmt.Println("Unhandled DataChannel message", m)
+		}
+	case sctp.PayloadTypeWebRTCString:
+		fallthrough
+	case sctp.PayloadTypeWebRTCStringEmpty:
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
+	case sctp.PayloadTypeWebRTCBinary:
+		fallthrough
+	case sctp.PayloadTypeWebRTCBinaryEmpty:
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
+	default:
+		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
+	}
+}
+
+func (m *Manager) dataChannelOutboundHandler(raw []byte) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	for _, p := range m.ports {
+		if p.iceState == ice.ConnectionStateCompleted {
+			p.sendSCTP(raw)
+			return
+		}
+	}
+
+}
+
 // NewManager creates a new network.Manager
 func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
 	m = &Manager{
@@ -49,60 +102,14 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: bufferTransportGenerator,
+		dataChannelEventHandler:  dataChannelEventHandler,
 	}
 	m.dtlsState, err = dtls.NewState(true)
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(func(raw []byte) {
-		m.portsLock.Lock()
-		defer m.portsLock.Unlock()
-
-		for _, p := range m.ports {
-			if p.iceState == ice.ConnectionStateCompleted {
-				p.sendSCTP(raw)
-				return
-			}
-		}
-	}, func(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
-		switch payloadType {
-		case sctp.PayloadTypeWebRTCDCEP:
-			msg, err := datachannel.Parse(data)
-			if err != nil {
-				fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
-				return
-			}
-			switch msg := msg.(type) {
-			case *datachannel.ChannelOpen:
-				// Cannot return err
-				ack := datachannel.ChannelAck{}
-				ackMsg, err := ack.Marshal()
-				if err != nil {
-					fmt.Println("Error Marshaling ChannelOpen ACK", err)
-					return
-				}
-				if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
-					fmt.Println("Error sending ChannelOpen ACK", err)
-					return
-				}
-				dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
-			default:
-				fmt.Println("Unhandled DataChannel message", m)
-			}
-		case sctp.PayloadTypeWebRTCString:
-			fallthrough
-		case sctp.PayloadTypeWebRTCStringEmpty:
-			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
-		case sctp.PayloadTypeWebRTCBinary:
-			fallthrough
-		case sctp.PayloadTypeWebRTCBinaryEmpty:
-			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
-		default:
-			fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
-		}
-
-	})
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
 
 	return m, err
 }
@@ -185,7 +192,7 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 	return nil
 }
 
-func (m *Manager) iceHandler(p *port, oldState ice.ConnectionState) {
+func (m *Manager) iceHandler(p *port) {
 	// One port disconnected, scan the other ones
 	if p.iceState == ice.ConnectionStateDisconnected {
 		m.portsLock.Lock()

@@ -1,8 +1,9 @@
 package sctp
 
 import (
-	"gotest.tools/assert"
 	"testing"
+
+	"gotest.tools/assert"
 )
 
 func TestReassemblyQueue_push(t *testing.T) {

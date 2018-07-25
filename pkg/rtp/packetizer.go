@@ -31,13 +31,13 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 	r := rand.New(rs)
 
 	return &packetizer{
-		mtu,
-		pt,
-		ssrc,
-		payloader,
-		sequencer,
-		r.Uint32(),
-		clockRate,
+		MTU:         mtu,
+		PayloadType: pt,
+		SSRC:        ssrc,
+		Payloader:   payloader,
+		Sequencer:   sequencer,
+		Timestamp:   r.Uint32(),
+		ClockRate:   clockRate,
 	}
 }
 
