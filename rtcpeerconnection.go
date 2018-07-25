@@ -202,7 +202,7 @@ func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) 
 	case *network.DataChannelMessage:
 		if datachannel, ok := r.dataChannels[e.StreamIdentifier()]; ok {
 			if datachannel.Onmessage != nil {
-				go datachannel.Onmessage(event.Body)
+				go datachannel.Onmessage(event.Payload)
 			} else {
 				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
 			}

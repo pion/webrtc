@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -65,8 +66,15 @@ func main() {
 		dataChannelsLock.Unlock()
 
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
-		d.Onmessage = func(message []byte) {
-			fmt.Printf("Message from DataChannel %s '%s'\n", d.Label, string(message))
+		d.Onmessage = func(payload datachannel.Payload) {
+			switch p := payload.(type) {
+			case *datachannel.PayloadString:
+				fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
+			case *datachannel.PayloadBinary:
+				fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), d.Label, p.Data)
+			default:
+				fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), d.Label)
+			}
 		}
 	}
 
@@ -95,7 +103,7 @@ func main() {
 
 		dataChannelsLock.RLock()
 		for _, d := range datachannels {
-			err := d.Send([]byte(message))
+			err := d.Send(datachannel.PayloadString{Data: []byte(message)})
 			if err != nil {
 				panic(err)
 			}

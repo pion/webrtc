@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 )
@@ -42,7 +43,7 @@ func (d *DataChannelCreated) StreamIdentifier() uint16 {
 
 // DataChannelMessage is emitted when a DataChannel recieves a message
 type DataChannelMessage struct {
-	Body             []byte
+	Payload          datachannel.Payload
 	streamIdentifier uint16
 }
 
