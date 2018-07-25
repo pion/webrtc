@@ -5,10 +5,10 @@ import (
 	"sync"
 
 	"github.com/pions/pkg/stun"
-	"github.com/pions/webrtc/internal/datachannel"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
+	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
@@ -92,12 +92,12 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 			}
 		case sctp.PayloadTypeWebRTCString:
 			fallthrough
+		case sctp.PayloadTypeWebRTCStringEmpty:
+			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
 		case sctp.PayloadTypeWebRTCBinary:
 			fallthrough
-		case sctp.PayloadTypeWebRTCStringEmpty:
-			fallthrough
 		case sctp.PayloadTypeWebRTCBinaryEmpty:
-			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Body: data})
+			dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
 		default:
 			fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
 		}
@@ -154,8 +154,30 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 }
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
-func (m *Manager) SendDataChannelMessage(message []byte, streamIdentifier uint16) error {
-	err := m.sctpAssociation.HandleOutbound(message, streamIdentifier, sctp.PayloadTypeWebRTCString)
+func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIdentifier uint16) error {
+	var data []byte
+	var ppi sctp.PayloadProtocolIdentifier
+
+	switch p := payload.(type) {
+	case datachannel.PayloadString:
+		data = p.Data
+		if len(data) == 0 {
+			ppi = sctp.PayloadTypeWebRTCStringEmpty
+		} else {
+			ppi = sctp.PayloadTypeWebRTCString
+		}
+	case datachannel.PayloadBinary:
+		data = p.Data
+		if len(data) == 0 {
+			ppi = sctp.PayloadTypeWebRTCBinaryEmpty
+		} else {
+			ppi = sctp.PayloadTypeWebRTCBinary
+		}
+	default:
+		return errors.Errorf("Unknown DataChannel Payload (%s)", payload.PayloadType().String())
+	}
+
+	err := m.sctpAssociation.HandleOutbound(data, streamIdentifier, ppi)
 	if err != nil {
 		return errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}

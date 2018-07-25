@@ -169,6 +169,8 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 // HandleOutbound parses incoming raw packets
 func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
 
+	fmt.Println(raw, payloadType)
+
 	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
 	if err != nil {
 		return errors.Wrap(err, "Unable to packetize outbound packet")
