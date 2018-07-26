@@ -3,6 +3,7 @@ package webrtc
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/pions/webrtc/internal/network"
@@ -60,6 +61,8 @@ func (t RTCPeerConnectionState) String() string {
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
+	sync.RWMutex
+
 	// ICE
 	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
 
@@ -183,6 +186,9 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 }
 
 func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
+	r.Lock()
+	defer r.Unlock()
+
 	if r.OnICEConnectionStateChange != nil && r.iceState != newState {
 		r.OnICEConnectionStateChange(newState)
 	}
@@ -190,6 +196,9 @@ func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+	r.Lock()
+	defer r.Unlock()
+
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
 		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: r}
@@ -201,6 +210,9 @@ func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) 
 		}
 	case *network.DataChannelMessage:
 		if datachannel, ok := r.dataChannels[e.StreamIdentifier()]; ok {
+			datachannel.RLock()
+			defer datachannel.RUnlock()
+
 			if datachannel.Onmessage != nil {
 				go datachannel.Onmessage(event.Payload)
 			} else {

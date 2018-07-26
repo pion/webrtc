@@ -11,7 +11,8 @@ import (
 )
 
 type port struct {
-	iceState ice.ConnectionState
+	iceStateLock sync.RWMutex
+	iceState     ice.ConnectionState
 
 	conn          *ipv4.PacketConn
 	listeningAddr *stun.TransportAddr
@@ -50,4 +51,10 @@ func newPort(address string, m *Manager) (*port, error) {
 
 func (p *port) close() error {
 	return p.conn.Close()
+}
+
+func (p *port) IceState() ice.ConnectionState {
+	p.iceStateLock.RLock()
+	defer p.iceStateLock.RUnlock()
+	return p.iceState
 }

@@ -86,7 +86,7 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 	defer m.portsLock.Unlock()
 
 	for _, p := range m.ports {
-		if p.iceState == ice.ConnectionStateCompleted {
+		if p.IceState() == ice.ConnectionStateCompleted {
 			p.sendSCTP(raw)
 			return
 		}
@@ -153,7 +153,7 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	defer m.portsLock.Unlock()
 
 	for _, p := range m.ports {
-		if p.iceState == ice.ConnectionStateCompleted {
+		if p.IceState() == ice.ConnectionStateCompleted {
 			p.sendRTP(packet)
 			return
 		}
@@ -165,10 +165,20 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 	var data []byte
 	var ppi sctp.PayloadProtocolIdentifier
 
+	/*
+		https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-12#section-6.6
+		SCTP does not support the sending of empty user messages.  Therefore,
+		if an empty message has to be sent, the appropriate PPID (WebRTC
+		String Empty or WebRTC Binary Empty) is used and the SCTP user
+		message of one zero byte is sent.  When receiving an SCTP user
+		message with one of these PPIDs, the receiver MUST ignore the SCTP
+		user message and process it as an empty message.
+	*/
 	switch p := payload.(type) {
 	case datachannel.PayloadString:
 		data = p.Data
 		if len(data) == 0 {
+			data = []byte{0}
 			ppi = sctp.PayloadTypeWebRTCStringEmpty
 		} else {
 			ppi = sctp.PayloadTypeWebRTCString
@@ -176,6 +186,7 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 	case datachannel.PayloadBinary:
 		data = p.Data
 		if len(data) == 0 {
+			data = []byte{0}
 			ppi = sctp.PayloadTypeWebRTCBinaryEmpty
 		} else {
 			ppi = sctp.PayloadTypeWebRTCBinary
@@ -184,7 +195,10 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 		return errors.Errorf("Unknown DataChannel Payload (%s)", payload.PayloadType().String())
 	}
 
+	m.sctpAssociation.Lock()
 	err := m.sctpAssociation.HandleOutbound(data, streamIdentifier, ppi)
+	m.sctpAssociation.Unlock()
+
 	if err != nil {
 		return errors.Wrap(err, "SCTP Association failed handling outbound packet")
 	}
@@ -192,20 +206,20 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 	return nil
 }
 
-func (m *Manager) iceHandler(p *port) {
+func (m *Manager) iceHandler(newState ice.ConnectionState) {
 	// One port disconnected, scan the other ones
-	if p.iceState == ice.ConnectionStateDisconnected {
+	if newState == ice.ConnectionStateDisconnected {
 		m.portsLock.Lock()
 		defer m.portsLock.Unlock()
 
 		for _, p := range m.ports {
-			if p.iceState == ice.ConnectionStateCompleted {
+			if p.IceState() == ice.ConnectionStateCompleted {
 				// Another peer is connected! We don't have to notify RTCPeerConnection
 				break
 			}
 		}
-		m.iceNotifier(p.iceState)
+		m.iceNotifier(newState)
 	} else {
-		m.iceNotifier(p.iceState)
+		m.iceNotifier(newState)
 	}
 }

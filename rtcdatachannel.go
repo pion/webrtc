@@ -1,11 +1,17 @@
 package webrtc
 
-import "github.com/pions/webrtc/pkg/datachannel"
+import (
+	"sync"
+
+	"github.com/pions/webrtc/pkg/datachannel"
+)
 
 // RTCDataChannel represents a WebRTC DataChannel
 // The RTCDataChannel interface represents a network channel
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
 type RTCDataChannel struct {
+	sync.RWMutex
+
 	Onmessage func(datachannel.Payload)
 	ID        uint16
 	Label     string

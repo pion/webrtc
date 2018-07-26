@@ -3,6 +3,7 @@ package sctp
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"math"
 	"math/rand"
@@ -69,6 +70,8 @@ func (a AssociationState) String() string {
 //               Note: No "CLOSED" state is illustrated since if a
 //               association is "CLOSED" its TCB SHOULD be removed.
 type Association struct {
+	sync.Mutex
+
 	peerVerificationTag uint32
 	myVerificationTag   uint32
 	state               AssociationState
@@ -168,9 +171,6 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 
 // HandleOutbound parses incoming raw packets
 func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
-
-	fmt.Println(raw, payloadType)
-
 	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
 	if err != nil {
 		return errors.Wrap(err, "Unable to packetize outbound packet")

@@ -22,8 +22,11 @@ type incomingPacket struct {
 }
 
 func (p *port) updateICEAndNotify(newState ice.ConnectionState) {
+	p.iceStateLock.Lock()
 	p.iceState = newState
-	p.m.iceHandler(p)
+	p.iceStateLock.Unlock()
+
+	p.m.iceHandler(p.iceState)
 }
 
 func (p *port) handleSRTP(buffer []byte) {
@@ -115,6 +118,9 @@ func (p *port) handleICE(in *incomingPacket, iceTimer *time.Timer) {
 }
 
 func (p *port) handleSCTP(raw []byte, a *sctp.Association) {
+	p.m.sctpAssociation.Lock()
+	defer p.m.sctpAssociation.Unlock()
+
 	if err := a.HandleInbound(raw); err != nil {
 		fmt.Println(errors.Wrap(err, "Failed to push SCTP packet"))
 	}
