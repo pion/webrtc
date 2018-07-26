@@ -66,6 +66,9 @@ func main() {
 		dataChannelsLock.Unlock()
 
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
+
+		d.Lock()
+		defer d.Unlock()
 		d.Onmessage = func(payload datachannel.Payload) {
 			switch p := payload.(type) {
 			case *datachannel.PayloadString:
