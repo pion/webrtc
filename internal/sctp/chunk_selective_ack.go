@@ -50,7 +50,7 @@ type chunkSelectiveAck struct {
 	chunkHeader
 	cumulativeTSNAck               uint32
 	advertisedReceiverWindowCredit uint32
-	gapAckBlocks                   []*gapAckBlock
+	gapAckBlocks                   []gapAckBlock
 	duplicateTSN                   []uint32
 }
 
@@ -74,7 +74,7 @@ func (s *chunkSelectiveAck) unmarshal(raw []byte) error {
 
 	s.cumulativeTSNAck = binary.BigEndian.Uint32(s.raw[0:])
 	s.advertisedReceiverWindowCredit = binary.BigEndian.Uint32(s.raw[4:])
-	s.gapAckBlocks = make([]*gapAckBlock, binary.BigEndian.Uint16(s.raw[8:]))
+	s.gapAckBlocks = make([]gapAckBlock, binary.BigEndian.Uint16(s.raw[8:]))
 	s.duplicateTSN = make([]uint32, binary.BigEndian.Uint16(s.raw[10:]))
 
 	if len(s.raw) != selectiveAckHeaderSize+(4*len(s.gapAckBlocks)+(4*len(s.duplicateTSN))) {

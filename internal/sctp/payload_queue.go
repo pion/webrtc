@@ -64,11 +64,11 @@ func (r *payloadQueue) popDuplicates() []uint32 {
 	return dups
 }
 
-func (r *payloadQueue) getGapAckBlocks(cumulativeTSN uint32) (gapAckBlocks []*gapAckBlock) {
+func (r *payloadQueue) getGapAckBlocks(cumulativeTSN uint32) (gapAckBlocks []gapAckBlock) {
 	var b gapAckBlock
 
 	if len(r.orderedPackets) == 0 {
-		return []*gapAckBlock{}
+		return []gapAckBlock{}
 	}
 
 	for i, p := range r.orderedPackets {
@@ -81,7 +81,7 @@ func (r *payloadQueue) getGapAckBlocks(cumulativeTSN uint32) (gapAckBlocks []*ga
 		if b.end+1 == diff {
 			b.end++
 		} else {
-			gapAckBlocks = append(gapAckBlocks, &gapAckBlock{
+			gapAckBlocks = append(gapAckBlocks, gapAckBlock{
 				start: b.start,
 				end:   b.end,
 			})
@@ -90,7 +90,7 @@ func (r *payloadQueue) getGapAckBlocks(cumulativeTSN uint32) (gapAckBlocks []*ga
 		}
 	}
 
-	gapAckBlocks = append(gapAckBlocks, &gapAckBlock{
+	gapAckBlocks = append(gapAckBlocks, gapAckBlock{
 		start: b.start,
 		end:   b.end,
 	})
