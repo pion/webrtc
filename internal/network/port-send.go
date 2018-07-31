@@ -8,7 +8,7 @@ import (
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-func (p *port) sendRTP(packet *rtp.Packet) {
+func (p *port) sendRTP(packet *rtp.Packet, dst *net.UDPAddr) {
 	p.m.certPairLock.RLock()
 	defer p.m.certPairLock.RUnlock()
 	if p.m.certPair == nil {
@@ -16,20 +16,7 @@ func (p *port) sendRTP(packet *rtp.Packet) {
 		return
 	}
 
-	var peer *net.UDPAddr
-	p.seenPeersLock.RLock()
-	for _, p := range p.seenPeers {
-		peer = p
-		break
-	}
-	p.seenPeersLock.RUnlock()
-
-	if peer == nil {
-		fmt.Printf("No peers to send to, ICE state is %s \n", p.iceState.String())
-		return
-	}
-
-	contextMapKey := peer.String() + ":" + fmt.Sprint(packet.SSRC)
+	contextMapKey := dst.String() + ":" + fmt.Sprint(packet.SSRC)
 	p.m.srtpContextsLock.Lock()
 	srtpContext, ok := p.m.srtpContexts[contextMapKey]
 	if !ok {
@@ -49,7 +36,7 @@ func (p *port) sendRTP(packet *rtp.Packet) {
 		if err != nil {
 			fmt.Printf("Failed to marshal packet: %s \n", err.Error())
 		}
-		if _, err := p.conn.WriteTo(raw, nil, peer); err != nil {
+		if _, err := p.conn.WriteTo(raw, nil, dst); err != nil {
 			fmt.Printf("Failed to send packet: %s \n", err.Error())
 		}
 	} else {
@@ -57,20 +44,10 @@ func (p *port) sendRTP(packet *rtp.Packet) {
 	}
 }
 
-func (p *port) sendSCTP(buf []byte) {
-	var peer *net.UDPAddr
+func (p *port) sendICE(buf []byte, dst *net.UDPAddr) {
+	fmt.Println("Send ICE")
+}
 
-	p.seenPeersLock.RLock()
-	for _, p := range p.seenPeers {
-		peer = p
-		break
-	}
-	p.seenPeersLock.RUnlock()
-
-	if peer == nil {
-		fmt.Printf("No peers to send to, ICE state is %s \n", p.iceState.String())
-		return
-	}
-
-	p.m.dtlsState.Send(buf, p.listeningAddr.String(), peer.String())
+func (p *port) sendSCTP(buf []byte, dst *net.UDPAddr) {
+	p.m.dtlsState.Send(buf, p.listeningAddr.String(), dst.String())
 }

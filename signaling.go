@@ -1,15 +1,9 @@
 package webrtc
 
 import (
-	"fmt"
-	"math/rand"
-	"net"
 	"strings"
-	"time"
 
-	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/sdp"
-	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pkg/errors"
 )
 
@@ -154,15 +148,6 @@ type RTCOfferOptions struct {
 	ICERestart             bool
 }
 
-// TODO
-type candidate struct {
-	transport    string
-	basePriority uint16
-	ip           string
-	port         int
-	typ          string
-}
-
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
 func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
 	panic("TODO")
@@ -246,11 +231,7 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDe
 		panic("TODO handle identity provider")
 	}
 
-	candidates, err := r.buildCandidates()
-	if err != nil {
-		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
-	}
-
+	candidates := r.networkManager.IceAgent.LocalCandidates()
 	d := sdp.NewJSEPSessionDescription(
 		r.networkManager.DTLSFingerprint(),
 		useIdentity)
@@ -283,7 +264,7 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDe
 	}, nil
 }
 
-func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType, candidates []candidate) (string, error) {
+func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType, candidates []string) (string, error) {
 	added := false
 
 	var streamlabels string
@@ -304,7 +285,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
 			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
-			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
+			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
 			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize). // TODO: Support Reduced-Size RTCP?
@@ -318,7 +299,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
 
 		for _, c := range candidates {
-			media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
+			media.WithCandidate(c)
 		}
 		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 		d.WithMedia(media)
@@ -332,10 +313,9 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
 			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
-			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd). // TODO: get credendials form ICE agent
-			WithPropertyAttribute(sdp.AttrKeyICELite).            // TODO: get ICE type from ICE Agent (#23)
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux).            // TODO: support RTCP fallback
-			WithPropertyAttribute(sdp.AttrKeyRtcpRsize)           // TODO: Support Reduced-Size RTCP?
+			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
+			WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
+			WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
 			media.WithCodec(
@@ -348,7 +328,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 		}
 
 		for _, c := range candidates {
-			media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
+			media.WithCandidate(c)
 		}
 		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 		d.WithMedia(media)
@@ -358,7 +338,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 
 }
 
-func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates []candidate) {
+func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates []string) {
 	media := (&sdp.MediaDescription{
 		MediaName:      "application 9 DTLS/SCTP 5000",
 		ConnectionData: "IN IP4 0.0.0.0",
@@ -367,89 +347,12 @@ func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates 
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, "data").
 		WithValueAttribute("sctpmap:5000", "webrtc-datachannel 1024").
-		WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
-		WithPropertyAttribute(sdp.AttrKeyICELite) // TODO: get ICE type from ICE Agent
+		WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd)
 
 	for _, c := range candidates {
-		media.WithCandidate(1, c.transport, c.basePriority, c.ip, c.port, c.typ)
+		media.WithCandidate(c)
 	}
 	media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
 
 	d.WithMedia(media)
-}
-
-func (r *RTCPeerConnection) buildCandidates() ([]candidate, error) {
-	basePriority := uint16(rand.Uint32() & (1<<16 - 1))
-	candidates := make([]candidate, 0)
-
-	for _, c := range ice.HostInterfaces() {
-		boundAddress, err := r.networkManager.Listen(c + ":0")
-		if err != nil {
-			return nil, err
-		}
-
-		candidates = append(candidates, candidate{
-			transport:    "udp",
-			basePriority: basePriority,
-			ip:           boundAddress.IP.String(),
-			port:         boundAddress.Port,
-			typ:          "host",
-		})
-
-		basePriority = basePriority + 1
-	}
-
-	for _, servers := range r.iceAgent.Servers {
-		for _, server := range servers {
-			if server.Type != ice.ServerTypeSTUN {
-				continue
-			}
-			// TODO Do we want the timeout to be configurable?
-			proto := server.TransportType.String()
-			client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", server.Host, server.Port), time.Second*5)
-			if err != nil {
-				return nil, errors.Wrapf(err, "Failed to create STUN client")
-			}
-			localAddr, ok := client.LocalAddr().(*net.UDPAddr)
-			if !ok {
-				return nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
-			}
-
-			resp, err := client.Request()
-			if err != nil {
-				return nil, errors.Wrapf(err, "Failed to make STUN request")
-			}
-
-			if err = client.Close(); err != nil {
-				return nil, errors.Wrapf(err, "Failed to close STUN client")
-			}
-
-			attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
-			if !ok {
-				return nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
-			}
-
-			var addr stun.XorAddress
-			if err = addr.Unpack(resp, attr); err != nil {
-				return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
-			}
-
-			boundAddress, err := r.networkManager.Listen(fmt.Sprintf("0.0.0.0:%d", localAddr.Port))
-			if err != nil {
-				return nil, err
-			}
-
-			candidates = append(candidates, candidate{
-				transport:    "udp",
-				basePriority: basePriority,
-				ip:           addr.IP.String(),
-				port:         boundAddress.Port,
-				typ:          "srflx",
-			})
-
-			basePriority = basePriority + 1
-		}
-	}
-
-	return candidates, nil
 }

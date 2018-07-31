@@ -5,13 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"time"
 
-	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
@@ -19,14 +16,6 @@ import (
 type incomingPacket struct {
 	srcAddr *net.UDPAddr
 	buffer  []byte
-}
-
-func (p *port) updateICEAndNotify(newState ice.ConnectionState) {
-	p.iceStateLock.Lock()
-	p.iceState = newState
-	p.iceStateLock.Unlock()
-
-	p.m.iceHandler(p.iceState)
 }
 
 func (p *port) handleSRTP(buffer []byte) {
@@ -94,29 +83,6 @@ func (p *port) handleSRTP(buffer []byte) {
 
 }
 
-func (p *port) handleICE(in *incomingPacket, iceTimer *time.Timer) {
-	if m, err := stun.NewMessage(in.buffer); err == nil && m.Class == stun.ClassRequest && m.Method == stun.MethodBinding {
-		dstAddr := &stun.TransportAddr{IP: in.srcAddr.IP, Port: in.srcAddr.Port}
-		if err := stun.BuildAndSend(p.conn, dstAddr, stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
-			&stun.XorMappedAddress{
-				XorAddress: stun.XorAddress{
-					IP:   dstAddr.IP,
-					Port: dstAddr.Port,
-				},
-			},
-			&stun.MessageIntegrity{
-				Key: p.m.icePwd,
-			},
-			&stun.Fingerprint{},
-		); err != nil {
-			fmt.Println(err)
-		} else {
-			p.updateICEAndNotify(ice.ConnectionStateCompleted)
-			iceTimer.Reset(iceTimeout)
-		}
-	}
-}
-
 func (p *port) handleSCTP(raw []byte, a *sctp.Association) {
 	p.m.sctpAssociation.Lock()
 	defer p.m.sctpAssociation.Unlock()
@@ -139,8 +105,6 @@ func (p *port) handleDTLS(raw []byte, srcAddr string) {
 
 }
 
-const iceTimeout = time.Second * 10
-const noTimeout = time.Hour * 8760
 const receiveMTU = 8192
 
 func (p *port) networkLoop() {
@@ -164,13 +128,8 @@ func (p *port) networkLoop() {
 		}
 	}()
 
-	// Never timeout originally, only start timer after we get an ICE ping
-	iceTimer := time.NewTimer(noTimeout)
 	for {
 		select {
-		case <-iceTimer.C:
-			p.updateICEAndNotify(ice.ConnectionStateDisconnected)
-			iceTimer.Reset(noTimeout)
 		case in, socketOpen := <-incomingPackets:
 			if !socketOpen {
 				// incomingPackets channel has closed, this port is finished processing
@@ -183,26 +142,22 @@ func (p *port) networkLoop() {
 				continue
 			}
 
-			// TODO these should age out, a candidate might not be good forever
-			p.seenPeersLock.Lock()
-			p.seenPeers[in.srcAddr.String()] = in.srcAddr
-			p.seenPeersLock.Unlock()
-
 			// https://tools.ietf.org/html/rfc5764#page-14
 			if 127 < in.buffer[0] && in.buffer[0] < 192 {
 				p.handleSRTP(in.buffer)
 			} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
 				p.handleDTLS(in.buffer, in.srcAddr.String())
 			} else if in.buffer[0] < 2 {
-				p.handleICE(in, iceTimer)
+				p.m.IceAgent.HandleInbound(in.buffer, in.srcAddr)
 			}
 
+			// TODO should use SetupAttr
+			// Currently we always send a DoHandshake (which seems to work ok)
 			p.m.certPairLock.RLock()
 			if p.m.certPair == nil {
 				p.m.dtlsState.DoHandshake(p.listeningAddr.String(), in.srcAddr.String())
 			}
 			p.m.certPairLock.RUnlock()
-
 		}
 	}
 }

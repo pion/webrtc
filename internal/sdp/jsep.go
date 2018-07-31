@@ -128,8 +128,6 @@ func (d *MediaDescription) WithMediaSource(ssrc uint32, cname, streamLabel, labe
 }
 
 // WithCandidate adds an ICE candidate to the media description
-func (d *MediaDescription) WithCandidate(id int, transport string, basePriority uint16, ip string, port int, typ string) *MediaDescription {
-	return d.
-		WithValueAttribute("candidate",
-			fmt.Sprintf("%scandidate %d %s %d %s %d typ %s", transport, id, transport, basePriority, ip, port, typ))
+func (d *MediaDescription) WithCandidate(value string) *MediaDescription {
+	return d.WithValueAttribute("candidate", value)
 }
