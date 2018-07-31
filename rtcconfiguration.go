@@ -237,26 +237,27 @@ func (r *RTCPeerConnection) validateICECandidatePoolSize(config RTCConfiguration
 }
 
 func (r *RTCPeerConnection) setICEServers(config RTCConfiguration) error {
-	if len(config.ICEServers) > 0 {
-		var servers [][]ice.URL
-		for _, server := range config.ICEServers {
-			var urls []ice.URL
-			for _, rawURL := range server.URLs {
-				url, err := parseICEServer(server, rawURL)
-				if err != nil {
-					return err
-				}
-				urls = append(urls, url)
-			}
-			if len(urls) > 0 {
-				servers = append(servers, urls)
-			}
-		}
-		if len(servers) > 0 {
-			r.iceAgent.SetServers(servers)
-		}
-	}
-	return nil
+	panic("TODO")
+	//if len(config.ICEServers) > 0 {
+	//	var servers [][]ice.URL
+	//	for _, server := range config.ICEServers {
+	//		var urls []ice.URL
+	//		for _, rawURL := range server.URLs {
+	//			url, err := parseICEServer(server, rawURL)
+	//			if err != nil {
+	//				return err
+	//			}
+	//			urls = append(urls, url)
+	//		}
+	//		if len(urls) > 0 {
+	//			servers = append(servers, urls)
+	//		}
+	//	}
+	//	// if len(servers) > 0 {
+	//	// 	r.iceAgent.SetServers(servers)
+	//	// }
+	//}
+	// return nil
 }
 
 func parseICEServer(server RTCICEServer, rawURL string) (ice.URL, error) {
