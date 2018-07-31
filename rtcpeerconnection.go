@@ -68,12 +68,6 @@ type RTCPeerConnection struct {
 
 	config RTCConfiguration
 
-	// ICE: TODO: Move to ICEAgent
-	iceAgent           *ice.Agent
-	iceState           ice.ConnectionState
-	iceGatheringState  ice.GatheringState
-	iceConnectionState ice.ConnectionState
-
 	networkManager *network.Manager
 
 	// Signaling
@@ -111,21 +105,18 @@ type RTCPeerConnection struct {
 // New creates a new RTCPeerConfiguration with the provided configuration
 func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 	r := &RTCPeerConnection{
-		config:             config,
-		signalingState:     RTCSignalingStateStable,
-		iceAgent:           ice.NewAgent(),
-		iceGatheringState:  ice.GatheringStateNew,
-		iceConnectionState: ice.ConnectionStateNew,
-		connectionState:    RTCPeerConnectionStateNew,
-		mediaEngine:        DefaultMediaEngine,
-		dataChannels:       make(map[uint16]*RTCDataChannel),
+		config:          config,
+		signalingState:  RTCSignalingStateStable,
+		connectionState: RTCPeerConnectionStateNew,
+		mediaEngine:     DefaultMediaEngine,
+		dataChannels:    make(map[uint16]*RTCDataChannel),
 	}
 	err := r.SetConfiguration(config)
 	if err != nil {
 		return nil, err
 	}
 
-	r.networkManager, err = network.NewManager([]byte(r.iceAgent.Pwd), r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
+	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
 	if err != nil {
 		return nil, err
 	}
@@ -189,10 +180,10 @@ func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	r.Lock()
 	defer r.Unlock()
 
-	if r.OnICEConnectionStateChange != nil && r.iceState != newState {
-		r.OnICEConnectionStateChange(newState)
-	}
-	r.iceState = newState
+	// if r.OnICEConnectionStateChange != nil && r.iceState != newState {
+	// 	r.OnICEConnectionStateChange(newState)
+	// }
+	// r.iceState = newState
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
