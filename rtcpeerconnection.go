@@ -111,13 +111,12 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		mediaEngine:     DefaultMediaEngine,
 		dataChannels:    make(map[uint16]*RTCDataChannel),
 	}
-	err := r.SetConfiguration(config)
+	var err error
+	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
 	if err != nil {
 		return nil, err
 	}
-
-	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
-	if err != nil {
+	if err := r.SetConfiguration(config); err != nil {
 		return nil, err
 	}
 

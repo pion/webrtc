@@ -45,7 +45,9 @@ func (p *port) sendRTP(packet *rtp.Packet, dst *net.UDPAddr) {
 }
 
 func (p *port) sendICE(buf []byte, dst *net.UDPAddr) {
-	fmt.Println("Send ICE")
+	if _, err := p.conn.WriteTo(buf, nil, dst); err != nil {
+		fmt.Printf("Failed to send packet: %s \n", err.Error())
+	}
 }
 
 func (p *port) sendSCTP(buf []byte, dst *net.UDPAddr) {
