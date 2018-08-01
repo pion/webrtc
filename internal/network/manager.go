@@ -2,11 +2,15 @@ package network
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
 
+	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
+	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -58,7 +62,7 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
 
-	m.IceAgent = ice.NewAgent(false /* isControlling TODO */)
+	m.IceAgent = ice.NewAgent(false /* isControlling TODO */, m.iceOutboundHandler)
 	for _, i := range localInterfaces() {
 		p, err := newPort(i+":0", m)
 		if err != nil {
@@ -76,6 +80,28 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 	}
 
 	return m, err
+}
+
+// AddURL takes an ICE Url, allocates any state and adds the candidate
+func (m *Manager) AddURL(url *ice.URL) error {
+	switch url.Type {
+	case ice.ServerTypeSTUN:
+		c, err := webrtcStun.Allocate(url)
+		if err != nil {
+			return err
+		}
+		p, err := newPort(c.RemoteAddress+":"+strconv.Itoa(c.RemotePort), m)
+		if err != nil {
+			return err
+		}
+
+		m.ports = append(m.ports, p)
+		m.IceAgent.AddLocalCandidate(c)
+	default:
+		return errors.Errorf("%s is not implemented", url.Type.String())
+	}
+
+	return nil
 }
 
 // Close cleans up all the allocated state
@@ -205,4 +231,16 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 	// TODO get selected pair
 	// p.sendSCTP(raw)
 
+}
+
+func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	for _, p := range m.ports {
+		if p.listeningAddr == local {
+			p.sendICE(raw, remote)
+			return
+		}
+	}
 }

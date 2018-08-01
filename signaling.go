@@ -220,17 +220,16 @@ type RTCAnswerOptions struct {
 
 // CreateAnswer starts the RTCPeerConnection and generates the localDescription
 func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDescription, error) {
+	useIdentity := r.idpLoginURL != nil
 	if options != nil {
 		panic("TODO handle options")
-	}
-	if r.IsClosed {
-		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
-	}
-	useIdentity := r.idpLoginURL != nil
-	if useIdentity {
+	} else if useIdentity {
 		panic("TODO handle identity provider")
 	}
 
+	if r.IsClosed {
+		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+	}
 	candidates := r.networkManager.IceAgent.LocalCandidates()
 	d := sdp.NewJSEPSessionDescription(
 		r.networkManager.DTLSFingerprint(),
