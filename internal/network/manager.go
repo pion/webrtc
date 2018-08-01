@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
@@ -61,21 +60,22 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 
 	m.IceAgent = ice.NewAgent(false /* isControlling TODO */)
 	for _, i := range localInterfaces() {
-		fmt.Println(i)
+		p, err := newPort(i+":0", m)
+		if err != nil {
+			return nil, err
+		}
+
+		m.ports = append(m.ports, p)
+		m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
+			CandidateBase: ice.CandidateBase{
+				Protocol: ice.TransportUDP,
+				Address:  p.listeningAddr.IP.String(),
+				Port:     p.listeningAddr.Port,
+			},
+		})
 	}
 
 	return m, err
-}
-
-// Listen starts a new Port for this manager
-func (m *Manager) Listen(address string) (boundAddress *stun.TransportAddr, err error) {
-	p, err := newPort(address, m)
-	if err != nil {
-		return nil, err
-	}
-
-	m.ports = append(m.ports, p)
-	return p.listeningAddr, nil
 }
 
 // Close cleans up all the allocated state
