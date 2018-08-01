@@ -37,7 +37,7 @@ func NewAgent(isControlling bool) *Agent {
 }
 
 // AddLocalCandidate adds a new candidate
-func (a *Agent) AddLocalCandidate(c *Candidate) {
+func (a *Agent) AddLocalCandidate(c Candidate) {
 }
 
 // Close cleans up the Agent
