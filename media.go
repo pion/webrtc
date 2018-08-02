@@ -143,8 +143,12 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 
 	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
 	ssrc := rand.Uint32()
+
+	// This goroutine packetizes and sends the track to the user
 	go func() {
 		packetizer := rtp.NewPacketizer(
+			// a MTU of 1400 bytes is a common value, however it is not the best.
+			// See: https://www.ietf.org/mail-archive/web/avt/current/msg02842.html for more details
 			1400,
 			payloadType,
 			ssrc,
@@ -152,6 +156,8 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 			rtp.NewRandomSequencer(),
 			codec.ClockRate,
 		)
+
+		// Read the track sample by sample, packetize them, and send them as RTP packets
 		for {
 			in := <-trackInput
 			packets := packetizer.Packetize(in.Data, in.Samples)
@@ -195,7 +201,7 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	var transceiver *RTCRtpTransceiver
 	for _, t := range r.rtpTransceivers {
 		if !t.stopped &&
-			// t.Sender == nil && // TODO: check that the sender has never sent
+		// t.Sender == nil && // TODO: check that the sender has never sent
 			t.Sender.Track == nil &&
 			t.Receiver.Track != nil &&
 			t.Receiver.Track.Kind == track.Kind {
