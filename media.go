@@ -183,14 +183,19 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	if r.IsClosed {
 		return nil, &InvalidStateError{Err: ErrConnectionClosed}
 	}
+
+	// Make sure the track has not already been added
 	for _, transceiver := range r.rtpTransceivers {
 		if transceiver.Sender.Track == nil {
 			continue
 		}
-		if track.ID == transceiver.Sender.Track.ID {
+		if transceiver.Sender.Track != nil && track.ID == transceiver.Sender.Track.ID {
 			return nil, &InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
+
+	// Try to find a transceiver (of the same Kind as the track) that already has a receiver but not sender
+	// so we can set the sender.
 	var transceiver *RTCRtpTransceiver
 	for _, t := range r.rtpTransceivers {
 		if !t.stopped &&
@@ -202,16 +207,16 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 			break
 		}
 	}
+
 	if transceiver != nil {
 		if err := transceiver.setSendingTrack(track); err != nil {
 			return nil, err
 		}
 	} else {
-		var receiver *RTCRtpReceiver
-		sender := newRTCRtpSender(track)
+		// If we found no matching transceiver, we create a new one that has a sender but no receiver
 		transceiver = r.newRTCRtpTransceiver(
-			receiver,
-			sender,
+			nil,
+			newRTCRtpSender(track),
 			RTCRtpTransceiverDirectionSendonly,
 		)
 	}
