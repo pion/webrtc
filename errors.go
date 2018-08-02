@@ -90,3 +90,31 @@ type SyntaxError struct {
 func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("syntax error: %v", e.Err)
 }
+
+// Types of TypeError
+var (
+	ErrInvalidValue = errors.New("invalid value")
+)
+
+// TypeError indicates an issue with a supplied value
+type TypeError struct {
+	Err error
+}
+
+func (e *SyntaxError) Error() string {
+	return fmt.Sprintf("type error: %v", e.Err)
+}
+
+// Types of OperationError
+var (
+	ErrMaxDataChannels = errors.New("maximum number of datachannels reached")
+)
+
+// OperationError indicates an issue with execution
+type OperationError struct {
+	Err error
+}
+
+func (e *SyntaxError) Error() string {
+	return fmt.Sprintf("operation error: %v", e.Err)
+}
