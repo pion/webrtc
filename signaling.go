@@ -287,13 +287,13 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 	added := false
 
 	var streamlabels string
-	for _, tranceiver := range r.rtpTransceivers {
-		if tranceiver.Sender == nil ||
-			tranceiver.Sender.Track == nil ||
-			tranceiver.Sender.Track.Kind != codecType {
+	for _, transceiver := range r.rtpTransceivers {
+		if transceiver.Sender == nil ||
+			transceiver.Sender.Track == nil ||
+			transceiver.Sender.Track.Kind != codecType {
 			continue
 		}
-		track := tranceiver.Sender.Track
+		track := transceiver.Sender.Track
 		cname := track.Label      // TODO: Support RTP streams synchronization
 		steamlabel := track.Label // TODO: Support steam labels
 		codec, err := r.mediaEngine.getCodec(track.PayloadType)
@@ -302,8 +302,8 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 		}
 		media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, tranceiver.Mid).
-			WithPropertyAttribute(tranceiver.Direction.String()).
+			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
+			WithPropertyAttribute(transceiver.Direction.String()).
 			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
 			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
