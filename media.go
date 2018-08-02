@@ -180,40 +180,40 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	if r.IsClosed {
 		return nil, &InvalidStateError{Err: ErrConnectionClosed}
 	}
-	for _, tranceiver := range r.rtpTransceivers {
-		if tranceiver.Sender.Track == nil {
+	for _, transceiver := range r.rtpTransceivers {
+		if transceiver.Sender.Track == nil {
 			continue
 		}
-		if track.ID == tranceiver.Sender.Track.ID {
+		if track.ID == transceiver.Sender.Track.ID {
 			return nil, &InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
-	var tranciever *RTCRtpTransceiver
+	var transceiver *RTCRtpTransceiver
 	for _, t := range r.rtpTransceivers {
 		if !t.stopped &&
 			// t.Sender == nil && // TODO: check that the sender has never sent
 			t.Sender.Track == nil &&
 			t.Receiver.Track != nil &&
 			t.Receiver.Track.Kind == track.Kind {
-			tranciever = t
+			transceiver = t
 			break
 		}
 	}
-	if tranciever != nil {
-		tranciever.setSendingTrack(track)
+	if transceiver != nil {
+		transceiver.setSendingTrack(track)
 	} else {
 		var receiver *RTCRtpReceiver
 		sender := newRTCRtpSender(track)
-		tranciever = r.newRTCRtpTransceiver(
+		transceiver = r.newRTCRtpTransceiver(
 			receiver,
 			sender,
 			RTCRtpTransceiverDirectionSendonly,
 		)
 	}
 
-	tranciever.Mid = track.Kind.String() // TODO: Mid generation
+	transceiver.Mid = track.Kind.String() // TODO: Mid generation
 
-	return tranciever.Sender, nil
+	return transceiver.Sender, nil
 }
 
 // GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
