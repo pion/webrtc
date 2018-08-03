@@ -303,7 +303,7 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 		media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
-			WithPropertyAttribute(transceiver.Direction.String()).
+			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 			WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
 			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
 			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
