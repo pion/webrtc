@@ -5,6 +5,7 @@ import (
 
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
+	"github.com/pions/webrtc/internal/network"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack
@@ -118,6 +119,14 @@ type RTCSample struct {
 	Samples uint32
 }
 
+type RTCTrackAccepts int
+
+const (
+	RCTTrackAcceptsOnlySamples    RTCTrackAccepts = iota + 1
+	RCTTrackAcceptsOnlyRTPPackets
+	UndefinedYet
+)
+
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
 	PayloadType uint8
@@ -126,8 +135,16 @@ type RTCTrack struct {
 	Label       string
 	Ssrc        uint32
 	Codec       *RTCRtpCodec
-	Packets     <-chan *rtp.Packet
-	Samples     chan<- RTCSample
+
+	// When the track is ingoing, you can dequeue RTP packets from this channel. If the track is outgoing and
+	// accepts RTP packets, then you can push them to this channel and they will be sent on the track
+	Packets chan *rtp.Packet
+
+	// All RTCSample sent to this channel will be sent on the track. This only works for outgoing media.
+	Samples chan RTCSample
+
+	// An outgoing track can only either accept RTCSample or RTP packets but not both.
+	Accepts RTCTrackAccepts
 }
 
 // NewRTCTrack is used to create a new RTCTrack
@@ -141,31 +158,7 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 		return nil, errors.New("codec payloader not set")
 	}
 
-	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
 	ssrc := rand.Uint32()
-
-	// This goroutine packetizes and sends the track to the user
-	go func() {
-		packetizer := rtp.NewPacketizer(
-			// a MTU of 1400 bytes is a common value, however it is not the best.
-			// See: https://www.ietf.org/mail-archive/web/avt/current/msg02842.html for more details
-			1400,
-			payloadType,
-			ssrc,
-			codec.Payloader,
-			rtp.NewRandomSequencer(),
-			codec.ClockRate,
-		)
-
-		// Read the track sample by sample, packetize them, and send them as RTP packets
-		for {
-			in := <-trackInput
-			packets := packetizer.Packetize(in.Data, in.Samples)
-			for _, p := range packets {
-				r.networkManager.SendRTP(p)
-			}
-		}
-	}()
 
 	t := &RTCTrack{
 		PayloadType: payloadType,
@@ -174,10 +167,54 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 		Label:       label,
 		Ssrc:        ssrc,
 		Codec:       codec,
-		Samples:     trackInput,
+		Samples:     make(chan RTCSample),
+		Packets:     make(chan *rtp.Packet),
+		Accepts:     UndefinedYet,
 	}
 
+	go t.SendToTrackPump(r.networkManager)
+
 	return t, nil
+}
+
+// Wait for the track to either receive a sample or a RTP packet to send.
+// Once you have sent either one of these, you cannot change anymore and only the same type (RTP packets or samples)
+// will be processed.
+func (track *RTCTrack) SendToTrackPump(manager *network.Manager) {
+	select {
+	case p := <-track.Packets:
+		track.Accepts = RCTTrackAcceptsOnlyRTPPackets
+
+		// Swap the SSRC of the packets and send them on the track
+		for {
+			p.SSRC = track.Ssrc
+			manager.SendRTP(p)
+			p = <-track.Packets
+		}
+
+	case s := <-track.Samples:
+		track.Accepts = RCTTrackAcceptsOnlySamples
+
+		packetizer := rtp.NewPacketizer(
+			// a MTU of 1400 bytes is a common value, however it is not the best.
+			// See: https://www.ietf.org/mail-archive/web/avt/current/msg02842.html for more details
+			1400,
+			track.PayloadType,
+			track.Ssrc,
+			track.Codec.Payloader,
+			rtp.NewRandomSequencer(),
+			track.Codec.ClockRate,
+		)
+
+		// Packetize the sample to RTP packets and send them
+		for {
+			packets := packetizer.Packetize(s.Data, s.Samples)
+			for _, p := range packets {
+				manager.SendRTP(p)
+			}
+			s = <-track.Samples
+		}
+	}
 }
 
 // AddTrack adds a RTCTrack to the RTCPeerConnection
@@ -191,7 +228,7 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 		if transceiver.Sender.Track == nil {
 			continue
 		}
-		if transceiver.Sender.Track != nil && track.ID == transceiver.Sender.Track.ID {
+		if track.ID == transceiver.Sender.Track.ID {
 			return nil, &InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
