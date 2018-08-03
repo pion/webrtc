@@ -52,7 +52,7 @@ func main() {
 		pipeline := gst.CreatePipeline(codec.Name)
 		pipeline.Start()
 		for {
-			p := <-track.Packets
+			p := <-track.IncomingPackets
 			pipeline.Push(p.Raw)
 		}
 	}

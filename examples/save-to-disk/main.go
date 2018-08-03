@@ -54,7 +54,7 @@ func main() {
 				panic(err)
 			}
 			for {
-				i.addPacket(<-track.Packets)
+				i.addPacket(<-track.IncomingPackets)
 			}
 		}
 	}

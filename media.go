@@ -140,9 +140,11 @@ type RTCTrack struct {
 	Ssrc        uint32
 	Codec       *RTCRtpCodec
 
-	// When the track is ingoing, you can dequeue RTP packets from this channel. If the track is outgoing and
-	// accepts RTP packets, then you can push them to this channel and they will be sent on the track
-	Packets chan *rtp.Packet
+	// You can dequeue RTP packets from this channel
+	IncomingPackets <-chan *rtp.Packet
+
+	// If the track is outgoing, you can push RTP packets to this channel and they will be sent on the track
+	OutgoingPackets chan *rtp.Packet
 
 	// All RTCSample sent to this channel will be sent on the track. This only works for outgoing media.
 	Samples chan RTCSample
@@ -165,18 +167,19 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 	ssrc := rand.Uint32()
 
 	t := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          id,
-		Label:       label,
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Samples:     make(chan RTCSample),
-		Packets:     make(chan *rtp.Packet),
-		Accepts:     UndefinedYet,
+		PayloadType:     payloadType,
+		Kind:            codec.Type,
+		ID:              id,
+		Label:           label,
+		Ssrc:            ssrc,
+		Codec:           codec,
+		Samples:         make(chan RTCSample),
+		IncomingPackets: nil,
+		OutgoingPackets: make(chan *rtp.Packet),
+		Accepts:         UndefinedYet,
 	}
 
-	go t.SendToTrackPump(r.networkManager)
+	go t.sendToTrackPump(r.networkManager)
 
 	return t, nil
 }
@@ -184,16 +187,16 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 // SendToTrackPump waits for the track to either receive a sample or a RTP packet to send.
 // Once you have sent either one of these, you cannot change anymore and only the same type (RTP packets or samples)
 // will be processed.
-func (track *RTCTrack) SendToTrackPump(manager *network.Manager) {
+func (track *RTCTrack) sendToTrackPump(manager *network.Manager) {
 	select {
-	case p := <-track.Packets:
+	case p := <-track.OutgoingPackets:
 		track.Accepts = RCTTrackAcceptsOnlyRTPPackets
 
 		// Swap the SSRC of the packets and send them on the track
 		for {
 			p.SSRC = track.Ssrc
 			manager.SendRTP(p)
-			p = <-track.Packets
+			p = <-track.OutgoingPackets
 		}
 
 	case s := <-track.Samples:

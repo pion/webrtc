@@ -20,7 +20,6 @@ func init() {
 type RTCPeerConnectionState int
 
 const (
-
 	// RTCPeerConnectionStateNew indicates some of the ICE or DTLS transports are in status new
 	RTCPeerConnectionStateNew RTCPeerConnectionState = iota + 1
 
@@ -170,13 +169,13 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 	bufferTransport := make(chan *rtp.Packet, 15)
 
 	track := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          "0", // TODO extract from remoteDescription
-		Label:       "",  // TODO extract from remoteDescription
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Packets:     bufferTransport,
+		PayloadType:     payloadType,
+		Kind:            codec.Type,
+		ID:              "0", // TODO extract from remoteDescription
+		Label:           "",  // TODO extract from remoteDescription
+		Ssrc:            ssrc,
+		Codec:           codec,
+		IncomingPackets: bufferTransport,
 	}
 
 	// TODO: Register the receiving Track
