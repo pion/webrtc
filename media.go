@@ -119,11 +119,15 @@ type RTCSample struct {
 	Samples uint32
 }
 
+// RTCTrackAccepts is used to know what type of data you can send to a track (RTP packets or RTCSample)
 type RTCTrackAccepts int
 
 const (
-	RCTTrackAcceptsOnlySamples    RTCTrackAccepts = iota + 1
+	// RCTTrackAcceptsOnlySamples indicates that the track can only receive RTCSample
+	RCTTrackAcceptsOnlySamples RTCTrackAccepts = iota + 1
+	// RCTTrackAcceptsOnlyRTPPackets indicates that the track can only receive RTP packets
 	RCTTrackAcceptsOnlyRTPPackets
+	// UndefinedYet indicates that it is not yet defined what the track can receive.
 	UndefinedYet
 )
 
@@ -177,7 +181,7 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 	return t, nil
 }
 
-// Wait for the track to either receive a sample or a RTP packet to send.
+// SendToTrackPump waits for the track to either receive a sample or a RTP packet to send.
 // Once you have sent either one of these, you cannot change anymore and only the same type (RTP packets or samples)
 // will be processed.
 func (track *RTCTrack) SendToTrackPump(manager *network.Manager) {
