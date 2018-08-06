@@ -2,6 +2,7 @@ package ice
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 
@@ -19,6 +20,7 @@ type Agent struct {
 	outboundCallback OutboundCallback
 
 	isControlling   bool
+	tieBreaker      uint32
 	state           ConnectionState
 	gatheringState  GatheringState
 	connectionState ConnectionState
@@ -30,12 +32,19 @@ type Agent struct {
 	remoteUfrag      string
 	remotePwd        string
 	remoteCandidates []Candidate
+
+	selectedPair struct {
+		// lastUpdateTime ?
+		remote Candidate
+		local  Candidate
+	}
 }
 
 // NewAgent creates a new Agent
 func NewAgent(isControlling bool, outboundCallback OutboundCallback) *Agent {
 	return &Agent{
 		isControlling:    isControlling,
+		tieBreaker:       rand.Uint32(),
 		outboundCallback: outboundCallback,
 
 		LocalUfrag: util.RandSeq(16),
@@ -43,7 +52,19 @@ func NewAgent(isControlling bool, outboundCallback OutboundCallback) *Agent {
 	}
 }
 
-// AddLocalCandidate adds a new candidate
+func (a *Agent) agentInterval() {
+	// TODO
+	// If isControlling we need to send out
+}
+
+// AddRemoteCandidate adds a new remote candidate
+func (a *Agent) AddRemoteCandidate(c Candidate) {
+	a.Lock()
+	defer a.Unlock()
+	a.remoteCandidates = append(a.remoteCandidates, c)
+}
+
+// AddLocalCandidate adds a new local candidate
 func (a *Agent) AddLocalCandidate(c Candidate) {
 	a.Lock()
 	defer a.Unlock()
@@ -67,8 +88,42 @@ func (a *Agent) LocalCandidates() (rtrn []string) {
 	return rtrn
 }
 
+func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
+	for _, c := range candidates {
+		if c.Address() == addr.IP.String() && c.Port() == addr.Port {
+			return c
+		}
+	}
+	return nil
+}
+
+func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
+	for _, c := range candidates {
+		if c.Address() == addr.IP.String() && c.Port() == addr.Port {
+			return c
+		}
+	}
+
+	return nil
+}
+
 // HandleInbound processes traffic from a remote candidate
 func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
+	a.Lock()
+	defer a.Unlock()
+
+	localCandidate := getTransportAddrCandidate(a.localCandidates, local)
+	if localCandidate == nil {
+		fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
+		return
+	}
+
+	remoteCandidate := getUDPAddrCandidate(a.remoteCandidates, remote)
+	if remoteCandidate == nil {
+		fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
+		return
+	}
+
 	m, err := stun.NewMessage(buf)
 	if err != nil {
 		fmt.Printf("Failed to handle decode ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
@@ -78,7 +133,19 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 		fmt.Printf("Wrong STUN Method ICE from: %s to: %s method: %s", local.String(), remote.String(), m.Method.String())
 	}
 
-	msg, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
+		a.selectedPair.remote = remoteCandidate
+		a.selectedPair.local = localCandidate
+	}
+
+	// iceControlledAttr := &stun.IceControlled{}
+	// realmRawAttr, realmFound := m.GetOneAttribute(stun.AttrRealm);
+
+	// iceControllingAttr := &stun.IceControlling{}
+	// priorityAttr := &stun.Priority{}
+
+	// Handle, maybe update properties
+	out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
 				IP:   remote.IP,
@@ -94,5 +161,23 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
 	}
 
-	a.outboundCallback(msg.Pack(), local, remote)
+	a.outboundCallback(out.Pack(), local, remote)
+}
+
+// SelectedPair gets the current selected pair's Addresses (or returns nil)
+func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) {
+	a.RLock()
+	defer a.RUnlock()
+
+	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+		return nil, nil
+	}
+
+	return &stun.TransportAddr{
+			IP:   net.ParseIP(a.selectedPair.local.Address()),
+			Port: a.selectedPair.local.Port(),
+		}, &net.UDPAddr{
+			IP:   net.ParseIP(a.selectedPair.remote.Address()),
+			Port: a.selectedPair.remote.Port(),
+		}
 }
