@@ -101,7 +101,7 @@ type TypeError struct {
 	Err error
 }
 
-func (e *SyntaxError) Error() string {
+func (e *TypeError) Error() string {
 	return fmt.Sprintf("type error: %v", e.Err)
 }
 
@@ -115,7 +115,7 @@ type OperationError struct {
 	Err error
 }
 
-func (e *SyntaxError) Error() string {
+func (e *OperationError) Error() string {
 	return fmt.Sprintf("operation error: %v", e.Err)
 }
 

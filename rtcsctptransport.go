@@ -77,5 +77,5 @@ func (r *RTCSctpTransport) calcMessageSize(remoteMaxMessageSize, canSendSize flo
 }
 
 func (r *RTCSctpTransport) updateMaxChannels() {
-	r.maxChannels = 65536 // TODO: Get from implementation
+	r.MaxChannels = 65535 // TODO: Get from implementation
 }
