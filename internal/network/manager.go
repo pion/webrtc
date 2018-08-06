@@ -136,8 +136,15 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
 
-	// TODO get selected pair
-	// p.sendRTP(packet)
+	local, remote := m.IceAgent.SelectedPair()
+	if local == nil || remote == nil {
+		return
+	}
+	for _, p := range m.ports {
+		if p.listeningAddr.Equal(local) {
+			p.sendRTP(packet, remote)
+		}
+	}
 }
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
@@ -228,9 +235,15 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
 
-	// TODO get selected pair
-	// p.sendSCTP(raw)
-
+	local, remote := m.IceAgent.SelectedPair()
+	if local == nil || remote == nil {
+		return
+	}
+	for _, p := range m.ports {
+		if p.listeningAddr.Equal(local) {
+			p.sendSCTP(raw, remote)
+		}
+	}
 }
 
 func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
