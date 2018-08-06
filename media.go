@@ -5,6 +5,7 @@ import (
 
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
+	"github.com/pions/webrtc/internal/network"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack
@@ -39,7 +40,6 @@ func newRTCRtpSender(track *RTCTrack) *RTCRtpSender {
 type RTCRtpTransceiverDirection int
 
 const (
-
 	// RTCRtpTransceiverDirectionSendrecv indicates the RTCRtpSender will offer to send RTP and RTCRtpReceiver the will offer to receive RTP
 	RTCRtpTransceiverDirectionSendrecv RTCRtpTransceiverDirection = iota + 1
 
@@ -127,8 +127,12 @@ type RTCTrack struct {
 	Label       string
 	Ssrc        uint32
 	Codec       *RTCRtpCodec
-	Packets     <-chan *rtp.Packet
-	Samples     chan<- RTCSample
+
+	// You can dequeue RTP packets from this channel
+	IncomingPackets <-chan *rtp.Packet
+
+	// If the track is outgoing, you can push RTP packets to this channel and they will be sent on the track
+	OutgoingPackets chan *rtp.Packet
 }
 
 // NewRTCTrack is used to create a new RTCTrack
@@ -142,37 +146,31 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 		return nil, errors.New("codec payloader not set")
 	}
 
-	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
 	ssrc := rand.Uint32()
-	go func() {
-		packetizer := rtp.NewPacketizer(
-			1400,
-			payloadType,
-			ssrc,
-			codec.Payloader,
-			rtp.NewRandomSequencer(),
-			codec.ClockRate,
-		)
-		for {
-			in := <-trackInput
-			packets := packetizer.Packetize(in.Data, in.Samples)
-			for _, p := range packets {
-				r.networkManager.SendRTP(p)
-			}
-		}
-	}()
 
 	t := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          id,
-		Label:       label,
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Samples:     trackInput,
+		PayloadType:     payloadType,
+		Kind:            codec.Type,
+		ID:              id,
+		Label:           label,
+		Ssrc:            ssrc,
+		Codec:           codec,
+		IncomingPackets: nil,
+		OutgoingPackets: make(chan *rtp.Packet),
 	}
 
+	go t.sendToTrackPump(r.networkManager)
+
 	return t, nil
+}
+
+// SendToTrackPump forwards RTP packets to the track
+func (track *RTCTrack) sendToTrackPump(manager *network.Manager) {
+	for {
+		p := <-track.OutgoingPackets
+		p.SSRC = track.Ssrc
+		manager.SendRTP(p)
+	}
 }
 
 // AddTrack adds a RTCTrack to the RTCPeerConnection
@@ -180,6 +178,8 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	if r.IsClosed {
 		return nil, &InvalidStateError{Err: ErrConnectionClosed}
 	}
+
+	// Make sure the track has not already been added
 	for _, transceiver := range r.rtpTransceivers {
 		if transceiver.Sender.Track == nil {
 			continue
@@ -188,10 +188,13 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 			return nil, &InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
+
+	// Try to find a transceiver (of the same Kind as the track) that already has a receiver but not sender
+	// so we can set the sender.
 	var transceiver *RTCRtpTransceiver
 	for _, t := range r.rtpTransceivers {
 		if !t.stopped &&
-			// t.Sender == nil && // TODO: check that the sender has never sent
+		// t.Sender == nil && // TODO: check that the sender has never sent
 			t.Sender.Track == nil &&
 			t.Receiver.Track != nil &&
 			t.Receiver.Track.Kind == track.Kind {
@@ -199,14 +202,14 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 			break
 		}
 	}
+
 	if transceiver != nil {
 		transceiver.setSendingTrack(track)
 	} else {
-		var receiver *RTCRtpReceiver
-		sender := newRTCRtpSender(track)
+		// If we found no matching transceiver, we create a new one that has a sender but no receiver
 		transceiver = r.newRTCRtpTransceiver(
-			receiver,
-			sender,
+			nil,
+			newRTCRtpSender(track),
 			RTCRtpTransceiverDirectionSendonly,
 		)
 	}

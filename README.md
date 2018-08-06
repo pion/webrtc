@@ -84,7 +84,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 * [Raphael Randschau](https://github.com/nicolai86) - *STUN*
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
 * [backkem](https://github.com/backkem) - *SDP, Public API, Project Management*
-* [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
+* [Brendan Rius](https://github.com/brendanrius) - *RTP forwarding*
 
 ## Project Ideas
 We are looking to support other interesting WebRTC projects, so if you have something to build please reach out!

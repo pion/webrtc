@@ -13,6 +13,8 @@ import (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Enter browser 1's SDP offer:")
 	rawSd, err := reader.ReadString('\n')
 	if err != nil && err != io.EOF {
 		panic(err)
@@ -48,14 +50,6 @@ func main() {
 	// In your application this is where you would handle/process video
 	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
 		if track.Codec.Name == webrtc.VP8 {
-			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := newIVFWriter("output.ivf")
-			if err != nil {
-				panic(err)
-			}
-			for {
-				i.addPacket(<-track.IncomingPackets)
-			}
 		}
 	}
 
