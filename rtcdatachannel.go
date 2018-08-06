@@ -77,14 +77,14 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 	negotiated := false
 
 	if options != nil {
-		ordered := options.Ordered
-		priority := options.Priority
-		negotiated := options.Negotiated
+		ordered = options.Ordered
+		priority = options.Priority
+		negotiated = options.Negotiated
 	}
 
-	id := 0
+	var id uint16 = 0
 	if negotiated {
-		id := options.Id
+		id = options.Id
 	} else {
 		// TODO: generate id
 	}
@@ -104,6 +104,10 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 		ID:                id,
 		rtcPeerConnection: r,
 	}
+
+	// TODO handle settings:
+	_ = ordered
+	_ = priority
 
 	return res, nil
 }
