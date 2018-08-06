@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pions/webrtc/internal/sdp"
@@ -136,10 +137,25 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 	}
 
 	r.currentRemoteDescription = &desc
-
 	r.remoteDescription = &sdp.SessionDescription{}
+	if err := r.remoteDescription.Unmarshal(desc.Sdp); err != nil {
+		return err
+	}
 
-	return r.remoteDescription.Unmarshal(desc.Sdp)
+	for _, m := range r.remoteDescription.MediaDescriptions {
+		for _, a := range m.Attributes {
+			if strings.HasPrefix(a, "candidate") {
+				if c := sdp.ICECandidateBuild(a); c != nil {
+					r.networkManager.IceAgent.AddRemoteCandidate(c)
+				} else {
+					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
+				}
+
+			}
+		}
+	}
+
+	return nil
 }
 
 // RTCOfferOptions describes the options used to control the offer creation process

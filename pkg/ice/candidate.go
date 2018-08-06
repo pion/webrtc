@@ -13,6 +13,8 @@ const (
 // Candidate represents an ICE candidate
 type Candidate interface {
 	String(component int) string
+	Address() string
+	Port() int
 }
 
 // CandidateBase represents an ICE candidate, a base with enough attributes
@@ -41,6 +43,16 @@ func (c *CandidateHost) String(component int) string {
 		component, c.CandidateBase.priority(hostCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port)
 }
 
+// Address for CandidateHost
+func (c *CandidateHost) Address() string {
+	return c.CandidateBase.Address
+}
+
+// Port for CandidateHost
+func (c *CandidateHost) Port() int {
+	return c.CandidateBase.Port
+}
+
 // CandidateSrflx is a Candidate of typ Server-Reflexive
 type CandidateSrflx struct {
 	CandidateBase
@@ -52,4 +64,14 @@ type CandidateSrflx struct {
 func (c *CandidateSrflx) String(component int) string {
 	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ srflx raddr %s rport %d generation 0",
 		component, c.CandidateBase.priority(srflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RemoteAddress, c.RemotePort)
+}
+
+// Address for CandidateSrflx
+func (c *CandidateSrflx) Address() string {
+	return c.CandidateBase.Address
+}
+
+// Port for CandidateSrflx
+func (c *CandidateSrflx) Port() int {
+	return c.CandidateBase.Port
 }
