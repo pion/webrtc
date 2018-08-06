@@ -119,18 +119,6 @@ type RTCSample struct {
 	Samples uint32
 }
 
-// RTCTrackAccepts is used to know what type of data you can send to a track (RTP packets or RTCSample)
-type RTCTrackAccepts int
-
-const (
-	// RCTTrackAcceptsOnlySamples indicates that the track can only receive RTCSample
-	RCTTrackAcceptsOnlySamples RTCTrackAccepts = iota + 1
-	// RCTTrackAcceptsOnlyRTPPackets indicates that the track can only receive RTP packets
-	RCTTrackAcceptsOnlyRTPPackets
-	// UndefinedYet indicates that it is not yet defined what the track can receive.
-	UndefinedYet
-)
-
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
 	PayloadType uint8
@@ -145,12 +133,6 @@ type RTCTrack struct {
 
 	// If the track is outgoing, you can push RTP packets to this channel and they will be sent on the track
 	OutgoingPackets chan *rtp.Packet
-
-	// All RTCSample sent to this channel will be sent on the track. This only works for outgoing media.
-	Samples chan RTCSample
-
-	// An outgoing track can only either accept RTCSample or RTP packets but not both.
-	Accepts RTCTrackAccepts
 }
 
 // NewRTCTrack is used to create a new RTCTrack
@@ -173,10 +155,8 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 		Label:           label,
 		Ssrc:            ssrc,
 		Codec:           codec,
-		Samples:         make(chan RTCSample),
 		IncomingPackets: nil,
 		OutgoingPackets: make(chan *rtp.Packet),
-		Accepts:         UndefinedYet,
 	}
 
 	go t.sendToTrackPump(r.networkManager)
@@ -184,43 +164,12 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 	return t, nil
 }
 
-// SendToTrackPump waits for the track to either receive a sample or a RTP packet to send.
-// Once you have sent either one of these, you cannot change anymore and only the same type (RTP packets or samples)
-// will be processed.
+// SendToTrackPump forwards RTP packets to the track
 func (track *RTCTrack) sendToTrackPump(manager *network.Manager) {
-	select {
-	case p := <-track.OutgoingPackets:
-		track.Accepts = RCTTrackAcceptsOnlyRTPPackets
-
-		// Swap the SSRC of the packets and send them on the track
-		for {
-			p.SSRC = track.Ssrc
-			manager.SendRTP(p)
-			p = <-track.OutgoingPackets
-		}
-
-	case s := <-track.Samples:
-		track.Accepts = RCTTrackAcceptsOnlySamples
-
-		packetizer := rtp.NewPacketizer(
-			// a MTU of 1400 bytes is a common value, however it is not the best.
-			// See: https://www.ietf.org/mail-archive/web/avt/current/msg02842.html for more details
-			1400,
-			track.PayloadType,
-			track.Ssrc,
-			track.Codec.Payloader,
-			rtp.NewRandomSequencer(),
-			track.Codec.ClockRate,
-		)
-
-		// Packetize the sample to RTP packets and send them
-		for {
-			packets := packetizer.Packetize(s.Data, s.Samples)
-			for _, p := range packets {
-				manager.SendRTP(p)
-			}
-			s = <-track.Samples
-		}
+	for {
+		p := <-track.OutgoingPackets
+		p.SSRC = track.Ssrc
+		manager.SendRTP(p)
 	}
 }
 
