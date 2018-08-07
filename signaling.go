@@ -8,45 +8,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-/*
-                      setRemote(OFFER)               setLocal(PRANSWER)
-                          /-----\                               /-----\
-                          |     |                               |     |
-                          v     |                               v     |
-           +---------------+    |                +---------------+    |
-           |               |----/                |               |----/
-           |  have-        | setLocal(PRANSWER)  | have-         |
-           |  remote-offer |------------------- >| local-pranswer|
-           |               |                     |               |
-           |               |                     |               |
-           +---------------+                     +---------------+
-                ^   |                                   |
-                |   | setLocal(ANSWER)                  |
-  setRemote(OFFER)  |                                   |
-                |   V                  setLocal(ANSWER) |
-           +---------------+                            |
-           |               |                            |
-           |               |<---------------------------+
-           |    stable     |
-           |               |<---------------------------+
-           |               |                            |
-           +---------------+          setRemote(ANSWER) |
-                ^   |                                   |
-                |   | setLocal(OFFER)                   |
-  setRemote(ANSWER) |                                   |
-                |   V                                   |
-           +---------------+                     +---------------+
-           |               |                     |               |
-           |  have-        | setRemote(PRANSWER) |have-          |
-           |  local-offer  |------------------- >|remote-pranswer|
-           |               |                     |               |
-           |               |----\                |               |----\
-           +---------------+    |                +---------------+    |
-                          ^     |                               ^     |
-                          |     |                               |     |
-                          \-----/                               \-----/
-                      setLocal(OFFER)               setRemote(PRANSWER)
-*/
+// RTCAnswerOptions describes the options used to control the answer creation process
+type RTCAnswerOptions struct {
+	VoiceActivityDetection bool
+}
+
+// RTCOfferOptions describes the options used to control the offer creation process
+type RTCOfferOptions struct {
+	VoiceActivityDetection bool
+	ICERestart             bool
+}
 
 // RTCSignalingState indicates the state of the offer/answer process
 type RTCSignalingState int
@@ -136,6 +107,11 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
 
+	isControllingICE := true
+	if desc.Type == RTCSdpTypeOffer {
+		isControllingICE = false
+	}
+
 	r.currentRemoteDescription = &desc
 	r.remoteDescription = &sdp.SessionDescription{}
 	if err := r.remoteDescription.Unmarshal(desc.Sdp); err != nil {
@@ -154,176 +130,82 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 			}
 		}
 	}
+	r.networkManager.IceAgent.Start(isControllingICE)
 
 	return nil
 }
 
-// RTCOfferOptions describes the options used to control the offer creation process
-type RTCOfferOptions struct {
-	VoiceActivityDetection bool
-	ICERestart             bool
-}
-
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
 func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
-	panic("TODO")
-	// if options != nil {
-	// 	panic("TODO handle options")
-	// }
-	// if r.IsClosed {
-	// 	return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
-	// }
-	// useIdentity := r.idpLoginURL != nil
-	// if useIdentity {
-	// 	panic("TODO handle identity provider")
-	// }
-
-	// d := sdp.NewJSEPSessionDescription(
-	// 	r.tlscfg.Fingerprint(),
-	// 	useIdentity).
-	// 	WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video") // TODO: Support BUNDLE
-
-	// var streamlabels string
-	// for _, transceiver := range r.rtpTransceivers {
-	// 	if transceiver.Sender == nil ||
-	// 		transceiver.Sender.Track == nil {
-	// 		continue
-	// 	}
-	// 	track := transceiver.Sender.Track
-	// 	cname := "pion"      // TODO: Support RTP streams synchronization
-	// 	steamlabel := "pion" // TODO: Support steam labels
-	// 	codec, err := r.mediaEngine.getCodec(track.PayloadType)
-	// 	if err != nil {
-	// 		return RTCSessionDescription{}, err
-	// 	}
-	// 	media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
-	// 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-	// 		WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
-	// 		WithPropertyAttribute(transceiver.Direction.String()).
-	// 		WithICECredentials(r.iceAgent.Ufrag, r.iceAgent.Pwd).
-	// 		WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
-	// 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
-	// 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize). // TODO: Support Reduced-Size RTCP?
-	// 		WithCodec(
-	// 			codec.PayloadType,
-	// 			codec.Name,
-	// 			codec.ClockRate,
-	// 			codec.Channels,
-	// 			codec.SdpFmtpLine,
-	// 		).
-	// 		WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
-	// 	err = r.addICECandidates(media)
-	// 	if err != nil {
-	// 		return RTCSessionDescription{}, err
-	// 	}
-	// 	streamlabels = streamlabels + " " + steamlabel
-
-	// 	d.WithMedia(media)
-	// }
-
-	// d.WithValueAttribute(sdp.AttrKeyMsidSemantic, " "+sdp.SemanticTokenWebRTCMediaStreams+streamlabels)
-
-	// return RTCSessionDescription{
-	// 	Type: RTCSdpTypeOffer,
-	// 	Sdp:  d.Marshal(),
-	// }, nil
-}
-
-// RTCAnswerOptions describes the options used to control the answer creation process
-type RTCAnswerOptions struct {
-	VoiceActivityDetection bool
-}
-
-// CreateAnswer starts the RTCPeerConnection and generates the localDescription
-func (r *RTCPeerConnection) CreateAnswer(options *RTCOfferOptions) (RTCSessionDescription, error) {
 	useIdentity := r.idpLoginURL != nil
 	if options != nil {
 		panic("TODO handle options")
 	} else if useIdentity {
 		panic("TODO handle identity provider")
-	}
-
-	if r.IsClosed {
+	} else if r.IsClosed {
 		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
 	}
+
 	candidates := r.networkManager.IceAgent.LocalCandidates()
-	d := sdp.NewJSEPSessionDescription(
-		r.networkManager.DTLSFingerprint(),
-		useIdentity)
+	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
+
+	r.addRTPMediaSections(d, []RTCRtpCodecType{RTCRtpCodecTypeAudio, RTCRtpCodecTypeVideo}, candidates)
+	r.addDataMediaSection(d, candidates)
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, "audio video data")
+
+	return RTCSessionDescription{
+		Type: RTCSdpTypeOffer,
+		Sdp:  d.Marshal(),
+	}, nil
+}
+
+// CreateAnswer starts the RTCPeerConnection and generates the localDescription
+func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionDescription, error) {
+	useIdentity := r.idpLoginURL != nil
+	if options != nil {
+		panic("TODO handle options")
+	} else if useIdentity {
+		panic("TODO handle identity provider")
+	} else if r.IsClosed {
+		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+	}
 
 	bundleValue := "BUNDLE"
+	mediaSectionsToAdd := []RTCRtpCodecType{}
+	addData := false
 	for _, remoteMedia := range r.remoteDescription.MediaDescriptions {
 		if strings.HasPrefix(remoteMedia.MediaName, "audio") {
 			bundleValue += " audio"
-			_, err := r.addAnswerMedia(d, RTCRtpCodecTypeAudio, candidates)
-			if err != nil {
-				return RTCSessionDescription{}, err
-			}
+			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeAudio)
 		} else if strings.HasPrefix(remoteMedia.MediaName, "video") {
 			bundleValue += " video"
-			_, err := r.addAnswerMedia(d, RTCRtpCodecTypeVideo, candidates)
-			if err != nil {
-				return RTCSessionDescription{}, err
-			}
-
+			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeVideo)
 		} else if strings.HasPrefix(remoteMedia.MediaName, "application") {
 			bundleValue += " data"
-			r.addAnswerData(d, candidates)
+			addData = true
 		}
 	}
 
+	candidates := r.networkManager.IceAgent.LocalCandidates()
+	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
+
+	r.addRTPMediaSections(d, mediaSectionsToAdd, candidates)
+	if addData {
+		r.addDataMediaSection(d, candidates)
+	}
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+
 	return RTCSessionDescription{
 		Type: RTCSdpTypeAnswer,
 		Sdp:  d.Marshal(),
 	}, nil
 }
 
-func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType RTCRtpCodecType, candidates []string) (string, error) {
-	added := false
-
-	var streamlabels string
-	for _, transceiver := range r.rtpTransceivers {
-		if transceiver.Sender == nil ||
-			transceiver.Sender.Track == nil ||
-			transceiver.Sender.Track.Kind != codecType {
-			continue
-		}
-		track := transceiver.Sender.Track
-		cname := track.Label      // TODO: Support RTP streams synchronization
-		steamlabel := track.Label // TODO: Support steam labels
-		codec, err := r.mediaEngine.getCodec(track.PayloadType)
-		if err != nil {
-			return "", err
-		}
-		media := sdp.NewJSEPMediaDescription(track.Kind.String(), []string{}).
-			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, transceiver.Mid).
-			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
-			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
-			WithPropertyAttribute(sdp.AttrKeyICELite).   // TODO: get ICE type from ICE Agent
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux).   // TODO: support RTCP fallback
-			WithPropertyAttribute(sdp.AttrKeyRtcpRsize). // TODO: Support Reduced-Size RTCP?
-			WithCodec(
-				codec.PayloadType,
-				codec.Name,
-				codec.ClockRate,
-				codec.Channels,
-				codec.SdpFmtpLine,
-			).
-			WithMediaSource(track.Ssrc, cname, steamlabel, track.Label)
-
-		for _, c := range candidates {
-			media.WithCandidate(c)
-		}
-		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
-		d.WithMedia(media)
-		streamlabels = streamlabels + " " + steamlabel
-		added = true
-	}
-
-	if !added {
-		// Add media line to advertise capabilities
+/*
+	TODO If we are generating an offer only include media sections we want
+*/
+func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, mediaTypes []RTCRtpCodecType, candidates []string) {
+	addMediaType := func(codecType RTCRtpCodecType) {
 		media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
 			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
@@ -333,27 +215,33 @@ func (r *RTCPeerConnection) addAnswerMedia(d *sdp.SessionDescription, codecType 
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
-			media.WithCodec(
-				codec.PayloadType,
-				codec.Name,
-				codec.ClockRate,
-				codec.Channels,
-				codec.SdpFmtpLine,
-			)
+			media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
+		}
+
+		for _, transceiver := range r.rtpTransceivers {
+			if transceiver.Sender == nil ||
+				transceiver.Sender.Track == nil ||
+				transceiver.Sender.Track.Kind != codecType {
+				continue
+			}
+			track := transceiver.Sender.Track
+			media = media.WithMediaSource(track.Ssrc, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
 		}
 
 		for _, c := range candidates {
 			media.WithCandidate(c)
 		}
-		media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
+		media.WithPropertyAttribute("end-of-candidates")
 		d.WithMedia(media)
+
 	}
 
-	return streamlabels, nil
-
+	for _, c := range mediaTypes {
+		addMediaType(c)
+	}
 }
 
-func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates []string) {
+func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candidates []string) {
 	media := (&sdp.MediaDescription{
 		MediaName:      "application 9 DTLS/SCTP 5000",
 		ConnectionData: "IN IP4 0.0.0.0",
@@ -367,7 +255,7 @@ func (r *RTCPeerConnection) addAnswerData(d *sdp.SessionDescription, candidates 
 	for _, c := range candidates {
 		media.WithCandidate(c)
 	}
-	media.WithPropertyAttribute("end-of-candidates") // TODO: Support full trickle-ice
+	media.WithPropertyAttribute("end-of-candidates")
 
 	d.WithMedia(media)
 }

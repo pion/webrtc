@@ -62,7 +62,7 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
 
-	m.IceAgent = ice.NewAgent(false /* isControlling TODO */, m.iceOutboundHandler)
+	m.IceAgent = ice.NewAgent(m.iceOutboundHandler)
 	for _, i := range localInterfaces() {
 		p, err := newPort(i+":0", m)
 		if err != nil {
