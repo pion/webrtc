@@ -3,6 +3,7 @@ package ice
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 const (
@@ -12,9 +13,8 @@ const (
 
 // Candidate represents an ICE candidate
 type Candidate interface {
+	GetBase() *CandidateBase
 	String(component int) string
-	Address() string
-	Port() int
 }
 
 // CandidateBase represents an ICE candidate, a base with enough attributes
@@ -23,6 +23,7 @@ type CandidateBase struct {
 	Protocol TransportType
 	Address  string
 	Port     int
+	LastSeen time.Time
 }
 
 func (c *CandidateBase) priority(typePreference uint16, component uint16) uint16 {
@@ -41,6 +42,11 @@ type CandidateHost struct {
 func (c *CandidateHost) String(component int) string {
 	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ host generation 0",
 		component, c.CandidateBase.priority(hostCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port)
+}
+
+// GetBase returns the CandidateBase, attributes shared between all Candidates
+func (c *CandidateHost) GetBase() *CandidateBase {
+	return &c.CandidateBase
 }
 
 // Address for CandidateHost
@@ -66,12 +72,7 @@ func (c *CandidateSrflx) String(component int) string {
 		component, c.CandidateBase.priority(srflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RemoteAddress, c.RemotePort)
 }
 
-// Address for CandidateSrflx
-func (c *CandidateSrflx) Address() string {
-	return c.CandidateBase.Address
-}
-
-// Port for CandidateSrflx
-func (c *CandidateSrflx) Port() int {
-	return c.CandidateBase.Port
+// GetBase returns the CandidateBase, attributes shared between all Candidates
+func (c *CandidateSrflx) GetBase() *CandidateBase {
+	return &c.CandidateBase
 }
