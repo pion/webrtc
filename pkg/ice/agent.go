@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/util"
@@ -19,11 +20,13 @@ type Agent struct {
 
 	outboundCallback OutboundCallback
 
-	isControlling   bool
 	tieBreaker      uint32
-	state           ConnectionState
-	gatheringState  GatheringState
 	connectionState ConnectionState
+	gatheringState  GatheringState
+
+	haveStarted   bool
+	isControlling bool
+	taskLoopChan  chan bool
 
 	LocalUfrag      string
 	LocalPwd        string
@@ -40,21 +43,69 @@ type Agent struct {
 	}
 }
 
+const (
+	agentTickerBaseInterval = 20 * time.Millisecond
+)
+
 // NewAgent creates a new Agent
-func NewAgent(isControlling bool, outboundCallback OutboundCallback) *Agent {
-	return &Agent{
-		isControlling:    isControlling,
+func NewAgent(outboundCallback OutboundCallback) *Agent {
+	a := &Agent{
 		tieBreaker:       rand.Uint32(),
 		outboundCallback: outboundCallback,
 
 		LocalUfrag: util.RandSeq(16),
 		LocalPwd:   util.RandSeq(32),
 	}
+	if a.isControlling {
+	}
+	return a
 }
 
-func (a *Agent) agentInterval() {
-	// TODO
-	// If isControlling we need to send out
+// Start starts the agent
+func (a *Agent) Start(isControlling bool) {
+	a.Lock()
+	defer a.Unlock()
+
+	if a.haveStarted {
+		panic("Attempted to start agent twice")
+	}
+
+	a.isControlling = isControlling
+	if isControlling {
+		go a.agentControllingTaskLoop()
+	}
+}
+
+func (a *Agent) pingAllCandidates() {
+	for _, localCandidate := range a.localCandidates {
+		for _, remoteCandidate := range a.remoteCandidates {
+			// Send an ICE ping
+			fmt.Println(localCandidate)
+			fmt.Println(remoteCandidate)
+		}
+	}
+
+}
+
+func (a *Agent) agentControllingTaskLoop() {
+	// TODO this should be dynamic, and grow when the connection is stable
+	t := time.NewTicker(agentTickerBaseInterval)
+
+	for {
+		select {
+		case <-t.C:
+			a.Lock()
+			if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+				a.pingAllCandidates()
+			} else {
+				fmt.Println("Check + Ping selected pair")
+			}
+			a.Unlock()
+		case <-a.taskLoopChan:
+			t.Stop()
+			return
+		}
+	}
 }
 
 // AddRemoteCandidate adds a new remote candidate
@@ -73,6 +124,7 @@ func (a *Agent) AddLocalCandidate(c Candidate) {
 
 // Close cleans up the Agent
 func (a *Agent) Close() {
+	close(a.taskLoopChan)
 }
 
 // LocalCandidates generates the string representation of the
@@ -90,7 +142,7 @@ func (a *Agent) LocalCandidates() (rtrn []string) {
 
 func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
 	for _, c := range candidates {
-		if c.Address() == addr.IP.String() && c.Port() == addr.Port {
+		if c.GetBase().Address == addr.IP.String() && c.GetBase().Port == addr.Port {
 			return c
 		}
 	}
@@ -99,11 +151,10 @@ func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr)
 
 func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	for _, c := range candidates {
-		if c.Address() == addr.IP.String() && c.Port() == addr.Port {
+		if c.GetBase().Address == addr.IP.String() && c.GetBase().Port == addr.Port {
 			return c
 		}
 	}
-
 	return nil
 }
 
@@ -114,15 +165,18 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 
 	localCandidate := getTransportAddrCandidate(a.localCandidates, local)
 	if localCandidate == nil {
-		fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
+		// TODO debug
+		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
 		return
 	}
 
 	remoteCandidate := getUDPAddrCandidate(a.remoteCandidates, remote)
 	if remoteCandidate == nil {
-		fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
+		// TODO debug
+		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
+	remoteCandidate.GetBase().LastSeen = time.Now()
 
 	m, err := stun.NewMessage(buf)
 	if err != nil {
@@ -136,16 +190,22 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
 		a.selectedPair.remote = remoteCandidate
 		a.selectedPair.local = localCandidate
+	} else if a.isControlling && a.selectedPair.remote == nil && a.selectedPair.local == nil {
+		fmt.Println("Response to our ping (and we always send useCandidate)!")
+		// make this our new peer!
 	}
 
-	// iceControlledAttr := &stun.IceControlled{}
-	// realmRawAttr, realmFound := m.GetOneAttribute(stun.AttrRealm);
+	_, isControlled := m.GetOneAttribute(stun.AttrIceControlled)
+	if isControlled && a.isControlling == false {
+		panic("isControlled && a.isControlling == false")
+	}
 
-	// iceControllingAttr := &stun.IceControlling{}
-	// priorityAttr := &stun.Priority{}
+	_, isControlling := m.GetOneAttribute(stun.AttrIceControlling)
+	if isControlling && a.isControlling == true {
+		panic("isControlling && a.isControlling == true")
+	}
 
-	// Handle, maybe update properties
-	out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
 				IP:   remote.IP,
@@ -156,12 +216,11 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 			Key: []byte(a.LocalPwd),
 		},
 		&stun.Fingerprint{},
-	)
-	if err != nil {
+	); err != nil {
 		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
+	} else {
+		a.outboundCallback(out.Pack(), local, remote)
 	}
-
-	a.outboundCallback(out.Pack(), local, remote)
 }
 
 // SelectedPair gets the current selected pair's Addresses (or returns nil)
@@ -174,10 +233,10 @@ func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) 
 	}
 
 	return &stun.TransportAddr{
-			IP:   net.ParseIP(a.selectedPair.local.Address()),
-			Port: a.selectedPair.local.Port(),
+			IP:   net.ParseIP(a.selectedPair.local.GetBase().Address),
+			Port: a.selectedPair.local.GetBase().Port,
 		}, &net.UDPAddr{
-			IP:   net.ParseIP(a.selectedPair.remote.Address()),
-			Port: a.selectedPair.remote.Port(),
+			IP:   net.ParseIP(a.selectedPair.remote.GetBase().Address),
+			Port: a.selectedPair.remote.GetBase().Port,
 		}
 }
