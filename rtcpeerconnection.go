@@ -21,22 +21,32 @@ type RTCPeerConnectionState int
 
 const (
 
-	// RTCPeerConnectionStateNew indicates some of the ICE or DTLS transports are in status new
+	// RTCPeerConnectionStateNew indicates some of the ICE or DTLS transports
+	// are in status new and none of the transports are in the "connecting",
+	// "checking", "failed" or "disconnected" state, or all transports are in
+	// the "closed" state, or there are no transports.
 	RTCPeerConnectionStateNew RTCPeerConnectionState = iota + 1
 
-	// RTCPeerConnectionStateConnecting indicates some of the ICE or DTLS transports are in status connecting or checking
+	// RTCPeerConnectionStateConnecting indicates some of the ICE or DTLS
+	// transports are in status connecting or checking and none of them is in
+	// the "failed" state.
 	RTCPeerConnectionStateConnecting
 
-	// RTCPeerConnectionStateConnected indicates all of the ICE or DTLS transports are in status connected or completed
+	// RTCPeerConnectionStateConnected indicates all of the ICE or DTLS
+	// transports are in status "connected", "completed" or "closed" state
+	// and at least one of them is in the "connected" or "completed" state.
 	RTCPeerConnectionStateConnected
 
-	// RTCPeerConnectionStateDisconnected indicates some of the ICE or DTLS transports are in status disconnected
+	// RTCPeerConnectionStateDisconnected indicates some of the ICE or DTLS
+	// transports are in status disconnected and none of them are in the
+	// "failed" or "connecting" or "checking" state.
 	RTCPeerConnectionStateDisconnected
 
-	// RTCPeerConnectionStateFailed indicates some of the ICE or DTLS transports are in status failed
+	// RTCPeerConnectionStateFailed indicates some of the ICE or DTLS transports
+	// are in status failed.
 	RTCPeerConnectionStateFailed
 
-	// RTCPeerConnectionStateClosed indicates the peer connection is closed
+	// RTCPeerConnectionStateClosed indicates the peer connection is closed.
 	RTCPeerConnectionStateClosed
 )
 
@@ -59,12 +69,15 @@ func (t RTCPeerConnectionState) String() string {
 	}
 }
 
-// RTCPeerConnection represents a WebRTC connection between itself and a remote peer
+// RTCPeerConnection represents a WebRTC connection between itself and a remote
+// peer. It provides an interface for managing and monitoring a remote peer
+// connection lifecycle.
 type RTCPeerConnection struct {
 	sync.RWMutex
 
-	// ICE
-	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
+	// OnICEConnectionStateChange event handler defines a callback method to be
+	// called when the state of the icegatheringstatechange event has beeb fired.
+	OnICEConnectionStateChange func(ice.ConnectionState)
 
 	config RTCConfiguration
 
