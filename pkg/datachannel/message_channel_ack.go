@@ -1,9 +1,5 @@
 package datachannel
 
-import (
-	"github.com/pkg/errors"
-)
-
 // ChannelAck is used to ACK a DataChannel open
 type ChannelAck struct{}
 
@@ -14,12 +10,13 @@ const (
 // Marshal returns raw bytes for the given message
 func (c *ChannelAck) Marshal() ([]byte, error) {
 	raw := make([]byte, channelOpenAckLength)
-	raw[0] = uint8(DataChannelAck)
+	raw[offsetMessageType] = uint8(DataChannelAck)
 
 	return raw, nil
 }
 
 // Unmarshal populates the struct with the given raw data
 func (c *ChannelAck) Unmarshal(raw []byte) error {
-	return errors.Errorf("Unimplemented")
+	// Message type already checked in Parse and there is no further data
+	return nil
 }

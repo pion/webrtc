@@ -17,6 +17,8 @@ type MessageType byte
 const (
 	DataChannelAck  MessageType = 0x02
 	DataChannelOpen MessageType = 0x03
+
+	offsetMessageType = 0
 )
 
 // Parse accepts raw input and returns a DataChannel message
@@ -26,11 +28,13 @@ func Parse(raw []byte) (Message, error) {
 	}
 
 	var msg Message
-	switch MessageType(raw[0]) {
+	switch MessageType(raw[offsetMessageType]) {
 	case DataChannelOpen:
 		msg = &ChannelOpen{}
+	case DataChannelAck:
+		msg = &ChannelAck{}
 	default:
-		return nil, errors.Errorf("Unknown MessageType %v", MessageType(raw[0]))
+		return nil, errors.Errorf("Unknown MessageType %v", MessageType(raw[offsetMessageType]))
 	}
 
 	if err := msg.Unmarshal(raw); err != nil {
