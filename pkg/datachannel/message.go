@@ -29,6 +29,8 @@ func Parse(raw []byte) (Message, error) {
 	switch MessageType(raw[0]) {
 	case DataChannelOpen:
 		msg = &ChannelOpen{}
+	case DataChannelAck:
+		msg = &ChannelAck{}
 	default:
 		return nil, errors.Errorf("Unknown MessageType %v", MessageType(raw[0]))
 	}

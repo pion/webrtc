@@ -42,7 +42,23 @@ const (
 
 // Marshal returns raw bytes for the given message
 func (c *ChannelOpen) Marshal() ([]byte, error) {
-	return nil, errors.Errorf("Unimplemented")
+	labelLength := len(c.Label)
+	protocolLength := len(c.Protocol)
+
+	totalLen := channelOpenHeaderLength + labelLength + protocolLength
+	raw := make([]byte, totalLen)
+
+	raw[0] = uint8(DataChannelOpen)
+	raw[1] = byte(c.ChannelType)
+	binary.BigEndian.PutUint16(raw[2:], c.Priority)
+	binary.BigEndian.PutUint32(raw[4:], c.ReliabilityParameter)
+	binary.BigEndian.PutUint16(raw[8:], uint16(labelLength))
+	binary.BigEndian.PutUint16(raw[10:], uint16(protocolLength))
+	endLabel := channelOpenHeaderLength + labelLength
+	copy(raw[channelOpenHeaderLength:endLabel], c.Label)
+	copy(raw[endLabel:endLabel+protocolLength], c.Protocol)
+
+	return raw, nil
 }
 
 // Unmarshal populates the struct with the given raw data
@@ -50,7 +66,7 @@ func (c *ChannelOpen) Unmarshal(raw []byte) error {
 	if len(raw) < channelOpenHeaderLength {
 		return errors.Errorf("Length of input is not long enough to satisfy header %d", len(raw))
 	}
-	c.ChannelType = raw[1]
+	c.ChannelType = ChannelType(raw[1])
 	c.Priority = binary.BigEndian.Uint16(raw[2:])
 	c.ReliabilityParameter = binary.BigEndian.Uint32(raw[4:])
 
@@ -61,7 +77,7 @@ func (c *ChannelOpen) Unmarshal(raw []byte) error {
 		return errors.Errorf("Label + Protocol length don't match full packet length")
 	}
 
-	c.Label = raw[12 : 12+labelLength]
-	c.Protocol = raw[12+labelLength : 12+labelLength+protocolLength]
+	c.Label = raw[channelOpenHeaderLength : channelOpenHeaderLength+labelLength]
+	c.Protocol = raw[channelOpenHeaderLength+labelLength : channelOpenHeaderLength+labelLength+protocolLength]
 	return nil
 }
