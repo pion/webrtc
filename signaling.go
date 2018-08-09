@@ -108,6 +108,9 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 	}
 
 	isControllingICE := true
+	remoteUfrag := ""
+	remotePwd := ""
+
 	if desc.Type == RTCSdpTypeOffer {
 		isControllingICE = false
 	}
@@ -126,11 +129,15 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 				} else {
 					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
 				}
-
+			} else if strings.HasPrefix(a, "ice-ufrag") {
+				remoteUfrag = a[len("ice-ufrag")+1:]
+			} else if strings.HasPrefix(a, "ice-pwd") {
+				remotePwd = a[len("ice-pwd")+1:]
 			}
 		}
 	}
-	r.networkManager.IceAgent.Start(isControllingICE)
+
+	r.networkManager.IceAgent.Start(isControllingICE, remoteUfrag, remotePwd)
 
 	return nil
 }
@@ -151,7 +158,11 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 
 	r.addRTPMediaSections(d, []RTCRtpCodecType{RTCRtpCodecTypeAudio, RTCRtpCodecTypeVideo}, candidates)
 	r.addDataMediaSection(d, candidates)
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, "audio video data")
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video data")
+
+	for _, m := range d.MediaDescriptions {
+		m.WithPropertyAttribute("setup:actpass")
+	}
 
 	return RTCSessionDescription{
 		Type: RTCSdpTypeOffer,
