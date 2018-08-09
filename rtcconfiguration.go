@@ -260,23 +260,13 @@ func (r *RTCPeerConnection) validateICECandidatePoolSize(config RTCConfiguration
 }
 
 func (r *RTCPeerConnection) setICEServers(config RTCConfiguration) error {
-	if len(config.ICEServers) > 0 {
-		var servers [][]ice.URL
-		for _, server := range config.ICEServers {
-			var urls []ice.URL
-			for _, rawURL := range server.URLs {
-				url, err := parseICEServer(server, rawURL)
-				if err != nil {
-					return err
-				}
-				urls = append(urls, url)
+	for _, server := range config.ICEServers {
+		for _, rawURL := range server.URLs {
+			url, err := parseICEServer(server, rawURL)
+			if err != nil {
+				return err
 			}
-			if len(urls) > 0 {
-				servers = append(servers, urls)
-			}
-		}
-		if len(servers) > 0 {
-			r.iceAgent.SetServers(servers)
+			r.networkManager.AddURL(&url)
 		}
 	}
 	return nil
