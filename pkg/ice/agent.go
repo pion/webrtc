@@ -44,7 +44,7 @@ type Agent struct {
 }
 
 const (
-	agentTickerBaseInterval = 20 * time.Millisecond
+	agentTickerBaseInterval = 3 * time.Second
 	stunTimeout             = 10 * time.Second
 )
 
@@ -89,8 +89,9 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 		&stun.UseCandidate{},
 		&stun.IceControlling{TieBreaker: a.tieBreaker},
+		&stun.Priority{Priority: uint32(local.GetBase().priority(hostCandidatePreference, 1))},
 		&stun.MessageIntegrity{
-			Key: []byte(a.LocalPwd),
+			Key: []byte(a.remotePwd),
 		},
 		&stun.Fingerprint{},
 	)
@@ -187,19 +188,7 @@ func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	return nil
 }
 
-func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
-	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && a.isControlling == false {
-		panic("inbound isControlled && a.isControlling == false")
-	} else if m.Class != stun.ClassRequest {
-		panic(fmt.Sprintf("Wrong STUN Class ICE from: %s to: %s class: %s", local.String(), remote.String(), m.Class.String()))
-	} else if m.Method != stun.MethodBinding {
-		panic(fmt.Sprintf("Wrong STUN Method ICE from: %s to: %s method: %s", local.String(), remote.String(), m.Method.String()))
-	}
-
-	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
-		a.selectedPair.remote = remoteCandidate
-		a.selectedPair.local = localCandidate
-	}
+func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr) {
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
@@ -219,6 +208,18 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 
 }
 
+func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && a.isControlling == false {
+		panic("inbound isControlled && a.isControlling == false")
+	}
+
+	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
+		a.selectedPair.remote = remoteCandidate
+		a.selectedPair.local = localCandidate
+	}
+	a.sendBindingSuccess(m, local, remote)
+}
+
 func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling == true {
 		panic("inbound isControlling && a.isControlling == true")
@@ -226,22 +227,14 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 		panic("useCandidate && a.isControlling == true")
 	}
 
-	if m.Class != stun.ClassSuccessResponse || m.Method != stun.MethodBinding {
-		if out, err := stun.Build(stun.ClassErrorResponse, stun.MethodBinding, m.TransactionID,
-			&stun.Err401Unauthorized,
-			&stun.MessageIntegrity{
-				Key: []byte(a.LocalPwd),
-			},
-			&stun.Fingerprint{},
-		); err != nil {
-			fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
-		} else {
-			a.outboundCallback(out.Pack(), local, remote)
-		}
-	} else if a.selectedPair.remote == nil && a.selectedPair.local == nil {
+	if m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding {
 		//Binding success!
-		a.selectedPair.remote = remoteCandidate
-		a.selectedPair.local = localCandidate
+		if a.selectedPair.remote == nil && a.selectedPair.local == nil {
+			a.selectedPair.remote = remoteCandidate
+			a.selectedPair.local = localCandidate
+		}
+	} else {
+		a.sendBindingSuccess(m, local, remote)
 	}
 }
 
