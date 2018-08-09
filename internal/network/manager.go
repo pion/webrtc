@@ -251,7 +251,7 @@ func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remo
 	defer m.portsLock.Unlock()
 
 	for _, p := range m.ports {
-		if p.listeningAddr == local {
+		if p.listeningAddr.Equal(local) {
 			p.sendICE(raw, remote)
 			return
 		}
