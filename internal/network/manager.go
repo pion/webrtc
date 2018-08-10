@@ -22,6 +22,7 @@ import (
 type Manager struct {
 	IceAgent    *ice.Agent
 	iceNotifier ICENotifier
+	isOffer     bool
 
 	dtlsState *dtls.State
 
@@ -55,7 +56,7 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 		bufferTransportGenerator: bufferTransportGenerator,
 		dataChannelEventHandler:  dataChannelEventHandler,
 	}
-	m.dtlsState, err = dtls.NewState(true)
+	m.dtlsState, err = dtls.NewState()
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +103,13 @@ func (m *Manager) AddURL(url *ice.URL) error {
 	}
 
 	return nil
+}
+
+// Start allocates DTLS/ICE state that is dependent on if we are offering or answering
+func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) {
+	m.isOffer = isOffer
+	m.IceAgent.Start(isOffer, remoteUfrag, remotePwd)
+	m.dtlsState.Start(isOffer)
 }
 
 // Close cleans up all the allocated state

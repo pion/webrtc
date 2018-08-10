@@ -51,5 +51,8 @@ func (p *port) sendICE(buf []byte, dst *net.UDPAddr) {
 }
 
 func (p *port) sendSCTP(buf []byte, dst *net.UDPAddr) {
-	p.m.dtlsState.Send(buf, p.listeningAddr.String(), dst.String())
+	_, err := p.m.dtlsState.Send(buf, p.listeningAddr.String(), dst.String())
+	if err != nil {
+		fmt.Println(err)
+	}
 }

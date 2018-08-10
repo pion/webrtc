@@ -107,12 +107,11 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
 
-	isControllingICE := true
+	weOffer := true
 	remoteUfrag := ""
 	remotePwd := ""
-
 	if desc.Type == RTCSdpTypeOffer {
-		isControllingICE = false
+		weOffer = false
 	}
 
 	r.currentRemoteDescription = &desc
@@ -137,8 +136,7 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 		}
 	}
 
-	r.networkManager.IceAgent.Start(isControllingICE, remoteUfrag, remotePwd)
-
+	r.networkManager.Start(weOffer, remoteUfrag, remotePwd)
 	return nil
 }
 
