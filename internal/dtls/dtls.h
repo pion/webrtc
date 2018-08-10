@@ -57,7 +57,7 @@ bool openssl_global_init();
 
 tlscfg *dtls_build_tlscfg();
 SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_server);
+dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_offer);
 
 ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote);
 dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *local, char *remote);

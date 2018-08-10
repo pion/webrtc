@@ -93,7 +93,13 @@ func (p *port) handleSCTP(raw []byte, a *sctp.Association) {
 }
 
 func (p *port) handleDTLS(raw []byte, srcAddr string) {
-	if decrypted := p.m.dtlsState.HandleDTLSPacket(raw, p.listeningAddr.String(), srcAddr); len(decrypted) > 0 {
+	decrypted, err := p.m.dtlsState.HandleDTLSPacket(raw, p.listeningAddr.String(), srcAddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if len(decrypted) > 0 {
 		p.handleSCTP(decrypted, p.m.sctpAssociation)
 	}
 
@@ -151,10 +157,8 @@ func (p *port) networkLoop() {
 				p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
 			}
 
-			// TODO should use SetupAttr
-			// Currently we always send a DoHandshake (which seems to work ok)
 			p.m.certPairLock.RLock()
-			if p.m.certPair == nil {
+			if p.m.isOffer == false && p.m.certPair == nil {
 				p.m.dtlsState.DoHandshake(p.listeningAddr.String(), in.srcAddr.String())
 			}
 			p.m.certPairLock.RUnlock()

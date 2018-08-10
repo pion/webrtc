@@ -18,6 +18,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
 
@@ -69,15 +70,19 @@ type State struct {
 }
 
 // NewState creates a new DTLS session
-func NewState(isClient bool) (s *State, err error) {
+func NewState() (s *State, err error) {
 	s = &State{
 		tlscfg: C.dtls_build_tlscfg(),
 	}
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
-	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(!isClient))
 
 	return s, err
+}
+
+// Start allocates DTLS/ICE state that is dependent on if we are offering or answering
+func (s *State) Start(isOffer bool) {
+	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(isOffer))
 }
 
 // Close cleans up the associated OpenSSL resources
@@ -101,9 +106,13 @@ type CertPair struct {
 
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
 // If there is any data after decoding we pass back to the caller to handler
-func (s *State) HandleDTLSPacket(packet []byte, local, remote string) []byte {
+func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, error) {
 	s.Lock()
 	defer s.Unlock()
+
+	if s.dtlsSession == nil {
+		return nil, errors.Errorf("Unable to handle DTLS packet, session has not started")
+	}
 
 	rawLocal := C.CString(local)
 	rawRemote := C.CString(remote)
@@ -119,15 +128,19 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) []byte {
 			C.free(unsafe.Pointer(ret.buf))
 			C.free(unsafe.Pointer(ret))
 		}()
-		return []byte(C.GoBytes(ret.buf, ret.len))
+		return []byte(C.GoBytes(ret.buf, ret.len)), nil
 	}
-	return nil
+	return nil, nil
 }
 
 // Send takes a un-encrypted packet and sends via DTLS
-func (s *State) Send(packet []byte, local, remote string) bool {
+func (s *State) Send(packet []byte, local, remote string) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
+
+	if s.dtlsSession == nil {
+		return false, errors.Errorf("Unable to send via DTLS, session has not started")
+	}
 
 	rawLocal := C.CString(local)
 	rawRemote := C.CString(remote)
@@ -138,11 +151,18 @@ func (s *State) Send(packet []byte, local, remote string) bool {
 		C.free(unsafe.Pointer(packetRaw))
 	}()
 
-	return bool(C.dtls_handle_outgoing(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote))
+	return bool(C.dtls_handle_outgoing(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote)), nil
 }
 
 // GetCertPair gets the current CertPair if DTLS has finished
 func (s *State) GetCertPair() *CertPair {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.dtlsSession == nil {
+		return nil
+	}
+
 	if ret := C.dtls_get_certpair(s.dtlsSession); ret != nil {
 		defer C.free(unsafe.Pointer(ret))
 		return &CertPair{
@@ -158,6 +178,9 @@ func (s *State) GetCertPair() *CertPair {
 func (s *State) DoHandshake(local, remote string) {
 	s.Lock()
 	defer s.Unlock()
+	if s.dtlsSession == nil {
+		return
+	}
 
 	rawLocal := C.CString(local)
 	rawRemote := C.CString(remote)
