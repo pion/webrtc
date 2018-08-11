@@ -2,12 +2,15 @@ package network
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
+	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -17,7 +20,7 @@ import (
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	icePwd      []byte
+	IceAgent    *ice.Agent
 	iceNotifier ICENotifier
 
 	dtlsState *dtls.State
@@ -43,61 +46,9 @@ type Manager struct {
 	ports     []*port
 }
 
-func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
-	switch payloadType {
-	case sctp.PayloadTypeWebRTCDCEP:
-		msg, err := datachannel.Parse(data)
-		if err != nil {
-			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
-			return
-		}
-		switch msg := msg.(type) {
-		case *datachannel.ChannelOpen:
-			// Cannot return err
-			ack := datachannel.ChannelAck{}
-			ackMsg, err := ack.Marshal()
-			if err != nil {
-				fmt.Println("Error Marshaling ChannelOpen ACK", err)
-				return
-			}
-			if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
-				fmt.Println("Error sending ChannelOpen ACK", err)
-				return
-			}
-			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
-		default:
-			fmt.Println("Unhandled DataChannel message", m)
-		}
-	case sctp.PayloadTypeWebRTCString:
-		fallthrough
-	case sctp.PayloadTypeWebRTCStringEmpty:
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
-	case sctp.PayloadTypeWebRTCBinary:
-		fallthrough
-	case sctp.PayloadTypeWebRTCBinaryEmpty:
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
-	default:
-		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
-	}
-}
-
-func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-
-	for _, p := range m.ports {
-		if p.IceState() == ice.ConnectionStateCompleted {
-			p.sendSCTP(raw)
-			return
-		}
-	}
-
-}
-
 // NewManager creates a new network.Manager
-func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
+func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
 	m = &Manager{
-		icePwd:                   icePwd,
 		iceNotifier:              iceNotifier,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
@@ -111,18 +62,46 @@ func NewManager(icePwd []byte, bufferTransportGenerator BufferTransportGenerator
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
 
+	m.IceAgent = ice.NewAgent(m.iceOutboundHandler)
+	for _, i := range localInterfaces() {
+		p, err := newPort(i+":0", m)
+		if err != nil {
+			return nil, err
+		}
+
+		m.ports = append(m.ports, p)
+		m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
+			CandidateBase: ice.CandidateBase{
+				Protocol: ice.TransportUDP,
+				Address:  p.listeningAddr.IP.String(),
+				Port:     p.listeningAddr.Port,
+			},
+		})
+	}
+
 	return m, err
 }
 
-// Listen starts a new Port for this manager
-func (m *Manager) Listen(address string) (boundAddress *stun.TransportAddr, err error) {
-	p, err := newPort(address, m)
-	if err != nil {
-		return nil, err
+// AddURL takes an ICE Url, allocates any state and adds the candidate
+func (m *Manager) AddURL(url *ice.URL) error {
+	switch url.Type {
+	case ice.ServerTypeSTUN:
+		c, err := webrtcStun.Allocate(url)
+		if err != nil {
+			return err
+		}
+		p, err := newPort(c.RemoteAddress+":"+strconv.Itoa(c.RemotePort), m)
+		if err != nil {
+			return err
+		}
+
+		m.ports = append(m.ports, p)
+		m.IceAgent.AddLocalCandidate(c)
+	default:
+		return errors.Errorf("%s is not implemented", url.Type.String())
 	}
 
-	m.ports = append(m.ports, p)
-	return p.listeningAddr, nil
+	return nil
 }
 
 // Close cleans up all the allocated state
@@ -132,12 +111,17 @@ func (m *Manager) Close() {
 
 	err := m.sctpAssociation.Close()
 	m.dtlsState.Close()
-	for _, p := range m.ports {
-		portError := p.close()
-		if err != nil {
-			err = errors.Wrapf(portError, " also: %s", err.Error())
+	m.IceAgent.Close()
+
+	for i := len(m.ports) - 1; i >= 0; i-- {
+		if portError := m.ports[i].close(); portError != nil {
+			if err != nil {
+				err = errors.Wrapf(portError, " also: %s", err.Error())
+			} else {
+				err = portError
+			}
 		} else {
-			err = portError
+			m.ports = append(m.ports[:i], m.ports[i+1:]...)
 		}
 	}
 }
@@ -152,10 +136,13 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
 
+	local, remote := m.IceAgent.SelectedPair()
+	if local == nil || remote == nil {
+		return
+	}
 	for _, p := range m.ports {
-		if p.IceState() == ice.ConnectionStateCompleted {
-			p.sendRTP(packet)
-			return
+		if p.listeningAddr.Equal(local) {
+			p.sendRTP(packet, remote)
 		}
 	}
 }
@@ -206,20 +193,67 @@ func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIden
 	return nil
 }
 
-func (m *Manager) iceHandler(newState ice.ConnectionState) {
-	// One port disconnected, scan the other ones
-	if newState == ice.ConnectionStateDisconnected {
-		m.portsLock.Lock()
-		defer m.portsLock.Unlock()
-
-		for _, p := range m.ports {
-			if p.IceState() == ice.ConnectionStateCompleted {
-				// Another peer is connected! We don't have to notify RTCPeerConnection
-				break
-			}
+func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
+	switch payloadType {
+	case sctp.PayloadTypeWebRTCDCEP:
+		msg, err := datachannel.Parse(data)
+		if err != nil {
+			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
+			return
 		}
-		m.iceNotifier(newState)
-	} else {
-		m.iceNotifier(newState)
+		switch msg := msg.(type) {
+		case *datachannel.ChannelOpen:
+			// Cannot return err
+			ack := datachannel.ChannelAck{}
+			ackMsg, err := ack.Marshal()
+			if err != nil {
+				fmt.Println("Error Marshaling ChannelOpen ACK", err)
+				return
+			}
+			if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
+				fmt.Println("Error sending ChannelOpen ACK", err)
+				return
+			}
+			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
+		default:
+			fmt.Println("Unhandled DataChannel message", m)
+		}
+	case sctp.PayloadTypeWebRTCString:
+		fallthrough
+	case sctp.PayloadTypeWebRTCStringEmpty:
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
+	case sctp.PayloadTypeWebRTCBinary:
+		fallthrough
+	case sctp.PayloadTypeWebRTCBinaryEmpty:
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
+	default:
+		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
+	}
+}
+
+func (m *Manager) dataChannelOutboundHandler(raw []byte) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	local, remote := m.IceAgent.SelectedPair()
+	if local == nil || remote == nil {
+		return
+	}
+	for _, p := range m.ports {
+		if p.listeningAddr.Equal(local) {
+			p.sendSCTP(raw, remote)
+		}
+	}
+}
+
+func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	for _, p := range m.ports {
+		if p.listeningAddr == local {
+			p.sendICE(raw, remote)
+			return
+		}
 	}
 }

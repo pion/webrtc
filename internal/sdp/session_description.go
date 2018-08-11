@@ -66,19 +66,19 @@ type SessionDescription struct {
 
 	// EncryptionKeys if for when the SessionDescription is transported over a secure and trusted channel,
 	// the Session Description Protocol MAY be used to convey encryption keys
-	// https://tools.ietf.org/html/rfc4566#section-5.11
+	// https://tools.ietf.org/html/rfc4566#section-5.12
 	EncryptionKeys []string
 
 	// Attributes are the primary means for extending SDP.  Attributes may
 	// be defined to be used as "session-level" attributes, "media-level"
 	// attributes, or both.
-	// https://tools.ietf.org/html/rfc4566#section-5.12
+	// https://tools.ietf.org/html/rfc4566#section-5.13
 	Attributes []string
 
 	// MediaDescriptions A session description may contain a number of media descriptions.
 	// Each media description starts with an "m=" field and is terminated by
 	// either the next "m=" field or by the end of the session description.
-	// https://tools.ietf.org/html/rfc4566#section-5.13
+	// https://tools.ietf.org/html/rfc4566#section-5.14
 	MediaDescriptions []*MediaDescription
 }
 

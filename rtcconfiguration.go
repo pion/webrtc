@@ -62,7 +62,8 @@ type RTCOAuthCredential struct {
 type RTCICETransportPolicy int
 
 const (
-	// RTCICETransportPolicyRelay indicates only media relay candidates such as candidates passing through a TURN server are used
+	// RTCICETransportPolicyRelay indicates only media relay candidates such
+	// as candidates passing through a TURN server are used
 	RTCICETransportPolicyRelay RTCICETransportPolicy = iota + 1
 
 	// RTCICETransportPolicyAll indicates any type of candidate is used
@@ -130,17 +131,39 @@ func (t RTCRtcpMuxPolicy) String() string {
 	}
 }
 
-// RTCConfiguration contains RTCPeerConfiguration options
+// RTCConfiguration contains RTCPeerConfiguration options to configure the new connection
 type RTCConfiguration struct {
-	// ICEServers holds multiple RTCICEServer instances, each describing one server which may be used by the ICE agent;
-	// these are typically STUN and/or TURN servers. If this isn't specified, the ICE agent may choose to use its own ICE servers;
-	// otherwise, the connection attempt will be made with no STUN or TURN server available, which limits the connection to local peers.
-	ICEServers           []RTCICEServer
-	ICETransportPolicy   RTCICETransportPolicy
-	BundlePolicy         RTCBundlePolicy
-	RtcpMuxPolicy        RTCRtcpMuxPolicy
-	PeerIdentity         string
-	Certificates         []RTCCertificate
+
+	// ICEServers holds multiple RTCICEServer instances, each describing one
+	// server which may be used by the ICE agent; these are typically STUN
+	// and/or TURN servers. If this isn't specified, the ICE agent may choose
+	// to use its own ICE servers; otherwise, the connection attempt will be
+	// made with no STUN or TURN server available, which limits the connection
+	// to local peers.
+	ICEServers []RTCICEServer
+
+	// ICETransportPolicy indicates which candidates the ICE Agent is allowed
+	// to use. Defaults to "all".
+	ICETransportPolicy RTCICETransportPolicy
+
+	// BundlePolicy indicates which media-bundling policy to use when gathering
+	// ICE candidates. Defaults to "balanced".
+	BundlePolicy RTCBundlePolicy
+
+	// RtcpMuxPolicy indicates which rtcp-mux policy to use when gathering ICE
+	// candidates. Defaults to "require".
+	RtcpMuxPolicy RTCRtcpMuxPolicy
+
+	// PeerIdentity sets the target peer identity for the RTCPeerConnection.
+	// The RTCPeerConnection will not establish a connection to a remote peer
+	// unless it can be successfully authenticated with the provided name.
+	PeerIdentity string
+
+	// Certificates contains a set of certificates that the RTCPeerConnection
+	// uses to authenticate.
+	Certificates []RTCCertificate
+
+	// ICECandidatePoolSize sets the size of the prefetched ICE pool.
 	ICECandidatePoolSize uint8
 }
 
@@ -237,23 +260,13 @@ func (r *RTCPeerConnection) validateICECandidatePoolSize(config RTCConfiguration
 }
 
 func (r *RTCPeerConnection) setICEServers(config RTCConfiguration) error {
-	if len(config.ICEServers) > 0 {
-		var servers [][]ice.URL
-		for _, server := range config.ICEServers {
-			var urls []ice.URL
-			for _, rawURL := range server.URLs {
-				url, err := parseICEServer(server, rawURL)
-				if err != nil {
-					return err
-				}
-				urls = append(urls, url)
+	for _, server := range config.ICEServers {
+		for _, rawURL := range server.URLs {
+			url, err := parseICEServer(server, rawURL)
+			if err != nil {
+				return err
 			}
-			if len(urls) > 0 {
-				servers = append(servers, urls)
-			}
-		}
-		if len(servers) > 0 {
-			r.iceAgent.SetServers(servers)
+			r.networkManager.AddURL(&url)
 		}
 	}
 	return nil
