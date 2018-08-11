@@ -20,6 +20,7 @@ type Agent struct {
 	sync.RWMutex
 
 	outboundCallback OutboundCallback
+	iceNotifier      func(ConnectionState)
 
 	tieBreaker      uint64
 	connectionState ConnectionState
@@ -50,12 +51,14 @@ const (
 )
 
 // NewAgent creates a new Agent
-func NewAgent(outboundCallback OutboundCallback) *Agent {
+func NewAgent(outboundCallback OutboundCallback, iceNotifier func(ConnectionState)) *Agent {
 	return &Agent{
-		tieBreaker:       rand.Uint64(),
 		outboundCallback: outboundCallback,
-		gatheringState:   GatheringStateComplete, // TODO trickle-ice
-		connectionState:  ConnectionStateNew,
+		iceNotifier:      iceNotifier,
+
+		tieBreaker:      rand.Uint64(),
+		gatheringState:  GatheringStateComplete, // TODO trickle-ice
+		connectionState: ConnectionStateNew,
 
 		LocalUfrag: util.RandSeq(16),
 		LocalPwd:   util.RandSeq(32),
@@ -79,9 +82,7 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 	a.remoteUfrag = remoteUfrag
 	a.remotePwd = remotePwd
 
-	if isControlling {
-		go a.agentControllingTaskLoop()
-	}
+	go a.agentTaskLoop()
 	return nil
 }
 
@@ -110,28 +111,51 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	})
 }
 
-func (a *Agent) agentControllingTaskLoop() {
+func (a *Agent) updateConnectionState(newState ConnectionState) {
+	a.connectionState = newState
+	a.iceNotifier(a.connectionState)
+}
+
+func (a *Agent) setSelectedPair(local, remote Candidate) {
+	a.selectedPair.remote = remote
+	a.selectedPair.local = local
+	a.updateConnectionState(ConnectionStateConnected)
+}
+
+func (a *Agent) agentTaskLoop() {
 	// TODO this should be dynamic, and grow when the connection is stable
 	t := time.NewTicker(agentTickerBaseInterval)
-	a.connectionState = ConnectionStateChecking
+	a.updateConnectionState(ConnectionStateChecking)
+
+	assertSelectedPairValid := func() bool {
+		if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+			return false
+		} else if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
+			a.selectedPair.remote = nil
+			a.selectedPair.local = nil
+			a.updateConnectionState(ConnectionStateDisconnected)
+			return false
+		}
+
+		return true
+	}
 
 	for {
 		select {
 		case <-t.C:
 			a.Lock()
-			if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+			if a.isControlling {
+				if assertSelectedPairValid() {
+					continue
+				}
+
 				for _, localCandidate := range a.LocalCandidates {
 					for _, remoteCandidate := range a.remoteCandidates {
 						a.pingCandidate(localCandidate, remoteCandidate)
 					}
 				}
 			} else {
-				if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
-					a.selectedPair.remote = nil
-					a.selectedPair.local = nil
-				} else {
-					a.pingCandidate(a.selectedPair.local, a.selectedPair.remote)
-				}
+				assertSelectedPairValid()
 			}
 			a.Unlock()
 		case <-a.taskLoopChan:
@@ -205,8 +229,7 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 	}
 
 	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
-		a.selectedPair.remote = remoteCandidate
-		a.selectedPair.local = localCandidate
+		a.setSelectedPair(localCandidate, remoteCandidate)
 	}
 	a.sendBindingSuccess(m, local, remote)
 }
@@ -223,8 +246,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 	if m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding {
 		//Binding success!
 		if a.selectedPair.remote == nil && a.selectedPair.local == nil {
-			a.selectedPair.remote = remoteCandidate
-			a.selectedPair.local = localCandidate
+			a.setSelectedPair(localCandidate, remoteCandidate)
 		}
 	} else {
 		a.sendBindingSuccess(m, local, remote)
