@@ -83,7 +83,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 * [Michael Melvin Santry](https://github.com/santrym) - *Mascot*
 * [Raphael Randschau](https://github.com/nicolai86) - *STUN*
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
-* [backkem](https://github.com/backkem) - *SDP, Public API, Project Management*
+* [Michiel De Backker](https://github.com/backkem) - *SDP, Public API, Project Management*
 * [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
 
 ## Project Ideas
