@@ -80,7 +80,7 @@ type RTCRtpTransceiver struct {
 	stopped bool
 }
 
-func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) {
+func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) error {
 	t.Sender.Track = track
 
 	switch t.Direction {
@@ -89,8 +89,9 @@ func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) {
 	case RTCRtpTransceiverDirectionInactive:
 		t.Direction = RTCRtpTransceiverDirectionSendonly
 	default:
-		panic("Invalid state change in RTCRtpTransceiver.setSending")
+		return errors.Errorf("Invalid state change in RTCRtpTransceiver.setSending")
 	}
+	return nil
 }
 
 func (r *RTCPeerConnection) newRTCRtpTransceiver(
@@ -110,7 +111,7 @@ func (r *RTCPeerConnection) newRTCRtpTransceiver(
 
 // Stop irreversibly stops the RTCRtpTransceiver
 func (t *RTCRtpTransceiver) Stop() error {
-	panic("TODO")
+	return errors.Errorf("TODO")
 }
 
 // RTCSample contains media, and the amount of samples in it

@@ -24,7 +24,7 @@ import (
 
 func init() {
 	if !C.openssl_global_init() {
-		panic("Failed to initalize OpenSSL")
+		panic("Failed to initalize OpenSSL") // nolint
 	}
 }
 

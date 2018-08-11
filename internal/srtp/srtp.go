@@ -237,14 +237,14 @@ func (c *Context) addAuthTag(packet *rtp.Packet) error {
 	mac := hmac.New(sha1.New, c.sessionAuthTag)
 	fullPkt, err := packet.Marshal()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	fullPkt = append(fullPkt, make([]byte, 4)...)
 	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], c.rolloverCounter)
 
 	if _, err := mac.Write(fullPkt); err != nil {
-		panic(err)
+		return err
 	}
 
 	packet.Payload = append(packet.Payload, mac.Sum(nil)[0:10]...)

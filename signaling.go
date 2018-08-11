@@ -155,9 +155,9 @@ func (r *RTCPeerConnection) generateLocalCandidates() []string {
 func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
 	useIdentity := r.idpLoginURL != nil
 	if options != nil {
-		panic("TODO handle options")
+		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
 	} else if useIdentity {
-		panic("TODO handle identity provider")
+		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
 	} else if r.IsClosed {
 		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -183,9 +183,9 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionDescription, error) {
 	useIdentity := r.idpLoginURL != nil
 	if options != nil {
-		panic("TODO handle options")
+		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
 	} else if useIdentity {
-		panic("TODO handle identity provider")
+		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
 	} else if r.IsClosed {
 		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
 	}

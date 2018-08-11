@@ -9,6 +9,7 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/util"
+	"github.com/pkg/errors"
 )
 
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
@@ -62,16 +63,16 @@ func NewAgent(outboundCallback OutboundCallback) *Agent {
 }
 
 // Start starts the agent
-func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) {
+func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 	a.Lock()
 	defer a.Unlock()
 
 	if a.haveStarted {
-		panic("Attempted to start agent twice")
+		return errors.Errorf("Attempted to start agent twice")
 	} else if remoteUfrag == "" {
-		panic("remoteUfrag is empty")
+		return errors.Errorf("remoteUfrag is empty")
 	} else if remotePwd == "" {
-		panic("remotePwd is empty")
+		return errors.Errorf("remotePwd is empty")
 	}
 
 	a.isControlling = isControlling
@@ -81,6 +82,7 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) {
 	if isControlling {
 		go a.agentControllingTaskLoop()
 	}
+	return nil
 }
 
 func (a *Agent) pingCandidate(local, remote Candidate) {
@@ -95,7 +97,8 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		&stun.Fingerprint{},
 	)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
 	a.outboundCallback(msg.Pack(), &stun.TransportAddr{
@@ -197,7 +200,8 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 
 func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
-		panic("inbound isControlled && a.isControlling == false")
+		fmt.Println("inbound isControlled && a.isControlling == false")
+		return
 	}
 
 	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
@@ -209,9 +213,11 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 
 func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
-		panic("inbound isControlling && a.isControlling == true")
+		fmt.Println("inbound isControlling && a.isControlling == true")
+		return
 	} else if _, useCandidate := m.GetOneAttribute(stun.AttrUseCandidate); useCandidate && a.isControlling {
-		panic("useCandidate && a.isControlling == true")
+		fmt.Println("useCandidate && a.isControlling == true")
+		return
 	}
 
 	if m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding {
@@ -247,7 +253,8 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 
 	m, err := stun.NewMessage(buf)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to handle decode ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error()))
+		fmt.Println(fmt.Sprintf("Failed to handle decode ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error()))
+		return
 	}
 
 	if a.isControlling {
