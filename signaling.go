@@ -135,9 +135,7 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 			}
 		}
 	}
-
-	r.networkManager.Start(weOffer, remoteUfrag, remotePwd)
-	return nil
+	return r.networkManager.Start(weOffer, remoteUfrag, remotePwd)
 }
 
 func (r *RTCPeerConnection) generateLocalCandidates() []string {
