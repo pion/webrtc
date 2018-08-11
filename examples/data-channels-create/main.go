@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/pions/webrtc"
@@ -58,29 +57,27 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
-	datachannels := make([]*webrtc.RTCDataChannel, 0)
-	var dataChannelsLock sync.RWMutex
+	// TODO: We have to send the offer otherwise it's empty.
 
-	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
-		dataChannelsLock.Lock()
-		datachannels = append(datachannels, d)
-		dataChannelsLock.Unlock()
+	d, err := peerConnection.CreateDataChannel("data", nil)
+	if err != nil {
+		panic(err)
+	}
 
-		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
+	fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 
-		d.Lock()
-		defer d.Unlock()
-		d.Onmessage = func(payload datachannel.Payload) {
-			switch p := payload.(type) {
-			case *datachannel.PayloadString:
-				fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
-			case *datachannel.PayloadBinary:
-				fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), d.Label, p.Data)
-			default:
-				fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), d.Label)
-			}
+	d.Lock()
+	d.Onmessage = func(payload datachannel.Payload) {
+		switch p := payload.(type) {
+		case *datachannel.PayloadString:
+			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
+		case *datachannel.PayloadBinary:
+			fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), d.Label, p.Data)
+		default:
+			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), d.Label)
 		}
 	}
+	d.Unlock()
 
 	// Set the remote SessionDescription
 	offer := webrtc.RTCSessionDescription{
@@ -105,13 +102,9 @@ func main() {
 		message := randSeq(15)
 		fmt.Printf("Sending %s \n", message)
 
-		dataChannelsLock.RLock()
-		for _, d := range datachannels {
-			err := d.Send(datachannel.PayloadString{Data: []byte(message)})
-			if err != nil {
-				panic(err)
-			}
+		err := d.Send(datachannel.PayloadString{Data: []byte(message)})
+		if err != nil {
+			panic(err)
 		}
-		dataChannelsLock.RUnlock()
 	}
 }
