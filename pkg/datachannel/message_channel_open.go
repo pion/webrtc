@@ -28,7 +28,7 @@ ChannelOpen represents a DATA_CHANNEL_OPEN Message
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 type ChannelOpen struct {
-	ChannelType          byte
+	ChannelType          ChannelType
 	Priority             uint16
 	ReliabilityParameter uint32
 
@@ -46,6 +46,43 @@ const (
 	offsetProtocolLength = 10
 )
 
+type ChannelType byte
+
+const (
+	// ChannelTypeReliable determines the Data Channel provides a
+	// reliable in-order bi-directional communication.
+	ChannelTypeReliable = 0x00
+	// ChannelTypeReliableUnordered determines the Data Channel
+	// provides a reliable unordered bi-directional communication.
+	ChannelTypeReliableUnordered = 0x80
+	// ChannelTypePartialReliableRexmit determines the Data Channel
+	// provides a partially-reliable in-order bi-directional communication.
+	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
+	ChannelTypePartialReliableRexmit = 0x01
+	// ChannelTypePartialReliableRexmitUnordered determines
+	//  the Data Channel provides a partial reliable unordered bi-directional communication.
+	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
+	ChannelTypePartialReliableRexmitUnordered = 0x81
+	// ChannelTypePartialReliableTimed determines the Data Channel
+	// provides a partial reliable in-order bi-directional communication.
+	// User messages might not be transmitted or retransmitted after
+	// a specified life-time given in milli- seconds in the Reliability Parameter.
+	// This life-time starts when providing the user message to the protocol stack.
+	ChannelTypePartialReliableTimed = 0x02
+	// The Data Channel provides a partial reliable unordered bi-directional
+	// communication.  User messages might not be transmitted or retransmitted
+	// after a specified life-time given in milli- seconds in the Reliability Parameter.
+	// This life-time starts when providing the user message to the protocol stack.
+	ChannelTypePartialReliableTimedUnordered = 0x82
+)
+
+const (
+	PriorityBelowNormal uint16 = 128
+	PriorityNormal      uint16 = 256
+	PriorityHigh        uint16 = 512
+	PriorityExtraHigh   uint16 = 1024
+)
+
 // Marshal returns raw bytes for the given message
 func (c *ChannelOpen) Marshal() ([]byte, error) {
 	labelLength := len(c.Label)
@@ -55,7 +92,7 @@ func (c *ChannelOpen) Marshal() ([]byte, error) {
 	raw := make([]byte, totalLen)
 
 	raw[offsetMessageType] = uint8(DataChannelOpen)
-	raw[offsetChannelType] = c.ChannelType
+	raw[offsetChannelType] = byte(c.ChannelType)
 	binary.BigEndian.PutUint16(raw[offsetPriority:], c.Priority)
 	binary.BigEndian.PutUint32(raw[offsetReliability:], c.ReliabilityParameter)
 	binary.BigEndian.PutUint16(raw[offsetLabelLength:], uint16(labelLength))
@@ -72,7 +109,7 @@ func (c *ChannelOpen) Unmarshal(raw []byte) error {
 	if len(raw) < channelOpenHeaderLength {
 		return errors.Errorf("Length of input is not long enough to satisfy header %d", len(raw))
 	}
-	c.ChannelType = raw[offsetChannelType]
+	c.ChannelType = ChannelType(raw[offsetChannelType])
 	c.Priority = binary.BigEndian.Uint16(raw[offsetPriority:])
 	c.ReliabilityParameter = binary.BigEndian.Uint32(raw[offsetReliability:])
 

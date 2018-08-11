@@ -51,13 +51,14 @@ func (p RTCPriorityType) String() string {
 	}
 }
 
+// RTCDataChannelInit can be used to configure properties of the underlying channel such as data reliability.
 type RTCDataChannelInit struct {
 	Ordered           bool
 	MaxPacketLifeTime *uint16
 	MaxRetransmits    *uint16
 	Protocol          string
 	Negotiated        bool
-	Id                uint16
+	ID                uint16
 	Priority          RTCPriorityType
 }
 
@@ -82,11 +83,15 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 		negotiated = options.Negotiated
 	}
 
-	var id uint16 = 0
+	var id uint16
 	if negotiated {
-		id = options.Id
+		id = options.ID
 	} else {
-		// TODO: generate id
+		var err error
+		id, err = r.generateDataChannelID(true) // TODO: base on DTLS role
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if id > 65534 {
@@ -98,18 +103,36 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 		return nil, &OperationError{Err: ErrMaxDataChannels}
 	}
 
-	// TODO: Actually allocate datachannel
+	_ = ordered  // TODO
+	_ = priority // TODO
 	res := &RTCDataChannel{
 		Label:             label,
 		ID:                id,
 		rtcPeerConnection: r,
 	}
 
-	// TODO handle settings:
-	_ = ordered
-	_ = priority
+	// Remember datachannel
+	r.dataChannels[id] = res
+
+	// Send opening message
+	r.networkManager.SendOpenChannelMessage(id, label)
 
 	return res, nil
+}
+
+func (r *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
+	var id uint16
+	if !client {
+		id++
+	}
+
+	for ; id < r.sctp.MaxChannels-1; id += 2 {
+		_, ok := r.dataChannels[id]
+		if !ok {
+			return id, nil
+		}
+	}
+	return 0, &OperationError{Err: ErrMaxDataChannels}
 }
 
 // Send sends the passed message to the DataChannel peer

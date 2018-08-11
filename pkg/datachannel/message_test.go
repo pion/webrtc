@@ -8,7 +8,7 @@ import (
 
 func TestChannelOpenMarshal(t *testing.T) {
 	msg := ChannelOpen{
-		ChannelType:          0,
+		ChannelType:          ChannelTypeReliable,
 		Priority:             0,
 		ReliabilityParameter: 0,
 
@@ -18,13 +18,15 @@ func TestChannelOpenMarshal(t *testing.T) {
 
 	rawMsg, err := msg.Marshal()
 	if err != nil {
-		t.Fatalf("Failed to marshal: %v", err)
+		t.Errorf("Failed to marshal: %v", err)
+		return
 	}
 
 	result := []byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72}
 
 	if len(rawMsg) != len(result) {
-		t.Fatalf("%q != %q", rawMsg, result)
+		t.Errorf("%q != %q", rawMsg, result)
+		return
 	}
 
 	for i, v := range rawMsg {
@@ -39,12 +41,14 @@ func TestChannelAckMarshal(t *testing.T) {
 	msg := ChannelAck{}
 	rawMsg, err := msg.Marshal()
 	if err != nil {
-		t.Fatalf("Failed to marshal: %v", err)
+		t.Errorf("Failed to marshal: %v", err)
+		return
 	}
 	result := []byte{0x02, 0x00, 0x00, 0x00}
 
 	if len(rawMsg) != len(result) {
-		t.Fatalf("%q != %q", rawMsg, result)
+		t.Errorf("%q != %q", rawMsg, result)
+		return
 	}
 
 	for i, v := range rawMsg {
@@ -66,7 +70,7 @@ func TestChannelOpenUnmarshal(t *testing.T) {
 
 	if err != nil {
 		t.Error(errors.Wrap(err, "Unmarshal failed, ChannelOpen"))
-	} else if msg.ChannelType != 0 {
+	} else if msg.ChannelType != ChannelTypeReliable {
 		t.Error(errors.Errorf("ChannelType should be 0"))
 	} else if msg.Priority != 0 {
 		t.Error(errors.Errorf("Priority should be 0"))
@@ -83,7 +87,8 @@ func TestChannelAckUnmarshal(t *testing.T) {
 	rawMsg := []byte{0x02}
 	msgUncast, err := Parse(rawMsg)
 	if err != nil {
-		t.Fatalf("Failed to parse: %v", err)
+		t.Errorf("Failed to parse: %v", err)
+		return
 	}
 
 	_, ok := msgUncast.(*ChannelAck)
