@@ -201,7 +201,9 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 		}
 	}
 	if transceiver != nil {
-		transceiver.setSendingTrack(track)
+		if err := transceiver.setSendingTrack(track); err != nil {
+			return nil, err
+		}
 	} else {
 		var receiver *RTCRtpReceiver
 		sender := newRTCRtpSender(track)

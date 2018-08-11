@@ -106,10 +106,13 @@ func (m *Manager) AddURL(url *ice.URL) error {
 }
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
-func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) {
+func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	m.isOffer = isOffer
-	m.IceAgent.Start(isOffer, remoteUfrag, remotePwd)
+	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
+		return err
+	}
 	m.dtlsState.Start(isOffer)
+	return nil
 }
 
 // Close cleans up all the allocated state
