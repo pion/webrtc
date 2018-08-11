@@ -270,3 +270,23 @@ func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remo
 		}
 	}
 }
+
+func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) error {
+	msg := &datachannel.ChannelOpen{
+		ChannelType:          datachannel.ChannelTypeReliable,
+		Priority:             datachannel.PriorityNormal,
+		ReliabilityParameter: 0,
+
+		Label:    []byte(label),
+		Protocol: []byte(""),
+	}
+
+	rawMsg, err := msg.Marshal()
+	if err != nil {
+		return fmt.Errorf("Error Marshaling ChannelOpen %v", err)
+	}
+	if err = m.sctpAssociation.HandleOutbound(rawMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
+		return fmt.Errorf("Error sending ChannelOpen %v", err)
+	}
+	return nil
+}

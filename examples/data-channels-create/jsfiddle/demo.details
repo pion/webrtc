@@ -1,0 +1,5 @@
+---
+ name: data-channels
+ description: Example of using pion-WebRTC to communicate with a web browser using bi-direction DataChannels
+ authors:
+   - Sean DuBois
