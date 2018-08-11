@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/pions/webrtc/pkg/ice"
@@ -243,7 +244,10 @@ func (r *RTCPeerConnection) setICEServers(config RTCConfiguration) error {
 			if err != nil {
 				return err
 			}
-			r.networkManager.AddURL(&url)
+			err = r.networkManager.AddURL(&url)
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 	return nil

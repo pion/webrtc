@@ -30,7 +30,7 @@ type Agent struct {
 
 	LocalUfrag      string
 	LocalPwd        string
-	localCandidates []Candidate
+	LocalCandidates []Candidate
 
 	remoteUfrag      string
 	remotePwd        string
@@ -50,16 +50,15 @@ const (
 
 // NewAgent creates a new Agent
 func NewAgent(outboundCallback OutboundCallback) *Agent {
-	a := &Agent{
+	return &Agent{
 		tieBreaker:       rand.Uint64(),
 		outboundCallback: outboundCallback,
+		gatheringState:   GatheringStateComplete, // TODO trickle-ice
+		connectionState:  ConnectionStateNew,
 
 		LocalUfrag: util.RandSeq(16),
 		LocalPwd:   util.RandSeq(32),
 	}
-	if a.isControlling {
-	}
-	return a
 }
 
 // Start starts the agent
@@ -89,7 +88,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 		&stun.UseCandidate{},
 		&stun.IceControlling{TieBreaker: a.tieBreaker},
-		&stun.Priority{Priority: uint32(local.GetBase().priority(hostCandidatePreference, 1))},
+		&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 		&stun.MessageIntegrity{
 			Key: []byte(a.remotePwd),
 		},
@@ -111,19 +110,20 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 func (a *Agent) agentControllingTaskLoop() {
 	// TODO this should be dynamic, and grow when the connection is stable
 	t := time.NewTicker(agentTickerBaseInterval)
+	a.connectionState = ConnectionStateChecking
 
 	for {
 		select {
 		case <-t.C:
 			a.Lock()
 			if a.selectedPair.remote == nil || a.selectedPair.local == nil {
-				for _, localCandidate := range a.localCandidates {
+				for _, localCandidate := range a.LocalCandidates {
 					for _, remoteCandidate := range a.remoteCandidates {
 						a.pingCandidate(localCandidate, remoteCandidate)
 					}
 				}
 			} else {
-				if time.Now().Sub(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
+				if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
 					a.selectedPair.remote = nil
 					a.selectedPair.local = nil
 				} else {
@@ -149,25 +149,12 @@ func (a *Agent) AddRemoteCandidate(c Candidate) {
 func (a *Agent) AddLocalCandidate(c Candidate) {
 	a.Lock()
 	defer a.Unlock()
-	a.localCandidates = append(a.localCandidates, c)
+	a.LocalCandidates = append(a.LocalCandidates, c)
 }
 
 // Close cleans up the Agent
 func (a *Agent) Close() {
 	close(a.taskLoopChan)
-}
-
-// LocalCandidates generates the string representation of the
-// local candidates that can be used in the SDP
-func (a *Agent) LocalCandidates() (rtrn []string) {
-	a.Lock()
-	defer a.Unlock()
-
-	for _, c := range a.localCandidates {
-		rtrn = append(rtrn, c.String(1))
-		rtrn = append(rtrn, c.String(2))
-	}
-	return rtrn
 }
 
 func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
@@ -209,7 +196,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 }
 
 func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
-	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && a.isControlling == false {
+	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
 		panic("inbound isControlled && a.isControlling == false")
 	}
 
@@ -221,9 +208,9 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 }
 
 func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
-	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling == true {
+	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
 		panic("inbound isControlling && a.isControlling == true")
-	} else if _, useCandidate := m.GetOneAttribute(stun.AttrUseCandidate); useCandidate && a.isControlling == true {
+	} else if _, useCandidate := m.GetOneAttribute(stun.AttrUseCandidate); useCandidate && a.isControlling {
 		panic("useCandidate && a.isControlling == true")
 	}
 
@@ -243,7 +230,7 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 	a.Lock()
 	defer a.Unlock()
 
-	localCandidate := getTransportAddrCandidate(a.localCandidates, local)
+	localCandidate := getTransportAddrCandidate(a.LocalCandidates, local)
 	if localCandidate == nil {
 		// TODO debug
 		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)

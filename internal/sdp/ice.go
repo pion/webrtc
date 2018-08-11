@@ -8,8 +8,8 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 )
 
-// ICECandidateBuild takes a candidate strings and returns a ice.Candidate or nil if it fails to parse
-func ICECandidateBuild(raw string) ice.Candidate {
+// ICECandidateUnmarshal takes a candidate strings and returns a ice.Candidate or nil if it fails to parse
+func ICECandidateUnmarshal(raw string) ice.Candidate {
 	split := strings.Fields(raw)
 	if len(split) < 8 {
 		fmt.Printf("Attribute not long enough to be ICE candidate (%d) %s \n", len(split), raw)
@@ -48,4 +48,30 @@ func ICECandidateBuild(raw string) ice.Candidate {
 	default:
 		return nil
 	}
+}
+
+func iceSrflxCandidateString(c *ice.CandidateSrflx, component int) string {
+	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ srflx raddr %s rport %d generation 0",
+		component, c.CandidateBase.Priority(ice.SrflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RemoteAddress, c.RemotePort)
+}
+
+func iceHostCandidateString(c *ice.CandidateHost, component int) string {
+	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ host generation 0",
+		component, c.CandidateBase.Priority(ice.HostCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port)
+}
+
+// ICECandidateMarshal takes a candidate and returns a string representation
+func ICECandidateMarshal(c ice.Candidate) []string {
+	out := make([]string, 0)
+
+	switch c := c.(type) {
+	case *ice.CandidateSrflx:
+		out = append(out, iceSrflxCandidateString(c, 0))
+		out = append(out, iceSrflxCandidateString(c, 1))
+	case *ice.CandidateHost:
+		out = append(out, iceHostCandidateString(c, 0))
+		out = append(out, iceHostCandidateString(c, 1))
+	}
+
+	return out
 }
