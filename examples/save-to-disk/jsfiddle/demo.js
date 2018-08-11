@@ -10,12 +10,14 @@ navigator.mediaDevices.getUserMedia({video: true, audio: true})
   .catch(log)
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
+pc.onicecandidate = event => {
+  if (event.candidate === null) {
+    document.getElementById('localSessionDescription').value = btoa(pc.localDescription.sdp)
+  }
+}
 
 pc.onnegotiationneeded = e =>
-  pc.createOffer().then(d => {
-    document.getElementById('localSessionDescription').value = btoa(d.sdp)
-    return pc.setLocalDescription(d)
-  }).catch(log)
+  pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value
