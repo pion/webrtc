@@ -20,4 +20,4 @@ script:
   - golangci-lint run
   - goveralls -v -race -covermode=atomic -service=travis-ci
   - bash .github/assert-contributors.sh
-  - bash .github/lint-panic-and-exit.sh
+  - bash .github/lint-disallowed-functions-in-library.sh
