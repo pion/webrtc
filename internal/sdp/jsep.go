@@ -35,11 +35,7 @@ const (
 func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescription {
 	d := &SessionDescription{
 		ProtocolVersion: 0,
-		Origin: fmt.Sprintf(
-			"- %d %d IN IP4 0.0.0.0",
-			newSessionID(),
-			time.Now().Unix(),
-		),
+		Origin: Origin{"-", newSessionID(), uint64(time.Now().Unix()), "IN", "IP4", "0.0.0.0"},
 		SessionName: "-",
 		Timing:      []string{"0 0"},
 		Attributes: []string{
@@ -56,21 +52,21 @@ func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescri
 }
 
 // WithPropertyAttribute adds a property attribute 'a=key' to the session description
-func (d *SessionDescription) WithPropertyAttribute(key string) *SessionDescription {
-	d.Attributes = append(d.Attributes, key)
-	return d
+func (s *SessionDescription) WithPropertyAttribute(key string) *SessionDescription {
+	s.Attributes = append(s.Attributes, key)
+	return s
 }
 
 // WithValueAttribute adds a value attribute 'a=key:value' to the session description
-func (d *SessionDescription) WithValueAttribute(key, value string) *SessionDescription {
-	d.Attributes = append(d.Attributes, fmt.Sprintf("%s:%s", key, value))
-	return d
+func (s *SessionDescription) WithValueAttribute(key, value string) *SessionDescription {
+	s.Attributes = append(s.Attributes, fmt.Sprintf("%s:%s", key, value))
+	return s
 }
 
 // WithMedia adds a media description to the session description
-func (d *SessionDescription) WithMedia(md *MediaDescription) *SessionDescription {
-	d.MediaDescriptions = append(d.MediaDescriptions, md)
-	return d
+func (s *SessionDescription) WithMedia(md *MediaDescription) *SessionDescription {
+	s.MediaDescriptions = append(s.MediaDescriptions, md)
+	return s
 }
 
 // NewJSEPMediaDescription creates a new MediaDescription with

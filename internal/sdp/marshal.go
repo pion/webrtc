@@ -40,14 +40,28 @@ func (s *SessionDescription) Marshal() (raw string) {
 	}
 
 	raw += kvBuilder("v", strconv.Itoa(s.ProtocolVersion))
-	raw += kvBuilder("o", s.Origin)
+	raw += kvBuilder("o", s.Origin.String())
 	raw += kvBuilder("s", s.SessionName)
 
-	addIfSet("i", s.SessionInformation)
-	addIfSet("u", s.URI)
-	addIfSet("e", s.EmailAddress)
-	addIfSet("p", s.PhoneNumber)
-	addIfSet("c", s.ConnectionData)
+	if s.SessionInformation != nil {
+		raw += kvBuilder("i", *s.SessionInformation)
+	}
+
+	if s.URI != nil {
+		raw += kvBuilder("u", s.URI.String())
+	}
+
+	if s.EmailAddress != nil {
+		raw += kvBuilder("e", *s.EmailAddress)
+	}
+
+	if s.PhoneNumber != nil {
+		raw += kvBuilder("p", *s.PhoneNumber)
+	}
+
+	if s.ConnectionInformation != nil {
+		raw += kvBuilder("c", s.ConnectionInformation.String())
+	}
 
 	addSlice("b", s.Bandwidth)
 	addSlice("t", s.Timing)

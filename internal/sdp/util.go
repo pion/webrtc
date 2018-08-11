@@ -59,7 +59,7 @@ func (c Codec) String() string {
 }
 
 // GetCodecForPayloadType scans the SessionDescription for the given payloadType and returns the codec
-func (sd *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, error) {
+func (s *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, error) {
 	codec := Codec{
 		PayloadType: payloadType,
 	}
@@ -69,7 +69,7 @@ func (sd *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, 
 	rtpmapPrefix := "rtpmap:" + payloadTypeString
 	fmtpPrefix := "fmtp:" + payloadTypeString
 
-	for _, m := range sd.MediaDescriptions {
+	for _, m := range s.MediaDescriptions {
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(a, rtpmapPrefix) {
 				found = true
