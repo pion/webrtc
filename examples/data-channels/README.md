@@ -8,7 +8,7 @@ go get github.com/pions/webrtc/examples/data-channels
 ```
 
 ### Open data-channels example page
-[jsfiddle.net](https://jsfiddle.net/gh/get/library/pure/pions/webrtc/tree/master/examples/data-channels/jsfiddle)
+[jsfiddle.net](http://jsfiddle.net/9tsx15mg/1/)
 
 ### Run data-channels, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser's session description, copy that and:

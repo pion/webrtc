@@ -8,7 +8,7 @@ go get github.com/pions/webrtc/examples/save-to-disk
 ```
 
 ### Open save-to-disk example page
-[jsfiddle.net](https://jsfiddle.net/usd3xmtz/2/) you should see your Webcam, two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/dyj8qpek/) you should see your Webcam, two text-areas and a 'Start Session' button
 
 ### Run save-to-disk, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser, copy that and:

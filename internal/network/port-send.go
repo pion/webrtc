@@ -12,7 +12,7 @@ func (p *port) sendRTP(packet *rtp.Packet, dst net.Addr) {
 	p.m.certPairLock.RLock()
 	defer p.m.certPairLock.RUnlock()
 	if p.m.certPair == nil {
-		fmt.Printf("Tried to send SRTP packet but no DTLS state to handle it %v \n", p.m.certPair)
+		fmt.Println("Tried to send SRTP packet but no DTLS state to handle it")
 		return
 	}
 
