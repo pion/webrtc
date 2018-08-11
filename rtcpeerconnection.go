@@ -181,7 +181,7 @@ func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	r.Lock()
 	defer r.Unlock()
 
-	if r.OnICEConnectionStateChange != nil {
+	if r.OnICEConnectionStateChange != nil && r.IceConnectionState != newState {
 		r.OnICEConnectionStateChange(newState)
 	}
 	r.IceConnectionState = newState
