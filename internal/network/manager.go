@@ -65,9 +65,9 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler)
 	for _, i := range localInterfaces() {
-		p, err := newPort(i+":0", m)
-		if err != nil {
-			return nil, err
+		p, portErr := newPort(i+":0", m)
+		if portErr != nil {
+			return nil, portErr
 		}
 
 		m.ports = append(m.ports, p)

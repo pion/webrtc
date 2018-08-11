@@ -123,7 +123,7 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 	for _, m := range r.remoteDescription.MediaDescriptions {
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(a, "candidate") {
-				if c := sdp.ICECandidateBuild(a); c != nil {
+				if c := sdp.ICECandidateUnmarshal(a); c != nil {
 					r.networkManager.IceAgent.AddRemoteCandidate(c)
 				} else {
 					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
@@ -140,6 +140,17 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 	return nil
 }
 
+func (r *RTCPeerConnection) generateLocalCandidates() []string {
+	r.networkManager.IceAgent.RLock()
+	defer r.networkManager.IceAgent.RUnlock()
+
+	candidates := make([]string, 0)
+	for _, c := range r.networkManager.IceAgent.LocalCandidates {
+		candidates = append(candidates, sdp.ICECandidateMarshal(c)...)
+	}
+	return candidates
+}
+
 // CreateOffer starts the RTCPeerConnection and generates the localDescription
 func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
 	useIdentity := r.idpLoginURL != nil
@@ -151,8 +162,8 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	candidates := r.networkManager.IceAgent.LocalCandidates()
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
+	candidates := r.generateLocalCandidates()
 
 	r.addRTPMediaSections(d, []RTCRtpCodecType{RTCRtpCodecTypeAudio, RTCRtpCodecTypeVideo}, candidates)
 	r.addDataMediaSection(d, candidates)
@@ -195,7 +206,7 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 		}
 	}
 
-	candidates := r.networkManager.IceAgent.LocalCandidates()
+	candidates := r.generateLocalCandidates()
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
 
 	r.addRTPMediaSections(d, mediaSectionsToAdd, candidates)

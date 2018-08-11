@@ -135,33 +135,31 @@ func (p *port) networkLoop() {
 	}()
 
 	for {
-		select {
-		case in, socketOpen := <-incomingPackets:
-			if !socketOpen {
-				// incomingPackets channel has closed, this port is finished processing
-				dtls.RemoveListener(p.listeningAddr.String())
-				return
-			}
-
-			if len(in.buffer) == 0 {
-				fmt.Println("Inbound buffer is not long enough to demux")
-				continue
-			}
-
-			// https://tools.ietf.org/html/rfc5764#page-14
-			if 127 < in.buffer[0] && in.buffer[0] < 192 {
-				p.handleSRTP(in.buffer)
-			} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
-				p.handleDTLS(in.buffer, in.srcAddr.String())
-			} else if in.buffer[0] < 2 {
-				p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
-			}
-
-			p.m.certPairLock.RLock()
-			if p.m.isOffer == false && p.m.certPair == nil {
-				p.m.dtlsState.DoHandshake(p.listeningAddr.String(), in.srcAddr.String())
-			}
-			p.m.certPairLock.RUnlock()
+		in, socketOpen := <-incomingPackets
+		if !socketOpen {
+			// incomingPackets channel has closed, this port is finished processing
+			dtls.RemoveListener(p.listeningAddr.String())
+			return
 		}
+
+		if len(in.buffer) == 0 {
+			fmt.Println("Inbound buffer is not long enough to demux")
+			continue
+		}
+
+		// https://tools.ietf.org/html/rfc5764#page-14
+		if 127 < in.buffer[0] && in.buffer[0] < 192 {
+			p.handleSRTP(in.buffer)
+		} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
+			p.handleDTLS(in.buffer, in.srcAddr.String())
+		} else if in.buffer[0] < 2 {
+			p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
+		}
+
+		p.m.certPairLock.RLock()
+		if !p.m.isOffer && p.m.certPair == nil {
+			p.m.dtlsState.DoHandshake(p.listeningAddr.String(), in.srcAddr.String())
+		}
+		p.m.certPairLock.RUnlock()
 	}
 }

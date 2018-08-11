@@ -65,6 +65,7 @@ type RTCPeerConnection struct {
 
 	// ICE
 	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
+	IceConnectionState         ice.ConnectionState
 
 	config RTCConfiguration
 
@@ -179,10 +180,10 @@ func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	r.Lock()
 	defer r.Unlock()
 
-	// if r.OnICEConnectionStateChange != nil && r.iceState != newState {
-	// 	r.OnICEConnectionStateChange(newState)
-	// }
-	// r.iceState = newState
+	if r.OnICEConnectionStateChange != nil {
+		r.OnICEConnectionStateChange(newState)
+	}
+	r.IceConnectionState = newState
 }
 
 func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
