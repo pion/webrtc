@@ -10,6 +10,7 @@ import (
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pkg/errors"
 )
 
 func init() {
@@ -132,7 +133,7 @@ func (r *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
 func (r *RTCPeerConnection) SetIdentityProvider(provider string) error {
-	panic("TODO SetIdentityProvider")
+	return errors.Errorf("TODO SetIdentityProvider")
 }
 
 // Close ends the RTCPeerConnection
