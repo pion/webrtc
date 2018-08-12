@@ -64,6 +64,20 @@ func (c *ConnectionInformation) String() string {
 	)
 }
 
+type Bandwidth struct {
+	Experimental bool
+	Type         string
+	Bandwidth    uint64
+}
+
+func (b *Bandwidth) String() string {
+	var output string
+	if b.Experimental {
+		output += "X-"
+	}
+	return output + b.Type + ":" + strconv.FormatUint(b.Bandwidth, 10)
+}
+
 // SessionDescription is a a well-defined format for conveying sufficient
 // information to discover and participate in a multimedia session.
 type SessionDescription struct {
@@ -111,7 +125,7 @@ type SessionDescription struct {
 	// session or media
 	// b=<bwtype>:<bandwidth>
 	// https://tools.ietf.org/html/rfc4566#section-5.8
-	Bandwidth []string
+	Bandwidth []Bandwidth
 
 	// Timing lines specify the start and stop times for a session.
 	// t=<start-time> <stop-time>

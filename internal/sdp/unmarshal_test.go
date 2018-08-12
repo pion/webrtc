@@ -12,6 +12,8 @@ const CanonicalSDP = "v=0\n" +
 "u=http://www.example.com/seminars/sdp.pdf\n" +
 "e=j.doe@example.com (Jane Doe)\n" +
 "c=IN IP4 224.2.17.12/127\n" +
+"b=X-YZ:128\n" +
+"b=AS:12345\n" +
 "t=2873397496 2873404696\n" +
 "a=recvonly\n" +
 "m=audio 49170 RTP/AVP 0\n" +
