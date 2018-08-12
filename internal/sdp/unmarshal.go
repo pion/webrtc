@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/url"
 		"net"
-)
+	)
 
 // States transition table
 // +--------+----+-----+----+-----+---+----+----+---+---+-----+---+---+----+---+----+
@@ -120,7 +120,7 @@ func unmarshalProtocolVersion(l *lexer) (stateFn, error) {
 
 	version, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
-		return nil, errors.Errorf("sdp: invalid syntax `v=%v`", version)
+		return nil, errors.Errorf("sdp: invalid numeric value `%v`", version)
 	}
 
 	// As off the latest draft of the rfc this value is required to be 0.
@@ -158,12 +158,12 @@ func unmarshalOrigin(l *lexer) (stateFn, error) {
 
 	sessionId, err := strconv.ParseUint(fields[1], 10, 64)
 	if err != nil {
-		return nil, errors.Errorf("sdp: invalid value `%v`", fields[1])
+		return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[1])
 	}
 
 	sessionVersion, err := strconv.ParseUint(fields[2], 10, 64)
 	if err != nil {
-		return nil, errors.Errorf("sdp: invalid value `%v`", fields[2])
+		return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[2])
 	}
 
 	// Set according to currently registered with IANA
@@ -320,7 +320,7 @@ func unmarshalSessionConnectionData(l *lexer) (stateFn, error) {
 		if len(parts) > 1 {
 			val, err := strconv.ParseInt(parts[1], 10, 32)
 			if err != nil {
-				return nil, errors.Errorf("sdp: invalid value `%v`", fields[2])
+				return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[2])
 			}
 
 			if isIP6 {
@@ -335,7 +335,7 @@ func unmarshalSessionConnectionData(l *lexer) (stateFn, error) {
 		if len(parts) > 2 {
 			val, err := strconv.ParseInt(parts[2], 10, 32)
 			if err != nil {
-				return nil, errors.Errorf("sdp: invalid value `%v`", fields[2])
+				return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[2])
 			}
 
 			multi := int(val)
@@ -354,8 +354,39 @@ func unmarshalSessionConnectionData(l *lexer) (stateFn, error) {
 }
 
 func unmarshalSessionBandwidth(l *lexer) (stateFn, error) {
-	// return s5, nil
-	return nil, nil
+	value, err := readValue(l.input)
+	if err != nil {
+		return nil, err
+	}
+
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return nil, errors.Errorf("sdp: invalid syntax `b=%v`", parts)
+	}
+
+	experimental := strings.HasPrefix(parts[0], "X-")
+	if experimental {
+		parts[0] = strings.TrimPrefix(parts[0], "X-")
+	} else {
+		// Set according to currently registered with IANA
+		// https://tools.ietf.org/html/rfc4566#section-5.8
+		if i := indexOf(parts[0], []string{"CT", "AS"}); i == -1 {
+			return nil, errors.Errorf("sdp: invalid value `%v`", parts[0])
+		}
+	}
+
+	bandwidth, err := strconv.ParseUint(parts[1], 10, 64)
+	if err != nil {
+		return nil, errors.Errorf("sdp: invalid numeric value `%v`", parts[1])
+	}
+
+	l.desc.Bandwidth = append(l.desc.Bandwidth, Bandwidth{
+		Experimental: experimental,
+		Type: parts[0],
+		Bandwidth: bandwidth,
+	})
+
+	return s5, nil
 }
 
 func unmarshalTiming(l *lexer) (stateFn, error) {

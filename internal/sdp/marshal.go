@@ -63,7 +63,10 @@ func (s *SessionDescription) Marshal() (raw string) {
 		raw += kvBuilder("c", s.ConnectionInformation.String())
 	}
 
-	addSlice("b", s.Bandwidth)
+	for _, v := range s.Bandwidth {
+		raw += kvBuilder("b", v.String())
+	}
+
 	addSlice("t", s.Timing)
 	addSlice("r", s.RepeatTimes)
 	addSlice("z", s.TimeZones)
