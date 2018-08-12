@@ -75,7 +75,7 @@ You can also use [Pion mailing list](https://groups.google.com/forum/#!forum/pio
 If you need commercial support/don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
 
 ## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 
 ### Contributors
 
