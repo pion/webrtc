@@ -254,7 +254,6 @@ func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRt
 }
 
 func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string) {
-
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
