@@ -5,9 +5,9 @@
 ### Folders ###
 #############
 bin/
-tags/
 vendor/
 
 ### Files ###
 #############
 *.ivf
+tags
