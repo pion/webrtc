@@ -25,20 +25,6 @@ func randSeq(n int) string {
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	rawSd, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
-		panic(err)
-	}
-
-	fmt.Println("")
-	sd, err := base64.StdEncoding.DecodeString(rawSd)
-	if err != nil {
-		panic(err)
-	}
-
-	/* Everything below is the pion-WebRTC API, thanks for using it! */
-
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{
 		ICEServers: []webrtc.RTCICEServer{
@@ -56,8 +42,6 @@ func main() {
 	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
-
-	// TODO: We have to send the offer otherwise it's empty.
 
 	d, err := peerConnection.CreateDataChannel("data", nil)
 	if err != nil {
@@ -79,23 +63,28 @@ func main() {
 	}
 	d.Unlock()
 
-	// Set the remote SessionDescription
-	offer := webrtc.RTCSessionDescription{
-		Type: webrtc.RTCSdpTypeOffer,
-		Sdp:  string(sd),
-	}
-	if err := peerConnection.SetRemoteDescription(offer); err != nil {
-		panic(err)
-	}
-
-	// Sets the LocalDescription, and starts our UDP listeners
-	answer, err := peerConnection.CreateAnswer(nil)
+	offer, err := peerConnection.CreateOffer(nil)
 	if err != nil {
 		panic(err)
 	}
 
+	/* Signaling via STDIN */
+
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte(offer.Sdp)))
+	sd := mustReadStdin()
+
+	/* --- */
+
+	// Set the remote SessionDescription
+	answer := webrtc.RTCSessionDescription{
+		Type: webrtc.RTCSdpTypeAnswer,
+		Sdp:  sd,
+	}
+	if err := peerConnection.SetRemoteDescription(answer); err != nil {
+		panic(err)
+	}
+
 	fmt.Println("Random messages will now be sent to any connected DataChannels every 5 seconds")
 	for {
 		time.Sleep(5 * time.Second)
@@ -107,4 +96,19 @@ func main() {
 			panic(err)
 		}
 	}
+}
+
+func mustReadStdin() string {
+	reader := bufio.NewReader(os.Stdin)
+	rawSd, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+
+	fmt.Println("")
+	sd, err := base64.StdEncoding.DecodeString(rawSd)
+	if err != nil {
+		panic(err)
+	}
+	return string(sd)
 }

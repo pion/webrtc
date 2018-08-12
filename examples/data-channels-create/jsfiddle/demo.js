@@ -5,28 +5,39 @@ let log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
-let sendChannel = pc.createDataChannel()
-console.log(sendChannel.id)
-sendChannel.onclose = () => console.log('sendChannel has closed')
-sendChannel.onopen = () => console.log('sendChannel has opened')
-sendChannel.onmessage = e => log(`sendChannel got '${e.data}'`)
+// let sendChannel = pc.createDataChannel('foo')
+// sendChannel.onclose = () => console.log('sendChannel has closed')
+// sendChannel.onopen = () => console.log('sendChannel has opened')
+// sendChannel.onmessage = e => log(`sendChannel got '${e.data}'`)
 
+pc.onsignalingstatechange = e => log(pc.signalingState)
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
-
-pc.onnegotiationneeded = e =>
-  pc.createOffer({ }).then(d => {
-    document.getElementById('localSessionDescription').value = btoa(d.sdp)
-    return pc.setLocalDescription(d)
-  }).catch(log)
-
-window.sendMessage = () => {
-  let message = document.getElementById('message').value
-  if (message === '') {
-    return alert('Message must not be empty')
+pc.onicecandidate = event => {
+  if (event.candidate === null) {
+    document.getElementById('localSessionDescription').value = btoa(pc.localDescription.sdp)
   }
-
-  sendChannel.send(message)
 }
+
+pc.ondatachannel = e => {
+  log('got dc')
+  dc = e.channel
+  dc.onclose = () => console.log('dc has closed')
+  dc.onopen = () => console.log('dc has opened')
+  dc.onmessage = e => log(`dc got '${e.data}'`)
+  window.sendMessage = () => {
+    let message = document.getElementById('message').value
+    if (message === '') {
+      return alert('Message must not be empty')
+    }
+
+    dc.send(message)
+  }
+}
+
+// pc.onnegotiationneeded = e =>
+//   pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+
+
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value
@@ -34,9 +45,10 @@ window.startSession = () => {
     return alert('Session Description must not be empty')
   }
 
-  try {
-    pc.setRemoteDescription(new RTCSessionDescription({type: 'answer', sdp: atob(sd)}))
-  } catch (e) {
-    alert(e)
-  }
+  log(atob(sd))
+  pc.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: atob(sd)})).catch(log)
+
+  log("ss", pc.signalingState)
+  pc.createAnswer().then(d => pc.setLocalDescription(d)).catch(log)
+
 }
