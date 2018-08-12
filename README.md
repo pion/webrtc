@@ -85,6 +85,7 @@ See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
 * [Michiel De Backker](https://github.com/backkem) - *SDP, Public API, Project Management*
 * [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
+* [Konstantin Itskov](https://github.com/trivigy) - *SDP Parsing*
 
 ## Project Ideas
 We are looking to support other interesting WebRTC projects, so if you have something to build please reach out!
