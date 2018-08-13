@@ -3,6 +3,7 @@ package sdp
 import (
 	"fmt"
 	"time"
+	"net"
 )
 
 // Constants for SDP attributes used in JSEP
@@ -78,20 +79,26 @@ func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescri
 			Media: codecType,
 			Proto: "UDP/TLS/RTP/SAVPF",
 		},
-		ConnectionInformation: "IN IP4 0.0.0.0",
+		ConnectionInformation: &ConnectionInformation{
+			NetworkType: "IN",
+			AddressType: "IP4",
+			Address: &ConnectionAddress{
+				IP: net.ParseIP("0.0.0.0"),
+			},
+		},
 	}
 	return d
 }
 
 // WithPropertyAttribute adds a property attribute 'a=key' to the media description
 func (d *MediaDescription) WithPropertyAttribute(key string) *MediaDescription {
-	d.Attributes = append(d.Attributes, key)
+	d.Attributes = append(d.Attributes, Attribute(key))
 	return d
 }
 
 // WithValueAttribute adds a value attribute 'a=key:value' to the media description
 func (d *MediaDescription) WithValueAttribute(key, value string) *MediaDescription {
-	d.Attributes = append(d.Attributes, fmt.Sprintf("%s:%s", key, value))
+	d.Attributes = append(d.Attributes, Attribute(fmt.Sprintf("%s:%s", key, value)))
 	return d
 }
 
@@ -104,7 +111,7 @@ func (d *MediaDescription) WithICECredentials(username, password string) *MediaD
 
 // WithCodec adds codec information to the media description
 func (d *MediaDescription) WithCodec(payloadType uint8, name string, clockrate uint32, channels uint16, fmtp string) *MediaDescription {
-	d.MediaName = fmt.Sprintf("%s %d", d.MediaName, payloadType)
+	d.MediaName.Formats = append(d.MediaName.Formats, int(payloadType))
 	rtpmap := fmt.Sprintf("%d %s/%d", payloadType, name, clockrate)
 	if channels > 0 {
 		rtpmap = rtpmap + fmt.Sprintf("/%d", channels)

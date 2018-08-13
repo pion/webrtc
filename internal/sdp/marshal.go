@@ -44,7 +44,8 @@ func (s *SessionDescription) Marshal() (raw string) {
 	}
 
 	if s.URI != nil {
-		raw += keyValueBuild("u=", s.URI.String())
+		uri := s.URI.String()
+		raw += keyValueBuild("u=", &uri)
 	}
 
 	if s.EmailAddress != nil {
@@ -65,8 +66,8 @@ func (s *SessionDescription) Marshal() (raw string) {
 
 	for _, td := range s.TimeDescriptions {
 		raw += keyValueBuild("t=", td.Timing.String())
-		if td.RepeatTimes != nil {
-			raw += keyValueBuild("r=", td.RepeatTimes.String())
+		for _, r := range td.RepeatTimes {
+			raw += keyValueBuild("r=", r.String())
 		}
 	}
 
