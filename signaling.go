@@ -100,7 +100,7 @@ type RTCSessionDescription struct {
 	Type RTCSdpType
 	Sdp  string
 
-	// This will never be initalized by callers, internal use only
+	// This will never be initialized by callers, internal use only
 	parsed *sdp.SessionDescription
 }
 
