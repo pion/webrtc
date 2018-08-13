@@ -25,7 +25,7 @@ type SessionDescription struct {
 
 	// u=<uri>
 	// https://tools.ietf.org/html/rfc4566#section-5.5
-	URI *URI
+	URI *url.URL
 
 	// e=<email-address>
 	// https://tools.ietf.org/html/rfc4566#section-5.6
@@ -98,13 +98,6 @@ type SessionName string
 
 func (s *SessionName) String() *string {
 	output := string(*s)
-	return &output
-}
-
-type URI url.URL
-
-func (u *URI) String() *string {
-	output := url.URL(*u).String()
 	return &output
 }
 

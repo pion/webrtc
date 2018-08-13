@@ -489,13 +489,10 @@ func unmarshalURI(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	u, err := url.Parse(value)
+	l.desc.URI, err = url.Parse(value)
 	if err != nil {
 		return nil, err
 	}
-
-	parsedUri := URI(*u)
-	l.desc.URI = &parsedUri
 
 	return s10, nil
 }
@@ -681,17 +678,15 @@ func unmarshalRepeatTimes(l *lexer) (stateFn, error) {
 		return nil, errors.Errorf("sdp: invalid syntax `r=%v`", fields)
 	}
 
-	latestTimeDesc := l.desc.TimeDescriptions[len(l.desc.TimeDescriptions)]
-	newRepeatTimes := latestTimeDesc.RepeatTimes
+	latestTimeDesc := &l.desc.TimeDescriptions[len(l.desc.TimeDescriptions)-1]
 
-	// Initializing RepeatTimes to make latestTimeDesc.RepeatTimes non nil value
-	newRepeatTimes = &RepeatTimes{}
-	newRepeatTimes.RepeatInterval, err = parseTimeUnits(fields[0])
+	newRepeatTime := RepeatTime{}
+	newRepeatTime.RepeatInterval, err = parseTimeUnits(fields[0])
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid value `%v`", fields)
 	}
 
-	newRepeatTimes.ActiveDuration, err = parseTimeUnits(fields[1])
+	newRepeatTime.ActiveDuration, err = parseTimeUnits(fields[1])
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid value `%v`", fields)
 	}
@@ -701,8 +696,9 @@ func unmarshalRepeatTimes(l *lexer) (stateFn, error) {
 		if err != nil {
 			return nil, errors.Errorf("sdp: invalid value `%v`", fields)
 		}
-		newRepeatTimes.Offsets = append(newRepeatTimes.Offsets, offset)
+		newRepeatTime.Offsets = append(newRepeatTime.Offsets, offset)
 	}
+	latestTimeDesc.RepeatTimes = append(latestTimeDesc.RepeatTimes, newRepeatTime)
 
 	return s9, nil
 }

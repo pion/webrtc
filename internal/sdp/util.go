@@ -1,20 +1,19 @@
 package sdp
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
 	"bufio"
 	"io"
+	"github.com/pkg/errors"
 )
 
 // ConnectionRole indicates which of the end points should initiate the connection establishment
 type ConnectionRole int
 
 const (
-
 	// ConnectionRoleActive indicates the endpoint will initiate an outgoing connection.
 	ConnectionRoleActive ConnectionRole = iota + 1
 
@@ -73,10 +72,10 @@ func (s *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, e
 
 	for _, m := range s.MediaDescriptions {
 		for _, a := range m.Attributes {
-			if strings.HasPrefix(a, rtpmapPrefix) {
+			if strings.HasPrefix(*a.String(), rtpmapPrefix) {
 				found = true
 				// a=rtpmap:<payload type> <encoding name>/<clock rate> [/<encoding parameters>]
-				split := strings.Split(a, " ")
+				split := strings.Split(*a.String(), " ")
 				if len(split) == 2 {
 					split = strings.Split(split[1], "/")
 					codec.Name = split[0]
@@ -92,9 +91,9 @@ func (s *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, e
 						codec.EncodingParameters = split[2]
 					}
 				}
-			} else if strings.HasPrefix(a, fmtpPrefix) {
+			} else if strings.HasPrefix(*a.String(), fmtpPrefix) {
 				// a=fmtp:<format> <format specific parameters>
-				split := strings.Split(a, " ")
+				split := strings.Split(*a.String(), " ")
 				if len(split) == 2 {
 					codec.Fmtp = split[1]
 				}
@@ -121,7 +120,7 @@ func readType(input *bufio.Reader) (string, error) {
 	}
 
 	if len(key) != 2 {
-		return key, ErrSyntax
+		return key, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	return key, nil

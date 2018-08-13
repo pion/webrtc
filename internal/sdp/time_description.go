@@ -12,7 +12,7 @@ type TimeDescription struct {
 
 	// r=<repeat interval> <active duration> <offsets from start-time>
 	// https://tools.ietf.org/html/rfc4566#section-5.10
-	RepeatTimes *RepeatTimes
+	RepeatTimes []RepeatTime
 }
 
 
@@ -23,17 +23,17 @@ type Timing struct {
 
 func (t *Timing) String() *string {
 	output := strconv.FormatUint(t.StartTime, 10)
-	output += ":" + strconv.FormatUint(t.StopTime, 10)
+	output += " " + strconv.FormatUint(t.StopTime, 10)
 	return &output
 }
 
-type RepeatTimes struct {
+type RepeatTime struct {
 	RepeatInterval int64
 	ActiveDuration int64
 	Offsets        []int64
 }
 
-func (r *RepeatTimes) String() *string {
+func (r *RepeatTime) String() *string {
 	var fields []string
 	fields = append(fields, strconv.FormatInt(r.RepeatInterval, 10))
 	fields = append(fields, strconv.FormatInt(r.ActiveDuration, 10))
