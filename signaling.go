@@ -261,9 +261,9 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 
 func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candidates []string) {
 	media := (&sdp.MediaDescription{
-		MediaName:      "application 9 DTLS/SCTP 5000",
-		ConnectionData: "IN IP4 0.0.0.0",
-		Attributes:     []string{},
+		MediaName:             "application 9 DTLS/SCTP 5000",
+		ConnectionInformation: "IN IP4 0.0.0.0",
+		Attributes:            []string{},
 	}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, "data").
