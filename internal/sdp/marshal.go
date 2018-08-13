@@ -1,7 +1,7 @@
 package sdp
 
 import (
-		"strings"
+	"strings"
 )
 
 // https://tools.ietf.org/html/rfc4566#section-5
@@ -75,10 +75,15 @@ func (s *SessionDescription) Marshal() (raw string) {
 	for _, z := range s.TimeZones {
 		rawTimeZones = append(rawTimeZones, z.String())
 	}
-	timeZones := strings.Join(rawTimeZones, " ")
-	raw += keyValueBuild("z=", &timeZones)
 
-	raw += keyValueBuild("k=", s.EncryptionKey.String())
+	if len(rawTimeZones) > 0 {
+		timeZones := strings.Join(rawTimeZones, " ")
+		raw += keyValueBuild("z=", &timeZones)
+	}
+
+	if s.EncryptionKey != nil {
+		raw += keyValueBuild("k=", s.EncryptionKey.String())
+	}
 
 	for _, a := range s.Attributes {
 		raw += keyValueBuild("a=", a.String())
@@ -99,7 +104,9 @@ func (s *SessionDescription) Marshal() (raw string) {
 			raw += keyValueBuild("b", b.String())
 		}
 
-		raw += keyValueBuild("k", md.EncryptionKey.String())
+		if md.EncryptionKey != nil {
+			raw += keyValueBuild("k", md.EncryptionKey.String())
+		}
 
 		for _, a := range md.Attributes {
 			raw += keyValueBuild("a", a.String())

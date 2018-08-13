@@ -743,7 +743,7 @@ func unmarshalSessionEncryptionKey(l *lexer) (stateFn, error) {
 	}
 
 	encryptionKey := EncryptionKey(value)
-	l.desc.EncryptionKey = encryptionKey
+	l.desc.EncryptionKey = &encryptionKey
 	return s11, nil
 }
 
@@ -803,7 +803,7 @@ func unmarshalMediaDescription(l *lexer) (stateFn, error) {
 	newMediaDesc.MediaName.Proto = fields[2]
 
 	// <fmt>...
-	for i := 0; i < len(fields); i++ {
+	for i := 3; i < len(fields); i++ {
 		format, err := strconv.Atoi(fields[i])
 		if err != nil {
 			return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[i])
