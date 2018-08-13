@@ -44,7 +44,7 @@ func (t ConnectionRole) String() string {
 }
 
 func newSessionID() uint64 {
-	return uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
+	return uint64(rand.Uint32()*2) >> 2
 }
 
 // Codec represents a codec
