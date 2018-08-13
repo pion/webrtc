@@ -230,7 +230,7 @@ func (r *RTCPeerConnection) validateRtcpMuxPolicy(config RTCConfiguration) error
 
 func (r *RTCPeerConnection) validateICECandidatePoolSize(config RTCConfiguration) error {
 	current := r.config
-	if r.LocalDescription != nil &&
+	if r.CurrentLocalDescription != nil &&
 		config.ICECandidatePoolSize != current.ICECandidatePoolSize {
 		return &InvalidModificationError{Err: ErrModICECandidatePoolSize}
 	}

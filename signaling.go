@@ -99,11 +99,14 @@ func (t RTCSdpType) String() string {
 type RTCSessionDescription struct {
 	Type RTCSdpType
 	Sdp  string
+
+	// This will never be initalized by callers, internal use only
+	parsed *sdp.SessionDescription
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) error {
-	if r.remoteDescription != nil {
+	if r.CurrentRemoteDescription != nil {
 		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
 
@@ -114,13 +117,13 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 		weOffer = false
 	}
 
-	r.currentRemoteDescription = &desc
-	r.remoteDescription = &sdp.SessionDescription{}
-	if err := r.remoteDescription.Unmarshal(desc.Sdp); err != nil {
+	r.CurrentRemoteDescription = &desc
+	r.CurrentRemoteDescription.parsed = &sdp.SessionDescription{}
+	if err := r.CurrentRemoteDescription.parsed.Unmarshal(r.CurrentRemoteDescription.Sdp); err != nil {
 		return err
 	}
 
-	for _, m := range r.remoteDescription.MediaDescriptions {
+	for _, m := range r.CurrentRemoteDescription.parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(*a.String(), "candidate") {
 				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
@@ -129,9 +132,9 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
 				}
 			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
-				remoteUfrag = (*a.String())[len("ice-ufrag")+1:]
+				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
 			} else if strings.HasPrefix(*a.String(), "ice-pwd") {
-				remotePwd = (*a.String())[len("ice-pwd")+1:]
+				remotePwd = (*a.String())[len("ice-pwd:"):]
 			}
 		}
 	}
@@ -163,18 +166,22 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
 	candidates := r.generateLocalCandidates()
 
-	r.addRTPMediaSections(d, []RTCRtpCodecType{RTCRtpCodecTypeAudio, RTCRtpCodecTypeVideo}, candidates)
-	r.addDataMediaSection(d, candidates)
+	r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", candidates)
+	r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", candidates)
+	r.addDataMediaSection(d, "data", candidates)
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video data")
 
 	for _, m := range d.MediaDescriptions {
 		m.WithPropertyAttribute("setup:actpass")
 	}
 
-	return RTCSessionDescription{
-		Type: RTCSdpTypeOffer,
-		Sdp:  d.Marshal(),
-	}, nil
+	r.CurrentLocalDescription = &RTCSessionDescription{
+		Type:   RTCSdpTypeOffer,
+		Sdp:    d.Marshal(),
+		parsed: d,
+	}
+
+	return *r.CurrentLocalDescription, nil
 }
 
 // CreateAnswer starts the RTCPeerConnection and generates the localDescription
@@ -188,78 +195,70 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	bundleValue := "BUNDLE"
-	mediaSectionsToAdd := []RTCRtpCodecType{}
-	addData := false
-	for _, remoteMedia := range r.remoteDescription.MediaDescriptions {
-		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
-			bundleValue += " audio"
-			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeAudio)
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
-			bundleValue += " video"
-			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeVideo)
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
-			bundleValue += " data"
-			addData = true
-		}
-	}
-
 	candidates := r.generateLocalCandidates()
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
 
-	r.addRTPMediaSections(d, mediaSectionsToAdd, candidates)
-	if addData {
-		r.addDataMediaSection(d, candidates)
+	bundleValue := "BUNDLE"
+	for _, remoteMedia := range r.CurrentRemoteDescription.parsed.MediaDescriptions {
+		// TODO @trivigy better SDP parser
+		midValue := ""
+		for _, a := range remoteMedia.Attributes {
+			if strings.HasPrefix(*a.String(), "mid") {
+				midValue = (*a.String())[len("mid:"):]
+			}
+		}
+		bundleValue += " " + midValue
+
+		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
+			r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, candidates)
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
+			r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, candidates)
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
+			r.addDataMediaSection(d, midValue, candidates)
+		}
 	}
+
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
-	return RTCSessionDescription{
-		Type: RTCSdpTypeAnswer,
-		Sdp:  d.Marshal(),
-	}, nil
+	r.CurrentLocalDescription = &RTCSessionDescription{
+		Type:   RTCSdpTypeAnswer,
+		Sdp:    d.Marshal(),
+		parsed: d,
+	}
+	return *r.CurrentLocalDescription, nil
 }
 
-/*
-	TODO If we are generating an offer only include media sections we want
-*/
-func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, mediaTypes []RTCRtpCodecType, candidates []string) {
-	addMediaType := func(codecType RTCRtpCodecType) {
-		media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
-			WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
-			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
-			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
-			WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
+func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, candidates []string) {
+	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
+		WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
+		WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
+		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
+		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
-		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
-			media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
-		}
-
-		for _, transceiver := range r.rtpTransceivers {
-			if transceiver.Sender == nil ||
-				transceiver.Sender.Track == nil ||
-				transceiver.Sender.Track.Kind != codecType {
-				continue
-			}
-			track := transceiver.Sender.Track
-			media = media.WithMediaSource(track.Ssrc, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
-		}
-
-		for _, c := range candidates {
-			media.WithCandidate(c)
-		}
-		media.WithPropertyAttribute("end-of-candidates")
-		d.WithMedia(media)
-
+	for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
+		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
 	}
 
-	for _, c := range mediaTypes {
-		addMediaType(c)
+	for _, transceiver := range r.rtpTransceivers {
+		if transceiver.Sender == nil ||
+			transceiver.Sender.Track == nil ||
+			transceiver.Sender.Track.Kind != codecType {
+			continue
+		}
+		track := transceiver.Sender.Track
+		media = media.WithMediaSource(track.Ssrc, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
 	}
+
+	for _, c := range candidates {
+		media.WithCandidate(c)
+	}
+	media.WithPropertyAttribute("end-of-candidates")
+	d.WithMedia(media)
 }
 
-func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candidates []string) {
+func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   "application",
@@ -276,7 +275,7 @@ func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candi
 		},
 	}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
-		WithValueAttribute(sdp.AttrKeyMID, "data").
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithValueAttribute("sctpmap:5000", "webrtc-datachannel 1024").
 		WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd)
 

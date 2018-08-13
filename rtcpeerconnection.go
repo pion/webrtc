@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/pions/webrtc/internal/network"
-	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
@@ -73,13 +72,11 @@ type RTCPeerConnection struct {
 	networkManager *network.Manager
 
 	// Signaling
+	CurrentLocalDescription *RTCSessionDescription
 	// pendingLocalDescription *RTCSessionDescription
-	// currentLocalDescription *RTCSessionDescription
-	LocalDescription *sdp.SessionDescription
 
+	CurrentRemoteDescription *RTCSessionDescription
 	// pendingRemoteDescription *RTCSessionDescription
-	currentRemoteDescription *RTCSessionDescription
-	remoteDescription        *sdp.SessionDescription
 
 	idpLoginURL *string
 
@@ -148,7 +145,7 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 		return nil
 	}
 
-	sdpCodec, err := r.remoteDescription.GetCodecForPayloadType(payloadType)
+	sdpCodec, err := r.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
 	if err != nil {
 		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
 		return nil
