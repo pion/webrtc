@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"bufio"
+	"io"
 )
 
 // ConnectionRole indicates which of the end points should initiate the connection establishment
@@ -103,4 +105,61 @@ func (s *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, e
 		}
 	}
 	return codec, errors.New("payload type not found")
+}
+
+type lexer struct {
+	desc  *SessionDescription
+	input *bufio.Reader
+}
+
+type stateFn func(*lexer) (stateFn, error)
+
+func readType(input *bufio.Reader) (string, error) {
+	key, err := input.ReadString('=')
+	if err != nil {
+		return key, err
+	}
+
+	if len(key) != 2 {
+		return key, ErrSyntax
+	}
+
+	return key, nil
+}
+
+func readValue(input *bufio.Reader) (string, error) {
+	line, err := input.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return line, err
+	}
+
+	if len(line) == 0 {
+		return line, nil
+	}
+
+	if line[len(line)-1] == '\n' {
+		drop := 1
+		if len(line) > 1 && line[len(line)-2] == '\r' {
+			drop = 2
+		}
+		line = line[:len(line)-drop]
+	}
+
+	return line, nil
+}
+
+func indexOf(element string, data []string) int {
+	for k, v := range data {
+		if element == v {
+			return k
+		}
+	}
+	return -1
+}
+
+func keyValueBuild(key string, value *string) string {
+	if value != nil {
+		return key + *value + "\n"
+	}
+	return ""
 }

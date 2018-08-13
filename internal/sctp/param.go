@@ -36,13 +36,13 @@ func buildParam(t paramType, rawParam []byte) (param, error) {
 
 const (
 	heartbeatInfo      paramType = 1     // Heartbeat Info	[RFC4960]
-	ipV4Addr           paramType = 5     // IPv4 Address	[RFC4960]
-	ipV6Addr           paramType = 6     // IPv6 Address	[RFC4960]
+	ipV4Addr           paramType = 5     // IPv4 IP	[RFC4960]
+	ipV6Addr           paramType = 6     // IPv6 IP	[RFC4960]
 	stateCookie        paramType = 7     // State Cookie	[RFC4960]
 	unrecognizedParam  paramType = 8     // Unrecognized Parameters	[RFC4960]
 	cookiePreservative paramType = 9     // Cookie Preservative	[RFC4960]
-	hostNameAddr       paramType = 11    // Host Name Address	[RFC4960]
-	supportedAddrTypes paramType = 12    // Supported Address Types	[RFC4960]
+	hostNameAddr       paramType = 11    // Host Name IP	[RFC4960]
+	supportedAddrTypes paramType = 12    // Supported IP Types	[RFC4960]
 	outSSNResetReq     paramType = 13    // Outgoing SSN Reset Request Parameter	[RFC6525]
 	incSSNResetReq     paramType = 14    // Incoming SSN Reset Request Parameter	[RFC6525]
 	ssnTSNResetReq     paramType = 15    // SSN/TSN Reset Request Parameter	[RFC6525]
@@ -55,10 +55,10 @@ const (
 	padding            paramType = 32773 // Padding (0x8005)
 	supportedExt       paramType = 32776 // Supported Extensions (0x8008)	[RFC5061]
 	forwardTSNSupp     paramType = 49152 // Forward TSN supported (0xC000)	[RFC3758]
-	addIPAddr          paramType = 49153 // Add IP Address (0xC001)	[RFC5061]
-	delIPAddr          paramType = 49154 // Delete IP Address (0xC002)	[RFC5061]
+	addIPAddr          paramType = 49153 // Add IP IP (0xC001)	[RFC5061]
+	delIPAddr          paramType = 49154 // Delete IP IP (0xC002)	[RFC5061]
 	errClauseInd       paramType = 49155 // Error Cause Indication (0xC003)	[RFC5061]
-	setPriAddr         paramType = 49156 // Set Primary Address (0xC004)	[RFC5061]
+	setPriAddr         paramType = 49156 // Set Primary IP (0xC004)	[RFC5061]
 	successInd         paramType = 49157 // Success Indication (0xC005)	[RFC5061]
 	adaptLayerInd      paramType = 49158 // Adaptation Layer Indication (0xC006)	[RFC5061]
 )
@@ -68,9 +68,9 @@ func (p paramType) String() string {
 	case heartbeatInfo:
 		return "Heartbeat Info"
 	case ipV4Addr:
-		return "IPv4 Address"
+		return "IPv4 IP"
 	case ipV6Addr:
-		return "IPv6 Address"
+		return "IPv6 IP"
 	case stateCookie:
 		return "State Cookie"
 	case unrecognizedParam:
@@ -78,9 +78,9 @@ func (p paramType) String() string {
 	case cookiePreservative:
 		return "Cookie Preservative"
 	case hostNameAddr:
-		return "Host Name Address"
+		return "Host Name IP"
 	case supportedAddrTypes:
-		return "Supported Address Types"
+		return "Supported IP Types"
 	case outSSNResetReq:
 		return "Outgoing SSN Reset Request Parameter"
 	case incSSNResetReq:
@@ -106,13 +106,13 @@ func (p paramType) String() string {
 	case forwardTSNSupp:
 		return "Forward TSN supported"
 	case addIPAddr:
-		return "Add IP Address"
+		return "Add IP IP"
 	case delIPAddr:
-		return "Delete IP Address"
+		return "Delete IP IP"
 	case errClauseInd:
 		return "Error Cause Indication"
 	case setPriAddr:
-		return "Set Primary Address"
+		return "Set Primary IP"
 	case successInd:
 		return "Success Indication"
 	case adaptLayerInd:

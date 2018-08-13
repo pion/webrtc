@@ -261,14 +261,14 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 	localCandidate := getTransportAddrCandidate(a.LocalCandidates, local)
 	if localCandidate == nil {
 		// TODO debug
-		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
+		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Value)
 		return
 	}
 
 	remoteCandidate := getUDPAddrCandidate(a.remoteCandidates, remote)
 	if remoteCandidate == nil {
 		// TODO debug
-		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
+		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Value)
 		return
 	}
 	remoteCandidate.GetBase().LastSeen = time.Now()

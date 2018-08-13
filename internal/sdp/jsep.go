@@ -34,13 +34,13 @@ const (
 // some settings that are required by the JSEP spec.
 func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescription {
 	d := &SessionDescription{
-		ProtocolVersion: 0,
-		Origin: Origin{"-", newSessionID(), uint64(time.Now().Unix()), "IN", "IP4", "0.0.0.0"},
-		SessionName: "-",
-		Timing:      []string{"0 0"},
-		Attributes: []string{
-			//	"ice-options:trickle", // TODO: implement trickle ICE
-			"fingerprint:sha-256 " + fingerprint,
+		ProtocolVersion:  0,
+		Origin:           Origin{"-", newSessionID(), uint64(time.Now().Unix()), "IN", "IP4", "0.0.0.0"},
+		SessionName:      "-",
+		TimeDescriptions: []TimeDescription{{Timing{0, 0}, nil}},
+		Attributes: []Attribute{
+			// 	"Attribute(ice-options:trickle)", // TODO: implement trickle ICE
+			Attribute("fingerprint:sha-256 " + fingerprint),
 		},
 	}
 
@@ -53,30 +53,32 @@ func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescri
 
 // WithPropertyAttribute adds a property attribute 'a=key' to the session description
 func (s *SessionDescription) WithPropertyAttribute(key string) *SessionDescription {
-	s.Attributes = append(s.Attributes, key)
+	s.Attributes = append(s.Attributes, Attribute(key))
 	return s
 }
 
 // WithValueAttribute adds a value attribute 'a=key:value' to the session description
 func (s *SessionDescription) WithValueAttribute(key, value string) *SessionDescription {
-	s.Attributes = append(s.Attributes, fmt.Sprintf("%s:%s", key, value))
+	s.Attributes = append(s.Attributes, Attribute(fmt.Sprintf("%s:%s", key, value)))
 	return s
 }
 
 // WithMedia adds a media description to the session description
 func (s *SessionDescription) WithMedia(md *MediaDescription) *SessionDescription {
-	s.MediaDescriptions = append(s.MediaDescriptions, md)
+	s.MediaDescriptions = append(s.MediaDescriptions, *md)
 	return s
 }
 
-// NewJSEPMediaDescription creates a new MediaDescription with
+// NewJSEPMediaDescription creates a new MediaName with
 // some settings that are required by the JSEP spec.
 func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescription {
 	// TODO: handle codecPrefs
 	d := &MediaDescription{
-		MediaName:      fmt.Sprintf("%s 9 UDP/TLS/RTP/SAVPF", codecType), // TODO: other transports?
-		ConnectionData: "IN IP4 0.0.0.0",
-		Attributes:     []string{},
+		MediaName: MediaName{
+			Media: codecType,
+			Proto: "UDP/TLS/RTP/SAVPF",
+		},
+		ConnectionInformation: "IN IP4 0.0.0.0",
 	}
 	return d
 }
@@ -120,7 +122,7 @@ func (d *MediaDescription) WithMediaSource(ssrc uint32, cname, streamLabel, labe
 		WithValueAttribute("ssrc", fmt.Sprintf("%d cname:%s", ssrc, cname)). // Deprecated but not phased out?
 		WithValueAttribute("ssrc", fmt.Sprintf("%d msid:%s %s", ssrc, streamLabel, label)).
 		WithValueAttribute("ssrc", fmt.Sprintf("%d mslabel:%s", ssrc, streamLabel)). // Deprecated but not phased out?
-		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label))          // Deprecated but not phased out?
+		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label)) // Deprecated but not phased out?
 }
 
 // WithCandidate adds an ICE candidate to the media description

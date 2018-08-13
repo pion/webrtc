@@ -67,7 +67,7 @@ func (e errorCauseCode) String() string {
 	case outOfResource:
 		return "Out Of Resource"
 	case unresolvableAddress:
-		return "Unresolvable Address"
+		return "Unresolvable IP"
 	case unrecognizedChunkType:
 		return "Unrecognized Chunk Type"
 	case invalidMandatoryParameter:
