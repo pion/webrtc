@@ -37,15 +37,23 @@ func main() {
 		panic(err)
 	}
 
-	// Set the handler for ICE connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
-		fmt.Printf("Connection State has changed %s \n", connectionState.String())
-	}
-
 	d, err := peerConnection.CreateDataChannel("data", nil)
 	if err != nil {
 		panic(err)
+	}
+
+	// Set the handler for ICE connection state
+	// This will notify you when the peer has connected/disconnected
+	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+		// TODO: find the correct place of this
+		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+		if connectionState == ice.ConnectionStateConnected {
+			fmt.Println("sending openchannel")
+			err := d.SendOpenChannelMessage()
+			if err != nil {
+				fmt.Println("faild to send openchannel", err)
+			}
+		}
 	}
 
 	fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)

@@ -115,7 +115,7 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 	r.dataChannels[id] = res
 
 	// Send opening message
-	r.networkManager.SendOpenChannelMessage(id, label)
+	// r.networkManager.SendOpenChannelMessage(id, label)
 
 	return res, nil
 }
@@ -135,9 +135,18 @@ func (r *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
 	return 0, &OperationError{Err: ErrMaxDataChannels}
 }
 
+// SendOpenChannelMessage is a test to send OpenChannel manually
+func (d *RTCDataChannel) SendOpenChannelMessage() error {
+	if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(d.ID, d.Label); err != nil {
+		return &UnknownError{Err: err}
+	}
+	return nil
+
+}
+
 // Send sends the passed message to the DataChannel peer
-func (r *RTCDataChannel) Send(p datachannel.Payload) error {
-	if err := r.rtcPeerConnection.networkManager.SendDataChannelMessage(p, r.ID); err != nil {
+func (d *RTCDataChannel) Send(p datachannel.Payload) error {
+	if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(p, d.ID); err != nil {
 		return &UnknownError{Err: err}
 	}
 	return nil

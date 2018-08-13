@@ -15,6 +15,31 @@ import (
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
 type OutboundCallback func(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr)
 
+func NewCandidatePair(local, remote Candidate) CandidatePair {
+	return CandidatePair{
+		remote: remote,
+		local:  local,
+	}
+}
+
+// CandidatePair represents a combination of a local and remote candidate
+type CandidatePair struct {
+	// lastUpdateTime ?
+	remote Candidate
+	local  Candidate
+}
+
+// GetAddrs returns network addresses for the candidate pair
+func (c CandidatePair) GetAddrs() (local *stun.TransportAddr, remote *net.UDPAddr) {
+	return &stun.TransportAddr{
+			IP:   net.ParseIP(c.local.GetBase().Address),
+			Port: c.local.GetBase().Port,
+		}, &net.UDPAddr{
+			IP:   net.ParseIP(c.remote.GetBase().Address),
+			Port: c.remote.GetBase().Port,
+		}
+}
+
 // Agent represents the ICE agent
 type Agent struct {
 	sync.RWMutex
@@ -38,11 +63,8 @@ type Agent struct {
 	remotePwd        string
 	remoteCandidates []Candidate
 
-	selectedPair struct {
-		// lastUpdateTime ?
-		remote Candidate
-		local  Candidate
-	}
+	selectedPair CandidatePair
+	validPairs   []CandidatePair
 }
 
 const (
@@ -113,13 +135,25 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	a.connectionState = newState
-	a.iceNotifier(a.connectionState)
+	// Call handler async since we may be holding the agent lock
+	// and the handler may also require it
+	go a.iceNotifier(a.connectionState)
 }
 
-func (a *Agent) setSelectedPair(local, remote Candidate) {
-	a.selectedPair.remote = remote
-	a.selectedPair.local = local
-	a.updateConnectionState(ConnectionStateConnected)
+func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
+	p := NewCandidatePair(local, remote)
+
+	if selected {
+		a.selectedPair = p
+		a.validPairs = nil
+		// TODO: only set state to connected on selecting final pair?
+		a.updateConnectionState(ConnectionStateConnected)
+	} else {
+		// keep track of pairs with succesfull bindings since any of them
+		// can be used for communication untill the final pair is selected:
+		// https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-12
+		a.validPairs = append(a.validPairs, p)
+	}
 }
 
 func (a *Agent) agentTaskLoop() {
@@ -244,9 +278,9 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 		return
 	}
 
-	if _, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate); useCandidateFound {
-		a.setSelectedPair(localCandidate, remoteCandidate)
-	}
+	_, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate)
+	a.setValidPair(localCandidate, remoteCandidate, useCandidateFound)
+
 	a.sendBindingSuccess(m, local, remote)
 }
 
@@ -259,12 +293,10 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 		return
 	}
 
-	if m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding {
-		//Binding success!
-		if a.selectedPair.remote == nil && a.selectedPair.local == nil {
-			a.setSelectedPair(localCandidate, remoteCandidate)
-		}
-	} else {
+	final := m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding
+	a.setValidPair(localCandidate, remoteCandidate, final)
+
+	if !final {
 		a.sendBindingSuccess(m, local, remote)
 	}
 }
@@ -309,14 +341,11 @@ func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) 
 	defer a.RUnlock()
 
 	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+		for _, p := range a.validPairs {
+			return p.GetAddrs()
+		}
 		return nil, nil
 	}
 
-	return &stun.TransportAddr{
-			IP:   net.ParseIP(a.selectedPair.local.GetBase().Address),
-			Port: a.selectedPair.local.GetBase().Port,
-		}, &net.UDPAddr{
-			IP:   net.ParseIP(a.selectedPair.remote.GetBase().Address),
-			Port: a.selectedPair.remote.GetBase().Port,
-		}
+	return a.selectedPair.GetAddrs()
 }
