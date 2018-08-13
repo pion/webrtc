@@ -245,18 +245,32 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 }
 
 func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-
 	local, remote := m.IceAgent.SelectedPair()
-	if local == nil || remote == nil {
+	if remote == nil || local == nil {
+		// Send data on any valid pair
+		fmt.Println("dataChannelOutboundHandler: no valid candidates, dropping packet")
 		return
 	}
+
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+	p, err := m.GetPort(local)
+	if err != nil {
+		fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
+		return
+
+	}
+	p.sendSCTP(raw, remote)
+}
+
+// GetPort looks up a local port by address
+func (m *Manager) GetPort(local *stun.TransportAddr) (*port, error) {
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
-			p.sendSCTP(raw, remote)
+			return p, nil
 		}
 	}
+	return nil, errors.New("port not found")
 }
 
 func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
