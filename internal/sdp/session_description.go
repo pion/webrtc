@@ -54,7 +54,7 @@ type SessionDescription struct {
 	// k=<method>
 	// k=<method>:<encryption key>
 	// https://tools.ietf.org/html/rfc4566#section-5.12
-	EncryptionKey EncryptionKey
+	EncryptionKey *EncryptionKey
 
 	// a=<attribute>
 	// a=<attribute>:<value>
