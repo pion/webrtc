@@ -63,7 +63,7 @@ func (m *MediaName) String() *string {
 		m.Media,
 		m.Port.String(),
 		strings.Join(m.Protos, "/"),
-		strings.Join(formats, ""),
+		strings.Join(formats, " "),
 	}, " ")
 	return &output
 }
