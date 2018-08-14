@@ -11,7 +11,7 @@ import (
 type SessionDescription struct {
 	// v=0
 	// https://tools.ietf.org/html/rfc4566#section-5.1
-	ProtocolVersion ProtocolVersion
+	Version Version
 
 	// o=<username> <sess-id> <sess-version> <nettype> <addrtype> <unicast-address>
 	// https://tools.ietf.org/html/rfc4566#section-5.2
@@ -67,16 +67,17 @@ type SessionDescription struct {
 	MediaDescriptions []MediaDescription
 }
 
-// The "v=" field gives the version of the Session Description Protocol.
-type ProtocolVersion int
+// Version describes the value provided by the "v=" field which gives
+// the version of the Session Description Protocol.
+type Version int
 
-func (v *ProtocolVersion) String() *string {
+func (v *Version) String() *string {
 	output := strconv.Itoa(int(*v))
 	return &output
 }
 
-// The "o=" field gives the originator of the session plus a session identifier
-// and version number.
+// Origin defines the structure for the "o=" field which provides the
+// originator of the session plus a session identifier and version number.
 type Origin struct {
 	Username       string
 	SessionID      uint64
@@ -99,7 +100,8 @@ func (o *Origin) String() *string {
 	return &output
 }
 
-// The "s=" field is the textual session name.
+// SessionName describes a structured representations for the "s=" field
+// and is the textual session name.
 type SessionName string
 
 func (s *SessionName) String() *string {
@@ -107,8 +109,9 @@ func (s *SessionName) String() *string {
 	return &output
 }
 
-// The "e=" line specify email contact information for the person responsible
-// for the conference.
+// EmailAddress describes a structured representations for the "e=" line
+// which specifies email contact information for the person responsible for
+// the conference.
 type EmailAddress string
 
 func (e *EmailAddress) String() *string {
@@ -116,8 +119,9 @@ func (e *EmailAddress) String() *string {
 	return &output
 }
 
-// The "p=" line specify phone contact information for the person responsible
-// for the conference.
+// PhoneNumber describes a structured representations for the "p=" line
+// specify phone contact information for the person responsible for the
+// conference.
 type PhoneNumber string
 
 func (p *PhoneNumber) String() *string {
@@ -125,7 +129,8 @@ func (p *PhoneNumber) String() *string {
 	return &output
 }
 
-// The "z=" line describes a structure for setting repeated sessions schedule.
+// TimeZone defines the structured object for "z=" line which describes
+// repeated sessions scheduling.
 type TimeZone struct {
 	AdjustmentTime uint64
 	Offset         int64

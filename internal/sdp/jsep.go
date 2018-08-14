@@ -35,7 +35,7 @@ const (
 // some settings that are required by the JSEP spec.
 func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescription {
 	d := &SessionDescription{
-		ProtocolVersion: 0,
+		Version: 0,
 		Origin: Origin{
 			Username:       "-",
 			SessionID:      newSessionID(),

@@ -709,12 +709,12 @@ func unmarshalRepeatTimes(l *lexer) (stateFn, error) {
 	latestTimeDesc := &l.desc.TimeDescriptions[len(l.desc.TimeDescriptions)-1]
 
 	newRepeatTime := RepeatTime{}
-	newRepeatTime.RepeatInterval, err = parseTimeUnits(fields[0])
+	newRepeatTime.Interval, err = parseTimeUnits(fields[0])
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid value `%v`", fields)
 	}
 
-	newRepeatTime.ActiveDuration, err = parseTimeUnits(fields[1])
+	newRepeatTime.Duration, err = parseTimeUnits(fields[1])
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid value `%v`", fields)
 	}
