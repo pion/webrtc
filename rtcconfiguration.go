@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pions/webrtc/internal/log"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -143,6 +144,7 @@ type RTCConfiguration struct {
 	PeerIdentity         string
 	Certificates         []RTCCertificate
 	ICECandidatePoolSize uint8
+	Logger               log.Logger
 }
 
 // SetConfiguration updates the configuration of the RTCPeerConnection

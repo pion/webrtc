@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/pions/webrtc/internal/log"
 	"github.com/pkg/errors"
 )
 
@@ -109,10 +110,14 @@ type Association struct {
 	// Put a blocking goroutine in port-receive (vs callbacks)
 	outboundHandler func([]byte)
 	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
+
+	// Logging
+	logger log.Logger
 }
 
 // HandleInbound parses incoming raw packets
 func (a *Association) HandleInbound(raw []byte) error {
+	a.logger.Debug(fmt.Sprintf("Got %q", raw))
 	p := &packet{}
 	if err := p.unmarshal(raw); err != nil {
 		return errors.Wrap(err, "Unable to parse SCTP packet")
@@ -199,7 +204,7 @@ func (a *Association) Close() error {
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier)) *Association {
+func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), logger log.Logger) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
@@ -218,6 +223,7 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 		outboundHandler:         outboundHandler,
 		dataHandler:             dataHandler,
 		state:                   Open,
+		logger:                  logger,
 	}
 }
 
@@ -410,6 +416,8 @@ func (a *Association) send(p *packet) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to send packet to outbound handler")
 	}
+
+	a.logger.Debug(fmt.Sprintf("Send %q", raw))
 
 	a.outboundHandler(raw)
 

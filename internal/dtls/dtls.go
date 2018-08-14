@@ -18,6 +18,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/pions/webrtc/internal/log"
 	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
@@ -67,12 +68,16 @@ type State struct {
 	tlscfg      *_Ctype_struct_tlscfg
 	sslctx      *_Ctype_struct_ssl_ctx_st
 	dtlsSession *_Ctype_struct_dtls_sess
+
+	// Logging
+	logger log.Logger
 }
 
 // NewState creates a new DTLS session
-func NewState() (s *State, err error) {
+func NewState(logger log.Logger) (s *State, err error) {
 	s = &State{
 		tlscfg: C.dtls_build_tlscfg(),
+		logger: logger,
 	}
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
@@ -128,7 +133,11 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 			C.free(unsafe.Pointer(ret.buf))
 			C.free(unsafe.Pointer(ret))
 		}()
-		return []byte(C.GoBytes(ret.buf, ret.len)), nil
+		result := []byte(C.GoBytes(ret.buf, ret.len))
+
+		s.logger.Debug(fmt.Sprintf("Got %q", result))
+
+		return result, nil
 	}
 	return nil, nil
 }
@@ -137,6 +146,8 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 func (s *State) Send(packet []byte, local, remote string) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
+
+	s.logger.Debug(fmt.Sprintf("Send %q", packet))
 
 	if s.dtlsSession == nil {
 		return false, errors.Errorf("Unable to send via DTLS, session has not started")

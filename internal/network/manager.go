@@ -8,6 +8,7 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/webrtc/internal/log"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	webrtcStun "github.com/pions/webrtc/internal/stun"
@@ -45,23 +46,27 @@ type Manager struct {
 
 	portsLock sync.RWMutex
 	ports     []*port
+
+	// Logging
+	logger log.Logger
 }
 
 // NewManager creates a new network.Manager
-func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
+func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier, logger log.Logger) (m *Manager, err error) {
 	m = &Manager{
 		iceNotifier:              iceNotifier,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: bufferTransportGenerator,
 		dataChannelEventHandler:  dataChannelEventHandler,
+		logger:                   logger,
 	}
-	m.dtlsState, err = dtls.NewState()
+	m.dtlsState, err = dtls.NewState(logger.WithFields(log.Field{"component", "dtls"}))
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, logger.WithFields(log.Field{"component", "sctp"}))
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
 	for _, i := range localInterfaces() {

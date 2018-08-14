@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/webrtc/internal/log"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -100,6 +101,9 @@ type RTCPeerConnection struct {
 	// DataChannels
 	dataChannels  map[uint16]*RTCDataChannel
 	Ondatachannel func(*RTCDataChannel)
+
+	// Logging
+	logger log.Logger
 }
 
 // Public
@@ -111,11 +115,18 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		signalingState:  RTCSignalingStateStable,
 		connectionState: RTCPeerConnectionStateNew,
 		mediaEngine:     DefaultMediaEngine,
-		sctp:               newRTCSctpTransport(),
+		sctp:            newRTCSctpTransport(),
 		dataChannels:    make(map[uint16]*RTCDataChannel),
 	}
+
+	logger := config.Logger
+	if logger == nil {
+		logger = &log.Nil{}
+	}
+	r.logger = logger
+
 	var err error
-	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
+	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange, logger.WithFields(log.Field{Key: "component", Value: "manager"}))
 	if err != nil {
 		return nil, err
 	}
