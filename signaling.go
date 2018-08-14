@@ -6,6 +6,7 @@ import (
 
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pkg/errors"
+	"net"
 )
 
 // RTCAnswerOptions describes the options used to control the answer creation process
@@ -23,7 +24,6 @@ type RTCOfferOptions struct {
 type RTCSignalingState int
 
 const (
-
 	// RTCSignalingStateStable indicates there is no offer­answer exchange in progress.
 	RTCSignalingStateStable RTCSignalingState = iota + 1
 
@@ -66,7 +66,6 @@ func (t RTCSignalingState) String() string {
 type RTCSdpType int
 
 const (
-
 	// RTCSdpTypeOffer indicates that a description MUST be treated as an SDP offer.
 	RTCSdpTypeOffer RTCSdpType = iota + 1
 
@@ -122,16 +121,16 @@ func (r *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) err
 
 	for _, m := range r.remoteDescription.MediaDescriptions {
 		for _, a := range m.Attributes {
-			if strings.HasPrefix(a, "candidate") {
-				if c := sdp.ICECandidateUnmarshal(a); c != nil {
+			if strings.HasPrefix(*a.String(), "candidate") {
+				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
 					r.networkManager.IceAgent.AddRemoteCandidate(c)
 				} else {
 					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
 				}
-			} else if strings.HasPrefix(a, "ice-ufrag") {
-				remoteUfrag = a[len("ice-ufrag")+1:]
-			} else if strings.HasPrefix(a, "ice-pwd") {
-				remotePwd = a[len("ice-pwd")+1:]
+			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
+				remoteUfrag = (*a.String())[len("ice-ufrag")+1:]
+			} else if strings.HasPrefix(*a.String(), "ice-pwd") {
+				remotePwd = (*a.String())[len("ice-pwd")+1:]
 			}
 		}
 	}
@@ -192,13 +191,13 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 	mediaSectionsToAdd := []RTCRtpCodecType{}
 	addData := false
 	for _, remoteMedia := range r.remoteDescription.MediaDescriptions {
-		if strings.HasPrefix(remoteMedia.MediaName, "audio") {
+		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
 			bundleValue += " audio"
 			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeAudio)
-		} else if strings.HasPrefix(remoteMedia.MediaName, "video") {
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
 			bundleValue += " video"
 			mediaSectionsToAdd = append(mediaSectionsToAdd, RTCRtpCodecTypeVideo)
-		} else if strings.HasPrefix(remoteMedia.MediaName, "application") {
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
 			bundleValue += " data"
 			addData = true
 		}
@@ -229,7 +228,7 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
 			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
+			WithPropertyAttribute(sdp.AttrKeyRtcpMux). // TODO: support RTCP fallback
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
@@ -238,8 +237,8 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 
 		for _, transceiver := range r.rtpTransceivers {
 			if transceiver.Sender == nil ||
-				transceiver.Sender.Track == nil ||
-				transceiver.Sender.Track.Kind != codecType {
+			transceiver.Sender.Track == nil ||
+			transceiver.Sender.Track.Kind != codecType {
 				continue
 			}
 			track := transceiver.Sender.Track
@@ -261,9 +260,19 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 
 func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candidates []string) {
 	media := (&sdp.MediaDescription{
-		MediaName:             "application 9 DTLS/SCTP 5000",
-		ConnectionInformation: "IN IP4 0.0.0.0",
-		Attributes:            []string{},
+		MediaName: sdp.MediaName{
+			Media: "application",
+			Port: sdp.RangedPort{Value: 9},
+			Protos: []string{"DTLS", "SCTP"},
+			Formats: []int{5000},
+		},
+		ConnectionInformation: &sdp.ConnectionInformation{
+			NetworkType: "IN",
+			AddressType: "IP4",
+			Address: &sdp.Address{
+				IP: net.ParseIP("0.0.0.0"),
+			},
+		},
 	}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, "data").

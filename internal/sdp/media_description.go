@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+// MediaDescription represents a media type.
+// https://tools.ietf.org/html/rfc4566#section-5.14
 type MediaDescription struct {
 	// m=<media> <port>/<number of ports> <proto> <fmt> ...
 	// https://tools.ietf.org/html/rfc4566#section-5.14
@@ -33,6 +35,10 @@ type MediaDescription struct {
 	Attributes []Attribute
 }
 
+// RangedPort supports special format for the media field "m=" port value. If
+// it may be necessary to specify multiple transport ports, the protocol allows
+// to write it as: <port>/<number of ports> where number of ports is a an
+// offsetting range.
 type RangedPort struct {
 	Value int
 	Range *int
@@ -46,6 +52,7 @@ func (p *RangedPort) String() string {
 	return output
 }
 
+// MediaName describes the "m=" field storage structure.
 type MediaName struct {
 	Media   string
 	Port    RangedPort

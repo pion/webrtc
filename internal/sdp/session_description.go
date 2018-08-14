@@ -6,6 +6,8 @@ import (
 	"net/url"
 )
 
+// SessionDescription is a a well-defined format for conveying sufficient
+// information to discover and participate in a multimedia session.
 type SessionDescription struct {
 	// v=0
 	// https://tools.ietf.org/html/rfc4566#section-5.1
@@ -65,6 +67,7 @@ type SessionDescription struct {
 	MediaDescriptions []MediaDescription
 }
 
+// The "v=" field gives the version of the Session Description Protocol.
 type ProtocolVersion int
 
 func (v *ProtocolVersion) String() *string {
@@ -72,9 +75,11 @@ func (v *ProtocolVersion) String() *string {
 	return &output
 }
 
+// The "o=" field gives the originator of the session plus a session identifier
+// and version number.
 type Origin struct {
 	Username       string
-	SessionId      uint64
+	SessionID      uint64
 	SessionVersion uint64
 	NetworkType    string
 	AddressType    string
@@ -85,7 +90,7 @@ func (o *Origin) String() *string {
 	output := fmt.Sprintf(
 		"%v %d %d %v %v %v",
 		o.Username,
-		o.SessionId,
+		o.SessionID,
 		o.SessionVersion,
 		o.NetworkType,
 		o.AddressType,
@@ -94,6 +99,7 @@ func (o *Origin) String() *string {
 	return &output
 }
 
+// The "s=" field is the textual session name.
 type SessionName string
 
 func (s *SessionName) String() *string {
@@ -101,6 +107,8 @@ func (s *SessionName) String() *string {
 	return &output
 }
 
+// The "e=" line specify email contact information for the person responsible
+// for the conference.
 type EmailAddress string
 
 func (e *EmailAddress) String() *string {
@@ -108,6 +116,8 @@ func (e *EmailAddress) String() *string {
 	return &output
 }
 
+// The "p=" line specify phone contact information for the person responsible
+// for the conference.
 type PhoneNumber string
 
 func (p *PhoneNumber) String() *string {
@@ -115,6 +125,7 @@ func (p *PhoneNumber) String() *string {
 	return &output
 }
 
+// The "z=" line describes a structure for setting repeated sessions schedule.
 type TimeZone struct {
 	AdjustmentTime uint64
 	Offset         int64
