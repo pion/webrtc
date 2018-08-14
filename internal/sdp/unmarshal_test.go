@@ -2,8 +2,12 @@ package sdp
 
 import (
 	"testing"
-	"fmt"
 )
+
+const MinimalSDP = "v=0\n" +
+"o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
+"s=SDP Seminar\n" +
+"t=2873397496 2873404696\n"
 
 const CanonicalSDP = "v=0\n" +
 "o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
@@ -25,24 +29,26 @@ const CanonicalSDP = "v=0\n" +
 "m=video 51372 RTP/AVP 99\n" +
 "a=rtpmap:99 h263-1998/90000\n"
 
-// Using the example given in https://tools.ietf.org/html/rfc4566#section-5 to
-// test default functionality working properly.
-func TestUnmarshalCanonical(t *testing.T) {
-	// scanner := bufio.NewScanner(strings.NewReader(CanonicalSDP))
-	// for status := scanner.Scan(); status; status = scanner.Scan() {
-	// 	fmt.Println(status)
-	// 	fmt.Println(scanner.Text())
-	// 	// fmt.Println(input.Bytes())
-	// 	// fmt.Println(hex.EncodeToString(input.Bytes()))
-	// }
-	// if err := scanner.Err(); err != nil {
-	// 	fmt.Fprintln(os.Stderr, "reading standard input:", err)
-	// }
-
+func TestUnmarshalMinimal(t *testing.T) {
 	sd := &SessionDescription{}
-	if err := sd.Unmarshal(CanonicalSDP); err != nil {
-		t.Errorf("%v", err)
+	if err := sd.Unmarshal(MinimalSDP); err != nil {
+		t.Errorf("error: %v", err)
 	}
 
-	fmt.Printf("%v", sd.Marshal())
+	actual := sd.Marshal()
+	if actual != MinimalSDP {
+		t.Errorf("expected: %v\n actual: %v", MinimalSDP, actual)
+	}
+}
+
+func TestUnmarshalCanonical(t *testing.T) {
+	sd := &SessionDescription{}
+	if err := sd.Unmarshal(CanonicalSDP); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	actual := sd.Marshal()
+	if actual != CanonicalSDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", CanonicalSDP, actual)
+	}
 }
