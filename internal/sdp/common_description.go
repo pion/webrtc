@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// The "i=" field provides textual information about the session.
 type Information string
 
 func (i *Information) String() *string {
@@ -14,10 +15,11 @@ func (i *Information) String() *string {
 	return &output
 }
 
+// The "c=" field contains connection data.
 type ConnectionInformation struct {
 	NetworkType string
 	AddressType string
-	Address     *ConnectionAddress
+	Address     *Address
 }
 
 func (c *ConnectionInformation) String() *string {
@@ -30,17 +32,18 @@ func (c *ConnectionInformation) String() *string {
 	return &output
 }
 
-type ConnectionAddress struct {
+// Address desribes a structured address token from within the "c=" field.
+type Address struct {
 	IP    net.IP
-	Ttl   *int
+	TTL   *int
 	Range *int
 }
 
-func (c *ConnectionAddress) String() string {
+func (c *Address) String() string {
 	var parts []string
 	parts = append(parts, c.IP.String())
-	if c.Ttl != nil {
-		parts = append(parts, strconv.Itoa(*c.Ttl))
+	if c.TTL != nil {
+		parts = append(parts, strconv.Itoa(*c.TTL))
 	}
 
 	if c.Range != nil {
@@ -50,6 +53,8 @@ func (c *ConnectionAddress) String() string {
 	return strings.Join(parts, "/")
 }
 
+// This OPTIONAL field denotes the proposed bandwidth to be used by the
+// session or media.
 type Bandwidth struct {
 	Experimental bool
 	Type         string
@@ -65,6 +70,8 @@ func (b *Bandwidth) String() *string {
 	return &output
 }
 
+// If transported over a secure and trusted channel, the Session Description
+// Protocol MAY be used to convey encryption keys.
 type EncryptionKey string
 
 func (s *EncryptionKey) String() *string {
@@ -72,6 +79,7 @@ func (s *EncryptionKey) String() *string {
 	return &output
 }
 
+// Attributes are the primary means for extending SDP.
 type Attribute string
 
 func (a *Attribute) String() *string {

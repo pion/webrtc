@@ -13,7 +13,7 @@ const (
 	"i=A Seminar on the session description protocol\n" +
 	"t=3034423619 3042462419\n"
 
-	UriSDP = BaseSDP +
+	URISDP = BaseSDP +
 	"u=http://www.example.com/seminars/sdp.pdf\n" +
 	"t=3034423619 3042462419\n"
 
@@ -123,13 +123,13 @@ func TestUnmarshalSessionInformation(t *testing.T) {
 
 func TestUnmarshalURI(t *testing.T) {
 	sd := &SessionDescription{}
-	if err := sd.Unmarshal(UriSDP); err != nil {
+	if err := sd.Unmarshal(URISDP); err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	actual := sd.Marshal()
-	if actual != UriSDP {
-		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", UriSDP, actual)
+	if actual != URISDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", URISDP, actual)
 	}
 }
 

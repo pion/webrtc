@@ -11,9 +11,12 @@ import (
 	"io"
 )
 
-// States Sransition Table - Describes the computation flow between functions
-// (namely s1, s2, s3, ...) for a parsing proceedure that complies with the
-// specifications layed out by the rfc4566#section-5 as well as by JavaScript
+// Unmarshal is the primary function that deserializes the session description
+// message and stores it inside of a structured SessionDescription object.
+//
+// The States Sransition Table describes the computation flow between functions
+// (namely s1, s2, s3, ...) for a parsing procedure that complies with the
+// specifications laid out by the rfc4566#section-5 as well as by JavaScript
 // Session Establishment Protocol draft. Links:
 // 		https://tools.ietf.org/html/rfc4566#section-5
 // 		https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-24
@@ -79,7 +82,10 @@ import (
 // |   s16  |    |    14 |    |     |    |  15 |   |    | 12 |   |   |     |   |   |    |   |    |
 // +--------+----+-------+----+-----+----+-----+---+----+----+---+---+-----+---+---+----+---+----+
 func (s *SessionDescription) Unmarshal(value string) error {
-	l := &lexer{s, bufio.NewReader(strings.NewReader(value))}
+	l := &lexer{
+		desc:  s,
+		input: bufio.NewReader(strings.NewReader(value)),
+	}
 	for state := s1; state != nil; {
 		var err error
 		state, err = state(l)
@@ -448,7 +454,7 @@ func unmarshalOrigin(l *lexer) (stateFn, error) {
 		return nil, errors.Errorf("sdp: invalid syntax `o=%v`", fields)
 	}
 
-	sessionId, err := strconv.ParseUint(fields[1], 10, 64)
+	sessionID, err := strconv.ParseUint(fields[1], 10, 64)
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[1])
 	}
@@ -474,7 +480,7 @@ func unmarshalOrigin(l *lexer) (stateFn, error) {
 
 	l.desc.Origin = Origin{
 		Username:       fields[0],
-		SessionId:      sessionId,
+		SessionID:      sessionID,
 		SessionVersion: sessionVersion,
 		NetworkType:    fields[3],
 		AddressType:    fields[4],
@@ -572,9 +578,9 @@ func unmarshalConnectionInformation(value string) (*ConnectionInformation, error
 		return nil, errors.Errorf("sdp: invalid value `%v`", fields[1])
 	}
 
-	var connAddr *ConnectionAddress
+	var connAddr *Address
 	if len(fields) > 2 {
-		connAddr = &ConnectionAddress{}
+		connAddr = &Address{}
 
 		parts := strings.Split(fields[2], "/")
 		connAddr.IP = net.ParseIP(parts[0])
@@ -594,7 +600,7 @@ func unmarshalConnectionInformation(value string) (*ConnectionInformation, error
 				connAddr.Range = &multi
 			} else {
 				ttl := int(val)
-				connAddr.Ttl = &ttl
+				connAddr.TTL = &ttl
 			}
 		}
 

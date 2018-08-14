@@ -35,10 +35,25 @@ const (
 // some settings that are required by the JSEP spec.
 func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescription {
 	d := &SessionDescription{
-		ProtocolVersion:  0,
-		Origin:           Origin{"-", newSessionID(), uint64(time.Now().Unix()), "IN", "IP4", "0.0.0.0"},
-		SessionName:      "-",
-		TimeDescriptions: []TimeDescription{{Timing{0, 0}, nil}},
+		ProtocolVersion: 0,
+		Origin: Origin{
+			Username:       "-",
+			SessionID:      newSessionID(),
+			SessionVersion: uint64(time.Now().Unix()),
+			NetworkType:    "IN",
+			AddressType:    "IP4",
+			UnicastAddress: "0.0.0.0",
+		},
+		SessionName: "-",
+		TimeDescriptions: []TimeDescription{
+			{
+				Timing: Timing{
+					StartTime: 0,
+					StopTime:  0,
+				},
+				RepeatTimes: nil,
+			},
+		},
 		Attributes: []Attribute{
 			// 	"Attribute(ice-options:trickle)", // TODO: implement trickle ICE
 			Attribute("fingerprint:sha-256 " + fingerprint),
@@ -82,7 +97,7 @@ func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescri
 		ConnectionInformation: &ConnectionInformation{
 			NetworkType: "IN",
 			AddressType: "IP4",
-			Address: &ConnectionAddress{
+			Address: &Address{
 				IP: net.ParseIP("0.0.0.0"),
 			},
 		},
