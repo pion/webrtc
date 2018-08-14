@@ -94,7 +94,7 @@ func (s *SessionDescription) Unmarshal(value string) error {
 func s1(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	if key == "v=" {
@@ -107,7 +107,7 @@ func s1(l *lexer) (stateFn, error) {
 func s2(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	if key == "o=" {
@@ -133,7 +133,7 @@ func s3(l *lexer) (stateFn, error) {
 func s4(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	switch key {
@@ -175,7 +175,7 @@ func s5(l *lexer) (stateFn, error) {
 func s6(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	switch key {
@@ -195,7 +195,7 @@ func s6(l *lexer) (stateFn, error) {
 func s7(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	switch key {
@@ -219,7 +219,7 @@ func s7(l *lexer) (stateFn, error) {
 func s8(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	switch key {
@@ -264,7 +264,7 @@ func s9(l *lexer) (stateFn, error) {
 func s10(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("sdp: invalid syntax `%v`", key)
 	}
 
 	switch key {
@@ -871,7 +871,7 @@ func unmarshalMediaBandwidth(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	bandwidth, err := unmarshalBandwidth(value)
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid syntax `b=%v`", value)
