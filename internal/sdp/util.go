@@ -1,12 +1,13 @@
 package sdp
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
 	"strconv"
 	"strings"
-	"bufio"
-	"io"
+
 	"github.com/pkg/errors"
 )
 

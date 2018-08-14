@@ -1,8 +1,8 @@
 package sdp
 
 import (
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // MediaDescription represents a media type.
