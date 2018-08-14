@@ -35,7 +35,7 @@ import (
 //    k=* (encryption key)
 //    a=* (zero or more media attribute lines)
 func (s *SessionDescription) Marshal() (raw string) {
-	raw += keyValueBuild("v=", s.ProtocolVersion.String())
+	raw += keyValueBuild("v=", s.Version.String())
 	raw += keyValueBuild("o=", s.Origin.String())
 	raw += keyValueBuild("s=", s.SessionName.String())
 

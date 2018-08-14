@@ -83,12 +83,13 @@ const (
 	"a=rtpmap:99 h263-1998/90000\n" +
 	"a=candidate:0 1 UDP 2113667327 203.0.113.1 54400 typ host\n"
 
-	CanonicalSDP = "v=0\n" +
+	CanonicalUnmarshalSDP = "v=0\n" +
 	"o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
 	"s=SDP Seminar\n" +
 	"i=A Seminar on the session description protocol\n" +
 	"u=http://www.example.com/seminars/sdp.pdf\n" +
 	"e=j.doe@example.com (Jane Doe)\n" +
+	"p=+1 617 555-6011\n" +
 	"c=IN IP4 224.2.17.12/127\n" +
 	"b=X-YZ:128\n" +
 	"b=AS:12345\n" +
@@ -303,12 +304,12 @@ func TestUnmarshalMediaAttributes(t *testing.T) {
 
 func TestUnmarshalCanonical(t *testing.T) {
 	sd := &SessionDescription{}
-	if err := sd.Unmarshal(CanonicalSDP); err != nil {
+	if err := sd.Unmarshal(CanonicalUnmarshalSDP); err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	actual := sd.Marshal()
-	if actual != CanonicalSDP {
-		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", CanonicalSDP, actual)
+	if actual != CanonicalUnmarshalSDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", CanonicalUnmarshalSDP, actual)
 	}
 }
