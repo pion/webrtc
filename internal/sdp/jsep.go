@@ -2,8 +2,8 @@ package sdp
 
 import (
 	"fmt"
-	"time"
 	"net"
+	"time"
 )
 
 // Constants for SDP attributes used in JSEP
@@ -144,7 +144,7 @@ func (d *MediaDescription) WithMediaSource(ssrc uint32, cname, streamLabel, labe
 		WithValueAttribute("ssrc", fmt.Sprintf("%d cname:%s", ssrc, cname)). // Deprecated but not phased out?
 		WithValueAttribute("ssrc", fmt.Sprintf("%d msid:%s %s", ssrc, streamLabel, label)).
 		WithValueAttribute("ssrc", fmt.Sprintf("%d mslabel:%s", ssrc, streamLabel)). // Deprecated but not phased out?
-		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label)) // Deprecated but not phased out?
+		WithValueAttribute("ssrc", fmt.Sprintf("%d label:%s", ssrc, label))          // Deprecated but not phased out?
 }
 
 // WithCandidate adds an ICE candidate to the media description

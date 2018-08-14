@@ -2,8 +2,8 @@ package sdp
 
 import (
 	"fmt"
-	"strconv"
 	"net/url"
+	"strconv"
 )
 
 // SessionDescription is a a well-defined format for conveying sufficient
