@@ -4,10 +4,25 @@ import (
 	"testing"
 )
 
-const MinimalSDP = "v=0\n" +
-"o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
-"s=SDP Seminar\n" +
-"t=2873397496 2873404696\n"
+const (
+	BaseSDP = "v=0\n" +
+	"o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
+	"s=SDP Seminar\n"
+
+	SessionInformationSDP = BaseSDP +
+	"i=A Seminar on the session description protocol\n" +
+	"t=3034423619 3042462419\n"
+
+	UriSDP = BaseSDP +
+	"u=http://www.example.com/seminars/sdp.pdf\n" +
+	"t=3034423619 3042462419\n"
+
+	TimingSDP = BaseSDP +
+	"t=2873397496 2873404696\n"
+
+	RepeatTimesSDP = TimingSDP +
+	"r=604800 3600 0 90000\n"
+)
 
 const CanonicalSDP = "v=0\n" +
 "o=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\n" +
@@ -29,15 +44,39 @@ const CanonicalSDP = "v=0\n" +
 "m=video 51372 RTP/AVP 99\n" +
 "a=rtpmap:99 h263-1998/90000\n"
 
-func TestUnmarshalMinimal(t *testing.T) {
+func TestUnmarshalSessionInformation(t *testing.T) {
 	sd := &SessionDescription{}
-	if err := sd.Unmarshal(MinimalSDP); err != nil {
+	if err := sd.Unmarshal(SessionInformationSDP); err != nil {
 		t.Errorf("error: %v", err)
 	}
 
 	actual := sd.Marshal()
-	if actual != MinimalSDP {
-		t.Errorf("expected: %v\n actual: %v", MinimalSDP, actual)
+	if actual != SessionInformationSDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", SessionInformationSDP, actual)
+	}
+}
+
+func TestUnmarshalURI(t *testing.T) {
+	sd := &SessionDescription{}
+	if err := sd.Unmarshal(UriSDP); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	actual := sd.Marshal()
+	if actual != UriSDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", UriSDP, actual)
+	}
+}
+
+func TestUnmarshalRepeatTimes(t *testing.T) {
+	sd := &SessionDescription{}
+	if err := sd.Unmarshal(RepeatTimesSDP); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	actual := sd.Marshal()
+	if actual != RepeatTimesSDP {
+		t.Errorf("error:\n\nEXPECTED:\n%v\nACTUAL:\n%v", RepeatTimesSDP, actual)
 	}
 }
 
