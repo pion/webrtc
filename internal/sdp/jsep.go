@@ -76,8 +76,8 @@ func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescri
 	// TODO: handle codecPrefs
 	d := &MediaDescription{
 		MediaName: MediaName{
-			Media: codecType,
-			Proto: "UDP/TLS/RTP/SAVPF",
+			Media:  codecType,
+			Protos: []string{"UDP", "TLS", "RTP", "SAVPF"},
 		},
 		ConnectionInformation: &ConnectionInformation{
 			NetworkType: "IN",

@@ -49,7 +49,7 @@ func (p *RangedPort) String() string {
 type MediaName struct {
 	Media   string
 	Port    RangedPort
-	Proto   string
+	Protos  []string
 	Formats []int
 }
 
@@ -62,7 +62,7 @@ func (m *MediaName) String() *string {
 	output := strings.Join([]string{
 		m.Media,
 		m.Port.String(),
-		m.Proto,
+		strings.Join(m.Protos, "/"),
 		strings.Join(formats, ""),
 	}, " ")
 	return &output

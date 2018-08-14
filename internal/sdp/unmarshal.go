@@ -818,10 +818,12 @@ func unmarshalMediaDescription(l *lexer) (stateFn, error) {
 	// <proto>
 	// Set according to currently registered with IANA
 	// https://tools.ietf.org/html/rfc4566#section-5.14
-	if i := indexOf(fields[2], []string{"udp", "RTP/AVP", "RTP/SAVP"}); i == -1 {
-		return nil, errors.Errorf("sdp: invalid value `%v`", fields[2])
+	for _, proto := range strings.Split(fields[2], "/") {
+		if i := indexOf(proto, []string{"UDP", "RTP", "AVP", "SAVP", "SAVPF", "TLS"}); i == -1 {
+			return nil, errors.Errorf("sdp: invalid value `%v`", fields[2])
+		}
+		newMediaDesc.MediaName.Protos = append(newMediaDesc.MediaName.Protos, proto)
 	}
-	newMediaDesc.MediaName.Proto = fields[2]
 
 	// <fmt>...
 	for i := 3; i < len(fields); i++ {
