@@ -81,7 +81,7 @@ func (s *SessionDescription) WithValueAttribute(key, value string) *SessionDescr
 
 // WithMedia adds a media description to the session description
 func (s *SessionDescription) WithMedia(md *MediaDescription) *SessionDescription {
-	s.MediaDescriptions = append(s.MediaDescriptions, *md)
+	s.MediaDescriptions = append(s.MediaDescriptions, md)
 	return s
 }
 

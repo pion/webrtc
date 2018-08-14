@@ -797,7 +797,7 @@ func unmarshalMediaDescription(l *lexer) (stateFn, error) {
 		return nil, errors.Errorf("sdp: invalid syntax `m=%v`", fields)
 	}
 
-	newMediaDesc := MediaDescription{}
+	newMediaDesc := &MediaDescription{}
 
 	// <media>
 	// Set according to currently registered with IANA
@@ -852,7 +852,7 @@ func unmarshalMediaTitle(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	mediaTitle := Information(value)
 	latestMediaDesc.MediaTitle = &mediaTitle
 	return s16, nil
@@ -864,7 +864,7 @@ func unmarshalMediaConnectionInformation(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	latestMediaDesc.ConnectionInformation, err = unmarshalConnectionInformation(value)
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid syntax `c=%v`", value)
@@ -878,7 +878,7 @@ func unmarshalMediaBandwidth(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	bandwidth, err := unmarshalBandwidth(value)
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid syntax `b=%v`", value)
@@ -893,7 +893,7 @@ func unmarshalMediaEncryptionKey(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	encryptionKey := EncryptionKey(value)
 	latestMediaDesc.EncryptionKey = &encryptionKey
 	return s14, nil
@@ -905,7 +905,7 @@ func unmarshalMediaAttribute(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	latestMediaDesc.Attributes = append(latestMediaDesc.Attributes, Attribute(value))
 	return s14, nil
 }
