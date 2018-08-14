@@ -92,6 +92,7 @@ func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescri
 	d := &MediaDescription{
 		MediaName: MediaName{
 			Media:  codecType,
+			Port:   RangedPort{Value: 9},
 			Protos: []string{"UDP", "TLS", "RTP", "SAVPF"},
 		},
 		ConnectionInformation: &ConnectionInformation{

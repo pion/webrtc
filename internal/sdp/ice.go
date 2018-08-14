@@ -66,11 +66,11 @@ func ICECandidateMarshal(c ice.Candidate) []string {
 
 	switch c := c.(type) {
 	case *ice.CandidateSrflx:
-		out = append(out, iceSrflxCandidateString(c, 0))
 		out = append(out, iceSrflxCandidateString(c, 1))
+		out = append(out, iceSrflxCandidateString(c, 2))
 	case *ice.CandidateHost:
-		out = append(out, iceHostCandidateString(c, 0))
 		out = append(out, iceHostCandidateString(c, 1))
+		out = append(out, iceHostCandidateString(c, 2))
 	}
 
 	return out
