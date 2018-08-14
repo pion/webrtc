@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"strings"
 
-	"github.com/pkg/errors"
-	"strconv"
-	"net/url"
-	"net"
 	"io"
+	"net"
+	"net/url"
+	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 // Unmarshal is the primary function that deserializes the session description

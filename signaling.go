@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"net"
+
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pkg/errors"
-	"net"
 )
 
 // RTCAnswerOptions describes the options used to control the answer creation process
@@ -228,7 +229,7 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 			WithValueAttribute(sdp.AttrKeyMID, codecType.String()).
 			WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 			WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
-			WithPropertyAttribute(sdp.AttrKeyRtcpMux). // TODO: support RTCP fallback
+			WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
 			WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 		for _, codec := range r.mediaEngine.getCodecsByKind(codecType) {
@@ -237,8 +238,8 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 
 		for _, transceiver := range r.rtpTransceivers {
 			if transceiver.Sender == nil ||
-			transceiver.Sender.Track == nil ||
-			transceiver.Sender.Track.Kind != codecType {
+				transceiver.Sender.Track == nil ||
+				transceiver.Sender.Track.Kind != codecType {
 				continue
 			}
 			track := transceiver.Sender.Track
@@ -261,9 +262,9 @@ func (r *RTCPeerConnection) addRTPMediaSections(d *sdp.SessionDescription, media
 func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, candidates []string) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
-			Media: "application",
-			Port: sdp.RangedPort{Value: 9},
-			Protos: []string{"DTLS", "SCTP"},
+			Media:   "application",
+			Port:    sdp.RangedPort{Value: 9},
+			Protos:  []string{"DTLS", "SCTP"},
 			Formats: []int{5000},
 		},
 		ConnectionInformation: &sdp.ConnectionInformation{

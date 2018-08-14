@@ -1,8 +1,8 @@
 package sdp
 
 import (
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // TimeDescription describes "t=", "r=" fields of the session description
@@ -11,7 +11,7 @@ import (
 type TimeDescription struct {
 	// t=<start-time> <stop-time>
 	// https://tools.ietf.org/html/rfc4566#section-5.9
-	Timing      Timing
+	Timing Timing
 
 	// r=<repeat interval> <active duration> <offsets from start-time>
 	// https://tools.ietf.org/html/rfc4566#section-5.10
