@@ -64,7 +64,7 @@ type SessionDescription struct {
 	Attributes []Attribute
 
 	// https://tools.ietf.org/html/rfc4566#section-5.14
-	MediaDescriptions []MediaDescription
+	MediaDescriptions []*MediaDescription
 }
 
 // Version describes the value provided by the "v=" field which gives
