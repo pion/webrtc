@@ -101,15 +101,15 @@ func (s *SessionDescription) Marshal() (raw string) {
 		}
 
 		for _, b := range md.Bandwidth {
-			raw += keyValueBuild("b", b.String())
+			raw += keyValueBuild("b=", b.String())
 		}
 
 		if md.EncryptionKey != nil {
-			raw += keyValueBuild("k", md.EncryptionKey.String())
+			raw += keyValueBuild("k=", md.EncryptionKey.String())
 		}
 
 		for _, a := range md.Attributes {
-			raw += keyValueBuild("a", a.String())
+			raw += keyValueBuild("a=", a.String())
 		}
 	}
 

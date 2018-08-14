@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"net/url"
 	"net"
+	"io"
 )
 
 // States Sransition Table - Describes the computation flow between functions
@@ -236,6 +237,9 @@ func s8(l *lexer) (stateFn, error) {
 func s9(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -282,6 +286,9 @@ func s10(l *lexer) (stateFn, error) {
 func s11(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -298,6 +305,9 @@ func s11(l *lexer) (stateFn, error) {
 func s12(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -322,6 +332,9 @@ func s12(l *lexer) (stateFn, error) {
 func s13(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -340,6 +353,9 @@ func s13(l *lexer) (stateFn, error) {
 func s14(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -356,6 +372,9 @@ func s14(l *lexer) (stateFn, error) {
 func s15(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -376,6 +395,9 @@ func s15(l *lexer) (stateFn, error) {
 func s16(l *lexer) (stateFn, error) {
 	key, err := readType(l.input)
 	if err != nil {
+		if err == io.EOF && key == "" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -753,7 +775,6 @@ func unmarshalSessionAttribute(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	// TODO Improve attribute parsing
 	l.desc.Attributes = append(l.desc.Attributes, Attribute(value))
 	return s11, nil
 }
@@ -822,7 +843,7 @@ func unmarshalMediaTitle(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	mediaTitle := Information(value)
 	latestMediaDesc.MediaTitle = &mediaTitle
 	return s16, nil
@@ -834,7 +855,7 @@ func unmarshalMediaConnectionInformation(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	latestMediaDesc.ConnectionInformation, err = unmarshalConnectionInformation(value)
 	if err != nil {
 		return nil, errors.Errorf("sdp: invalid syntax `c=%v`", value)
@@ -863,7 +884,7 @@ func unmarshalMediaEncryptionKey(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	encryptionKey := EncryptionKey(value)
 	latestMediaDesc.EncryptionKey = &encryptionKey
 	return s14, nil
@@ -875,7 +896,7 @@ func unmarshalMediaAttribute(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
+	latestMediaDesc := &l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
 	latestMediaDesc.Attributes = append(latestMediaDesc.Attributes, Attribute(value))
 	return s14, nil
 }
