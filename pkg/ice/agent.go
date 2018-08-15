@@ -15,7 +15,7 @@ import (
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
 type OutboundCallback func(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr)
 
-func NewCandidatePair(local, remote Candidate) CandidatePair {
+func newCandidatePair(local, remote Candidate) CandidatePair {
 	return CandidatePair{
 		remote: remote,
 		local:  local,
@@ -141,7 +141,7 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 }
 
 func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
-	p := NewCandidatePair(local, remote)
+	p := newCandidatePair(local, remote)
 
 	if selected {
 		a.selectedPair = p
