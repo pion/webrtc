@@ -117,7 +117,7 @@ type Association struct {
 
 // HandleInbound parses incoming raw packets
 func (a *Association) HandleInbound(raw []byte) error {
-	a.logger.Debug(fmt.Sprintf("Got %q", raw))
+	// a.logger.Debug(fmt.Sprintf("Got %q", raw)) TODO @backkem
 	p := &packet{}
 	if err := p.unmarshal(raw); err != nil {
 		return errors.Wrap(err, "Unable to parse SCTP packet")
