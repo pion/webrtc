@@ -170,10 +170,17 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
 	candidates := r.generateLocalCandidates()
 
-	r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass)
-	r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass)
+	bundleValue := "BUNDLE"
+
+	if r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+		bundleValue += " audio"
+	}
+	if r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+		bundleValue += " video"
+	}
+
 	r.addDataMediaSection(d, "data", candidates, sdp.ConnectionRoleActpass)
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video data")
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
 
 	for _, m := range d.MediaDescriptions {
 		m.WithPropertyAttribute("setup:actpass")
@@ -207,7 +214,6 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 		// TODO @trivigy better SDP parser
 		var peerDirection RTCRtpTransceiverDirection
 		midValue := ""
-
 		for _, a := range remoteMedia.Attributes {
 			if strings.HasPrefix(*a.String(), "mid") {
 				midValue = (*a.String())[len("mid:"):]
@@ -219,12 +225,19 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 				peerDirection = RTCRtpTransceiverDirectionRecvonly
 			}
 		}
-		bundleValue += " " + midValue
+
+		appendBundle := func() {
+			bundleValue += " " + midValue
+		}
 
 		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
-			r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive)
+			if r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+				appendBundle()
+			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
-			r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive)
+			if r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+				appendBundle()
+			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
 			r.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
 		}
@@ -253,9 +266,9 @@ func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRt
 	return RTCRtpTransceiverDirectionInactive
 }
 
-func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string, dtlsRole sdp.ConnectionRole) {
+func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string, dtlsRole sdp.ConnectionRole) bool {
 	if codecs := r.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
-		return
+		return false
 	}
 
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
@@ -287,6 +300,7 @@ func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecT
 	}
 	media.WithPropertyAttribute("end-of-candidates")
 	d.WithMedia(media)
+	return true
 }
 
 func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string, dtlsRole sdp.ConnectionRole) {
