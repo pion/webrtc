@@ -90,3 +90,6 @@ type SyntaxError struct {
 func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("syntax error: %v", e.Err)
 }
+
+// ErrUnknownType indicates a Unknown info
+var ErrUnknownType = errors.New("Unknown")

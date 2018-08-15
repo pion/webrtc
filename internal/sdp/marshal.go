@@ -72,7 +72,7 @@ func (s *SessionDescription) Marshal() (raw string) {
 		}
 	}
 
-	var rawTimeZones []string
+	rawTimeZones := make([]string, 0)
 	for _, z := range s.TimeZones {
 		rawTimeZones = append(rawTimeZones, z.String())
 	}

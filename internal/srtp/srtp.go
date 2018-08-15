@@ -117,7 +117,7 @@ func (c *Context) generateSessionSalt() ([]byte, error) {
 
 	labelAndIndexOverKdr := []byte{labelSalt, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	for i, j := len(labelAndIndexOverKdr)-1, len(sessionSalt)-1; i >= 0; i, j = i-1, j-1 {
-		sessionSalt[j] = byte(sessionSalt[j]) ^ byte(labelAndIndexOverKdr[i])
+		sessionSalt[j] = sessionSalt[j] ^ labelAndIndexOverKdr[i]
 	}
 
 	// That value is padded and encrypted as above.

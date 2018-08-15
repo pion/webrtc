@@ -55,7 +55,7 @@ func (t RTCPeerConnectionState) String() string {
 	case RTCPeerConnectionStateClosed:
 		return "closed"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 

@@ -24,7 +24,7 @@ func (t RTCICECredentialType) String() string {
 	case RTCICECredentialTypeOauth:
 		return "oauth"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -59,11 +59,13 @@ type RTCOAuthCredential struct {
 	AccessToken string
 }
 
-// RTCICETransportPolicy defines the ICE candidate policy [JSEP] (section 3.5.3.) used to surface the permitted candidates
+// RTCICETransportPolicy defines the ICE candidate policy [JSEP] (section 3.5.3.) used to
+// surface the permitted candidates
 type RTCICETransportPolicy int
 
 const (
-	// RTCICETransportPolicyRelay indicates only media relay candidates such as candidates passing through a TURN server are used
+	// RTCICETransportPolicyRelay indicates only media relay candidates such as candidates passing
+	// through a TURN server are used
 	RTCICETransportPolicyRelay RTCICETransportPolicy = iota + 1
 
 	// RTCICETransportPolicyAll indicates any type of candidate is used
@@ -77,11 +79,12 @@ func (t RTCICETransportPolicy) String() string {
 	case RTCICETransportPolicyAll:
 		return "all"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
-// RTCBundlePolicy affects which media tracks are negotiated if the remote endpoint is not bundle-aware, and what ICE candidates are gathered.
+// RTCBundlePolicy affects which media tracks are negotiated if the remote endpoint is not bundle-aware,
+// and what ICE candidates are gathered.
 type RTCBundlePolicy int
 
 const (
@@ -105,7 +108,7 @@ func (t RTCBundlePolicy) String() string {
 	case RTCRtcpMuxPolicyMaxBundle:
 		return "max-bundle"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -127,15 +130,16 @@ func (t RTCRtcpMuxPolicy) String() string {
 	case RTCRtcpMuxPolicyRequire:
 		return "require"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
 // RTCConfiguration contains RTCPeerConfiguration options
 type RTCConfiguration struct {
 	// ICEServers holds multiple RTCICEServer instances, each describing one server which may be used by the ICE agent;
-	// these are typically STUN and/or TURN servers. If this isn't specified, the ICE agent may choose to use its own ICE servers;
-	// otherwise, the connection attempt will be made with no STUN or TURN server available, which limits the connection to local peers.
+	// these are typically STUN and/or TURN servers. If this isn't specified, the ICE agent may choose to use its own
+	// ICE servers; otherwise, the connection attempt will be made with no STUN or TURN server available, which limits
+	// the connection to local peers.
 	ICEServers           []RTCICEServer
 	ICETransportPolicy   RTCICETransportPolicy
 	BundlePolicy         RTCBundlePolicy
