@@ -150,7 +150,7 @@ func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
 		a.updateConnectionState(ConnectionStateConnected)
 	} else {
 		// keep track of pairs with succesfull bindings since any of them
-		// can be used for communication untill the final pair is selected:
+		// can be used for communication until the final pair is selected:
 		// https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-12
 		a.validPairs = append(a.validPairs, p)
 	}

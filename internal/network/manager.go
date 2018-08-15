@@ -61,12 +61,12 @@ func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEv
 		dataChannelEventHandler:  dataChannelEventHandler,
 		logger:                   logger,
 	}
-	m.dtlsState, err = dtls.NewState(logger.WithFields(log.Field{"component", "dtls"}))
+	m.dtlsState, err = dtls.NewState(logger.WithFields(log.Field{Key: "component", Value: "dtls"}))
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, logger.WithFields(log.Field{"component", "sctp"}))
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, logger.WithFields(log.Field{Key: "component", Value: "sctp"}))
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
 	for _, i := range localInterfaces() {
@@ -257,7 +257,7 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
-	p, err := m.GetPort(local)
+	p, err := m.port(local)
 	if err != nil {
 		fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
 		return
@@ -266,8 +266,7 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 	p.sendSCTP(raw, remote)
 }
 
-// GetPort looks up a local port by address
-func (m *Manager) GetPort(local *stun.TransportAddr) (*port, error) {
+func (m *Manager) port(local *stun.TransportAddr) (*port, error) {
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
 			return p, nil
@@ -288,6 +287,7 @@ func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remo
 	}
 }
 
+// SendOpenChannelMessage sends the message to open a datachannel to the connected peer
 func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) error {
 	msg := &datachannel.ChannelOpen{
 		ChannelType:          datachannel.ChannelTypeReliable,
