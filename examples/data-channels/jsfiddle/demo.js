@@ -14,7 +14,7 @@ let log = msg => {
 let sendChannel = pc.createDataChannel('foo')
 sendChannel.onclose = () => console.log('sendChannel has closed')
 sendChannel.onopen = () => console.log('sendChannel has opened')
-sendChannel.onmessage = e => log(`sendChannel got '${e.data}'`)
+sendChannel.onmessage = e => log(`Message from DataChannel '${sendChannel.label}' payload '${e.data}'`)
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 pc.onicecandidate = event => {
