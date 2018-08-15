@@ -11,6 +11,16 @@ const (
 	SrflxCandidatePreference uint16 = 100
 )
 
+// TransportType indicates the transport that is used
+type TransportType int
+
+const (
+	// TransportUDP indicates the URL uses a UDP transport
+	TransportUDP TransportType = iota + 1
+	// TransportTCP indicates the URL uses a TCP transport
+	TransportTCP
+)
+
 // Candidate represents an ICE candidate
 type Candidate interface {
 	GetBase() *CandidateBase
