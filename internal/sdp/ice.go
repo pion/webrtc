@@ -45,6 +45,14 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 				Port:     port,
 			},
 		}
+	case "srflx":
+		return &ice.CandidateSrflx{
+			CandidateBase: ice.CandidateBase{
+				Protocol: ice.TransportUDP,
+				Address:  address,
+				Port:     port,
+			},
+		}
 	default:
 		return nil
 	}
