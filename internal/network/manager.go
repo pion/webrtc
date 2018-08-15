@@ -254,7 +254,7 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
-	p, err := m.GetPort(local)
+	p, err := m.port(local)
 	if err != nil {
 		fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
 		return
@@ -263,8 +263,7 @@ func (m *Manager) dataChannelOutboundHandler(raw []byte) {
 	p.sendSCTP(raw, remote)
 }
 
-// GetPort looks up a local port by address
-func (m *Manager) GetPort(local *stun.TransportAddr) (*port, error) {
+func (m *Manager) port(local *stun.TransportAddr) (*port, error) {
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
 			return p, nil
@@ -285,6 +284,7 @@ func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remo
 	}
 }
 
+// SendOpenChannelMessage sends the message to open a datachannel to the connected peer
 func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) error {
 	msg := &datachannel.ChannelOpen{
 		ChannelType:          datachannel.ChannelTypeReliable,

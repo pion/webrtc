@@ -112,7 +112,7 @@ func TestMarshalCanonical(t *testing.T) {
 			Attribute("candidate:0 1 UDP 2113667327 203.0.113.1 54400 typ host"),
 			Attribute("recvonly"),
 		},
-		MediaDescriptions: []MediaDescription{
+		MediaDescriptions: []*MediaDescription{
 			{
 				MediaName: MediaName{
 					Media: "audio",
