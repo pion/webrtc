@@ -84,9 +84,9 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 }
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
-func (m *Manager) AddURL(url *ice.URL) error {
+func (m *Manager) AddURL(url *stun.URL) error {
 	switch url.Type {
-	case ice.ServerTypeSTUN:
+	case stun.ServerTypeSTUN:
 		c, err := webrtcStun.Allocate(url)
 		if err != nil {
 			return err

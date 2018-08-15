@@ -12,7 +12,7 @@ import (
 
 // Allocate crafts and sends a STUN binding
 // On success will return our XORMappedAddress
-func Allocate(url *ice.URL) (*ice.CandidateSrflx, error) {
+func Allocate(url *stun.URL) (*ice.CandidateSrflx, error) {
 	// TODO Do we want the timeout to be configurable?
 	proto := url.TransportType.String()
 	client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
