@@ -4,7 +4,7 @@ package logger
 // It allows any log package to be plugged in and
 // intentionally limits the possible ways to log.
 type Logger interface {
-	// Debug represents the lowest logging level
+	// Debug logs the lowest logging level
 	Debug(msg string)
 
 	// WithFields creates a child logger with fields

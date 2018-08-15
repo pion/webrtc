@@ -5,6 +5,7 @@ type Optional struct {
 	logger Logger
 }
 
+// NewOptional creates a new Optional logger
 func NewOptional(l Logger) *Optional {
 	if l == nil {
 		return nil
@@ -13,10 +14,11 @@ func NewOptional(l Logger) *Optional {
 	case *Optional:
 		return l
 	default:
-		return &Optional{l}
+		return &Optional{logger: l}
 	}
 }
 
+// WithFields creates a child logger with fields
 func (l *Optional) WithFields(fields ...Field) Logger {
 	if l == nil {
 		return nil
@@ -24,6 +26,7 @@ func (l *Optional) WithFields(fields ...Field) Logger {
 	return NewOptional(l.logger.WithFields(fields...))
 }
 
+// Debug logs the lowest logging level
 func (l *Optional) Debug(msg string) {
 	if l == nil {
 		return

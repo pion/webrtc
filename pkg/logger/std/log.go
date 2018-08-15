@@ -8,8 +8,10 @@ import (
 	"github.com/pions/webrtc/pkg/logger"
 )
 
+// Level represents the logging levels
 type Level int
 
+// Logging levels
 const (
 	Debug = iota + 1
 	Info

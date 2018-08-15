@@ -1,28 +1,27 @@
-# data-channels
-data-channels is a pion-WebRTC application that shows how you can send/recv DataChannel messages from a web browser
+# data-channels-create
+data-channels-create is a pion-WebRTC application that shows how you can send/recv DataChannel messages from a web browser. The difference with the data-channels example is that the datachannel is initialized from the pion side in this example.
 
 ## Instructions
-### Download data-channels
+### Download data-channels-create
 ```
-go get github.com/pions/webrtc/examples/data-channels
+go get github.com/pions/webrtc/examples/data-channels-create
 ```
 
-### Open data-channels example page
-[jsfiddle.net](https://jsfiddle.net/gh/get/library/pure/pions/webrtc/tree/master/examples/data-channels/jsfiddle)
+### Open data-channels-create example page
+[jsfiddle.net](https://jsfiddle.net/swgxrp94/5/)
 
-### Run data-channels, with your browsers SessionDescription as stdin
-In the jsfiddle the top textarea is your browser's session description, copy that and:
-#### Linux/macOS
-Run `echo $BROWSER_SDP | data-channels`
-#### Windows
-1. Paste the SessionDescription into a file.
-1. Run `data-channels < my_file`
+### Run data-channels-create
+Just run run `data-channels-create`.
 
-### Input data-channels's SessionDescription into your browser
-Copy the text that `data-channels` just emitted and copy into second text area
+### Input data-channels-create's SessionDescription into your browser
+Copy the text that `data-channels-create` just emitted and copy into first text area of the jsfiddle.
 
 ### Hit 'Start Session' in jsfiddle
-Under Start Session you should see 'Checking' as it starts connecting. If everything worked you should see `New DataChannel foo 1`
+Hit the 'Start Session' button in the browser. You should see `have-remote-offer` below the `Send Message` button.
+
+### Input browser's SessionDescription into data-channels-create
+Meanwhile text has appeared in the second text area of the jsfiddle. Copy the text and paste it into `data-channels-create` and hit ENTER.
+In the browser you'll now see `connected` as the connection is created. If everything worked you should see `New DataChannel data`.
 
 Now you can put whatever you want in the `Message` textarea, and when you hit `Send Message` it should appear in your browser!
 
