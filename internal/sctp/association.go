@@ -148,12 +148,12 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 
 	var chunks []*chunkPayloadData
 	for remaining != 0 {
-		l := min(a.myMaxMTU, uint16(remaining))
+		l := min(a.myMaxMTU, remaining)
 		chunks = append(chunks, &chunkPayloadData{
 			streamIdentifier:     streamIdentifier,
-			userData:             raw[i : uint16(i)+l],
+			userData:             raw[i : i+l],
 			beginingFragment:     i == 0,
-			endingFragment:       uint16(remaining)-l == 0,
+			endingFragment:       remaining-l == 0,
 			immediateSack:        false,
 			payloadType:          payloadType,
 			streamSequenceNumber: seqNum,

@@ -47,7 +47,7 @@ func (t ServerType) String() string {
 	case ServerTypeTURN:
 		return "turn"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -69,7 +69,7 @@ func (t TransportType) String() string {
 	case TransportTCP:
 		return "tcp"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 

@@ -48,13 +48,13 @@ type Manager struct {
 }
 
 // NewManager creates a new network.Manager
-func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier) (m *Manager, err error) {
+func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
 	m = &Manager{
-		iceNotifier:              iceNotifier,
+		iceNotifier:              ntf,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
-		bufferTransportGenerator: bufferTransportGenerator,
-		dataChannelEventHandler:  dataChannelEventHandler,
+		bufferTransportGenerator: btg,
+		dataChannelEventHandler:  dcet,
 	}
 	m.dtlsState, err = dtls.NewState()
 	if err != nil {
@@ -232,11 +232,13 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 	case sctp.PayloadTypeWebRTCString:
 		fallthrough
 	case sctp.PayloadTypeWebRTCStringEmpty:
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadString{Data: data}})
+		payload := &datachannel.PayloadString{Data: data}
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: payload})
 	case sctp.PayloadTypeWebRTCBinary:
 		fallthrough
 	case sctp.PayloadTypeWebRTCBinaryEmpty:
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: &datachannel.PayloadBinary{Data: data}})
+		payload := &datachannel.PayloadBinary{Data: data}
+		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: payload})
 	default:
 		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
 	}

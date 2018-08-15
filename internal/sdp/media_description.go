@@ -61,7 +61,7 @@ type MediaName struct {
 }
 
 func (m *MediaName) String() *string {
-	var formats []string
+	formats := make([]string, 0)
 	for _, format := range m.Formats {
 		formats = append(formats, strconv.Itoa(format))
 	}

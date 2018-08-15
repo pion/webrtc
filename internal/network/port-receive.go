@@ -52,7 +52,7 @@ func (p *port) handleSRTP(buffer []byte) {
 	srtpContext, ok := p.m.srtpContexts[contextMapKey]
 	if !ok {
 		var err error
-		srtpContext, err = srtp.CreateContext([]byte(p.m.certPair.ServerWriteKey[0:16]), []byte(p.m.certPair.ServerWriteKey[16:]), p.m.certPair.Profile, packet.SSRC)
+		srtpContext, err = srtp.CreateContext(p.m.certPair.ServerWriteKey[0:16], p.m.certPair.ServerWriteKey[16:], p.m.certPair.Profile, packet.SSRC)
 		if err != nil {
 			fmt.Println("Failed to build SRTP context")
 			return
