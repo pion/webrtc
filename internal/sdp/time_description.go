@@ -40,7 +40,7 @@ type RepeatTime struct {
 }
 
 func (r *RepeatTime) String() *string {
-	var fields []string
+	fields := make([]string, 0)
 	fields = append(fields, strconv.FormatInt(r.Interval, 10))
 	fields = append(fields, strconv.FormatInt(r.Duration, 10))
 	for _, value := range r.Offsets {

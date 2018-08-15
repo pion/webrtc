@@ -40,7 +40,8 @@ type RTCRtpTransceiverDirection int
 
 const (
 
-	// RTCRtpTransceiverDirectionSendrecv indicates the RTCRtpSender will offer to send RTP and RTCRtpReceiver the will offer to receive RTP
+	// RTCRtpTransceiverDirectionSendrecv indicates the RTCRtpSender will offer to send RTP and RTCRtpReceiver the will
+	// offer to receive RTP
 	RTCRtpTransceiverDirectionSendrecv RTCRtpTransceiverDirection = iota + 1
 
 	// RTCRtpTransceiverDirectionSendonly indicates the RTCRtpSender will offer to send RTP
@@ -49,7 +50,8 @@ const (
 	// RTCRtpTransceiverDirectionRecvonly indicates the RTCRtpReceiver the will offer to receive RTP
 	RTCRtpTransceiverDirectionRecvonly
 
-	// RTCRtpTransceiverDirectionInactive indicates the RTCRtpSender won't offer to send RTP and RTCRtpReceiver the won't offer to receive RTP
+	// RTCRtpTransceiverDirectionInactive indicates the RTCRtpSender won't offer to send RTP and RTCRtpReceiver the
+	// won't offer to receive RTP
 	RTCRtpTransceiverDirectionInactive
 )
 
@@ -64,7 +66,7 @@ func (t RTCRtpTransceiverDirection) String() string {
 	case RTCRtpTransceiverDirectionInactive:
 		return "inactive"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -122,9 +124,9 @@ type RTCSample struct {
 
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
+	ID          string
 	PayloadType uint8
 	Kind        RTCRtpCodecType
-	ID          string
 	Label       string
 	Ssrc        uint32
 	Codec       *RTCRtpCodec

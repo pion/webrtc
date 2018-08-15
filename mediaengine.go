@@ -159,7 +159,7 @@ func (t RTCRtpCodecType) String() string {
 	case RTCRtpCodecTypeVideo:
 		return "video"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 

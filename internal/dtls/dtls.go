@@ -116,19 +116,19 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 
 	rawLocal := C.CString(local)
 	rawRemote := C.CString(remote)
-	packetRaw := C.CBytes(packet)
+	packetRaw := C.CBytes(packet) // unsafe.Pointer
 	defer func() {
 		C.free(unsafe.Pointer(rawLocal))
 		C.free(unsafe.Pointer(rawRemote))
-		C.free(unsafe.Pointer(packetRaw))
+		C.free(packetRaw)
 	}()
 
 	if ret := C.dtls_handle_incoming(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote); ret != nil {
 		defer func() {
-			C.free(unsafe.Pointer(ret.buf))
+			C.free(ret.buf)
 			C.free(unsafe.Pointer(ret))
 		}()
-		return []byte(C.GoBytes(ret.buf, ret.len)), nil
+		return C.GoBytes(ret.buf, ret.len), nil
 	}
 	return nil, nil
 }
@@ -144,11 +144,11 @@ func (s *State) Send(packet []byte, local, remote string) (bool, error) {
 
 	rawLocal := C.CString(local)
 	rawRemote := C.CString(remote)
-	packetRaw := C.CBytes(packet)
+	packetRaw := C.CBytes(packet) // unsafe.Pointer
 	defer func() {
 		C.free(unsafe.Pointer(rawLocal))
 		C.free(unsafe.Pointer(rawRemote))
-		C.free(unsafe.Pointer(packetRaw))
+		C.free(packetRaw)
 	}()
 
 	return bool(C.dtls_handle_outgoing(s.dtlsSession, packetRaw, C.int(len(packet)), rawLocal, rawRemote)), nil

@@ -89,8 +89,8 @@ func (i *chunkInitCommon) unmarshal(raw []byte) error {
 			}
 			i.params = append(i.params, p)
 			padding := getPadding(p.length())
-			offset += int(p.length() + padding)
-			remaining -= int(p.length() + padding)
+			offset += p.length() + padding
+			remaining -= p.length() + padding
 		} else {
 			break
 		}

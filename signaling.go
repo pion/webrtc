@@ -34,10 +34,12 @@ const (
 	// RTCSignalingStateHaveRemoteOffer indicates A remote description, of type "offer", has been successfully applied.
 	RTCSignalingStateHaveRemoteOffer
 
-	// RTCSignalingStateHaveLocalPranswer indicates A remote description of type "offer" has been successfully applied and a local description of type "pranswer" has been successfully applied.
+	// RTCSignalingStateHaveLocalPranswer indicates A remote description of type "offer" has been successfully applied
+	// and a local description of type "pranswer" has been successfully applied.
 	RTCSignalingStateHaveLocalPranswer
 
-	// RTCSignalingStateHaveRemotePranswer indicates A local description of type "offer" has been successfully applied and a remote description of type "pranswer" has been successfully applied.
+	// RTCSignalingStateHaveRemotePranswer indicates A local description of type "offer" has been successfully applied
+	// and a remote description of type "pranswer" has been successfully applied.
 	RTCSignalingStateHaveRemotePranswer
 
 	// RTCSignalingStateClosed indicates The RTCPeerConnection has been closed.
@@ -59,7 +61,7 @@ func (t RTCSignalingState) String() string {
 	case RTCSignalingStateClosed:
 		return "closed"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -73,10 +75,12 @@ const (
 	// RTCSdpTypePranswer indicates that a description MUST be treated as an SDP answer, but not a final answer.
 	RTCSdpTypePranswer
 
-	// RTCSdpTypeAnswer indicates that a description MUST be treated as an SDP final answer, and the offer-answer exchange MUST be considered complete.
+	// RTCSdpTypeAnswer indicates that a description MUST be treated as an SDP final answer, and the offer-answer
+	// exchange MUST be considered complete.
 	RTCSdpTypeAnswer
 
-	// RTCSdpTypeRollback indicates that a description MUST be treated as canceling the current SDP negotiation and moving the SDP offer and answer back to what it was in the previous stable state.
+	// RTCSdpTypeRollback indicates that a description MUST be treated as canceling the current SDP negotiation
+	// and moving the SDP offer and answer back to what it was in the previous stable state.
 	RTCSdpTypeRollback
 )
 
@@ -91,7 +95,7 @@ func (t RTCSdpType) String() string {
 	case RTCSdpTypeRollback:
 		return "rollback"
 	default:
-		return "Unknown"
+		return ErrUnknownType.Error()
 	}
 }
 

@@ -98,12 +98,12 @@ func (c *chunkHeader) unmarshal(raw []byte) error {
 	}
 
 	c.typ = chunkType(raw[0])
-	c.flags = byte(raw[1])
+	c.flags = raw[1]
 	length := binary.BigEndian.Uint16(raw[2:])
 
 	// Length includes Chunk header
 	valueLength := int(length - chunkHeaderSize)
-	lengthAfterValue := len(raw) - (chunkHeaderSize + int(valueLength))
+	lengthAfterValue := len(raw) - (chunkHeaderSize + valueLength)
 
 	if lengthAfterValue < 0 {
 		return errors.Errorf("Not enough data left in SCTP packet to satisfy requested length remain %d req %d ", valueLength, len(raw)-chunkHeaderSize)
