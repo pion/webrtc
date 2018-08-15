@@ -170,9 +170,9 @@ func (r *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDes
 	d := sdp.NewJSEPSessionDescription(r.networkManager.DTLSFingerprint(), useIdentity)
 	candidates := r.generateLocalCandidates()
 
-	r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates)
-	r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates)
-	r.addDataMediaSection(d, "data", candidates)
+	r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass)
+	r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass)
+	r.addDataMediaSection(d, "data", candidates, sdp.ConnectionRoleActpass)
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio video data")
 
 	for _, m := range d.MediaDescriptions {
@@ -222,11 +222,11 @@ func (r *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionD
 		bundleValue += " " + midValue
 
 		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
-			r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates)
+			r.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive)
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
-			r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates)
+			r.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive)
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
-			r.addDataMediaSection(d, midValue, candidates)
+			r.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
 		}
 	}
 
@@ -253,9 +253,13 @@ func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRt
 	return RTCRtpTransceiverDirectionInactive
 }
 
-func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string) {
+func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string, dtlsRole sdp.ConnectionRole) {
+	if codecs := r.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
+		return
+	}
+
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(r.networkManager.IceAgent.LocalUfrag, r.networkManager.IceAgent.LocalPwd).
 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
@@ -285,7 +289,7 @@ func (r *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecT
 	d.WithMedia(media)
 }
 
-func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string) {
+func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string, dtlsRole sdp.ConnectionRole) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   "application",
@@ -301,7 +305,7 @@ func (r *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midVa
 			},
 		},
 	}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, sdp.ConnectionRoleActive.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
