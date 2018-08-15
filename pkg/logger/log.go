@@ -1,4 +1,4 @@
-package log
+package logger
 
 // Logger is an interface around logging.
 // It allows any log package to be plugged in and

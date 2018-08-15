@@ -18,7 +18,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/pions/webrtc/internal/log"
+	"github.com/pions/webrtc/pkg/logger"
 	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
@@ -70,14 +70,14 @@ type State struct {
 	dtlsSession *_Ctype_struct_dtls_sess
 
 	// Logging
-	logger log.Logger
+	logger *logger.Optional
 }
 
 // NewState creates a new DTLS session
-func NewState(logger log.Logger) (s *State, err error) {
+func NewState(l logger.Logger) (s *State, err error) {
 	s = &State{
 		tlscfg: C.dtls_build_tlscfg(),
-		logger: logger,
+		logger: logger.NewOptional(l),
 	}
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)

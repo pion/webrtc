@@ -8,12 +8,12 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
-	"github.com/pions/webrtc/internal/log"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/pkg/logger"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
@@ -48,25 +48,25 @@ type Manager struct {
 	ports     []*port
 
 	// Logging
-	logger log.Logger
+	logger *logger.Optional
 }
 
 // NewManager creates a new network.Manager
-func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier, logger log.Logger) (m *Manager, err error) {
+func NewManager(bufferTransportGenerator BufferTransportGenerator, dataChannelEventHandler DataChannelEventHandler, iceNotifier ICENotifier, l logger.Logger) (m *Manager, err error) {
 	m = &Manager{
 		iceNotifier:              iceNotifier,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
 		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: bufferTransportGenerator,
 		dataChannelEventHandler:  dataChannelEventHandler,
-		logger:                   logger,
+		logger:                   logger.NewOptional(l),
 	}
-	m.dtlsState, err = dtls.NewState(logger.WithFields(log.Field{Key: "component", Value: "dtls"}))
+	m.dtlsState, err = dtls.NewState(m.logger.WithFields(logger.Field{Key: "component", Value: "dtls"}))
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, logger.WithFields(log.Field{Key: "component", Value: "sctp"}))
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.logger.WithFields(logger.Field{Key: "component", Value: "sctp"}))
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
 	for _, i := range localInterfaces() {

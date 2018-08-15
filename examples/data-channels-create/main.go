@@ -5,15 +5,15 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/internal/log"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
-	"go.uber.org/zap"
+	"github.com/pions/webrtc/pkg/logger/std"
 )
 
 func randSeq(n int) string {
@@ -27,14 +27,6 @@ func randSeq(n int) string {
 }
 
 func main() {
-	l, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	logger := log.NewZap(l)
-
-	logger.Debug("test")
-
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{
 		ICEServers: []webrtc.RTCICEServer{
@@ -42,7 +34,7 @@ func main() {
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
 		},
-		Logger: logger,
+		Logger: std.New(log.New(os.Stderr, "", log.LstdFlags), std.Debug),
 	})
 	if err != nil {
 		panic(err)

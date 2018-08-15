@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/pions/webrtc/internal/log"
+	"github.com/pions/webrtc/pkg/logger"
 	"github.com/pkg/errors"
 )
 
@@ -112,12 +112,12 @@ type Association struct {
 	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
 
 	// Logging
-	logger log.Logger
+	logger *logger.Optional
 }
 
 // HandleInbound parses incoming raw packets
 func (a *Association) HandleInbound(raw []byte) error {
-	// a.logger.Debug(fmt.Sprintf("Got %q", raw)) TODO @backkem
+	a.logger.Debug(fmt.Sprintf("Got %q", raw))
 	p := &packet{}
 	if err := p.unmarshal(raw); err != nil {
 		return errors.Wrap(err, "Unable to parse SCTP packet")
@@ -204,7 +204,7 @@ func (a *Association) Close() error {
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), logger log.Logger) *Association {
+func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), l logger.Logger) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
@@ -223,7 +223,7 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 		outboundHandler:         outboundHandler,
 		dataHandler:             dataHandler,
 		state:                   Open,
-		logger:                  logger,
+		logger:                  logger.NewOptional(l),
 	}
 }
 
