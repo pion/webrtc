@@ -146,6 +146,7 @@ func (a *Agent) agentTaskLoop() {
 			a.Lock()
 			if a.isControlling {
 				if assertSelectedPairValid() {
+					a.Unlock()
 					continue
 				}
 
