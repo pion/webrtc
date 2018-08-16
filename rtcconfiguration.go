@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/internal/ice"
 )
 
 // RTCICECredentialType indicates the type of credentials used to connect to an ICE server

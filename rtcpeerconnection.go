@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/network"
-	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )

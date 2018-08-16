@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/internal/ice"
 )
 
 func main() {
