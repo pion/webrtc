@@ -86,6 +86,8 @@ See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 * [Michiel De Backker](https://github.com/backkem) - *SDP, Public API, Project Management*
 * [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
 * [Konstantin Itskov](https://github.com/trivigy) - *SDP Parsing*
+* [chenkaiC4](https://github.com/chenkaiC4) - *Fix GolangCI Linter*
+
 
 ## Project Ideas
 We are looking to support other interesting WebRTC projects, so if you have something to build please reach out!
