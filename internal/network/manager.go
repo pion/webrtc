@@ -8,11 +8,11 @@ import (
 
 	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
-	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
