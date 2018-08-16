@@ -43,12 +43,12 @@ func (c *CandidateHost) GetBase() *CandidateBase {
 	return &c.CandidateBase
 }
 
-// IP for CandidateHost
+// Address for CandidateHost
 func (c *CandidateHost) Address() string {
 	return c.CandidateBase.Address
 }
 
-// Value for CandidateHost
+// Port for CandidateHost
 func (c *CandidateHost) Port() int {
 	return c.CandidateBase.Port
 }

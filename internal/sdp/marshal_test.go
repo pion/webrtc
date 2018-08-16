@@ -47,9 +47,15 @@ func TestMarshalCanonical(t *testing.T) {
 		},
 		SessionName:        "SDP Seminar",
 		SessionInformation: &(&struct{ x Information }{"A Seminar on the session description protocol"}).x,
-		URI:                func() *url.URL { uri, _ := url.Parse("http://www.example.com/seminars/sdp.pdf"); return uri }(),
-		EmailAddress:       &(&struct{ x EmailAddress }{"j.doe@example.com (Jane Doe)"}).x,
-		PhoneNumber:        &(&struct{ x PhoneNumber }{"+1 617 555-6011"}).x,
+		URI: func() *url.URL {
+			uri, err := url.Parse("http://www.example.com/seminars/sdp.pdf")
+			if err != nil {
+				return nil
+			}
+			return uri
+		}(),
+		EmailAddress: &(&struct{ x EmailAddress }{"j.doe@example.com (Jane Doe)"}).x,
+		PhoneNumber:  &(&struct{ x PhoneNumber }{"+1 617 555-6011"}).x,
 		ConnectionInformation: &ConnectionInformation{
 			NetworkType: "IN",
 			AddressType: "IP4",

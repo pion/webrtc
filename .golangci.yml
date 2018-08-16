@@ -10,3 +10,6 @@ linters:
     - maligned
     - lll
     - dupl
+
+issues:
+  exclude-use-default: false
