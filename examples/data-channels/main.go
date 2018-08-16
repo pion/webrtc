@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/pkg/datachannel"
+	"github.com/pions/webrtc/pkg/ice"
 )
 
 func randSeq(n int) string {

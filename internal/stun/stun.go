@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/pions/pkg/stun"
-	"github.com/pions/webrtc/internal/ice"
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pkg/errors"
 )
 

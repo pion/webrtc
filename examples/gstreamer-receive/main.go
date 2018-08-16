@@ -10,7 +10,7 @@ import (
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/gstreamer-receive/gst"
-	"github.com/pions/webrtc/internal/ice"
+	"github.com/pions/webrtc/pkg/ice"
 )
 
 func main() {
