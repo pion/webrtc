@@ -159,7 +159,7 @@ func indexOf(element string, data []string) int {
 
 func keyValueBuild(key string, value *string) string {
 	if value != nil {
-		return key + *value + "\n"
+		return key + *value + "\r\n"
 	}
 	return ""
 }

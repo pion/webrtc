@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// Marshal takes a SDP struct to text
 // https://tools.ietf.org/html/rfc4566#section-5
 // Session description
 //    v=  (protocol version)
