@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/pkg/stun"
 )
 
 // RTCICECredentialType indicates the type of credentials used to connect to an ICE server
@@ -253,13 +253,13 @@ func (r *RTCPeerConnection) setICEServers(config RTCConfiguration) error {
 	return nil
 }
 
-func parseICEServer(server RTCICEServer, rawURL string) (ice.URL, error) {
-	iceurl, err := ice.NewURL(rawURL)
+func parseICEServer(server RTCICEServer, rawURL string) (stun.URL, error) {
+	iceurl, err := stun.NewURL(rawURL)
 	if err != nil {
 		return iceurl, &SyntaxError{Err: err}
 	}
 
-	if iceurl.Type == ice.ServerTypeTURN {
+	if iceurl.Type == stun.ServerTypeTURN {
 		if server.Username == "" {
 			return iceurl, &InvalidAccessError{Err: ErrNoTurnCred}
 		}
