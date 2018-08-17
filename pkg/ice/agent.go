@@ -185,9 +185,24 @@ func (a *Agent) Close() {
 	close(a.taskLoopChan)
 }
 
+func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
+	if c.GetBase().Address == testAddress && c.GetBase().Port == testPort {
+		return true
+	}
+
+	switch c := c.(type) {
+	case *CandidateSrflx:
+		if c.RemoteAddress == testAddress && c.RemotePort == testPort {
+			return true
+		}
+	}
+
+	return false
+}
+
 func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
 	for _, c := range candidates {
-		if c.GetBase().Address == addr.IP.String() && c.GetBase().Port == addr.Port {
+		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
 			return c
 		}
 	}
@@ -196,7 +211,7 @@ func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr)
 
 func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	for _, c := range candidates {
-		if c.GetBase().Address == addr.IP.String() && c.GetBase().Port == addr.Port {
+		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
 			return c
 		}
 	}
