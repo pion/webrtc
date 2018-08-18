@@ -21,3 +21,4 @@ script:
   - goveralls -v -race -covermode=atomic -service=travis-ci
   - bash .github/assert-contributors.sh
   - bash .github/lint-disallowed-functions-in-library.sh
+  - bash .github/build-examples.sh
