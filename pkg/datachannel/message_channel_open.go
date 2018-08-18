@@ -40,41 +40,44 @@ const (
 	channelOpenHeaderLength = 12
 )
 
+// ChannelType determines the reliability of the WebRTC DataChannel
 type ChannelType byte
 
+// ChannelType enums
 const (
 	// ChannelTypeReliable determines the Data Channel provides a
 	// reliable in-order bi-directional communication.
-	ChannelTypeReliable = 0x00
+	ChannelTypeReliable ChannelType = 0x00
 	// ChannelTypeReliableUnordered determines the Data Channel
 	// provides a reliable unordered bi-directional communication.
-	ChannelTypeReliableUnordered = 0x80
+	ChannelTypeReliableUnordered ChannelType = 0x80
 	// ChannelTypePartialReliableRexmit determines the Data Channel
 	// provides a partially-reliable in-order bi-directional communication.
 	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
-	ChannelTypePartialReliableRexmit = 0x01
+	ChannelTypePartialReliableRexmit ChannelType = 0x01
 	// ChannelTypePartialReliableRexmitUnordered determines
 	//  the Data Channel provides a partial reliable unordered bi-directional communication.
 	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
-	ChannelTypePartialReliableRexmitUnordered = 0x81
+	ChannelTypePartialReliableRexmitUnordered ChannelType = 0x81
 	// ChannelTypePartialReliableTimed determines the Data Channel
 	// provides a partial reliable in-order bi-directional communication.
 	// User messages might not be transmitted or retransmitted after
 	// a specified life-time given in milli- seconds in the Reliability Parameter.
 	// This life-time starts when providing the user message to the protocol stack.
-	ChannelTypePartialReliableTimed = 0x02
+	ChannelTypePartialReliableTimed ChannelType = 0x02
 	// The Data Channel provides a partial reliable unordered bi-directional
 	// communication.  User messages might not be transmitted or retransmitted
 	// after a specified life-time given in milli- seconds in the Reliability Parameter.
 	// This life-time starts when providing the user message to the protocol stack.
-	ChannelTypePartialReliableTimedUnordered = 0x82
+	ChannelTypePartialReliableTimedUnordered ChannelType = 0x82
 )
 
+// ChannelPriority enums
 const (
-	PriorityBelowNormal uint16 = 128
-	PriorityNormal      uint16 = 256
-	PriorityHigh        uint16 = 512
-	PriorityExtraHigh   uint16 = 1024
+	ChannelPriorityBelowNormal uint16 = 128
+	ChannelPriorityNormal      uint16 = 256
+	ChannelPriorityHigh        uint16 = 512
+	ChannelPriorityExtraHigh   uint16 = 1024
 )
 
 // Marshal returns raw bytes for the given message
