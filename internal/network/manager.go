@@ -288,7 +288,7 @@ func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remo
 func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) error {
 	msg := &datachannel.ChannelOpen{
 		ChannelType:          datachannel.ChannelTypeReliable,
-		Priority:             datachannel.PriorityNormal,
+		Priority:             datachannel.ChannelPriorityNormal,
 		ReliabilityParameter: 0,
 
 		Label:    []byte(label),

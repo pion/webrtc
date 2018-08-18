@@ -20,7 +20,6 @@ func init() {
 type RTCPeerConnectionState int
 
 const (
-
 	// RTCPeerConnectionStateNew indicates some of the ICE or DTLS transports are in status new
 	RTCPeerConnectionStateNew RTCPeerConnectionState = iota + 1
 
@@ -53,7 +52,9 @@ func (t RTCPeerConnectionState) String() string {
 	case RTCPeerConnectionStateFailed:
 		return "failed"
 	case RTCPeerConnectionStateClosed:
-		return "closed"
+		// goconst, "closed" is used in different unrelated packages
+		const closed = "closed"
+		return closed
 	default:
 		return ErrUnknownType.Error()
 	}
@@ -111,7 +112,7 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		signalingState:  RTCSignalingStateStable,
 		connectionState: RTCPeerConnectionStateNew,
 		mediaEngine:     DefaultMediaEngine,
-		sctp:               newRTCSctpTransport(),
+		sctp:            newRTCSctpTransport(),
 		dataChannels:    make(map[uint16]*RTCDataChannel),
 	}
 	var err error
