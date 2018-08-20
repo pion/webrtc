@@ -72,7 +72,7 @@ type PayloadProtocolIdentifier uint32
 const (
 	PayloadTypeWebRTCDCEP        PayloadProtocolIdentifier = 50
 	PayloadTypeWebRTCString      PayloadProtocolIdentifier = 51
-	PayloadTypeWebRTCBinary      PayloadProtocolIdentifier = 52
+	PayloadTypeWebRTCBinary      PayloadProtocolIdentifier = 53
 	PayloadTypeWebRTCStringEmpty PayloadProtocolIdentifier = 56
 	PayloadTypeWebRTCBinaryEmpty PayloadProtocolIdentifier = 57
 )
