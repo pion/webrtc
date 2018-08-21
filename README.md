@@ -87,6 +87,7 @@ See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 * [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
 * [Konstantin Itskov](https://github.com/trivigy) - *SDP Parsing*
 * [chenkaiC4](https://github.com/chenkaiC4) - *Fix GolangCI Linter*
+* [Ronan J](https://github.com/ronanj) - *Fix STCP PPID*
 
 
 ## Project Ideas
