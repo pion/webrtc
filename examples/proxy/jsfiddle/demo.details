@@ -1,0 +1,5 @@
+---
+ name: save-to-disk
+ description: Example of using pion-WebRTC to save video to disk in an IVF container
+ authors:
+   - Sean DuBois

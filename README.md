@@ -84,11 +84,10 @@ See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 * [Raphael Randschau](https://github.com/nicolai86) - *STUN*
 * [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
 * [Michiel De Backker](https://github.com/backkem) - *SDP, Public API, Project Management*
-* [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
+* [Brendan Rius](https://github.com/brendanrius) - *RTP forwarding*
 * [Konstantin Itskov](https://github.com/trivigy) - *SDP Parsing*
 * [chenkaiC4](https://github.com/chenkaiC4) - *Fix GolangCI Linter*
 * [Ronan J](https://github.com/ronanj) - *Fix STCP PPID*
-
 
 ## Project Ideas
 We are looking to support other interesting WebRTC projects, so if you have something to build please reach out!
