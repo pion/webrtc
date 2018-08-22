@@ -771,6 +771,7 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
 		fmt.Printf("Codec %s in not registered\n", sdpCodec)
+		return nil
 	}
 
 	bufferTransport := make(chan *rtp.Packet, 15)
