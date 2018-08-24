@@ -20,7 +20,7 @@ import (
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	IceAgent    *ice.Agent
+	// IceAgent    *ice.Agent
 	iceNotifier ICENotifier
 	isOffer     bool
 
@@ -63,22 +63,22 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
 
-	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
-	for _, i := range localInterfaces() {
-		p, portErr := newPort(i+":0", m)
-		if portErr != nil {
-			return nil, portErr
-		}
-
-		m.ports = append(m.ports, p)
-		m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
-			CandidateBase: ice.CandidateBase{
-				Protocol: ice.TransportUDP,
-				Address:  p.listeningAddr.IP.String(),
-				Port:     p.listeningAddr.Port,
-			},
-		})
-	}
+	// m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
+	// for _, i := range localInterfaces() {
+	// 	p, portErr := newPort(i+":0", m)
+	// 	if portErr != nil {
+	// 		return nil, portErr
+	// 	}
+	//
+	// 	m.ports = append(m.ports, p)
+	// 	m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
+	// 		CandidateBase: ice.CandidateBase{
+	// 			Protocol: ice.TransportUDP,
+	// 			Address:  p.listeningAddr.IP.String(),
+	// 			Port:     p.listeningAddr.Port,
+	// 		},
+	// 	})
+	// }
 
 	return m, err
 }
@@ -97,7 +97,7 @@ func (m *Manager) AddURL(url *ice.URL) error {
 		}
 
 		m.ports = append(m.ports, p)
-		m.IceAgent.AddLocalCandidate(c)
+		// m.IceAgent.AddLocalCandidate(c)
 	default:
 		return errors.Errorf("%s is not implemented", url.Type.String())
 	}
@@ -108,9 +108,9 @@ func (m *Manager) AddURL(url *ice.URL) error {
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	m.isOffer = isOffer
-	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
-		return err
-	}
+	// if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
+	// 	return err
+	// }
 	m.dtlsState.Start(isOffer)
 	return nil
 }
@@ -122,7 +122,7 @@ func (m *Manager) Close() {
 
 	err := m.sctpAssociation.Close()
 	m.dtlsState.Close()
-	m.IceAgent.Close()
+	// m.IceAgent.Close()
 
 	for i := len(m.ports) - 1; i >= 0; i-- {
 		if portError := m.ports[i].close(); portError != nil {
@@ -147,15 +147,15 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	m.portsLock.Lock()
 	defer m.portsLock.Unlock()
 
-	local, remote := m.IceAgent.SelectedPair()
-	if local == nil || remote == nil {
-		return
-	}
-	for _, p := range m.ports {
-		if p.listeningAddr.Equal(local) {
-			p.sendRTP(packet, remote)
-		}
-	}
+	// local, remote := m.IceAgent.SelectedPair()
+	// if local == nil || remote == nil {
+	// 	return
+	// }
+	// for _, p := range m.ports {
+	// 	if p.listeningAddr.Equal(local) {
+	// 		p.sendRTP(packet, remote)
+	// 	}
+	// }
 }
 
 // SendDataChannelMessage sends a DataChannel message to a connected peer
@@ -245,22 +245,22 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 }
 
 func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	local, remote := m.IceAgent.SelectedPair()
-	if remote == nil || local == nil {
-		// Send data on any valid pair
-		fmt.Println("dataChannelOutboundHandler: no valid candidates, dropping packet")
-		return
-	}
-
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-	p, err := m.port(local)
-	if err != nil {
-		fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
-		return
-
-	}
-	p.sendSCTP(raw, remote)
+	// local, remote := m.IceAgent.SelectedPair()
+	// if remote == nil || local == nil {
+	// 	// Send data on any valid pair
+	// 	fmt.Println("dataChannelOutboundHandler: no valid candidates, dropping packet")
+	// 	return
+	// }
+	//
+	// m.portsLock.Lock()
+	// defer m.portsLock.Unlock()
+	// p, err := m.port(local)
+	// if err != nil {
+	// 	fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
+	// 	return
+	//
+	// }
+	// p.sendSCTP(raw, remote)
 }
 
 func (m *Manager) port(local *stun.TransportAddr) (*port, error) {

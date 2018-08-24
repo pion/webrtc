@@ -1,83 +1,42 @@
+// Package webrtc implements the WebRTC 1.0 as defined in W3C WebRTC specification document.
 package webrtc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
-	"sync"
-	"time"
-
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
+	"sync"
+	"time"
 )
 
 func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
-
-// RTCPeerConnectionState indicates the state of the peer connection
-type RTCPeerConnectionState int
-
-const (
-	// RTCPeerConnectionStateNew indicates some of the ICE or DTLS transports are in status new
-	RTCPeerConnectionStateNew RTCPeerConnectionState = iota + 1
-
-	// RTCPeerConnectionStateConnecting indicates some of the ICE or DTLS transports are in status connecting or checking
-	RTCPeerConnectionStateConnecting
-
-	// RTCPeerConnectionStateConnected indicates all of the ICE or DTLS transports are in status connected or completed
-	RTCPeerConnectionStateConnected
-
-	// RTCPeerConnectionStateDisconnected indicates some of the ICE or DTLS transports are in status disconnected
-	RTCPeerConnectionStateDisconnected
-
-	// RTCPeerConnectionStateFailed indicates some of the ICE or DTLS transports are in status failed
-	RTCPeerConnectionStateFailed
-
-	// RTCPeerConnectionStateClosed indicates the peer connection is closed
-	RTCPeerConnectionStateClosed
-)
-
-func (t RTCPeerConnectionState) String() string {
-	switch t {
-	case RTCPeerConnectionStateNew:
-		return "new"
-	case RTCPeerConnectionStateConnecting:
-		return "connecting"
-	case RTCPeerConnectionStateConnected:
-		return "connected"
-	case RTCPeerConnectionStateDisconnected:
-		return "disconnected"
-	case RTCPeerConnectionStateFailed:
-		return "failed"
-	case RTCPeerConnectionStateClosed:
-		// goconst, "closed" is used in different unrelated packages
-		const closed = "closed"
-		return closed
-	default:
-		return ErrUnknownType.Error()
-	}
+	// TODO Must address this and either revert or delete.
+	// rand.Seed(time.Now().UTC().UnixNano())
 }
 
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
 	sync.RWMutex
 
+	configuration RTCConfiguration
+
 	// ICE
 	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
 	IceConnectionState         ice.ConnectionState
-
-	config RTCConfiguration
 
 	networkManager *network.Manager
 
 	// Signaling
 	CurrentLocalDescription *RTCSessionDescription
-	// pendingLocalDescription *RTCSessionDescription
+	PendingLocalDescription *RTCSessionDescription
 
 	CurrentRemoteDescription *RTCSessionDescription
-	// pendingRemoteDescription *RTCSessionDescription
+	PendingRemoteDescription *RTCSessionDescription
 
 	idpLoginURL *string
 
@@ -106,9 +65,18 @@ type RTCPeerConnection struct {
 // Public
 
 // New creates a new RTCPeerConfiguration with the provided configuration
-func New(config RTCConfiguration) (*RTCPeerConnection, error) {
-	r := &RTCPeerConnection{
-		config:          config,
+func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+	// Some variables defined explicitly despite their implicit zero values to
+	// allow better readability to understand what is happening.
+	pc := RTCPeerConnection{
+		configuration: RTCConfiguration{
+			IceServers:           []RTCIceServer{},
+			IceTransportPolicy:   RTCIceTransportPolicyAll,
+			BundlePolicy:         RTCBundlePolicyBalanced,
+			RtcpMuxPolicy:        RTCRtcpMuxPolicyRequire,
+			Certificates:         []RTCCertificate{},
+			IceCandidatePoolSize: 0,
+		},
 		signalingState:  RTCSignalingStateStable,
 		connectionState: RTCPeerConnectionStateNew,
 		mediaEngine:     DefaultMediaEngine,
@@ -116,47 +84,235 @@ func New(config RTCConfiguration) (*RTCPeerConnection, error) {
 		dataChannels:    make(map[uint16]*RTCDataChannel),
 	}
 	var err error
-	r.networkManager, err = network.NewManager(r.generateChannel, r.dataChannelEventHandler, r.iceStateChange)
-	if err != nil {
-		return nil, err
-	}
-	if err := r.SetConfiguration(config); err != nil {
+
+	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}
 
-	return r, nil
+	pc.networkManager, err = network.NewManager(pc.generateChannel, pc.dataChannelEventHandler, pc.iceStateChange)
+	if err != nil {
+		return nil, err
+	}
+
+	// https://www.w3.org/TR/webrtc/#constructor (step #4)
+	// This validation is omitted since the pions-webrtc implements rtcp-mux.
+	// FIXME This is actually not implemented yet but will be soon.
+
+	return &pc, nil
+}
+
+// initConfiguration defines validation of the specified RTCConfiguration and
+// its assignment to the internal configuration variable. This function differs
+// from its SetConfiguration counterpart because most of the checks do not
+// include verification statements related to the existing state. Thus the
+// function describes only minor verification of some the struct variables.
+func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) error {
+	if configuration.PeerIdentity != "" {
+		pc.configuration.PeerIdentity = configuration.PeerIdentity
+	}
+
+	// https://www.w3.org/TR/webrtc/#constructor (step #3)
+	if len(configuration.Certificates) > 0 {
+		now := time.Now()
+		for _, certificate := range configuration.Certificates {
+			if !certificate.Expires.IsZero() && now.After(certificate.Expires) {
+				return &InvalidAccessError{Err: ErrCertificateExpired}
+			}
+		}
+	} else {
+		pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return &UnknownError{Err: err}
+		}
+
+		// Default value to expires is set as zero initialized time instant.
+		// Use IsZero() to check: https://golang.org/pkg/time/#Time.IsZero
+		pc.configuration.Certificates = []RTCCertificate{
+			NewRTCCertificate(pk, time.Time{}),
+		}
+	}
+
+	if configuration.BundlePolicy != 0 {
+		pc.configuration.BundlePolicy = configuration.BundlePolicy
+	}
+
+	if configuration.RtcpMuxPolicy != 0 {
+		pc.configuration.RtcpMuxPolicy = configuration.RtcpMuxPolicy
+	}
+
+	if configuration.IceCandidatePoolSize != 0 {
+		pc.configuration.IceCandidatePoolSize = configuration.IceCandidatePoolSize
+	}
+
+	if configuration.IceTransportPolicy != 0 {
+		pc.configuration.IceTransportPolicy = configuration.IceTransportPolicy
+	}
+
+	if len(configuration.IceServers) > 0 {
+		for _, server := range configuration.IceServers {
+			if err := server.validate(); err != nil {
+				return err
+			}
+		}
+
+		pc.configuration.IceServers = configuration.IceServers
+	}
+
+	return nil
+}
+
+// SetConfiguration updates the configuration of this RTCPeerConnection object.
+func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) error {
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
+	if pc.IsClosed {
+		return &InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #3)
+	if configuration.PeerIdentity != "" {
+		if configuration.PeerIdentity != pc.configuration.PeerIdentity {
+			return &InvalidModificationError{Err: ErrModifyingPeerIdentity}
+		}
+		pc.configuration.PeerIdentity = configuration.PeerIdentity
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4)
+	if len(configuration.Certificates) > 0 {
+		if len(configuration.Certificates) != len(pc.configuration.Certificates) {
+			return &InvalidModificationError{Err: ErrModifyingCertificates}
+		}
+
+		for i, certificate := range configuration.Certificates {
+			if !pc.configuration.Certificates[i].Equals(certificate) {
+				return &InvalidModificationError{Err: ErrModifyingCertificates}
+			}
+		}
+		pc.configuration.Certificates = configuration.Certificates
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #5)
+	if configuration.BundlePolicy != 0 {
+		if configuration.BundlePolicy != pc.configuration.BundlePolicy {
+			return &InvalidModificationError{Err: ErrModifyingBundlePolicy}
+		}
+		pc.configuration.BundlePolicy = configuration.BundlePolicy
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #6)
+	if configuration.RtcpMuxPolicy != 0 {
+		if configuration.RtcpMuxPolicy != pc.configuration.RtcpMuxPolicy {
+			return &InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}
+		}
+		pc.configuration.RtcpMuxPolicy = configuration.RtcpMuxPolicy
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #7)
+	if configuration.IceCandidatePoolSize != 0 {
+		if pc.configuration.IceCandidatePoolSize != configuration.IceCandidatePoolSize &&
+			pc.LocalDescription() != nil {
+			return &InvalidModificationError{Err: ErrModifyingIceCandidatePoolSize}
+		}
+		pc.configuration.IceCandidatePoolSize = configuration.IceCandidatePoolSize
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #8)
+	if configuration.IceTransportPolicy != 0 {
+		pc.configuration.IceTransportPolicy = configuration.IceTransportPolicy
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11)
+	if len(configuration.IceServers) > 0 {
+		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
+		for _, server := range configuration.IceServers {
+			if err := server.validate(); err != nil {
+				return err
+			}
+		}
+		pc.configuration.IceServers = configuration.IceServers
+	}
+
+	return nil
+}
+
+// GetConfiguration returns an RTCConfiguration object representing the current
+// configuration of this RTCPeerConnection object. The returned object is a
+// copy and direct mutation on it will not take affect until SetConfiguration
+// has been called with RTCConfiguration passed as its only arguement.
+// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-getconfiguration
+func (pc *RTCPeerConnection) GetConfiguration() RTCConfiguration {
+	return pc.configuration
+}
+
+// LocalDescription returns PendingLocalDescription if it is not null and
+// otherwise it returns CurrentLocalDescription. This property is used to
+// determine if setLocalDescription has already been called.
+// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-localdescription
+func (pc *RTCPeerConnection) LocalDescription() *RTCSessionDescription {
+	if pc.PendingLocalDescription != nil {
+		return pc.PendingLocalDescription
+	}
+	return pc.CurrentLocalDescription
+}
+
+// RemoteDescription returns PendingRemoteDescription if it is not null and
+// otherwise it returns CurrentRemoteDescription. This property is used to
+// determine if setRemoteDescription has already been called.
+// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-remotedescription
+func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
+	if pc.PendingRemoteDescription != nil {
+		return pc.PendingRemoteDescription
+	}
+	return pc.CurrentRemoteDescription
 }
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
 // This enables RTCPeerConnection with support for different codecs
-func (r *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
-	r.mediaEngine = m
+func (pc *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
+	pc.mediaEngine = m
 }
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
-func (r *RTCPeerConnection) SetIdentityProvider(provider string) error {
+func (pc *RTCPeerConnection) SetIdentityProvider(provider string) error {
 	return errors.Errorf("TODO SetIdentityProvider")
 }
 
 // Close ends the RTCPeerConnection
-func (r *RTCPeerConnection) Close() error {
-	r.networkManager.Close()
+func (pc *RTCPeerConnection) Close() error {
+	pc.networkManager.Close()
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	if pc.IsClosed {
+		return nil
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
+	pc.IsClosed = true
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
+	pc.signalingState = RTCSignalingStateClosed
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
+	pc.IceConnectionState = ice.ConnectionStateClosed
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
+	pc.connectionState = RTCPeerConnectionStateClosed
+
 	return nil
 }
 
 /* Everything below is private */
-func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
-	if r.Ontrack == nil {
+func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
+	if pc.Ontrack == nil {
 		return nil
 	}
 
-	sdpCodec, err := r.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
+	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
 	if err != nil {
 		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
 		return nil
 	}
 
-	codec, err := r.mediaEngine.getCodecSDP(sdpCodec)
+	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
 		fmt.Printf("Codec %s in not registered\n", sdpCodec)
 	}
@@ -175,35 +331,35 @@ func (r *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buf
 
 	// TODO: Register the receiving Track
 
-	go r.Ontrack(track)
+	go pc.Ontrack(track)
 	return bufferTransport
 }
 
-func (r *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
-	r.Lock()
-	defer r.Unlock()
+func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
+	pc.Lock()
+	defer pc.Unlock()
 
-	if r.OnICEConnectionStateChange != nil && r.IceConnectionState != newState {
-		r.OnICEConnectionStateChange(newState)
+	if pc.OnICEConnectionStateChange != nil && pc.IceConnectionState != newState {
+		pc.OnICEConnectionStateChange(newState)
 	}
-	r.IceConnectionState = newState
+	pc.IceConnectionState = newState
 }
 
-func (r *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	r.Lock()
-	defer r.Unlock()
+func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+	pc.Lock()
+	defer pc.Unlock()
 
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
-		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: r}
-		r.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if r.Ondatachannel != nil {
-			go r.Ondatachannel(newDataChannel)
+		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: pc}
+		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
+		if pc.Ondatachannel != nil {
+			go pc.Ondatachannel(newDataChannel)
 		} else {
 			fmt.Println("Ondatachannel is unset, discarding message")
 		}
 	case *network.DataChannelMessage:
-		if datachannel, ok := r.dataChannels[e.StreamIdentifier()]; ok {
+		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
 			datachannel.RLock()
 			defer datachannel.RUnlock()
 

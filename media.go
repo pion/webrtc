@@ -96,7 +96,7 @@ func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) error {
 	return nil
 }
 
-func (r *RTCPeerConnection) newRTCRtpTransceiver(
+func (pc *RTCPeerConnection) newRTCRtpTransceiver(
 	receiver *RTCRtpReceiver,
 	sender *RTCRtpSender,
 	direction RTCRtpTransceiverDirection,
@@ -107,7 +107,7 @@ func (r *RTCPeerConnection) newRTCRtpTransceiver(
 		Sender:    sender,
 		Direction: direction,
 	}
-	r.rtpTransceivers = append(r.rtpTransceivers, t)
+	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
 	return t
 }
 
@@ -135,8 +135,8 @@ type RTCTrack struct {
 }
 
 // NewRTCTrack is used to create a new RTCTrack
-func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
-	codec, err := r.mediaEngine.getCodec(payloadType)
+func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
+	codec, err := pc.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 			in := <-trackInput
 			packets := packetizer.Packetize(in.Data, in.Samples)
 			for _, p := range packets {
-				r.networkManager.SendRTP(p)
+				pc.networkManager.SendRTP(p)
 			}
 		}
 	}()
@@ -179,11 +179,11 @@ func (r *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*R
 }
 
 // AddTrack adds a RTCTrack to the RTCPeerConnection
-func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
-	if r.IsClosed {
+func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
+	if pc.IsClosed {
 		return nil, &InvalidStateError{Err: ErrConnectionClosed}
 	}
-	for _, transceiver := range r.rtpTransceivers {
+	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Sender.Track == nil {
 			continue
 		}
@@ -192,7 +192,7 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 		}
 	}
 	var transceiver *RTCRtpTransceiver
-	for _, t := range r.rtpTransceivers {
+	for _, t := range pc.rtpTransceivers {
 		if !t.stopped &&
 			// t.Sender == nil && // TODO: check that the sender has never sent
 			t.Sender.Track == nil &&
@@ -209,7 +209,7 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	} else {
 		var receiver *RTCRtpReceiver
 		sender := newRTCRtpSender(track)
-		transceiver = r.newRTCRtpTransceiver(
+		transceiver = pc.newRTCRtpTransceiver(
 			receiver,
 			sender,
 			RTCRtpTransceiverDirectionSendonly,
@@ -222,27 +222,27 @@ func (r *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 }
 
 // GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
-func (r *RTCPeerConnection) GetSenders() []RTCRtpSender {
-	result := make([]RTCRtpSender, len(r.rtpTransceivers))
-	for i, tranceiver := range r.rtpTransceivers {
+func (pc *RTCPeerConnection) GetSenders() []RTCRtpSender {
+	result := make([]RTCRtpSender, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
 		result[i] = *tranceiver.Sender
 	}
 	return result
 }
 
 // GetReceivers returns the RTCRtpReceivers that are currently attached to this RTCPeerConnection
-func (r *RTCPeerConnection) GetReceivers() []RTCRtpReceiver {
-	result := make([]RTCRtpReceiver, len(r.rtpTransceivers))
-	for i, tranceiver := range r.rtpTransceivers {
+func (pc *RTCPeerConnection) GetReceivers() []RTCRtpReceiver {
+	result := make([]RTCRtpReceiver, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
 		result[i] = *tranceiver.Receiver
 	}
 	return result
 }
 
 // GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
-func (r *RTCPeerConnection) GetTransceivers() []RTCRtpTransceiver {
-	result := make([]RTCRtpTransceiver, len(r.rtpTransceivers))
-	for i, tranceiver := range r.rtpTransceivers {
+func (pc *RTCPeerConnection) GetTransceivers() []RTCRtpTransceiver {
+	result := make([]RTCRtpTransceiver, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
 		result[i] = *tranceiver
 	}
 	return result
