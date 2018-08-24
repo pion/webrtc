@@ -14,7 +14,6 @@ func TestRTCPeerConnection_initConfiguration(t *testing.T) {
 	assert.Nil(t, err)
 
 	expected := InvalidAccessError{Err: ErrCertificateExpired}
-
 	_, actualError := New(RTCConfiguration{
 		Certificates: []RTCCertificate{
 			NewRTCCertificate(pk, time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)),
@@ -23,8 +22,44 @@ func TestRTCPeerConnection_initConfiguration(t *testing.T) {
 	assert.EqualError(t, actualError, expected.Error())
 }
 
-func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
+func TestRTCPeerConnection_SetConfiguration_IsClosed(t *testing.T) {
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+	pc.Close()
 
+	expected := InvalidStateError{Err: ErrConnectionClosed}
+	actualError := pc.SetConfiguration(RTCConfiguration{})
+
+	assert.EqualError(t, actualError, expected.Error())
+}
+
+func TestRTCPeerConnection_SetConfiguration_PeerIdentity(t *testing.T) {
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	expected := InvalidModificationError{Err: ErrModifyingPeerIdentity}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		PeerIdentity: "unittest",
+	})
+
+	assert.EqualError(t, actualError, expected.Error())
+}
+
+func TestRTCPeerConnection_SetConfiguration_Certificates(t *testing.T) {
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
+
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	expected := InvalidModificationError{Err: ErrModifyingCertificates}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		Certificates: []RTCCertificate{
+			NewRTCCertificate(pk, time.Time{}),
+		},
+	})
+
+	assert.EqualError(t, actualError, expected.Error())
 }
 
 func TestRTCPeerConnection_GetConfiguration(t *testing.T) {
