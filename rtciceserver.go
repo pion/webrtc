@@ -27,23 +27,23 @@ func (s RTCIceServer) validate() error {
 		if url.Type == ice.ServerTypeTURN {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
-				return &InvalidAccessError{Err: ErrNoTurnCred}
+				return &InvalidAccessError{Err: ErrNoTurnCredencials}
 			}
 
 			switch s.CredentialType {
 			case RTCIceCredentialTypePassword:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 				if _, ok := s.Credential.(string); !ok {
-					return &InvalidAccessError{Err: ErrTurnCred}
+					return &InvalidAccessError{Err: ErrTurnCredencials}
 				}
 			case RTCIceCredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
 				if _, ok := s.Credential.(RTCOAuthCredential); !ok {
-					return &InvalidAccessError{Err: ErrTurnCred}
+					return &InvalidAccessError{Err: ErrTurnCredencials}
 				}
 
 			default:
-				return &InvalidAccessError{Err: ErrTurnCred}
+				return &InvalidAccessError{Err: ErrTurnCredencials}
 			}
 		}
 	}
