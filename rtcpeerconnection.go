@@ -8,6 +8,10 @@ import (
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 	"sync"
+	"time"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 )
 
 func init() {
@@ -108,25 +112,24 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 	}
 
 	// https://www.w3.org/TR/webrtc/#constructor (step #3)
-	// if len(configuration.Certificates) > 0 {
-	// 	now := time.Now()
-	// 	for _, x509Cert := range configuration.Certificates {
-	// 		if !x509Cert.Expires.IsZero() && now.After(x509Cert.Expires) {
-	// 			return &InvalidAccessError{Err: ErrCertificateExpired}
-	// 		}
-	// 	}
-	// } else {
-	// 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	// 	if err != nil {
-	// 		return &UnknownError{Err: err}
-	// 	}
-	//
-	// 	// Default value to expires is set as zero initialized time instant.
-	// 	// Use IsZero() to check: https://golang.org/pkg/time/#Time.IsZero
-	// 	pc.configuration.Certificates = []RTCCertificate{
-	// 		NewRTCCertificate(sk, time.Time{}),
-	// 	}
-	// }
+	if len(configuration.Certificates) > 0 {
+		now := time.Now()
+		for _, x509Cert := range configuration.Certificates {
+			if !x509Cert.Expires().IsZero() || now.After(x509Cert.Expires()) {
+				return &InvalidAccessError{Err: ErrCertificateExpired}
+			}
+		}
+	} else {
+		sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return &UnknownError{Err: err}
+		}
+		certificate, err := GenerateCertificate(sk)
+		if err != nil {
+			return err
+		}
+		pc.configuration.Certificates = []RTCCertificate{*certificate}
+	}
 
 	if configuration.BundlePolicy != 0 {
 		pc.configuration.BundlePolicy = configuration.BundlePolicy

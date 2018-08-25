@@ -1,19 +1,26 @@
 package webrtc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-// func TestRTCPeerConnection_initConfiguration(t *testing.T) {
-// 	expected := InvalidAccessError{Err: ErrCertificateExpired}
-// 	_, actualError := New(RTCConfiguration{
-// 		Certificates: []RTCCertificate{
-// 			NewRTCCertificate(),
-// 		},
-// 	})
-// 	assert.EqualError(t, actualError, expected.Error())
-// }
+func TestRTCPeerConnection_initConfiguration(t *testing.T) {
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
+
+	certificate, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	expected := InvalidAccessError{Err: ErrCertificateExpired}
+	_, actualError := New(RTCConfiguration{
+		Certificates: []RTCCertificate{*certificate},
+	})
+	assert.EqualError(t, actualError, expected.Error())
+}
 
 func TestRTCPeerConnection_SetConfiguration_IsClosed(t *testing.T) {
 	pc, err := New(RTCConfiguration{})
@@ -36,51 +43,63 @@ func TestRTCPeerConnection_SetConfiguration_PeerIdentity(t *testing.T) {
 	assert.EqualError(t, actualError, expected.Error())
 }
 
-// func TestRTCPeerConnection_SetConfiguration_Certificates_Len(t *testing.T) {
-// 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	assert.Nil(t, err)
-//
-// 	pc, err := New(RTCConfiguration{})
-// 	assert.Nil(t, err)
-//
-// 	expected := InvalidModificationError{Err: ErrModifyingCertificates}
-// 	actualError := pc.SetConfiguration(RTCConfiguration{
-// 		Certificates: []RTCCertificate{
-// 			NewRTCCertificate(pk, time.Time{}),
-// 			NewRTCCertificate(pk, time.Time{}),
-// 		},
-// 	})
-// 	assert.EqualError(t, actualError, expected.Error())
-// }
+func TestRTCPeerConnection_SetConfiguration_Certificates_Len(t *testing.T) {
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
 
-// func TestRTCPeerConnection_SetConfiguration_Certificates_Equals(t *testing.T) {
-// 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	assert.Nil(t, err)
-//
-// 	pc, err := New(RTCConfiguration{})
-//
-// 	skDER, err := x509.MarshalECPrivateKey(sk)
-// 	assert.Nil(t, err)
-// 	fmt.Printf("skDER: %x\n", skDER)
-//
-// 	skPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: skDER})
-// 	fmt.Printf("skPEM: %v\n", string(skPEM))
-//
-// 	pkDER, err := x509.MarshalPKIXPublicKey(&sk.PublicKey)
-// 	assert.Nil(t, err)
-// 	fmt.Printf("pkDER: %x\n", pkDER)
-//
-// 	pkPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pkDER})
-// 	fmt.Printf("pkPEM: %v\n", string(pkPEM))
-//
-// 	expected := InvalidModificationError{Err: ErrModifyingCertificates}
-// 	actualError := pc.SetConfiguration(RTCConfiguration{
-// 		Certificates: []RTCCertificate{
-// 			NewRTCCertificate(sk, time.Time{}),
-// 		},
-// 	})
-// 	assert.EqualError(t, actualError, expected.Error())
-// }
+	certificate1, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	certificate2, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	expected := InvalidModificationError{Err: ErrModifyingCertificates}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		Certificates: []RTCCertificate{*certificate1, *certificate2},
+	})
+	assert.EqualError(t, actualError, expected.Error())
+}
+
+func TestRTCPeerConnection_SetConfiguration_Certificates_Equals(t *testing.T) {
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
+
+	certificate, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	pc, err := New(RTCConfiguration{})
+
+	expected := InvalidModificationError{Err: ErrModifyingCertificates}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		Certificates: []RTCCertificate{*certificate},
+	})
+	assert.EqualError(t, actualError, expected.Error())
+}
+
+func TestRTCPeerConnection_SetConfiguration_BundlePolicy(t *testing.T) {
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	expected := InvalidModificationError{Err: ErrModifyingBundlePolicy}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		BundlePolicy: RTCBundlePolicyMaxCompat,
+	})
+	assert.EqualError(t, actualError, expected.Error())
+}
+
+func TestRTCPeerConnection_SetConfiguration_RtcpMuxPolicy(t *testing.T) {
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	expected := InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}
+	actualError := pc.SetConfiguration(RTCConfiguration{
+		RtcpMuxPolicy: RTCRtcpMuxPolicyNegotiate,
+	})
+	assert.EqualError(t, actualError, expected.Error())
+}
 
 func TestRTCPeerConnection_GetConfiguration(t *testing.T) {
 	pc, err := New(RTCConfiguration{})
