@@ -115,7 +115,7 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 	if len(configuration.Certificates) > 0 {
 		now := time.Now()
 		for _, x509Cert := range configuration.Certificates {
-			if !x509Cert.Expires().IsZero() || now.After(x509Cert.Expires()) {
+			if !x509Cert.Expires().IsZero() && now.After(x509Cert.Expires()) {
 				return &InvalidAccessError{Err: ErrCertificateExpired}
 			}
 		}
