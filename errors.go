@@ -44,9 +44,9 @@ func (e *InvalidAccessError) Error() string {
 
 // Types of InvalidAccessErrors
 var (
-	ErrCertificateExpired = errors.New("certificate expired")
-	ErrNoTurnCred         = errors.New("turn server credentials required")
-	ErrTurnCred           = errors.New("invalid turn server credentials")
+	ErrCertificateExpired = errors.New("x509Cert expired")
+	ErrNoTurnCredencials  = errors.New("turn server credentials required")
+	ErrTurnCredencials    = errors.New("invalid turn server credentials")
 	ErrExistingTrack      = errors.New("track aready exists")
 )
 
@@ -60,7 +60,9 @@ func (e *NotSupportedError) Error() string {
 }
 
 // Types of NotSupportedErrors
-var ()
+var (
+	ErrPrivateKeyType = errors.New("private key type not supported")
+)
 
 // InvalidModificationError indicates the object can not be modified in this way.
 type InvalidModificationError struct {
