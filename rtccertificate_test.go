@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"crypto/tls"
+	"time"
 )
 
 func TestGenerateCertificateRSA(t *testing.T) {
@@ -75,18 +76,12 @@ func TestGenerateCertificateEqual(t *testing.T) {
 }
 
 func TestGenerateCertificateExpires(t *testing.T) {
-	sk1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.Nil(t, err)
 
-	cert1, err := GenerateCertificate(sk1)
+	cert, err := GenerateCertificate(sk)
 	assert.Nil(t, err)
 
-	sk2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	assert.Nil(t, err)
-
-	cert2, err := GenerateCertificate(sk2)
-	assert.Nil(t, err)
-
-	assert.True(t, cert1.Equals(*cert1))
-	assert.False(t, cert1.Equals(*cert2))
+	now := time.Now()
+	assert.False(t, cert.Expires().IsZero() || now.After(cert.Expires()))
 }
