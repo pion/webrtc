@@ -5,11 +5,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"github.com/stretchr/testify/assert"
-	"testing"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"crypto/tls"
+	"github.com/stretchr/testify/assert"
+	"testing"
 	"time"
 )
 

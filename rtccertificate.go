@@ -4,12 +4,12 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"math/big"
 	"time"
-	"crypto/rsa"
-	"encoding/hex"
 )
 
 // RTCCertificate represents a x509Cert used to authenticate WebRTC communications.
