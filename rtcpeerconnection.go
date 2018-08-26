@@ -119,13 +119,13 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 		now := time.Now()
 		for _, x509Cert := range configuration.Certificates {
 			if !x509Cert.Expires().IsZero() && now.After(x509Cert.Expires()) {
-				return &InvalidAccessError{Err: ErrCertificateExpired}
+				return InvalidAccessError{Err: ErrCertificateExpired}
 			}
 		}
 	} else {
 		sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return &UnknownError{Err: err}
+			return UnknownError{Err: err}
 		}
 		certificate, err := GenerateCertificate(sk)
 		if err != nil {
@@ -167,13 +167,13 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
 	if pc.IsClosed {
-		return &InvalidStateError{Err: ErrConnectionClosed}
+		return InvalidStateError{Err: ErrConnectionClosed}
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #3)
 	if configuration.PeerIdentity != "" {
 		if configuration.PeerIdentity != pc.configuration.PeerIdentity {
-			return &InvalidModificationError{Err: ErrModifyingPeerIdentity}
+			return InvalidModificationError{Err: ErrModifyingPeerIdentity}
 		}
 		pc.configuration.PeerIdentity = configuration.PeerIdentity
 	}
@@ -181,12 +181,12 @@ func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) er
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4)
 	if len(configuration.Certificates) > 0 {
 		if len(configuration.Certificates) != len(pc.configuration.Certificates) {
-			return &InvalidModificationError{Err: ErrModifyingCertificates}
+			return InvalidModificationError{Err: ErrModifyingCertificates}
 		}
 
 		for i, certificate := range configuration.Certificates {
 			if !pc.configuration.Certificates[i].Equals(certificate) {
-				return &InvalidModificationError{Err: ErrModifyingCertificates}
+				return InvalidModificationError{Err: ErrModifyingCertificates}
 			}
 		}
 		pc.configuration.Certificates = configuration.Certificates
@@ -195,7 +195,7 @@ func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) er
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #5)
 	if configuration.BundlePolicy != 0 {
 		if configuration.BundlePolicy != pc.configuration.BundlePolicy {
-			return &InvalidModificationError{Err: ErrModifyingBundlePolicy}
+			return InvalidModificationError{Err: ErrModifyingBundlePolicy}
 		}
 		pc.configuration.BundlePolicy = configuration.BundlePolicy
 	}
@@ -203,7 +203,7 @@ func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) er
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #6)
 	if configuration.RtcpMuxPolicy != 0 {
 		if configuration.RtcpMuxPolicy != pc.configuration.RtcpMuxPolicy {
-			return &InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}
+			return InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}
 		}
 		pc.configuration.RtcpMuxPolicy = configuration.RtcpMuxPolicy
 	}
@@ -212,7 +212,7 @@ func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) er
 	if configuration.IceCandidatePoolSize != 0 {
 		if pc.configuration.IceCandidatePoolSize != configuration.IceCandidatePoolSize &&
 			pc.LocalDescription() != nil {
-			return &InvalidModificationError{Err: ErrModifyingIceCandidatePoolSize}
+			return InvalidModificationError{Err: ErrModifyingIceCandidatePoolSize}
 		}
 		pc.configuration.IceCandidatePoolSize = configuration.IceCandidatePoolSize
 	}
@@ -435,7 +435,7 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 	} else if useIdentity {
 		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
 	} else if pc.IsClosed {
-		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+		return RTCSessionDescription{}, InvalidStateError{Err: ErrConnectionClosed}
 	}
 
 	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
@@ -474,7 +474,7 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 	} else if useIdentity {
 		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
 	} else if pc.IsClosed {
-		return RTCSessionDescription{}, &InvalidStateError{Err: ErrConnectionClosed}
+		return RTCSessionDescription{}, InvalidStateError{Err: ErrConnectionClosed}
 	}
 
 	candidates := pc.generateLocalCandidates()

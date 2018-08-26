@@ -14,7 +14,7 @@ type RTCIceServer struct {
 }
 
 func (s RTCIceServer) parseURL(i int) (*ice.URL, error) {
-	return nil, nil
+	return ice.ParseURL(s.URLs[i])
 }
 
 func (s RTCIceServer) validate() error {
@@ -24,26 +24,26 @@ func (s RTCIceServer) validate() error {
 			return err // TODO Need proper error
 		}
 
-		if url.Type == ice.ServerTypeTURN {
+		if url.Scheme == ice.SchemeTypeTURN {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
-				return &InvalidAccessError{Err: ErrNoTurnCredencials}
+				return InvalidAccessError{Err: ErrNoTurnCredencials}
 			}
 
 			switch s.CredentialType {
 			case RTCIceCredentialTypePassword:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 				if _, ok := s.Credential.(string); !ok {
-					return &InvalidAccessError{Err: ErrTurnCredencials}
+					return InvalidAccessError{Err: ErrTurnCredencials}
 				}
 			case RTCIceCredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
 				if _, ok := s.Credential.(RTCOAuthCredential); !ok {
-					return &InvalidAccessError{Err: ErrTurnCredencials}
+					return InvalidAccessError{Err: ErrTurnCredencials}
 				}
 
 			default:
-				return &InvalidAccessError{Err: ErrTurnCredencials}
+				return InvalidAccessError{Err: ErrTurnCredencials}
 			}
 		}
 	}

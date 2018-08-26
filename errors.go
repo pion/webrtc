@@ -10,7 +10,7 @@ type InvalidStateError struct {
 	Err error
 }
 
-func (e *InvalidStateError) Error() string {
+func (e InvalidStateError) Error() string {
 	return fmt.Sprintf("webrtc: InvalidStateError: %v", e.Err)
 }
 
@@ -24,7 +24,7 @@ type UnknownError struct {
 	Err error
 }
 
-func (e *UnknownError) Error() string {
+func (e UnknownError) Error() string {
 	return fmt.Sprintf("webrtc: UnknownError: %v", e.Err)
 }
 
@@ -38,7 +38,7 @@ type InvalidAccessError struct {
 	Err error
 }
 
-func (e *InvalidAccessError) Error() string {
+func (e InvalidAccessError) Error() string {
 	return fmt.Sprintf("webrtc: InvalidAccessError: %v", e.Err)
 }
 
@@ -55,7 +55,7 @@ type NotSupportedError struct {
 	Err error
 }
 
-func (e *NotSupportedError) Error() string {
+func (e NotSupportedError) Error() string {
 	return fmt.Sprintf("webrtc: NotSupportedError: %v", e.Err)
 }
 
@@ -69,7 +69,7 @@ type InvalidModificationError struct {
 	Err error
 }
 
-func (e *InvalidModificationError) Error() string {
+func (e InvalidModificationError) Error() string {
 	return fmt.Sprintf("webrtc: InvalidModificationError: %v", e.Err)
 }
 
@@ -87,7 +87,7 @@ type SyntaxError struct {
 	Err error
 }
 
-func (e *SyntaxError) Error() string {
+func (e SyntaxError) Error() string {
 	return fmt.Sprintf("webrtc: SyntaxError: %v", e.Err)
 }
 
@@ -99,7 +99,7 @@ type TypeError struct {
 	Err error
 }
 
-func (e *TypeError) Error() string {
+func (e TypeError) Error() string {
 	return fmt.Sprintf("webrtc: TypeError: %v", e.Err)
 }
 
@@ -113,7 +113,7 @@ type OperationError struct {
 	Err error
 }
 
-func (e *OperationError) Error() string {
+func (e OperationError) Error() string {
 	return fmt.Sprintf("webrtc: OperationError: %v", e.Err)
 }
 

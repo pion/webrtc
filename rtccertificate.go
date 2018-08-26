@@ -21,7 +21,7 @@ type RTCCertificate struct {
 func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	origin := make([]byte, 16)
 	if _, err := rand.Read(origin); err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, UnknownError{Err: err}
 	}
 
 	// Max random value, a 130-bits integer, i.e 2^130 - 1
@@ -29,7 +29,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	maxBigInt.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(maxBigInt, big.NewInt(1))
 	serialNumber, err := rand.Int(rand.Reader, maxBigInt)
 	if err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, UnknownError{Err: err}
 	}
 
 	temp := &x509.Certificate{
@@ -56,22 +56,22 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 		temp.SignatureAlgorithm = x509.SHA256WithRSA
 		certDER, err = x509.CreateCertificate(rand.Reader, temp, temp, pk, sk)
 		if err != nil {
-			return nil, &UnknownError{Err: err}
+			return nil, UnknownError{Err: err}
 		}
 	case *ecdsa.PrivateKey:
 		pk := sk.Public()
 		temp.SignatureAlgorithm = x509.ECDSAWithSHA256
 		certDER, err = x509.CreateCertificate(rand.Reader, temp, temp, pk, sk)
 		if err != nil {
-			return nil, &UnknownError{Err: err}
+			return nil, UnknownError{Err: err}
 		}
 	default:
-		return nil, &NotSupportedError{Err: ErrPrivateKeyType}
+		return nil, NotSupportedError{Err: ErrPrivateKeyType}
 	}
 
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, UnknownError{Err: err}
 	}
 
 	return &RTCCertificate{secretKey: secretKey, x509Cert: cert}, nil
