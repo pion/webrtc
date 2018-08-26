@@ -14,7 +14,7 @@ import (
 // On success will return our XORMappedAddress
 func Allocate(url *ice.URL) (*ice.CandidateSrflx, error) {
 	// TODO Do we want the timeout to be configurable?
-	proto := url.TransportType.String()
+	proto := url.Proto.String()
 	client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to create STUN client")
@@ -45,7 +45,7 @@ func Allocate(url *ice.URL) (*ice.CandidateSrflx, error) {
 
 	return &ice.CandidateSrflx{
 		CandidateBase: ice.CandidateBase{
-			Protocol: ice.TransportUDP,
+			Protocol: ice.ProtoTypeUDP,
 			Address:  addr.IP.String(),
 			Port:     addr.Port,
 		},

@@ -8,7 +8,22 @@ import (
 	"testing"
 )
 
-func TestRTCPeerConnection_initConfiguration(t *testing.T) {
+// TODO
+// func TestRTCPeerConnection_initConfiguration(t *testing.T) {
+// 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	assert.Nil(t, err)
+//
+// 	certificate, err := GenerateCertificate(sk)
+// 	assert.Nil(t, err)
+//
+// 	expected := InvalidAccessError{Err: ErrCertificateExpired}
+// 	_, actualError := New(RTCConfiguration{
+// 		Certificates: []RTCCertificate{*certificate},
+// 	})
+// 	assert.EqualError(t, actualError, expected.Error())
+// }
+
+func TestRTCPeerConnection_initConfiguration_Certificates(t *testing.T) {
 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.Nil(t, err)
 
@@ -21,6 +36,17 @@ func TestRTCPeerConnection_initConfiguration(t *testing.T) {
 	})
 	assert.EqualError(t, actualError, expected.Error())
 }
+
+// TODO
+// func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
+// 	pc, err := New(RTCConfiguration{})
+// 	assert.Nil(t, err)
+// 	pc.Close()
+//
+// 	expected := InvalidStateError{Err: ErrConnectionClosed}
+// 	actualError := pc.SetConfiguration(RTCConfiguration{})
+// 	assert.EqualError(t, actualError, expected.Error())
+// }
 
 func TestRTCPeerConnection_SetConfiguration_IsClosed(t *testing.T) {
 	pc, err := New(RTCConfiguration{})
@@ -123,6 +149,7 @@ func TestRTCPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.IceCandidatePoolSize, actual.IceCandidatePoolSize)
 }
 
+// TODO Fix this test
 const minimalOffer = `v=0
 o=- 7193157174393298413 2 IN IP4 127.0.0.1
 s=-
@@ -159,7 +186,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	}
 }
 
-
+// TODO Add more examples for different functions
 func ExampleNew() {
 	if _, err := New(RTCConfiguration{}); err != nil {
 		panic(err)

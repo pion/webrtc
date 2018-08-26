@@ -19,7 +19,7 @@ type Candidate interface {
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
 type CandidateBase struct {
-	Protocol TransportType
+	Protocol ProtoType
 	Address  string
 	Port     int
 	LastSeen time.Time

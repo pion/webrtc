@@ -12,5 +12,5 @@ type RTCAnswerOptions struct {
 // RTCOfferOptions describes the options used to control the offer creation process
 type RTCOfferOptions struct {
 	RTCOfferAnswerOptions
-	ICERestart             bool
+	ICERestart bool
 }

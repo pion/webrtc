@@ -73,7 +73,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	// 	m.ports = append(m.ports, p)
 	// 	m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
 	// 		CandidateBase: ice.CandidateBase{
-	// 			Protocol: ice.TransportUDP,
+	// 			Proto: ice.ProtoTypeUDP,
 	// 			Address:  p.listeningAddr.IP.String(),
 	// 			Port:     p.listeningAddr.Port,
 	// 		},
@@ -85,8 +85,8 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
 func (m *Manager) AddURL(url *ice.URL) error {
-	switch url.Type {
-	case ice.ServerTypeSTUN:
+	switch url.Scheme {
+	case ice.SchemeTypeSTUN:
 		c, err := webrtcStun.Allocate(url)
 		if err != nil {
 			return err
@@ -99,7 +99,7 @@ func (m *Manager) AddURL(url *ice.URL) error {
 		m.ports = append(m.ports, p)
 		// m.IceAgent.AddLocalCandidate(c)
 	default:
-		return errors.Errorf("%s is not implemented", url.Type.String())
+		return errors.Errorf("%s is not implemented", url.Scheme.String())
 	}
 
 	return nil
