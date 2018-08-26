@@ -95,20 +95,18 @@ type URL struct {
 func ParseURL(raw string) (*URL, error) {
 	rawParts, err := url.Parse(raw)
 	if err != nil {
-		return nil, UnknownError{Err: err}
+		return nil, &UnknownError{err}
 	}
 
 	var u URL
 	u.Scheme = NewSchemeType(rawParts.Scheme)
-	if u.Scheme == SchemeType(0) {
-		return nil, SyntaxError{Err: ErrSchemeType}
+	if u.Scheme == SchemeType(Unknown) {
+		return nil, &SyntaxError{ErrSchemeType}
 	}
 
 	var rawPort string
-	u.Host, rawPort, err = net.SplitHostPort(rawParts.Opaque)
-	if err != nil {
-		switch e := err.(type) {
-		case *net.AddrError:
+	if u.Host, rawPort, err = net.SplitHostPort(rawParts.Opaque); err != nil {
+		if e, ok := err.(*net.AddrError); ok {
 			if e.Err == "missing port in address" {
 				nextRawURL := u.Scheme.String() + ":" + rawParts.Opaque
 				switch {
@@ -126,57 +124,83 @@ func ParseURL(raw string) (*URL, error) {
 					return ParseURL(nextRawURL)
 				}
 			}
-			return nil, SyntaxError{Err: ErrHost}
-		case *strconv.NumError:
-			return nil, SyntaxError{Err: ErrPort}
-		default:
-			return nil, UnknownError{Err: err}
 		}
+		return nil, &UnknownError{err}
+	}
+
+	if u.Host == "" {
+		return nil, &SyntaxError{ErrHost}
 	}
 
 	if u.Port, err = strconv.Atoi(rawPort); err != nil {
-		return nil, SyntaxError{Err: ErrPort}
+		return nil, &SyntaxError{ErrPort}
 	}
 
 	switch {
 	case u.Scheme == SchemeTypeSTUN:
-		u.Proto = ProtoTypeUDP
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, SyntaxError{Err: ErrSTUNQuery}
+			return nil, &SyntaxError{ErrSTUNQuery}
 		}
+		u.Proto = ProtoTypeUDP
 	case u.Scheme == SchemeTypeSTUNS:
-		u.Proto = ProtoTypeTCP
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, SyntaxError{Err: ErrSTUNQuery}
-		}
-	case u.Scheme == SchemeTypeTURN:
-		qArgs, err := url.ParseQuery(rawParts.RawQuery)
-		if err != nil {
-			return nil, SyntaxError{Err: ErrInvalidQuery}
-		}
-		if proto := qArgs.Get("transport"); proto != "" {
-			if u.Proto = NewProtoType(proto); u.Proto == ProtoType(0) {
-				return nil, SyntaxError{Err: ErrProtoType}
-			}
-			break
-		}
-		u.Proto = ProtoTypeUDP
-	case u.Scheme == SchemeTypeTURNS:
-		qArgs, err := url.ParseQuery(rawParts.RawQuery)
-		if err != nil {
-			return nil, SyntaxError{Err: ErrInvalidQuery}
-		}
-		if proto := qArgs.Get("transport"); proto != "" {
-			if u.Proto = NewProtoType(proto); u.Proto == ProtoType(0) {
-				return nil, SyntaxError{Err: ErrProtoType}
-			}
-			break
+			return nil, &SyntaxError{ErrSTUNQuery}
 		}
 		u.Proto = ProtoTypeTCP
+	case u.Scheme == SchemeTypeTURN:
+		proto, err := parseProto(rawParts.RawQuery)
+		if err != nil {
+			return nil, err
+		}
+
+		u.Proto = proto
+		if u.Proto == ProtoType(Unknown) {
+			u.Proto = ProtoTypeUDP
+		}
+	case u.Scheme == SchemeTypeTURNS:
+		proto, err := parseProto(rawParts.RawQuery)
+		if err != nil {
+			return nil, err
+		}
+
+		u.Proto = proto
+		if u.Proto == ProtoType(Unknown) {
+			u.Proto = ProtoTypeTCP
+		}
 	}
+
 	return &u, nil
+}
+
+func parseProto(raw string) (ProtoType, error) {
+	qArgs, err := url.ParseQuery(raw)
+	if err != nil || len(qArgs) > 1 {
+		return ProtoType(Unknown), &SyntaxError{ErrInvalidQuery}
+	}
+
+	var proto ProtoType
+	if rawProto := qArgs.Get("transport"); rawProto != "" {
+		if proto = NewProtoType(rawProto); proto == ProtoType(0) {
+			return ProtoType(Unknown), &NotSupportedError{ErrProtoType}
+		}
+		return proto, nil
+	}
+
+	if len(qArgs) > 0 {
+		return ProtoType(Unknown), &SyntaxError{ErrInvalidQuery}
+	}
+
+	return proto, nil
+}
+
+func (u URL) String() string {
+	rawURL := u.Scheme.String() + ":" + net.JoinHostPort(u.Host, strconv.Itoa(u.Port))
+	if u.Scheme == SchemeTypeTURN || u.Scheme == SchemeTypeTURNS {
+		rawURL += "?transport=" + u.Proto.String()
+	}
+	return rawURL
 }
 
 func (u URL) IsSecure() bool {

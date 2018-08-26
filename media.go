@@ -181,14 +181,14 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 // AddTrack adds a RTCTrack to the RTCPeerConnection
 func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	if pc.IsClosed {
-		return nil, InvalidStateError{Err: ErrConnectionClosed}
+		return nil, &InvalidStateError{ErrConnectionClosed}
 	}
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Sender.Track == nil {
 			continue
 		}
 		if track.ID == transceiver.Sender.Track.ID {
-			return nil, InvalidAccessError{Err: ErrExistingTrack}
+			return nil, &InvalidAccessError{ErrExistingTrack}
 		}
 	}
 	var transceiver *RTCRtpTransceiver

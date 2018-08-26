@@ -65,11 +65,11 @@ type RTCDataChannelInit struct {
 // CreateDataChannel creates a new RTCDataChannel object with the given label and optitional options.
 func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
 	if pc.IsClosed {
-		return nil, InvalidStateError{Err: ErrConnectionClosed}
+		return nil, &InvalidStateError{ErrConnectionClosed}
 	}
 
 	if len(label) > 65535 {
-		return nil, TypeError{Err: ErrInvalidValue}
+		return nil, &TypeError{ErrInvalidValue}
 	}
 
 	// Defaults
@@ -95,12 +95,12 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	}
 
 	if id > 65534 {
-		return nil, TypeError{Err: ErrInvalidValue}
+		return nil, &TypeError{ErrInvalidValue}
 	}
 
 	if pc.sctp.State == RTCSctpTransportStateConnected &&
 		id >= pc.sctp.MaxChannels {
-		return nil, OperationError{Err: ErrMaxDataChannels}
+		return nil, &OperationError{ErrMaxDataChannels}
 	}
 
 	_ = ordered  // TODO
@@ -132,13 +132,13 @@ func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) 
 			return id, nil
 		}
 	}
-	return 0, OperationError{Err: ErrMaxDataChannels}
+	return 0, &OperationError{ErrMaxDataChannels}
 }
 
 // SendOpenChannelMessage is a test to send OpenChannel manually
 func (d *RTCDataChannel) SendOpenChannelMessage() error {
 	if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(d.ID, d.Label); err != nil {
-		return UnknownError{Err: err}
+		return &UnknownError{err}
 	}
 	return nil
 
@@ -147,7 +147,7 @@ func (d *RTCDataChannel) SendOpenChannelMessage() error {
 // Send sends the passed message to the DataChannel peer
 func (d *RTCDataChannel) Send(p datachannel.Payload) error {
 	if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(p, d.ID); err != nil {
-		return UnknownError{Err: err}
+		return &UnknownError{err}
 	}
 	return nil
 }

@@ -9,20 +9,22 @@ import (
 func TestParseURL(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		testCases := []struct {
-			rawURL         string
-			expectedScheme SchemeType
-			expectedHost   string
-			expectedPort   int
-			expectedProto  ProtoType
+			rawURL            string
+			expectedURLString string
+			expectedScheme    SchemeType
+			expectedSecure    bool
+			expectedHost      string
+			expectedPort      int
+			expectedProto     ProtoType
 		}{
-			{"stun:google.de", SchemeTypeSTUN, "google.de", 3478, ProtoTypeUDP},
-			{"stun:google.de:1234", SchemeTypeSTUN, "google.de", 1234, ProtoTypeUDP},
-			{"stuns:google.de", SchemeTypeSTUNS, "google.de", 5349, ProtoTypeTCP},
-			{"stun:[::1]:123", SchemeTypeSTUN, "::1", 123, ProtoTypeUDP},
-			{"turn:google.de", SchemeTypeTURN, "google.de", 3478, ProtoTypeUDP},
-			{"turns:google.de", SchemeTypeTURNS, "google.de", 5349, ProtoTypeTCP},
-			{"turn:google.de?transport=udp", SchemeTypeTURN, "google.de", 3478, ProtoTypeUDP},
-			{"turn:google.de?transport=tcp", SchemeTypeTURN, "google.de", 3478, ProtoTypeTCP},
+			{"stun:google.de", "stun:google.de:3478", SchemeTypeSTUN, false, "google.de", 3478, ProtoTypeUDP},
+			{"stun:google.de:1234", "stun:google.de:1234", SchemeTypeSTUN, false, "google.de", 1234, ProtoTypeUDP},
+			{"stuns:google.de", "stuns:google.de:5349", SchemeTypeSTUNS, true, "google.de", 5349, ProtoTypeTCP},
+			{"stun:[::1]:123", "stun:[::1]:123", SchemeTypeSTUN, false, "::1", 123, ProtoTypeUDP},
+			{"turn:google.de", "turn:google.de:3478?transport=udp", SchemeTypeTURN, false, "google.de", 3478, ProtoTypeUDP},
+			{"turns:google.de", "turns:google.de:5349?transport=tcp", SchemeTypeTURNS, true, "google.de", 5349, ProtoTypeTCP},
+			{"turn:google.de?transport=udp", "turn:google.de:3478?transport=udp", SchemeTypeTURN, false, "google.de", 3478, ProtoTypeUDP},
+			{"turns:google.de?transport=tcp", "turns:google.de:5349?transport=tcp", SchemeTypeTURNS, true, "google.de", 5349, ProtoTypeTCP},
 		}
 
 		for i, testCase := range testCases {
@@ -33,6 +35,8 @@ func TestParseURL(t *testing.T) {
 			}
 
 			assert.Equal(t, testCase.expectedScheme, url.Scheme, "testCase: %d %v", i, testCase)
+			assert.Equal(t, testCase.expectedURLString, url.String(), "testCase: %d %v", i, testCase)
+			assert.Equal(t, testCase.expectedSecure, url.IsSecure(), "testCase: %d %v", i, testCase)
 			assert.Equal(t, testCase.expectedHost, url.Host, "testCase: %d %v", i, testCase)
 			assert.Equal(t, testCase.expectedPort, url.Port, "testCase: %d %v", i, testCase)
 			assert.Equal(t, testCase.expectedProto, url.Proto, "testCase: %d %v", i, testCase)
@@ -43,14 +47,19 @@ func TestParseURL(t *testing.T) {
 			rawURL      string
 			expectedErr error
 		}{
-			{"", SyntaxError{Err: ErrSchemeType}},
-			{":::", UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
-			{"google.de", SyntaxError{Err: ErrSchemeType}},
-			{"stun:", SyntaxError{Err: ErrHost}},
-			{"stun:google.de:abc", SyntaxError{Err: ErrPort}},
-			{"stun:google.de?transport=udp", SyntaxError{Err: ErrSTUNQuery}},
-			{"turn:google.de?trans=udp", SyntaxError{Err: ErrInvalidQuery}},
-			{"turn:google.de?transport=ip", SyntaxError{Err: ErrProtoType}},
+			{"", &SyntaxError{ErrSchemeType}},
+			{":::", &UnknownError{errors.New("parse :::: missing protocol scheme")}},
+			{"stun:[::1]:123:", &UnknownError{errors.New("address [::1]:123:: too many colons in address")}},
+			{"stun:[::1]:123a", &SyntaxError{ErrPort}},
+			{"google.de", &SyntaxError{ErrSchemeType}},
+			{"stun:", &SyntaxError{ErrHost}},
+			{"stun:google.de:abc", &SyntaxError{ErrPort}},
+			{"stun:google.de?transport=udp", &SyntaxError{ErrSTUNQuery}},
+			{"stuns:google.de?transport=udp", &SyntaxError{ErrSTUNQuery}},
+			{"turn:google.de?trans=udp", &SyntaxError{ErrInvalidQuery}},
+			{"turns:google.de?trans=udp", &SyntaxError{ErrInvalidQuery}},
+			{"turns:google.de?transport=udp&another=1", &SyntaxError{ErrInvalidQuery}},
+			{"turn:google.de?transport=ip", &NotSupportedError{ErrProtoType}},
 		}
 
 		for i, testCase := range testCases {

@@ -1,32 +1,78 @@
 package webrtc
 
 import (
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestRTCIceServer_validate(t *testing.T) {
-	assert.Nil(t, (RTCIceServer{
-		URLs: []string{"turn:192.158.29.39?transport=udp"},
-	}).validate())
+	t.Run("Success", func(t *testing.T) {
+		testCases := []struct {
+			iceServer        RTCIceServer
+			expectedValidate bool
+		}{
+			{RTCIceServer{
+				URLs:           []string{"turn:192.158.29.39?transport=udp"},
+				Username:       "unittest",
+				Credential:     "placeholder",
+				CredentialType: RTCIceCredentialTypePassword,
+			}, true},
+			{RTCIceServer{
+				URLs:     []string{"turn:192.158.29.39?transport=udp"},
+				Username: "unittest",
+				Credential: RTCOAuthCredential{
+					MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+					AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ5VhNDgeMR3+ZlZ35byg972fW8QjpEl7bx91YLBPFsIhsxloWcXPhA==",
+				},
+				CredentialType: RTCIceCredentialTypeOauth,
+			}, true},
+		}
 
-	// pc, err := New(RTCConfiguration{})
-	// assert.Nil(t, err)
-	//
-	// expected := RTCConfiguration{
-	// 	IceServers:           []RTCIceServer{},
-	// 	IceTransportPolicy:   RTCIceTransportPolicyAll,
-	// 	BundlePolicy:         RTCBundlePolicyBalanced,
-	// 	RtcpMuxPolicy:        RTCRtcpMuxPolicyRequire,
-	// 	Certificates:         []RTCCertificate{},
-	// 	IceCandidatePoolSize: 0,
-	// }
-	// actual := pc.GetConfiguration()
-	// assert.True(t, &expected != &actual)
-	// assert.Equal(t, expected.IceServers, actual.IceServers)
-	// assert.Equal(t, expected.IceTransportPolicy, actual.IceTransportPolicy)
-	// assert.Equal(t, expected.BundlePolicy, actual.BundlePolicy)
-	// assert.Equal(t, expected.RtcpMuxPolicy, actual.RtcpMuxPolicy)
-	// assert.NotEqual(t, len(expected.Certificates), len(actual.Certificates))
-	// assert.Equal(t, expected.IceCandidatePoolSize, actual.IceCandidatePoolSize)
+		for i, testCase := range testCases {
+			assert.Nil(t, testCase.iceServer.validate(), "testCase: %d %v", i, testCase)
+		}
+	})
+	t.Run("Failure", func(t *testing.T) {
+		testCases := []struct {
+			iceServer   RTCIceServer
+			expectedErr error
+		}{
+			{RTCIceServer{
+				URLs: []string{"turn:192.158.29.39?transport=udp"},
+			}, &InvalidAccessError{ErrNoTurnCredencials}},
+			{RTCIceServer{
+				URLs:           []string{"turn:192.158.29.39?transport=udp"},
+				Username:       "unittest",
+				Credential:     false,
+				CredentialType: RTCIceCredentialTypePassword,
+			}, &InvalidAccessError{ErrTurnCredencials}},
+			{RTCIceServer{
+				URLs:           []string{"turn:192.158.29.39?transport=udp"},
+				Username:       "unittest",
+				Credential:     false,
+				CredentialType: RTCIceCredentialTypeOauth,
+			}, &InvalidAccessError{ErrTurnCredencials}},
+			{RTCIceServer{
+				URLs:           []string{"turn:192.158.29.39?transport=udp"},
+				Username:       "unittest",
+				Credential:     false,
+				CredentialType: Unknown,
+			}, &InvalidAccessError{ErrTurnCredencials}},
+			{RTCIceServer{
+				URLs:           []string{"stun:google.de?transport=udp"},
+				Username:       "unittest",
+				Credential:     false,
+				CredentialType: RTCIceCredentialTypeOauth,
+			}, &ice.SyntaxError{Err: ice.ErrSTUNQuery}},
+		}
+
+		for i, testCase := range testCases {
+			assert.EqualError(t,
+				testCase.iceServer.validate(),
+				testCase.expectedErr.Error(),
+				"testCase: %d %v", i, testCase,
+			)
+		}
+	})
 }

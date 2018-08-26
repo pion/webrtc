@@ -1,10 +1,5 @@
 package ice
 
-import "github.com/pkg/errors"
-
-// ErrUnknownType indicates a Unknown info
-var ErrUnknownType = errors.New("Unknown")
-
 // ConnectionState is an enum showing the state of a ICE Connection
 type ConnectionState int
 
