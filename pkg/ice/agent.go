@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const Unknown = iota
+
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
 type OutboundCallback func(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr)
 
