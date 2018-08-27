@@ -13,14 +13,14 @@ const (
 	RTCIceTransportPolicyAll
 )
 
-func NewRTCIceTransportPolicy(raw string) (unknown RTCIceTransportPolicy) {
+func NewRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
 	switch raw {
 	case "relay":
 		return RTCIceTransportPolicyRelay
 	case "all":
 		return RTCIceTransportPolicyAll
 	default:
-		return unknown
+		return RTCIceTransportPolicy(Unknown)
 	}
 }
 

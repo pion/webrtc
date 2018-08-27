@@ -23,7 +23,7 @@ const (
 	RTCPeerConnectionStateClosed
 )
 
-func NewRTCPeerConnectionState(raw string) (unknown RTCPeerConnectionState) {
+func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 	switch raw {
 	case "new":
 		return RTCPeerConnectionStateNew
@@ -38,7 +38,7 @@ func NewRTCPeerConnectionState(raw string) (unknown RTCPeerConnectionState) {
 	case "closed":
 		return RTCPeerConnectionStateClosed
 	default:
-		return unknown
+		return RTCPeerConnectionState(Unknown)
 	}
 }
 

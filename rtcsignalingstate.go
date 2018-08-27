@@ -25,7 +25,7 @@ const (
 	RTCSignalingStateClosed
 )
 
-func NewRTCSignalingState(raw string) (unknown RTCSignalingState) {
+func NewRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {
 	case "stable":
 		return RTCSignalingStateStable
@@ -40,7 +40,7 @@ func NewRTCSignalingState(raw string) (unknown RTCSignalingState) {
 	case "closed":
 		return RTCSignalingStateClosed
 	default:
-		return unknown
+		return RTCSignalingState(Unknown)
 	}
 }
 

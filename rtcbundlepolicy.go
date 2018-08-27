@@ -16,7 +16,7 @@ const (
 	RTCBundlePolicyMaxBundle
 )
 
-func NewRTCBundlePolicy(raw string) (unknown RTCBundlePolicy) {
+func NewRTCBundlePolicy(raw string) RTCBundlePolicy {
 	switch raw {
 	case "balanced":
 		return RTCBundlePolicyBalanced
@@ -25,7 +25,7 @@ func NewRTCBundlePolicy(raw string) (unknown RTCBundlePolicy) {
 	case "max-bundle":
 		return RTCBundlePolicyMaxBundle
 	default:
-		return unknown
+		return RTCBundlePolicy(Unknown)
 	}
 }
 

@@ -10,14 +10,14 @@ const (
 	RTCIceCredentialTypeOauth
 )
 
-func NewRTCIceCredentialType(raw string) (unknown RTCIceCredentialType) {
+func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
 	switch raw {
 	case "password":
 		return RTCIceCredentialTypePassword
 	case "oauth":
 		return RTCIceCredentialTypeOauth
 	default:
-		return unknown
+		return RTCIceCredentialType(Unknown)
 	}
 }
 

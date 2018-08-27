@@ -19,7 +19,7 @@ const (
 	RTCSdpTypeRollback
 )
 
-func NewRTCSdpType(raw string) (unknown RTCSdpType) {
+func NewRTCSdpType(raw string) RTCSdpType {
 	switch raw {
 	case "offer":
 		return RTCSdpTypeOffer
@@ -30,7 +30,7 @@ func NewRTCSdpType(raw string) (unknown RTCSdpType) {
 	case "rollback":
 		return RTCSdpTypeRollback
 	default:
-		return unknown
+		return RTCSdpType(Unknown)
 	}
 }
 
