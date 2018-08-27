@@ -11,14 +11,14 @@ const (
 	RTCRtcpMuxPolicyRequire
 )
 
-func NewRTCRtcpMuxPolicy(raw string) (unknown RTCRtcpMuxPolicy) {
+func NewRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
 	switch raw {
 	case "negotiate":
 		return RTCRtcpMuxPolicyNegotiate
 	case "require":
 		return RTCRtcpMuxPolicyRequire
 	default:
-		return unknown
+		return RTCRtcpMuxPolicy(Unknown)
 	}
 }
 
