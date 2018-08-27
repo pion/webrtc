@@ -24,7 +24,7 @@ func (s RTCIceServer) validate() error {
 			return err
 		}
 
-		if url.Scheme == ice.SchemeTypeTURN {
+		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
 				return &InvalidAccessError{ErrNoTurnCredencials}
