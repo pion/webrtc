@@ -6,22 +6,10 @@ import (
 	"crypto/rand"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"crypto/x509"
+	"time"
+	"math/big"
 )
-
-// TODO
-// func TestRTCPeerConnection_initConfiguration(t *testing.T) {
-// 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	assert.Nil(t, err)
-//
-// 	certificate, err := GenerateCertificate(sk)
-// 	assert.Nil(t, err)
-//
-// 	expected := InvalidAccessError{Err: ErrCertificateExpired}
-// 	_, actualError := New(RTCConfiguration{
-// 		Certificates: []RTCCertificate{*certificate},
-// 	})
-// 	assert.EqualError(t, actualError, expected.Error())
-// }
 
 func TestNew(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
@@ -46,68 +34,143 @@ func TestNew(t *testing.T) {
 					CredentialType: RTCIceCredentialTypeOauth,
 				},
 			},
-			IceTransportPolicy: RTCIceTransportPolicyRelay,
-			BundlePolicy: RTCBundlePolicyMaxCompat,
-			RtcpMuxPolicy: RTCRtcpMuxPolicyNegotiate,
+			IceTransportPolicy:   RTCIceTransportPolicyRelay,
+			BundlePolicy:         RTCBundlePolicyMaxCompat,
+			RtcpMuxPolicy:        RTCRtcpMuxPolicyNegotiate,
+			PeerIdentity:         "unittest",
+			Certificates:         []RTCCertificate{*certificate},
 			IceCandidatePoolSize: 5,
-			Certificates: []RTCCertificate{*certificate},
 		})
 		assert.Nil(t, err)
 		assert.NotNil(t, pc)
-
-		// testCases := []struct {
-		// 	initializer func() (*RTCPeerConnection, error)
-		// 	expectedErr error
-		// }{
-		// 	{func() (*RTCPeerConnection, error) {
-		// 		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		// 		assert.Nil(t, err)
-		//
-		// 		certificate, err := GenerateCertificate(secretKey)
-		// 		assert.Nil(t, err)
-		//
-		// 		// expected := InvalidAccessError{Err: ErrCertificateExpired}
-		// 		return New(RTCConfiguration{
-		// 			Certificates: []RTCCertificate{*certificate},
-		// 		})
-		// 	}, &InvalidAccessError{ErrNoTurnCredencials}},
-		// }
-		//
-		// 	for i, testCase := range testCases {
-		// 	}
-
-		// secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		// assert.Nil(t, err)
-		//
-		// certificate, err := GenerateCertificate(secretKey)
-		// assert.Nil(t, err)
-		//
-		// expected := InvalidAccessError{ErrCertificateExpired}
-		// _, actualError := New(RTCConfiguration{
-		// 	Certificates: []RTCCertificate{*certificate},
-		// })
-		// assert.EqualError(t, actualError, expected.Error())
 	})
 	t.Run("Failure", func(t *testing.T) {
 		testCases := []struct {
-			iceServer   RTCIceServer
+			initialize  func() (*RTCPeerConnection, error)
 			expectedErr error
 		}{
-			{RTCIceServer{
-				URLs: []string{"turn:192.158.29.39?transport=udp"},
+			{func() (*RTCPeerConnection, error) {
+				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				assert.Nil(t, err)
+
+				certificate, err := NewRTCCertificate(secretKey, x509.Certificate{
+					Version:      2,
+					SerialNumber: big.NewInt(1653),
+					NotBefore:    time.Now().AddDate(0, -2, 0),
+					NotAfter:     time.Now().AddDate(0, -1, 0),
+				})
+				assert.Nil(t, err)
+
+				return New(RTCConfiguration{
+					Certificates: []RTCCertificate{*certificate},
+				})
+			}, &InvalidAccessError{ErrCertificateExpired}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{
+					IceServers: []RTCIceServer{
+						{
+							URLs: []string{
+								"stun:stun.l.google.com:19302",
+								"turns:google.de?transport=tcp",
+							},
+							Username: "unittest",
+						},
+					},
+				})
 			}, &InvalidAccessError{ErrNoTurnCredencials}},
 		}
 
 		for i, testCase := range testCases {
-
-
-			assert.EqualError(t,
-				testCase.iceServer.validate(),
-				testCase.expectedErr.Error(),
+			_, err := testCase.initialize()
+			assert.EqualError(t, err, testCase.expectedErr.Error(),
 				"testCase: %d %v", i, testCase,
 			)
 		}
 	})
+}
+
+func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		assert.Nil(t, err)
+
+		certificate, err := GenerateCertificate(secretKey)
+		assert.Nil(t, err)
+
+		pc, err := New(RTCConfiguration{
+			PeerIdentity: "unittest",
+			Certificates: []RTCCertificate{*certificate},
+			IceCandidatePoolSize: 5,
+		})
+		assert.Nil(t, err)
+
+		err = pc.SetConfiguration(RTCConfiguration{
+			IceServers: []RTCIceServer{
+				{
+					URLs: []string{
+						"stun:stun.l.google.com:19302",
+						"turns:google.de?transport=tcp",
+					},
+					Username: "unittest",
+					Credential: RTCOAuthCredential{
+						MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
+					},
+					CredentialType: RTCIceCredentialTypeOauth,
+				},
+			},
+			IceTransportPolicy:   RTCIceTransportPolicyAll,
+			BundlePolicy:         RTCBundlePolicyBalanced,
+			RtcpMuxPolicy:        RTCRtcpMuxPolicyRequire,
+			PeerIdentity:         "unittest",
+			Certificates:         []RTCCertificate{*certificate},
+			IceCandidatePoolSize: 5,
+		})
+		assert.Nil(t, err)
+	})
+	// t.Run("Failure", func(t *testing.T) {
+	// 	testCases := []struct {
+	// 		initialize  func() (*RTCPeerConnection, error)
+	// 		expectedErr error
+	// 	}{
+	// 		{func() (*RTCPeerConnection, error) {
+	// 			secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// 			assert.Nil(t, err)
+	//
+	// 			certificate, err := NewRTCCertificate(secretKey, x509.Certificate{
+	// 				Version:      2,
+	// 				SerialNumber: big.NewInt(1653),
+	// 				NotBefore:    time.Now().AddDate(0, -2, 0),
+	// 				NotAfter:     time.Now().AddDate(0, -1, 0),
+	// 			})
+	// 			assert.Nil(t, err)
+	//
+	// 			return New(RTCConfiguration{
+	// 				Certificates: []RTCCertificate{*certificate},
+	// 			})
+	// 		}, &InvalidAccessError{ErrCertificateExpired}},
+	// 		{func() (*RTCPeerConnection, error) {
+	// 			return New(RTCConfiguration{
+	// 				IceServers: []RTCIceServer{
+	// 					{
+	// 						URLs: []string{
+	// 							"stun:stun.l.google.com:19302",
+	// 							"turns:google.de?transport=tcp",
+	// 						},
+	// 						Username: "unittest",
+	// 					},
+	// 				},
+	// 			})
+	// 		}, &InvalidAccessError{ErrNoTurnCredencials}},
+	// 	}
+	//
+	// 	for i, testCase := range testCases {
+	// 		_, err := testCase.initialize()
+	// 		assert.EqualError(t, err, testCase.expectedErr.Error(),
+	// 			"testCase: %d %v", i, testCase,
+	// 		)
+	// 	}
+	// })
 }
 
 // TODO
