@@ -20,11 +20,15 @@ func TestNewRTCSignalingState(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t, NewRTCSignalingState(testCase.stateString), testCase.expectedState, "testCase: %d %v", i, testCase)
+		assert.Equal(t,
+			NewRTCSignalingState(testCase.stateString),
+			testCase.expectedState,
+			"testCase: %d %v", i, testCase,
+		)
 	}
 }
 
-func TestString(t *testing.T) {
+func TestRTCSignalingState_String(t *testing.T) {
 	testCases := []struct {
 		state          RTCSignalingState
 		expectedString string
@@ -39,6 +43,10 @@ func TestString(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t, testCase.state.String(), testCase.expectedString, "testCase: %d %v", i, testCase)
+		assert.Equal(t,
+			testCase.state.String(),
+			testCase.expectedString,
+			"testCase: %d %v", i, testCase,
+		)
 	}
 }
