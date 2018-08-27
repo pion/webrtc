@@ -9,6 +9,7 @@ import (
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/pkg/media/ivfwriter"
 )
 
 func main() {
@@ -49,12 +50,14 @@ func main() {
 	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
 		if track.Codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := newIVFWriter("output.ivf")
+			i, err := ivfwriter.New("output.ivf")
 			if err != nil {
 				panic(err)
 			}
 			for {
-				i.addPacket(<-track.Packets)
+				if err := i.AddPacket(<-track.Packets); err != nil {
+					panic(err)
+				}
 			}
 		}
 	}
