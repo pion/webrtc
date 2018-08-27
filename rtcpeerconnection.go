@@ -99,6 +99,21 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		return nil, err
 	}
 
+	// FIXME Temporary code before IceAgent and RTCIceTransport Rebuild
+	for _, server := range pc.configuration.IceServers {
+		for _, rawURL := range server.URLs {
+			url, err := ice.ParseURL(rawURL)
+			if err != nil {
+				return nil, err
+			}
+
+			err = pc.networkManager.AddURL(url)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+
 	// https://www.w3.org/TR/webrtc/#constructor (step #4)
 	// This validation is omitted since the pions-webrtc implements rtcp-mux.
 	// FIXME This is actually not implemented yet but will be soon.
