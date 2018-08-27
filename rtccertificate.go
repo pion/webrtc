@@ -3,13 +3,13 @@ package webrtc
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"time"
 	"crypto/x509/pkix"
 	"encoding/hex"
-	"crypto/rand"
 	"math/big"
+	"time"
 )
 
 // RTCCertificate represents a x509Cert used to authenticate WebRTC communications.

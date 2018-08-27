@@ -10,6 +10,17 @@ const (
 	RTCIceCredentialTypeOauth
 )
 
+func NewRTCIceCredentialType(raw string) (unknown RTCIceCredentialType) {
+	switch raw {
+	case "password":
+		return RTCIceCredentialTypePassword
+	case "oauth":
+		return RTCIceCredentialTypeOauth
+	default:
+		return unknown
+	}
+}
+
 func (t RTCIceCredentialType) String() string {
 	switch t {
 	case RTCIceCredentialTypePassword:

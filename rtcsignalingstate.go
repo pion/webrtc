@@ -1,6 +1,6 @@
 package webrtc
 
-// RTCSignalingState indicates the state of the offer/answer process
+// RTCSignalingState indicates the policy of the offer/answer process
 type RTCSignalingState int
 
 const (

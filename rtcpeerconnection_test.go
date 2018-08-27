@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"github.com/stretchr/testify/assert"
-	"testing"
 	"crypto/x509"
-	"time"
+	"github.com/stretchr/testify/assert"
 	"math/big"
+	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {

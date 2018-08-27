@@ -123,7 +123,7 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 			if !x509Cert.Expires().IsZero() && now.After(x509Cert.Expires()) {
 				return &InvalidAccessError{ErrCertificateExpired}
 			}
-			pc.configuration.Certificates = append(pc.configuration.Certificates, x509Cert, )
+			pc.configuration.Certificates = append(pc.configuration.Certificates, x509Cert)
 		}
 	} else {
 		sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

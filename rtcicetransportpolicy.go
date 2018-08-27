@@ -13,6 +13,17 @@ const (
 	RTCIceTransportPolicyAll
 )
 
+func NewRTCIceTransportPolicy(raw string) (unknown RTCIceTransportPolicy) {
+	switch raw {
+	case "relay":
+		return RTCIceTransportPolicyRelay
+	case "all":
+		return RTCIceTransportPolicyAll
+	default:
+		return unknown
+	}
+}
+
 func (t RTCIceTransportPolicy) String() string {
 	switch t {
 	case RTCIceTransportPolicyRelay:
