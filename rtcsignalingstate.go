@@ -25,6 +25,25 @@ const (
 	RTCSignalingStateClosed
 )
 
+func NewRTCSignalingState(raw string) (unknown RTCSignalingState) {
+	switch raw {
+	case "stable":
+		return RTCSignalingStateStable
+	case "have-local-offer":
+		return RTCSignalingStateHaveLocalOffer
+	case "have-remote-offer":
+		return RTCSignalingStateHaveRemoteOffer
+	case "have-local-pranswer":
+		return RTCSignalingStateHaveLocalPranswer
+	case "have-remote-pranswer":
+		return RTCSignalingStateHaveRemotePranswer
+	case "closed":
+		return RTCSignalingStateClosed
+	default:
+		return unknown
+	}
+}
+
 func (t RTCSignalingState) String() string {
 	switch t {
 	case RTCSignalingStateStable:
