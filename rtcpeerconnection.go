@@ -158,10 +158,8 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 				return err
 			}
 		}
-
 		pc.configuration.IceServers = configuration.IceServers
 	}
-
 	return nil
 }
 

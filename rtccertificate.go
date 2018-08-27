@@ -3,13 +3,13 @@ package webrtc
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"time"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"crypto/rand"
 	"math/big"
-	"time"
 )
 
 // RTCCertificate represents a x509Cert used to authenticate WebRTC communications.
@@ -18,50 +18,21 @@ type RTCCertificate struct {
 	x509Cert  *x509.Certificate
 }
 
-func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
-	origin := make([]byte, 16)
-	if _, err := rand.Read(origin); err != nil {
-		return nil, &UnknownError{err}
-	}
-
-	// Max random value, a 130-bits integer, i.e 2^130 - 1
-	maxBigInt := new(big.Int)
-	maxBigInt.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(maxBigInt, big.NewInt(1))
-	serialNumber, err := rand.Int(rand.Reader, maxBigInt)
-	if err != nil {
-		return nil, &UnknownError{err}
-	}
-
-	temp := &x509.Certificate{
-		Version:      2,
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName: hex.EncodeToString(origin),
-		},
-		IsCA: true,
-		BasicConstraintsValid: true,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(0, 1, 0),
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-			x509.ExtKeyUsageServerAuth,
-		},
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-	}
-
+func NewRTCCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*RTCCertificate, error) {
+	var err error
 	var certDER []byte
-	switch sk := secretKey.(type) {
+	switch sk := key.(type) {
 	case *rsa.PrivateKey:
 		pk := sk.Public()
-		temp.SignatureAlgorithm = x509.SHA256WithRSA
-		certDER, err = x509.CreateCertificate(rand.Reader, temp, temp, pk, sk)
+		tpl.SignatureAlgorithm = x509.SHA256WithRSA
+		certDER, err = x509.CreateCertificate(rand.Reader, &tpl, &tpl, pk, sk)
 		if err != nil {
 			return nil, &UnknownError{err}
 		}
 	case *ecdsa.PrivateKey:
 		pk := sk.Public()
-		temp.SignatureAlgorithm = x509.ECDSAWithSHA256
-		certDER, err = x509.CreateCertificate(rand.Reader, temp, temp, pk, sk)
+		tpl.SignatureAlgorithm = x509.ECDSAWithSHA256
+		certDER, err = x509.CreateCertificate(rand.Reader, &tpl, &tpl, pk, sk)
 		if err != nil {
 			return nil, &UnknownError{err}
 		}
@@ -74,7 +45,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 		return nil, &UnknownError{err}
 	}
 
-	return &RTCCertificate{secretKey: secretKey, x509Cert: cert}, nil
+	return &RTCCertificate{secretKey: key, x509Cert: cert}, nil
 }
 
 // Equals determines if two certificates are identical
@@ -110,4 +81,34 @@ func (c RTCCertificate) Expires() time.Time {
 
 func (c RTCCertificate) GetFingerprints() {
 
+}
+
+func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
+	origin := make([]byte, 16)
+	if _, err := rand.Read(origin); err != nil {
+		return nil, &UnknownError{err}
+	}
+
+	// Max random value, a 130-bits integer, i.e 2^130 - 1
+	maxBigInt := new(big.Int)
+	maxBigInt.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(maxBigInt, big.NewInt(1))
+	serialNumber, err := rand.Int(rand.Reader, maxBigInt)
+	if err != nil {
+		return nil, &UnknownError{err}
+	}
+
+	return NewRTCCertificate(secretKey, x509.Certificate{
+		Version:      2,
+		SerialNumber: serialNumber,
+		Subject:      pkix.Name{CommonName: hex.EncodeToString(origin)},
+		IsCA:         true,
+		BasicConstraintsValid: true,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(0, 1, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageClientAuth,
+			x509.ExtKeyUsageServerAuth,
+		},
+		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+	})
 }
