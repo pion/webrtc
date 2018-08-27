@@ -218,7 +218,9 @@ func (a *Agent) AddLocalCandidate(c Candidate) {
 
 // Close cleans up the Agent
 func (a *Agent) Close() {
-	close(a.taskLoopChan)
+	if a.taskLoopChan != nil {
+		close(a.taskLoopChan)
+	}
 }
 
 func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
