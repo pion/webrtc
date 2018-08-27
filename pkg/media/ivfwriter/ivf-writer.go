@@ -1,4 +1,4 @@
-package main
+package ivfwriter
 
 import (
 	"encoding/binary"
@@ -9,19 +9,15 @@ import (
 	"github.com/pions/webrtc/pkg/rtp/codecs"
 )
 
-type ivfWriter struct {
+// IVFWriter is used to take RTP packets and write them to an IVF on disk
+type IVFWriter struct {
 	fd           *os.File
 	count        uint64
 	currentFrame []byte
 }
 
-func panicWrite(fd *os.File, data []byte) {
-	if _, err := fd.Write(data); err != nil {
-		panic(err)
-	}
-}
-
-func newIVFWriter(fileName string) (*ivfWriter, error) {
+// New builds a new IVF writer
+func New(fileName string) (*IVFWriter, error) {
 	f, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
@@ -39,27 +35,29 @@ func newIVFWriter(fileName string) (*ivfWriter, error) {
 	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count
 	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
-	panicWrite(f, header)
+	if _, err := f.Write(header); err != nil {
+		return nil, err
+	}
 
-	i := &ivfWriter{fd: f}
-	return i, nil
+	return &IVFWriter{fd: f}, nil
 }
 
-func (i *ivfWriter) addPacket(packet *rtp.Packet) {
+// AddPacket adds a new packet and writes the appropriate headers for it
+func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 
 	vp8Packet := codecs.VP8Packet{}
 	err := vp8Packet.Unmarshal(packet)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	i.currentFrame = append(i.currentFrame, vp8Packet.Payload[0:]...)
 
 	if !packet.Marker {
-		return
+		return nil
 	} else if len(i.currentFrame) == 0 {
 		fmt.Println("skipping")
-		return
+		return nil
 	}
 
 	frameHeader := make([]byte, 12)
@@ -68,8 +66,12 @@ func (i *ivfWriter) addPacket(packet *rtp.Packet) {
 
 	i.count++
 
-	panicWrite(i.fd, frameHeader)
-	panicWrite(i.fd, i.currentFrame)
+	if _, err := i.fd.Write(frameHeader); err != nil {
+		return err
+	} else if _, err := i.fd.Write(i.currentFrame); err != nil {
+		return err
+	}
 
 	i.currentFrame = nil
+	return nil
 }
