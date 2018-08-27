@@ -23,6 +23,25 @@ const (
 	RTCPeerConnectionStateClosed
 )
 
+func NewRTCPeerConnectionState(raw string) (unknown RTCPeerConnectionState) {
+	switch raw {
+	case "new":
+		return RTCPeerConnectionStateNew
+	case "connecting":
+		return RTCPeerConnectionStateConnecting
+	case "connected":
+		return RTCPeerConnectionStateConnected
+	case "disconnected":
+		return RTCPeerConnectionStateDisconnected
+	case "failed":
+		return RTCPeerConnectionStateFailed
+	case "closed":
+		return RTCPeerConnectionStateClosed
+	default:
+		return unknown
+	}
+}
+
 func (t RTCPeerConnectionState) String() string {
 	switch t {
 	case RTCPeerConnectionStateNew:
@@ -36,9 +55,7 @@ func (t RTCPeerConnectionState) String() string {
 	case RTCPeerConnectionStateFailed:
 		return "failed"
 	case RTCPeerConnectionStateClosed:
-		// goconst, "closed" is used in different unrelated packages
-		const closed = "closed"
-		return closed
+		return "closed"
 	default:
 		return ErrUnknownType.Error()
 	}
