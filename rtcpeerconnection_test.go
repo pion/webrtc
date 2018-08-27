@@ -98,8 +98,8 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 		assert.Nil(t, err)
 
 		pc, err := New(RTCConfiguration{
-			PeerIdentity: "unittest",
-			Certificates: []RTCCertificate{*certificate},
+			PeerIdentity:         "unittest",
+			Certificates:         []RTCCertificate{*certificate},
 			IceCandidatePoolSize: 5,
 		})
 		assert.Nil(t, err)
@@ -128,49 +128,100 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 		})
 		assert.Nil(t, err)
 	})
-	// t.Run("Failure", func(t *testing.T) {
-	// 	testCases := []struct {
-	// 		initialize  func() (*RTCPeerConnection, error)
-	// 		expectedErr error
-	// 	}{
-	// 		{func() (*RTCPeerConnection, error) {
-	// 			secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	// 			assert.Nil(t, err)
-	//
-	// 			certificate, err := NewRTCCertificate(secretKey, x509.Certificate{
-	// 				Version:      2,
-	// 				SerialNumber: big.NewInt(1653),
-	// 				NotBefore:    time.Now().AddDate(0, -2, 0),
-	// 				NotAfter:     time.Now().AddDate(0, -1, 0),
-	// 			})
-	// 			assert.Nil(t, err)
-	//
-	// 			return New(RTCConfiguration{
-	// 				Certificates: []RTCCertificate{*certificate},
-	// 			})
-	// 		}, &InvalidAccessError{ErrCertificateExpired}},
-	// 		{func() (*RTCPeerConnection, error) {
-	// 			return New(RTCConfiguration{
-	// 				IceServers: []RTCIceServer{
-	// 					{
-	// 						URLs: []string{
-	// 							"stun:stun.l.google.com:19302",
-	// 							"turns:google.de?transport=tcp",
-	// 						},
-	// 						Username: "unittest",
-	// 					},
-	// 				},
-	// 			})
-	// 		}, &InvalidAccessError{ErrNoTurnCredencials}},
-	// 	}
-	//
-	// 	for i, testCase := range testCases {
-	// 		_, err := testCase.initialize()
-	// 		assert.EqualError(t, err, testCase.expectedErr.Error(),
-	// 			"testCase: %d %v", i, testCase,
-	// 		)
-	// 	}
-	// })
+	t.Run("Failure", func(t *testing.T) {
+		testCases := []struct {
+			initialize     func() (*RTCPeerConnection, error)
+			updatingConfig func() RTCConfiguration
+			expectedErr    error
+		}{
+			{func() (*RTCPeerConnection, error) {
+				pc, err := New(RTCConfiguration{})
+				pc.Close()
+				return pc, err
+			}, func() RTCConfiguration {
+				return RTCConfiguration{}
+			}, &InvalidStateError{ErrConnectionClosed}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				return RTCConfiguration{
+					PeerIdentity: "unittest",
+				}
+			}, &InvalidModificationError{ErrModifyingPeerIdentity}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				secretKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				assert.Nil(t, err)
+
+				certificate1, err := GenerateCertificate(secretKey1)
+				assert.Nil(t, err)
+
+				secretKey2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				assert.Nil(t, err)
+
+				certificate2, err := GenerateCertificate(secretKey2)
+				assert.Nil(t, err)
+
+				return RTCConfiguration{
+					Certificates: []RTCCertificate{*certificate1, *certificate2},
+				}
+			}, &InvalidModificationError{ErrModifyingCertificates}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				assert.Nil(t, err)
+
+				certificate, err := GenerateCertificate(secretKey)
+				assert.Nil(t, err)
+
+				return RTCConfiguration{
+					Certificates: []RTCCertificate{*certificate},
+				}
+			}, &InvalidModificationError{ErrModifyingCertificates}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				return RTCConfiguration{
+					BundlePolicy: RTCBundlePolicyMaxCompat,
+				}
+			}, &InvalidModificationError{ErrModifyingBundlePolicy}},
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				return RTCConfiguration{
+					RtcpMuxPolicy: RTCRtcpMuxPolicyNegotiate,
+				}
+			}, &InvalidModificationError{ErrModifyingRtcpMuxPolicy}},
+			// TODO Unittest for IceCandidatePoolSize cannot be done now needs pc.LocalDescription()
+			{func() (*RTCPeerConnection, error) {
+				return New(RTCConfiguration{})
+			}, func() RTCConfiguration {
+				return RTCConfiguration{
+					IceServers: []RTCIceServer{
+						{
+							URLs: []string{
+								"stun:stun.l.google.com:19302",
+								"turns:google.de?transport=tcp",
+							},
+							Username: "unittest",
+						},
+					},
+				}
+			}, &InvalidAccessError{ErrNoTurnCredencials}},
+		}
+
+		for i, testCase := range testCases {
+			pc, err := testCase.initialize()
+			assert.Nil(t, err)
+
+			err = pc.SetConfiguration(testCase.updatingConfig())
+			assert.EqualError(t, err, testCase.expectedErr.Error(),
+				"testCase: %d %v", i, testCase,
+			)
+		}
+	})
 }
 
 // TODO
