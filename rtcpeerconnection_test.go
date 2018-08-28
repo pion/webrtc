@@ -137,7 +137,10 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 		}{
 			{func() (*RTCPeerConnection, error) {
 				pc, err := New(RTCConfiguration{})
-				pc.Close()
+				assert.Nil(t, err)
+
+				err = pc.Close()
+				assert.Nil(t, err)
 				return pc, err
 			}, func() RTCConfiguration {
 				return RTCConfiguration{}
