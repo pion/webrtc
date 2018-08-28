@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"time"
 )
 
 // ConnectionRole indicates which of the end points should initiate the connection establishment
@@ -44,7 +45,8 @@ func (t ConnectionRole) String() string {
 }
 
 func newSessionID() uint64 {
-	return uint64(rand.Uint32()*2) >> 2
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return uint64(r.Uint32()*2) >> 2
 }
 
 // Codec represents a codec

@@ -22,11 +22,6 @@ import (
 // comparisons when no value was defined.
 const Unknown = iota
 
-func init() {
-	// TODO Must address this and either revert or delete.
-	// rand.Seed(time.Now().UTC().UnixNano())
-}
-
 // RTCPeerConnection represents a WebRTC connection between itself and a remote peer
 type RTCPeerConnection struct {
 	sync.RWMutex

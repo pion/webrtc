@@ -5,6 +5,7 @@ import (
 
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
+	"time"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack
@@ -146,7 +147,7 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 	}
 
 	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
-	ssrc := rand.Uint32()
+	ssrc := rand.New(rand.NewSource(time.Now().UnixNano())).Uint32()
 	go func() {
 		packetizer := rtp.NewPacketizer(
 			1400,

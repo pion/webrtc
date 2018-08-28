@@ -27,7 +27,7 @@ type CandidateBase struct {
 
 // Priority computes the priority for this ICE Candidate
 func (c *CandidateBase) Priority(typePreference uint16, component uint16) uint16 {
-	localPreference := uint16(rand.Uint32() / 2)
+	localPreference := uint16(rand.New(rand.NewSource(time.Now().UnixNano())).Uint32() / 2)
 	return (2^24)*typePreference +
 		(2^8)*localPreference +
 		(2^0)*(256-component)
