@@ -31,21 +31,31 @@ const (
 	RTCSignalingStateClosed
 )
 
+// This is done this way because of a linter.
+const (
+	stableStr = "stable"
+	haveLocalOfferStr = "have-local-offer"
+	haveRemoteOfferStr = "have-remote-offer"
+	haveLocalPranswerStr = "have-local-pranswer"
+	haveRemotePranswerStr = "have-remote-pranswer"
+	closeStr = "closed"
+)
+
 // NewRTCSignalingState defines a procedure for creating a new
 // RTCSignalingState from a raw string naming the signaling state.
 func NewRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {
-	case "stable":
+	case stableStr:
 		return RTCSignalingStateStable
-	case "have-local-offer":
+	case haveLocalOfferStr:
 		return RTCSignalingStateHaveLocalOffer
-	case "have-remote-offer":
+	case haveRemoteOfferStr:
 		return RTCSignalingStateHaveRemoteOffer
-	case "have-local-pranswer":
+	case haveLocalPranswerStr:
 		return RTCSignalingStateHaveLocalPranswer
-	case "have-remote-pranswer":
+	case haveRemotePranswerStr:
 		return RTCSignalingStateHaveRemotePranswer
-	case "closed":
+	case closeStr:
 		return RTCSignalingStateClosed
 	default:
 		return RTCSignalingState(Unknown)
@@ -55,17 +65,17 @@ func NewRTCSignalingState(raw string) RTCSignalingState {
 func (t RTCSignalingState) String() string {
 	switch t {
 	case RTCSignalingStateStable:
-		return "stable"
+		return stableStr
 	case RTCSignalingStateHaveLocalOffer:
-		return "have-local-offer"
+		return haveLocalOfferStr
 	case RTCSignalingStateHaveRemoteOffer:
-		return "have-remote-offer"
+		return haveRemoteOfferStr
 	case RTCSignalingStateHaveLocalPranswer:
-		return "have-local-pranswer"
+		return haveLocalPranswerStr
 	case RTCSignalingStateHaveRemotePranswer:
-		return "have-remote-pranswer"
+		return haveRemotePranswerStr
 	case RTCSignalingStateClosed:
-		return "closed"
+		return closeStr
 	default:
 		return ErrUnknownType.Error()
 	}
