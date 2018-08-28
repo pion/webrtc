@@ -28,7 +28,7 @@ const (
 	RTCSdpTypeRollback
 )
 
-// NewRTCSdpType defines a proceedure for creating a new RTCSdpType from a raw
+// NewRTCSdpType defines a procedure for creating a new RTCSdpType from a raw
 // string naming the session description protocol type.
 func NewRTCSdpType(raw string) RTCSdpType {
 	switch raw {

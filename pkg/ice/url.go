@@ -8,20 +8,26 @@ import (
 
 // TODO: Migrate address parsing to STUN/TURN packages?
 
-// Scheme indicates the type of server used
+// SchemeType indicates the type of server used in the ice.URL structure.
 type SchemeType int
 
 const (
-	// SchemeTypeSTUN indicates the URL represents a STUN server
+	// SchemeTypeSTUN indicates the URL represents a STUN server.
 	SchemeTypeSTUN SchemeType = iota + 1
+
+	// SchemeTypeSTUNS indicates the URL represents a STUNS (secure) server.
 	SchemeTypeSTUNS
 
-	// SchemeTypeTURN indicates the URL represents a TURN server
+	// SchemeTypeTURN indicates the URL represents a TURN server.
 	SchemeTypeTURN
+
+	// SchemeTypeTURNS indicates the URL represents a TURNS (secure) server.
 	SchemeTypeTURNS
 )
 
-func NewSchemeType(raw string) (unknown SchemeType) {
+// NewSchemeType defines a procedure for creating a new SchemeType from a raw
+// string naming the scheme type.
+func NewSchemeType(raw string) (SchemeType) {
 	switch raw {
 	case "stun":
 		return SchemeTypeSTUN
@@ -32,7 +38,7 @@ func NewSchemeType(raw string) (unknown SchemeType) {
 	case "turns":
 		return SchemeTypeTURNS
 	default:
-		return unknown
+		return SchemeType(Unknown)
 	}
 }
 
@@ -51,25 +57,28 @@ func (t SchemeType) String() string {
 	}
 }
 
-// Proto indicates the transport that is used
+// ProtoType indicates the transport protocol type that is used in the ice.URL
+// structure.
 type ProtoType int
 
 const (
-	// ProtoTypeUDP indicates the URL uses a UDP transport
+	// ProtoTypeUDP indicates the URL uses a UDP transport.
 	ProtoTypeUDP ProtoType = iota + 1
 
-	// ProtoTypeTCP indicates the URL uses a TCP transport
+	// ProtoTypeTCP indicates the URL uses a TCP transport.
 	ProtoTypeTCP
 )
 
-func NewProtoType(raw string) (unknown ProtoType) {
+// NewProtoType defines a procedure for creating a new ProtoType from a raw
+// string naming the transport protocol type.
+func NewProtoType(raw string) (ProtoType) {
 	switch raw {
 	case "udp":
 		return ProtoTypeUDP
 	case "tcp":
 		return ProtoTypeTCP
 	default:
-		return unknown
+		return ProtoType(Unknown)
 	}
 }
 
@@ -92,16 +101,19 @@ type URL struct {
 	Proto  ProtoType
 }
 
+// ParseURL parses a STUN or TURN urls following the ABNF syntax described in
+// https://tools.ietf.org/html/rfc7064 and https://tools.ietf.org/html/rfc7065
+// respectively.
 func ParseURL(raw string) (*URL, error) {
 	rawParts, err := url.Parse(raw)
 	if err != nil {
-		return nil, &UnknownError{err}
+		return nil, &UnknownError{Err: err}
 	}
 
 	var u URL
 	u.Scheme = NewSchemeType(rawParts.Scheme)
 	if u.Scheme == SchemeType(Unknown) {
-		return nil, &SyntaxError{ErrSchemeType}
+		return nil, &SyntaxError{Err: ErrSchemeType}
 	}
 
 	var rawPort string
@@ -125,28 +137,28 @@ func ParseURL(raw string) (*URL, error) {
 				}
 			}
 		}
-		return nil, &UnknownError{err}
+		return nil, &UnknownError{Err: err}
 	}
 
 	if u.Host == "" {
-		return nil, &SyntaxError{ErrHost}
+		return nil, &SyntaxError{Err: ErrHost}
 	}
 
 	if u.Port, err = strconv.Atoi(rawPort); err != nil {
-		return nil, &SyntaxError{ErrPort}
+		return nil, &SyntaxError{Err: ErrPort}
 	}
 
 	switch {
 	case u.Scheme == SchemeTypeSTUN:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, &SyntaxError{ErrSTUNQuery}
+			return nil, &SyntaxError{Err: ErrSTUNQuery}
 		}
 		u.Proto = ProtoTypeUDP
 	case u.Scheme == SchemeTypeSTUNS:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, &SyntaxError{ErrSTUNQuery}
+			return nil, &SyntaxError{Err: ErrSTUNQuery}
 		}
 		u.Proto = ProtoTypeTCP
 	case u.Scheme == SchemeTypeTURN:
@@ -177,19 +189,19 @@ func ParseURL(raw string) (*URL, error) {
 func parseProto(raw string) (ProtoType, error) {
 	qArgs, err := url.ParseQuery(raw)
 	if err != nil || len(qArgs) > 1 {
-		return ProtoType(Unknown), &SyntaxError{ErrInvalidQuery}
+		return ProtoType(Unknown), &SyntaxError{Err: ErrInvalidQuery}
 	}
 
 	var proto ProtoType
 	if rawProto := qArgs.Get("transport"); rawProto != "" {
 		if proto = NewProtoType(rawProto); proto == ProtoType(0) {
-			return ProtoType(Unknown), &NotSupportedError{ErrProtoType}
+			return ProtoType(Unknown), &NotSupportedError{Err: ErrProtoType}
 		}
 		return proto, nil
 	}
 
 	if len(qArgs) > 0 {
-		return ProtoType(Unknown), &SyntaxError{ErrInvalidQuery}
+		return ProtoType(Unknown), &SyntaxError{Err: ErrInvalidQuery}
 	}
 
 	return proto, nil
@@ -203,6 +215,7 @@ func (u URL) String() string {
 	return rawURL
 }
 
+// IsSecure returns whether the this URL's scheme describes secure scheme or not.
 func (u URL) IsSecure() bool {
 	return u.Scheme == SchemeTypeSTUNS || u.Scheme == SchemeTypeTURNS
 }

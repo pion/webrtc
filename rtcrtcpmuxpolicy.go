@@ -17,7 +17,7 @@ const (
 	RTCRtcpMuxPolicyRequire
 )
 
-// NewRTCRtcpMuxPolicy defines a proceedure for creating a new RTCRtcpMuxPolicy
+// NewRTCRtcpMuxPolicy defines a procedure for creating a new RTCRtcpMuxPolicy
 // from a raw string naming the rtcp multiplexing policy.
 func NewRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
 	switch raw {

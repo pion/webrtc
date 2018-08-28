@@ -47,19 +47,19 @@ func TestParseURL(t *testing.T) {
 			rawURL      string
 			expectedErr error
 		}{
-			{"", &SyntaxError{ErrSchemeType}},
-			{":::", &UnknownError{errors.New("parse :::: missing protocol scheme")}},
-			{"stun:[::1]:123:", &UnknownError{errors.New("address [::1]:123:: too many colons in address")}},
-			{"stun:[::1]:123a", &SyntaxError{ErrPort}},
-			{"google.de", &SyntaxError{ErrSchemeType}},
-			{"stun:", &SyntaxError{ErrHost}},
-			{"stun:google.de:abc", &SyntaxError{ErrPort}},
-			{"stun:google.de?transport=udp", &SyntaxError{ErrSTUNQuery}},
-			{"stuns:google.de?transport=udp", &SyntaxError{ErrSTUNQuery}},
-			{"turn:google.de?trans=udp", &SyntaxError{ErrInvalidQuery}},
-			{"turns:google.de?trans=udp", &SyntaxError{ErrInvalidQuery}},
-			{"turns:google.de?transport=udp&another=1", &SyntaxError{ErrInvalidQuery}},
-			{"turn:google.de?transport=ip", &NotSupportedError{ErrProtoType}},
+			{"", &SyntaxError{Err: ErrSchemeType}},
+			{":::", &UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
+			{"stun:[::1]:123:", &UnknownError{Err: errors.New("address [::1]:123:: too many colons in address")}},
+			{"stun:[::1]:123a", &SyntaxError{Err: ErrPort}},
+			{"google.de", &SyntaxError{Err: ErrSchemeType}},
+			{"stun:", &SyntaxError{Err: ErrHost}},
+			{"stun:google.de:abc", &SyntaxError{Err: ErrPort}},
+			{"stun:google.de?transport=udp", &SyntaxError{Err: ErrSTUNQuery}},
+			{"stuns:google.de?transport=udp", &SyntaxError{Err: ErrSTUNQuery}},
+			{"turn:google.de?trans=udp", &SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?trans=udp", &SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?transport=udp&another=1", &SyntaxError{Err: ErrInvalidQuery}},
+			{"turn:google.de?transport=ip", &NotSupportedError{Err: ErrProtoType}},
 		}
 
 		for i, testCase := range testCases {

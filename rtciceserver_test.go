@@ -40,25 +40,25 @@ func TestRTCIceServer_validate(t *testing.T) {
 		}{
 			{RTCIceServer{
 				URLs: []string{"turn:192.158.29.39?transport=udp"},
-			}, &InvalidAccessError{ErrNoTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrNoTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: RTCIceCredentialTypePassword,
-			}, &InvalidAccessError{ErrTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: RTCIceCredentialTypeOauth,
-			}, &InvalidAccessError{ErrTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: Unknown,
-			}, &InvalidAccessError{ErrTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"stun:google.de?transport=udp"},
 				Username:       "unittest",

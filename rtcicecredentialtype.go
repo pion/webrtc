@@ -14,7 +14,7 @@ const (
 	RTCIceCredentialTypeOauth
 )
 
-// NewRTCIceCredentialType defines a proceedure for creating a new
+// NewRTCIceCredentialType defines a procedure for creating a new
 // RTCIceCredentialType from a raw string naming the ice credential type.
 func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
 	switch raw {

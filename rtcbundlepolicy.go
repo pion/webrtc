@@ -24,7 +24,7 @@ const (
 	RTCBundlePolicyMaxBundle
 )
 
-// NewRTCBundlePolicy defines a proceedure for creating a new RTCBundlePolicy
+// NewRTCBundlePolicy defines a procedure for creating a new RTCBundlePolicy
 // from a raw string naming the bundle policy.
 func NewRTCBundlePolicy(raw string) RTCBundlePolicy {
 	switch raw {
