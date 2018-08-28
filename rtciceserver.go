@@ -1,8 +1,8 @@
 package webrtc
 
 import (
-	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
 // RTCIceServer describes a single STUN and TURN server that can be used by
