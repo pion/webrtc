@@ -415,7 +415,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(*a.String(), "candidate") {
 				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
-					// pc.networkManager.IceAgent.AddRemoteCandidate(c)
+					pc.networkManager.IceAgent.AddRemoteCandidate(c)
 				} else {
 					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
 				}
