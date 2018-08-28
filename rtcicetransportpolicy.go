@@ -13,7 +13,7 @@ const (
 	RTCIceTransportPolicyAll
 )
 
-// NewRTCIceTransportPolicy defines a proceedure for creating a new
+// NewRTCIceTransportPolicy defines a procedure for creating a new
 // RTCIceTransportPolicy from a raw string naming the ice transport policy.
 func NewRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
 	switch raw {

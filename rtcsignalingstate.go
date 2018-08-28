@@ -31,7 +31,7 @@ const (
 	RTCSignalingStateClosed
 )
 
-// NewRTCSignalingState defines a proceedure for creating a new
+// NewRTCSignalingState defines a procedure for creating a new
 // RTCSignalingState from a raw string naming the signaling state.
 func NewRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {

@@ -64,7 +64,7 @@ func TestNew(t *testing.T) {
 				return New(RTCConfiguration{
 					Certificates: []RTCCertificate{*certificate},
 				})
-			}, &InvalidAccessError{ErrCertificateExpired}},
+			}, &InvalidAccessError{Err: ErrCertificateExpired}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{
 					IceServers: []RTCIceServer{
@@ -77,7 +77,7 @@ func TestNew(t *testing.T) {
 						},
 					},
 				})
-			}, &InvalidAccessError{ErrNoTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrNoTurnCredencials}},
 		}
 
 		for i, testCase := range testCases {
@@ -140,14 +140,14 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				return pc, err
 			}, func() RTCConfiguration {
 				return RTCConfiguration{}
-			}, &InvalidStateError{ErrConnectionClosed}},
+			}, &InvalidStateError{Err: ErrConnectionClosed}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					PeerIdentity: "unittest",
 				}
-			}, &InvalidModificationError{ErrModifyingPeerIdentity}},
+			}, &InvalidModificationError{Err: ErrModifyingPeerIdentity}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
 			}, func() RTCConfiguration {
@@ -166,7 +166,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				return RTCConfiguration{
 					Certificates: []RTCCertificate{*certificate1, *certificate2},
 				}
-			}, &InvalidModificationError{ErrModifyingCertificates}},
+			}, &InvalidModificationError{Err: ErrModifyingCertificates}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
 			}, func() RTCConfiguration {
@@ -179,21 +179,21 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				return RTCConfiguration{
 					Certificates: []RTCCertificate{*certificate},
 				}
-			}, &InvalidModificationError{ErrModifyingCertificates}},
+			}, &InvalidModificationError{Err: ErrModifyingCertificates}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					BundlePolicy: RTCBundlePolicyMaxCompat,
 				}
-			}, &InvalidModificationError{ErrModifyingBundlePolicy}},
+			}, &InvalidModificationError{Err: ErrModifyingBundlePolicy}},
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					RtcpMuxPolicy: RTCRtcpMuxPolicyNegotiate,
 				}
-			}, &InvalidModificationError{ErrModifyingRtcpMuxPolicy}},
+			}, &InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}},
 			// TODO Unittest for IceCandidatePoolSize cannot be done now needs pc.LocalDescription()
 			{func() (*RTCPeerConnection, error) {
 				return New(RTCConfiguration{})
@@ -209,7 +209,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 						},
 					},
 				}
-			}, &InvalidAccessError{ErrNoTurnCredencials}},
+			}, &InvalidAccessError{Err: ErrNoTurnCredencials}},
 		}
 
 		for i, testCase := range testCases {

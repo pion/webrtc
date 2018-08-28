@@ -34,7 +34,7 @@ const (
 	RTCPeerConnectionStateClosed
 )
 
-// NewRTCPeerConnectionState defines a proceedure for creating a new
+// NewRTCPeerConnectionState defines a procedure for creating a new
 // RTCPeerConnectionState from a raw string naming the peer connection state.
 func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 	switch raw {
