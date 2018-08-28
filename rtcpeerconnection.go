@@ -6,15 +6,16 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
-	"net"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Unknown defines default public constant to use for "enum" like struct

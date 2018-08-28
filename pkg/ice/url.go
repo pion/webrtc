@@ -27,7 +27,7 @@ const (
 
 // NewSchemeType defines a procedure for creating a new SchemeType from a raw
 // string naming the scheme type.
-func NewSchemeType(raw string) (SchemeType) {
+func NewSchemeType(raw string) SchemeType {
 	switch raw {
 	case "stun":
 		return SchemeTypeSTUN
@@ -71,7 +71,7 @@ const (
 
 // NewProtoType defines a procedure for creating a new ProtoType from a raw
 // string naming the transport protocol type.
-func NewProtoType(raw string) (ProtoType) {
+func NewProtoType(raw string) ProtoType {
 	switch raw {
 	case "udp":
 		return ProtoTypeUDP
