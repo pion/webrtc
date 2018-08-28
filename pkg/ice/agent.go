@@ -12,6 +12,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Unknown defines default public constant to use for "enum" like struct
+// comparisons when no value was defined.
+const Unknown = iota
+
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
 type OutboundCallback func(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr)
 
@@ -78,7 +82,7 @@ func NewAgent(outboundCallback OutboundCallback, iceNotifier func(ConnectionStat
 		outboundCallback: outboundCallback,
 		iceNotifier:      iceNotifier,
 
-		tieBreaker:      rand.Uint64(),
+		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:  GatheringStateComplete, // TODO trickle-ice
 		connectionState: ConnectionStateNew,
 
@@ -216,7 +220,9 @@ func (a *Agent) AddLocalCandidate(c Candidate) {
 
 // Close cleans up the Agent
 func (a *Agent) Close() {
-	close(a.taskLoopChan)
+	if a.taskLoopChan != nil {
+		close(a.taskLoopChan)
+	}
 }
 
 func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {

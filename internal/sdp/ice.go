@@ -40,7 +40,7 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 	case "host":
 		return &ice.CandidateHost{
 			CandidateBase: ice.CandidateBase{
-				Protocol: ice.TransportUDP,
+				Protocol: ice.ProtoTypeUDP,
 				Address:  address,
 				Port:     port,
 			},
@@ -48,7 +48,7 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 	case "srflx":
 		return &ice.CandidateSrflx{
 			CandidateBase: ice.CandidateBase{
-				Protocol: ice.TransportUDP,
+				Protocol: ice.ProtoTypeUDP,
 				Address:  address,
 				Port:     port,
 			},
