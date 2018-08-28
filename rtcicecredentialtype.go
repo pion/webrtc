@@ -1,15 +1,21 @@
 package webrtc
 
-// RTCIceCredentialType indicates the type of credentials used to connect to an ICE server
+// RTCIceCredentialType indicates the type of credentials used to connect to
+// an ICE server.
 type RTCIceCredentialType int
 
 const (
-	// RTCIceCredentialTypePassword describes username+pasword based credentials
+	// RTCIceCredentialTypePassword describes username and pasword based
+	// credentials as described in https://tools.ietf.org/html/rfc5389.
 	RTCIceCredentialTypePassword RTCIceCredentialType = iota + 1
-	// RTCIceCredentialTypeOauth describes token based credentials
+
+	// RTCIceCredentialTypeOauth describes token based credential as described
+	// in https://tools.ietf.org/html/rfc7635.
 	RTCIceCredentialTypeOauth
 )
 
+// NewRTCIceCredentialType defines a proceedure for creating a new
+// RTCIceCredentialType from a raw string naming the ice credential type.
 func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
 	switch raw {
 	case "password":

@@ -6,9 +6,7 @@ import (
 )
 
 var (
-	// ErrUnknownType indicates a Unknown info
 	ErrUnknownType                   = errors.New("unknown")
-	ErrNoConfig                      = errors.New("no configuration provided")
 	ErrConnectionClosed              = errors.New("connection closed")
 	ErrCertificateExpired            = errors.New("x509Cert expired")
 	ErrNoTurnCredencials             = errors.New("turn server credentials required")

@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+// Unknown defines default public constant to use for "enum" like struct
+// comparisons when no value was defined.
 const Unknown = iota
 
 func init() {
