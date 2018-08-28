@@ -42,7 +42,7 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{
-		ICEServers: []webrtc.RTCICEServer{
+		IceServers: []webrtc.RTCIceServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},

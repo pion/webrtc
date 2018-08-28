@@ -63,8 +63,8 @@ type RTCDataChannelInit struct {
 }
 
 // CreateDataChannel creates a new RTCDataChannel object with the given label and optitional options.
-func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
-	if r.IsClosed {
+func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
+	if pc.IsClosed {
 		return nil, &InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -88,7 +88,7 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 		id = options.ID
 	} else {
 		var err error
-		id, err = r.generateDataChannelID(true) // TODO: base on DTLS role
+		id, err = pc.generateDataChannelID(true) // TODO: base on DTLS role
 		if err != nil {
 			return nil, err
 		}
@@ -98,8 +98,8 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 		return nil, &TypeError{Err: ErrInvalidValue}
 	}
 
-	if r.sctp.State == RTCSctpTransportStateConnected &&
-		id >= r.sctp.MaxChannels {
+	if pc.sctp.State == RTCSctpTransportStateConnected &&
+		id >= pc.sctp.MaxChannels {
 		return nil, &OperationError{Err: ErrMaxDataChannels}
 	}
 
@@ -108,26 +108,26 @@ func (r *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChan
 	res := &RTCDataChannel{
 		Label:             label,
 		ID:                id,
-		rtcPeerConnection: r,
+		rtcPeerConnection: pc,
 	}
 
 	// Remember datachannel
-	r.dataChannels[id] = res
+	pc.dataChannels[id] = res
 
 	// Send opening message
-	// r.networkManager.SendOpenChannelMessage(id, label)
+	// pc.networkManager.SendOpenChannelMessage(id, label)
 
 	return res, nil
 }
 
-func (r *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
+func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
 	var id uint16
 	if !client {
 		id++
 	}
 
-	for ; id < r.sctp.MaxChannels-1; id += 2 {
-		_, ok := r.dataChannels[id]
+	for ; id < pc.sctp.MaxChannels-1; id += 2 {
+		_, ok := pc.dataChannels[id]
 		if !ok {
 			return id, nil
 		}
