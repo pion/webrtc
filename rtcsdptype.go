@@ -30,9 +30,9 @@ const (
 
 // This is done this way because of a linter.
 const (
-	offerStr = "offer"
+	offerStr    = "offer"
 	pranswerStr = "pranswer"
-	answerStr = "answer"
+	answerStr   = "answer"
 	rollbackStr = "rollback"
 )
 

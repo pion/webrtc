@@ -153,7 +153,7 @@ func (p *port) networkLoop() {
 		} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
 			p.handleDTLS(in.buffer, in.srcAddr.String())
 		} else if in.buffer[0] < 2 {
-			// p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
+			p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
 		}
 
 		p.m.certPairLock.RLock()
