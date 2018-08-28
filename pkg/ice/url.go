@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/pions/webrtc/pkg/dom"
+	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
 // TODO: Migrate address parsing to STUN/TURN packages?
@@ -109,13 +109,13 @@ type URL struct {
 func ParseURL(raw string) (*URL, error) {
 	rawParts, err := url.Parse(raw)
 	if err != nil {
-		return nil, &dom.UnknownError{Err: err}
+		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
 	var u URL
 	u.Scheme = NewSchemeType(rawParts.Scheme)
 	if u.Scheme == SchemeType(Unknown) {
-		return nil, &dom.SyntaxError{Err: ErrSchemeType}
+		return nil, &rtcerr.SyntaxError{Err: ErrSchemeType}
 	}
 
 	var rawPort string
@@ -139,28 +139,28 @@ func ParseURL(raw string) (*URL, error) {
 				}
 			}
 		}
-		return nil, &dom.UnknownError{Err: err}
+		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
 	if u.Host == "" {
-		return nil, &dom.SyntaxError{Err: ErrHost}
+		return nil, &rtcerr.SyntaxError{Err: ErrHost}
 	}
 
 	if u.Port, err = strconv.Atoi(rawPort); err != nil {
-		return nil, &dom.SyntaxError{Err: ErrPort}
+		return nil, &rtcerr.SyntaxError{Err: ErrPort}
 	}
 
 	switch {
 	case u.Scheme == SchemeTypeSTUN:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, &dom.SyntaxError{Err: ErrSTUNQuery}
+			return nil, &rtcerr.SyntaxError{Err: ErrSTUNQuery}
 		}
 		u.Proto = ProtoTypeUDP
 	case u.Scheme == SchemeTypeSTUNS:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || (err == nil && len(qArgs) > 0) {
-			return nil, &dom.SyntaxError{Err: ErrSTUNQuery}
+			return nil, &rtcerr.SyntaxError{Err: ErrSTUNQuery}
 		}
 		u.Proto = ProtoTypeTCP
 	case u.Scheme == SchemeTypeTURN:
@@ -191,19 +191,19 @@ func ParseURL(raw string) (*URL, error) {
 func parseProto(raw string) (ProtoType, error) {
 	qArgs, err := url.ParseQuery(raw)
 	if err != nil || len(qArgs) > 1 {
-		return ProtoType(Unknown), &dom.SyntaxError{Err: ErrInvalidQuery}
+		return ProtoType(Unknown), &rtcerr.SyntaxError{Err: ErrInvalidQuery}
 	}
 
 	var proto ProtoType
 	if rawProto := qArgs.Get("transport"); rawProto != "" {
 		if proto = NewProtoType(rawProto); proto == ProtoType(0) {
-			return ProtoType(Unknown), &dom.NotSupportedError{Err: ErrProtoType}
+			return ProtoType(Unknown), &rtcerr.NotSupportedError{Err: ErrProtoType}
 		}
 		return proto, nil
 	}
 
 	if len(qArgs) > 0 {
-		return ProtoType(Unknown), &dom.SyntaxError{Err: ErrInvalidQuery}
+		return ProtoType(Unknown), &rtcerr.SyntaxError{Err: ErrInvalidQuery}
 	}
 
 	return proto, nil

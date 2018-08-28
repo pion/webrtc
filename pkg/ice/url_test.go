@@ -3,7 +3,7 @@ package ice
 import (
 	"testing"
 
-	"github.com/pions/webrtc/pkg/dom"
+	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,19 +49,19 @@ func TestParseURL(t *testing.T) {
 			rawURL      string
 			expectedErr error
 		}{
-			{"", &dom.SyntaxError{Err: ErrSchemeType}},
-			{":::", &dom.UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
-			{"stun:[::1]:123:", &dom.UnknownError{Err: errors.New("address [::1]:123:: too many colons in address")}},
-			{"stun:[::1]:123a", &dom.SyntaxError{Err: ErrPort}},
-			{"google.de", &dom.SyntaxError{Err: ErrSchemeType}},
-			{"stun:", &dom.SyntaxError{Err: ErrHost}},
-			{"stun:google.de:abc", &dom.SyntaxError{Err: ErrPort}},
-			{"stun:google.de?transport=udp", &dom.SyntaxError{Err: ErrSTUNQuery}},
-			{"stuns:google.de?transport=udp", &dom.SyntaxError{Err: ErrSTUNQuery}},
-			{"turn:google.de?trans=udp", &dom.SyntaxError{Err: ErrInvalidQuery}},
-			{"turns:google.de?trans=udp", &dom.SyntaxError{Err: ErrInvalidQuery}},
-			{"turns:google.de?transport=udp&another=1", &dom.SyntaxError{Err: ErrInvalidQuery}},
-			{"turn:google.de?transport=ip", &dom.NotSupportedError{Err: ErrProtoType}},
+			{"", &rtcerr.SyntaxError{Err: ErrSchemeType}},
+			{":::", &rtcerr.UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
+			{"stun:[::1]:123:", &rtcerr.UnknownError{Err: errors.New("address [::1]:123:: too many colons in address")}},
+			{"stun:[::1]:123a", &rtcerr.SyntaxError{Err: ErrPort}},
+			{"google.de", &rtcerr.SyntaxError{Err: ErrSchemeType}},
+			{"stun:", &rtcerr.SyntaxError{Err: ErrHost}},
+			{"stun:google.de:abc", &rtcerr.SyntaxError{Err: ErrPort}},
+			{"stun:google.de?transport=udp", &rtcerr.SyntaxError{Err: ErrSTUNQuery}},
+			{"stuns:google.de?transport=udp", &rtcerr.SyntaxError{Err: ErrSTUNQuery}},
+			{"turn:google.de?trans=udp", &rtcerr.SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?trans=udp", &rtcerr.SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?transport=udp&another=1", &rtcerr.SyntaxError{Err: ErrInvalidQuery}},
+			{"turn:google.de?transport=ip", &rtcerr.NotSupportedError{Err: ErrProtoType}},
 		}
 
 		for i, testCase := range testCases {
