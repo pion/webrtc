@@ -34,21 +34,31 @@ const (
 	RTCPeerConnectionStateClosed
 )
 
+// This is done this way because of a linter.
+const (
+	newStr          = "new"
+	connectingStr   = "connecting"
+	connectedStr    = "connected"
+	disconnectedStr = "disconnected"
+	failedStr       = "failed"
+	closedStr       = "closed"
+)
+
 // NewRTCPeerConnectionState defines a procedure for creating a new
 // RTCPeerConnectionState from a raw string naming the peer connection state.
 func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 	switch raw {
-	case "new":
+	case newStr:
 		return RTCPeerConnectionStateNew
-	case "connecting":
+	case connectingStr:
 		return RTCPeerConnectionStateConnecting
-	case "connected":
+	case connectedStr:
 		return RTCPeerConnectionStateConnected
-	case "disconnected":
+	case disconnectedStr:
 		return RTCPeerConnectionStateDisconnected
-	case "failed":
+	case failedStr:
 		return RTCPeerConnectionStateFailed
-	case "closed":
+	case closedStr:
 		return RTCPeerConnectionStateClosed
 	default:
 		return RTCPeerConnectionState(Unknown)
@@ -58,17 +68,17 @@ func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 func (t RTCPeerConnectionState) String() string {
 	switch t {
 	case RTCPeerConnectionStateNew:
-		return "new"
+		return newStr
 	case RTCPeerConnectionStateConnecting:
-		return "connecting"
+		return connectingStr
 	case RTCPeerConnectionStateConnected:
-		return "connected"
+		return connectedStr
 	case RTCPeerConnectionStateDisconnected:
-		return "disconnected"
+		return disconnectedStr
 	case RTCPeerConnectionStateFailed:
-		return "failed"
+		return failedStr
 	case RTCPeerConnectionStateClosed:
-		return "closed"
+		return closedStr
 	default:
 		return ErrUnknownType.Error()
 	}

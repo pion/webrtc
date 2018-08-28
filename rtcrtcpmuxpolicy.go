@@ -17,13 +17,19 @@ const (
 	RTCRtcpMuxPolicyRequire
 )
 
+// This is done this way because of a linter.
+const (
+	negotiateStr = "negotiate"
+	requireStr = "require"
+)
+
 // NewRTCRtcpMuxPolicy defines a procedure for creating a new RTCRtcpMuxPolicy
 // from a raw string naming the rtcp multiplexing policy.
 func NewRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
 	switch raw {
-	case "negotiate":
+	case negotiateStr:
 		return RTCRtcpMuxPolicyNegotiate
-	case "require":
+	case requireStr:
 		return RTCRtcpMuxPolicyRequire
 	default:
 		return RTCRtcpMuxPolicy(Unknown)
@@ -33,9 +39,9 @@ func NewRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
 func (t RTCRtcpMuxPolicy) String() string {
 	switch t {
 	case RTCRtcpMuxPolicyNegotiate:
-		return "negotiate"
+		return negotiateStr
 	case RTCRtcpMuxPolicyRequire:
-		return "require"
+		return requireStr
 	default:
 		return ErrUnknownType.Error()
 	}
