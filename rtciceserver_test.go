@@ -3,6 +3,7 @@ package webrtc
 import (
 	"testing"
 
+	"github.com/pions/webrtc/pkg/dom"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,31 +42,31 @@ func TestRTCIceServer_validate(t *testing.T) {
 		}{
 			{RTCIceServer{
 				URLs: []string{"turn:192.158.29.39?transport=udp"},
-			}, &InvalidAccessError{Err: ErrNoTurnCredencials}},
+			}, &dom.InvalidAccessError{Err: ErrNoTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: RTCIceCredentialTypePassword,
-			}, &InvalidAccessError{Err: ErrTurnCredencials}},
+			}, &dom.InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: RTCIceCredentialTypeOauth,
-			}, &InvalidAccessError{Err: ErrTurnCredencials}},
+			}, &dom.InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: Unknown,
-			}, &InvalidAccessError{Err: ErrTurnCredencials}},
+			}, &dom.InvalidAccessError{Err: ErrTurnCredencials}},
 			{RTCIceServer{
 				URLs:           []string{"stun:google.de?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: RTCIceCredentialTypeOauth,
-			}, &ice.SyntaxError{Err: ice.ErrSTUNQuery}},
+			}, &dom.SyntaxError{Err: ice.ErrSTUNQuery}},
 		}
 
 		for i, testCase := range testCases {

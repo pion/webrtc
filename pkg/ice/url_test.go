@@ -1,9 +1,10 @@
 package ice
 
 import (
-	"errors"
 	"testing"
 
+	"github.com/pions/webrtc/pkg/dom"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,19 +49,19 @@ func TestParseURL(t *testing.T) {
 			rawURL      string
 			expectedErr error
 		}{
-			{"", &SyntaxError{Err: ErrSchemeType}},
-			{":::", &UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
-			{"stun:[::1]:123:", &UnknownError{Err: errors.New("address [::1]:123:: too many colons in address")}},
-			{"stun:[::1]:123a", &SyntaxError{Err: ErrPort}},
-			{"google.de", &SyntaxError{Err: ErrSchemeType}},
-			{"stun:", &SyntaxError{Err: ErrHost}},
-			{"stun:google.de:abc", &SyntaxError{Err: ErrPort}},
-			{"stun:google.de?transport=udp", &SyntaxError{Err: ErrSTUNQuery}},
-			{"stuns:google.de?transport=udp", &SyntaxError{Err: ErrSTUNQuery}},
-			{"turn:google.de?trans=udp", &SyntaxError{Err: ErrInvalidQuery}},
-			{"turns:google.de?trans=udp", &SyntaxError{Err: ErrInvalidQuery}},
-			{"turns:google.de?transport=udp&another=1", &SyntaxError{Err: ErrInvalidQuery}},
-			{"turn:google.de?transport=ip", &NotSupportedError{Err: ErrProtoType}},
+			{"", &dom.SyntaxError{Err: ErrSchemeType}},
+			{":::", &dom.UnknownError{Err: errors.New("parse :::: missing protocol scheme")}},
+			{"stun:[::1]:123:", &dom.UnknownError{Err: errors.New("address [::1]:123:: too many colons in address")}},
+			{"stun:[::1]:123a", &dom.SyntaxError{Err: ErrPort}},
+			{"google.de", &dom.SyntaxError{Err: ErrSchemeType}},
+			{"stun:", &dom.SyntaxError{Err: ErrHost}},
+			{"stun:google.de:abc", &dom.SyntaxError{Err: ErrPort}},
+			{"stun:google.de?transport=udp", &dom.SyntaxError{Err: ErrSTUNQuery}},
+			{"stuns:google.de?transport=udp", &dom.SyntaxError{Err: ErrSTUNQuery}},
+			{"turn:google.de?trans=udp", &dom.SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?trans=udp", &dom.SyntaxError{Err: ErrInvalidQuery}},
+			{"turns:google.de?transport=udp&another=1", &dom.SyntaxError{Err: ErrInvalidQuery}},
+			{"turn:google.de?transport=ip", &dom.NotSupportedError{Err: ErrProtoType}},
 		}
 
 		for i, testCase := range testCases {

@@ -10,6 +10,8 @@ import (
 	"encoding/hex"
 	"math/big"
 	"time"
+
+	"github.com/pions/webrtc/pkg/dom"
 )
 
 // RTCCertificate represents a x509Cert used to authenticate WebRTC communications.
@@ -31,22 +33,22 @@ func NewRTCCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*RTCCertifi
 		tpl.SignatureAlgorithm = x509.SHA256WithRSA
 		certDER, err = x509.CreateCertificate(rand.Reader, &tpl, &tpl, pk, sk)
 		if err != nil {
-			return nil, &UnknownError{Err: err}
+			return nil, &dom.UnknownError{Err: err}
 		}
 	case *ecdsa.PrivateKey:
 		pk := sk.Public()
 		tpl.SignatureAlgorithm = x509.ECDSAWithSHA256
 		certDER, err = x509.CreateCertificate(rand.Reader, &tpl, &tpl, pk, sk)
 		if err != nil {
-			return nil, &UnknownError{Err: err}
+			return nil, &dom.UnknownError{Err: err}
 		}
 	default:
-		return nil, &NotSupportedError{Err: ErrPrivateKeyType}
+		return nil, &dom.NotSupportedError{Err: ErrPrivateKeyType}
 	}
 
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, &dom.UnknownError{Err: err}
 	}
 
 	return &RTCCertificate{secretKey: key, x509Cert: cert}, nil
@@ -97,7 +99,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	origin := make([]byte, 16)
 	/* #nosec */
 	if _, err := rand.Read(origin); err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, &dom.UnknownError{Err: err}
 	}
 
 	// Max random value, a 130-bits integer, i.e 2^130 - 1
@@ -107,7 +109,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	/* #nosec */
 	serialNumber, err := rand.Int(rand.Reader, maxBigInt)
 	if err != nil {
-		return nil, &UnknownError{Err: err}
+		return nil, &dom.UnknownError{Err: err}
 	}
 
 	return NewRTCCertificate(secretKey, x509.Certificate{
