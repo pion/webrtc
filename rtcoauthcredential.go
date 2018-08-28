@@ -7,7 +7,7 @@ package webrtc
 type RTCOAuthCredential struct {
 	// MacKey is a base64-url encoded format. It is used in STUN message
 	// integrity hash calculation.
-	MacKey      string
+	MacKey string
 
 	// AccessToken is a base64-encoded format. This is an encrypted
 	// self-contained token that is opaque to the application.

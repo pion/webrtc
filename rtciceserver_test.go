@@ -1,9 +1,10 @@
 package webrtc
 
 import (
+	"testing"
+
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestRTCIceServer_validate(t *testing.T) {
