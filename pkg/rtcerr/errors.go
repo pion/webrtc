@@ -1,5 +1,5 @@
-// Package dom implements the browser DOM specific classes needed for spec compliance.
-package dom
+// Package rtcerr implements the browser DOM specific classes needed for spec compliance.
+package rtcerr
 
 import (
 	"fmt"
