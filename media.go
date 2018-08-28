@@ -3,9 +3,10 @@ package webrtc
 import (
 	"math/rand"
 
+	"time"
+
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
-	"time"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack

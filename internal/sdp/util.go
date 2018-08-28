@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // ConnectionRole indicates which of the end points should initiate the connection establishment
