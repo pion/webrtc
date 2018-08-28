@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"github.com/pions/webrtc/pkg/dom"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -27,23 +28,23 @@ func (s RTCIceServer) validate() error {
 		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
-				return &InvalidAccessError{Err: ErrNoTurnCredencials}
+				return &dom.InvalidAccessError{Err: ErrNoTurnCredencials}
 			}
 
 			switch s.CredentialType {
 			case RTCIceCredentialTypePassword:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 				if _, ok := s.Credential.(string); !ok {
-					return &InvalidAccessError{Err: ErrTurnCredencials}
+					return &dom.InvalidAccessError{Err: ErrTurnCredencials}
 				}
 			case RTCIceCredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
 				if _, ok := s.Credential.(RTCOAuthCredential); !ok {
-					return &InvalidAccessError{Err: ErrTurnCredencials}
+					return &dom.InvalidAccessError{Err: ErrTurnCredencials}
 				}
 
 			default:
-				return &InvalidAccessError{Err: ErrTurnCredencials}
+				return &dom.InvalidAccessError{Err: ErrTurnCredencials}
 			}
 		}
 	}

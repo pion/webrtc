@@ -5,6 +5,7 @@ import (
 
 	"time"
 
+	"github.com/pions/webrtc/pkg/dom"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
@@ -183,14 +184,14 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 // AddTrack adds a RTCTrack to the RTCPeerConnection
 func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	if pc.IsClosed {
-		return nil, &InvalidStateError{Err: ErrConnectionClosed}
+		return nil, &dom.InvalidStateError{Err: ErrConnectionClosed}
 	}
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Sender.Track == nil {
 			continue
 		}
 		if track.ID == transceiver.Sender.Track.ID {
-			return nil, &InvalidAccessError{Err: ErrExistingTrack}
+			return nil, &dom.InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
 	var transceiver *RTCRtpTransceiver

@@ -2,7 +2,6 @@ package webrtc
 
 import (
 	"errors"
-	"fmt"
 )
 
 var (
@@ -58,75 +57,3 @@ var (
 	// was reached.
 	ErrMaxDataChannels = errors.New("maximum number of datachannels reached")
 )
-
-// InvalidStateError indicates the object is in an invalid state.
-type InvalidStateError struct {
-	Err error
-}
-
-func (e *InvalidStateError) Error() string {
-	return fmt.Sprintf("webrtc: InvalidStateError: %v", e.Err)
-}
-
-// UnknownError indicates the operation failed for an unknown transient reason
-type UnknownError struct {
-	Err error
-}
-
-func (e *UnknownError) Error() string {
-	return fmt.Sprintf("webrtc: UnknownError: %v", e.Err)
-}
-
-// InvalidAccessError indicates the object does not support the operation or argument.
-type InvalidAccessError struct {
-	Err error
-}
-
-func (e *InvalidAccessError) Error() string {
-	return fmt.Sprintf("webrtc: InvalidAccessError: %v", e.Err)
-}
-
-// NotSupportedError indicates the operation is not supported.
-type NotSupportedError struct {
-	Err error
-}
-
-func (e *NotSupportedError) Error() string {
-	return fmt.Sprintf("webrtc: NotSupportedError: %v", e.Err)
-}
-
-// InvalidModificationError indicates the object can not be modified in this way.
-type InvalidModificationError struct {
-	Err error
-}
-
-func (e *InvalidModificationError) Error() string {
-	return fmt.Sprintf("webrtc: InvalidModificationError: %v", e.Err)
-}
-
-// SyntaxError indicates the string did not match the expected pattern.
-type SyntaxError struct {
-	Err error
-}
-
-func (e *SyntaxError) Error() string {
-	return fmt.Sprintf("webrtc: SyntaxError: %v", e.Err)
-}
-
-// TypeError indicates an issue with a supplied value
-type TypeError struct {
-	Err error
-}
-
-func (e *TypeError) Error() string {
-	return fmt.Sprintf("webrtc: TypeError: %v", e.Err)
-}
-
-// OperationError indicates an issue with execution
-type OperationError struct {
-	Err error
-}
-
-func (e *OperationError) Error() string {
-	return fmt.Sprintf("webrtc: OperationError: %v", e.Err)
-}
