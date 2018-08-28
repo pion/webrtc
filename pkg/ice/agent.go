@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Unknown defines default public constant to use for "enum" like struct
+// comparisons when no value was defined.
 const Unknown = iota
 
 // OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent

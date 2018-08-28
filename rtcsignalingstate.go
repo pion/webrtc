@@ -1,30 +1,38 @@
 package webrtc
 
-// RTCSignalingState indicates the policy of the offer/answer process
+// RTCSignalingState indicates the signaling state of the offer/answer process.
 type RTCSignalingState int
 
 const (
-	// RTCSignalingStateStable indicates there is no offer­answer exchange in progress.
+	// RTCSignalingStateStable indicates there is no offer/answer exchange in
+	// progress. This is also the initial state, in which case the local and
+	// remote descriptions are nil.
 	RTCSignalingStateStable RTCSignalingState = iota + 1
 
-	// RTCSignalingStateHaveLocalOffer indicates A local description, of type "offer", has been successfully applied.
+	// RTCSignalingStateHaveLocalOffer indicates that a local description, of
+	// type "offer", has been successfully applied.
 	RTCSignalingStateHaveLocalOffer
 
-	// RTCSignalingStateHaveRemoteOffer indicates A remote description, of type "offer", has been successfully applied.
+	// RTCSignalingStateHaveRemoteOffer indicates that a remote description, of
+	// type "offer", has been successfully applied.
 	RTCSignalingStateHaveRemoteOffer
 
-	// RTCSignalingStateHaveLocalPranswer indicates A remote description of type "offer" has been successfully applied
-	// and a local description of type "pranswer" has been successfully applied.
+	// RTCSignalingStateHaveLocalPranswer indicates that a remote description
+	// of type "offer" has been successfully applied and a local description
+	// of type "pranswer" has been successfully applied.
 	RTCSignalingStateHaveLocalPranswer
 
-	// RTCSignalingStateHaveRemotePranswer indicates A local description of type "offer" has been successfully applied
-	// and a remote description of type "pranswer" has been successfully applied.
+	// RTCSignalingStateHaveRemotePranswer indicates that a local description
+	// of type "offer" has been successfully applied and a remote description
+	// of type "pranswer" has been successfully applied.
 	RTCSignalingStateHaveRemotePranswer
 
 	// RTCSignalingStateClosed indicates The RTCPeerConnection has been closed.
 	RTCSignalingStateClosed
 )
 
+// NewRTCSignalingState defines a proceedure for creating a new
+// RTCSignalingState from a raw string naming the signaling state.
 func NewRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {
 	case "stable":
