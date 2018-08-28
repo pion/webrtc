@@ -95,13 +95,16 @@ func (c RTCCertificate) GetFingerprints() {
 // corresponding private key.
 func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	origin := make([]byte, 16)
+	/* #nosec */
 	if _, err := rand.Read(origin); err != nil {
 		return nil, &UnknownError{Err: err}
 	}
 
 	// Max random value, a 130-bits integer, i.e 2^130 - 1
 	maxBigInt := new(big.Int)
+	/* #nosec */
 	maxBigInt.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(maxBigInt, big.NewInt(1))
+	/* #nosec */
 	serialNumber, err := rand.Int(rand.Reader, maxBigInt)
 	if err != nil {
 		return nil, &UnknownError{Err: err}

@@ -82,7 +82,7 @@ func NewAgent(outboundCallback OutboundCallback, iceNotifier func(ConnectionStat
 		outboundCallback: outboundCallback,
 		iceNotifier:      iceNotifier,
 
-		tieBreaker:      rand.Uint64(),
+		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:  GatheringStateComplete, // TODO trickle-ice
 		connectionState: ConnectionStateNew,
 
