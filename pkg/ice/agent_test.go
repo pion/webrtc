@@ -10,7 +10,7 @@ func TestTimeConsuming(t *testing.T) {
 	}
 }
 
-func ExampleNew() {
+// func ExampleNew() {
 	// m := New("a", "a", "b")
 	// var list []string
 	// for elem := range m.Iter() {
@@ -20,4 +20,4 @@ func ExampleNew() {
 	// fmt.Println(list)
 	// Output:
 	// [a a b]
-}
+// }
