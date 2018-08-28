@@ -29,7 +29,7 @@ type RTCPeerConnection struct {
 	configuration RTCConfiguration
 
 	// ICE
-	OnICEConnectionStateChange func(iceConnectionState ice.ConnectionState)
+	OnICEConnectionStateChange func(ice.ConnectionState)
 	IceConnectionState         ice.ConnectionState
 
 	networkManager *network.Manager
