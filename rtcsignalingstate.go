@@ -33,12 +33,12 @@ const (
 
 // This is done this way because of a linter.
 const (
-	stableStr = "stable"
-	haveLocalOfferStr = "have-local-offer"
-	haveRemoteOfferStr = "have-remote-offer"
-	haveLocalPranswerStr = "have-local-pranswer"
+	stableStr             = "stable"
+	haveLocalOfferStr     = "have-local-offer"
+	haveRemoteOfferStr    = "have-remote-offer"
+	haveLocalPranswerStr  = "have-local-pranswer"
 	haveRemotePranswerStr = "have-remote-pranswer"
-	closeStr = "closed"
+	closeStr              = "closed"
 )
 
 // NewRTCSignalingState defines a procedure for creating a new

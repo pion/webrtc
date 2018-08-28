@@ -20,7 +20,7 @@ const (
 // This is done this way because of a linter.
 const (
 	negotiateStr = "negotiate"
-	requireStr = "require"
+	requireStr   = "require"
 )
 
 // NewRTCRtcpMuxPolicy defines a procedure for creating a new RTCRtcpMuxPolicy

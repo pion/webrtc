@@ -17,7 +17,7 @@ const (
 // This is done this way because of a linter.
 const (
 	passwordStr = "password"
-	oauthStr = "oauth"
+	oauthStr    = "oauth"
 )
 
 // NewRTCIceCredentialType defines a procedure for creating a new

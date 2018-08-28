@@ -16,7 +16,7 @@ const (
 // This is done this way because of a linter.
 const (
 	relayStr = "relay"
-	allStr = "all"
+	allStr   = "all"
 )
 
 // NewRTCIceTransportPolicy defines a procedure for creating a new

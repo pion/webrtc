@@ -561,11 +561,11 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 	}
 
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
-	WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
-	WithValueAttribute(sdp.AttrKeyMID, midValue).
-	WithICECredentials(pc.networkManager.IceAgent.LocalUfrag, pc.networkManager.IceAgent.LocalPwd).
-	WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
-	WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
+		WithICECredentials(pc.networkManager.IceAgent.LocalUfrag, pc.networkManager.IceAgent.LocalPwd).
+		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
+		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 	for _, codec := range pc.mediaEngine.getCodecsByKind(codecType) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
@@ -608,11 +608,11 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 			},
 		},
 	}).
-	WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
-	WithValueAttribute(sdp.AttrKeyMID, midValue).
-	WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
-	WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
-	WithICECredentials(pc.networkManager.IceAgent.LocalUfrag, pc.networkManager.IceAgent.LocalPwd)
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
+		WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
+		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
+		WithICECredentials(pc.networkManager.IceAgent.LocalUfrag, pc.networkManager.IceAgent.LocalPwd)
 
 	for _, c := range candidates {
 		media.WithCandidate(c)
