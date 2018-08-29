@@ -26,20 +26,20 @@ const (
 
 // This is done this way because of a linter.
 const (
-	balancedStr  = "balanced"
-	maxCompatStr = "max-compat"
-	maxBundleStr = "max-bundle"
+	rtcBundlePolicyBalancedStr  = "balanced"
+	rtcBundlePolicyMaxCompatStr = "max-compat"
+	rtcBundlePolicyMaxBundleStr = "max-bundle"
 )
 
 // NewRTCBundlePolicy defines a procedure for creating a new RTCBundlePolicy
 // from a raw string naming the bundle policy.
 func NewRTCBundlePolicy(raw string) RTCBundlePolicy {
 	switch raw {
-	case balancedStr:
+	case rtcBundlePolicyBalancedStr:
 		return RTCBundlePolicyBalanced
-	case maxCompatStr:
+	case rtcBundlePolicyMaxCompatStr:
 		return RTCBundlePolicyMaxCompat
-	case maxBundleStr:
+	case rtcBundlePolicyMaxBundleStr:
 		return RTCBundlePolicyMaxBundle
 	default:
 		return RTCBundlePolicy(Unknown)
@@ -49,11 +49,11 @@ func NewRTCBundlePolicy(raw string) RTCBundlePolicy {
 func (t RTCBundlePolicy) String() string {
 	switch t {
 	case RTCBundlePolicyBalanced:
-		return balancedStr
+		return rtcBundlePolicyBalancedStr
 	case RTCBundlePolicyMaxCompat:
-		return maxCompatStr
+		return rtcBundlePolicyMaxCompatStr
 	case RTCBundlePolicyMaxBundle:
-		return maxBundleStr
+		return rtcBundlePolicyMaxBundleStr
 	default:
 		return ErrUnknownType.Error()
 	}

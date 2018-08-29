@@ -33,29 +33,29 @@ const (
 
 // This is done this way because of a linter.
 const (
-	stableStr             = "stable"
-	haveLocalOfferStr     = "have-local-offer"
-	haveRemoteOfferStr    = "have-remote-offer"
-	haveLocalPranswerStr  = "have-local-pranswer"
-	haveRemotePranswerStr = "have-remote-pranswer"
-	closeStr              = "closed"
+	rtcSignalingStateStableStr             = "stable"
+	rtcSignalingStateHaveLocalOfferStr     = "have-local-offer"
+	rtcSignalingStateHaveRemoteOfferStr    = "have-remote-offer"
+	rtcSignalingStateHaveLocalPranswerStr  = "have-local-pranswer"
+	rtcSignalingStateHaveRemotePranswerStr = "have-remote-pranswer"
+	rtcSignalingStateClosedStr             = "closed"
 )
 
 // NewRTCSignalingState defines a procedure for creating a new
 // RTCSignalingState from a raw string naming the signaling state.
 func NewRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {
-	case stableStr:
+	case rtcSignalingStateStableStr:
 		return RTCSignalingStateStable
-	case haveLocalOfferStr:
+	case rtcSignalingStateHaveLocalOfferStr:
 		return RTCSignalingStateHaveLocalOffer
-	case haveRemoteOfferStr:
+	case rtcSignalingStateHaveRemoteOfferStr:
 		return RTCSignalingStateHaveRemoteOffer
-	case haveLocalPranswerStr:
+	case rtcSignalingStateHaveLocalPranswerStr:
 		return RTCSignalingStateHaveLocalPranswer
-	case haveRemotePranswerStr:
+	case rtcSignalingStateHaveRemotePranswerStr:
 		return RTCSignalingStateHaveRemotePranswer
-	case closeStr:
+	case rtcSignalingStateClosedStr:
 		return RTCSignalingStateClosed
 	default:
 		return RTCSignalingState(Unknown)
@@ -65,17 +65,17 @@ func NewRTCSignalingState(raw string) RTCSignalingState {
 func (t RTCSignalingState) String() string {
 	switch t {
 	case RTCSignalingStateStable:
-		return stableStr
+		return rtcSignalingStateStableStr
 	case RTCSignalingStateHaveLocalOffer:
-		return haveLocalOfferStr
+		return rtcSignalingStateHaveLocalOfferStr
 	case RTCSignalingStateHaveRemoteOffer:
-		return haveRemoteOfferStr
+		return rtcSignalingStateHaveRemoteOfferStr
 	case RTCSignalingStateHaveLocalPranswer:
-		return haveLocalPranswerStr
+		return rtcSignalingStateHaveLocalPranswerStr
 	case RTCSignalingStateHaveRemotePranswer:
-		return haveRemotePranswerStr
+		return rtcSignalingStateHaveRemotePranswerStr
 	case RTCSignalingStateClosed:
-		return closeStr
+		return rtcSignalingStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}
