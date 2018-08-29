@@ -16,17 +16,17 @@ const (
 
 // This is done this way because of a linter.
 const (
-	passwordStr = "password"
-	oauthStr    = "oauth"
+	rtcIceCredentialTypePasswordStr = "password"
+	rtcIceCredentialTypeOauthStr    = "oauth"
 )
 
 // NewRTCIceCredentialType defines a procedure for creating a new
 // RTCIceCredentialType from a raw string naming the ice credential type.
 func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
 	switch raw {
-	case passwordStr:
+	case rtcIceCredentialTypePasswordStr:
 		return RTCIceCredentialTypePassword
-	case oauthStr:
+	case rtcIceCredentialTypeOauthStr:
 		return RTCIceCredentialTypeOauth
 	default:
 		return RTCIceCredentialType(Unknown)
@@ -36,9 +36,9 @@ func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
 func (t RTCIceCredentialType) String() string {
 	switch t {
 	case RTCIceCredentialTypePassword:
-		return passwordStr
+		return rtcIceCredentialTypePasswordStr
 	case RTCIceCredentialTypeOauth:
-		return oauthStr
+		return rtcIceCredentialTypeOauthStr
 	default:
 		return ErrUnknownType.Error()
 	}

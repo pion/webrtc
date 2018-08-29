@@ -35,23 +35,23 @@ const (
 
 // This is done this way because of a linter.
 const (
-	offerStr    = "offer"
-	pranswerStr = "pranswer"
-	answerStr   = "answer"
-	rollbackStr = "rollback"
+	rtcSdpTypeOfferStr    = "offer"
+	rtcSdpTypePranswerStr = "pranswer"
+	rtcSdpTypeAnswerStr   = "answer"
+	rtcSdpTypeRollbackStr = "rollback"
 )
 
 // NewRTCSdpType defines a procedure for creating a new RTCSdpType from a raw
 // string naming the session description protocol type.
 func NewRTCSdpType(raw string) RTCSdpType {
 	switch raw {
-	case offerStr:
+	case rtcSdpTypeOfferStr:
 		return RTCSdpTypeOffer
-	case pranswerStr:
+	case rtcSdpTypePranswerStr:
 		return RTCSdpTypePranswer
-	case answerStr:
+	case rtcSdpTypeAnswerStr:
 		return RTCSdpTypeAnswer
-	case rollbackStr:
+	case rtcSdpTypeRollbackStr:
 		return RTCSdpTypeRollback
 	default:
 		return RTCSdpType(Unknown)
@@ -61,13 +61,13 @@ func NewRTCSdpType(raw string) RTCSdpType {
 func (t RTCSdpType) String() string {
 	switch t {
 	case RTCSdpTypeOffer:
-		return offerStr
+		return rtcSdpTypeOfferStr
 	case RTCSdpTypePranswer:
-		return pranswerStr
+		return rtcSdpTypePranswerStr
 	case RTCSdpTypeAnswer:
-		return answerStr
+		return rtcSdpTypeAnswerStr
 	case RTCSdpTypeRollback:
-		return rollbackStr
+		return rtcSdpTypeRollbackStr
 	default:
 		return ErrUnknownType.Error()
 	}

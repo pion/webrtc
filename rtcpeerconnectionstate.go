@@ -36,29 +36,29 @@ const (
 
 // This is done this way because of a linter.
 const (
-	newStr          = "new"
-	connectingStr   = "connecting"
-	connectedStr    = "connected"
-	disconnectedStr = "disconnected"
-	failedStr       = "failed"
-	closedStr       = "closed"
+	rtcPeerConnectionStateNewStr          = "new"
+	rtcPeerConnectionStateConnectingStr   = "connecting"
+	rtcPeerConnectionStateConnectedStr    = "connected"
+	rtcPeerConnectionStateDisconnectedStr = "disconnected"
+	rtcPeerConnectionStateFailedStr       = "failed"
+	rtcPeerConnectionStateClosedStr       = "closed"
 )
 
 // NewRTCPeerConnectionState defines a procedure for creating a new
 // RTCPeerConnectionState from a raw string naming the peer connection state.
 func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 	switch raw {
-	case newStr:
+	case rtcPeerConnectionStateNewStr:
 		return RTCPeerConnectionStateNew
-	case connectingStr:
+	case rtcPeerConnectionStateConnectingStr:
 		return RTCPeerConnectionStateConnecting
-	case connectedStr:
+	case rtcPeerConnectionStateConnectedStr:
 		return RTCPeerConnectionStateConnected
-	case disconnectedStr:
+	case rtcPeerConnectionStateDisconnectedStr:
 		return RTCPeerConnectionStateDisconnected
-	case failedStr:
+	case rtcPeerConnectionStateFailedStr:
 		return RTCPeerConnectionStateFailed
-	case closedStr:
+	case rtcPeerConnectionStateClosedStr:
 		return RTCPeerConnectionStateClosed
 	default:
 		return RTCPeerConnectionState(Unknown)
@@ -68,17 +68,17 @@ func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 func (t RTCPeerConnectionState) String() string {
 	switch t {
 	case RTCPeerConnectionStateNew:
-		return newStr
+		return rtcPeerConnectionStateNewStr
 	case RTCPeerConnectionStateConnecting:
-		return connectingStr
+		return rtcPeerConnectionStateConnectingStr
 	case RTCPeerConnectionStateConnected:
-		return connectedStr
+		return rtcPeerConnectionStateConnectedStr
 	case RTCPeerConnectionStateDisconnected:
-		return disconnectedStr
+		return rtcPeerConnectionStateDisconnectedStr
 	case RTCPeerConnectionStateFailed:
-		return failedStr
+		return rtcPeerConnectionStateFailedStr
 	case RTCPeerConnectionStateClosed:
-		return closedStr
+		return rtcPeerConnectionStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}

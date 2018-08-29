@@ -15,17 +15,17 @@ const (
 
 // This is done this way because of a linter.
 const (
-	relayStr = "relay"
-	allStr   = "all"
+	rtcIceTransportPolicyRelayStr = "relay"
+	rtcIceTransportPolicyAllStr   = "all"
 )
 
 // NewRTCIceTransportPolicy defines a procedure for creating a new
 // RTCIceTransportPolicy from a raw string naming the ice transport policy.
 func NewRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
 	switch raw {
-	case relayStr:
+	case rtcIceTransportPolicyRelayStr:
 		return RTCIceTransportPolicyRelay
-	case allStr:
+	case rtcIceTransportPolicyAllStr:
 		return RTCIceTransportPolicyAll
 	default:
 		return RTCIceTransportPolicy(Unknown)
@@ -35,9 +35,9 @@ func NewRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
 func (t RTCIceTransportPolicy) String() string {
 	switch t {
 	case RTCIceTransportPolicyRelay:
-		return relayStr
+		return rtcIceTransportPolicyRelayStr
 	case RTCIceTransportPolicyAll:
-		return allStr
+		return rtcIceTransportPolicyAllStr
 	default:
 		return ErrUnknownType.Error()
 	}
