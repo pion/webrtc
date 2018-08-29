@@ -1,3 +1,5 @@
+// Package ice implements the Interactive Connectivity Establishment (ICE)
+// protocol defined in rfc5245.
 package ice
 
 import (
