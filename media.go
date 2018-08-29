@@ -1,14 +1,14 @@
 package webrtc
 
 import (
+	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
 // RTCSample contains media, and the amount of samples in it
-type RTCSample struct {
-	Data    []byte
-	Samples uint32
-}
+//
+// Deprecated: use RTCSample from github.com/pions/webrtc/pkg/media instead
+type RTCSample = media.RTCSample
 
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
@@ -19,5 +19,5 @@ type RTCTrack struct {
 	Ssrc        uint32
 	Codec       *RTCRtpCodec
 	Packets     <-chan *rtp.Packet
-	Samples     chan<- RTCSample
+	Samples     chan<- media.RTCSample
 }
