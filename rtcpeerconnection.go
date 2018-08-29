@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/binary"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
@@ -23,11 +24,11 @@ import (
 // comparisons when no value was defined.
 const Unknown = iota
 
-// RTCPeerConnection represents a WebRTC connection between itself and a remote peer
+// RTCPeerConnection represents a WebRTC connection that establishes a
+// peer-to-peer communications with another RTCPeerConnection instance in a
+// browser, or to another endpoint implementing the required protocols.
 type RTCPeerConnection struct {
 	sync.RWMutex
-
-	networkManager *network.Manager
 
 	configuration RTCConfiguration
 
@@ -56,25 +57,36 @@ type RTCPeerConnection struct {
 	// null.
 	PendingRemoteDescription *RTCSessionDescription
 
-	// IceConnectionState attribute MUST return the ICE connection state of the
+	// SignalingState attribute returns the signaling state of the
 	// RTCPeerConnection instance.
-	IceConnectionState RTCIceConnectionState
+	SignalingState RTCSignalingState
+
+	// IceGatheringState attribute returns the ICE gathering state of the
+	// RTCPeerConnection instance.
+	IceGatheringState RTCIceGatheringState // FIXME NOT-USED
+
+	// IceConnectionState attribute returns the ICE connection state of the
+	// RTCPeerConnection instance.
+	// IceConnectionState RTCIceConnectionState
+	IceConnectionState ice.ConnectionState // FIXME REMOVE
+
+	// ConnectionState attribute returns the connection state of the
+	// RTCPeerConnection instance.
+	ConnectionState RTCPeerConnectionState
+
+	networkManager *network.Manager
 
 	idpLoginURL *string
 
-	IsClosed          bool
-	NegotiationNeeded bool
+	isClosed          bool
+	negotiationNeeded bool // FIXME NOT-USED
 
 	// lastOffer  string
 	// lastAnswer string
 
-	signalingState  RTCSignalingState
-	connectionState RTCPeerConnectionState
-
 	// Media
 	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
-	Ontrack         func(*RTCTrack)
 
 	// SCTP
 	sctp *RTCSctpTransport
@@ -82,8 +94,15 @@ type RTCPeerConnection struct {
 	// DataChannels
 	dataChannels map[uint16]*RTCDataChannel
 
-	OnICEConnectionStateChange func(ice.ConnectionState)
-	Ondatachannel              func(*RTCDataChannel)
+	// OnNegotiationNeeded        func()
+	// OnIceCandidate             func()
+	// OnIceCandidateError        func()
+	// OnSignalingStateChange     func()
+	OnIceConnectionStateChange func(ice.ConnectionState)
+	// OnIceGatheringStateChange  func()
+	// OnConnectionStateChange    func()
+	OnTrack       func(*RTCTrack)
+	OnDataChannel func(*RTCDataChannel)
 }
 
 // Public
@@ -101,8 +120,8 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 			Certificates:         []RTCCertificate{},
 			IceCandidatePoolSize: 0,
 		},
-		signalingState:  RTCSignalingStateStable,
-		connectionState: RTCPeerConnectionStateNew,
+		SignalingState:  RTCSignalingStateStable,
+		ConnectionState: RTCPeerConnectionStateNew,
 		mediaEngine:     DefaultMediaEngine,
 		sctp:            newRTCSctpTransport(),
 		dataChannels:    make(map[uint16]*RTCDataChannel),
@@ -201,7 +220,7 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 // SetConfiguration updates the configuration of this RTCPeerConnection object.
 func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
-	if pc.IsClosed {
+	if pc.isClosed {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -279,6 +298,112 @@ func (pc *RTCPeerConnection) GetConfiguration() RTCConfiguration {
 	return pc.configuration
 }
 
+// ------------------------------------------------------------------------
+// --- FIXME - BELOW CODE NEEDS REVIEW/CLEANUP
+// ------------------------------------------------------------------------
+
+// CreateOffer starts the RTCPeerConnection and generates the localDescription
+func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
+	useIdentity := pc.idpLoginURL != nil
+	if options != nil {
+		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
+	} else if useIdentity {
+		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
+	} else if pc.isClosed {
+		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
+	candidates := pc.generateLocalCandidates()
+
+	bundleValue := "BUNDLE"
+
+	if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+		bundleValue += " audio"
+	}
+	if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+		bundleValue += " video"
+	}
+
+	pc.addDataMediaSection(d, "data", candidates, sdp.ConnectionRoleActpass)
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
+
+	for _, m := range d.MediaDescriptions {
+		m.WithPropertyAttribute("setup:actpass")
+	}
+
+	pc.CurrentLocalDescription = &RTCSessionDescription{
+		Type:   RTCSdpTypeOffer,
+		Sdp:    d.Marshal(),
+		parsed: d,
+	}
+
+	return *pc.CurrentLocalDescription, nil
+}
+
+// CreateAnswer starts the RTCPeerConnection and generates the localDescription
+func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionDescription, error) {
+	useIdentity := pc.idpLoginURL != nil
+	if options != nil {
+		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
+	} else if useIdentity {
+		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
+	} else if pc.isClosed {
+		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	candidates := pc.generateLocalCandidates()
+	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
+
+	bundleValue := "BUNDLE"
+	for _, remoteMedia := range pc.CurrentRemoteDescription.parsed.MediaDescriptions {
+		// TODO @trivigy better SDP parser
+		var peerDirection RTCRtpTransceiverDirection
+		midValue := ""
+		for _, a := range remoteMedia.Attributes {
+			if strings.HasPrefix(*a.String(), "mid") {
+				midValue = (*a.String())[len("mid:"):]
+			} else if strings.HasPrefix(*a.String(), "sendrecv") {
+				peerDirection = RTCRtpTransceiverDirectionSendrecv
+			} else if strings.HasPrefix(*a.String(), "sendonly") {
+				peerDirection = RTCRtpTransceiverDirectionSendonly
+			} else if strings.HasPrefix(*a.String(), "recvonly") {
+				peerDirection = RTCRtpTransceiverDirectionRecvonly
+			}
+		}
+
+		appendBundle := func() {
+			bundleValue += " " + midValue
+		}
+
+		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
+			if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+				appendBundle()
+			}
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
+			if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+				appendBundle()
+			}
+		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
+			pc.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
+		}
+	}
+
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+
+	pc.CurrentLocalDescription = &RTCSessionDescription{
+		Type:   RTCSdpTypeAnswer,
+		Sdp:    d.Marshal(),
+		parsed: d,
+	}
+	return *pc.CurrentLocalDescription, nil
+}
+
+// SetLocalDescription
+func (pc *RTCPeerConnection) SetLocalDescription() {
+	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+}
+
 // LocalDescription returns PendingLocalDescription if it is not null and
 // otherwise it returns CurrentLocalDescription. This property is used to
 // determine if setLocalDescription has already been called.
@@ -288,129 +413,6 @@ func (pc *RTCPeerConnection) LocalDescription() *RTCSessionDescription {
 		return pc.PendingLocalDescription
 	}
 	return pc.CurrentLocalDescription
-}
-
-// RemoteDescription returns PendingRemoteDescription if it is not null and
-// otherwise it returns CurrentRemoteDescription. This property is used to
-// determine if setRemoteDescription has already been called.
-// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-remotedescription
-func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
-	if pc.PendingRemoteDescription != nil {
-		return pc.PendingRemoteDescription
-	}
-	return pc.CurrentRemoteDescription
-}
-
-// SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
-// This enables RTCPeerConnection with support for different codecs
-func (pc *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
-	pc.mediaEngine = m
-}
-
-// SetIdentityProvider is used to configure an identity provider to generate identity assertions
-func (pc *RTCPeerConnection) SetIdentityProvider(provider string) error {
-	return errors.Errorf("TODO SetIdentityProvider")
-}
-
-// Close ends the RTCPeerConnection
-func (pc *RTCPeerConnection) Close() error {
-	pc.networkManager.Close()
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
-	if pc.IsClosed {
-		return nil
-	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
-	pc.IsClosed = true
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
-	pc.signalingState = RTCSignalingStateClosed
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
-	pc.IceConnectionState = RTCIceConnectionStateClosed
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
-	pc.connectionState = RTCPeerConnectionStateClosed
-
-	return nil
-}
-
-/* Everything below is private */
-func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
-	if pc.Ontrack == nil {
-		return nil
-	}
-
-	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
-	if err != nil {
-		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
-		return nil
-	}
-
-	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
-	if err != nil {
-		fmt.Printf("Codec %s in not registered\n", sdpCodec)
-	}
-
-	bufferTransport := make(chan *rtp.Packet, 15)
-
-	track := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          "0", // TODO extract from remoteDescription
-		Label:       "",  // TODO extract from remoteDescription
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Packets:     bufferTransport,
-	}
-
-	// TODO: Register the receiving Track
-
-	go pc.Ontrack(track)
-	return bufferTransport
-}
-
-func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
-	pc.Lock()
-	defer pc.Unlock()
-
-	if pc.OnICEConnectionStateChange != nil && pc.IceConnectionState != newState {
-		pc.OnICEConnectionStateChange(newState)
-	}
-	pc.IceConnectionState = newState
-}
-
-func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	pc.Lock()
-	defer pc.Unlock()
-
-	switch event := e.(type) {
-	case *network.DataChannelCreated:
-		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: pc}
-		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.Ondatachannel != nil {
-			go pc.Ondatachannel(newDataChannel)
-		} else {
-			fmt.Println("Ondatachannel is unset, discarding message")
-		}
-	case *network.DataChannelMessage:
-		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-			datachannel.RLock()
-			defer datachannel.RUnlock()
-
-			if datachannel.Onmessage != nil {
-				go datachannel.Onmessage(event.Payload)
-			} else {
-				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
-			}
-		} else {
-			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-
-		}
-	default:
-		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
-	}
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
@@ -450,6 +452,274 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	return pc.networkManager.Start(weOffer, remoteUfrag, remotePwd)
 }
 
+// RemoteDescription returns PendingRemoteDescription if it is not null and
+// otherwise it returns CurrentRemoteDescription. This property is used to
+// determine if setRemoteDescription has already been called.
+// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-remotedescription
+func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
+	if pc.PendingRemoteDescription != nil {
+		return pc.PendingRemoteDescription
+	}
+	return pc.CurrentRemoteDescription
+}
+
+func (pc *RTCPeerConnection) addIceCandidate() {
+	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+}
+
+// ------------------------------------------------------------------------
+// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION
+// ------------------------------------------------------------------------
+
+// GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
+func (pc *RTCPeerConnection) GetSenders() []RTCRtpSender {
+	result := make([]RTCRtpSender, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
+		result[i] = *tranceiver.Sender
+	}
+	return result
+}
+
+// GetReceivers returns the RTCRtpReceivers that are currently attached to this RTCPeerConnection
+func (pc *RTCPeerConnection) GetReceivers() []RTCRtpReceiver {
+	result := make([]RTCRtpReceiver, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
+		result[i] = *tranceiver.Receiver
+	}
+	return result
+}
+
+// GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
+func (pc *RTCPeerConnection) GetTransceivers() []RTCRtpTransceiver {
+	result := make([]RTCRtpTransceiver, len(pc.rtpTransceivers))
+	for i, tranceiver := range pc.rtpTransceivers {
+		result[i] = *tranceiver
+	}
+	return result
+}
+
+// AddTrack adds a RTCTrack to the RTCPeerConnection
+func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
+	if pc.isClosed {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+	for _, transceiver := range pc.rtpTransceivers {
+		if transceiver.Sender.Track == nil {
+			continue
+		}
+		if track.ID == transceiver.Sender.Track.ID {
+			return nil, &rtcerr.InvalidAccessError{Err: ErrExistingTrack}
+		}
+	}
+	var transceiver *RTCRtpTransceiver
+	for _, t := range pc.rtpTransceivers {
+		if !t.stopped &&
+			// t.Sender == nil && // TODO: check that the sender has never sent
+			t.Sender.Track == nil &&
+			t.Receiver.Track != nil &&
+			t.Receiver.Track.Kind == track.Kind {
+			transceiver = t
+			break
+		}
+	}
+	if transceiver != nil {
+		if err := transceiver.setSendingTrack(track); err != nil {
+			return nil, err
+		}
+	} else {
+		var receiver *RTCRtpReceiver
+		sender := newRTCRtpSender(track)
+		transceiver = pc.newRTCRtpTransceiver(
+			receiver,
+			sender,
+			RTCRtpTransceiverDirectionSendonly,
+		)
+	}
+
+	transceiver.Mid = track.Kind.String() // TODO: Mid generation
+
+	return transceiver.Sender, nil
+}
+
+func (pc *RTCPeerConnection) RemoveTrack() {
+	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+}
+
+func (pc *RTCPeerConnection) AddTransceiver() RTCRtpTransceiver {
+	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+}
+
+// CreateDataChannel creates a new RTCDataChannel object with the given label and optitional options.
+func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
+	if pc.isClosed {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	if len(label) > 65535 {
+		return nil, &rtcerr.TypeError{Err: ErrInvalidValue}
+	}
+
+	// Defaults
+	ordered := true
+	priority := RTCPriorityTypeLow
+	negotiated := false
+
+	if options != nil {
+		ordered = options.Ordered
+		priority = options.Priority
+		negotiated = options.Negotiated
+	}
+
+	var id uint16
+	if negotiated {
+		id = options.ID
+	} else {
+		var err error
+		id, err = pc.generateDataChannelID(true) // TODO: base on DTLS role
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if id > 65534 {
+		return nil, &rtcerr.TypeError{Err: ErrInvalidValue}
+	}
+
+	if pc.sctp.State == RTCSctpTransportStateConnected &&
+		id >= pc.sctp.MaxChannels {
+		return nil, &rtcerr.OperationError{Err: ErrMaxDataChannels}
+	}
+
+	_ = ordered  // TODO
+	_ = priority // TODO
+	res := &RTCDataChannel{
+		Label:             label,
+		ID:                id,
+		rtcPeerConnection: pc,
+	}
+
+	// Remember datachannel
+	pc.dataChannels[id] = res
+
+	// Send opening message
+	// pc.networkManager.SendOpenChannelMessage(id, label)
+
+	return res, nil
+}
+
+// SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
+// This enables RTCPeerConnection with support for different codecs
+func (pc *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
+	pc.mediaEngine = m
+}
+
+// SetIdentityProvider is used to configure an identity provider to generate identity assertions
+func (pc *RTCPeerConnection) SetIdentityProvider(provider string) error {
+	return errors.Errorf("TODO SetIdentityProvider")
+}
+
+// Close ends the RTCPeerConnection
+func (pc *RTCPeerConnection) Close() error {
+	pc.networkManager.Close()
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	if pc.isClosed {
+		return nil
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
+	pc.isClosed = true
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
+	pc.SignalingState = RTCSignalingStateClosed
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
+	// pc.IceConnectionState = RTCIceConnectionStateClosed
+	pc.IceConnectionState = ice.ConnectionStateClosed // FIXME REMOVE
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
+	pc.ConnectionState = RTCPeerConnectionStateClosed
+
+	return nil
+}
+
+/* Everything below is private */
+func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
+	if pc.Ontrack == nil {
+		return nil
+	}
+
+	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
+	if err != nil {
+		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+		return nil
+	}
+
+	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
+	if err != nil {
+		fmt.Printf("Codec %s in not registered\n", sdpCodec)
+	}
+
+	bufferTransport := make(chan *rtp.Packet, 15)
+
+	track := &RTCTrack{
+		PayloadType: payloadType,
+		Kind:        codec.Type,
+		ID:          "0", // TODO extract from remoteDescription
+		Label:       "",  // TODO extract from remoteDescription
+		Ssrc:        ssrc,
+		Codec:       codec,
+		Packets:     bufferTransport,
+	}
+
+	// TODO: Register the receiving Track
+
+	go pc.OnTrack(track)
+	return bufferTransport
+}
+
+func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
+	pc.Lock()
+	defer pc.Unlock()
+
+	if pc.OnIceConnectionStateChange != nil && pc.IceConnectionState != newState {
+		pc.OnIceConnectionStateChange(newState)
+	}
+	pc.IceConnectionState = newState
+}
+
+func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+	pc.Lock()
+	defer pc.Unlock()
+
+	switch event := e.(type) {
+	case *network.DataChannelCreated:
+		newDataChannel := &RTCDataChannel{ID: event.StreamIdentifier(), Label: event.Label, rtcPeerConnection: pc}
+		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
+		if pc.OnDataChannel != nil {
+			go pc.OnDataChannel(newDataChannel)
+		} else {
+			fmt.Println("OnDataChannel is unset, discarding message")
+		}
+	case *network.DataChannelMessage:
+		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
+			datachannel.RLock()
+			defer datachannel.RUnlock()
+
+			if datachannel.Onmessage != nil {
+				go datachannel.Onmessage(event.Payload)
+			} else {
+				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+			}
+		} else {
+			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+
+		}
+	default:
+		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+	}
+}
+
 func (pc *RTCPeerConnection) generateLocalCandidates() []string {
 	pc.networkManager.IceAgent.RLock()
 	defer pc.networkManager.IceAgent.RUnlock()
@@ -459,104 +729,6 @@ func (pc *RTCPeerConnection) generateLocalCandidates() []string {
 		candidates = append(candidates, sdp.ICECandidateMarshal(c)...)
 	}
 	return candidates
-}
-
-// CreateOffer starts the RTCPeerConnection and generates the localDescription
-func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDescription, error) {
-	useIdentity := pc.idpLoginURL != nil
-	if options != nil {
-		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
-	} else if useIdentity {
-		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
-	} else if pc.IsClosed {
-		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	}
-
-	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
-	candidates := pc.generateLocalCandidates()
-
-	bundleValue := "BUNDLE"
-
-	if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
-		bundleValue += " audio"
-	}
-	if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
-		bundleValue += " video"
-	}
-
-	pc.addDataMediaSection(d, "data", candidates, sdp.ConnectionRoleActpass)
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
-
-	for _, m := range d.MediaDescriptions {
-		m.WithPropertyAttribute("setup:actpass")
-	}
-
-	pc.CurrentLocalDescription = &RTCSessionDescription{
-		Type:   RTCSdpTypeOffer,
-		Sdp:    d.Marshal(),
-		parsed: d,
-	}
-
-	return *pc.CurrentLocalDescription, nil
-}
-
-// CreateAnswer starts the RTCPeerConnection and generates the localDescription
-func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionDescription, error) {
-	useIdentity := pc.idpLoginURL != nil
-	if options != nil {
-		return RTCSessionDescription{}, errors.Errorf("TODO handle options")
-	} else if useIdentity {
-		return RTCSessionDescription{}, errors.Errorf("TODO handle identity provider")
-	} else if pc.IsClosed {
-		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	}
-
-	candidates := pc.generateLocalCandidates()
-	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
-
-	bundleValue := "BUNDLE"
-	for _, remoteMedia := range pc.CurrentRemoteDescription.parsed.MediaDescriptions {
-		// TODO @trivigy better SDP parser
-		var peerDirection RTCRtpTransceiverDirection
-		midValue := ""
-		for _, a := range remoteMedia.Attributes {
-			if strings.HasPrefix(*a.String(), "mid") {
-				midValue = (*a.String())[len("mid:"):]
-			} else if strings.HasPrefix(*a.String(), "sendrecv") {
-				peerDirection = RTCRtpTransceiverDirectionSendrecv
-			} else if strings.HasPrefix(*a.String(), "sendonly") {
-				peerDirection = RTCRtpTransceiverDirectionSendonly
-			} else if strings.HasPrefix(*a.String(), "recvonly") {
-				peerDirection = RTCRtpTransceiverDirectionRecvonly
-			}
-		}
-
-		appendBundle := func() {
-			bundleValue += " " + midValue
-		}
-
-		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
-			if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
-				appendBundle()
-			}
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
-			if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
-				appendBundle()
-			}
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
-			pc.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
-			appendBundle()
-		}
-	}
-
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
-
-	pc.CurrentLocalDescription = &RTCSessionDescription{
-		Type:   RTCSdpTypeAnswer,
-		Sdp:    d.Marshal(),
-		parsed: d,
-	}
-	return *pc.CurrentLocalDescription, nil
 }
 
 func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRtpTransceiverDirection {

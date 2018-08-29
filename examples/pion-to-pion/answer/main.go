@@ -43,7 +43,7 @@ func buildPeerConnection() *webrtc.RTCPeerConnection {
 	}
 	d.Unlock()
 
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnIceConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 		if connectionState == ice.ConnectionStateConnected {
 			fmt.Println("sending openchannel")

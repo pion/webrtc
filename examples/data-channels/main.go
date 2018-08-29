@@ -54,14 +54,14 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnIceConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
 	datachannels := make([]*webrtc.RTCDataChannel, 0)
 	var dataChannelsLock sync.RWMutex
 
-	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
+	peerConnection.OnDataChannel = func(d *webrtc.RTCDataChannel) {
 		dataChannelsLock.Lock()
 		datachannels = append(datachannels, d)
 		dataChannelsLock.Unlock()
