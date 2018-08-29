@@ -30,7 +30,7 @@ const (
 	RTCPeerConnectionStateFailed
 
 	// RTCPeerConnectionStateClosed indicates the peer connection is closed
-	// and the IsClosed member variable of RTCPeerConnection is true.
+	// and the isClosed member variable of RTCPeerConnection is true.
 	RTCPeerConnectionStateClosed
 )
 

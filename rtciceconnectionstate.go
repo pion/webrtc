@@ -35,7 +35,7 @@ const (
 	RTCIceConnectionStateFailed
 
 	// RTCIceConnectionStateClosed indicates that the RTCPeerConnection's
-	// IsClosed is true.
+	// isClosed is true.
 	RTCIceConnectionStateClosed
 )
 
