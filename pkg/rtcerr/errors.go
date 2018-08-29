@@ -1,4 +1,5 @@
-// Package rtcerr implements the browser DOM specific classes needed for spec compliance.
+// Package rtcerr implements the error wrappers defined throughout the
+// WebRTC 1.0 specifications.
 package rtcerr
 
 import (
