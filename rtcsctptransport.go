@@ -2,33 +2,6 @@ package webrtc
 
 import "math"
 
-// RTCSctpTransportState indicates the state of the SCTP transport.
-type RTCSctpTransportState int
-
-const (
-	// RTCSctpTransportStateConnecting indicates the RTCSctpTransport is in the process of negotiating an association.
-	RTCSctpTransportStateConnecting RTCSctpTransportState = iota + 1
-
-	// RTCSctpTransportStateConnected indicates the negotiation of an association is completed.
-	RTCSctpTransportStateConnected
-
-	// RTCSctpTransportStateClosed indicates a SHUTDOWN or ABORT chunk is received or when the SCTP association has been closed intentionally.
-	RTCSctpTransportStateClosed
-)
-
-func (s RTCSctpTransportState) String() string {
-	switch s {
-	case RTCSctpTransportStateConnecting:
-		return "connecting"
-	case RTCSctpTransportStateConnected:
-		return "connected"
-	case RTCSctpTransportStateClosed:
-		return "closed"
-	default:
-		return "Unknown"
-	}
-}
-
 // RTCSctpTransport provides details about the SCTP transport.
 type RTCSctpTransport struct {
 	State RTCSctpTransportState // TODO: Set RTCSctpTransportState

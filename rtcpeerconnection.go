@@ -468,7 +468,7 @@ func (pc *RTCPeerConnection) addIceCandidate() {
 }
 
 // ------------------------------------------------------------------------
-// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION
+// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#rtp-media-api
 // ------------------------------------------------------------------------
 
 // GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
@@ -548,6 +548,10 @@ func (pc *RTCPeerConnection) RemoveTrack() {
 func (pc *RTCPeerConnection) AddTransceiver() RTCRtpTransceiver {
 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
 }
+
+// ------------------------------------------------------------------------
+// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api
+// ------------------------------------------------------------------------
 
 // CreateDataChannel creates a new RTCDataChannel object with the given label and optitional options.
 func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
