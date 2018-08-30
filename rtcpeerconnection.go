@@ -810,3 +810,83 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 
 	d.WithMedia(media)
 }
+
+func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
+	var id uint16
+	if !client {
+		id++
+	}
+
+	for ; id < pc.sctp.MaxChannels-1; id += 2 {
+		_, ok := pc.dataChannels[id]
+		if !ok {
+			return id, nil
+		}
+	}
+	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannels}
+}
+
+// NewRTCTrack is used to create a new RTCTrack
+func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
+	codec, err := pc.mediaEngine.getCodec(payloadType)
+	if err != nil {
+		return nil, err
+	}
+
+	if codec.Payloader == nil {
+		return nil, errors.New("codec payloader not set")
+	}
+
+	buf := make([]byte, 4)
+	_, err = rand.Read(buf)
+	if err != nil {
+		return nil, errors.New("failed to generate random value")
+	}
+
+	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
+	ssrc := binary.LittleEndian.Uint32(buf)
+	go func() {
+		packetizer := rtp.NewPacketizer(
+			1400,
+			payloadType,
+			ssrc,
+			codec.Payloader,
+			rtp.NewRandomSequencer(),
+			codec.ClockRate,
+		)
+		for {
+			in := <-trackInput
+			packets := packetizer.Packetize(in.Data, in.Samples)
+			for _, p := range packets {
+				pc.networkManager.SendRTP(p)
+			}
+		}
+	}()
+
+	t := &RTCTrack{
+		PayloadType: payloadType,
+		Kind:        codec.Type,
+		ID:          id,
+		Label:       label,
+		Ssrc:        ssrc,
+		Codec:       codec,
+		Samples:     trackInput,
+	}
+
+	return t, nil
+}
+
+func (pc *RTCPeerConnection) newRTCRtpTransceiver(
+	receiver *RTCRtpReceiver,
+	sender *RTCRtpSender,
+	direction RTCRtpTransceiverDirection,
+) *RTCRtpTransceiver {
+
+	t := &RTCRtpTransceiver{
+		Receiver:  receiver,
+		Sender:    sender,
+		Direction: direction,
+	}
+	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
+	return t
+}
