@@ -6,8 +6,8 @@ import (
 
 // RTCSessionDescription is used to expose local and remote session descriptions.
 type RTCSessionDescription struct {
-	Type RTCSdpType
-	Sdp  string
+	Type RTCSdpType `json:"type"`
+	Sdp  string     `json:"sdp"`
 
 	// This will never be initialized by callers, internal use only
 	parsed *sdp.SessionDescription
