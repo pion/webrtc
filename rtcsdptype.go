@@ -1,5 +1,10 @@
 package webrtc
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 // RTCSdpType describes the type of an RTCSessionDescription.
 type RTCSdpType int
 
@@ -66,4 +71,31 @@ func (t RTCSdpType) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// MarshalJSON enables JSON marshalling of a RTCSdpType
+func (t RTCSdpType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
+}
+
+// UnmarshalJSON enables JSON unmarshalling of a RTCSdpType
+func (t RTCSdpType) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch strings.ToLower(s) {
+	default:
+		return ErrUnknownType
+	case "offer":
+		t = RTCSdpTypeOffer
+	case "pranswer":
+		t = RTCSdpTypePranswer
+	case "answer":
+		t = RTCSdpTypeAnswer
+	case "rollback":
+		t = RTCSdpTypeRollback
+	}
+
+	return nil
 }
