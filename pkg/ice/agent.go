@@ -113,28 +113,55 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 }
 
 func (a *Agent) pingCandidate(local, remote Candidate) {
-	msg, err := stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
-		&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
-		&stun.UseCandidate{},
-		&stun.IceControlling{TieBreaker: a.tieBreaker},
-		&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
-		&stun.MessageIntegrity{
-			Key: []byte(a.remotePwd),
-		},
-		&stun.Fingerprint{},
-	)
-	if err != nil {
-		fmt.Println(err)
-		return
+	if a.isControlling {
+		msg, err := stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
+			&stun.UseCandidate{},
+			&stun.IceControlling{TieBreaker: a.tieBreaker},
+			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.MessageIntegrity{
+				Key: []byte(a.remotePwd),
+			},
+			&stun.Fingerprint{},
+		)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		a.outboundCallback(msg.Pack(), &stun.TransportAddr{
+			IP:   net.ParseIP(local.GetBase().Address),
+			Port: local.GetBase().Port,
+		}, &net.UDPAddr{
+			IP:   net.ParseIP(remote.GetBase().Address),
+			Port: remote.GetBase().Port,
+		})
+	} else {
+		msg, err := stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
+			&stun.UseCandidate{},
+			&stun.IceControlled{TieBreaker: a.tieBreaker},
+			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.MessageIntegrity{
+				Key: []byte(a.remotePwd),
+			},
+			&stun.Fingerprint{},
+		)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		a.outboundCallback(msg.Pack(), &stun.TransportAddr{
+			IP:   net.ParseIP(local.GetBase().Address),
+			Port: local.GetBase().Port,
+		}, &net.UDPAddr{
+			IP:   net.ParseIP(remote.GetBase().Address),
+			Port: remote.GetBase().Port,
+		})
 	}
 
-	a.outboundCallback(msg.Pack(), &stun.TransportAddr{
-		IP:   net.ParseIP(local.GetBase().Address),
-		Port: local.GetBase().Port,
-	}, &net.UDPAddr{
-		IP:   net.ParseIP(remote.GetBase().Address),
-		Port: remote.GetBase().Port,
-	})
+	
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
@@ -194,7 +221,16 @@ func (a *Agent) agentTaskLoop() {
 					}
 				}
 			} else {
-				assertSelectedPairValid()
+				if assertSelectedPairValid() {
+					a.Unlock()
+					continue
+				}
+
+				for _, localCandidate := range a.LocalCandidates {
+					for _, remoteCandidate := range a.remoteCandidates {
+						a.pingCandidate(localCandidate, remoteCandidate)
+					}
+				}
 			}
 			a.Unlock()
 		case <-a.taskLoopChan:
