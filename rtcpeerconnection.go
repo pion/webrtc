@@ -525,6 +525,7 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
 			pc.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
+			appendBundle()
 		}
 	}
 
