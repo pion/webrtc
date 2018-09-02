@@ -160,8 +160,6 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			Port: remote.GetBase().Port,
 		})
 	}
-
-	
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
