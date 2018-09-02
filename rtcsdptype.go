@@ -73,13 +73,13 @@ func (t RTCSdpType) String() string {
 	}
 }
 
-// MarshalJSON enables JSON marshalling of a RTCSdpType
+// MarshalJSON enables JSON marshaling of a RTCSdpType
 func (t RTCSdpType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }
 
-// UnmarshalJSON enables JSON unmarshalling of a RTCSdpType
-func (t RTCSdpType) UnmarshalJSON(b []byte) error {
+// UnmarshalJSON enables JSON unmarshaling of a RTCSdpType
+func (t *RTCSdpType) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
@@ -88,13 +88,13 @@ func (t RTCSdpType) UnmarshalJSON(b []byte) error {
 	default:
 		return ErrUnknownType
 	case "offer":
-		t = RTCSdpTypeOffer
+		*t = RTCSdpTypeOffer
 	case "pranswer":
-		t = RTCSdpTypePranswer
+		*t = RTCSdpTypePranswer
 	case "answer":
-		t = RTCSdpTypeAnswer
+		*t = RTCSdpTypeAnswer
 	case "rollback":
-		t = RTCSdpTypeRollback
+		*t = RTCSdpTypeRollback
 	}
 
 	return nil
