@@ -37,27 +37,34 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(i uint16) *media.RTCSample {
-	if s.buffer[i+1] == nil {
-		return nil // We have no next buffer, so can't assert if current sample has ended
-	}
+func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
 	data := []byte{}
 
-	if s.buffer[i+1].Timestamp != s.buffer[i].Timestamp {
+	for i := firstBuffer; s.buffer[i] != nil; i++ {
+		if s.buffer[i].Timestamp != s.buffer[firstBuffer].Timestamp {
+			s.lastPopSeq = int32(i)
+			s.lastPopTimestamp = s.buffer[i].Timestamp
+			for j := firstBuffer; j <= firstBuffer; j++ {
+				s.buffer[j] = nil
+			}
+			return &media.RTCSample{Data: data}
+		}
+
 		data = append(data, s.buffer[i].Payload...)
-		s.lastPopSeq = int32(i)
-		s.lastPopTimestamp = s.buffer[i].Timestamp
-		s.buffer[i] = nil
-
-		return &media.RTCSample{Data: data}
 	}
-
 	return nil
 }
 
 // Pop scans buffer for valid samples, returns nil when no valid samples have been found
 func (s *SampleBuilder) Pop() *media.RTCSample {
-	for i := s.lastPush - s.maxLate; i != s.lastPush; i++ {
+	var i uint16
+	if s.lastPopSeq == -1 {
+		i = s.lastPush - s.maxLate
+	} else {
+		i = uint16(s.lastPopSeq)
+	}
+
+	for ; i != s.lastPush; i++ {
 		curr := s.buffer[i]
 		if curr == nil {
 			if s.buffer[i-1] != nil {
