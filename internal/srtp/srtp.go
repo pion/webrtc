@@ -4,7 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec
 	"encoding/binary"
 
 	"github.com/pions/webrtc/pkg/rtp"
