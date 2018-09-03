@@ -73,7 +73,7 @@ type Agent struct {
 
 const (
 	agentTickerBaseInterval = 3 * time.Second
-	stunTimeout             = 10 * time.Second
+	stunTimeout             = 30 * time.Second
 )
 
 // NewAgent creates a new Agent
@@ -113,8 +113,11 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 }
 
 func (a *Agent) pingCandidate(local, remote Candidate) {
+	var msg *stun.Message
+	var err error
+
 	if a.isControlling {
-		msg, err := stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
@@ -124,20 +127,9 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			},
 			&stun.Fingerprint{},
 		)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
 
-		a.outboundCallback(msg.Pack(), &stun.TransportAddr{
-			IP:   net.ParseIP(local.GetBase().Address),
-			Port: local.GetBase().Port,
-		}, &net.UDPAddr{
-			IP:   net.ParseIP(remote.GetBase().Address),
-			Port: remote.GetBase().Port,
-		})
 	} else {
-		msg, err := stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
@@ -147,20 +139,22 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			},
 			&stun.Fingerprint{},
 		)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		a.outboundCallback(msg.Pack(), &stun.TransportAddr{
-			IP:   net.ParseIP(local.GetBase().Address),
-			Port: local.GetBase().Port,
-		}, &net.UDPAddr{
-			IP:   net.ParseIP(remote.GetBase().Address),
-			Port: remote.GetBase().Port,
-		})
 	}
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	a.outboundCallback(msg.Pack(), &stun.TransportAddr{
+		IP:   net.ParseIP(local.GetBase().Address),
+		Port: local.GetBase().Port,
+	}, &net.UDPAddr{
+		IP:   net.ParseIP(remote.GetBase().Address),
+		Port: remote.GetBase().Port,
+	})
 }
+
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	a.connectionState = newState
@@ -197,39 +191,39 @@ func (a *Agent) agentTaskLoop() {
 			a.selectedPair.remote = nil
 			a.selectedPair.local = nil
 			a.updateConnectionState(ConnectionStateDisconnected)
+			fmt.Println("agent close")
+			a.Close()
 			return false
 		}
 
 		return true
 	}
 
+	fmt.Println("LocalCandidates: ")
+	for _, localCandidate := range a.LocalCandidates {
+		fmt.Println(localCandidate)
+	}
+
+	fmt.Println("remoteCandidate: ")
+	for _, remoteCandidate := range a.remoteCandidates {
+		fmt.Println(remoteCandidate)
+	}
+
 	for {
 		select {
 		case <-t.C:
 			a.Lock()
-			if a.isControlling {
-				if assertSelectedPairValid() {
-					a.Unlock()
-					continue
-				}
+			if assertSelectedPairValid() {
+				a.Unlock()
+				continue
+			}
 
-				for _, localCandidate := range a.LocalCandidates {
-					for _, remoteCandidate := range a.remoteCandidates {
-						a.pingCandidate(localCandidate, remoteCandidate)
-					}
-				}
-			} else {
-				if assertSelectedPairValid() {
-					a.Unlock()
-					continue
-				}
-
-				for _, localCandidate := range a.LocalCandidates {
-					for _, remoteCandidate := range a.remoteCandidates {
-						a.pingCandidate(localCandidate, remoteCandidate)
-					}
+			for _, localCandidate := range a.LocalCandidates {
+				for _, remoteCandidate := range a.remoteCandidates {
+					a.pingCandidate(localCandidate, remoteCandidate)
 				}
 			}
+
 			a.Unlock()
 		case <-a.taskLoopChan:
 			t.Stop()
@@ -313,6 +307,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 }
 
 func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+	fmt.Println("handleInboundControlled")
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
 		fmt.Println("inbound isControlled && a.isControlling == false")
 		return
@@ -320,11 +315,12 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 
 	_, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate)
 	a.setValidPair(localCandidate, remoteCandidate, useCandidateFound)
-
+	fmt.Println("sendBindingSuccess")
 	a.sendBindingSuccess(m, local, remote)
 }
 
 func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+	fmt.Println("handleInboundControlling")
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
 		fmt.Println("inbound isControlling && a.isControlling == true")
 		return
@@ -337,6 +333,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 	a.setValidPair(localCandidate, remoteCandidate, final)
 
 	if !final {
+		fmt.Println("!final->sendBindingSuccess")
 		a.sendBindingSuccess(m, local, remote)
 	}
 }
@@ -349,14 +346,14 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 	localCandidate := getTransportAddrCandidate(a.LocalCandidates, local)
 	if localCandidate == nil {
 		// TODO debug
-		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Value)
+		fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
 		return
 	}
 
 	remoteCandidate := getUDPAddrCandidate(a.remoteCandidates, remote)
 	if remoteCandidate == nil {
 		// TODO debug
-		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Value)
+		fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
 	remoteCandidate.GetBase().LastSeen = time.Now()
@@ -367,6 +364,7 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 		return
 	}
 
+	fmt.Println("check agent role")
 	if a.isControlling {
 		a.handleInboundControlling(m, local, remote, localCandidate, remoteCandidate)
 	} else {
