@@ -2,7 +2,7 @@ language: go
 
 go:
   - "1.9"
-    #  - "master" TODO https://github.com/golangci/golangci-lint/issues/157
+  - "master"
 
 notifications:
   email: false
@@ -18,7 +18,7 @@ before_script:
 
 script:
   - golangci-lint run
-  - goveralls -v -race -covermode=atomic -service=travis-ci
+  - goveralls -v -race -covermode=atomic -service=travis-ci -ignore $(find examples -name '*.go' -printf "%P\n" | paste -d, -s)
   - bash .github/assert-contributors.sh
   - bash .github/lint-disallowed-functions-in-library.sh
   - bash .github/build-examples.sh
