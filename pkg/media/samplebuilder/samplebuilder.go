@@ -9,15 +9,15 @@ import (
 // maxLate determines how long we should wait until we get a valid RTCSample
 // The larger the value the less packet loss you will see, but higher latency
 type SampleBuilder struct {
-	maxLate   uint16
-	clockRate uint32
-	buffer    [65536]*rtp.Packet
+	maxLate uint16
+	// clockRate uint32
+	buffer [65536]*rtp.Packet
 
 	// Last seqnum that has been added to buffer
 	lastPush uint16
 
 	// Last seqnum that has been successfully popped
-	// -1 means if no pop has occured
+	// -1 means if no pop has occurred
 	lastPopSeq       int32
 	lastPopTimestamp uint32
 }
