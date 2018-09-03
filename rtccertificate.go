@@ -113,17 +113,17 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 	}
 
 	return NewRTCCertificate(secretKey, x509.Certificate{
-		Version:      2,
-		SerialNumber: serialNumber,
-		Subject:      pkix.Name{CommonName: hex.EncodeToString(origin)},
-		IsCA:         true,
-		BasicConstraintsValid: true,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(0, 1, 0),
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 			x509.ExtKeyUsageServerAuth,
 		},
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		NotBefore:             time.Now(),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		NotAfter:              time.Now().AddDate(0, 1, 0),
+		SerialNumber:          serialNumber,
+		Version:               2,
+		Subject:               pkix.Name{CommonName: hex.EncodeToString(origin)},
+		IsCA:                  true,
 	})
 }
