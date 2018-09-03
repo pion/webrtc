@@ -155,7 +155,6 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	})
 }
 
-
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	a.connectionState = newState
 	// Call handler async since we may be holding the agent lock
