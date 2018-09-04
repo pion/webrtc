@@ -1,12 +1,24 @@
 package webrtc
 
-// RTCPeerConnectionState indicates the state of the RTCPeerConnection.
+// RTCDataChannelState indicates the state of a data channel.
 type RTCDataChannelState int
 
 const (
+	// RTCDataChannelStateConnecting indicates that the data channel is being
+	// established. This is the initial state of RTCDataChannel, whether created
+	// with CreateDataChannel, or dispatched as a part of an RTCDataChannelEvent.
 	RTCDataChannelStateConnecting RTCDataChannelState = iota + 1
+
+	// RTCDataChannelStateOpen indicates that the underlying data transport is
+	// established and communication is possible.
 	RTCDataChannelStateOpen
+
+	// RTCDataChannelStateClosing indicates that the procedure to close down the
+	// underlying data transport has started.
 	RTCDataChannelStateClosing
+
+	// RTCDataChannelStateClosed indicates that the underlying data transport
+	// has been closed or could not be established.
 	RTCDataChannelStateClosed
 )
 

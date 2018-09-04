@@ -1,6 +1,6 @@
 package webrtc
 
-// RTCSignalingState indicates the signaling state of the offer/answer process.
+// RTCDtlsTransportState indicates the dtsl transport establishment state.
 type RTCDtlsTransportState int
 
 const (
