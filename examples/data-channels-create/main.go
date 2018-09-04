@@ -33,7 +33,7 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnIceConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 
 		// TODO: find the correct place for this
@@ -46,9 +46,9 @@ func main() {
 		}
 	}
 
-	// Register the OnMessage to handle incoming messages
+	// Register the Onmessage to handle incoming messages
 	dataChannel.Lock()
-	dataChannel.OnMessage = func(payload datachannel.Payload) {
+	dataChannel.Onmessage = func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), dataChannel.Label, string(p.Data))

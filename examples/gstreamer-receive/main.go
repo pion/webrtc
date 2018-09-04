@@ -46,7 +46,7 @@ func main() {
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
-	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
+	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
 		codec := track.Codec
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType, codec.Name)
 		pipeline := gst.CreatePipeline(codec.Name)
@@ -59,7 +59,7 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnIceConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
