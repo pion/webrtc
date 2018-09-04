@@ -1,14 +1,27 @@
 package webrtc
 
-import "math"
+import (
+	"math"
+)
 
 // RTCSctpTransport provides details about the SCTP transport.
 type RTCSctpTransport struct {
-	State RTCSctpTransportState // TODO: Set RTCSctpTransportState
-	// transport *RTCDtlsTransport // TODO: DTLS introspection API
+	// Transport represents the transport over which all SCTP packets for data
+	// channels will be sent and received.
+	Transport RTCDtlsTransport
+
+	// State represents the current state of the SCTP transport.
+	State RTCSctpTransportState
+
+	// MaxMessageSize represents the maximum size of data that can be passed to
+	// RTCDataChannel's send() method.
 	MaxMessageSize float64
-	MaxChannels    uint16
-	// onstatechange func()
+
+	// MaxChannels represents the maximum amount of RTCDataChannel's that can
+	// be used simultaneously.
+	MaxChannels *uint16
+
+	// OnStateChange  func()
 }
 
 func newRTCSctpTransport() *RTCSctpTransport {
@@ -50,5 +63,6 @@ func (r *RTCSctpTransport) calcMessageSize(remoteMaxMessageSize, canSendSize flo
 }
 
 func (r *RTCSctpTransport) updateMaxChannels() {
-	r.MaxChannels = 65535 // TODO: Get from implementation
+	val := uint16(65535)
+	r.MaxChannels = &val // TODO: Get from implementation
 }

@@ -31,7 +31,7 @@ func buildPeerConnection() *webrtc.RTCPeerConnection {
 	}
 
 	d.Lock()
-	d.Onmessage = func(payload datachannel.Payload) {
+	d.OnMessage = func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
