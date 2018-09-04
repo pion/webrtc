@@ -9,9 +9,10 @@ import (
 )
 
 type sampleBuilderTest struct {
-	message string
-	packets []*rtp.Packet
-	samples []*media.RTCSample
+	message    string
+	packets    []*rtp.Packet
+	samples    []*media.RTCSample
+	bufferSize uint16
 }
 
 var testCases = []sampleBuilderTest{
@@ -20,7 +21,8 @@ var testCases = []sampleBuilderTest{
 		packets: []*rtp.Packet{
 			{SequenceNumber: 5000, Timestamp: 5, Payload: []byte{0x01}},
 		},
-		samples: []*media.RTCSample{},
+		samples:    []*media.RTCSample{},
+		bufferSize: 50,
 	},
 	{
 		message: "SampleBuilder should emit one packet, we had three packets with unique timestamps",
@@ -30,8 +32,9 @@ var testCases = []sampleBuilderTest{
 			{SequenceNumber: 5002, Timestamp: 7, Payload: []byte{0x03}},
 		},
 		samples: []*media.RTCSample{
-			{Data: []byte{0x02}},
+			{Data: []byte{0x02}, Samples: 1},
 		},
+		bufferSize: 50,
 	},
 	{
 		message: "SampleBuilder should emit one packet, we had two packets but two with duplicate timestamps",
@@ -42,8 +45,9 @@ var testCases = []sampleBuilderTest{
 			{SequenceNumber: 5003, Timestamp: 7, Payload: []byte{0x04}},
 		},
 		samples: []*media.RTCSample{
-			{Data: []byte{0x02, 0x03}},
+			{Data: []byte{0x02, 0x03}, Samples: 1},
 		},
+		bufferSize: 50,
 	},
 	{
 		message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one",
@@ -52,10 +56,11 @@ var testCases = []sampleBuilderTest{
 			{SequenceNumber: 5007, Timestamp: 6, Payload: []byte{0x02}},
 			{SequenceNumber: 5008, Timestamp: 7, Payload: []byte{0x03}},
 		},
-		samples: []*media.RTCSample{},
+		samples:    []*media.RTCSample{},
+		bufferSize: 50,
 	},
 	{
-		message: "SampleBuilder shouldn't emit multiple valid packets",
+		message: "SampleBuilder should emit multiple valid packets",
 		packets: []*rtp.Packet{
 			{SequenceNumber: 5000, Timestamp: 1, Payload: []byte{0x01}},
 			{SequenceNumber: 5001, Timestamp: 2, Payload: []byte{0x02}},
@@ -65,11 +70,12 @@ var testCases = []sampleBuilderTest{
 			{SequenceNumber: 5005, Timestamp: 6, Payload: []byte{0x06}},
 		},
 		samples: []*media.RTCSample{
-			{Data: []byte{0x02}},
-			{Data: []byte{0x03}},
-			{Data: []byte{0x04}},
-			{Data: []byte{0x05}},
+			{Data: []byte{0x02}, Samples: 1},
+			{Data: []byte{0x03}, Samples: 1},
+			{Data: []byte{0x04}, Samples: 1},
+			{Data: []byte{0x05}, Samples: 1},
 		},
+		bufferSize: 50,
 	},
 }
 
@@ -77,7 +83,7 @@ func TestSampleBuilder(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, t := range testCases {
-		s := New(50, 90000)
+		s := New(t.bufferSize)
 		samples := []*media.RTCSample{}
 
 		for _, p := range t.packets {

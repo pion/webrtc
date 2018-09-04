@@ -47,11 +47,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
 	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
-		clockRate := uint32(90000)
-		if track.Codec.Type == webrtc.RTCRtpCodecTypeAudio {
-			clockRate = 48000
-		}
-		builder := samplebuilder.New(256, clockRate)
+		builder := samplebuilder.New(256)
 		for {
 			builder.Push(<-track.Packets)
 			for s := builder.Pop(); s != nil; s = builder.Pop() {

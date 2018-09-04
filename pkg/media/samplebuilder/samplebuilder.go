@@ -10,8 +10,7 @@ import (
 // The larger the value the less packet loss you will see, but higher latency
 type SampleBuilder struct {
 	maxLate uint16
-	// clockRate uint32
-	buffer [65536]*rtp.Packet
+	buffer  [65536]*rtp.Packet
 
 	// Last seqnum that has been added to buffer
 	lastPush uint16
@@ -23,7 +22,7 @@ type SampleBuilder struct {
 }
 
 // New constructs a new SampleBuilder
-func New(maxLate uint16, clockRate uint32) *SampleBuilder {
+func New(maxLate uint16) *SampleBuilder {
 	return &SampleBuilder{maxLate: maxLate, lastPopSeq: -1}
 }
 
@@ -42,12 +41,19 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
 
 	for i := firstBuffer; s.buffer[i] != nil; i++ {
 		if s.buffer[i].Timestamp != s.buffer[firstBuffer].Timestamp {
-			s.lastPopSeq = int32(i)
-			s.lastPopTimestamp = s.buffer[i].Timestamp
-			for j := firstBuffer; j <= firstBuffer; j++ {
+			lastTimeStamp := s.lastPopTimestamp
+			if s.lastPopSeq == -1 && s.buffer[firstBuffer-1] != nil {
+				// firstBuffer-1 should always pass, but just to be safe if there is a bug in Pop()
+				lastTimeStamp = s.buffer[firstBuffer-1].Timestamp
+			}
+
+			samples := s.buffer[i-1].Timestamp - lastTimeStamp
+			s.lastPopSeq = int32(i - 1)
+			s.lastPopTimestamp = s.buffer[i-1].Timestamp
+			for j := firstBuffer; j < i; j++ {
 				s.buffer[j] = nil
 			}
-			return &media.RTCSample{Data: data}
+			return &media.RTCSample{Data: data, Samples: samples}
 		}
 
 		data = append(data, s.buffer[i].Payload...)
@@ -61,7 +67,7 @@ func (s *SampleBuilder) Pop() *media.RTCSample {
 	if s.lastPopSeq == -1 {
 		i = s.lastPush - s.maxLate
 	} else {
-		i = uint16(s.lastPopSeq)
+		i = uint16(s.lastPopSeq + 1)
 	}
 
 	for ; i != s.lastPush; i++ {
