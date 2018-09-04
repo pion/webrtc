@@ -1,16 +1,20 @@
 package webrtc
 
-// GatheringState describes the state of the candidate gathering process
+// RTCIceGatheringState describes the state of the candidate gathering process.
 type RTCIceGatheringState int
 
 const (
-	// GatheringStateNew indicates candidate gatering is not yet started
+	// RTCIceGatheringStateNew indicates that any of the RTCIceTransports are
+	// in the "new" gathering state and none of the transports are in the
+	// "gathering" state, or there are no transports.
 	RTCIceGatheringStateNew RTCIceGatheringState = iota + 1
 
-	// GatheringStateGathering indicates candidate gatering is ongoing
+	// RTCIceGatheringStateGathering indicates that any of the RTCIceTransports
+	// are in the "gathering" state.
 	RTCIceGatheringStateGathering
 
-	// GatheringStateComplete indicates candidate gatering has been completed
+	// RTCIceGatheringStateComplete indicates that at least one RTCIceTransport
+	// exists, and all RTCIceTransports are in the "completed" gathering state.
 	RTCIceGatheringStateComplete
 )
 

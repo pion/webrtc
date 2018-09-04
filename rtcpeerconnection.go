@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"encoding/binary"
+
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
@@ -63,7 +64,7 @@ type RTCPeerConnection struct {
 
 	// IceGatheringState attribute returns the ICE gathering state of the
 	// RTCPeerConnection instance.
-	IceGatheringState RTCIceGatheringState // FIXME NOT-USED
+	// IceGatheringState RTCIceGatheringState // FIXME NOT-USED
 
 	// IceConnectionState attribute returns the ICE connection state of the
 	// RTCPeerConnection instance.
@@ -78,11 +79,11 @@ type RTCPeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed          bool
-	negotiationNeeded bool // FIXME NOT-USED
+	isClosed bool
+	// negotiationNeeded bool // FIXME NOT-USED
 
-	LastOffer  string // FIXME NOT-USED
-	LastAnswer string // FIXME NOT-USED
+	// LastOffer  string // FIXME NOT-USED
+	// LastAnswer string // FIXME NOT-USED
 
 	// Media
 	mediaEngine     *MediaEngine
@@ -399,10 +400,10 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 	return *pc.CurrentLocalDescription, nil
 }
 
-// SetLocalDescription
-func (pc *RTCPeerConnection) SetLocalDescription() {
-	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
-}
+// // SetLocalDescription sets the SessionDescription of the local peer
+// func (pc *RTCPeerConnection) SetLocalDescription() {
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// }
 
 // LocalDescription returns PendingLocalDescription if it is not null and
 // otherwise it returns CurrentLocalDescription. This property is used to
@@ -463,9 +464,9 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 	return pc.CurrentRemoteDescription
 }
 
-func (pc *RTCPeerConnection) addIceCandidate() {
-	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
-}
+// func (pc *RTCPeerConnection) addIceCandidate() {
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// }
 
 // ------------------------------------------------------------------------
 // --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#rtp-media-api
@@ -541,13 +542,13 @@ func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 	return transceiver.Sender, nil
 }
 
-func (pc *RTCPeerConnection) RemoveTrack() {
-	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
-}
+// func (pc *RTCPeerConnection) RemoveTrack() {
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// }
 
-func (pc *RTCPeerConnection) AddTransceiver() RTCRtpTransceiver {
-	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
-}
+// func (pc *RTCPeerConnection) AddTransceiver() RTCRtpTransceiver {
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// }
 
 // ------------------------------------------------------------------------
 // --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api

@@ -38,12 +38,12 @@ type RTCDataChannel struct {
 	// application (true), or not (false).
 	Negotiated bool
 
-	// ID represents the ID for this RTCDataChannel. The value is initally null,
-	// which is what will be returned if the ID was not provided at channel
-	// creation time, and the DTLS role of the SCTP transport has not yet been
-	// negotiated. Otherwise, it will return the ID that was either selected by
-	// the script or generated. After the ID is set to a non-null value, it will
-	// not change.
+	// ID represents the ID for this RTCDataChannel. The value is initially
+	// null, which is what will be returned if the ID was not provided at
+	// channel creation time, and the DTLS role of the SCTP transport has not
+	// yet been negotiated. Otherwise, it will return the ID that was either
+	// selected by the script or generated. After the ID is set to a non-null
+	// value, it will not change.
 	ID *uint16
 
 	// Priority represents the priority for this RTCDataChannel. The priority is
