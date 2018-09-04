@@ -99,11 +99,27 @@ type RTCPeerConnection struct {
 	// OnIceCandidate             func()
 	// OnIceCandidateError        func()
 	// OnSignalingStateChange     func()
-	OnIceConnectionStateChange func(ice.ConnectionState)
+
+	// OnICEConnectionStateChange designates an event handler which is called
+	// when an ice connection state is changed.
+	//
+	// Deprecated: Variable name is changing from OnICEConnectionStateChange to
+	// OnIceConnectionStateChange.
+	OnICEConnectionStateChange func(ice.ConnectionState)
 	// OnIceGatheringStateChange  func()
 	// OnConnectionStateChange    func()
-	OnTrack       func(*RTCTrack)
-	OnDataChannel func(*RTCDataChannel)
+
+	// Ontrack designates an event handler which is called when remote track
+	// arrives from a remote peer.
+	//
+	// Deprecated: Variable name is changing from Ontrack to OnTrack.
+	Ontrack func(*RTCTrack)
+
+	// Ondatachannel designates an event handler which is invoked when a data
+	// channel message arrives from a remote peer.
+	//
+	// Deprecated: Variable name is changing from Ondatachannel to OnDataChannel.
+	Ondatachannel func(*RTCDataChannel)
 }
 
 // Public
@@ -740,7 +756,7 @@ func (pc *RTCPeerConnection) Close() error {
 
 /* Everything below is private */
 func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
-	if pc.OnTrack == nil {
+	if pc.Ontrack == nil {
 		return nil
 	}
 
@@ -769,7 +785,7 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 
 	// TODO: Register the receiving Track
 
-	go pc.OnTrack(track)
+	go pc.Ontrack(track)
 	return bufferTransport
 }
 
@@ -777,8 +793,8 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.Lock()
 	defer pc.Unlock()
 
-	if pc.OnIceConnectionStateChange != nil && pc.IceConnectionState != newState {
-		pc.OnIceConnectionStateChange(newState)
+	if pc.OnICEConnectionStateChange != nil && pc.IceConnectionState != newState {
+		pc.OnICEConnectionStateChange(newState)
 	}
 	pc.IceConnectionState = newState
 }
@@ -792,20 +808,20 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 		id := event.StreamIdentifier()
 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.OnDataChannel != nil {
-			go pc.OnDataChannel(newDataChannel)
+		if pc.Ondatachannel != nil {
+			go pc.Ondatachannel(newDataChannel)
 		} else {
-			fmt.Println("OnDataChannel is unset, discarding message")
+			fmt.Println("Ondatachannel is unset, discarding message")
 		}
 	case *network.DataChannelMessage:
 		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
 			datachannel.RLock()
 			defer datachannel.RUnlock()
 
-			if datachannel.OnMessage != nil {
-				go datachannel.OnMessage(event.Payload)
+			if datachannel.Onmessage != nil {
+				go datachannel.Onmessage(event.Payload)
 			} else {
-				fmt.Printf("OnMessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
 			}
 		} else {
 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())

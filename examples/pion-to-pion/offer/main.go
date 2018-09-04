@@ -22,16 +22,16 @@ func buildPeerConnection() *webrtc.RTCPeerConnection {
 		panic(err)
 	}
 
-	peerConnection.OnIceConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
-	peerConnection.OnDataChannel = func(d *webrtc.RTCDataChannel) {
+	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 
 		d.Lock()
 		defer d.Unlock()
-		d.OnMessage = func(payload datachannel.Payload) {
+		d.Onmessage = func(payload datachannel.Payload) {
 			switch p := payload.(type) {
 			case *datachannel.PayloadString:
 				fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
