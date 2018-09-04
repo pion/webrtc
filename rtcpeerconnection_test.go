@@ -251,6 +251,17 @@ func TestRTCPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.IceCandidatePoolSize, actual.IceCandidatePoolSize)
 }
 
+// TODO - This unittest needs to be completed when CreateDataChannel is complete
+// func TestRTCPeerConnection_CreateDataChannel(t *testing.T) {
+// 	pc, err := New(RTCConfiguration{})
+// 	assert.Nil(t, err)
+//
+// 	_, err = pc.CreateDataChannel("data", &RTCDataChannelInit{
+//
+// 	})
+// 	assert.Nil(t, err)
+// }
+
 // TODO Fix this test
 const minimalOffer = `v=0
 o=- 7193157174393298413 2 IN IP4 127.0.0.1

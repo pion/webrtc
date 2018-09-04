@@ -50,10 +50,22 @@ var (
 	// IceCandidatePoolSize was made after RTCPeerConnection has been initialized.
 	ErrModifyingIceCandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
 
-	// ErrInvalidValue indicates that an invalid value was provided.
-	ErrInvalidValue = errors.New("invalid value")
+	// ErrStringSizeLimit indicates that the character size limit of string is
+	// exceeded. The limit is hardcoded to 65535 according to specifications.
+	ErrStringSizeLimit = errors.New("data channel label exceeds size limit")
 
-	// ErrMaxDataChannels indicates that the maximum number of data channels
-	// was reached.
-	ErrMaxDataChannels = errors.New("maximum number of datachannels reached")
+	// ErrMaxDataChannelID indicates that the maximum number ID that could be
+	// specified for a data channel has been exceeded.
+	ErrMaxDataChannelID = errors.New("maximum number ID for datachannel specified")
+
+	// ErrNegotiatedWithoutID indicates that an attempt to create a data channel
+	// was made while setting the negotiated option to true without providing
+	// the negotiated channel ID.
+	ErrNegotiatedWithoutID = errors.New("negotiated set without channel id")
+
+	// ErrRetransmitsOrPacketLifeTime indicates that an attempt to create a data
+	// channel was made with both options MaxPacketLifeTime and MaxRetransmits
+	// set together. Such configuration is not supported by the specification
+	// and is mutually exclusive.
+	ErrRetransmitsOrPacketLifeTime = errors.New("both MaxPacketLifeTime and MaxRetransmits was set")
 )

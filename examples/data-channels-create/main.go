@@ -46,9 +46,9 @@ func main() {
 		}
 	}
 
-	// Register the Onmessage to handle incoming messages
+	// Register the OnMessage to handle incoming messages
 	dataChannel.Lock()
-	dataChannel.Onmessage = func(payload datachannel.Payload) {
+	dataChannel.OnMessage = func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), dataChannel.Label, string(p.Data))
