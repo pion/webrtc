@@ -603,6 +603,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	// definitions in https://w3c.github.io/webrtc-pc/#dom-rtcdatachannelinit
 	// which are later overwriten by the options if any were specified.
 	channel := RTCDataChannel{
+		rtcPeerConnection: pc,
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
 		Label:             label,
 		Ordered:           true,
@@ -672,61 +673,33 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 
 	// FIXME https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
 
-	// FIXME - Where sctp transport is going to go
-	// if pc.SctpTransport == nil {
-	// 	pc.SctpTransport = &RTCSctpTransport{
-	//
-	// 	}
-	// }
+	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #20)
+	channel.Transport = pc.sctpTransport
 
-	if !channel.Negotiated {
-		var err error
-		channel.ID, err = pc.generateDataChannelID(true) // TODO: base on DTLS role
-		if err != nil {
+	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
+	if channel.ID == nil {
+		if err := channel.generateID(); err != nil {
 			return nil, err
 		}
 	}
 
 	// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
-	if *channel.ID > 65534 {
+	if channel.ID != nil && *channel.ID > 65534 {
 		return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
 	}
 
-	if pc.SctpTransport.State == RTCSctpTransportStateConnected &&
-		*channel.ID >= *pc.SctpTransport.MaxChannels {
+	if pc.sctpTransport.State == RTCSctpTransportStateConnected &&
+		*channel.ID >= *pc.sctpTransport.MaxChannels {
 		return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 	}
 
-	// _ = ordered  // TODO
-	// _ = priority // TODO
-	// res := &RTCDataChannel{
-	// 	Label:             label,
-	// 	ID:                id,
-	// 	rtcPeerConnection: pc,
-	// }
-
 	// Remember datachannel
-	pc.dataChannels[*channel.ID] = &channel
+	// pc.dataChannels[*channel.ID] = &channel
 
 	// Send opening message
 	// pc.networkManager.SendOpenChannelMessage(id, label)
 
 	return &channel, nil
-}
-
-func (pc *RTCPeerConnection) generateDataChannelID(client bool) (*uint16, error) {
-	var id uint16
-	if !client {
-		id++
-	}
-
-	for ; id < *pc.SctpTransport.MaxChannels-1; id += 2 {
-		_, ok := pc.dataChannels[id]
-		if !ok {
-			return &id, nil
-		}
-	}
-	return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
@@ -810,38 +783,38 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.IceConnectionState = newState
 }
 
-func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	pc.Lock()
-	defer pc.Unlock()
-
-	switch event := e.(type) {
-	case *network.DataChannelCreated:
-		id := event.StreamIdentifier()
-		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
-		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.Ondatachannel != nil {
-			go pc.Ondatachannel(newDataChannel)
-		} else {
-			fmt.Println("Ondatachannel is unset, discarding message")
-		}
-	case *network.DataChannelMessage:
-		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-			datachannel.RLock()
-			defer datachannel.RUnlock()
-
-			if datachannel.Onmessage != nil {
-				go datachannel.Onmessage(event.Payload)
-			} else {
-				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
-			}
-		} else {
-			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-
-		}
-	default:
-		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
-	}
-}
+// func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+// 	pc.Lock()
+// 	defer pc.Unlock()
+//
+// 	switch event := e.(type) {
+// 	case *network.DataChannelCreated:
+// 		id := event.StreamIdentifier()
+// 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
+// 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
+// 		if pc.Ondatachannel != nil {
+// 			go pc.Ondatachannel(newDataChannel)
+// 		} else {
+// 			fmt.Println("Ondatachannel is unset, discarding message")
+// 		}
+// 	case *network.DataChannelMessage:
+// 		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
+// 			datachannel.RLock()
+// 			defer datachannel.RUnlock()
+//
+// 			if datachannel.Onmessage != nil {
+// 				go datachannel.Onmessage(event.Payload)
+// 			} else {
+// 				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+// 			}
+// 		} else {
+// 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+//
+// 		}
+// 	default:
+// 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+// 	}
+// }
 
 func (pc *RTCPeerConnection) generateLocalCandidates() []string {
 	pc.networkManager.IceAgent.RLock()
