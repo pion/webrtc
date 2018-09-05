@@ -88,8 +88,12 @@ type RTCDataChannel struct {
 	// Onmessage designates an event handler which is invoked on a message
 	// arrival over the sctp transport from a remote peer.
 	//
-	// Deprecated: Variable name is changing from Onmessage to OnMessage.
+	// Deprecated: use OnMessage instead.
 	Onmessage func(datachannel.Payload)
+
+	// OnMessage designates an event handler which is invoked on a message
+	// arrival over the sctp transport from a remote peer.
+	OnMessage func(datachannel.Payload)
 
 	rtcPeerConnection *RTCPeerConnection
 }

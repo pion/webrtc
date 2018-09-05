@@ -95,31 +95,43 @@ type RTCPeerConnection struct {
 	// DataChannels
 	dataChannels map[uint16]*RTCDataChannel
 
-	// OnNegotiationNeeded        func()
-	// OnIceCandidate             func()
-	// OnIceCandidateError        func()
-	// OnSignalingStateChange     func()
+	// OnNegotiationNeeded        func() // FIXME NOT-USED
+	// OnIceCandidate             func() // FIXME NOT-USED
+	// OnIceCandidateError        func() // FIXME NOT-USED
+	// OnSignalingStateChange     func() // FIXME NOT-USED
 
 	// OnICEConnectionStateChange designates an event handler which is called
 	// when an ice connection state is changed.
 	//
-	// Deprecated: Variable name is changing from OnICEConnectionStateChange to
-	// OnIceConnectionStateChange.
+	// Deprecated: use OnIceConnectionStateChange instead.
 	OnICEConnectionStateChange func(ice.ConnectionState)
-	// OnIceGatheringStateChange  func()
-	// OnConnectionStateChange    func()
+
+	// OnIceConnectionStateChange designates an event handler which is called
+	// when an ice connection state is changed.
+	OnIceConnectionStateChange func(ice.ConnectionState)
+
+	// OnIceGatheringStateChange  func() // FIXME NOT-USED
+	// OnConnectionStateChange    func() // FIXME NOT-USED
 
 	// Ontrack designates an event handler which is called when remote track
 	// arrives from a remote peer.
 	//
-	// Deprecated: Variable name is changing from Ontrack to OnTrack.
+	// Deprecated: use OnTrack instead.
 	Ontrack func(*RTCTrack)
+
+	// OnTrack designates an event handler which is called when remote track
+	// arrives from a remote peer.
+	OnTrack func(*RTCTrack)
 
 	// Ondatachannel designates an event handler which is invoked when a data
 	// channel message arrives from a remote peer.
 	//
-	// Deprecated: Variable name is changing from Ondatachannel to OnDataChannel.
+	// Deprecated: use OnDataChannel instead.
 	Ondatachannel func(*RTCDataChannel)
+
+	// OnDataChannel designates an event handler which is invoked when a data
+	// channel message arrives from a remote peer.
+	OnDataChannel func(*RTCDataChannel)
 }
 
 // Public
