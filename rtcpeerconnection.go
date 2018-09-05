@@ -667,10 +667,9 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	// 	}
 	// }
 
-	var id uint16
 	if !channel.Negotiated {
 		var err error
-		id, err = pc.generateDataChannelID(true) // TODO: base on DTLS role
+		channel.ID, err = pc.generateDataChannelID(true) // TODO: base on DTLS role
 		if err != nil {
 			return nil, err
 		}
@@ -682,7 +681,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	}
 
 	if pc.SctpTransport.State == RTCSctpTransportStateConnected &&
-		id >= *pc.SctpTransport.MaxChannels {
+		*channel.ID >= *pc.SctpTransport.MaxChannels {
 		return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 	}
 
@@ -695,7 +694,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	// }
 
 	// Remember datachannel
-	pc.dataChannels[id] = &channel
+	pc.dataChannels[*channel.ID] = &channel
 
 	// Send opening message
 	// pc.networkManager.SendOpenChannelMessage(id, label)
@@ -703,7 +702,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	return &channel, nil
 }
 
-func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
+func (pc *RTCPeerConnection) generateDataChannelID(client bool) (*uint16, error) {
 	var id uint16
 	if !client {
 		id++
@@ -712,10 +711,10 @@ func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) 
 	for ; id < *pc.SctpTransport.MaxChannels-1; id += 2 {
 		_, ok := pc.dataChannels[id]
 		if !ok {
-			return id, nil
+			return &id, nil
 		}
 	}
-	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
