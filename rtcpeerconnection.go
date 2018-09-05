@@ -64,7 +64,7 @@ type RTCPeerConnection struct {
 
 	// IceGatheringState attribute returns the ICE gathering state of the
 	// RTCPeerConnection instance.
-	// IceGatheringState RTCIceGatheringState // FIXME NOT-USED
+	IceGatheringState RTCIceGatheringState // FIXME NOT-USED
 
 	// IceConnectionState attribute returns the ICE connection state of the
 	// RTCPeerConnection instance.
@@ -75,22 +75,20 @@ type RTCPeerConnection struct {
 	// RTCPeerConnection instance.
 	ConnectionState RTCPeerConnectionState
 
-	networkManager *network.Manager
-
 	idpLoginURL *string
 
-	isClosed bool
-	// negotiationNeeded bool // FIXME NOT-USED
+	isClosed          bool
+	negotiationNeeded bool
 
-	// LastOffer  string // FIXME NOT-USED
-	// LastAnswer string // FIXME NOT-USED
+	lastOffer  string
+	lastAnswer string
 
 	// Media
 	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
 
-	// SctpTransport
-	SctpTransport *RTCSctpTransport
+	// sctpTransport
+	sctpTransport *RTCSctpTransport
 
 	// DataChannels
 	dataChannels map[uint16]*RTCDataChannel
@@ -132,12 +130,14 @@ type RTCPeerConnection struct {
 	// OnDataChannel designates an event handler which is invoked when a data
 	// channel message arrives from a remote peer.
 	OnDataChannel func(*RTCDataChannel)
-}
 
-// Public
+	// Deprecated: Internal mechanism which will be removed.
+	networkManager *network.Manager
+}
 
 // New creates a new RTCPeerConfiguration with the provided configuration
 func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
 	pc := RTCPeerConnection{
@@ -149,14 +149,21 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 			Certificates:         []RTCCertificate{},
 			IceCandidatePoolSize: 0,
 		},
-		SignalingState:  RTCSignalingStateStable,
-		ConnectionState: RTCPeerConnectionStateNew,
-		mediaEngine:     DefaultMediaEngine,
-		SctpTransport:   newRTCSctpTransport(),
-		dataChannels:    make(map[uint16]*RTCDataChannel),
+		isClosed:          false,
+		negotiationNeeded: false,
+		lastOffer:         "",
+		lastAnswer:        "",
+		SignalingState:    RTCSignalingStateStable,
+		// IceConnectionState: RTCIceConnectionStateNew, // FIXME SWAP-FOR-THIS
+		IceConnectionState: ice.ConnectionStateNew, // FIXME REMOVE
+		IceGatheringState:  RTCIceGatheringStateNew,
+		ConnectionState:    RTCPeerConnectionStateNew,
+		mediaEngine:        DefaultMediaEngine,
+		sctpTransport:      newRTCSctpTransport(),
+		dataChannels:       make(map[uint16]*RTCDataChannel),
 	}
-	var err error
 
+	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}
@@ -180,10 +187,6 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 			}
 		}
 	}
-
-	// https://www.w3.org/TR/webrtc/#constructor (step #4)
-	// This validation is omitted since the pions-webrtc implements rtcp-mux.
-	// FIXME This is actually not implemented yet but will be soon.
 
 	return &pc, nil
 }
@@ -678,13 +681,17 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
 	if channel.ID == nil {
-		if err := channel.generateID(); err != nil {
+		var err error
+		if channel.ID, err = pc.generateDataChannelID(true); err != nil {
 			return nil, err
 		}
+		// if err := channel.generateID(); err != nil {
+		// 	return nil, err
+		// }
 	}
 
 	// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
-	if channel.ID != nil && *channel.ID > 65534 {
+	if *channel.ID > 65534 {
 		return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
 	}
 
@@ -694,12 +701,27 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	}
 
 	// Remember datachannel
-	// pc.dataChannels[*channel.ID] = &channel
+	pc.dataChannels[*channel.ID] = &channel
 
 	// Send opening message
 	// pc.networkManager.SendOpenChannelMessage(id, label)
 
 	return &channel, nil
+}
+
+func (pc *RTCPeerConnection) generateDataChannelID(client bool) (*uint16, error) {
+	var id uint16
+	if !client {
+		id++
+	}
+
+	for ; id < *pc.sctpTransport.MaxChannels-1; id += 2 {
+		_, ok := pc.dataChannels[id]
+		if !ok {
+			return &id, nil
+		}
+	}
+	return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
@@ -783,38 +805,38 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.IceConnectionState = newState
 }
 
-// func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-// 	pc.Lock()
-// 	defer pc.Unlock()
-//
-// 	switch event := e.(type) {
-// 	case *network.DataChannelCreated:
-// 		id := event.StreamIdentifier()
-// 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
-// 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-// 		if pc.Ondatachannel != nil {
-// 			go pc.Ondatachannel(newDataChannel)
-// 		} else {
-// 			fmt.Println("Ondatachannel is unset, discarding message")
-// 		}
-// 	case *network.DataChannelMessage:
-// 		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-// 			datachannel.RLock()
-// 			defer datachannel.RUnlock()
-//
-// 			if datachannel.Onmessage != nil {
-// 				go datachannel.Onmessage(event.Payload)
-// 			} else {
-// 				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
-// 			}
-// 		} else {
-// 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-//
-// 		}
-// 	default:
-// 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
-// 	}
-// }
+func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+	pc.Lock()
+	defer pc.Unlock()
+
+	switch event := e.(type) {
+	case *network.DataChannelCreated:
+		id := event.StreamIdentifier()
+		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
+		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
+		if pc.Ondatachannel != nil {
+			go pc.Ondatachannel(newDataChannel)
+		} else {
+			fmt.Println("Ondatachannel is unset, discarding message")
+		}
+	case *network.DataChannelMessage:
+		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
+			datachannel.RLock()
+			defer datachannel.RUnlock()
+
+			if datachannel.Onmessage != nil {
+				go datachannel.Onmessage(event.Payload)
+			} else {
+				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+			}
+		} else {
+			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+
+		}
+	default:
+		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+	}
+}
 
 func (pc *RTCPeerConnection) generateLocalCandidates() []string {
 	pc.networkManager.IceAgent.RLock()

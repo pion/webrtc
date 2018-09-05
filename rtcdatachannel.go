@@ -13,6 +13,10 @@ import (
 type RTCDataChannel struct {
 	sync.RWMutex
 
+	// Transport represents the associated underlying data transport that is
+	// used to transport actual data to the other peer.
+	Transport *RTCSctpTransport
+
 	// Label represents a label that can be used to distinguish this
 	// RTCDataChannel object from other RTCDataChannel objects. Scripts are
 	// allowed to create multiple RTCDataChannel objects with the same label.
@@ -95,23 +99,27 @@ type RTCDataChannel struct {
 	// arrival over the sctp transport from a remote peer.
 	OnMessage func(datachannel.Payload)
 
+	// Deprecated: Will be removed when networkManager is deprecated.
 	rtcPeerConnection *RTCPeerConnection
 }
 
-// // Close closes the RTCDataChannel. It may be called regardless of whether the
-// // RTCDataChannel object was created by this peer or the remote peer.
-// func (d *RTCDataChannel) Close() error {
-// 	if d.ReadyState == RTCDataChannelStateClosing || d.ReadyState == RTCDataChannelStateClosed {
-// 		return nil
+// func (d *RTCDataChannel) generateID() error {
+// 	// TODO: base on DTLS role, currently static at "true".
+// 	client := true
+//
+// 	var id uint16
+// 	if !client {
+// 		id++
 // 	}
 //
-// 	d.ReadyState = RTCDataChannelStateClosing
-//
-// 	// if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(d.ID, d.Label); err != nil {
-// 	// 	return &rtcerr.UnknownError{Err: err}
-// 	// }
-// 	return nil
-//
+// 	for ; id < *d.Transport.MaxChannels-1; id += 2 {
+// 		_, ok := d.rtcPeerConnection.dataChannels[id]
+// 		if !ok {
+// 			d.ID = &id
+// 			return nil
+// 		}
+// 	}
+// 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 // }
 
 // SendOpenChannelMessage is a test to send OpenChannel manually
