@@ -8,7 +8,7 @@ import (
 type RTCSctpTransport struct {
 	// Transport represents the transport over which all SCTP packets for data
 	// channels will be sent and received.
-	Transport RTCDtlsTransport
+	Transport *RTCDtlsTransport
 
 	// State represents the current state of the SCTP transport.
 	State RTCSctpTransportState
@@ -22,6 +22,9 @@ type RTCSctpTransport struct {
 	MaxChannels *uint16
 
 	// OnStateChange  func()
+
+	// dataChannels
+	// dataChannels map[uint16]*RTCDataChannel
 }
 
 func newRTCSctpTransport() *RTCSctpTransport {
