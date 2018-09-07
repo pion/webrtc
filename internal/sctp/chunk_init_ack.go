@@ -12,12 +12,11 @@ See chunkInitCommon for the fixed headers
 Variable Parameters                  Status     Type Value
 -------------------------------------------------------------
 State Cookie                        Mandatory   7
-IPv4 IP (Note 1)               Optional    5
-IPv6 IP (Note 1)               Optional    6
+IPv4 IP (Note 1)               		Optional    5
+IPv6 IP (Note 1)               		Optional    6
 Unrecognized Parameter              Optional    8
 Reserved for ECN Capable (Note 2)   Optional    32768 (0x8000)
-Host Name IP (Note 3)          Optional    11<Paste>
-
+Host Name IP (Note 3)          		Optional    11<Paste>
 */
 type chunkInitAck struct {
 	chunkHeader
