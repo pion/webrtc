@@ -3,8 +3,14 @@ package webrtc
 import (
 	"sync"
 
-	"github.com/pions/webrtc/pkg/datachannel"
+	"container/list"
+
+	"fmt"
+
+	"github.com/pions/webrtc/internal/sctp"
+	"github.com/pions/webrtc/pkg/dcep"
 	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pkg/errors"
 )
 
 // RTCDataChannel represents a WebRTC DataChannel
@@ -28,11 +34,11 @@ type RTCDataChannel struct {
 
 	// MaxPacketLifeTime represents the length of the time window (msec) during
 	// which transmissions and retransmissions may occur in unreliable mode.
-	MaxPacketLifeTime *uint16
+	MaxPacketLifeTime *uint32
 
 	// MaxRetransmits represents the maximum number of retransmissions that are
 	// attempted in unreliable mode.
-	MaxRetransmits *uint16
+	MaxRetransmits *uint32
 
 	// Protocol represents the name of the sub-protocol used with this
 	// RTCDataChannel.
@@ -84,57 +90,237 @@ type RTCDataChannel struct {
 	// "blob". This attribute controls how binary data is exposed to scripts.
 	// binaryType                 string
 
-	// OnOpen              func()
+	// OnOpen designates an event handler which is invoked on data channel
+	// ready state changing to "open".
+	OnOpen func()
+
 	// OnBufferedAmountLow func()
-	// OnError             func()
+	// OnError             func(*RTCErrorEvent)
 	// OnClose             func()
 
 	// Onmessage designates an event handler which is invoked on a message
 	// arrival over the sctp transport from a remote peer.
 	//
 	// Deprecated: use OnMessage instead.
-	Onmessage func(datachannel.Payload)
+	Onmessage func(dcep.Payload)
 
 	// OnMessage designates an event handler which is invoked on a message
 	// arrival over the sctp transport from a remote peer.
-	OnMessage func(datachannel.Payload)
+	OnMessage func(dcep.Payload)
 
-	// Deprecated: Will be removed when networkManager is deprecated.
-	rtcPeerConnection *RTCPeerConnection
+	fromSctp chan interface{}
 }
 
-// func (d *RTCDataChannel) generateID() error {
-// 	// TODO: base on DTLS role, currently static at "true".
-// 	client := true
-//
-// 	var id uint16
-// 	if !client {
-// 		id++
-// 	}
-//
-// 	for ; id < *d.Transport.MaxChannels-1; id += 2 {
-// 		_, ok := d.rtcPeerConnection.dataChannels[id]
-// 		if !ok {
-// 			d.ID = &id
-// 			return nil
-// 		}
-// 	}
-// 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
-// }
-
-// SendOpenChannelMessage is a test to send OpenChannel manually
-func (d *RTCDataChannel) SendOpenChannelMessage() error {
-	if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(*d.ID, d.Label); err != nil {
-		return &rtcerr.UnknownError{Err: err}
+func newDataChannel(sctp *RTCSctpTransport) *RTCDataChannel {
+	channel := &RTCDataChannel{
+		Transport:         sctp,
+		Ordered:           true,
+		MaxPacketLifeTime: nil,
+		MaxRetransmits:    nil,
+		Protocol:          "",
+		Negotiated:        false,
+		ID:                nil,
+		Priority:          RTCPriorityTypeLow,
+		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #2)
+		ReadyState: RTCDataChannelStateConnecting,
+		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #3)
+		BufferedAmount: 0,
+		fromSctp:       make(chan interface{}, 1),
 	}
+	go channel.handler()
+	return channel
+}
+
+func (c *RTCDataChannel) handler() {
+	inbound := make(chan interface{}, 1)
+	queue := list.New()
+	for {
+		if front := queue.Front(); front == nil {
+			if c.fromSctp == nil {
+				close(inbound)
+				return
+			}
+
+			value, ok := <-c.fromSctp
+			if !ok {
+				close(inbound)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case inbound <- front.Value:
+				val := <-inbound
+				switch val := val.(type) {
+				case sctp.ReceiveEvent:
+					go c.onReceiveHandler(val)
+					// case sctp.SendFailureEvent:
+					// case sctp.NetworkStatusChangeEvent:
+				case sctp.CommunicationUpEvent:
+					go c.onCommunicationUpHandler(val)
+					// case sctp.CommunicationLostEvent:
+					// case sctp.CommunicationErrorEvent
+					// case sctp.RestartEvent
+					// case sctp.ShutdownCompleteEvent:
+				}
+				queue.Remove(front)
+			case value, ok := <-c.fromSctp:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					c.fromSctp = nil
+				}
+			}
+		}
+	}
+}
+
+func (c *RTCDataChannel) onReceiveHandler(event sctp.ReceiveEvent) {
+	switch event.PayloadProtocolID {
+	case sctp.PayloadTypeWebRTCDcep:
+		msg, err := dcep.Parse(event.Buffer)
+		if err != nil {
+			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
+			return
+		}
+
+		switch msg.(type) {
+		case *dcep.ChannelOpen:
+			if c.Transport.conn.isClosed {
+				return
+			}
+
+			if c.ReadyState == RTCDataChannelStateClosing ||
+				c.ReadyState == RTCDataChannelStateClosed {
+				return
+			}
+
+			c.ReadyState = RTCDataChannelStateOpen
+			go c.OnOpen()
+		}
+	case sctp.PayloadTypeWebRTCString:
+		fallthrough
+	case sctp.PayloadTypeWebRTCStringEmpty:
+		c.RLock()
+		defer c.RUnlock()
+
+		if c.Onmessage == nil && c.OnMessage == nil {
+			fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", c.Label, *c.ID)
+		}
+
+		if c.Onmessage != nil {
+			go c.Onmessage(dcep.PayloadString{Data: event.Buffer})
+		}
+
+		if c.OnMessage != nil {
+			go c.OnMessage(dcep.PayloadString{Data: event.Buffer})
+		}
+	case sctp.PayloadTypeWebRTCBinary:
+		fallthrough
+	case sctp.PayloadTypeWebRTCBinaryEmpty:
+		c.RLock()
+		defer c.RUnlock()
+
+		if c.Onmessage == nil && c.OnMessage == nil {
+			fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", c.Label, *c.ID)
+		}
+
+		if c.Onmessage != nil {
+			go c.Onmessage(dcep.PayloadBinary{Data: event.Buffer})
+		}
+
+		if c.OnMessage != nil {
+			go c.OnMessage(dcep.PayloadBinary{Data: event.Buffer})
+		}
+	default:
+		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", event.PayloadProtocolID)
+	}
+}
+
+func (c *RTCDataChannel) onCommunicationUpHandler(event sctp.CommunicationUpEvent) {
+
+}
+
+// Close closes the RTCDataChannel. It may be called regardless of whether the
+// RTCDataChannel object was created by this peer or the remote peer.
+func (c *RTCDataChannel) Close() error {
+	if c.ReadyState == RTCDataChannelStateClosing || c.ReadyState == RTCDataChannelStateClosed {
+		return nil
+	}
+
+	c.ReadyState = RTCDataChannelStateClosing
+
+	// if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(d.ID, d.Label); err != nil {
+	// 	return &rtcerr.UnknownError{Err: err}
+	// }
 	return nil
 
 }
 
 // Send sends the passed message to the DataChannel peer
-func (d *RTCDataChannel) Send(p datachannel.Payload) error {
-	if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(p, *d.ID); err != nil {
-		return &rtcerr.UnknownError{Err: err}
-	}
-	return nil
+func (c *RTCDataChannel) Send(p dcep.Payload) error {
+	return c.Transport.send(p, *c.ID)
+
+	// if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(p, *d.ID); err != nil {
+	// 	return &rtcerr.UnknownError{Err: err}
+	// }
+	// return nil
 }
+
+// // Send sends the passed message to the DataChannel peer
+// func (d *RTCDataChannel) Send(msg interface{}) error {
+// 	switch msg := msg.(type) {
+// 	// FIXME: THIS USECASE IS BEING DEPRECATED
+// 	case datachannel.Payload:
+// 		if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(msg, *d.ID); err != nil {
+// 			return &rtcerr.UnknownError{Err: err}
+// 		}
+// 	case string:
+// 	case []byte:
+// 	}
+// 	return nil
+// }
+
+func (c *RTCDataChannel) generateID() (int, error) {
+	// TODO: base on DTLS role, currently static at "true".
+	client := true
+
+	var id uint16
+	if !client {
+		id++
+	}
+
+	c.Transport.Lock()
+	defer c.Transport.Unlock()
+	count := len(c.Transport.channels)
+	for ; id < *c.Transport.MaxChannels-1; id += 2 {
+		_, ok := c.Transport.channels[id]
+		if !ok {
+			// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
+			if id > 65534 {
+				return count, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
+			}
+
+			// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #20)
+			if c.Transport.State == RTCSctpTransportStateConnected && id >= *c.Transport.MaxChannels {
+				return count, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+			}
+
+			c.ID = &id
+			c.Transport.channels[id] = c.fromSctp
+			return count, nil
+		}
+	}
+	return count, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+}
+
+// // SendOpenChannelMessage is a test to send OpenChannel manually
+// //
+// // Deprecated: Function discontinued in favor of spec compliance.
+// func (c *RTCDataChannel) SendOpenChannelMessage() error {
+// 	if err := c.rtcPeerConnection.networkManager.SendOpenChannelMessage(*c.ID, c.Label); err != nil {
+// 		return &rtcerr.UnknownError{Err: err}
+// 	}
+// 	return nil
+//
+// }

@@ -91,10 +91,10 @@ type RTCPeerConnection struct {
 	// sctpTransport
 	sctpTransport *RTCSctpTransport
 
-	// DataChannels
-	dataChannels map[uint16]*RTCDataChannel
+	// OnNegotiationNeeded indicates that session negotiation needs to be done
+	// (i.e. a createOffer call followed by setLocalDescription).
+	OnNegotiationNeeded func()
 
-	// OnNegotiationNeeded        func() // FIXME NOT-USED
 	// OnIceCandidate             func() // FIXME NOT-USED
 	// OnIceCandidateError        func() // FIXME NOT-USED
 	// OnSignalingStateChange     func() // FIXME NOT-USED
@@ -141,7 +141,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
-	pc := RTCPeerConnection{
+	pc := &RTCPeerConnection{
 		configuration: RTCConfiguration{
 			IceServers:           []RTCIceServer{},
 			IceTransportPolicy:   RTCIceTransportPolicyAll,
@@ -160,36 +160,35 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		IceGatheringState:  RTCIceGatheringStateNew,
 		ConnectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
-		sctpTransport:      newRTCSctpTransport(),
-		dataChannels:       make(map[uint16]*RTCDataChannel),
 	}
+	pc.sctpTransport = newRTCSctpTransport(pc)
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}
 
-	pc.networkManager, err = network.NewManager(pc.generateChannel, pc.dataChannelEventHandler, pc.iceStateChange)
-	if err != nil {
-		return nil, err
-	}
+	// pc.networkManager, err = network.NewManager(pc.generateChannel, pc.dataChannelEventHandler, pc.iceStateChange)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//
+	// // FIXME Temporary code before IceAgent and RTCIceTransport Rebuild
+	// for _, server := range pc.configuration.IceServers {
+	// 	for _, rawURL := range server.URLs {
+	// 		url, err := ice.ParseURL(rawURL)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	//
+	// 		err = pc.networkManager.AddURL(url)
+	// 		if err != nil {
+	// 			fmt.Println(err)
+	// 		}
+	// 	}
+	// }
 
-	// FIXME Temporary code before IceAgent and RTCIceTransport Rebuild
-	for _, server := range pc.configuration.IceServers {
-		for _, rawURL := range server.URLs {
-			url, err := ice.ParseURL(rawURL)
-			if err != nil {
-				return nil, err
-			}
-
-			err = pc.networkManager.AddURL(url)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	}
-
-	return &pc, nil
+	return pc, nil
 }
 
 // initConfiguration defines validation of the specified RTCConfiguration and
@@ -582,10 +581,6 @@ func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 // 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
-// ------------------------------------------------------------------------
-// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api
-// ------------------------------------------------------------------------
-
 // CreateDataChannel creates a new RTCDataChannel object with the given label
 // and optitional RTCDataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
@@ -595,32 +590,20 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
-	if len(label) > 65535 {
-		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
-	}
-
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #3)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening. Additionally,
 	// some members are set to a non zero value default due to the default
 	// definitions in https://w3c.github.io/webrtc-pc/#dom-rtcdatachannelinit
 	// which are later overwriten by the options if any were specified.
-	channel := RTCDataChannel{
-		rtcPeerConnection: pc,
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
-		Label:             label,
-		Ordered:           true,
-		MaxPacketLifeTime: nil,
-		MaxRetransmits:    nil,
-		Protocol:          "",
-		Negotiated:        false,
-		ID:                nil,
-		Priority:          RTCPriorityTypeLow,
-		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #2)
-		ReadyState: RTCDataChannelStateConnecting,
-		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #3)
-		BufferedAmount: 0,
+	channel := newDataChannel(pc.sctpTransport)
+
+	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
+	channel.Label = label
+
+	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
+	if len(channel.Label) > 65535 {
+		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
 	if options != nil {
@@ -675,55 +658,31 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
-	// FIXME https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #20)
-	channel.Transport = pc.sctpTransport
+	// FIXME missing https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
+	// FIXME missing channel.ID == nil && dtls.Role == true
 	if channel.ID == nil {
-		var err error
-		if channel.ID, err = pc.generateDataChannelID(true); err != nil {
+		count, err := channel.generateID()
+		if err != nil {
 			return nil, err
 		}
-		// if err := channel.generateID(); err != nil {
-		// 	return nil, err
-		// }
-	}
 
-	// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
-	if *channel.ID > 65534 {
-		return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
-	}
-
-	if pc.sctpTransport.State == RTCSctpTransportStateConnected &&
-		*channel.ID >= *pc.sctpTransport.MaxChannels {
-		return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
-	}
-
-	// Remember datachannel
-	pc.dataChannels[*channel.ID] = &channel
-
-	// Send opening message
-	// pc.networkManager.SendOpenChannelMessage(id, label)
-
-	return &channel, nil
-}
-
-func (pc *RTCPeerConnection) generateDataChannelID(client bool) (*uint16, error) {
-	var id uint16
-	if !client {
-		id++
-	}
-
-	for ; id < *pc.sctpTransport.MaxChannels-1; id += 2 {
-		_, ok := pc.dataChannels[id]
-		if !ok {
-			return &id, nil
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #21)
+		if count == 0 {
+			pc.Lock()
+			defer pc.Unlock()
+			pc.negotiationNeeded = true
+			go pc.OnNegotiationNeeded()
 		}
 	}
-	return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+
+	return channel, nil
 }
+
+// ------------------------------------------------------------------------
+// --- FIXME - BELOW CODE NEEDS REVIEW/CLEANUP
+// ------------------------------------------------------------------------
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
 // This enables RTCPeerConnection with support for different codecs
@@ -806,38 +765,38 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.IceConnectionState = newState
 }
 
-func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	pc.Lock()
-	defer pc.Unlock()
-
-	switch event := e.(type) {
-	case *network.DataChannelCreated:
-		id := event.StreamIdentifier()
-		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
-		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.Ondatachannel != nil {
-			go pc.Ondatachannel(newDataChannel)
-		} else {
-			fmt.Println("Ondatachannel is unset, discarding message")
-		}
-	case *network.DataChannelMessage:
-		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-			datachannel.RLock()
-			defer datachannel.RUnlock()
-
-			if datachannel.Onmessage != nil {
-				go datachannel.Onmessage(event.Payload)
-			} else {
-				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
-			}
-		} else {
-			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-
-		}
-	default:
-		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
-	}
-}
+// func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
+// 	pc.Lock()
+// 	defer pc.Unlock()
+//
+// 	switch event := e.(type) {
+// 	case *network.DataChannelCreated:
+// 		id := event.StreamIdentifier()
+// 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
+// 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
+// 		if pc.Ondatachannel != nil {
+// 			go pc.Ondatachannel(newDataChannel)
+// 		} else {
+// 			fmt.Println("Ondatachannel is unset, discarding message")
+// 		}
+// 	case *network.DataChannelMessage:
+// 		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
+// 			datachannel.RLock()
+// 			defer datachannel.RUnlock()
+//
+// 			if datachannel.Onmessage != nil {
+// 				go datachannel.Onmessage(event.Payload)
+// 			} else {
+// 				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
+// 			}
+// 		} else {
+// 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+//
+// 		}
+// 	default:
+// 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+// 	}
+// }
 
 func (pc *RTCPeerConnection) generateLocalCandidates() []string {
 	pc.networkManager.IceAgent.RLock()

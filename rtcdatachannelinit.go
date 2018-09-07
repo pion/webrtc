@@ -10,12 +10,12 @@ type RTCDataChannelInit struct {
 	// MaxPacketLifeTime limits the time (in milliseconds) during which the
 	// channel will transmit or retransmit data if not acknowledged. This value
 	// may be clamped if it exceeds the maximum value supported.
-	MaxPacketLifeTime *uint16
+	MaxPacketLifeTime *uint32
 
 	// MaxRetransmits limits the number of times a channel will retransmit data
 	// if not successfully delivered. This value may be clamped if it exceeds
 	// the maximum value supported.
-	MaxRetransmits *uint16
+	MaxRetransmits *uint32
 
 	// Protocol describes the subprotocol name used for this channel.
 	Protocol *string
