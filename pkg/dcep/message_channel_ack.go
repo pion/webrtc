@@ -1,4 +1,4 @@
-package datachannel
+package dcep
 
 // ChannelAck is used to ACK a DataChannel open
 type ChannelAck struct{}
@@ -11,7 +11,6 @@ const (
 func (c *ChannelAck) Marshal() ([]byte, error) {
 	raw := make([]byte, channelOpenAckLength)
 	raw[0] = uint8(DataChannelAck)
-
 	return raw, nil
 }
 

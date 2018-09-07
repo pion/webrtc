@@ -1,4 +1,4 @@
-package datachannel
+package dcep
 
 import (
 	"encoding/binary"
@@ -31,9 +31,8 @@ type ChannelOpen struct {
 	ChannelType          ChannelType
 	Priority             uint16
 	ReliabilityParameter uint32
-
-	Label    []byte
-	Protocol []byte
+	Label                string
+	Protocol             string
 }
 
 const (
@@ -43,36 +42,42 @@ const (
 // ChannelType determines the reliability of the WebRTC DataChannel
 type ChannelType byte
 
-// ChannelType enums
 const (
-	// ChannelTypeReliable determines the Data Channel provides a
-	// reliable in-order bi-directional communication.
+	// ChannelTypeReliable determines the Data Channel provides a reliable
+	// in-order bi-directional communication.
 	ChannelTypeReliable ChannelType = 0x00
-	// ChannelTypeReliableUnordered determines the Data Channel
-	// provides a reliable unordered bi-directional communication.
+
+	// ChannelTypeReliableUnordered determines the Data Channel provides a
+	// reliable unordered bi-directional communication.
 	ChannelTypeReliableUnordered ChannelType = 0x80
-	// ChannelTypePartialReliableRexmit determines the Data Channel
-	// provides a partially-reliable in-order bi-directional communication.
-	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
+
+	// ChannelTypePartialReliableRexmit determines the Data Channel provides a
+	// partially-reliable in-order bi-directional communication. User messages
+	// will not be retransmitted more times than specified in the Reliability
+	// Parameter.
 	ChannelTypePartialReliableRexmit ChannelType = 0x01
-	// ChannelTypePartialReliableRexmitUnordered determines
-	//  the Data Channel provides a partial reliable unordered bi-directional communication.
-	// User messages will not be retransmitted more times than specified in the Reliability Parameter.
+
+	// ChannelTypePartialReliableRexmitUnordered determines the Data Channel
+	// provides a partial reliable unordered bi-directional communication. User
+	// messages will not be retransmitted more times than specified in the
+	// Reliability Parameter.
 	ChannelTypePartialReliableRexmitUnordered ChannelType = 0x81
-	// ChannelTypePartialReliableTimed determines the Data Channel
-	// provides a partial reliable in-order bi-directional communication.
-	// User messages might not be transmitted or retransmitted after
-	// a specified life-time given in milli- seconds in the Reliability Parameter.
-	// This life-time starts when providing the user message to the protocol stack.
+
+	// ChannelTypePartialReliableTimed determines the Data Channel provides a
+	// partial reliable in-order bi-directional communication. User messages
+	// might not be transmitted or retransmitted after a specified life-time
+	// given in milli- seconds in the Reliability Parameter. This life-time
+	// starts when providing the user message to the protocol stack.
 	ChannelTypePartialReliableTimed ChannelType = 0x02
+
 	// The Data Channel provides a partial reliable unordered bi-directional
 	// communication.  User messages might not be transmitted or retransmitted
-	// after a specified life-time given in milli- seconds in the Reliability Parameter.
-	// This life-time starts when providing the user message to the protocol stack.
+	// after a specified life-time given in milli- seconds in the Reliability
+	// Parameter. This life-time starts when providing the user message to the
+	// protocol stack.
 	ChannelTypePartialReliableTimedUnordered ChannelType = 0x82
 )
 
-// ChannelPriority enums
 const (
 	ChannelPriorityBelowNormal uint16 = 128
 	ChannelPriorityNormal      uint16 = 256
@@ -117,7 +122,7 @@ func (c *ChannelOpen) Unmarshal(raw []byte) error {
 		return errors.Errorf("Label + Protocol length don't match full packet length")
 	}
 
-	c.Label = raw[channelOpenHeaderLength : channelOpenHeaderLength+labelLength]
-	c.Protocol = raw[channelOpenHeaderLength+labelLength : channelOpenHeaderLength+labelLength+protocolLength]
+	c.Label = string(raw[channelOpenHeaderLength : channelOpenHeaderLength+labelLength])
+	c.Protocol = string(raw[channelOpenHeaderLength+labelLength : channelOpenHeaderLength+labelLength+protocolLength])
 	return nil
 }

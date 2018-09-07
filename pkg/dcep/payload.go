@@ -1,4 +1,4 @@
-package datachannel
+package dcep
 
 import "fmt"
 
