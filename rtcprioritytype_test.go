@@ -21,6 +21,13 @@ func TestNewRTCPriorityType(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
+			newRTCPriorityTypeFromString(testCase.priorityString),
+			testCase.expectedPriority,
+			"testCase: %d %v", i, testCase,
+		)
+
+		assert.Equal(t,
+			newRTCPriorityTypeFromUint16(testCase.priorityUint16),
 			testCase.expectedPriority,
 			newRTCPriorityTypeFromString(testCase.priorityString),
 			"testCase: %d %v", i, testCase,
