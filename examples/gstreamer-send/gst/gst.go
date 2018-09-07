@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/pkg/media"
 )
 
 func init() {
@@ -22,7 +23,7 @@ func init() {
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline  *C.GstElement
-	in        chan<- webrtc.RTCSample
+	in        chan<- media.RTCSample
 	id        int
 	codecName string
 }
@@ -31,7 +32,7 @@ var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(codecName string, in chan<- webrtc.RTCSample) *Pipeline {
+func CreatePipeline(codecName string, in chan<- media.RTCSample) *Pipeline {
 	pipelineStr := "appsink name=appsink"
 	switch codecName {
 	case webrtc.VP8:
@@ -90,7 +91,7 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 		} else {
 			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
 		}
-		pipeline.in <- webrtc.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}
+		pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}
 	} else {
 		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineID))
 	}

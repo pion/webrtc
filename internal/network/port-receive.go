@@ -36,7 +36,7 @@ func (p *port) handleSRTP(buffer []byte) {
 		}
 
 		if rtcpPacketType >= 192 && rtcpPacketType <= 223 {
-			fmt.Println("Discarding RTCP packet TODO")
+			// fmt.Println("Discarding RTCP packet TODO")
 			return
 		}
 	}

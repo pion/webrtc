@@ -16,6 +16,7 @@ import (
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
@@ -946,7 +947,7 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 		return nil, errors.New("failed to generate random value")
 	}
 
-	trackInput := make(chan RTCSample, 15) // Is the buffering needed?
+	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
 	ssrc := binary.LittleEndian.Uint32(buf)
 	go func() {
 		packetizer := rtp.NewPacketizer(
