@@ -50,9 +50,9 @@ type chunkPayloadData struct {
 	immediateSack    bool
 
 	tsn                  uint32
-	streamIdentifier     uint16
+	streamID             uint16
 	streamSequenceNumber uint16
-	payloadType          PayloadProtocolIdentifier
+	payloadProtocolID    PayloadProtocolID
 	userData             []byte
 }
 
@@ -65,21 +65,21 @@ const (
 	payloadDataHeaderSize = 12
 )
 
-// PayloadProtocolIdentifier is an enum for DataChannel payload types
-type PayloadProtocolIdentifier uint32
+// PayloadProtocolID is an enum for DataChannel payload types
+type PayloadProtocolID uint32
 
-// PayloadProtocolIdentifier enums
+// PayloadProtocolID enums
 const (
-	PayloadTypeWebRTCDCEP        PayloadProtocolIdentifier = 50
-	PayloadTypeWebRTCString      PayloadProtocolIdentifier = 51
-	PayloadTypeWebRTCBinary      PayloadProtocolIdentifier = 53
-	PayloadTypeWebRTCStringEmpty PayloadProtocolIdentifier = 56
-	PayloadTypeWebRTCBinaryEmpty PayloadProtocolIdentifier = 57
+	PayloadTypeWebRTCDcep        PayloadProtocolID = 50
+	PayloadTypeWebRTCString      PayloadProtocolID = 51
+	PayloadTypeWebRTCBinary      PayloadProtocolID = 53
+	PayloadTypeWebRTCStringEmpty PayloadProtocolID = 56
+	PayloadTypeWebRTCBinaryEmpty PayloadProtocolID = 57
 )
 
-func (p PayloadProtocolIdentifier) String() string {
+func (p PayloadProtocolID) String() string {
 	switch p {
-	case PayloadTypeWebRTCDCEP:
+	case PayloadTypeWebRTCDcep:
 		return "WebRTC DCEP"
 	case PayloadTypeWebRTCString:
 		return "WebRTC String"
@@ -105,9 +105,9 @@ func (p *chunkPayloadData) unmarshal(raw []byte) error {
 	p.endingFragment = p.flags&payloadDataEndingFragmentBitmask != 0
 
 	p.tsn = binary.BigEndian.Uint32(p.raw[0:])
-	p.streamIdentifier = binary.BigEndian.Uint16(p.raw[4:])
+	p.streamID = binary.BigEndian.Uint16(p.raw[4:])
 	p.streamSequenceNumber = binary.BigEndian.Uint16(p.raw[6:])
-	p.payloadType = PayloadProtocolIdentifier(binary.BigEndian.Uint32(p.raw[8:]))
+	p.payloadProtocolID = PayloadProtocolID(binary.BigEndian.Uint32(p.raw[8:]))
 	p.userData = p.raw[payloadDataHeaderSize:]
 
 	return nil
@@ -118,9 +118,9 @@ func (p *chunkPayloadData) marshal() ([]byte, error) {
 	payRaw := make([]byte, payloadDataHeaderSize+len(p.userData))
 
 	binary.BigEndian.PutUint32(payRaw[0:], p.tsn)
-	binary.BigEndian.PutUint16(payRaw[4:], p.streamIdentifier)
+	binary.BigEndian.PutUint16(payRaw[4:], p.streamID)
 	binary.BigEndian.PutUint16(payRaw[6:], p.streamSequenceNumber)
-	binary.BigEndian.PutUint32(payRaw[8:], uint32(p.payloadType))
+	binary.BigEndian.PutUint32(payRaw[8:], uint32(p.payloadProtocolID))
 	copy(payRaw[payloadDataHeaderSize:], p.userData)
 
 	flags := uint8(0)

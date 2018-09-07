@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"container/list"
+	"github.com/pkg/errors"
 	"math"
 	"math/rand"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // AssociationState is an enum for the states that an Association will transition
@@ -58,7 +58,7 @@ func (a AssociationState) String() string {
 // Verification: in the INIT or INIT ACK chunk.
 // Tag         :
 //
-// My          : Tag expected in every inbound packet and sent in the
+// My          : Tag expected in every reader packet and sent in the
 // Verification: INIT or INIT ACK chunk.
 //
 // Tag         :
@@ -75,20 +75,20 @@ type Association struct {
 	peerVerificationTag uint32
 	myVerificationTag   uint32
 	state               AssociationState
-	//peerTransportList
-	//primaryPath
-	//overallErrorCount
-	//overallErrorThreshold
-	//peerReceiverWindow (peerRwnd)
+	// peerTransportList
+	// primaryPath
+	// overallErrorCount
+	// overallErrorThreshold
+	// peerReceiverWindow (peerRwnd)
 	myNextTSN   uint32 // nextTSN
 	peerLastTSN uint32 // lastRcvdTSN
-	//peerMissingTSN (MappingArray)
-	//ackState
-	//inboundStreams
-	//outboundStreams
-	//reassemblyQueue
-	//localTransportAddressList
-	//associationPTMU
+	// peerMissingTSN (MappingArray)
+	// ackState
+	// inboundStreams
+	// outboundStreams
+	// reassemblyQueue
+	// localTransportAddressList
+	// associationPTMU
 
 	// Non-RFC internal data
 	sourcePort                uint16
@@ -107,8 +107,144 @@ type Association struct {
 
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-receive (vs callbacks)
-	outboundHandler func([]byte)
-	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
+	// outboundHandler func([]byte)
+	// dataHandler     func([]byte, uint16, PayloadProtocolID)
+
+	OnReceive func(event ReceiveEvent)
+	// OnSendFailure func()
+	// OnNetworkStatusChange func()
+	OnCommunicationUp func(event CommunicationUpEvent)
+	// OnCommunicationLost func()
+	// OnCommunicationError func()
+	// OnRestart func()
+	// OnShutdownComplete func()
+
+	Input  chan interface{}
+	reader chan interface{}
+
+	Output chan interface{}
+	writer chan interface{}
+}
+
+// NewAssocation creates a new Association and the state needed to manage it
+func NewAssocation() *Association {
+	rs := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(rs)
+
+	association := &Association{
+		myMaxNumOutboundStreams: math.MaxUint16,
+		myMaxNumInboundStreams:  math.MaxUint16,
+		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets writer
+		payloadQueue:            &payloadQueue{},
+		inflightQueue:           &payloadQueue{},
+		myMaxMTU:                1200,
+		firstSack:               true,
+		reassemblyQueue:         make(map[uint16]*reassemblyQueue),
+		outboundStreams:         make(map[uint16]uint16),
+		myVerificationTag:       r.Uint32(),
+		myNextTSN:               r.Uint32(),
+		state:                   Open,
+		Input:                   make(chan interface{}, 1),
+		Output:                  make(chan interface{}, 1),
+		reader:                  make(chan interface{}, 1),
+		writer:                  make(chan interface{}, 1),
+	}
+
+	go association.inboundHander()
+	go association.outboundHandler()
+	return association
+}
+
+func (a *Association) outboundHandler() {
+	queue := list.New()
+	for {
+		if front := queue.Front(); front == nil {
+			if a.writer == nil {
+				close(a.Output)
+				return
+			}
+			value, ok := <-a.writer
+			if !ok {
+				close(a.Output)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case a.Output <- front.Value:
+				queue.Remove(front)
+			case value, ok := <-a.writer:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					a.writer = nil
+				}
+			}
+		}
+	}
+}
+
+func (a *Association) inboundHander() {
+	queue := list.New()
+	for {
+		if front := queue.Front(); front == nil {
+			if a.Input == nil {
+				close(a.reader)
+				return
+			}
+
+			value, ok := <-a.Input
+			if !ok {
+				close(a.reader)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case a.reader <- front.Value:
+				// val := a.reader
+				// switch val := val.(type) {
+				// case sctp.ReceiveEvent:
+				// 	go c.onReceiveHandler(val)
+				// 	// case sctp.SendFailureEvent:
+				// 	// case sctp.NetworkStatusChangeEvent:
+				// case sctp.CommunicationUpEvent:
+				// 	go c.onCommunicationUpHandler(val)
+				// 	// case sctp.CommunicationLostEvent:
+				// 	// case sctp.CommunicationErrorEvent
+				// 	// case sctp.RestartEvent
+				// 	// case sctp.ShutdownCompleteEvent:
+				// }
+				queue.Remove(front)
+			case value, ok := <-a.Input:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					a.Input = nil
+				}
+			}
+		}
+	}
+}
+
+// FromDtls is a syntactic sugar function for the Input channel. It is useful
+// for readability when working against a dtls as lower protocol layer. The
+// function name is more descriptive of the source of data.
+func (a *Association) FromDtls() chan interface{} {
+	return a.Input
+}
+
+// ToDtls is a syntactic sugar function for the Output channel. If is useful
+// for readability when working against a dtls as lower protocol layer. The
+// function name is more descriptive of the destination for data.
+func (a *Association) ToDtls() chan interface{} {
+	return a.Output
+}
+
+func (a *Association) Associate(outboundStreamCount uint16) {
+	if a.OnCommunicationUp != nil {
+		a.OnCommunicationUp(CommunicationUpEvent{})
+	}
 }
 
 // HandleInbound parses incoming raw packets
@@ -131,7 +267,7 @@ func (a *Association) HandleInbound(raw []byte) error {
 	return nil
 }
 
-func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) ([]*chunkPayloadData, error) {
+func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolID) ([]*chunkPayloadData, error) {
 
 	if len(raw) > math.MaxUint16 {
 		return nil, errors.Errorf("Outbound packet larger than maximum message size %v", math.MaxUint16)
@@ -150,12 +286,12 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 	for remaining != 0 {
 		l := min(a.myMaxMTU, remaining)
 		chunks = append(chunks, &chunkPayloadData{
-			streamIdentifier:     streamIdentifier,
+			streamID:             streamIdentifier,
 			userData:             raw[i : i+l],
 			beginingFragment:     i == 0,
 			endingFragment:       remaining-l == 0,
 			immediateSack:        false,
-			payloadType:          payloadType,
+			payloadProtocolID:    payloadType,
 			streamSequenceNumber: seqNum,
 			tsn:                  a.myNextTSN,
 		})
@@ -169,15 +305,15 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 	return chunks, nil
 }
 
-// HandleOutbound parses incoming raw packets
-func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
+// Send is the main method to send user data via SCTP.
+func (a *Association) Send(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolID) error {
 	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
 	if err != nil {
-		return errors.Wrap(err, "Unable to packetize outbound packet")
+		return errors.Wrap(err, "Unable to packetize writer packet")
 	}
 
 	for _, c := range chunks {
-		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for inbound SACK generation
+		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for reader SACK generation
 		a.inflightQueue.pushNoCheck(c)
 
 		p := &packet{
@@ -186,7 +322,7 @@ func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloa
 			verificationTag: a.peerVerificationTag,
 			chunks:          []chunk{c}}
 		if err := a.send(p); err != nil {
-			return errors.Wrap(err, "Unable to send outbound packet")
+			return errors.Wrap(err, "Unable to send writer packet")
 		}
 
 	}
@@ -196,29 +332,6 @@ func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloa
 // Close ends the SCTP Association and cleans up any state
 func (a *Association) Close() error {
 	return nil
-}
-
-// NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier)) *Association {
-	rs := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(rs)
-
-	return &Association{
-		myMaxNumOutboundStreams: math.MaxUint16,
-		myMaxNumInboundStreams:  math.MaxUint16,
-		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
-		payloadQueue:            &payloadQueue{},
-		inflightQueue:           &payloadQueue{},
-		myMaxMTU:                1200,
-		firstSack:               true,
-		reassemblyQueue:         make(map[uint16]*reassemblyQueue),
-		outboundStreams:         make(map[uint16]uint16),
-		myVerificationTag:       r.Uint32(),
-		myNextTSN:               r.Uint32(),
-		outboundHandler:         outboundHandler,
-		dataHandler:             dataHandler,
-		state:                   Open,
-	}
 }
 
 func checkPacket(p *packet) error {
@@ -316,12 +429,12 @@ func (a *Association) handleData(d *chunkPayloadData) *packet {
 	pd, popOk := a.payloadQueue.pop(a.peerLastTSN + 1)
 
 	for popOk {
-		rq, ok := a.reassemblyQueue[pd.streamIdentifier]
+		rq, ok := a.reassemblyQueue[pd.streamID]
 		if !ok {
 			// If this is the first time we've seen a stream identifier
 			// Expected SeqNum == 0
 			rq = &reassemblyQueue{}
-			a.reassemblyQueue[pd.streamIdentifier] = rq
+			a.reassemblyQueue[pd.streamID] = rq
 		}
 
 		rq.push(pd)
@@ -329,7 +442,13 @@ func (a *Association) handleData(d *chunkPayloadData) *packet {
 		if ok {
 			// We know the popped data will have the same stream
 			// identifier as the pushed data
-			a.dataHandler(userData, pd.streamIdentifier, pd.payloadType)
+			if a.OnReceive != nil {
+				a.OnReceive(ReceiveEvent{
+					Buffer:            userData,
+					StreamID:          pd.streamID,
+					PayloadProtocolID: pd.payloadProtocolID,
+				})
+			}
 		}
 
 		a.peerLastTSN++
@@ -408,11 +527,10 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 func (a *Association) send(p *packet) error {
 	raw, err := p.marshal()
 	if err != nil {
-		return errors.Wrap(err, "Failed to send packet to outbound handler")
+		return errors.Wrap(err, "Failed to send packet to writer handler")
 	}
 
-	a.outboundHandler(raw)
-
+	a.writer <- raw
 	return nil
 }
 
@@ -438,6 +556,8 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
+	case *chunkInitAck:
+
 	case *chunkAbort:
 		fmt.Println("Abort chunk, with errors")
 		for _, e := range c.errorCauses {
