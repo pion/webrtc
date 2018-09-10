@@ -145,8 +145,8 @@ func NewAssocation() *Association {
 		myNextTSN:               r.Uint32(),
 		state:                   Open,
 		Input:                   make(chan interface{}, 1),
-		Output:                  make(chan interface{}, 1),
 		reader:                  make(chan interface{}, 1),
+		Output:                  make(chan interface{}, 1),
 		writer:                  make(chan interface{}, 1),
 	}
 
@@ -202,19 +202,21 @@ func (a *Association) inboundHander() {
 		} else {
 			select {
 			case a.reader <- front.Value:
-				// val := a.reader
-				// switch val := val.(type) {
-				// case sctp.ReceiveEvent:
-				// 	go c.onReceiveHandler(val)
-				// 	// case sctp.SendFailureEvent:
-				// 	// case sctp.NetworkStatusChangeEvent:
-				// case sctp.CommunicationUpEvent:
-				// 	go c.onCommunicationUpHandler(val)
-				// 	// case sctp.CommunicationLostEvent:
-				// 	// case sctp.CommunicationErrorEvent
-				// 	// case sctp.RestartEvent
-				// 	// case sctp.ShutdownCompleteEvent:
-				// }
+				raw := (<-a.reader).([]byte)
+				packet := &packet{}
+				if err := packet.unmarshal(raw); err != nil {
+					fmt.Println(errors.Wrap(err, "Unable to parse SCTP packet"))
+				}
+
+				if err := checkPacket(packet); err != nil {
+					fmt.Println(errors.Wrap(err, "Failed validating packet"))
+				}
+
+				for _, chunk := range packet.chunks {
+					if err := a.handleChunk(packet, chunk); err != nil {
+						fmt.Println(errors.Wrap(err, "Failed handling chunk"))
+					}
+				}
 				queue.Remove(front)
 			case value, ok := <-a.Input:
 				if ok {
@@ -227,44 +229,10 @@ func (a *Association) inboundHander() {
 	}
 }
 
-// FromDtls is a syntactic sugar function for the Input channel. It is useful
-// for readability when working against a dtls as lower protocol layer. The
-// function name is more descriptive of the source of data.
-func (a *Association) FromDtls() chan interface{} {
-	return a.Input
-}
-
-// ToDtls is a syntactic sugar function for the Output channel. If is useful
-// for readability when working against a dtls as lower protocol layer. The
-// function name is more descriptive of the destination for data.
-func (a *Association) ToDtls() chan interface{} {
-	return a.Output
-}
-
 func (a *Association) Associate(outboundStreamCount uint16) {
 	if a.OnCommunicationUp != nil {
 		a.OnCommunicationUp(CommunicationUpEvent{})
 	}
-}
-
-// HandleInbound parses incoming raw packets
-func (a *Association) HandleInbound(raw []byte) error {
-	p := &packet{}
-	if err := p.unmarshal(raw); err != nil {
-		return errors.Wrap(err, "Unable to parse SCTP packet")
-	}
-
-	if err := checkPacket(p); err != nil {
-		return errors.Wrap(err, "Failed validating packet")
-	}
-
-	for _, c := range p.chunks {
-		if err := a.handleChunk(p, c); err != nil {
-			return errors.Wrap(err, "Failed handling chunk")
-		}
-	}
-
-	return nil
 }
 
 func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolID) ([]*chunkPayloadData, error) {
@@ -556,8 +524,6 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
-	case *chunkInitAck:
-
 	case *chunkAbort:
 		fmt.Println("Abort chunk, with errors")
 		for _, e := range c.errorCauses {
