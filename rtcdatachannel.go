@@ -127,6 +127,7 @@ func newDataChannel(sctp *RTCSctpTransport) *RTCDataChannel {
 		BufferedAmount: 0,
 		fromSctp:       make(chan interface{}, 1),
 	}
+
 	go channel.handler()
 	return channel
 }

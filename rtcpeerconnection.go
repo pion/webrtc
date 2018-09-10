@@ -161,9 +161,13 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		ConnectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
 	}
-	pc.sctpTransport = newRTCSctpTransport(pc)
 
 	var err error
+	pc.sctpTransport, err = newRTCSctpTransport(pc)
+	if err != nil {
+		return nil, err
+	}
+
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}

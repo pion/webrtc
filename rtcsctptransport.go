@@ -37,7 +37,8 @@ type RTCSctpTransport struct {
 	channels    map[uint16]chan interface{}
 }
 
-func newRTCSctpTransport(connection *RTCPeerConnection) *RTCSctpTransport {
+func newRTCSctpTransport(connection *RTCPeerConnection) (*RTCSctpTransport, error) {
+	var err error
 	t := &RTCSctpTransport{
 		State: RTCSctpTransportStateConnecting,
 		conn:  connection,
@@ -52,20 +53,23 @@ func newRTCSctpTransport(connection *RTCPeerConnection) *RTCSctpTransport {
 	// t.association.OnRestart = t.onRestartHandler
 	// t.association.OnShutdownComplete = t.onShutdownCompleteHandler
 
-	t.Transport = newRTCDtlsTransport(connection)
+	t.Transport, err = newRTCDtlsTransport(connection)
+	if err != nil {
+		return nil, err
+	}
 
 	// dtls -> sctp
-	t.Transport.toSctp = t.association.FromDtls()
+	t.Transport.toSctp = t.association.Input
 
 	// dtls <- sctp
-	t.Transport.fromSctp = t.association.ToDtls()
+	t.Transport.fromSctp = t.association.Output
 
 	t.updateMessageSize()
 	t.updateMaxChannels()
 
 	// go t.handler()
 
-	return t
+	return t, nil
 }
 
 func (r *RTCSctpTransport) onReceiveHandler(event sctp.ReceiveEvent) {
