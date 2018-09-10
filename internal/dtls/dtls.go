@@ -12,6 +12,7 @@ package dtls
 */
 import "C"
 import (
+	"container/list"
 	"fmt"
 	"net"
 	"strconv"
@@ -67,17 +68,85 @@ type State struct {
 	tlscfg      *_Ctype_struct_tlscfg
 	sslctx      *_Ctype_struct_ssl_ctx_st
 	dtlsSession *_Ctype_struct_dtls_sess
+
+	Input  chan interface{}
+	reader chan interface{}
+
+	Output chan interface{}
+	writer chan interface{}
 }
 
-// NewState creates a new DTLS session
-func NewState() (s *State, err error) {
-	s = &State{
+// New creates a new DTLS session
+func NewState() *State {
+	state := &State{
 		tlscfg: C.dtls_build_tlscfg(),
 	}
 
-	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
+	state.sslctx = C.dtls_build_sslctx(state.tlscfg)
 
-	return s, err
+	go state.inboundHander()
+	go state.outboundHandler()
+	return state
+}
+
+func (s *State) outboundHandler() {
+	queue := list.New()
+	for {
+		if front := queue.Front(); front == nil {
+			if s.writer == nil {
+				close(s.Output)
+				return
+			}
+			value, ok := <-s.writer
+			if !ok {
+				close(s.Output)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case s.Output <- front.Value:
+				queue.Remove(front)
+			case value, ok := <-s.writer:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					s.writer = nil
+				}
+			}
+		}
+	}
+}
+
+func (s *State) inboundHander() {
+	queue := list.New()
+	for {
+		if front := queue.Front(); front == nil {
+			if s.Input == nil {
+				close(s.reader)
+				return
+			}
+
+			value, ok := <-s.Input
+			if !ok {
+				close(s.reader)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case s.reader <- front.Value:
+				raw := (<-s.reader).([]byte)
+				queue.Remove(front)
+			case value, ok := <-s.Input:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					s.Input = nil
+				}
+			}
+		}
+	}
 }
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
