@@ -89,6 +89,7 @@ See [Contributing](https://github.com/pions/webrtc/wiki/Contributing)
 * [chenkaiC4](https://github.com/chenkaiC4) - *Fix GolangCI Linter*
 * [Ronan J](https://github.com/ronanj) - *Fix STCP PPID*
 * [wattanakorn495](https://github.com/wattanakorn495)
+* [Max Hawkins](https://github.com/maxhawkins) - *RTCP*
 
 
 ## Project Ideas
