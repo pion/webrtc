@@ -29,6 +29,14 @@ func TestHeaderUnmarshal(t *testing.T) {
 		t.Fatalf("Unmarshal: got %#v, want %#v", got, want)
 	}
 }
+
+func TestHeaderUnmarshalNil(t *testing.T) {
+	var header Header
+	err := header.Unmarshal(nil)
+	if got, want := err, errHeaderTooShort; got != want {
+		t.Fatalf("unmarshal nil header: err = %v, want %v", got, want)
+	}
+}
 func TestHeaderRoundTrip(t *testing.T) {
 	for _, test := range []struct {
 		Name      string
