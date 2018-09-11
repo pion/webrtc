@@ -8,11 +8,11 @@ import (
 
 // RTCP packet types registered with IANA. See: https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml#rtp-parameters-4
 const (
-	TypeSR   = 200 // sender report        RFC 3550, 6.4.1
-	TypeRR   = 201 // receiver report      RFC 3550, 6.4.2
-	TypeSDES = 202 // source description   RFC 3550, 6.5
-	TypeBYE  = 203 // goodbye              RFC 3550, 6.6
-	TypeAPP  = 204 // application-defined  RFC 3550, 6.7
+	TypeSenderReport       = 200 // RFC 3550, 6.4.1
+	TypeReceiverReport     = 201 // RFC 3550, 6.4.2
+	TypeSourceDescription  = 202 // RFC 3550, 6.5
+	TypeGoodbye            = 203 // RFC 3550, 6.6
+	TypeApplicationDefined = 204 // RFC 3550, 6.7
 )
 
 // A Header is the common header shared by all RTCP packets

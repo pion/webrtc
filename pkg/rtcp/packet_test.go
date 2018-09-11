@@ -16,7 +16,7 @@ func TestHeaderUnmarshal(t *testing.T) {
 		Version:     2,
 		Padding:     false,
 		ReportCount: 1,
-		Type:        TypeRR,
+		Type:        TypeReceiverReport,
 		Length:      7,
 	}
 
@@ -41,7 +41,7 @@ func TestHeaderRoundTrip(t *testing.T) {
 				Version:     2,
 				Padding:     true,
 				ReportCount: 31,
-				Type:        TypeSR,
+				Type:        TypeSenderReport,
 				Length:      4,
 			},
 		},
@@ -51,7 +51,7 @@ func TestHeaderRoundTrip(t *testing.T) {
 				Version:     1,
 				Padding:     false,
 				ReportCount: 28,
-				Type:        TypeRR,
+				Type:        TypeReceiverReport,
 				Length:      65535,
 			},
 		},
