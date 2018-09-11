@@ -46,6 +46,7 @@ const (
 var (
 	errInvalidVersion     = errors.New("invalid version")
 	errInvalidReportCount = errors.New("invalid report count")
+	errHeaderTooShort     = errors.New("rtcp header too short")
 )
 
 // Marshal encodes the Header in binary
@@ -83,7 +84,7 @@ func (h Header) Marshal() ([]byte, error) {
 // Unmarshal decodes the Header from binary
 func (h *Header) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
-		return errors.Errorf("RTCP header size insufficient; %d < %d", len(rawPacket), headerLength)
+		return errHeaderTooShort
 	}
 
 	/*
