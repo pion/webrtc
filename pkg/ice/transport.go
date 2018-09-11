@@ -1,78 +1,76 @@
 package ice
 
 import (
-	"fmt"
 	"net"
-
-	"github.com/pions/pkg/stun"
-	"github.com/pions/webrtc/internal/dtls"
-	"golang.org/x/net/ipv4"
 )
 
 const receiveMTU = 8192
 
-type Packet struct {
-	Buffer []byte
-	Addr   *net.UDPAddr
+type packet struct {
+	transport *transport
+	buffer    []byte
+	addr      *net.UDPAddr
 }
 
-type Transport struct {
-	Conn *ipv4.PacketConn
-	Addr *stun.TransportAddr
+type transport struct {
+	conn packetConn
+	addr *net.UDPAddr
 
-	OnReceive func(*Transport, *Packet)
+	onReceive func(*packet)
 }
 
-func NewTransport(address string) (*Transport, error) {
-	listener, err := net.ListenPacket("udp4", address)
+func newTransport(address string) (*transport, error) {
+	listener, err := net.ListenPacket("udp", address)
 	if err != nil {
 		return nil, err
 	}
 
-	addr, err := stun.NewTransportAddr(listener.LocalAddr())
-	if err != nil {
-		return nil, err
+	// addr, err := stun.NewTransportAddr(listener.LocalAddr())
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	var t *transport
+	if addr := listener.LocalAddr().(*net.UDPAddr); addr.IP.To4() != nil {
+		t = &transport{conn: newPacketConnIPv4(listener), addr: addr}
+	} else {
+		t = &transport{conn: newPacketConnIPv6(listener), addr: addr}
 	}
+	// dtls.AddListener(addr.String(), conn)
 
-	conn := ipv4.NewPacketConn(listener)
-	dtls.AddListener(addr.String(), conn)
-
-	transport := &Transport{
-		Conn: conn,
-		Addr: addr,
-	}
-
-	go transport.handler()
-	return transport, nil
+	go t.handler()
+	return t, nil
 }
 
-func (t *Transport) handler() {
+func (t *transport) handler() {
 	buffer := make([]byte, receiveMTU)
 	for {
-		n, _, addr, err := t.Conn.ReadFrom(buffer)
+		n, _, addr, err := t.conn.readFrom(buffer)
 		if err != nil {
-			t.Close()
+			t.close()
 			break
 		}
 
 		temp := make([]byte, n)
 		copy(temp, buffer[:n])
 
-		if t.OnReceive != nil {
-			t.OnReceive(t, &Packet{
-				Buffer: temp,
-				Addr:   addr.(*net.UDPAddr),
+		if t.onReceive != nil {
+			go t.onReceive(&packet{
+				transport: t,
+				buffer:    temp,
+				addr:      addr.(*net.UDPAddr),
 			})
 		}
 	}
 }
 
-func (t *Transport) Send(raw []byte, remote *net.UDPAddr) error {
-	if _, err := t.Conn.WriteTo(raw, nil, remote); err != nil {
-		fmt.Printf("Failed to send packet: %s \n", err.Error())
+func (t *transport) send(raw []byte, cm controlMessage, remote *net.UDPAddr) error {
+	if _, err := t.conn.writeTo(raw, cm, remote); err != nil {
+		return err
 	}
+	return nil
 }
 
-func (t *Transport) Close() error {
-	return t.Conn.Close()
+func (t *transport) close() error {
+	return t.conn.close()
 }
