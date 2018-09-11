@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,8 +34,8 @@ type CandidatePair struct {
 }
 
 // GetAddrs returns network addresses for the candidate pair
-func (c CandidatePair) GetAddrs() (local *stun.TransportAddr, remote *net.UDPAddr) {
-	return &stun.TransportAddr{
+func (c CandidatePair) GetAddrs() (local *net.UDPAddr, remote *net.UDPAddr) {
+	return &net.UDPAddr{
 			IP:   net.ParseIP(c.local.GetBase().Address),
 			Port: c.local.GetBase().Port,
 		}, &net.UDPAddr{
@@ -46,8 +47,6 @@ func (c CandidatePair) GetAddrs() (local *stun.TransportAddr, remote *net.UDPAdd
 // Agent represents the ICE agent
 type Agent struct {
 	sync.RWMutex
-
-	// iceNotifier      func(ConnectionState)
 
 	tieBreaker      uint64
 	connectionState ConnectionState
@@ -68,15 +67,10 @@ type Agent struct {
 	selectedPair CandidatePair
 	validPairs   []CandidatePair
 
-	transports map[string]*Transport
+	transports map[string]*transport
 
-	Input  chan interface{}
-	reader chan interface{}
-
-	Output chan []byte
-	writer chan []byte
-
-	OnReceive func([]byte, *net.UDPAddr)
+	OnConnectionStateChange func(ConnectionState)
+	OnReceive               func(ReceiveEvent)
 }
 
 const (
@@ -87,35 +81,27 @@ const (
 // NewAgent creates a new Agent
 func NewAgent() (*Agent, error) {
 	agent := &Agent{
-		// outboundCallback: outboundCallback,
-		// iceNotifier:      iceNotifier,
-
 		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:  GatheringStateComplete, // TODO trickle-ice
 		connectionState: ConnectionStateNew,
 
 		LocalUfrag: util.RandSeq(16),
 		LocalPwd:   util.RandSeq(32),
-
-		Input:  make(chan interface{}, 1),
-		reader: make(chan interface{}, 1),
-		Output: make(chan []byte, 1),
-		writer: make(chan []byte, 1),
 	}
 
 	for _, ip := range getLocalInterfaces() {
-		transport, err := NewTransport(ip + ":0")
+		transport, err := newTransport(ip + ":0")
 		if err != nil {
 			return nil, err
 		}
-		transport.OnReceive = agent.onReceiveHandler
+		transport.onReceive = agent.onReceiveHandler
 
-		agent.transports[transport.Addr.String()] = transport
+		agent.transports[transport.addr.String()] = transport
 		agent.LocalCandidates = append(agent.LocalCandidates, &CandidateHost{
 			CandidateBase: CandidateBase{
 				Protocol: ProtoTypeUDP,
-				Address:  transport.Addr.IP.String(),
-				Port:     transport.Addr.Port,
+				Address:  transport.addr.IP.String(),
+				Port:     transport.addr.Port,
 			},
 		})
 	}
@@ -123,13 +109,17 @@ func NewAgent() (*Agent, error) {
 	return agent, nil
 }
 
-func (a *Agent) onReceiveHandler(t *Transport, packet *Packet) {
-	if packet.Buffer[0] < 2 {
-		a.handleInbound(packet.Buffer, t.Addr, packet.Addr)
+func (a *Agent) onReceiveHandler(packet *packet) {
+	if packet.buffer[0] < 2 {
+		a.handleInbound(packet.buffer, packet.transport.addr, packet.addr)
 	}
 
 	if a.OnReceive != nil {
-		a.OnReceive(packet.Buffer, packet.Addr)
+		go a.OnReceive(ReceiveEvent{
+			Buffer: packet.buffer,
+			Local:  packet.transport.addr.String(),
+			Remote: packet.addr.String(),
+		})
 	}
 }
 
@@ -161,18 +151,28 @@ func getLocalInterfaces() (IPs []string) {
 			if ip == nil || ip.IsLoopback() {
 				continue
 			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
-			}
 			IPs = append(IPs, ip.String())
 		}
 	}
 	return IPs
 }
 
-func (a *Agent) Send(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
+func (a *Agent) Send(raw []byte, local, remote string) error {
+	strIP, strPort, err := net.SplitHostPort(remote)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(strPort)
+	if err != nil {
+		return err
+	}
 
+	addr := &net.UDPAddr{IP: net.ParseIP(strIP), Port: port}
+	if err := a.transports[local].send(raw, nil, addr); err != nil {
+		return nil
+	}
+
+	return nil
 }
 
 // Start starts the agent
@@ -230,28 +230,22 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		return
 	}
 
-	a.Send(msg.Pack(), &stun.TransportAddr{
+	a.Send(msg.Pack(), net.UDPAddr{
 		IP:   net.ParseIP(local.GetBase().Address),
 		Port: local.GetBase().Port,
-	}, &net.UDPAddr{
+	}.String(), net.UDPAddr{
 		IP:   net.ParseIP(remote.GetBase().Address),
 		Port: remote.GetBase().Port,
-	})
-
-	// a.outboundCallback(msg.Pack(), &stun.TransportAddr{
-	// 	IP:   net.ParseIP(local.GetBase().Address),
-	// 	Port: local.GetBase().Port,
-	// }, &net.UDPAddr{
-	// 	IP:   net.ParseIP(remote.GetBase().Address),
-	// 	Port: remote.GetBase().Port,
-	// })
+	}.String())
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	a.connectionState = newState
 	// Call handler async since we may be holding the agent lock
 	// and the handler may also require it
-	go a.iceNotifier(a.connectionState)
+	if a.OnConnectionStateChange != nil {
+		go a.OnConnectionStateChange(a.connectionState)
+	}
 }
 
 func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
@@ -347,7 +341,7 @@ func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
 	return false
 }
 
-func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
+func getTransportAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	for _, c := range candidates {
 		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
 			return c
@@ -365,7 +359,7 @@ func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	return nil
 }
 
-func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr) {
+func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *net.UDPAddr) {
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
@@ -380,13 +374,12 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 	); err != nil {
 		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
 	} else {
-		a.Send(out.Pack(), local, remote)
-		// a.outboundCallback(out.Pack(), local, remote)
+		a.Send(out.Pack(), local.String(), remote.String())
 	}
 
 }
 
-func (a *Agent) handleInbound(buf []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
+func (a *Agent) handleInbound(buf []byte, local, remote *net.UDPAddr) {
 	a.Lock()
 	defer a.Unlock()
 
@@ -419,7 +412,7 @@ func (a *Agent) handleInbound(buf []byte, local *stun.TransportAddr, remote *net
 
 }
 
-func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlled(m *stun.Message, local, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
 		fmt.Println("inbound isControlled && a.isControlling == false")
 		return
@@ -430,7 +423,7 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 	a.sendBindingSuccess(m, local, remote)
 }
 
-func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlling(m *stun.Message, local, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
 		fmt.Println("inbound isControlling && a.isControlling == true")
 		return
@@ -448,7 +441,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 }
 
 // SelectedPair gets the current selected pair's Addresses (or returns nil)
-func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) {
+func (a *Agent) SelectedPair() (local *net.UDPAddr, remote *net.UDPAddr) {
 	a.RLock()
 	defer a.RUnlock()
 
