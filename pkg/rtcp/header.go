@@ -33,6 +33,13 @@ type Header struct {
 	Length uint16
 }
 
+var (
+	errInvalidVersion     = errors.New("invalid version")
+	errInvalidReportCount = errors.New("invalid report count")
+	errInvalidTotalLost   = errors.New("invalid total lost count")
+	errPacketTooShort     = errors.New("packet too short")
+)
+
 const (
 	headerLength     = 4
 	versionShift     = 6
@@ -41,12 +48,6 @@ const (
 	paddingMask      = 0x1
 	reportCountShift = 0
 	reportCountMask  = 0x1f
-)
-
-var (
-	errInvalidVersion     = errors.New("invalid version")
-	errInvalidReportCount = errors.New("invalid report count")
-	errHeaderTooShort     = errors.New("rtcp header too short")
 )
 
 // Marshal encodes the Header in binary
@@ -84,7 +85,7 @@ func (h Header) Marshal() ([]byte, error) {
 // Unmarshal decodes the Header from binary
 func (h *Header) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
-		return errHeaderTooShort
+		return errPacketTooShort
 	}
 
 	/*
