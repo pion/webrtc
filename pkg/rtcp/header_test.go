@@ -33,8 +33,8 @@ func TestHeaderUnmarshal(t *testing.T) {
 func TestHeaderUnmarshalNil(t *testing.T) {
 	var header Header
 	err := header.Unmarshal(nil)
-	if got, want := err, errHeaderTooShort; got != want {
-		t.Errorf("unmarshal nil header: err = %v, want %v", got, want)
+	if got, want := err, errPacketTooShort; got != want {
+		t.Fatalf("unmarshal nil header: err = %v, want %v", got, want)
 	}
 }
 func TestHeaderRoundTrip(t *testing.T) {
