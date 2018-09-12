@@ -46,21 +46,21 @@ func TestHeaderRoundTrip(t *testing.T) {
 		{
 			Name: "valid",
 			Header: Header{
-				Version:     2,
-				Padding:     true,
-				ReportCount: 31,
-				Type:        TypeSenderReport,
-				Length:      4,
+				Version: 2,
+				Padding: true,
+				Count:   31,
+				Type:    TypeSenderReport,
+				Length:  4,
 			},
 		},
 		{
 			Name: "also valid",
 			Header: Header{
-				Version:     1,
-				Padding:     false,
-				ReportCount: 28,
-				Type:        TypeReceiverReport,
-				Length:      65535,
+				Version: 1,
+				Padding: false,
+				Count:   28,
+				Type:    TypeReceiverReport,
+				Length:  65535,
 			},
 		},
 		{
@@ -71,11 +71,11 @@ func TestHeaderRoundTrip(t *testing.T) {
 			WantError: errInvalidVersion,
 		},
 		{
-			Name: "invalid report count",
+			Name: "invalid count",
 			Header: Header{
-				ReportCount: 40,
+				Count: 40,
 			},
-			WantError: errInvalidReportCount,
+			WantError: errInvalidCount,
 		},
 	} {
 		data, err := test.Header.Marshal()
