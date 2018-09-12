@@ -298,9 +298,3 @@ func TestSetRemoteDescription(t *testing.T) {
 		}
 	}
 }
-
-func ExampleNew_default() {
-	if _, err := New(RTCConfiguration{}); err != nil {
-		panic(err)
-	}
-}

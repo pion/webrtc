@@ -434,7 +434,7 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 
 // // SetLocalDescription sets the SessionDescription of the local peer
 // func (pc *RTCPeerConnection) SetLocalDescription() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
 // LocalDescription returns PendingLocalDescription if it is not null and
@@ -497,7 +497,7 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 }
 
 // func (pc *RTCPeerConnection) addIceCandidate() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
 // ------------------------------------------------------------------------
@@ -575,11 +575,11 @@ func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 }
 
 // func (pc *RTCPeerConnection) RemoveTrack() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
 // func (pc *RTCPeerConnection) AddTransceiver() RTCRtpTransceiver {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED
+// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
 // ------------------------------------------------------------------------

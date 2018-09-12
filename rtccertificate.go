@@ -16,8 +16,8 @@ import (
 
 // RTCCertificate represents a x509Cert used to authenticate WebRTC communications.
 type RTCCertificate struct {
-	secretKey crypto.PrivateKey
-	x509Cert  *x509.Certificate
+	privateKey crypto.PrivateKey
+	x509Cert   *x509.Certificate
 }
 
 // NewRTCCertificate generates a new x509 compliant RTCCertificate to be used
@@ -51,15 +51,15 @@ func NewRTCCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*RTCCertifi
 		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
-	return &RTCCertificate{secretKey: key, x509Cert: cert}, nil
+	return &RTCCertificate{privateKey: key, x509Cert: cert}, nil
 }
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
 func (c RTCCertificate) Equals(o RTCCertificate) bool {
-	switch cSK := c.secretKey.(type) {
+	switch cSK := c.privateKey.(type) {
 	case *rsa.PrivateKey:
-		if oSK, ok := o.secretKey.(*rsa.PrivateKey); ok {
+		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
 			if cSK.N.Cmp(oSK.N) != 0 {
 				return false
 			}
@@ -67,7 +67,7 @@ func (c RTCCertificate) Equals(o RTCCertificate) bool {
 		}
 		return false
 	case *ecdsa.PrivateKey:
-		if oSK, ok := o.secretKey.(*ecdsa.PrivateKey); ok {
+		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
 			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
 				return false
 			}
@@ -90,7 +90,7 @@ func (c RTCCertificate) Expires() time.Time {
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
 func (c RTCCertificate) GetFingerprints() {
-	panic("not implemented yet.")
+	panic("not implemented yet.") // nolint
 }
 
 // GenerateCertificate causes the creation of an X.509 certificate and
