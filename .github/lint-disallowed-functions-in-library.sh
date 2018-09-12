@@ -4,7 +4,7 @@ set -e
 # Disallow usages of functions that cause the program to exit in the library code
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 EXCLUDE_DIRECTORIES="--exclude-dir=examples --exclude-dir=.git --exclude-dir=.github "
-DISALLOWED_FUNCTIONS=('os.Exit(', 'panic(', 'Fatal(', 'Fatalf(', 'Fatalln(')
+DISALLOWED_FUNCTIONS=('os.Exit(' 'panic(' 'Fatal(' 'Fatalf(' 'Fatalln(')
 
 
 for disallowedFunction in "${DISALLOWED_FUNCTIONS[@]}"

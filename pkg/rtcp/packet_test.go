@@ -22,11 +22,11 @@ func TestHeaderUnmarshal(t *testing.T) {
 
 	var got Header
 	if err := got.Unmarshal(data); err != nil {
-		t.Fatalf("Unmarshal: %v", err)
+		t.Errorf("Unmarshal: %v", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Unmarshal: got %#v, want %#v", got, want)
+		t.Errorf("Unmarshal: got %#v, want %#v", got, want)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestHeaderUnmarshalNil(t *testing.T) {
 	var header Header
 	err := header.Unmarshal(nil)
 	if got, want := err, errHeaderTooShort; got != want {
-		t.Fatalf("unmarshal nil header: err = %v, want %v", got, want)
+		t.Errorf("unmarshal nil header: err = %v, want %v", got, want)
 	}
 }
 func TestHeaderRoundTrip(t *testing.T) {
@@ -80,7 +80,7 @@ func TestHeaderRoundTrip(t *testing.T) {
 	} {
 		data, err := test.Header.Marshal()
 		if got, want := err, test.WantError; got != want {
-			t.Fatalf("Marshal %q: err = %v, want %v", test.Name, got, want)
+			t.Errorf("Marshal %q: err = %v, want %v", test.Name, got, want)
 		}
 		if err != nil {
 			continue
@@ -88,11 +88,11 @@ func TestHeaderRoundTrip(t *testing.T) {
 
 		var decoded Header
 		if err := decoded.Unmarshal(data); err != nil {
-			t.Fatalf("Unmarshal %q: %v", test.Name, err)
+			t.Errorf("Unmarshal %q: %v", test.Name, err)
 		}
 
 		if got, want := decoded, test.Header; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%q header round trip: got %#v, want %#v", test.Name, got, want)
+			t.Errorf("%q header round trip: got %#v, want %#v", test.Name, got, want)
 		}
 	}
 }
