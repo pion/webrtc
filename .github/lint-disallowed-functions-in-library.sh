@@ -9,7 +9,7 @@ DISALLOWED_FUNCTIONS=('os.Exit(' 'panic(' 'Fatal(' 'Fatalf(' 'Fatalln(')
 
 for disallowedFunction in "${DISALLOWED_FUNCTIONS[@]}"
 do
-	if grep -R $EXCLUDE_DIRECTORIES -e "$disallowedFunction" "$SCRIPT_PATH/.." | grep -v nolint; then
+	if grep -R $EXCLUDE_DIRECTORIES -e "$disallowedFunction" "$SCRIPT_PATH/.." | grep -v -e '_test.go' -e 'nolint'; then
 		echo "$disallowedFunction may only be used in example code"
 		exit 1
 	fi
