@@ -24,8 +24,8 @@ type Header struct {
 	// some additional padding octets at the end which are not part of
 	// the control information but are included in the length field.
 	Padding bool
-	// The number of reception report blocks contained in this packet.
-	ReportCount uint8
+	// The number of reception reports or sources contained in this packet (depending on the Type)
+	Count uint8
 	// The RTCP packet type for this packet
 	Type uint8
 	// The length of this RTCP packet in 32-bit words minus one,
@@ -34,20 +34,20 @@ type Header struct {
 }
 
 var (
-	errInvalidVersion     = errors.New("invalid version")
-	errInvalidReportCount = errors.New("invalid report count")
-	errInvalidTotalLost   = errors.New("invalid total lost count")
-	errPacketTooShort     = errors.New("packet too short")
+	errInvalidVersion   = errors.New("invalid version")
+	errInvalidCount     = errors.New("invalid count header")
+	errInvalidTotalLost = errors.New("invalid total lost count")
+	errPacketTooShort   = errors.New("packet too short")
 )
 
 const (
-	headerLength     = 4
-	versionShift     = 6
-	versionMask      = 0x3
-	paddingShift     = 5
-	paddingMask      = 0x1
-	reportCountShift = 0
-	reportCountMask  = 0x1f
+	headerLength = 4
+	versionShift = 6
+	versionMask  = 0x3
+	paddingShift = 5
+	paddingMask  = 0x1
+	countShift   = 0
+	countMask    = 0x1f
 )
 
 // Marshal encodes the Header in binary
@@ -70,10 +70,10 @@ func (h Header) Marshal() ([]byte, error) {
 		rawPacket[0] |= 1 << paddingShift
 	}
 
-	if h.ReportCount > 31 {
-		return nil, errInvalidReportCount
+	if h.Count > 31 {
+		return nil, errInvalidCount
 	}
-	rawPacket[0] |= h.ReportCount << reportCountShift
+	rawPacket[0] |= h.Count << countShift
 
 	rawPacket[1] = h.Type
 
@@ -98,7 +98,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 
 	h.Version = rawPacket[0] >> versionShift & versionMask
 	h.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
-	h.ReportCount = rawPacket[0] >> reportCountShift & reportCountMask
+	h.Count = rawPacket[0] >> countShift & countMask
 
 	h.Type = rawPacket[1]
 
