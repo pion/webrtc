@@ -25,17 +25,17 @@ enum dtls_con_type {
   DTLS_CONTYPE_EXISTING = true, // Endpoint wishes to use existing connection
 };
 
-typedef struct tlscfg {
+typedef struct dtls_cert_st {
   X509 *cert;
   EVP_PKEY *pkey;
-} tlscfg;
+} dtls_cert_st;
 
-typedef struct dtls_sess {
+typedef struct dtls_sess_st {
   SSL *ssl;
 
   enum dtls_con_state state;
   enum dtls_con_type type;
-} dtls_sess;
+} dtls_sess_st;
 
 typedef struct dtls_decrypted {
   void *buf;
@@ -53,19 +53,24 @@ typedef struct dtls_cert_pair {
   int key_length;
 } dtls_cert_pair;
 
-bool openssl_global_init();
+void dtls_init();
 
-tlscfg *dtls_build_tlscfg();
-SSL_CTX *dtls_build_sslctx(tlscfg *cfg);
-dtls_sess *dtls_build_session(SSL_CTX *cfg, bool is_offer);
+dtls_cert_st *dtls_build_certificate();
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote);
-dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *local, char *remote);
-bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char *remote);
+SSL_CTX *dtls_build_ssl_context(dtls_cert_st *cert);
 
-dtls_cert_pair *dtls_get_certpair(dtls_sess *sess);
-char *dtls_tlscfg_fingerprint(tlscfg *cfg);
+dtls_sess_st *dtls_build_session(SSL_CTX *ctx, bool is_offer);
 
-void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session, tlscfg *cfg);
+ptrdiff_t dtls_do_handshake(dtls_sess_st *sess, char *local, char *remote);
+
+dtls_decrypted *dtls_handle_incoming(dtls_sess_st *sess, void *buf, int len);
+
+bool dtls_handle_outgoing(dtls_sess_st *sess, void *buf, int len);
+
+dtls_cert_pair *dtls_get_certpair(dtls_sess_st *sess);
+
+char *dtls_certificate_fingerprint(dtls_cert_st *cfg);
+
+void dtls_session_cleanup(SSL_CTX *ctx, dtls_sess_st *sess, dtls_cert_st *cert);
 
 #endif

@@ -14,20 +14,22 @@ char *dtls_strdup(char *src) {
   return str;
 }
 
-bool openssl_global_init() {
-  OpenSSL_add_ssl_algorithms();
-  SSL_load_error_strings();
-  return SSL_library_init();
-}
-
 int dtls_trivial_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
   (void)preverify_ok;
   (void)ctx;
   return 1;
 }
 
-SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
-  if (cfg == NULL) {
+// dtls_init initializes openssl library.
+void dtls_init() {
+  OpenSSL_add_ssl_algorithms();
+  SSL_load_error_strings();
+  SSL_library_init();
+}
+
+// dtls_build_ssl_context creates and configures the ssl context.
+SSL_CTX *dtls_build_ssl_context(dtls_cert_st *cert) {
+  if (cert == NULL) {
     return NULL;
   }
 
@@ -61,11 +63,11 @@ SSL_CTX *dtls_build_sslctx(tlscfg *cfg) {
     goto error;
   }
 
-  if (!SSL_CTX_use_certificate(ctx, cfg->cert)) {
+  if (!SSL_CTX_use_certificate(ctx, cert->cert)) {
     goto error;
   }
 
-  if (!SSL_CTX_use_PrivateKey(ctx, cfg->pkey) || !SSL_CTX_check_private_key(ctx)) {
+  if (!SSL_CTX_use_PrivateKey(ctx, cert->pkey) || !SSL_CTX_check_private_key(ctx)) {
     goto error;
   }
 
@@ -82,14 +84,14 @@ error:
   return NULL;
 }
 
-dtls_sess *dtls_build_session(SSL_CTX *sslcfg, bool is_offer) {
-  dtls_sess *sess = (dtls_sess *)calloc(1, sizeof(dtls_sess));
+dtls_sess_st *dtls_build_session(SSL_CTX *ctx, bool is_offer) {
+  dtls_sess_st *sess = (dtls_sess_st *)calloc(1, sizeof(dtls_sess_st));
   BIO *rbio = NULL;
   BIO *wbio = NULL;
 
   sess->state = is_offer;
 
-  if (NULL == (sess->ssl = SSL_new(sslcfg))) {
+  if (NULL == (sess->ssl = SSL_new(ctx))) {
     goto error;
   }
 
@@ -127,8 +129,8 @@ error:
   return NULL;
 }
 
-extern void go_handle_sendto(const char *local, const char *remote, char *buf, int len);
-ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, char *local, char *remote) {
+extern void go_handle_sendto(char *buf, int len);
+ptrdiff_t dtls_flush(dtls_sess_st *sess) {
   if (sess->ssl == NULL) {
     return -2;
   }
@@ -140,15 +142,15 @@ ptrdiff_t dtls_sess_send_pending(dtls_sess *sess, char *local, char *remote) {
     len = BIO_read(wbio, buf, pending);
     buf = realloc(buf, len);
 
-    go_handle_sendto(local, remote, buf, len);
+    go_handle_sendto(buf, len);
     return len;
   }
   return 0;
 }
 
-static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess *sess) { return sess->state; }
+static inline enum dtls_con_state dtls_sess_get_state(const dtls_sess_st *sess) { return sess->state; }
 
-ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote) {
+ptrdiff_t dtls_do_handshake(dtls_sess_st *sess, char *local, char *remote) {
   if (sess->ssl == NULL ||
       (dtls_sess_get_state(sess) != DTLS_CONSTATE_ACT && dtls_sess_get_state(sess) != DTLS_CONSTATE_ACTPASS)) {
     return -2;
@@ -157,11 +159,11 @@ ptrdiff_t dtls_do_handshake(dtls_sess *sess, char *local, char *remote) {
     sess->state = DTLS_CONSTATE_ACT;
   }
   SSL_do_handshake(sess->ssl);
-  return dtls_sess_send_pending(sess, local, remote);
+  return dtls_flush(sess);
 }
 
-tlscfg *dtls_build_tlscfg() {
-  tlscfg *cfg = (tlscfg *)calloc(1, sizeof(tlscfg));
+dtls_cert_st *dtls_build_certificate() {
+  dtls_cert_st *cert = (dtls_cert_st *)calloc(1, sizeof(dtls_cert_st));
 
   static const int num_bits = 2048;
 
@@ -183,28 +185,28 @@ tlscfg *dtls_build_tlscfg() {
     goto error;
   }
 
-  if ((cfg->pkey = EVP_PKEY_new()) == NULL) {
+  if ((cert->pkey = EVP_PKEY_new()) == NULL) {
     goto error;
   }
 
-  if (!EVP_PKEY_assign_RSA(cfg->pkey, rsa_key)) {
+  if (!EVP_PKEY_assign_RSA(cert->pkey, rsa_key)) {
     goto error;
   }
 
   rsa_key = NULL;
-  if ((cfg->cert = X509_new()) == NULL) {
+  if ((cert->cert = X509_new()) == NULL) {
     goto error;
   }
 
-  X509_set_version(cfg->cert, 2);
-  ASN1_INTEGER_set(X509_get_serialNumber(cfg->cert), 1000); // TODO
-  X509_gmtime_adj(X509_get_notBefore(cfg->cert), -1 * ONE_YEAR);
-  X509_gmtime_adj(X509_get_notAfter(cfg->cert), ONE_YEAR);
-  if (!X509_set_pubkey(cfg->cert, cfg->pkey)) {
+  X509_set_version(cert->cert, 2);
+  ASN1_INTEGER_set(X509_get_serialNumber(cert->cert), 1000); // TODO
+  X509_gmtime_adj(X509_get_notBefore(cert->cert), -1 * ONE_YEAR);
+  X509_gmtime_adj(X509_get_notAfter(cert->cert), ONE_YEAR);
+  if (!X509_set_pubkey(cert->cert, cert->pkey)) {
     goto error;
   }
 
-  X509_NAME *cert_name = cert_name = X509_get_subject_name(cfg->cert);
+  X509_NAME *cert_name = cert_name = X509_get_subject_name(cert->cert);
   if (cert_name == NULL) {
     goto error;
   }
@@ -213,61 +215,61 @@ tlscfg *dtls_build_tlscfg() {
   X509_NAME_add_entry_by_txt(cert_name, "O", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
   X509_NAME_add_entry_by_txt(cert_name, "CN", MBSTRING_ASC, (const char unsigned *)name, -1, -1, 0);
 
-  if (!X509_set_issuer_name(cfg->cert, cert_name)) {
+  if (!X509_set_issuer_name(cert->cert, cert_name)) {
     goto error;
   }
 
-  if (!X509_sign(cfg->cert, cfg->pkey, EVP_sha1())) {
+  if (!X509_sign(cert->cert, cert->pkey, EVP_sha1())) {
     goto error;
   }
 
   BN_free(bne);
-  return cfg;
+  return cert;
 
 error:
   if (bne) {
     BN_free(bne);
   }
-  if (rsa_key && !cfg && !cfg->pkey) {
+  if (rsa_key && !cert && !cert->pkey) {
     RSA_free(rsa_key);
   }
-  if (cfg && cfg->pkey) {
-    EVP_PKEY_free(cfg->pkey);
+  if (cert && cert->pkey) {
+    EVP_PKEY_free(cert->pkey);
   }
-  if (cfg && cfg->cert) {
-    X509_free(cfg->cert);
+  if (cert && cert->cert) {
+    X509_free(cert->cert);
   }
   return NULL;
 }
 
 
-void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session, tlscfg *cfg) {
-  if (dtls_session) {
-    if (dtls_session->ssl != NULL) {
-      SSL_free(dtls_session->ssl);
-      dtls_session->ssl = NULL;
+void dtls_session_cleanup(SSL_CTX *ctx, dtls_sess_st *sess, dtls_cert_st *cert) {
+  if (sess) {
+    if (sess->ssl != NULL) {
+      SSL_free(sess->ssl);
+      sess->ssl = NULL;
     }
 
-    free(dtls_session);
+    free(sess);
   }
 
-  if (ssl_ctx) {
-    SSL_CTX_free(ssl_ctx);
+  if (ctx) {
+    SSL_CTX_free(ctx);
   }
 
-  if (cfg) {
-    if (cfg->cert) {
-      X509_free(cfg->cert);
+  if (cert) {
+    if (cert->cert) {
+      X509_free(cert->cert);
     }
-    if (cfg->pkey) {
-      EVP_PKEY_free(cfg->pkey);
+    if (cert->pkey) {
+      EVP_PKEY_free(cert->pkey);
     }
 
-    free(cfg);
+    free(cert);
   }
 }
 
-dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *local, char *remote) {
+dtls_decrypted *dtls_handle_incoming(dtls_sess_st *sess, void *buf, int len) {
   if (sess->ssl == NULL) {
     return NULL;
   }
@@ -283,19 +285,18 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *
     SSL_set_accept_state(sess->ssl);
   }
 
-  dtls_sess_send_pending(sess, local, remote);
+  dtls_flush(sess);
 
   BIO_write(rbio, buf, len);
   decrypted_len = SSL_read(sess->ssl, decrypted, len);
 
   if ((decrypted_len < 0) && SSL_get_error(sess->ssl, decrypted_len) == SSL_ERROR_SSL) {
-     fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
-             ERR_reason_error_string(ERR_get_error()));
+     fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess, ERR_reason_error_string(ERR_get_error()));
      free(decrypted);
      return ret;
   }
 
-  dtls_sess_send_pending(sess, local, remote);
+  dtls_flush(sess);
 
   if (SSL_is_init_finished(sess->ssl)) {
     sess->type = DTLS_CONTYPE_EXISTING;
@@ -312,7 +313,7 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *
   return ret;
 }
 
-bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char *remote) {
+bool dtls_handle_outgoing(dtls_sess_st *sess, void *buf, int len) {
   if (sess->ssl == NULL) {
     return false;
   }
@@ -320,25 +321,24 @@ bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char
   int written = SSL_write(sess->ssl, buf, len);
   if (written != len) {
     if (SSL_get_error(sess->ssl, written) == SSL_ERROR_SSL) {
-      fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess,
-          ERR_reason_error_string(ERR_get_error()));
+      fprintf(stderr, "DTLS failure occurred on dtls session %p due to reason '%s'\n", sess, ERR_reason_error_string(ERR_get_error()));
     }
     return false;
   }
 
-  dtls_sess_send_pending(sess, local, remote);
+  dtls_flush(sess);
 
   return true;
 }
 
-char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
-  if (cfg == NULL) {
+char *dtls_certificate_fingerprint(dtls_cert_st *cert) {
+  if (cert == NULL) {
     return NULL;
   }
 
   unsigned int size;
   unsigned char fingerprint[EVP_MAX_MD_SIZE];
-  if (X509_digest(cfg->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
+  if (X509_digest(cert->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
     return NULL;
   }
 
@@ -353,7 +353,7 @@ char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
   return hex_fingeprint;
 }
 
-dtls_cert_pair *dtls_get_certpair(dtls_sess *sess) {
+dtls_cert_pair *dtls_get_certpair(dtls_sess_st *sess) {
   if (sess->type == DTLS_CONTYPE_EXISTING) {
     unsigned char dtls_buffer[SRTP_MASTER_KEY_KEY_LEN * 2 + SRTP_MASTER_KEY_SALT_LEN * 2];
 
