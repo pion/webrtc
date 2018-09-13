@@ -42,6 +42,15 @@ func newTransport(address string) (*transport, error) {
 	return t, nil
 }
 
+func (t *transport) host() string {
+	host, _, _ := net.SplitHostPort(t.addr.String())
+	return host
+}
+
+func (t *transport) port() int {
+	return t.addr.Port
+}
+
 func (t *transport) handler() {
 	buffer := make([]byte, receiveMTU)
 	for {

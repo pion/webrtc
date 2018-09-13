@@ -25,4 +25,7 @@ var (
 
 	// ErrProtoType indicates an unsupported transport type was provided.
 	ErrProtoType = errors.New("invalid transport protocol type")
+
+	// ErrRandomNumber indicates that a random number generator failed.
+	ErrRandomNumber = errors.New("failed to generate random value")
 )
