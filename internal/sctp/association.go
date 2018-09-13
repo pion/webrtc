@@ -2,14 +2,14 @@ package sctp
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
-
 	"container/list"
-	"github.com/pkg/errors"
+	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // AssociationState is an enum for the states that an Association will transition
@@ -119,11 +119,9 @@ type Association struct {
 	// OnRestart func()
 	// OnShutdownComplete func()
 
-	Input  chan interface{}
-	reader chan interface{}
+	Input chan []byte
 
-	Output chan interface{}
-	writer chan interface{}
+	Output chan []byte
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
@@ -144,65 +142,32 @@ func NewAssocation() *Association {
 		myVerificationTag:       r.Uint32(),
 		myNextTSN:               r.Uint32(),
 		state:                   Open,
-		Input:                   make(chan interface{}, 1),
-		reader:                  make(chan interface{}, 1),
-		Output:                  make(chan interface{}, 1),
-		writer:                  make(chan interface{}, 1),
+		Input:                   make(chan []byte, 1),
+		Output:                  make(chan []byte, 1),
 	}
 
 	go association.inboundHander()
-	go association.outboundHandler()
 	return association
 }
 
-func (a *Association) outboundHandler() {
-	queue := list.New()
-	for {
-		if front := queue.Front(); front == nil {
-			if a.writer == nil {
-				close(a.Output)
-				return
-			}
-			value, ok := <-a.writer
-			if !ok {
-				close(a.Output)
-				return
-			}
-			queue.PushBack(value)
-		} else {
-			select {
-			case a.Output <- front.Value:
-				queue.Remove(front)
-			case value, ok := <-a.writer:
-				if ok {
-					queue.PushBack(value)
-				} else {
-					a.writer = nil
-				}
-			}
-		}
-	}
-}
-
 func (a *Association) inboundHander() {
+	reader := make(chan []byte, 1)
 	queue := list.New()
 	for {
 		if front := queue.Front(); front == nil {
 			if a.Input == nil {
-				close(a.reader)
 				return
 			}
 
 			value, ok := <-a.Input
 			if !ok {
-				close(a.reader)
 				return
 			}
 			queue.PushBack(value)
 		} else {
 			select {
-			case a.reader <- front.Value:
-				raw := (<-a.reader).([]byte)
+			case reader <- front.Value.([]byte):
+				raw := <-reader
 				packet := &packet{}
 				if err := packet.unmarshal(raw); err != nil {
 					fmt.Println(errors.Wrap(err, "Unable to parse SCTP packet"))
@@ -228,6 +193,35 @@ func (a *Association) inboundHander() {
 		}
 	}
 }
+
+// func (a *Association) outboundHandler() {
+// 	queue := list.New()
+// 	for {
+// 		if front := queue.Front(); front == nil {
+// 			if a.writer == nil {
+// 				close(a.Output)
+// 				return
+// 			}
+// 			value, ok := <-a.writer
+// 			if !ok {
+// 				close(a.Output)
+// 				return
+// 			}
+// 			queue.PushBack(value)
+// 		} else {
+// 			select {
+// 			case a.Output <- front.Value:
+// 				queue.Remove(front)
+// 			case value, ok := <-a.writer:
+// 				if ok {
+// 					queue.PushBack(value)
+// 				} else {
+// 					a.writer = nil
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
 func (a *Association) Associate(outboundStreamCount uint16) {
 	if a.OnCommunicationUp != nil {
@@ -498,7 +492,7 @@ func (a *Association) send(p *packet) error {
 		return errors.Wrap(err, "Failed to send packet to writer handler")
 	}
 
-	a.writer <- raw
+	a.Output <- raw
 	return nil
 }
 
