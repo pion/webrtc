@@ -13,12 +13,12 @@ const (
 
 // Candidate represents an ICE candidate
 type Candidate interface {
-	GetBase() *CandidateBase
+	Base() *baseCandidate
 }
 
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
-type CandidateBase struct {
+type baseCandidate struct {
 	Protocol ProtoType
 	Address  string
 	Port     int
@@ -26,41 +26,41 @@ type CandidateBase struct {
 }
 
 // Priority computes the priority for this ICE Candidate
-func (c *CandidateBase) Priority(typePreference uint16, component uint16) uint16 {
+func (c *baseCandidate) Priority(typePreference uint16, component uint16) uint16 {
 	localPreference := uint16(rand.New(rand.NewSource(time.Now().UnixNano())).Uint32() / 2)
 	return (2^24)*typePreference +
 		(2^8)*localPreference +
 		(2^0)*(256-component)
 }
 
-// CandidateHost is a Candidate of typ Host
-type CandidateHost struct {
-	CandidateBase
+// HostCandidate is a Candidate of typ Host
+type HostCandidate struct {
+	baseCandidate
 }
 
 // GetBase returns the CandidateBase, attributes shared between all Candidates
-func (c *CandidateHost) GetBase() *CandidateBase {
-	return &c.CandidateBase
+func (c *HostCandidate) Base() *baseCandidate {
+	return &c.baseCandidate
 }
 
 // Address for CandidateHost
-func (c *CandidateHost) Address() string {
-	return c.CandidateBase.Address
+func (c *HostCandidate) Address() string {
+	return c.baseCandidate.Address
 }
 
 // Port for CandidateHost
-func (c *CandidateHost) Port() int {
-	return c.CandidateBase.Port
+func (c *HostCandidate) Port() int {
+	return c.baseCandidate.Port
 }
 
 // CandidateSrflx is a Candidate of typ Server-Reflexive
-type CandidateSrflx struct {
-	CandidateBase
+type SrflxCandidate struct {
+	baseCandidate
 	RemoteAddress string
 	RemotePort    int
 }
 
 // GetBase returns the CandidateBase, attributes shared between all Candidates
-func (c *CandidateSrflx) GetBase() *CandidateBase {
-	return &c.CandidateBase
+func (c *SrflxCandidate) Base() *baseCandidate {
+	return &c.baseCandidate
 }

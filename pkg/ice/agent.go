@@ -157,7 +157,7 @@ func (a *Agent) taskLoop() {
 	assertSelectedPairValid := func() bool {
 		if a.selectedPair.remote == nil || a.selectedPair.local == nil {
 			return false
-		} else if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
+		} else if time.Since(a.selectedPair.remote.Base().LastSeen) > stunTimeout {
 			a.selectedPair.remote = nil
 			a.selectedPair.local = nil
 			a.updateConnectionState(ConnectionStateDisconnected)
@@ -208,7 +208,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.Base().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -220,7 +220,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.Base().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -234,14 +234,12 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	}
 
 	localAddr := net.UDPAddr{}
-	localAddr.IP, localAddr.Zone = splitIPZone(local.GetBase().Address)
-	localAddr.Port = local.GetBase().Port
+	localAddr.IP, localAddr.Zone = splitIPZone(local.Base().Address)
+	localAddr.Port = local.Base().Port
 
 	remoteAddr := net.UDPAddr{}
-	remoteAddr.IP, remoteAddr.Zone = splitIPZone(remote.GetBase().Address)
-	remoteAddr.Port = remote.GetBase().Port
-
-	fmt.Println(localAddr, remoteAddr)
+	remoteAddr.IP, remoteAddr.Zone = splitIPZone(remote.Base().Address)
+	remoteAddr.Port = remote.Base().Port
 
 	a.Send(msg.Pack(), &localAddr, &remoteAddr)
 }
@@ -257,12 +255,12 @@ func splitIPZone(s string) (ip net.IP, zone string) {
 
 func isCandidateMatch(c Candidate, testAddr *net.UDPAddr) bool {
 	host, _, _ := net.SplitHostPort(testAddr.String())
-	if c.GetBase().Address == host && c.GetBase().Port == testAddr.Port {
+	if c.Base().Address == host && c.Base().Port == testAddr.Port {
 		return true
 	}
 
 	switch c := c.(type) {
-	case *CandidateSrflx:
+	case *SrflxCandidate:
 		if c.RemoteAddress == host && c.RemotePort == testAddr.Port {
 			return true
 		}
@@ -317,7 +315,7 @@ func (a *Agent) handleInbound(buf []byte, local, remote *net.UDPAddr) {
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
-	remoteCandidate.GetBase().LastSeen = time.Now()
+	remoteCandidate.Base().LastSeen = time.Now()
 
 	m, err := stun.NewMessage(buf)
 	if err != nil {
@@ -386,8 +384,8 @@ func (a *Agent) gatherHostCandidates() error {
 		transport.onReceive = a.onReceiveHandler
 
 		a.transports[transport.addr.String()] = transport
-		a.addLocalCandidate(&CandidateHost{
-			CandidateBase: CandidateBase{
+		a.addLocalCandidate(&HostCandidate{
+			baseCandidate: baseCandidate{
 				Protocol: ProtoTypeUDP,
 				Address:  transport.host(),
 				Port:     transport.port(),
@@ -480,7 +478,7 @@ func (a *Agent) gatherSrvRflxCandidates(iceServers *[]*URL) error {
 func (a *Agent) addURL(url *URL) error {
 	switch url.Scheme {
 	case SchemeTypeSTUN:
-		candidate, err := a.getSrvRflxCandidate(url)
+		candidate, err := a.getSrflxCandidate(url)
 		if err != nil {
 			return err
 		}
@@ -501,7 +499,7 @@ func (a *Agent) addURL(url *URL) error {
 	return nil
 }
 
-func (a *Agent) getSrvRflxCandidate(url *URL) (*CandidateSrflx, error) {
+func (a *Agent) getSrflxCandidate(url *URL) (*SrflxCandidate, error) {
 	// TODO Do we want the timeout to be configurable?
 	proto := url.Proto.String()
 	client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
@@ -532,8 +530,8 @@ func (a *Agent) getSrvRflxCandidate(url *URL) (*CandidateSrflx, error) {
 		return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 	}
 
-	return &CandidateSrflx{
-		CandidateBase: CandidateBase{
+	return &SrflxCandidate{
+		baseCandidate: baseCandidate{
 			Protocol: ProtoTypeUDP,
 			Address:  addr.IP.String(),
 			Port:     addr.Port,
