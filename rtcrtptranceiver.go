@@ -14,6 +14,24 @@ type RTCRtpTransceiver struct {
 	// firedDirection   RTCRtpTransceiverDirection
 	// receptive bool
 	stopped bool
+
+	conn *RTCPeerConnection
+}
+
+func newRTCRtpTransceiver(pc *RTCPeerConnection) (*RTCRtpTransceiver, error) {
+	t := &RTCRtpTransceiver{
+		conn: pc,
+	}
+
+	t.Transport = pc.sctpTransport.Transport
+
+	// dtls -> sctp
+	t.Transport.toSctp = t.association.Input
+
+	// dtls <- sctp
+	t.Transport.fromSctp = t.association.Output
+
+	return t, nil
 }
 
 func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) error {

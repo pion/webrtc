@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"container/list"
 	"fmt"
 	"sync"
 
@@ -22,8 +23,8 @@ type RTCDtlsTransport struct {
 
 	conn     *RTCPeerConnection
 	dtls     *dtls.State
-	toSctp   chan interface{}
-	fromSctp chan interface{}
+	toSctp   chan []byte
+	fromSctp chan []byte
 }
 
 func newRTCDtlsTransport(connection *RTCPeerConnection) (*RTCDtlsTransport, error) {
@@ -32,27 +33,54 @@ func newRTCDtlsTransport(connection *RTCPeerConnection) (*RTCDtlsTransport, erro
 		conn:  connection,
 	}
 	t.dtls = dtls.NewState()
+	t.dtls.OnReceive = t.onReceiveHandler
 
 	var err error
-
 	t.Transport, err = newRTCIceTransport(connection)
 	if err != nil {
 		return nil, err
 	}
 
-	// ice -> dtls
-	t.Transport.toDtls = t.dtls.Input
+	t.Transport.toDtls = t.dtls.Input    // ice -> dtls
+	t.Transport.fromDtls = t.dtls.Output // ice <- dtls
+	go t.Transport.dtlsHandler()
 
-	// ice <- dtls
-	t.Transport.fromDtls = t.dtls.Output
-
-	go t.sctpHandler()
 	return t, nil
 }
 
 func (t *RTCDtlsTransport) sctpHandler() {
+	reader := make(chan []byte, 1)
+	queue := list.New()
 	for {
-		raw, ok := (<-t.fromSctp).([]byte)
+		if front := queue.Front(); front == nil {
+			if t.fromSctp == nil {
+				return
+			}
+			value, ok := <-t.fromSctp
+			if !ok {
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case reader <- front.Value.([]byte):
+				raw := <-reader
+
+				t.dtls.Send(raw)
+
+				queue.Remove(front)
+			case value, ok := <-t.fromSctp:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					t.fromSctp = nil
+				}
+			}
+		}
+	}
+
+	for {
+		raw, ok := <-t.fromSctp
 		if !ok {
 			return
 		}
@@ -79,4 +107,8 @@ func (t *RTCDtlsTransport) sctpHandler() {
 			fmt.Println(err)
 		}
 	}
+}
+
+func (t *RTCDtlsTransport) onReceiveHandler(event dtls.ReceiveEvent) {
+	t.toSctp <- event.Buffer
 }

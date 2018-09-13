@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	"fmt"
+	"container/list"
 
 	"github.com/pions/webrtc/pkg/ice"
 )
@@ -20,29 +20,59 @@ type RTCIceTransport struct {
 
 	agent    *ice.Agent
 	conn     *RTCPeerConnection
-	toDtls   chan interface{}
-	fromDtls chan interface{}
+	toDtls   chan []byte
+	fromDtls chan []byte
 }
 
-func newRTCIceTransport(connection *RTCPeerConnection) (*RTCIceTransport, error) {
+func newRTCIceTransport(pc *RTCPeerConnection) (*RTCIceTransport, error) {
 	t := &RTCIceTransport{
-		conn: connection,
+		conn: pc,
 	}
-	var err error
 
-	t.agent, err = ice.NewAgent()
+	iceServer, err := pc.configuration.getIceServers()
 	if err != nil {
 		return nil, err
 	}
 
-	go t.dtlsHandler()
-	go t.iceHandler()
+	t.agent, err = ice.NewAgent(iceServer)
+	if err != nil {
+		return nil, err
+	}
+	t.agent.OnReceive = t.onRecieveHandler
+
 	return t, nil
 }
 
 func (t *RTCIceTransport) dtlsHandler() {
+	queue := list.New()
 	for {
-		raw, ok := (<-t.fromDtls).([]byte)
+		if front := queue.Front(); front == nil {
+			if s.writer == nil {
+				close(s.Output)
+				return
+			}
+			value, ok := <-t.fromDtls
+			if !ok {
+				close(s.Output)
+				return
+			}
+			queue.PushBack(value)
+		} else {
+			select {
+			case s.Output <- front.Value:
+				queue.Remove(front)
+			case value, ok := <-s.writer:
+				if ok {
+					queue.PushBack(value)
+				} else {
+					s.writer = nil
+				}
+			}
+		}
+	}
+
+	for {
+		raw, ok := <-t.fromDtls
 		if !ok {
 			return
 		}
@@ -51,13 +81,14 @@ func (t *RTCIceTransport) dtlsHandler() {
 	}
 }
 
-func (t *RTCIceTransport) iceHandler() {
-	for {
-		raw, ok := <-t.agent.Output
-		if !ok {
-			return
-		}
-	}
+func (t *RTCIceTransport) onRecieveHandler(event ice.ReceiveEvent) {
+	t.toDtls <- event.Buffer
+	// for {
+	// 	raw, ok := <-t.agent.Output
+	// 	if !ok {
+	// 		return
+	// 	}
+	// }
 
 	// in, socketOpen := <-incomingPackets
 	// if !socketOpen {
@@ -66,25 +97,25 @@ func (t *RTCIceTransport) iceHandler() {
 	// 	return
 	// }
 
-	if len(buffer) == 0 {
-		fmt.Println("Inbound buffer is not long enough to demux")
-		return
-	}
-
-	// https://tools.ietf.org/html/rfc5764#page-14
-	if 127 < buffer[0] && buffer[0] < 192 {
-		p.handleSRTP(buffer)
-	} else if 19 < buffer[0] && buffer[0] < 64 {
-		p.handleDTLS(buffer, remoteAddr.String())
-	} else if buffer[0] < 2 {
-		p.m.IceAgent.HandleInbound(buffer, p.listeningAddr, remoteAddr.String())
-	}
-
-	p.m.certPairLock.RLock()
-	if !p.m.isOffer && p.m.certPair == nil {
-		p.m.dtlsState.DoHandshake(p.listeningAddr.String(), remoteAddr.String())
-	}
-	p.m.certPairLock.RUnlock()
+	// if len(buffer) == 0 {
+	// 	fmt.Println("Inbound buffer is not long enough to demux")
+	// 	return
+	// }
+	//
+	// // https://tools.ietf.org/html/rfc5764#page-14
+	// if 127 < buffer[0] && buffer[0] < 192 {
+	// 	p.handleSRTP(buffer)
+	// } else if 19 < buffer[0] && buffer[0] < 64 {
+	// 	p.handleDTLS(buffer, remoteAddr.String())
+	// } else if buffer[0] < 2 {
+	// 	p.m.IceAgent.HandleInbound(buffer, p.listeningAddr, remoteAddr.String())
+	// }
+	//
+	// p.m.certPairLock.RLock()
+	// if !p.m.isOffer && p.m.certPair == nil {
+	// 	p.m.dtlsState.DoHandshake(p.listeningAddr.String(), remoteAddr.String())
+	// }
+	// p.m.certPairLock.RUnlock()
 }
 
 func (t *RTCIceTransport) GetLocalCandidates() []RTCIceCandidate {
