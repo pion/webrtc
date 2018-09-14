@@ -6,18 +6,46 @@ import (
 	"github.com/pkg/errors"
 )
 
+// SDESType is the item type used in the RTCP SDES control packet.
+type SDESType uint8
+
 // RTP SDES item types registered with IANA. See: https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml#rtp-parameters-5
 const (
-	SDESEnd      = iota // end of SDES list                RFC 3550, 6.5
-	SDESCNAME           // canonical name                  RFC 3550, 6.5.1
-	SDESName            // user name                       RFC 3550, 6.5.2
-	SDESEmail           // user's electronic mail address  RFC 3550, 6.5.3
-	SDESPhone           // user's phone number             RFC 3550, 6.5.4
-	SDESLocation        // geographic user location        RFC 3550, 6.5.5
-	SDESTool            // name of application or tool     RFC 3550, 6.5.6
-	SDESNote            // notice about the source         RFC 3550, 6.5.7
-	SDESPrivate         // private extensions              RFC 3550, 6.5.8  (not implemented)
+	SDESEnd      SDESType = iota // end of SDES list                RFC 3550, 6.5
+	SDESCNAME                    // canonical name                  RFC 3550, 6.5.1
+	SDESName                     // user name                       RFC 3550, 6.5.2
+	SDESEmail                    // user's electronic mail address  RFC 3550, 6.5.3
+	SDESPhone                    // user's phone number             RFC 3550, 6.5.4
+	SDESLocation                 // geographic user location        RFC 3550, 6.5.5
+	SDESTool                     // name of application or tool     RFC 3550, 6.5.6
+	SDESNote                     // notice about the source         RFC 3550, 6.5.7
+	SDESPrivate                  // private extensions              RFC 3550, 6.5.8  (not implemented)
 )
+
+func (s SDESType) String() string {
+	switch s {
+	case SDESEnd:
+		return "END"
+	case SDESCNAME:
+		return "CNAME"
+	case SDESName:
+		return "NAME"
+	case SDESEmail:
+		return "EMAIL"
+	case SDESPhone:
+		return "PHONE"
+	case SDESLocation:
+		return "LOC"
+	case SDESTool:
+		return "TOOL"
+	case SDESNote:
+		return "NOTE"
+	case SDESPrivate:
+		return "PRIV"
+	default:
+		return string(s)
+	}
+}
 
 var (
 	errSDESTextTooLong = errors.New("session description must be < 255 octets long")
@@ -126,7 +154,7 @@ func (s SourceDescriptionChunk) Marshal() ([]byte, error) {
 	}
 
 	// The list of items in each chunk MUST be terminated by one or more null octets
-	rawPacket = append(rawPacket, SDESEnd)
+	rawPacket = append(rawPacket, uint8(SDESEnd))
 
 	// additional null octets MUST be included if needed to pad until the next 32-bit boundary
 	if size := len(rawPacket); size%4 != 0 {
@@ -155,7 +183,7 @@ func (s *SourceDescriptionChunk) Unmarshal(rawPacket []byte) error {
 	s.Source = binary.BigEndian.Uint32(rawPacket)
 
 	for i := 4; i < len(rawPacket); {
-		if pktType := rawPacket[i]; pktType == SDESEnd {
+		if pktType := SDESType(rawPacket[i]); pktType == SDESEnd {
 			return nil
 		}
 
@@ -190,7 +218,7 @@ type SourceDescriptionItem struct {
 	// The type identifier for this item. eg, SDESCNAME for canonical name description.
 	//
 	// Type zero or SDESEnd is interpreted as the end of an item list and cannot be used.
-	Type uint8
+	Type SDESType
 	// Text is a unicode text blob associated with the item. Its meaning varies based on the item's Type.
 	Text string
 }
@@ -222,7 +250,7 @@ func (s SourceDescriptionItem) Marshal() ([]byte, error) {
 
 	rawPacket := make([]byte, sdesTypeLen+sdesOctetCountLen)
 
-	rawPacket[sdesTypeOffset] = s.Type
+	rawPacket[sdesTypeOffset] = uint8(s.Type)
 
 	txtBytes := []byte(s.Text)
 	octetCount := len(txtBytes)
@@ -250,7 +278,7 @@ func (s *SourceDescriptionItem) Unmarshal(rawPacket []byte) error {
 		return errPacketTooShort
 	}
 
-	s.Type = rawPacket[sdesTypeOffset]
+	s.Type = SDESType(rawPacket[sdesTypeOffset])
 
 	octetCount := int(rawPacket[sdesOctetCountOffset])
 	if sdesTextOffset+octetCount > len(rawPacket) {
