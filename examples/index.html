@@ -1,0 +1,15 @@
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>pions/webrtc examples!</title>
+	</head>
+	<body>
+		<ol>
+			{{range .}}
+				<li><a href="/example/{{ .Link }}/">{{ .Title }}</a>: {{ .Description }}</li>
+			{{else}}
+				<li><strong>No examples found!</strong></li>
+			{{end}}
+		</ol>
+	</body>
+</html>
