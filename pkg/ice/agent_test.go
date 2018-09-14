@@ -39,6 +39,7 @@ func TestAgent_Start(t *testing.T) {
 	assert.Nil(t, err)
 
 	agent2.AddRemoteCandidate(agent1.LocalCandidates[0])
+	agent2.Start(false, agent1.LocalUfrag, agent1.LocalPwd)
 
 	agent1.AddRemoteCandidate(agent2.LocalCandidates[0])
 	agent1.Start(true, agent2.LocalUfrag, agent2.LocalPwd)

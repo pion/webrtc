@@ -157,7 +157,7 @@ func (a *Agent) taskLoop() {
 	assertSelectedPairValid := func() bool {
 		if a.selectedPair.remote == nil || a.selectedPair.local == nil {
 			return false
-		} else if time.Since(a.selectedPair.remote.Base().LastSeen) > stunTimeout {
+		} else if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
 			a.selectedPair.remote = nil
 			a.selectedPair.local = nil
 			a.updateConnectionState(ConnectionStateDisconnected)
@@ -204,11 +204,14 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	var err error
 
 	if a.isControlling {
-		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(
+			stun.ClassRequest,
+			stun.MethodBinding,
+			stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.Base().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -216,11 +219,13 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		)
 
 	} else {
-		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(
+			stun.ClassRequest,
+			stun.MethodBinding,
+			stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
-			&stun.UseCandidate{},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.Base().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -234,12 +239,12 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	}
 
 	localAddr := net.UDPAddr{}
-	localAddr.IP, localAddr.Zone = splitIPZone(local.Base().Address)
-	localAddr.Port = local.Base().Port
+	localAddr.IP, localAddr.Zone = splitIPZone(local.GetBase().Address)
+	localAddr.Port = local.GetBase().Port
 
 	remoteAddr := net.UDPAddr{}
-	remoteAddr.IP, remoteAddr.Zone = splitIPZone(remote.Base().Address)
-	remoteAddr.Port = remote.Base().Port
+	remoteAddr.IP, remoteAddr.Zone = splitIPZone(remote.GetBase().Address)
+	remoteAddr.Port = remote.GetBase().Port
 
 	a.Send(msg.Pack(), &localAddr, &remoteAddr)
 }
@@ -255,12 +260,12 @@ func splitIPZone(s string) (ip net.IP, zone string) {
 
 func isCandidateMatch(c Candidate, testAddr *net.UDPAddr) bool {
 	host, _, _ := net.SplitHostPort(testAddr.String())
-	if c.Base().Address == host && c.Base().Port == testAddr.Port {
+	if c.GetBase().Address == host && c.GetBase().Port == testAddr.Port {
 		return true
 	}
 
 	switch c := c.(type) {
-	case *SrflxCandidate:
+	case *CandidateSrflx:
 		if c.RemoteAddress == host && c.RemotePort == testAddr.Port {
 			return true
 		}
@@ -279,7 +284,10 @@ func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 }
 
 func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *net.UDPAddr) {
-	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
+	if out, err := stun.Build(
+		stun.ClassSuccessResponse,
+		stun.MethodBinding,
+		m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
 				IP:   remote.IP,
@@ -315,7 +323,7 @@ func (a *Agent) handleInbound(buf []byte, local, remote *net.UDPAddr) {
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
-	remoteCandidate.Base().LastSeen = time.Now()
+	remoteCandidate.GetBase().LastSeen = time.Now()
 
 	m, err := stun.NewMessage(buf)
 	if err != nil {
@@ -329,17 +337,6 @@ func (a *Agent) handleInbound(buf []byte, local, remote *net.UDPAddr) {
 		a.handleInboundControlled(m, local, remote, localCandidate, remoteCandidate)
 	}
 
-}
-
-func (a *Agent) handleInboundControlled(m *stun.Message, local, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
-	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
-		fmt.Println("inbound isControlled && a.isControlling == false")
-		return
-	}
-
-	_, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate)
-	a.setValidPair(localCandidate, remoteCandidate, useCandidateFound)
-	a.sendBindingSuccess(m, local, remote)
 }
 
 func (a *Agent) handleInboundControlling(m *stun.Message, local, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
@@ -357,6 +354,16 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local, remote *net.UDP
 	if !final {
 		a.sendBindingSuccess(m, local, remote)
 	}
+}
+
+func (a *Agent) handleInboundControlled(m *stun.Message, local, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
+		fmt.Println("inbound isControlled && a.isControlling == false")
+		return
+	}
+
+	a.setValidPair(localCandidate, remoteCandidate, false)
+	a.sendBindingSuccess(m, local, remote)
 }
 
 func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
@@ -377,15 +384,15 @@ func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
 
 func (a *Agent) gatherHostCandidates() error {
 	for _, ip := range getLocalInterfaces() {
-		transport, err := newTransport(ip + ":0")
+		transport, err := newTransport(net.JoinHostPort(ip, "0"))
 		if err != nil {
 			return err
 		}
 		transport.onReceive = a.onReceiveHandler
 
 		a.transports[transport.addr.String()] = transport
-		a.addLocalCandidate(&HostCandidate{
-			baseCandidate: baseCandidate{
+		a.addLocalCandidate(&CandidateHost{
+			CandidateBase: CandidateBase{
 				Protocol: ProtoTypeUDP,
 				Address:  transport.host(),
 				Port:     transport.port(),
@@ -450,14 +457,35 @@ func getLocalInterfaces() (IPs []string) {
 				continue
 			}
 
-			if ip4 := ip.To4(); ip4 != nil {
-				IPs = append(IPs, ip4.String())
-			} else {
-				IPs = append(IPs, "["+ip.String()+"%"+iface.Name+"]")
+			// The conditions of invalidation written below are defined in
+			// https://tools.ietf.org/html/rfc8445#section-5.1.1.1
+			if ip := ip.To4(); ip != nil {
+				IPs = append(IPs, ip.String())
+				continue
 			}
+
+			if len(ip) != net.IPv6len ||
+				!isZeros(ip[0:12]) || // !(IPv4-compatible IPv6)
+				ip[0] == 0xfe && ip[1]&0xc0 == 0xc0 || // !(IPv6 site-local unicast)
+				ip.IsLinkLocalUnicast() ||
+				ip.IsLinkLocalMulticast() {
+				continue
+			}
+
+			IPs = append(IPs, ip.String())
+
 		}
 	}
 	return IPs
+}
+
+func isZeros(p net.IP) bool {
+	for i := 0; i < len(p); i++ {
+		if p[i] != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *Agent) gatherSrvRflxCandidates(iceServers *[]*URL) error {
@@ -490,7 +518,9 @@ func (a *Agent) addURL(url *URL) error {
 			return err
 		}
 
-		a.transports[transport.addr.String()] = transport
+		host := candidate.GetBase().Address
+		port := strconv.Itoa(candidate.GetBase().Port)
+		a.transports[net.JoinHostPort(host, port)] = transport
 		a.addLocalCandidate(candidate)
 	default:
 		return errors.Errorf("%s is not implemented", url.Scheme.String())
@@ -499,7 +529,7 @@ func (a *Agent) addURL(url *URL) error {
 	return nil
 }
 
-func (a *Agent) getSrflxCandidate(url *URL) (*SrflxCandidate, error) {
+func (a *Agent) getSrflxCandidate(url *URL) (*CandidateSrflx, error) {
 	// TODO Do we want the timeout to be configurable?
 	proto := url.Proto.String()
 	client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
@@ -530,8 +560,8 @@ func (a *Agent) getSrflxCandidate(url *URL) (*SrflxCandidate, error) {
 		return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 	}
 
-	return &SrflxCandidate{
-		baseCandidate: baseCandidate{
+	return &CandidateSrflx{
+		CandidateBase: CandidateBase{
 			Protocol: ProtoTypeUDP,
 			Address:  addr.IP.String(),
 			Port:     addr.Port,
