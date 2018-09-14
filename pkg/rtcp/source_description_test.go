@@ -13,8 +13,16 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		WantError error
 	}{
 		{
-			Name: "nil",
-			Data: nil,
+			Name:      "nil",
+			Data:      nil,
+			WantError: errInvalidHeader,
+		},
+		{
+			Name: "no chunks",
+			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=8
+				0x80, 0xca, 0x00, 0x04,
+			},
 			Want: SourceDescription{
 				Chunks: nil,
 			},
@@ -22,6 +30,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "missing type",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=8
+				0x81, 0xca, 0x00, 0x08,
 				// ssrc=0x00000000
 				0x00, 0x00, 0x00, 0x00,
 			},
@@ -30,6 +40,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "bad cname length",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=10
+				0x81, 0xca, 0x00, 0x0a,
 				// ssrc=0x00000000
 				0x00, 0x00, 0x00, 0x00,
 				// CNAME, len = 1
@@ -40,6 +52,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "short cname",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=9
+				0x81, 0xca, 0x00, 0x09,
 				// ssrc=0x00000000
 				0x00, 0x00, 0x00, 0x00,
 				// CNAME, Missing length
@@ -50,6 +64,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "no end",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=11
+				0x81, 0xca, 0x00, 0x0b,
 				// ssrc=0x00000000
 				0x00, 0x00, 0x00, 0x00,
 				// CNAME, len=1, content=A
@@ -59,13 +75,22 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 			WantError: errPacketTooShort,
 		},
 		{
-			Name:      "bad octet count",
-			Data:      []byte{0, 0, 0, 0, 1, 1},
+			Name: "bad octet count",
+			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=10
+				0x81, 0xca, 0x00, 0x0a,
+				// ssrc=0x00000000
+				0x00, 0x00, 0x00, 0x00,
+				// CNAME, len=1
+				0x01, 0x01,
+			},
 			WantError: errPacketTooShort,
 		},
 		{
 			Name: "zero item chunk",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=12
+				0x81, 0xca, 0x00, 0x0c,
 				// ssrc=0x01020304
 				0x01, 0x02, 0x03, 0x04,
 				// END + padding
@@ -79,8 +104,30 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			Name: "wrong type",
+			Data: []byte{
+				// v=2, p=0, count=1, SR, len=12
+				0x81, 0xc8, 0x00, 0x0c,
+				// ssrc=0x01020304
+				0x01, 0x02, 0x03, 0x04,
+				// END + padding
+				0x00, 0x00, 0x00, 0x00,
+			},
+			WantError: errWrongType,
+		},
+		{
+			Name: "bad count in header",
+			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=12
+				0x81, 0xca, 0x00, 0x0c,
+			},
+			WantError: errInvalidHeader,
+		},
+		{
 			Name: "empty string",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=12
+				0x81, 0xca, 0x00, 0x0c,
 				// ssrc=0x01020304
 				0x01, 0x02, 0x03, 0x04,
 				// CNAME, len=0
@@ -103,6 +150,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "two items",
 			Data: []byte{
+				// v=2, p=0, count=1, SDES, len=16
+				0x81, 0xca, 0x00, 0x10,
 				// ssrc=0x10000000
 				0x10, 0x00, 0x00, 0x00,
 				// CNAME, len=1, content=A
@@ -133,6 +182,8 @@ func TestSourceDescriptionUnmarshal(t *testing.T) {
 		{
 			Name: "two chunks",
 			Data: []byte{
+				// v=2, p=0, count=2, SDES, len=24
+				0x82, 0xca, 0x00, 0x18,
 				// ssrc=0x01020304
 				0x01, 0x02, 0x03, 0x04,
 				// Chunk 1
@@ -278,6 +329,13 @@ func TestSourceDescriptionRoundTrip(t *testing.T) {
 			},
 			WantError: errSDESTextTooLong,
 		},
+		{
+			Name: "count overflow",
+			Desc: SourceDescription{
+				Chunks: tooManyChunks,
+			},
+			WantError: errTooManyChunks,
+		},
 	} {
 		data, err := test.Desc.Marshal()
 		if got, want := err, test.WantError; got != want {
@@ -295,5 +353,14 @@ func TestSourceDescriptionRoundTrip(t *testing.T) {
 		if got, want := decoded, test.Desc; !reflect.DeepEqual(got, want) {
 			t.Fatalf("%q sdes round trip: got %#v, want %#v", test.Name, got, want)
 		}
+	}
+}
+
+// a slice with enough SourceDescriptionChunks to overflow an 5-bit int
+var tooManyChunks []SourceDescriptionChunk
+
+func init() {
+	for i := 0; i < (1 << 5); i++ {
+		tooManyChunks = append(tooManyChunks, SourceDescriptionChunk{})
 	}
 }

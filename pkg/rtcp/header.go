@@ -35,6 +35,8 @@ func (p PacketType) String() string {
 	}
 }
 
+const rtpVersion = 2
+
 // A Header is the common header shared by all RTCP packets
 type Header struct {
 	// Identifies the version of RTP, which is the same in RTCP packets
@@ -56,7 +58,10 @@ type Header struct {
 var (
 	errInvalidTotalLost = errors.New("rtcp: invalid total lost count")
 	errInvalidHeader    = errors.New("rtcp: invalid header")
+	errTooManyReports   = errors.New("rtcp: too many reports")
+	errTooManyChunks    = errors.New("rtcp: too many chunks")
 	errPacketTooShort   = errors.New("rtcp: packet too short")
+	errWrongType        = errors.New("rtcp: wrong packet type")
 )
 
 const (
@@ -67,6 +72,7 @@ const (
 	paddingMask  = 0x1
 	countShift   = 0
 	countMask    = 0x1f
+	countMax     = (1 << 5) - 1
 )
 
 // Marshal encodes the Header in binary
