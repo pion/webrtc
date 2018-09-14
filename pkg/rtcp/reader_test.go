@@ -9,7 +9,7 @@ import (
 // An RTCP packet from a packet dump
 var realPacket = []byte{
 	// Receiver Report (offset=0)
-	// v=1, p=0, count=1, RR, len=7
+	// v=2, p=0, count=1, RR, len=7
 	0x81, 0xc9, 0x0, 0x7,
 	// ssrc=0x902f9e2e
 	0x90, 0x2f, 0x9e, 0x2e,
@@ -27,7 +27,7 @@ var realPacket = []byte{
 	0x0, 0x2, 0x4a, 0x79,
 
 	// Source Description (offset=32)
-	// v=1, p=0, count=1, SDES, len=12
+	// v=2, p=0, count=1, SDES, len=12
 	0x81, 0xca, 0x0, 0xc,
 	// ssrc=0x902f9e2e
 	0x90, 0x2f, 0x9e, 0x2e,
@@ -63,7 +63,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read rr: %v", err)
 	}
 	var rr ReceiverReport
-	if err := rr.Unmarshal(packet[headerLength:]); err != nil {
+	if err := rr.Unmarshal(packet); err != nil {
 		t.Errorf("Unmarshal rr: %v", err)
 	}
 	wantRR := ReceiverReport{
@@ -88,7 +88,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read sdes: %v", err)
 	}
 	var sdes SourceDescription
-	if err := sdes.Unmarshal(packet[headerLength:]); err != nil {
+	if err := sdes.Unmarshal(packet); err != nil {
 		t.Errorf("Unmarshal: %v", err)
 	}
 	wantSdes := SourceDescription{

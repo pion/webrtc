@@ -92,6 +92,23 @@ func (s SourceDescription) Marshal() ([]byte, error) {
 		rawPacket = append(rawPacket, data...)
 	}
 
+	if len(s.Chunks) > countMax {
+		return nil, errTooManyChunks
+	}
+
+	h := Header{
+		Version: rtpVersion,
+		Count:   uint8(len(s.Chunks)),
+		Type:    TypeSourceDescription,
+		Length:  uint16(headerLength + len(rawPacket)),
+	}
+	hData, err := h.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	rawPacket = append(hData, rawPacket...)
+
 	return rawPacket, nil
 }
 
@@ -111,7 +128,16 @@ func (s *SourceDescription) Unmarshal(rawPacket []byte) error {
 	 *        +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 	 */
 
-	for i := 0; i < len(rawPacket); {
+	var h Header
+	if err := h.Unmarshal(rawPacket); err != nil {
+		return err
+	}
+
+	if h.Type != TypeSourceDescription {
+		return errWrongType
+	}
+
+	for i := headerLength; i < len(rawPacket); {
 		var chunk SourceDescriptionChunk
 		if err := chunk.Unmarshal(rawPacket[i:]); err != nil {
 			return err
@@ -119,6 +145,10 @@ func (s *SourceDescription) Unmarshal(rawPacket []byte) error {
 		s.Chunks = append(s.Chunks, chunk)
 
 		i += chunk.len()
+	}
+
+	if len(s.Chunks) != int(h.Count) {
+		return errInvalidHeader
 	}
 
 	return nil
