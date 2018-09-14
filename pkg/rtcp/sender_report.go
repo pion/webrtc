@@ -34,22 +34,28 @@ type SenderReport struct {
 }
 
 var (
-	senderReportLength = 24
-	ntpTimeOffset      = 4
-	rtpTimeOffset      = 12
-	packetCountOffset  = 16
-	octetCountOffset   = 20
+	srHeaderLength      = 24
+	srSSRCOffset        = 0
+	srNTPOffset         = srSSRCOffset + ssrcLength
+	ntpTimeLength       = 8
+	srRTPOffset         = srNTPOffset + ntpTimeLength
+	rtpTimeLength       = 4
+	srPacketCountOffset = srRTPOffset + rtpTimeLength
+	srPacketCountLength = 4
+	srOctetCountOffset  = srPacketCountOffset + srPacketCountLength
+	srOctetCountLength  = 4
+	srReportOffset      = srOctetCountOffset + srOctetCountLength
 )
 
 // Marshal encodes the SenderReport in binary
 func (r SenderReport) Marshal() ([]byte, error) {
-	rawPacket := make([]byte, senderReportLength)
+	rawPacket := make([]byte, srHeaderLength)
 
-	binary.BigEndian.PutUint32(rawPacket, r.SSRC)
-	binary.BigEndian.PutUint64(rawPacket[ntpTimeOffset:], r.NTPTime)
-	binary.BigEndian.PutUint32(rawPacket[rtpTimeOffset:], r.RTPTime)
-	binary.BigEndian.PutUint32(rawPacket[packetCountOffset:], r.PacketCount)
-	binary.BigEndian.PutUint32(rawPacket[octetCountOffset:], r.OctetCount)
+	binary.BigEndian.PutUint32(rawPacket[srSSRCOffset:], r.SSRC)
+	binary.BigEndian.PutUint64(rawPacket[srNTPOffset:], r.NTPTime)
+	binary.BigEndian.PutUint32(rawPacket[srRTPOffset:], r.RTPTime)
+	binary.BigEndian.PutUint32(rawPacket[srPacketCountOffset:], r.PacketCount)
+	binary.BigEndian.PutUint32(rawPacket[srOctetCountOffset:], r.OctetCount)
 
 	for _, rp := range r.Reports {
 		data, err := rp.Marshal()
@@ -59,27 +65,59 @@ func (r SenderReport) Marshal() ([]byte, error) {
 		rawPacket = append(rawPacket, data...)
 	}
 
+	if len(r.Reports) > countMax {
+		return nil, errTooManyReports
+	}
+
+	h := Header{
+		Version: rtpVersion,
+		Count:   uint8(len(r.Reports)),
+		Type:    TypeSenderReport,
+		Length:  uint16(headerLength + len(rawPacket)),
+	}
+	hData, err := h.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	rawPacket = append(hData, rawPacket...)
+
 	return rawPacket, nil
 }
 
 // Unmarshal decodes the SenderReport from binary
 func (r *SenderReport) Unmarshal(rawPacket []byte) error {
-	if len(rawPacket) < senderReportLength {
+	if len(rawPacket) < (headerLength + srHeaderLength) {
 		return errPacketTooShort
 	}
 
-	r.SSRC = binary.BigEndian.Uint32(rawPacket)
-	r.NTPTime = binary.BigEndian.Uint64(rawPacket[ntpTimeOffset:])
-	r.RTPTime = binary.BigEndian.Uint32(rawPacket[rtpTimeOffset:])
-	r.PacketCount = binary.BigEndian.Uint32(rawPacket[packetCountOffset:])
-	r.OctetCount = binary.BigEndian.Uint32(rawPacket[octetCountOffset:])
+	var h Header
+	if err := h.Unmarshal(rawPacket); err != nil {
+		return err
+	}
 
-	for i := senderReportLength; i < len(rawPacket); i += receptionReportLength {
+	if h.Type != TypeSenderReport {
+		return errWrongType
+	}
+
+	packetBody := rawPacket[headerLength:]
+
+	r.SSRC = binary.BigEndian.Uint32(packetBody[srSSRCOffset:])
+	r.NTPTime = binary.BigEndian.Uint64(packetBody[srNTPOffset:])
+	r.RTPTime = binary.BigEndian.Uint32(packetBody[srRTPOffset:])
+	r.PacketCount = binary.BigEndian.Uint32(packetBody[srPacketCountOffset:])
+	r.OctetCount = binary.BigEndian.Uint32(packetBody[srOctetCountOffset:])
+
+	for i := srReportOffset; i < len(packetBody); i += receptionReportLength {
 		var rr ReceptionReport
-		if err := rr.Unmarshal(rawPacket[i:]); err != nil {
+		if err := rr.Unmarshal(packetBody[i:]); err != nil {
 			return err
 		}
 		r.Reports = append(r.Reports, rr)
+	}
+
+	if uint8(len(r.Reports)) != h.Count {
+		return errInvalidHeader
 	}
 
 	return nil
