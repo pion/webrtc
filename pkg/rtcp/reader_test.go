@@ -1,17 +1,16 @@
 package rtcp
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
 
 // An RTCP packet from a packet dump
 var realPacket = []byte{
-	// Header (offset=0)
+	// Receiver Report (offset=0)
 	// v=1, p=0, count=1, RR, len=7
 	0x81, 0xc9, 0x0, 0x7,
-
-	// Receiver Report (offset=4)
 	// ssrc=0x902f9e2e
 	0x90, 0x2f, 0x9e, 0x2e,
 	// ssrc=0xbc5e9a40
@@ -27,11 +26,9 @@ var realPacket = []byte{
 	// delay=150137
 	0x0, 0x2, 0x4a, 0x79,
 
-	// Header (offset=32)
+	// Source Description (offset=32)
 	// v=1, p=0, count=1, SDES, len=12
 	0x81, 0xca, 0x0, 0xc,
-
-	// Source Description (offset=36)
 	// ssrc=0x902f9e2e
 	0x90, 0x2f, 0x9e, 0x2e,
 	// CNAME, len=38
@@ -50,7 +47,7 @@ var realPacket = []byte{
 	// END + padding
 	0x0, 0x0, 0x0, 0x0,
 
-	// Header (offset=84)
+	// Goodbye (offset=84)
 	// v=1, p=0, count=1, BYE, len=1
 	0x81, 0xcb, 0x0, 0x1,
 	// source=0x902f9e2e
@@ -58,33 +55,16 @@ var realPacket = []byte{
 }
 
 func TestUnmarshal(t *testing.T) {
-	// TODO: write a Packet class to make parsing multiple packets easier
+	r := NewReader(bytes.NewReader(realPacket))
 
-	var offset uint16
-
-	// Get header
-	wantHeader := Header{
-		Version: 2,
-		Padding: false,
-		Count:   1,
-		Type:    TypeReceiverReport,
-		Length:  7,
+	// ReceiverReport
+	_, packet, err := r.ReadPacket()
+	if err != nil {
+		t.Fatalf("Read rr: %v", err)
 	}
-	var header Header
-	if err := header.Unmarshal(realPacket[offset:]); err != nil {
-		t.Errorf("Unmarshal: %v", err)
-	}
-	if got, want := wantHeader, header; !reflect.DeepEqual(got, want) {
-		t.Errorf("Unmarshal: got %#v, want %#v", got, want)
-	}
-
-	// Get RR
-	pktLen := (header.Length + 1) * 4
-	rrData := realPacket[headerLength:pktLen]
-
 	var rr ReceiverReport
-	if err := rr.Unmarshal(rrData); err != nil {
-		t.Errorf("Unmarshal: %v", err)
+	if err := rr.Unmarshal(packet[headerLength:]); err != nil {
+		t.Errorf("Unmarshal rr: %v", err)
 	}
 	wantRR := ReceiverReport{
 		SSRC: 0x902f9e2e,
@@ -99,32 +79,16 @@ func TestUnmarshal(t *testing.T) {
 		}},
 	}
 	if got, want := wantRR, rr; !reflect.DeepEqual(got, want) {
-		t.Errorf("Unmarshal: got %#v, want %#v", got, want)
+		t.Errorf("Unmarshal rr: got %#v, want %#v", got, want)
 	}
 
-	offset += pktLen
-
-	// Get Header
-	if err := header.Unmarshal(realPacket[offset:]); err != nil {
-		t.Errorf("Unmarshal: %v", err)
+	// SourceDescription
+	_, packet, err = r.ReadPacket()
+	if err != nil {
+		t.Fatalf("Read sdes: %v", err)
 	}
-	wantHeader = Header{
-		Version: 2,
-		Padding: false,
-		Count:   1,
-		Type:    TypeSourceDescription,
-		Length:  12,
-	}
-	if got, want := header, wantHeader; !reflect.DeepEqual(got, want) {
-		t.Errorf("Unmarshal: got %#v, want %#v", got, want)
-	}
-
-	// Get SDES
-	pktLen = (header.Length + 1) * 4
-	sdesData := realPacket[offset+headerLength : offset+pktLen]
-
 	var sdes SourceDescription
-	if err := sdes.Unmarshal(sdesData); err != nil {
+	if err := sdes.Unmarshal(packet[headerLength:]); err != nil {
 		t.Errorf("Unmarshal: %v", err)
 	}
 	wantSdes := SourceDescription{
@@ -141,23 +105,6 @@ func TestUnmarshal(t *testing.T) {
 		},
 	}
 	if got, want := sdes, wantSdes; !reflect.DeepEqual(got, want) {
-		t.Errorf("sdes: got %#v, want %#v", got, want)
-	}
-
-	offset += pktLen
-
-	// Get header
-	if err := header.Unmarshal(realPacket[offset:]); err != nil {
-		t.Errorf("Unmarshal: %v", err)
-	}
-	wantHeader = Header{
-		Version: 2,
-		Padding: false,
-		Count:   1,
-		Type:    TypeGoodbye,
-		Length:  1,
-	}
-	if got, want := wantHeader, header; !reflect.DeepEqual(got, want) {
-		t.Errorf("Unmarshal: got %#v, want %#v", got, want)
+		t.Errorf("Unmarshal sdes: got %#v, want %#v", got, want)
 	}
 }
