@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"github.com/pions/webrtc/pkg/ice"
+)
+
 // RTCConfiguration defines a set of parameters to configure how the
 // peer-to-peer communication via RTCPeerConnection is established or
 // re-established.
@@ -40,4 +44,18 @@ type RTCConfiguration struct {
 
 	// IceCandidatePoolSize describes the size of the prefetched ICE pool.
 	IceCandidatePoolSize uint8
+}
+
+func (c RTCConfiguration) getIceServers() (*[]*ice.URL, error) {
+	var iceServers []*ice.URL
+	for _, server := range c.IceServers {
+		for _, rawURL := range server.URLs {
+			url, err := ice.ParseURL(rawURL)
+			if err != nil {
+				return nil, err
+			}
+			iceServers = append(iceServers, url)
+		}
+	}
+	return &iceServers, nil
 }
