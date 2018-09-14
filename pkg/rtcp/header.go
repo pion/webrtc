@@ -6,14 +6,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+// PacketType specifies the type of an RTCP packet
+type PacketType uint8
+
 // RTCP packet types registered with IANA. See: https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml#rtp-parameters-4
 const (
-	TypeSenderReport       = 200 // RFC 3550, 6.4.1
-	TypeReceiverReport     = 201 // RFC 3550, 6.4.2
-	TypeSourceDescription  = 202 // RFC 3550, 6.5
-	TypeGoodbye            = 203 // RFC 3550, 6.6
-	TypeApplicationDefined = 204 // RFC 3550, 6.7
+	TypeSenderReport       PacketType = 200 // RFC 3550, 6.4.1
+	TypeReceiverReport     PacketType = 201 // RFC 3550, 6.4.2
+	TypeSourceDescription  PacketType = 202 // RFC 3550, 6.5
+	TypeGoodbye            PacketType = 203 // RFC 3550, 6.6
+	TypeApplicationDefined PacketType = 204 // RFC 3550, 6.7
 )
+
+func (p PacketType) String() string {
+	switch p {
+	case TypeSenderReport:
+		return "SR"
+	case TypeReceiverReport:
+		return "RR"
+	case TypeSourceDescription:
+		return "SDES"
+	case TypeGoodbye:
+		return "BYE"
+	case TypeApplicationDefined:
+		return "APP"
+	default:
+		return string(p)
+	}
+}
 
 // A Header is the common header shared by all RTCP packets
 type Header struct {
@@ -27,7 +47,7 @@ type Header struct {
 	// The number of reception reports or sources contained in this packet (depending on the Type)
 	Count uint8
 	// The RTCP packet type for this packet
-	Type uint8
+	Type PacketType
 	// The length of this RTCP packet in 32-bit words minus one,
 	// including the header and any padding.
 	Length uint16
@@ -75,7 +95,7 @@ func (h Header) Marshal() ([]byte, error) {
 	}
 	rawPacket[0] |= h.Count << countShift
 
-	rawPacket[1] = h.Type
+	rawPacket[1] = uint8(h.Type)
 
 	binary.BigEndian.PutUint16(rawPacket[2:], h.Length)
 
@@ -100,7 +120,7 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	h.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
 	h.Count = rawPacket[0] >> countShift & countMask
 
-	h.Type = rawPacket[1]
+	h.Type = PacketType(rawPacket[1])
 
 	h.Length = binary.BigEndian.Uint16(rawPacket[2:])
 
