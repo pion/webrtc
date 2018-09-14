@@ -41,26 +41,30 @@ type MediaEngine struct {
 
 // RegisterCodec registers a codec to a media engine
 func (m *MediaEngine) RegisterCodec(codec *RTCRtpCodec) uint8 {
+	if codec.PayloadType == nil {
+		// check for existing payload type
+		for _, c := range m.codecs {
+			if c.Equals(codec) {
+				codec.PayloadType = new(uint8)
+				*codec.PayloadType = *c.PayloadType
+				break
+			}
+		}
 
-	var payloadType uint8
-
-	// check for existing payload type
-	for _, c := range m.codecs {
-		if c.Name == codec.Name {
-			payloadType = c.PayloadType
-			break
+		if codec.PayloadType == nil {
+			codec.PayloadType = new(uint8)
+			if m.nextPayloadType >= 96 && m.nextPayloadType <= 127 {
+				*codec.PayloadType = m.nextPayloadType
+				m.nextPayloadType++
+			}
+			// FIXME: if nextPayloadType is > 127 then the assigned payload type will
+			// default to zero which is a valid type (PCMU)
+			// we should start using values marked 'unassigned' as per RFC3551
 		}
 	}
 
-	if payloadType > 0 {
-		codec.PayloadType = payloadType
-	} else if m.nextPayloadType >= 96 && m.nextPayloadType <= 127 {
-		codec.PayloadType = m.nextPayloadType
-		m.nextPayloadType++
-	}
-
 	m.codecs = append(m.codecs, codec)
-	return codec.PayloadType
+	return *codec.PayloadType
 }
 
 func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTCRtpCodec, error) {
@@ -176,10 +180,22 @@ func (t RTCRtpCodecType) String() string {
 // RTCRtpCodec represents a codec supported by the PeerConnection
 type RTCRtpCodec struct {
 	RTCRtpCodecCapability
-	Type        RTCRtpCodecType
-	Name        string
-	PayloadType uint8
+	Type RTCRtpCodecType
+	Name string
+	// use a pointer for payload type as uint8(0) is a valid type (PCMU)
+	PayloadType *uint8
 	Payloader   rtp.Payloader
+}
+
+// Equals checks two RTCRtpCodec values for equality
+func (c1 RTCRtpCodec) Equals(c2 *RTCRtpCodec) bool {
+	if c1.Name == c2.Name &&
+		c1.ClockRate == c2.ClockRate &&
+		c1.SdpFmtpLine == c2.SdpFmtpLine &&
+		c1.Channels == c2.Channels {
+		return true
+	}
+	return false
 }
 
 // NewRTCRtpCodec is used to define a new codec

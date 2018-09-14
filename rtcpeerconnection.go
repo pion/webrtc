@@ -1192,7 +1192,7 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 	for _, codec := range pc.mediaEngine.getCodecsByKind(codecType) {
-		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
+		media.WithCodec(*codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
 	}
 
 	weSend := false
@@ -1299,7 +1299,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	}
 
 	t := &RTCTrack{
-		PayloadType: codec.PayloadType,
+		PayloadType: *codec.PayloadType,
 		Kind:        codec.Type,
 		ID:          id,
 		Label:       label,

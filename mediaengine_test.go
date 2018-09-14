@@ -14,7 +14,7 @@ func TestDefaultCodecs(t *testing.T) {
 	assert.Len(t, codecs, 1)
 	for _, c := range codecs {
 		assert.Equal(t, c.Type, RTCRtpCodecTypeAudio)
-		if c.PayloadType < 96 || c.PayloadType > 127 {
+		if *c.PayloadType < 96 || *c.PayloadType > 127 {
 			assert.Fail(t, "payload type outside dynamic range")
 		}
 	}
@@ -23,7 +23,7 @@ func TestDefaultCodecs(t *testing.T) {
 	assert.Len(t, codecs, 3)
 	for _, c := range codecs {
 		assert.Equal(t, c.Type, RTCRtpCodecTypeVideo)
-		if c.PayloadType < 96 || c.PayloadType > 127 {
+		if *c.PayloadType < 96 || *c.PayloadType > 127 {
 			assert.Fail(t, "payload type outside dynamic range")
 		}
 	}
