@@ -50,9 +50,7 @@ const (
 	rtcIceConnectionStateClosedStr       = "closed"
 )
 
-// NewRTCIceConnectionState defines a procedure for creating a new
-// RTCIceConnectionState from a raw string naming the signaling state.
-func NewRTCIceConnectionState(raw string) RTCIceConnectionState {
+func newRTCIceConnectionState(raw string) RTCIceConnectionState {
 	switch raw {
 	case rtcIceConnectionStateNewStr:
 		return RTCIceConnectionStateNew

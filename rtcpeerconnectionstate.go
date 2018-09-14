@@ -44,9 +44,7 @@ const (
 	rtcPeerConnectionStateClosedStr       = "closed"
 )
 
-// NewRTCPeerConnectionState defines a procedure for creating a new
-// RTCPeerConnectionState from a raw string naming the peer connection state.
-func NewRTCPeerConnectionState(raw string) RTCPeerConnectionState {
+func newRTCPeerConnectionState(raw string) RTCPeerConnectionState {
 	switch raw {
 	case rtcPeerConnectionStateNewStr:
 		return RTCPeerConnectionStateNew

@@ -21,8 +21,8 @@ func TestNewRTCDtlsTransportState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCDtlsTransportState(testCase.stateString),
 			testCase.expectedState,
+			newRTCDtlsTransportState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -43,8 +43,8 @@ func TestRTCDtlsTransportState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

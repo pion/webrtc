@@ -30,9 +30,7 @@ const (
 	rtcDataChannelStateClosedStr     = "closed"
 )
 
-// NewRTCDataChannelState defines a procedure for creating a new
-// RTCDataChannelState from a raw string naming the data chanenel state.
-func NewRTCDataChannelState(raw string) RTCDataChannelState {
+func newRTCDataChannelState(raw string) RTCDataChannelState {
 	switch raw {
 	case rtcDataChannelStateConnectingStr:
 		return RTCDataChannelStateConnecting

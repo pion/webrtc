@@ -23,8 +23,8 @@ func TestNewRTCIceConnectionState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCIceConnectionState(testCase.stateString),
 			testCase.expectedState,
+			newRTCIceConnectionState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -47,8 +47,8 @@ func TestRTCIceConnectionState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

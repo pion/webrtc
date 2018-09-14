@@ -19,8 +19,8 @@ func TestNewRTCIceGatheringState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCIceGatheringState(testCase.stateString),
 			testCase.expectedState,
+			newRTCIceGatheringState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -39,8 +39,8 @@ func TestRTCIceGatheringState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

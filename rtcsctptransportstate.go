@@ -27,9 +27,7 @@ const (
 	rtcSctpTransportStateClosedStr     = "closed"
 )
 
-// NewRTCSctpTransportState defines a procedure for creating a new
-// RTCSctpTransportState from a raw string naming the transport state.
-func NewRTCSctpTransportState(raw string) RTCSctpTransportState {
+func newRTCSctpTransportState(raw string) RTCSctpTransportState {
 	switch raw {
 	case rtcSctpTransportStateConnectingStr:
 		return RTCSctpTransportStateConnecting

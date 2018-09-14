@@ -9,19 +9,31 @@ import (
 func TestNewRTCPriorityType(t *testing.T) {
 	testCases := []struct {
 		priorityString   string
+		priorityUint16   uint16
 		expectedPriority RTCPriorityType
 	}{
-		{"unknown", RTCPriorityType(Unknown)},
-		{"very-low", RTCPriorityTypeVeryLow},
-		{"low", RTCPriorityTypeLow},
-		{"medium", RTCPriorityTypeMedium},
-		{"high", RTCPriorityTypeHigh},
+		{"unknown", 0, RTCPriorityType(Unknown)},
+		{"very-low", 100, RTCPriorityTypeVeryLow},
+		{"low", 200, RTCPriorityTypeLow},
+		{"medium", 300, RTCPriorityTypeMedium},
+		{"high", 1000, RTCPriorityTypeHigh},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCPriorityType(testCase.priorityString),
 			testCase.expectedPriority,
+			newRTCPriorityTypeFromString(testCase.priorityString),
+			"testCase: %d %v", i, testCase,
+		)
+
+		// There is no uint that produces generate RTCPriorityType(Unknown).
+		if i == 0 {
+			continue
+		}
+
+		assert.Equal(t,
+			testCase.expectedPriority,
+			newRTCPriorityTypeFromUint16(testCase.priorityUint16),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -41,8 +53,8 @@ func TestRTCPriorityType_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.priority.String(),
 			testCase.expectedString,
+			testCase.priority.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

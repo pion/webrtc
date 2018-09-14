@@ -20,8 +20,8 @@ func TestNewRTCSdpType(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCSdpType(testCase.sdpTypeString),
 			testCase.expectedSdpType,
+			newRTCSdpType(testCase.sdpTypeString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -41,8 +41,8 @@ func TestRTCSdpType_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.sdpType.String(),
 			testCase.expectedString,
+			testCase.sdpType.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

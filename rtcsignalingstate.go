@@ -41,9 +41,7 @@ const (
 	rtcSignalingStateClosedStr             = "closed"
 )
 
-// NewRTCSignalingState defines a procedure for creating a new
-// RTCSignalingState from a raw string naming the signaling state.
-func NewRTCSignalingState(raw string) RTCSignalingState {
+func newRTCSignalingState(raw string) RTCSignalingState {
 	switch raw {
 	case rtcSignalingStateStableStr:
 		return RTCSignalingStateStable

@@ -20,9 +20,7 @@ const (
 	rtcIceCredentialTypeOauthStr    = "oauth"
 )
 
-// NewRTCIceCredentialType defines a procedure for creating a new
-// RTCIceCredentialType from a raw string naming the ice credential type.
-func NewRTCIceCredentialType(raw string) RTCIceCredentialType {
+func newRTCIceCredentialType(raw string) RTCIceCredentialType {
 	switch raw {
 	case rtcIceCredentialTypePasswordStr:
 		return RTCIceCredentialTypePassword

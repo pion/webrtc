@@ -22,8 +22,8 @@ func TestNewRTCSignalingState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCSignalingState(testCase.stateString),
 			testCase.expectedState,
+			newRTCSignalingState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -45,8 +45,8 @@ func TestRTCSignalingState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

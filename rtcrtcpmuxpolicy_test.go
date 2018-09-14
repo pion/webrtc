@@ -18,8 +18,8 @@ func TestNewRTCRtcpMuxPolicy(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCRtcpMuxPolicy(testCase.policyString),
 			testCase.expectedPolicy,
+			newRTCRtcpMuxPolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -37,8 +37,8 @@ func TestRTCRtcpMuxPolicy_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.policy.String(),
 			testCase.expectedString,
+			testCase.policy.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

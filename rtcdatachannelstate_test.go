@@ -20,8 +20,8 @@ func TestNewRTCDataChannelState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCDataChannelState(testCase.stateString),
 			testCase.expectedState,
+			newRTCDataChannelState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -41,8 +41,8 @@ func TestRTCDataChannelState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}
