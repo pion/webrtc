@@ -41,9 +41,7 @@ const (
 	rtcSdpTypeRollbackStr = "rollback"
 )
 
-// NewRTCSdpType defines a procedure for creating a new RTCSdpType from a raw
-// string naming the session description protocol type.
-func NewRTCSdpType(raw string) RTCSdpType {
+func newRTCSdpType(raw string) RTCSdpType {
 	switch raw {
 	case rtcSdpTypeOfferStr:
 		return RTCSdpTypeOffer

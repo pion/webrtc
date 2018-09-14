@@ -18,8 +18,8 @@ func TestNewRTCIceTransportPolicy(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCIceTransportPolicy(testCase.policyString),
 			testCase.expectedPolicy,
+			newRTCIceTransportPolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -37,8 +37,8 @@ func TestRTCIceTransportPolicy_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.policy.String(),
 			testCase.expectedString,
+			testCase.policy.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

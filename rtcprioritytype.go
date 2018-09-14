@@ -25,9 +25,7 @@ const (
 	rtcPriorityTypeHighStr    = "high"
 )
 
-// NewRTCPriorityType defines a procedure for creating a new RTCPriorityType
-// from a raw string naming the priority type.
-func NewRTCPriorityType(raw string) RTCPriorityType {
+func newRTCPriorityTypeFromString(raw string) RTCPriorityType {
 	switch raw {
 	case rtcPriorityTypeVeryLowStr:
 		return RTCPriorityTypeVeryLow
@@ -36,6 +34,21 @@ func NewRTCPriorityType(raw string) RTCPriorityType {
 	case rtcPriorityTypeMediumStr:
 		return RTCPriorityTypeMedium
 	case rtcPriorityTypeHighStr:
+		return RTCPriorityTypeHigh
+	default:
+		return RTCPriorityType(Unknown)
+	}
+}
+
+func newRTCPriorityTypeFromUint16(raw uint16) RTCPriorityType {
+	switch {
+	case raw <= 128:
+		return RTCPriorityTypeVeryLow
+	case 129 <= raw && raw <= 256:
+		return RTCPriorityTypeLow
+	case 257 <= raw && raw <= 512:
+		return RTCPriorityTypeMedium
+	case 513 <= raw:
 		return RTCPriorityTypeHigh
 	default:
 		return RTCPriorityType(Unknown)

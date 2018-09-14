@@ -22,8 +22,8 @@ func TestNewRTCPeerConnectionState(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCPeerConnectionState(testCase.stateString),
 			testCase.expectedState,
+			newRTCPeerConnectionState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -45,8 +45,8 @@ func TestRTCPeerConnectionState_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.state.String(),
 			testCase.expectedString,
+			testCase.state.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

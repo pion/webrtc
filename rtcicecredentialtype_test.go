@@ -18,8 +18,8 @@ func TestNewRTCIceCredentialType(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCIceCredentialType(testCase.credentialTypeString),
 			testCase.expectedCredentialType,
+			newRTCIceCredentialType(testCase.credentialTypeString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -37,8 +37,8 @@ func TestRTCIceCredentialType_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.credentialType.String(),
 			testCase.expectedString,
+			testCase.credentialType.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

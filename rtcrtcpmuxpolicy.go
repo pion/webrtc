@@ -23,9 +23,7 @@ const (
 	rtcRtcpMuxPolicyRequireStr   = "require"
 )
 
-// NewRTCRtcpMuxPolicy defines a procedure for creating a new RTCRtcpMuxPolicy
-// from a raw string naming the rtcp multiplexing policy.
-func NewRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
+func newRTCRtcpMuxPolicy(raw string) RTCRtcpMuxPolicy {
 	switch raw {
 	case rtcRtcpMuxPolicyNegotiateStr:
 		return RTCRtcpMuxPolicyNegotiate

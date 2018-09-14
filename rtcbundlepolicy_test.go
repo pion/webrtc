@@ -19,8 +19,8 @@ func TestNewRTCBundlePolicy(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCBundlePolicy(testCase.policyString),
 			testCase.expectedPolicy,
+			newRTCBundlePolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -39,8 +39,8 @@ func TestRTCBundlePolicy_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.policy.String(),
 			testCase.expectedString,
+			testCase.policy.String(),
 			"testCase: %d %v", i, testCase,
 		)
 	}

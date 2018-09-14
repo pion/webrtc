@@ -25,9 +25,7 @@ const (
 	rtcIceGatheringStateCompleteStr  = "complete"
 )
 
-// NewRTCIceGatheringState defines a procedure for creating a new
-// RTCIceGatheringState from a raw string naming the gathering state.
-func NewRTCIceGatheringState(raw string) RTCIceGatheringState {
+func newRTCIceGatheringState(raw string) RTCIceGatheringState {
 	switch raw {
 	case rtcIceGatheringStateNewStr:
 		return RTCIceGatheringStateNew

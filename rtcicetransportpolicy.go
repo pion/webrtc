@@ -19,9 +19,7 @@ const (
 	rtcIceTransportPolicyAllStr   = "all"
 )
 
-// NewRTCIceTransportPolicy defines a procedure for creating a new
-// RTCIceTransportPolicy from a raw string naming the ice transport policy.
-func NewRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
+func newRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
 	switch raw {
 	case rtcIceTransportPolicyRelayStr:
 		return RTCIceTransportPolicyRelay

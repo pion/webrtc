@@ -36,9 +36,7 @@ const (
 	rtcDtlsTransportStateFailedStr     = "failed"
 )
 
-// NewRTCDtlsTransportState defines a procedure for creating a new
-// RTCDtlsTransportState from a raw string naming the transport state.
-func NewRTCDtlsTransportState(raw string) RTCDtlsTransportState {
+func newRTCDtlsTransportState(raw string) RTCDtlsTransportState {
 	switch raw {
 	case rtcDtlsTransportStateNewStr:
 		return RTCDtlsTransportStateNew
