@@ -1299,7 +1299,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	}
 
 	t := &RTCTrack{
-		PayloadType: payloadType,
+		PayloadType: codec.PayloadType,
 		Kind:        codec.Type,
 		ID:          id,
 		Label:       label,

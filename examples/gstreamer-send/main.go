@@ -19,7 +19,10 @@ func main() {
 
 	// Setup the codecs you want to use.
 	// We'll use the default ones but you can also define your own
-	webrtc.RegisterDefaultCodecs()
+	audioCodec := webrtc.NewRTCRtpOpusCodec(48000, 2)
+	webrtc.RegisterCodec(audioCodec)
+	videoCodec := webrtc.NewRTCRtpVP8Codec(90000)
+	webrtc.RegisterCodec(videoCodec)
 
 	// Prepare the configuration
 	config := webrtc.RTCConfiguration{
