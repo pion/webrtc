@@ -7,6 +7,7 @@ package dtls
 #cgo darwin LDFLAGS: -L/usr/local/opt/openssl/lib -L/usr/local/opt/openssl/lib -lssl -lcrypto
 #cgo windows CFLAGS: -DWIN32_LEAN_AND_MEAN
 
+#include "queue.h"
 #include "dtls.h"
 
 */
@@ -19,6 +20,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// export go_callback
+func go_callback() {}
+
 func init() {
 	C.dtls_init()
 }
@@ -26,45 +30,45 @@ func init() {
 // var listenerMap = make(map[string]*ipv4.PacketConn)
 // var listenerMapLock = &sync.Mutex{}
 
-//export go_handle_sendto
-func go_handle_sendto(rawBuf *C.char, rawBufLen C.int) {
-	// local := C.GoString(rawLocal)
-	// remote := C.GoString(rawRemote)
-	// buf := []byte(C.GoStringN(rawBuf, rawBufLen))
-	// C.free(unsafe.Pointer(rawBuf))
-	//
-	// listenerMapLock.Lock()
-	// defer listenerMapLock.Unlock()
-	// if conn, ok := listenerMap[local]; ok {
-	// 	strIP, strPort, err := net.SplitHostPort(remote)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return
-	// 	}
-	// 	port, err := strconv.Atoi(strPort)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return
-	// 	}
-	// 	_, err = conn.WriteTo(buf, nil, &net.UDPAddr{IP: net.ParseIP(strIP), Port: port})
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 	}
-	// } else {
-	// 	fmt.Printf("Could not find ipv4.PacketConn for %s \n", local)
-	// }
-}
+// export go_handle_sendto
+// func go_handle_sendto(rawBuf *C.char, rawBufLen C.int) {
+// 	local := C.GoString(rawLocal)
+// 	remote := C.GoString(rawRemote)
+// 	buf := []byte(C.GoStringN(rawBuf, rawBufLen))
+// 	C.free(unsafe.Pointer(rawBuf))
+//
+// 	listenerMapLock.Lock()
+// 	defer listenerMapLock.Unlock()
+// 	if conn, ok := listenerMap[local]; ok {
+// 		strIP, strPort, err := net.SplitHostPort(remote)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		}
+// 		port, err := strconv.Atoi(strPort)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return
+// 		}
+// 		_, err = conn.WriteTo(buf, nil, &net.UDPAddr{IP: net.ParseIP(strIP), Port: port})
+// 		if err != nil {
+// 			fmt.Println(err)
+// 		}
+// 	} else {
+// 		fmt.Printf("Could not find ipv4.PacketConn for %s \n", local)
+// 	}
+// }
 
 // State represents all the state needed for a DTLS session
 type State struct {
 	sync.Mutex
 
-	cert *C.struct_dtls_cert_st
-	ctx  *C.struct_ssl_ctx_st
-	sess *C.struct_dtls_sess_st
+	queue *C.struct_queue_st
+	cert  *C.struct_dtls_cert_st
+	ctx   *C.struct_ssl_ctx_st
+	sess  *C.struct_dtls_sess_st
 
-	Input chan []byte
-
+	Input  chan []byte
 	Output chan []byte
 
 	OnReceive func(ReceiveEvent)
@@ -73,12 +77,16 @@ type State struct {
 // New creates a new DTLS session
 func NewState() *State {
 	state := &State{
-		cert: C.dtls_build_certificate(),
-	}
+		queue: C.queue_init(),
+		cert:  C.dtls_build_certificate(),
 
+		Input:  make(chan []byte, 1),
+		Output: make(chan []byte, 1),
+	}
 	state.ctx = C.dtls_build_ssl_context(state.cert)
 
 	go state.inboundHander()
+	go state.outboundHandler()
 	return state
 }
 
@@ -137,34 +145,15 @@ func (s *State) inboundHander() {
 	}
 }
 
-// func (s *State) outboundHandler() {
-// 	queue := list.New()
-// 	for {
-// 		if front := queue.Front(); front == nil {
-// 			if s.writer == nil {
-// 				close(s.Output)
-// 				return
-// 			}
-// 			value, ok := <-s.writer
-// 			if !ok {
-// 				close(s.Output)
-// 				return
-// 			}
-// 			queue.PushBack(value)
-// 		} else {
-// 			select {
-// 			case s.Output <- front.Value:
-// 				queue.Remove(front)
-// 			case value, ok := <-s.writer:
-// 				if ok {
-// 					queue.PushBack(value)
-// 				} else {
-// 					s.writer = nil
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+func (s *State) outboundHandler() {
+	for {
+		msg := C.queue_get(s.queue, nil)
+		if msg == nil {
+			break
+		}
+
+	}
+}
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (s *State) Start(isOffer bool) {
@@ -173,6 +162,7 @@ func (s *State) Start(isOffer bool) {
 
 // Close cleans up the associated OpenSSL resources
 func (s *State) Close() {
+	C.queue_destroy(s.queue)
 	C.dtls_session_cleanup(s.ctx, s.sess, s.cert)
 }
 
@@ -209,12 +199,12 @@ func (s *State) handleInbound(packet []byte) ([]byte, error) {
 		C.free(packetRaw)
 	}()
 
-	if ret := C.dtls_handle_incoming(s.sess, packetRaw, C.int(len(packet))); ret != nil {
+	if ret := C.dtls_handle_incoming(s.sess, s.queue, packetRaw, C.int(len(packet))); ret != nil {
 		defer func() {
-			C.free(ret.buf)
+			C.free(ret.data)
 			C.free(unsafe.Pointer(ret))
 		}()
-		return C.GoBytes(ret.buf, ret.len), nil
+		return C.GoBytes(ret.data, ret.size), nil
 	}
 	return nil, nil
 }
@@ -237,7 +227,7 @@ func (s *State) Send(packet []byte) (bool, error) {
 		C.free(packetRaw)
 	}()
 
-	return bool(C.dtls_handle_outgoing(s.sess, packetRaw, C.int(len(packet)))), nil
+	return bool(C.dtls_handle_outgoing(s.sess, s.queue, packetRaw, C.int(len(packet)))), nil
 }
 
 // GetCertPair gets the current CertPair if DTLS has finished
@@ -275,5 +265,5 @@ func (s *State) DoHandshake(local, remote string) {
 		C.free(unsafe.Pointer(rawRemote))
 	}()
 
-	C.dtls_do_handshake(s.sess, rawLocal, rawRemote)
+	C.dtls_do_handshake(s.sess, s.queue, rawLocal, rawRemote)
 }

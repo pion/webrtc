@@ -37,10 +37,10 @@ typedef struct dtls_sess_st {
   enum dtls_con_type type;
 } dtls_sess_st;
 
-typedef struct dtls_decrypted {
-  void *buf;
-  int len;
-} dtls_decrypted;
+typedef struct dtls_buffer_st {
+  void *data;
+  int size;
+} dtls_buffer_st;
 
 #define PROFILE_STRING_LENGTH 23
 #define SRTP_MASTER_KEY_KEY_LEN 16
@@ -61,11 +61,11 @@ SSL_CTX *dtls_build_ssl_context(dtls_cert_st *cert);
 
 dtls_sess_st *dtls_build_session(SSL_CTX *ctx, bool is_offer);
 
-ptrdiff_t dtls_do_handshake(dtls_sess_st *sess, char *local, char *remote);
+ptrdiff_t dtls_do_handshake(dtls_sess_st *sess, queue_st *queue, char *local, char *remote);
 
-dtls_decrypted *dtls_handle_incoming(dtls_sess_st *sess, void *buf, int len);
+dtls_buffer_st *dtls_handle_incoming(dtls_sess_st *sess, queue_st *queue, void *buf, int len);
 
-bool dtls_handle_outgoing(dtls_sess_st *sess, void *buf, int len);
+bool dtls_handle_outgoing(dtls_sess_st *sess, queue_st *queue, void *buf, int len);
 
 dtls_cert_pair *dtls_get_certpair(dtls_sess_st *sess);
 
