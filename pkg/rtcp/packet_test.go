@@ -89,13 +89,13 @@ func TestUnmarshal(t *testing.T) {
 	wantRR := ReceiverReport{
 		SSRC: 0x902f9e2e,
 		Reports: []ReceptionReport{{
-			SSRC:         0xbc5e9a40,
-			FractionLost: 0,
-			TotalLost:    0,
-			LastSeq:      0x46e1,
-			Jitter:       273,
-			LastSR:       0x9f36432,
-			Delay:        150137,
+			SSRC:               0xbc5e9a40,
+			FractionLost:       0,
+			TotalLost:          0,
+			LastSequenceNumber: 0x46e1,
+			Jitter:             273,
+			LastSenderReport:   0x9f36432,
+			Delay:              150137,
 		}},
 	}
 	if got, want := wantRR, rr; !reflect.DeepEqual(got, want) {

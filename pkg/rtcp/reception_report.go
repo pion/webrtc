@@ -19,7 +19,7 @@ type ReceptionReport struct {
 	// RTP data packet from source SSRC, and the most significant 16
 	// bits extend that sequence number with the corresponding count of
 	// sequence number cycles.
-	LastSeq uint32
+	LastSequenceNumber uint32
 	// An estimate of the statistical variance of the RTP data packet
 	// interarrival time, measured in timestamp units and expressed as an
 	// unsigned integer.
@@ -27,7 +27,7 @@ type ReceptionReport struct {
 	// The middle 32 bits out of 64 in the NTP timestamp received as part of
 	// the most recent RTCP sender report (SR) packet from source SSRC. If no
 	// SR has been received yet, the field is set to zero.
-	LastSR uint32
+	LastSenderReport uint32
 	// The delay, expressed in units of 1/65536 seconds, between receiving the
 	// last SR packet from source SSRC and sending this reception report block.
 	// If no SR packet has been received yet from SSRC, the field is set to zero.
@@ -79,9 +79,9 @@ func (r ReceptionReport) Marshal() ([]byte, error) {
 	tlBytes[1] = byte(r.TotalLost >> 8)
 	tlBytes[2] = byte(r.TotalLost)
 
-	binary.BigEndian.PutUint32(rawPacket[lastSeqOffset:], r.LastSeq)
+	binary.BigEndian.PutUint32(rawPacket[lastSeqOffset:], r.LastSequenceNumber)
 	binary.BigEndian.PutUint32(rawPacket[jitterOffset:], r.Jitter)
-	binary.BigEndian.PutUint32(rawPacket[lastSROffset:], r.LastSR)
+	binary.BigEndian.PutUint32(rawPacket[lastSROffset:], r.LastSenderReport)
 	binary.BigEndian.PutUint32(rawPacket[delayOffset:], r.Delay)
 
 	return rawPacket, nil
@@ -117,9 +117,9 @@ func (r *ReceptionReport) Unmarshal(rawPacket []byte) error {
 	tlBytes := rawPacket[totalLostOffset:]
 	r.TotalLost = uint32(tlBytes[2]) | uint32(tlBytes[1])<<8 | uint32(tlBytes[0])<<16
 
-	r.LastSeq = binary.BigEndian.Uint32(rawPacket[lastSeqOffset:])
+	r.LastSequenceNumber = binary.BigEndian.Uint32(rawPacket[lastSeqOffset:])
 	r.Jitter = binary.BigEndian.Uint32(rawPacket[jitterOffset:])
-	r.LastSR = binary.BigEndian.Uint32(rawPacket[lastSROffset:])
+	r.LastSenderReport = binary.BigEndian.Uint32(rawPacket[lastSROffset:])
 	r.Delay = binary.BigEndian.Uint32(rawPacket[delayOffset:])
 
 	return nil
