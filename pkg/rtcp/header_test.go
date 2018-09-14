@@ -8,7 +8,7 @@ import (
 func TestHeaderUnmarshalNil(t *testing.T) {
 	var header Header
 	err := header.Unmarshal(nil)
-	if got, want := err, errPacketTooShort; got != want {
+	if got, want := err, errInvalidHeader; got != want {
 		t.Fatalf("unmarshal nil header: err = %v, want %v", got, want)
 	}
 }
@@ -43,14 +43,14 @@ func TestHeaderRoundTrip(t *testing.T) {
 			Header: Header{
 				Version: 99,
 			},
-			WantError: errInvalidVersion,
+			WantError: errInvalidHeader,
 		},
 		{
 			Name: "invalid count",
 			Header: Header{
 				Count: 40,
 			},
-			WantError: errInvalidCount,
+			WantError: errInvalidHeader,
 		},
 	} {
 		data, err := test.Header.Marshal()

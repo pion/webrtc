@@ -54,10 +54,9 @@ type Header struct {
 }
 
 var (
-	errInvalidVersion   = errors.New("invalid version")
-	errInvalidCount     = errors.New("invalid count header")
-	errInvalidTotalLost = errors.New("invalid total lost count")
-	errPacketTooShort   = errors.New("packet too short")
+	errInvalidTotalLost = errors.New("rtcp: invalid total lost count")
+	errInvalidHeader    = errors.New("rtcp: invalid header")
+	errPacketTooShort   = errors.New("rtcp: packet too short")
 )
 
 const (
@@ -82,7 +81,7 @@ func (h Header) Marshal() ([]byte, error) {
 	rawPacket := make([]byte, headerLength)
 
 	if h.Version > 3 {
-		return nil, errInvalidVersion
+		return nil, errInvalidHeader
 	}
 	rawPacket[0] |= h.Version << versionShift
 
@@ -91,7 +90,7 @@ func (h Header) Marshal() ([]byte, error) {
 	}
 
 	if h.Count > 31 {
-		return nil, errInvalidCount
+		return nil, errInvalidHeader
 	}
 	rawPacket[0] |= h.Count << countShift
 
@@ -105,7 +104,7 @@ func (h Header) Marshal() ([]byte, error) {
 // Unmarshal decodes the Header from binary
 func (h *Header) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
-		return errPacketTooShort
+		return errInvalidHeader
 	}
 
 	/*
