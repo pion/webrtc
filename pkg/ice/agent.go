@@ -35,11 +35,19 @@ type CandidatePair struct {
 	local  Candidate
 }
 
-// GetAddrs returns network addresses for the candidate pair
-func (c CandidatePair) GetAddrs() (local *stun.TransportAddr, remote *net.UDPAddr) {
+func (c CandidatePair) getAddrs() (local *stun.TransportAddr, remote *net.UDPAddr) {
+	localIP := net.ParseIP(c.local.GetBase().Address)
+	localPort := c.local.GetBase().Port
+
+	switch c := c.local.(type) {
+	case *CandidateSrflx:
+		localIP = net.ParseIP(c.RemoteAddress)
+		localPort = c.RemotePort
+	}
+
 	return &stun.TransportAddr{
-			IP:   net.ParseIP(c.local.GetBase().Address),
-			Port: c.local.GetBase().Port,
+			IP:   localIP,
+			Port: localPort,
 		}, &net.UDPAddr{
 			IP:   net.ParseIP(c.remote.GetBase().Address),
 			Port: c.remote.GetBase().Port,
@@ -364,10 +372,10 @@ func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) 
 
 	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
 		for _, p := range a.validPairs {
-			return p.GetAddrs()
+			return p.getAddrs()
 		}
 		return nil, nil
 	}
 
-	return a.selectedPair.GetAddrs()
+	return a.selectedPair.getAddrs()
 }
