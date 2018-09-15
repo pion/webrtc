@@ -4,11 +4,18 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 )
 
 const cipherContextAlgo = "SRTP_AES128_CM_SHA1_80"
 const defaultSsrc = 0
+
+type rtpTestCase struct {
+	sequenceNumber uint16
+	encrypted      []byte
+}
 
 func TestKeyLen(t *testing.T) {
 	if _, err := CreateContext([]byte{}, make([]byte, saltLen), cipherContextAlgo, defaultSsrc); err == nil {
@@ -110,5 +117,59 @@ func TestRolloverCount(t *testing.T) {
 	c.updateRolloverCount(8)
 	if c.rolloverCounter != 1 {
 		t.Errorf("rolloverCounter was improperly updated for non-significant packets")
+	}
+}
+
+func TestRTPLifecyle(t *testing.T) {
+	assert := assert.New(t)
+	masterKey := []byte{0x0d, 0xcd, 0x21, 0x3e, 0x4c, 0xbc, 0xf2, 0x8f, 0x01, 0x7f, 0x69, 0x94, 0x40, 0x1e, 0x28, 0x89}
+	masterSalt := []byte{0x62, 0x77, 0x60, 0x38, 0xc0, 0x6d, 0xc9, 0x41, 0x9f, 0x6d, 0xd9, 0x43, 0x3e, 0x7c}
+
+	encryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	decryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo, defaultSsrc)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	decrypted := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05}
+	var testCases = []rtpTestCase{
+		{
+			sequenceNumber: 5000,
+			encrypted:      []byte{0x6d, 0xd3, 0x7e, 0xd5, 0x99, 0xb7, 0x2d, 0x28, 0xb1, 0xf3, 0xa1, 0xf0, 0xc, 0xfb, 0xfd, 0x8},
+		},
+		{
+			sequenceNumber: 5001,
+			encrypted:      []byte{0xda, 0x47, 0xb, 0x2a, 0x74, 0x53, 0x65, 0xbd, 0x2f, 0xeb, 0xdc, 0x4b, 0x6d, 0x23, 0xf3, 0xde},
+		},
+		{
+			sequenceNumber: 5002,
+			encrypted:      []byte{0x6e, 0xa7, 0x69, 0x8d, 0x24, 0x6d, 0xdc, 0xbf, 0xec, 0x2, 0x1c, 0xd1, 0x60, 0x76, 0xc1, 0xe},
+		},
+		{
+			sequenceNumber: 5003,
+			encrypted:      []byte{0x24, 0x7e, 0x96, 0xc8, 0x7d, 0x33, 0xa2, 0x92, 0x8d, 0x13, 0x8d, 0xe0, 0x76, 0x9f, 0x8, 0xdc},
+		},
+		{
+			sequenceNumber: 5004,
+			encrypted:      []byte{0x75, 0x43, 0x28, 0xe4, 0x3a, 0x77, 0x59, 0x9b, 0x2e, 0xdf, 0x7b, 0x12, 0x68, 0xb, 0x57, 0x49},
+		},
+	}
+
+	for _, testCase := range testCases {
+		pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
+		if !encryptContext.EncryptPacket(pkt) {
+			t.Errorf("Failed to encrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
+		}
+		assert.Equalf(pkt.Payload, testCase.encrypted, "RTP packet with SeqNum invalid encryption: %d", testCase.sequenceNumber)
+
+		if !decryptContext.DecryptPacket(pkt) {
+			t.Errorf("Failed to decrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
+		}
+		assert.Equalf(pkt.Payload, decrypted, "RTP packet with SeqNum invalid decryption: %d")
+
 	}
 }
