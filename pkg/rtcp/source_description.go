@@ -63,6 +63,10 @@ type SourceDescription struct {
 // Marshal encodes the SourceDescription in binary
 func (s SourceDescription) Marshal() ([]byte, error) {
 	/*
+	 *         0                   1                   2                   3
+	 *         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	 *        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	 * header |V=2|P|    SC   |  PT=SDES=202  |             length            |
 	 *        +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 	 * chunk  |                          SSRC/CSRC_1                          |
 	 *   1    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -107,6 +111,10 @@ func (s SourceDescription) Marshal() ([]byte, error) {
 // Unmarshal decodes the SourceDescription from binary
 func (s *SourceDescription) Unmarshal(rawPacket []byte) error {
 	/*
+	 *         0                   1                   2                   3
+	 *         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	 *        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	 * header |V=2|P|    SC   |  PT=SDES=202  |             length            |
 	 *        +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 	 * chunk  |                          SSRC/CSRC_1                          |
 	 *   1    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
