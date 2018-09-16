@@ -13,7 +13,7 @@ const (
 	TypeReceiverReport     PacketType = 201 // RFC 3550, 6.4.2
 	TypeSourceDescription  PacketType = 202 // RFC 3550, 6.5
 	TypeGoodbye            PacketType = 203 // RFC 3550, 6.6
-	TypeApplicationDefined PacketType = 204 // RFC 3550, 6.7
+	TypeApplicationDefined PacketType = 204 // RFC 3550, 6.7 (unimplemented)
 )
 
 func (p PacketType) String() string {
