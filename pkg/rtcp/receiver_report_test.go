@@ -15,7 +15,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 		{
 			Name: "valid",
 			Data: []byte{
-				// v=1, p=0, count=1, RR, len=7
+				// v=2, p=0, count=1, RR, len=7
 				0x81, 0xc9, 0x0, 0x7,
 				// ssrc=0x902f9e2e
 				0x90, 0x2f, 0x9e, 0x2e,
@@ -48,7 +48,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 		{
 			Name: "wrong type",
 			Data: []byte{
-				// v=1, p=0, count=1, SR, len=7
+				// v=2, p=0, count=1, SR, len=7
 				0x81, 0xc8, 0x0, 0x7,
 				// ssrc=0x902f9e2e
 				0x90, 0x2f, 0x9e, 0x2e,
@@ -70,7 +70,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 		{
 			Name: "bad count in header",
 			Data: []byte{
-				// v=1, p=0, count=2, RR, len=7
+				// v=2, p=0, count=2, RR, len=7
 				0x82, 0xc9, 0x0, 0x7,
 				// ssrc=0x902f9e2e
 				0x90, 0x2f, 0x9e, 0x2e,
