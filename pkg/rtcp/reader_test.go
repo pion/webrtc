@@ -63,7 +63,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read rr: %v", err)
 	}
 	var rr ReceiverReport
-	if err := rr.Unmarshal(packet); err != nil {
+	if err = rr.Unmarshal(packet); err != nil {
 		t.Errorf("Unmarshal rr: %v", err)
 	}
 	wantRR := ReceiverReport{
@@ -88,7 +88,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read sdes: %v", err)
 	}
 	var sdes SourceDescription
-	if err := sdes.Unmarshal(packet); err != nil {
+	if err = sdes.Unmarshal(packet); err != nil {
 		t.Errorf("Unmarshal: %v", err)
 	}
 	wantSdes := SourceDescription{
