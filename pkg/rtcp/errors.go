@@ -13,4 +13,5 @@ var (
 	errSDESTextTooLong  = errors.New("rtcp: sdes must be < 255 octets long")
 	errSDESMissingType  = errors.New("rtcp: sdes item missing type")
 	errReasonTooLong    = errors.New("rtcp: reason must be < 255 octets long")
+	errBadVersion       = errors.New("rtcp: invalid packet version")
 )
