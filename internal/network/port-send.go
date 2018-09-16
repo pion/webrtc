@@ -4,34 +4,18 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
 func (p *port) sendRTP(packet *rtp.Packet, dst net.Addr) {
-	p.m.certPairLock.RLock()
-	defer p.m.certPairLock.RUnlock()
-	if p.m.certPair == nil {
-		fmt.Println("Tried to send SRTP packet but no DTLS state to handle it")
+	p.m.srtpInboundContextLock.Lock()
+	defer p.m.srtpInboundContextLock.Unlock()
+	if p.m.srtpInboundContext == nil {
+		fmt.Printf("Tried to send RTP packet but no SRTP Context to handle it \n")
 		return
 	}
 
-	contextMapKey := dst.String() + ":" + fmt.Sprint(packet.SSRC)
-	p.m.srtpContextsLock.Lock()
-	srtpContext, ok := p.m.srtpContexts[contextMapKey]
-	if !ok {
-		var err error
-		srtpContext, err = srtp.CreateContext(p.m.certPair.ClientWriteKey[0:16], p.m.certPair.ClientWriteKey[16:], p.m.certPair.Profile, packet.SSRC)
-		if err != nil {
-			fmt.Println("Failed to build SRTP context")
-			return
-		}
-
-		p.m.srtpContexts[contextMapKey] = srtpContext
-	}
-	p.m.srtpContextsLock.Unlock()
-
-	if ok := srtpContext.EncryptPacket(packet); ok {
+	if ok := p.m.srtpOutboundContext.EncryptPacket(packet); ok {
 		raw, err := packet.Marshal()
 		if err != nil {
 			fmt.Printf("Failed to marshal packet: %s \n", err.Error())

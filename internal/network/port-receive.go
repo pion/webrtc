@@ -19,13 +19,6 @@ type incomingPacket struct {
 }
 
 func (p *port) handleSRTP(buffer []byte) {
-	p.m.certPairLock.RLock()
-	defer p.m.certPairLock.RUnlock()
-
-	if p.m.certPair == nil {
-		fmt.Printf("Got SRTP packet but no DTLS state to handle it %v \n", p.m.certPair)
-		return
-	}
 	if len(buffer) > 4 {
 		var rtcpPacketType uint8
 
@@ -47,22 +40,14 @@ func (p *port) handleSRTP(buffer []byte) {
 		return
 	}
 
-	contextMapKey := p.listeningAddr.String() + ":" + fmt.Sprint(packet.SSRC)
-	p.m.srtpContextsLock.Lock()
-	srtpContext, ok := p.m.srtpContexts[contextMapKey]
-	if !ok {
-		var err error
-		srtpContext, err = srtp.CreateContext(p.m.certPair.ServerWriteKey[0:16], p.m.certPair.ServerWriteKey[16:], p.m.certPair.Profile, packet.SSRC)
-		if err != nil {
-			fmt.Println("Failed to build SRTP context")
-			return
-		}
-
-		p.m.srtpContexts[contextMapKey] = srtpContext
+	p.m.srtpInboundContextLock.Lock()
+	defer p.m.srtpInboundContextLock.Unlock()
+	if p.m.srtpInboundContext == nil {
+		fmt.Printf("Got RTP packet but no SRTP Context to handle it \n")
+		return
 	}
-	p.m.srtpContextsLock.Unlock()
 
-	if ok := srtpContext.DecryptPacket(packet); !ok {
+	if ok := p.m.srtpInboundContext.DecryptPacket(packet); !ok {
 		fmt.Println("Failed to decrypt packet")
 		return
 	}
@@ -105,7 +90,25 @@ func (p *port) handleDTLS(raw []byte, srcAddr string) {
 
 	p.m.certPairLock.Lock()
 	if certPair := p.m.dtlsState.GetCertPair(); certPair != nil && p.m.certPair == nil {
+		var err error
 		p.m.certPair = certPair
+
+		p.m.srtpInboundContextLock.Lock()
+		p.m.srtpInboundContext, err = srtp.CreateContext(p.m.certPair.ServerWriteKey[0:16], p.m.certPair.ServerWriteKey[16:], p.m.certPair.Profile)
+		p.m.srtpInboundContextLock.Unlock()
+		if err != nil {
+			fmt.Println("Failed to build SRTP context, this is fatal")
+			return
+		}
+
+		p.m.srtpOutboundContextLock.Lock()
+		p.m.srtpOutboundContext, err = srtp.CreateContext(p.m.certPair.ClientWriteKey[0:16], p.m.certPair.ClientWriteKey[16:], p.m.certPair.Profile)
+		p.m.srtpOutboundContextLock.Unlock()
+		if err != nil {
+			fmt.Println("Failed to build SRTP context, this is fatal")
+			return
+		}
+
 	}
 	p.m.certPairLock.Unlock()
 

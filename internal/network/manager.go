@@ -34,12 +34,11 @@ type Manager struct {
 	bufferTransportGenerator BufferTransportGenerator
 	bufferTransports         map[uint32]chan<- *rtp.Packet
 
-	// https://tools.ietf.org/html/rfc3711#section-3.2.3
-	// A cryptographic context SHALL be uniquely identified by the triplet
-	//  <SSRC, destination network address, destination transport port number>
-	// contexts are keyed by IP:PORT:SSRC
-	srtpContextsLock sync.RWMutex
-	srtpContexts     map[string]*srtp.Context
+	srtpInboundContextLock sync.RWMutex
+	srtpInboundContext     *srtp.Context
+
+	srtpOutboundContextLock sync.RWMutex
+	srtpOutboundContext     *srtp.Context
 
 	sctpAssociation *sctp.Association
 
@@ -52,7 +51,6 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	m = &Manager{
 		iceNotifier:              ntf,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
-		srtpContexts:             make(map[string]*srtp.Context),
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
