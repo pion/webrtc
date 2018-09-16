@@ -1,3 +1,5 @@
-# Contributing
+<h1 align="center">
+  Contributing
+</h1>
 
-Moved to [https://github.com/pions/webrtc/wiki/Contributing](https://github.com/pions/webrtc/wiki/Contributing)
+Moved to the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contributing)**.
