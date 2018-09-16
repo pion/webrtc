@@ -2,6 +2,7 @@ package rtcp
 
 import (
 	"bytes"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -122,5 +123,17 @@ func TestUnmarshal(t *testing.T) {
 	}
 	if got, want := bye, wantBye; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal bye: got %#v, want %#v", got, want)
+	}
+}
+
+func TestReadEOF(t *testing.T) {
+	shortHeader := []byte{
+		0x81, 0xc9, // missing type & len
+	}
+
+	r := NewReader(bytes.NewReader(shortHeader))
+	_, _, err := r.ReadPacket()
+	if got, want := err, io.ErrUnexpectedEOF; got != want {
+		t.Fatalf("read short header: got err = %v, want %v", got, want)
 	}
 }
