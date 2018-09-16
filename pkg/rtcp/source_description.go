@@ -90,10 +90,9 @@ func (s SourceDescription) Marshal() ([]byte, error) {
 	}
 
 	h := Header{
-		Version: rtpVersion,
-		Count:   uint8(len(s.Chunks)),
-		Type:    TypeSourceDescription,
-		Length:  uint16(headerLength + len(rawPacket)),
+		Count:  uint8(len(s.Chunks)),
+		Type:   TypeSourceDescription,
+		Length: uint16(headerLength + len(rawPacket)),
 	}
 	hData, err := h.Marshal()
 	if err != nil {

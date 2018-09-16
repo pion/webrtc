@@ -56,7 +56,6 @@ func (g Goodbye) Marshal() ([]byte, error) {
 	}
 
 	h := Header{
-		Version: 2,
 		Padding: false,
 		Count:   uint8(len(g.Sources)),
 		Type:    TypeGoodbye,

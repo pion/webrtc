@@ -70,10 +70,9 @@ func (r SenderReport) Marshal() ([]byte, error) {
 	}
 
 	h := Header{
-		Version: rtpVersion,
-		Count:   uint8(len(r.Reports)),
-		Type:    TypeSenderReport,
-		Length:  uint16(headerLength + len(rawPacket)),
+		Count:  uint8(len(r.Reports)),
+		Type:   TypeSenderReport,
+		Length: uint16(headerLength + len(rawPacket)),
 	}
 	hData, err := h.Marshal()
 	if err != nil {

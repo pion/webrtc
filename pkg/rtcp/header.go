@@ -37,9 +37,6 @@ const rtpVersion = 2
 
 // A Header is the common header shared by all RTCP packets
 type Header struct {
-	// Identifies the version of RTP, which is the same in RTCP packets
-	// as in RTP data packets.
-	Version uint8
 	// If the padding bit is set, this individual RTCP packet contains
 	// some additional padding octets at the end which are not part of
 	// the control information but are included in the length field.
@@ -75,10 +72,7 @@ func (h Header) Marshal() ([]byte, error) {
 	 */
 	rawPacket := make([]byte, headerLength)
 
-	if h.Version > 3 {
-		return nil, errInvalidHeader
-	}
-	rawPacket[0] |= h.Version << versionShift
+	rawPacket[0] |= rtpVersion << versionShift
 
 	if h.Padding {
 		rawPacket[0] |= 1 << paddingShift
@@ -106,11 +100,15 @@ func (h *Header) Unmarshal(rawPacket []byte) error {
 	 *  0                   1                   2                   3
 	 *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-	 * |V=2|P|    RC   |   PT=SR=200   |             length            |
+	 * |V=2|P|    RC   |      PT       |             length            |
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	h.Version = rawPacket[0] >> versionShift & versionMask
+	version := rawPacket[0] >> versionShift & versionMask
+	if version != rtpVersion {
+		return errBadVersion
+	}
+
 	h.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
 	h.Count = rawPacket[0] >> countShift & countMask
 
