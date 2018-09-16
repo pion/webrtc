@@ -2,8 +2,6 @@ package rtcp
 
 import (
 	"encoding/binary"
-
-	"github.com/pkg/errors"
 )
 
 // SDESType is the item type used in the RTCP SDES control packet.
@@ -46,11 +44,6 @@ func (s SDESType) String() string {
 		return string(s)
 	}
 }
-
-var (
-	errSDESTextTooLong = errors.New("session description must be < 255 octets long")
-	errSDESMissingType = errors.New("session description item missing type")
-)
 
 const (
 	sdesSourceLen        = 4
