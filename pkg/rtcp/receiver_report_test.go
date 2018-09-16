@@ -46,6 +46,19 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			Name: "short report",
+			Data: []byte{
+				// v=2, p=0, count=1, RR, len=7
+				0x81, 0xc9, 0x00, 0x0c,
+				// ssrc=0x902f9e2e
+				0x90, 0x2f, 0x9e, 0x2e,
+				// fracLost=0, totalLost=0
+				0x00, 0x00, 0x00, 0x00,
+				// report ends early
+			},
+			WantError: errPacketTooShort,
+		},
+		{
 			Name: "wrong type",
 			Data: []byte{
 				// v=2, p=0, count=1, SR, len=7
