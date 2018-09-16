@@ -107,4 +107,20 @@ func TestUnmarshal(t *testing.T) {
 	if got, want := sdes, wantSdes; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal sdes: got %#v, want %#v", got, want)
 	}
+
+	// Goodbye
+	_, packet, err = r.ReadPacket()
+	if err != nil {
+		t.Fatalf("Read bye: %v", err)
+	}
+	var bye Goodbye
+	if err := bye.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal bye: %v", err)
+	}
+	wantBye := Goodbye{
+		Sources: []uint32{0x902f9e2e},
+	}
+	if got, want := bye, wantBye; !reflect.DeepEqual(got, want) {
+		t.Errorf("Unmarshal bye: got %#v, want %#v", got, want)
+	}
 }

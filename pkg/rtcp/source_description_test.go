@@ -323,7 +323,7 @@ func TestSourceDescriptionRoundTrip(t *testing.T) {
 				Chunks: []SourceDescriptionChunk{{
 					Items: []SourceDescriptionItem{{
 						Type: SDESCNAME,
-						Text: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+						Text: tooLongText,
 					}},
 				}},
 			},
@@ -358,9 +358,13 @@ func TestSourceDescriptionRoundTrip(t *testing.T) {
 
 // a slice with enough SourceDescriptionChunks to overflow an 5-bit int
 var tooManyChunks []SourceDescriptionChunk
+var tooLongText string
 
 func init() {
 	for i := 0; i < (1 << 5); i++ {
 		tooManyChunks = append(tooManyChunks, SourceDescriptionChunk{})
+	}
+	for i := 0; i < (1 << 8); i++ {
+		tooLongText += "x"
 	}
 }

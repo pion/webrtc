@@ -2,8 +2,6 @@ package rtcp
 
 import (
 	"encoding/binary"
-
-	"github.com/pkg/errors"
 )
 
 // PacketType specifies the type of an RTCP packet
@@ -54,15 +52,6 @@ type Header struct {
 	// including the header and any padding.
 	Length uint16
 }
-
-var (
-	errInvalidTotalLost = errors.New("rtcp: invalid total lost count")
-	errInvalidHeader    = errors.New("rtcp: invalid header")
-	errTooManyReports   = errors.New("rtcp: too many reports")
-	errTooManyChunks    = errors.New("rtcp: too many chunks")
-	errPacketTooShort   = errors.New("rtcp: packet too short")
-	errWrongType        = errors.New("rtcp: wrong packet type")
-)
 
 const (
 	headerLength = 4
