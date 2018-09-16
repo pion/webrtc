@@ -109,9 +109,6 @@ func (g *Goodbye) Unmarshal(rawPacket []byte) error {
 
 	for i := 0; i < int(header.Count); i++ {
 		offset := headerLength + i*ssrcLength
-		if offset > len(rawPacket) {
-			return errPacketTooShort
-		}
 
 		g.Sources[i] = binary.BigEndian.Uint32(rawPacket[offset:])
 	}
