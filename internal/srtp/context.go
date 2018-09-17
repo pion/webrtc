@@ -7,7 +7,6 @@ import (
 	"crypto/sha1" // #nosec
 	"encoding/binary"
 
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 
@@ -54,6 +53,7 @@ type Context struct {
 	srtcpSessionKey     []byte
 	srtcpSessionSalt    []byte
 	srtcpSessionAuthTag []byte
+	srtcpIndex          uint32
 	srtcpBlock          cipher.Block
 }
 
@@ -190,7 +190,7 @@ func (c *Context) generateCounter(sequenceNumber uint16, rolloverCounter uint32,
 	return counter
 }
 
-func (c *Context) addAuthTag(packet *rtp.Packet, s *ssrcState) error {
+func (c *Context) generateAuthTag(buf []byte, authTag []byte) ([]byte, error) {
 	// https://tools.ietf.org/html/rfc3711#section-4.2
 	// In the case of SRTP, M SHALL consist of the Authenticated
 	// Portion of the packet (as specified in Figure 1) concatenated with
@@ -205,20 +205,11 @@ func (c *Context) addAuthTag(packet *rtp.Packet, s *ssrcState) error {
 	// - Authenticated portion of the packet is everything BEFORE MKI
 	// - k_a is the session message authentication key
 	// - n_tag is the bit-length of the output authentication tag
-
-	mac := hmac.New(sha1.New, c.srtpSessionAuthTag) // TODO
-	fullPkt, err := packet.Marshal()
-	if err != nil {
-		return err
+	// - ROC is already added by caller (to allow RTP + RTCP support)
+	mac := hmac.New(sha1.New, authTag)
+	if _, err := mac.Write(buf); err != nil {
+		return nil, err
 	}
 
-	fullPkt = append(fullPkt, make([]byte, 4)...)
-	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], s.rolloverCounter)
-
-	if _, err := mac.Write(fullPkt); err != nil {
-		return err
-	}
-
-	packet.Payload = append(packet.Payload, mac.Sum(nil)[0:10]...)
-	return nil
+	return mac.Sum(nil)[0:10], nil
 }

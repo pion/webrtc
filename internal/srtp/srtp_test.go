@@ -2,7 +2,6 @@ package srtp
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/pions/webrtc/pkg/rtp"
@@ -190,16 +189,21 @@ func TestRTCPLifecycle(t *testing.T) {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
 
-	// decryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
-	// if err != nil {
-	// 	t.Error(errors.Wrap(err, "CreateContext failed"))
-	// }
+	decryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
 
-	fmt.Println(len(encrypted))
-	decryptResult, err := encryptContext.DecryptRTCP(append([]byte{}, encrypted...))
+	decryptResult, err := decryptContext.DecryptRTCP(append([]byte{}, encrypted...))
 	if err != nil {
 		t.Error(err)
 	}
 	assert.Equal(decryptResult, decrypted, "RTCP failed to decrypt")
+
+	encryptResult, err := encryptContext.EncryptRTCP(append([]byte{}, decrypted...))
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(encryptResult, encrypted, "RTCP failed to encrypt")
 
 }
