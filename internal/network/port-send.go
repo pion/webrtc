@@ -8,9 +8,9 @@ import (
 )
 
 func (p *port) sendRTP(packet *rtp.Packet, dst net.Addr) {
-	p.m.srtpInboundContextLock.Lock()
-	defer p.m.srtpInboundContextLock.Unlock()
-	if p.m.srtpInboundContext == nil {
+	p.m.srtpOutboundContextLock.Lock()
+	defer p.m.srtpOutboundContextLock.Unlock()
+	if p.m.srtpOutboundContext == nil {
 		fmt.Printf("Tried to send RTP packet but no SRTP Context to handle it \n")
 		return
 	}
