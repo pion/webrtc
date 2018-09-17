@@ -2,6 +2,7 @@ package srtp
 
 import (
 	"crypto/cipher"
+	"encoding/binary"
 
 	"github.com/pions/webrtc/pkg/rtp"
 )
@@ -34,10 +35,20 @@ func (c *Context) EncryptRTP(packet *rtp.Packet) bool {
 	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(packet.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
 	stream.XORKeyStream(packet.Payload, packet.Payload)
 
-	if err := c.addAuthTag(packet, s); err != nil {
+	fullPkt, err := packet.Marshal()
+	if err != nil {
 		return false
 	}
 
+	fullPkt = append(fullPkt, make([]byte, 4)...)
+	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], s.rolloverCounter)
+
+	authTag, err := c.generateAuthTag(fullPkt, c.srtpSessionAuthTag)
+	if err != nil {
+		return false
+	}
+
+	packet.Payload = append(packet.Payload, authTag...)
 	return true
 }
 
