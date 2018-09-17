@@ -15,7 +15,7 @@ func (p *port) sendRTP(packet *rtp.Packet, dst net.Addr) {
 		return
 	}
 
-	if ok := p.m.srtpOutboundContext.EncryptPacket(packet); ok {
+	if ok := p.m.srtpOutboundContext.EncryptRTP(packet); ok {
 		raw, err := packet.Marshal()
 		if err != nil {
 			fmt.Printf("Failed to marshal packet: %s \n", err.Error())

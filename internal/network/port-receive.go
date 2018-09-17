@@ -19,6 +19,13 @@ type incomingPacket struct {
 }
 
 func (p *port) handleSRTP(buffer []byte) {
+	p.m.srtpInboundContextLock.Lock()
+	defer p.m.srtpInboundContextLock.Unlock()
+	if p.m.srtpInboundContext == nil {
+		fmt.Printf("Got RTP packet but no SRTP Context to handle it \n")
+		return
+	}
+
 	if len(buffer) > 4 {
 		var rtcpPacketType uint8
 
@@ -29,7 +36,12 @@ func (p *port) handleSRTP(buffer []byte) {
 		}
 
 		if rtcpPacketType >= 192 && rtcpPacketType <= 223 {
-			fmt.Println("Discarding RTCP packet TODO")
+			decrypted, err := p.m.srtpInboundContext.DecryptRTCP(buffer)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Println(decrypted)
+				return
+			}
 			return
 		}
 	}
@@ -40,14 +52,7 @@ func (p *port) handleSRTP(buffer []byte) {
 		return
 	}
 
-	p.m.srtpInboundContextLock.Lock()
-	defer p.m.srtpInboundContextLock.Unlock()
-	if p.m.srtpInboundContext == nil {
-		fmt.Printf("Got RTP packet but no SRTP Context to handle it \n")
-		return
-	}
-
-	if ok := p.m.srtpInboundContext.DecryptPacket(packet); !ok {
+	if ok := p.m.srtpInboundContext.DecryptRTP(packet); !ok {
 		fmt.Println("Failed to decrypt packet")
 		return
 	}

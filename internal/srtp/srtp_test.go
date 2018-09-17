@@ -2,6 +2,7 @@ package srtp
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/pions/webrtc/pkg/rtp"
@@ -44,21 +45,21 @@ func TestValidSessionKeys(t *testing.T) {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
 
-	sessionKey, err := c.generateSessionKey()
+	sessionKey, err := c.generateSessionKey(labelSRTPEncryption)
 	if err != nil {
 		t.Error(errors.Wrap(err, "generateSessionKey failed"))
 	} else if !bytes.Equal(sessionKey, expectedSessionKey) {
 		t.Errorf("Session Key % 02x does not match expected % 02x", sessionKey, expectedSessionKey)
 	}
 
-	sessionSalt, err := c.generateSessionSalt()
+	sessionSalt, err := c.generateSessionSalt(labelSRTPSalt)
 	if err != nil {
 		t.Error(errors.Wrap(err, "generateSessionSalt failed"))
 	} else if !bytes.Equal(sessionSalt, expectedSessionSalt) {
 		t.Errorf("Session Salt % 02x does not match expected % 02x", sessionSalt, expectedSessionSalt)
 	}
 
-	sessionAuthTag, err := c.generateSessionAuthTag()
+	sessionAuthTag, err := c.generateSessionAuthTag(labelSRTPAuthenticationTag)
 	if err != nil {
 		t.Error(errors.Wrap(err, "generateSessionAuthTag failed"))
 	} else if !bytes.Equal(sessionAuthTag, expectedSessionAuthTag) {
@@ -78,7 +79,7 @@ func TestValidPacketCounter(t *testing.T) {
 
 	s := &ssrcState{ssrc: 4160032510}
 	expectedCounter := []byte{0xcf, 0x90, 0x1e, 0xa5, 0xda, 0xd3, 0x2c, 0x15, 0x00, 0xa2, 0x24, 0xae, 0xae, 0xaf, 0x00, 0x00}
-	counter := c.generateCounter(32846, s)
+	counter := c.generateCounter(32846, s.rolloverCounter, s.ssrc, c.srtpSessionSalt)
 	if !bytes.Equal(counter, expectedCounter) {
 		t.Errorf("Session Key % 02x does not match expected % 02x", counter, expectedCounter)
 	}
@@ -163,15 +164,42 @@ func TestRTPLifecyle(t *testing.T) {
 
 	for _, testCase := range testCases {
 		pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
-		if !encryptContext.EncryptPacket(pkt) {
+		if !encryptContext.EncryptRTP(pkt) {
 			t.Errorf("Failed to encrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
 		}
 		assert.Equalf(pkt.Payload, testCase.encrypted, "RTP packet with SeqNum invalid encryption: %d", testCase.sequenceNumber)
 
-		if !decryptContext.DecryptPacket(pkt) {
+		if !decryptContext.DecryptRTP(pkt) {
 			t.Errorf("Failed to decrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
 		}
-		assert.Equalf(pkt.Payload, decrypted, "RTP packet with SeqNum invalid decryption: %d")
+		assert.Equalf(pkt.Payload, decrypted, "RTP packet with SeqNum invalid decryption: %d", testCase.sequenceNumber)
 
 	}
+}
+
+func TestRTCPLifecycle(t *testing.T) {
+	assert := assert.New(t)
+	masterKey := []byte{0xfd, 0xa6, 0x25, 0x95, 0xd7, 0xf6, 0x92, 0x6f, 0x7d, 0x9c, 0x02, 0x4c, 0xc9, 0x20, 0x9f, 0x34}
+	masterSalt := []byte{0xa9, 0x65, 0x19, 0x85, 0x54, 0x0b, 0x47, 0xbe, 0x2f, 0x27, 0xa8, 0xb8, 0x81, 0x23}
+
+	encrypted := []byte{0x80, 0xc8, 0x00, 0x06, 0x66, 0xef, 0x91, 0xff, 0xcd, 0x34, 0xc5, 0x78, 0xb2, 0x8b, 0xe1, 0x6b, 0xc5, 0x09, 0xd5, 0x77, 0xe4, 0xce, 0x5f, 0x20, 0x80, 0x21, 0xbd, 0x66, 0x74, 0x65, 0xe9, 0x5f, 0x49, 0xe5, 0xf5, 0xc0, 0x68, 0x4e, 0xe5, 0x6a, 0x78, 0x07, 0x75, 0x46, 0xed, 0x90, 0xf6, 0xdc, 0x9d, 0xef, 0x3b, 0xdf, 0xf2, 0x79, 0xa9, 0xd8, 0x80, 0x00, 0x00, 0x01, 0x60, 0xc0, 0xae, 0xb5, 0x6f, 0x40, 0x88, 0x0e, 0x28, 0xba}
+	decrypted := []byte{0x80, 0xc8, 0x00, 0x06, 0x66, 0xef, 0x91, 0xff, 0xdf, 0x48, 0x80, 0xdd, 0x61, 0xa6, 0x2e, 0xd3, 0xd8, 0xbc, 0xde, 0xbe, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x16, 0x04, 0x81, 0xca, 0x00, 0x06, 0x66, 0xef, 0x91, 0xff, 0x01, 0x10, 0x52, 0x6e, 0x54, 0x35, 0x43, 0x6d, 0x4a, 0x68, 0x7a, 0x79, 0x65, 0x74, 0x41, 0x78, 0x77, 0x2b, 0x00, 0x00}
+
+	encryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	// decryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
+	// if err != nil {
+	// 	t.Error(errors.Wrap(err, "CreateContext failed"))
+	// }
+
+	fmt.Println(len(encrypted))
+	decryptResult, err := encryptContext.DecryptRTCP(append([]byte{}, encrypted...))
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(decryptResult, decrypted, "RTCP failed to decrypt")
+
 }
