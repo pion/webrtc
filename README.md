@@ -80,6 +80,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Ronan J](https://github.com/ronanj) - *Fix STCP PPID*
 * [wattanakorn495](https://github.com/wattanakorn495)
 * [Max Hawkins](https://github.com/maxhawkins) - *RTCP*
+* [Justin Okamoto](https://github.com/justinokamoto) - *Fix Docs*
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
