@@ -26,7 +26,7 @@ func buildPeerConnection() *webrtc.RTCPeerConnection {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	}
 
-	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
+	peerConnection.OnDataChannel = func(d *webrtc.RTCDataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 
 		d.Lock()

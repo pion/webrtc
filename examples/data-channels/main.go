@@ -61,7 +61,7 @@ func main() {
 	datachannels := make([]*webrtc.RTCDataChannel, 0)
 	var dataChannelsLock sync.RWMutex
 
-	peerConnection.Ondatachannel = func(d *webrtc.RTCDataChannel) {
+	peerConnection.OnDataChannel = func(d *webrtc.RTCDataChannel) {
 		dataChannelsLock.Lock()
 		datachannels = append(datachannels, d)
 		dataChannelsLock.Unlock()

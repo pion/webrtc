@@ -47,7 +47,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
 		if track.Codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			i, err := ivfwriter.New("output.ivf")
