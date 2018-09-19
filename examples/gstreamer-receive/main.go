@@ -46,7 +46,7 @@ func main() {
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
-	peerConnection.Ontrack = func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
 		codec := track.Codec
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType, codec.Name)
 		pipeline := gst.CreatePipeline(codec.Name)

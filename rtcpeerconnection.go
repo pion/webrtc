@@ -99,34 +99,16 @@ type RTCPeerConnection struct {
 	// OnIceCandidateError        func() // FIXME NOT-USED
 	// OnSignalingStateChange     func() // FIXME NOT-USED
 
-	// OnICEConnectionStateChange designates an event handler which is called
-	// when an ice connection state is changed.
-	//
-	// Deprecated: use OnIceConnectionStateChange instead.
-	OnICEConnectionStateChange func(ice.ConnectionState)
-
 	// OnIceConnectionStateChange designates an event handler which is called
 	// when an ice connection state is changed.
-	OnIceConnectionStateChange func(ice.ConnectionState)
+	OnICEConnectionStateChange func(ice.ConnectionState)
 
 	// OnIceGatheringStateChange  func() // FIXME NOT-USED
 	// OnConnectionStateChange    func() // FIXME NOT-USED
 
-	// Ontrack designates an event handler which is called when remote track
-	// arrives from a remote peer.
-	//
-	// Deprecated: use OnTrack instead.
-	Ontrack func(*RTCTrack)
-
 	// OnTrack designates an event handler which is called when remote track
 	// arrives from a remote peer.
 	OnTrack func(*RTCTrack)
-
-	// Ondatachannel designates an event handler which is invoked when a data
-	// channel message arrives from a remote peer.
-	//
-	// Deprecated: use OnDataChannel instead.
-	Ondatachannel func(*RTCDataChannel)
 
 	// OnDataChannel designates an event handler which is invoked when a data
 	// channel message arrives from a remote peer.
@@ -419,6 +401,7 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
 			pc.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
+			appendBundle()
 		}
 	}
 
@@ -763,7 +746,7 @@ func (pc *RTCPeerConnection) Close() error {
 
 /* Everything below is private */
 func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
-	if pc.Ontrack == nil {
+	if pc.OnTrack == nil {
 		return nil
 	}
 
@@ -792,7 +775,7 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 
 	// TODO: Register the receiving Track
 
-	go pc.Ontrack(track)
+	go pc.OnTrack(track)
 	return bufferTransport
 }
 
@@ -815,10 +798,10 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 		id := event.StreamIdentifier()
 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.Ondatachannel != nil {
-			go pc.Ondatachannel(newDataChannel)
+		if pc.OnDataChannel != nil {
+			go pc.OnDataChannel(newDataChannel)
 		} else {
-			fmt.Println("Ondatachannel is unset, discarding message")
+			fmt.Println("OnDataChannel is unset, discarding message")
 		}
 	case *network.DataChannelMessage:
 		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
