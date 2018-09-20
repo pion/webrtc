@@ -2,6 +2,8 @@ package rtcp
 
 import (
 	"encoding/binary"
+
+	"github.com/pions/webrtc/internal/util"
 )
 
 // The Goodbye packet indicates that one or more sources are no longer active.
@@ -49,10 +51,7 @@ func (g Goodbye) Marshal() ([]byte, error) {
 		rawPacket = append(rawPacket, reason...)
 
 		// align to 32-bit boundary
-		if len(rawPacket)%4 != 0 {
-			padCount := 4 - len(rawPacket)%4
-			rawPacket = append(rawPacket, make([]byte, padCount)...)
-		}
+		rawPacket = append(rawPacket, make([]byte, util.GetPadding(len(rawPacket)))...)
 	}
 
 	h := Header{
@@ -96,7 +95,7 @@ func (g *Goodbye) Unmarshal(rawPacket []byte) error {
 		return errWrongType
 	}
 
-	if len(rawPacket)%4 != 0 {
+	if util.GetPadding(len(rawPacket)) != 0 {
 		return errPacketTooShort
 	}
 
