@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 
 	"github.com/pkg/errors"
@@ -80,6 +81,8 @@ func (p *packet) unmarshal(raw []byte) error {
 			c = &chunkAbort{}
 		case COOKIEECHO:
 			c = &chunkCookieEcho{}
+		case COOKIEACK:
+			c = &chunkCookieAck{}
 		case HEARTBEAT:
 			c = &chunkHeartbeat{}
 		case PAYLOADDATA:
@@ -145,4 +148,22 @@ func generatePacketChecksum(raw []byte) uint32 {
 	}
 
 	return crc32.Checksum(rawCopy, crc32.MakeTable(crc32.Castagnoli))
+}
+
+// String makes packet printable
+func (p *packet) String() string {
+	format := `Packet:
+	sourcePort: %d
+	destinationPort: %d
+	verificationTag: %d
+	`
+	res := fmt.Sprintf(format,
+		p.sourcePort,
+		p.destinationPort,
+		p.verificationTag,
+	)
+	for i, chunk := range p.chunks {
+		res = res + fmt.Sprintf("Chunk %d:\n %s", i, chunk)
+	}
+	return res
 }

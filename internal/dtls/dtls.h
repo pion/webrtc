@@ -40,6 +40,7 @@ typedef struct dtls_sess {
 typedef struct dtls_decrypted {
   void *buf;
   int len;
+  bool init;
 } dtls_decrypted;
 
 #define PROFILE_STRING_LENGTH 23

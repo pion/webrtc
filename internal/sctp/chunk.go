@@ -150,3 +150,8 @@ type chunk interface {
 
 	valueLength() int
 }
+
+// String makes chunkHeader printable
+func (c chunkHeader) String() string {
+	return c.typ.String()
+}

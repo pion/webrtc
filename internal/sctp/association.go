@@ -105,6 +105,9 @@ type Association struct {
 	reassemblyQueue           map[uint16]*reassemblyQueue
 	outboundStreams           map[uint16]uint16
 
+	isInitiating bool
+	notifier     func(AssociationState)
+
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-receive (vs callbacks)
 	outboundHandler func([]byte)
@@ -199,7 +202,7 @@ func (a *Association) Close() error {
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier)) *Association {
+func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), notifier func(AssociationState)) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
@@ -218,6 +221,7 @@ func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16
 		outboundHandler:         outboundHandler,
 		dataHandler:             dataHandler,
 		state:                   Open,
+		notifier:                notifier,
 	}
 }
 
@@ -270,8 +274,53 @@ func min(a, b uint16) uint16 {
 	return b
 }
 
-func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
+// Start starts the Association
+func (a *Association) Start(isInitiating bool) {
+	a.isInitiating = isInitiating
+}
 
+// Start starts the Association
+func (a *Association) setState(state AssociationState) {
+	if a.state != state {
+		a.state = state
+		go a.notifier(state)
+	}
+}
+
+// Connect
+func (a *Association) Connect() {
+	if a.isInitiating {
+		init := a.CreateInit()
+		err := a.send(init)
+		if err != nil {
+			fmt.Printf("Failed to send init: %s: %v", init, err)
+		}
+		a.setState(CookieWait)
+	}
+}
+
+func (a *Association) CreateInit() *packet {
+	outbound := &packet{}
+	outbound.verificationTag = a.peerVerificationTag
+	a.sourcePort = 5000      // TODO: Spec??
+	a.destinationPort = 5000 // TODO: Spec??
+	outbound.sourcePort = a.sourcePort
+	outbound.destinationPort = a.destinationPort
+
+	init := &chunkInit{}
+
+	init.initialTSN = a.myNextTSN
+	init.numOutboundStreams = a.myMaxNumOutboundStreams
+	init.numInboundStreams = a.myMaxNumInboundStreams
+	init.initiateTag = a.myVerificationTag
+	init.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
+
+	outbound.chunks = []chunk{init}
+
+	return outbound
+}
+
+func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	// Should we be setting any of these permanently until we've ACKed further?
 	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
 	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
@@ -307,6 +356,36 @@ func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	outbound.chunks = []chunk{initAck}
 
 	return outbound
+}
+
+func (a *Association) handleInitAck(p *packet, i *chunkInitAck) (*packet, error) {
+	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
+	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
+	a.peerVerificationTag = i.initiateTag
+
+	outbound := &packet{}
+	outbound.verificationTag = a.peerVerificationTag
+	outbound.sourcePort = a.sourcePort
+	outbound.destinationPort = a.destinationPort
+
+	var cookieParam *paramStateCookie
+	for _, param := range i.params {
+		switch v := param.(type) {
+		case *paramStateCookie:
+			cookieParam = v
+		}
+	}
+	if cookieParam == nil {
+		return nil, errors.New("no cookie in InitAck")
+	}
+
+	cookieEcho := &chunkCookieEcho{}
+
+	cookieEcho.cookie = cookieParam.cookie
+
+	outbound.chunks = []chunk{cookieEcho}
+
+	return outbound, nil
 }
 
 func (a *Association) handleData(d *chunkPayloadData) *packet {
@@ -438,6 +517,19 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
+	case *chunkInitAck:
+		switch a.state {
+		case CookieWait:
+			r, err := a.handleInitAck(p, c)
+			err = a.send(r)
+			if err != nil {
+				return err
+			}
+			a.setState(CookieEchoed)
+			return nil
+		default:
+			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
+		}
 	case *chunkAbort:
 		fmt.Println("Abort chunk, with errors")
 		for _, e := range c.errorCauses {
@@ -463,12 +555,27 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		})
 	case *chunkCookieEcho:
 		if bytes.Equal(a.myCookie.cookie, c.cookie) {
-			return a.send(&packet{
+			err := a.send(&packet{
 				verificationTag: a.peerVerificationTag,
 				sourcePort:      a.sourcePort,
 				destinationPort: a.destinationPort,
 				chunks:          []chunk{&chunkCookieAck{}},
 			})
+			if err != nil {
+				return err
+			}
+			a.setState(Established)
+
+			return nil
+		}
+
+	case *chunkCookieAck:
+		switch a.state {
+		case CookieEchoed:
+			a.setState(Established)
+			return nil
+		default:
+			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
 		}
 
 		// TODO Abort
@@ -485,6 +592,8 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 				return errors.Wrap(err, "Failure handling SACK")
 			}
 		}
+	default:
+		return errors.New("unhandled chunk type")
 	}
 
 	return nil

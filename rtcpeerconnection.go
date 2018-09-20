@@ -817,6 +817,15 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
 
 		}
+	case *network.DataChannelOpen:
+		for _, dc := range pc.dataChannels {
+			dc.Lock()
+			err := dc.SendOpenChannelMessage()
+			if err != nil {
+				fmt.Println("faild to send openchannel", err)
+			}
+			dc.Unlock()
+		}
 	default:
 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
 	}

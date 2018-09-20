@@ -28,6 +28,25 @@ func init() {
 	}
 }
 
+type DTLSState uint8
+
+// DTLSState enums
+const (
+	New DTLSState = iota + 1
+	Established
+)
+
+func (a DTLSState) String() string {
+	switch a {
+	case New:
+		return "New"
+	case Established:
+		return "Established"
+	default:
+		return fmt.Sprintf("Invalid DTLSState %d", a)
+	}
+}
+
 var listenerMap = make(map[string]*ipv4.PacketConn)
 var listenerMapLock = &sync.Mutex{}
 
@@ -38,6 +57,7 @@ func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBu
 	buf := []byte(C.GoStringN(rawBuf, rawBufLen))
 	C.free(unsafe.Pointer(rawBuf))
 
+	fmt.Println("go_handle_sendto", buf)
 	listenerMapLock.Lock()
 	defer listenerMapLock.Unlock()
 	if conn, ok := listenerMap[local]; ok {
@@ -64,15 +84,23 @@ func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBu
 type State struct {
 	sync.Mutex
 
+	started bool
+	isOffer bool
+
+	state    DTLSState
+	notifier func(DTLSState)
+
 	tlscfg      *_Ctype_struct_tlscfg
 	sslctx      *_Ctype_struct_ssl_ctx_st
 	dtlsSession *_Ctype_struct_dtls_sess
 }
 
 // NewState creates a new DTLS session
-func NewState() (s *State, err error) {
+func NewState(notifier func(DTLSState)) (s *State, err error) {
 	s = &State{
-		tlscfg: C.dtls_build_tlscfg(),
+		tlscfg:   C.dtls_build_tlscfg(),
+		state:    New,
+		notifier: notifier,
 	}
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
@@ -82,7 +110,16 @@ func NewState() (s *State, err error) {
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (s *State) Start(isOffer bool) {
+	s.started = true
+	s.isOffer = isOffer
 	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(isOffer))
+}
+
+func (s *State) setState(state DTLSState) {
+	if s.state != state {
+		s.state = state
+		go s.notifier(state)
+	}
 }
 
 // Close cleans up the associated OpenSSL resources
@@ -107,6 +144,7 @@ type CertPair struct {
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
 // If there is any data after decoding we pass back to the caller to handler
 func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, error) {
+	fmt.Println("HandleDTLSPacket", len(packet))
 	s.Lock()
 	defer s.Unlock()
 
@@ -128,13 +166,21 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 			C.free(ret.buf)
 			C.free(unsafe.Pointer(ret))
 		}()
+		fmt.Println("dtls_handle_incoming", ret.len)
+
+		if bool(ret.init) && s.state == New {
+			s.setState(Established)
+		}
+
 		return C.GoBytes(ret.buf, ret.len), nil
 	}
+	fmt.Println("HandleDTLSPacket nil")
 	return nil, nil
 }
 
 // Send takes a un-encrypted packet and sends via DTLS
 func (s *State) Send(packet []byte, local, remote string) (bool, error) {
+	fmt.Println("DTLS send", packet)
 	s.Lock()
 	defer s.Unlock()
 
@@ -177,8 +223,10 @@ func (s *State) GetCertPair() *CertPair {
 // DoHandshake sends the DTLS handshake it the remote peer
 func (s *State) DoHandshake(local, remote string) {
 	s.Lock()
+	fmt.Println("DoHandshake", s.started, s.isOffer)
 	defer s.Unlock()
 	if s.dtlsSession == nil {
+		fmt.Println("DoHandshake no session", s.started, s.isOffer)
 		return
 	}
 
@@ -189,7 +237,12 @@ func (s *State) DoHandshake(local, remote string) {
 		C.free(unsafe.Pointer(rawRemote))
 	}()
 
-	C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
+	ret := C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
+	if ret < 0 {
+		fmt.Println("DoHandshake failed", s.started, s.isOffer, ret)
+	} else {
+		fmt.Println("DoHandshake", s.started, s.isOffer, ret)
+	}
 }
 
 // AddListener adds the socket to a map that can be accessed by OpenSSL for sending
