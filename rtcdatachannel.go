@@ -99,6 +99,10 @@ type RTCDataChannel struct {
 	// arrival over the sctp transport from a remote peer.
 	OnMessage func(datachannel.Payload)
 
+	// OnOpen designates an event handler which is invoked when
+	// the underlying data transport has been established (or re-established).
+	OnOpen func()
+
 	// Deprecated: Will be removed when networkManager is deprecated.
 	rtcPeerConnection *RTCPeerConnection
 }

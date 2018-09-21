@@ -57,7 +57,6 @@ func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBu
 	buf := []byte(C.GoStringN(rawBuf, rawBufLen))
 	C.free(unsafe.Pointer(rawBuf))
 
-	fmt.Println("go_handle_sendto", buf)
 	listenerMapLock.Lock()
 	defer listenerMapLock.Unlock()
 	if conn, ok := listenerMap[local]; ok {
@@ -144,7 +143,6 @@ type CertPair struct {
 // HandleDTLSPacket checks if the packet is a DTLS packet, and if it is passes to the DTLS session
 // If there is any data after decoding we pass back to the caller to handler
 func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, error) {
-	fmt.Println("HandleDTLSPacket", len(packet))
 	s.Lock()
 	defer s.Unlock()
 
@@ -166,7 +164,6 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 			C.free(ret.buf)
 			C.free(unsafe.Pointer(ret))
 		}()
-		fmt.Println("dtls_handle_incoming", ret.len)
 
 		if bool(ret.init) && s.state == New {
 			s.setState(Established)
@@ -174,13 +171,11 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 
 		return C.GoBytes(ret.buf, ret.len), nil
 	}
-	fmt.Println("HandleDTLSPacket nil")
 	return nil, nil
 }
 
 // Send takes a un-encrypted packet and sends via DTLS
 func (s *State) Send(packet []byte, local, remote string) (bool, error) {
-	fmt.Println("DTLS send", packet)
 	s.Lock()
 	defer s.Unlock()
 
@@ -223,10 +218,8 @@ func (s *State) GetCertPair() *CertPair {
 // DoHandshake sends the DTLS handshake it the remote peer
 func (s *State) DoHandshake(local, remote string) {
 	s.Lock()
-	fmt.Println("DoHandshake", s.started, s.isOffer)
 	defer s.Unlock()
 	if s.dtlsSession == nil {
-		fmt.Println("DoHandshake no session", s.started, s.isOffer)
 		return
 	}
 
@@ -237,12 +230,7 @@ func (s *State) DoHandshake(local, remote string) {
 		C.free(unsafe.Pointer(rawRemote))
 	}()
 
-	ret := C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
-	if ret < 0 {
-		fmt.Println("DoHandshake failed", s.started, s.isOffer, ret)
-	} else {
-		fmt.Println("DoHandshake", s.started, s.isOffer, ret)
-	}
+	C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
 }
 
 // AddListener adds the socket to a map that can be accessed by OpenSSL for sending

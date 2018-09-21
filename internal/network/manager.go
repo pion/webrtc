@@ -337,6 +337,8 @@ func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) 
 	if err != nil {
 		return fmt.Errorf("Error Marshaling ChannelOpen %v", err)
 	}
+	m.sctpAssociation.Lock()
+	defer m.sctpAssociation.Unlock()
 	if err = m.sctpAssociation.HandleOutbound(rawMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
 		return fmt.Errorf("Error sending ChannelOpen %v", err)
 	}

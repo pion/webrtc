@@ -1,6 +1,8 @@
 package sctp
 
-import "sort"
+import (
+	"sort"
+)
 
 type payloadDataArray []*chunkPayloadData
 

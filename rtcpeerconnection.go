@@ -799,7 +799,10 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
 		if pc.OnDataChannel != nil {
-			go pc.OnDataChannel(newDataChannel)
+			go func() {
+				pc.OnDataChannel(newDataChannel) // This should actually be called when processing the SDP answer.
+				go newDataChannel.OnOpen()
+			}()
 		} else {
 			fmt.Println("OnDataChannel is unset, discarding message")
 		}
@@ -825,6 +828,8 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 				fmt.Println("faild to send openchannel", err)
 			}
 			dc.Unlock()
+
+			go dc.OnOpen()
 		}
 	default:
 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)

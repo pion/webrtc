@@ -14,6 +14,7 @@ type errorCause interface {
 	unmarshal([]byte) error
 	marshal() ([]byte, error)
 	length() uint16
+	String() string
 
 	errorCauseCode() errorCauseCode
 }

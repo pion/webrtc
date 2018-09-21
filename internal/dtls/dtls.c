@@ -306,7 +306,6 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *
   ret->init = finisched;
 
   if (decrypted_len > 1) {
-    fprintf(stderr, "dtls_handle_incoming empty\n");
     ret->buf = decrypted;
     ret->len = decrypted_len;
   }

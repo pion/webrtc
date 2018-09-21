@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"time"
@@ -35,19 +36,24 @@ func main() {
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+	}
 
-		// TODO: find the correct place for this
-		if connectionState == ice.ConnectionStateConnected {
-			fmt.Println("sending openchannel")
-			err := dataChannel.SendOpenChannelMessage()
-			if err != nil {
-				fmt.Println("faild to send openchannel", err)
-			}
+	dataChannel.Lock()
+
+	// Register channel opening handling
+	dataChannel.OnOpen = func() {
+		fmt.Printf("Data channel %s %d open. Random messages will now be sent to any connected DataChannels every 5 seconds", dataChannel.Label, dataChannel.ID)
+		for {
+			time.Sleep(5 * time.Second)
+			message := randSeq(15)
+			fmt.Printf("Sending %s \n", message)
+
+			err := dataChannel.Send(datachannel.PayloadString{Data: []byte(message)})
+			check(err)
 		}
 	}
 
 	// Register the Onmessage to handle incoming messages
-	dataChannel.Lock()
 	dataChannel.Onmessage = func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:
@@ -58,6 +64,7 @@ func main() {
 			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), dataChannel.Label)
 		}
 	}
+
 	dataChannel.Unlock()
 
 	// Create an offer to send to the browser
@@ -67,7 +74,7 @@ func main() {
 	// Output the offer in base64 so we can paste it in browser
 	fmt.Println(base64.StdEncoding.EncodeToString([]byte(offer.Sdp)))
 
-	// Wait for the offer to be pasted
+	// Wait for the answer to be pasted
 	sd := mustReadStdin()
 
 	// Set the remote SessionDescription
@@ -80,15 +87,8 @@ func main() {
 	err = peerConnection.SetRemoteDescription(answer)
 	check(err)
 
-	// Send messages every 5 seconds
-	fmt.Println("Random messages will now be sent to any connected DataChannels every 5 seconds")
+	// Block forever
 	for {
-		time.Sleep(5 * time.Second)
-		message := randSeq(15)
-		fmt.Printf("Sending %s \n", message)
-
-		err := dataChannel.Send(datachannel.PayloadString{Data: []byte(message)})
-		check(err)
 	}
 }
 
@@ -107,12 +107,15 @@ func randSeq(n int) string {
 func mustReadStdin() string {
 	reader := bufio.NewReader(os.Stdin)
 	rawSd, err := reader.ReadString('\n')
-	check(err)
+	if err != io.EOF {
+		check(err)
+	}
 
 	fmt.Println("")
-	sd, err := base64.StdEncoding.DecodeString(rawSd)
 
+	sd, err := base64.StdEncoding.DecodeString(rawSd)
 	check(err)
+
 	return string(sd)
 }
 
