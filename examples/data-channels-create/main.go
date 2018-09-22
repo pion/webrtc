@@ -38,11 +38,13 @@ func main() {
 
 		// TODO: find the correct place for this
 		if connectionState == ice.ConnectionStateConnected {
-			fmt.Println("sending openchannel")
-			err := dataChannel.SendOpenChannelMessage()
-			if err != nil {
-				fmt.Println("faild to send openchannel", err)
-			}
+			time.AfterFunc(3*time.Second, func() {
+				fmt.Println("sending openchannel")
+				err := dataChannel.SendOpenChannelMessage()
+				if err != nil {
+					fmt.Println("faild to send openchannel", err)
+				}
+			})
 		}
 	}
 

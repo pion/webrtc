@@ -132,6 +132,11 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	var msg *stun.Message
 	var err error
 
+	// The controlling agent MUST include the USE-CANDIDATE attribute in
+	// order to nominate a candidate pair (Section 8.1.1).  The controlled
+	// agent MUST NOT include the USE-CANDIDATE attribute in a Binding
+	// request.
+
 	if a.isControlling {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
@@ -143,11 +148,9 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			},
 			&stun.Fingerprint{},
 		)
-
 	} else {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
-			&stun.UseCandidate{},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
 			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
@@ -353,9 +356,15 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 		return
 	}
 
-	_, useCandidateFound := m.GetOneAttribute(stun.AttrUseCandidate)
-	a.setValidPair(localCandidate, remoteCandidate, useCandidateFound)
-	a.sendBindingSuccess(m, local, remote)
+	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
+	_, usepair := m.GetOneAttribute(stun.AttrUseCandidate)
+	// Remember the working pair and select it when marked with usepair
+	a.setValidPair(localCandidate, remoteCandidate, usepair)
+
+	if !successResponse {
+		// Send success response
+		a.sendBindingSuccess(m, local, remote)
+	}
 }
 
 func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
@@ -367,11 +376,16 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 		return
 	}
 
-	final := m.Class == stun.ClassSuccessResponse && m.Method == stun.MethodBinding
-	a.setValidPair(localCandidate, remoteCandidate, final)
+	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
+	// Remember the working pair and select it when receiving a success response
+	a.setValidPair(localCandidate, remoteCandidate, successResponse)
 
-	if !final {
+	if !successResponse {
+		// Send success response
 		a.sendBindingSuccess(m, local, remote)
+
+		// We received a ping from the controlled agent. We know the pair works so now we ping with use-candidate set:
+		a.pingCandidate(localCandidate, remoteCandidate)
 	}
 }
 
