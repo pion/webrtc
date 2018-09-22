@@ -9,6 +9,7 @@ We've build an extensive collection of examples covering common use-cases. Modif
 * [save-to-disk](save-to-disk/README.md): Save video from your Webcam to disk
 * [data-channels](data-channels/README.md): Use data channels to send text between Pion WebRTC and your browser
 * [data-channels-create](data-channels/README.md): Similar to data channels but now Pion initiates the creation of the data channel.
+* [sfu](sfu/README.md): Broadcast a video to many peers, while only requiring the broadcaster to upload once
 * [WIP] [pion-to-pion](pion-to-pion/README.md): An example of two Pion instances communicating directly.
 
 All examples can be executed on your local machine.
