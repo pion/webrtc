@@ -16,7 +16,7 @@ type OpusPacket struct {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the OpusPacket this method is called upon
-func (p *OpusPacket) Unmarshal(packet *rtp.Packet) error {
+func (p *OpusPacket) Unmarshal(packet *rtp.Packet) ([]byte, error) {
 	p.Payload = packet.Payload
-	return nil
+	return p.Payload, nil
 }

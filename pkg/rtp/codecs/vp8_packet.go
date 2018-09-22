@@ -76,7 +76,7 @@ type VP8Packet struct {
 }
 
 // Unmarshal parses the passed byte slice and stores the result in the VP8Packet this method is called upon
-func (p *VP8Packet) Unmarshal(packet *rtp.Packet) error {
+func (p *VP8Packet) Unmarshal(packet *rtp.Packet) ([]byte, error) {
 	payload := packet.Payload
 
 	payloadIndex := 0
@@ -113,6 +113,5 @@ func (p *VP8Packet) Unmarshal(packet *rtp.Packet) error {
 	}
 
 	p.Payload = payload[payloadIndex:]
-
-	return nil
+	return p.Payload, nil
 }
