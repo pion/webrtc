@@ -89,8 +89,7 @@ func main() {
 	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
 
 	// Block forever
-	for {
-	}
+	select {}
 }
 
 func randSeq(n int) string {

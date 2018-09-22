@@ -156,12 +156,17 @@ func (p *port) networkLoop() {
 		}
 
 		// https://tools.ietf.org/html/rfc5764#page-14
+		isICE := false
 		if 127 < in.buffer[0] && in.buffer[0] < 192 {
 			p.handleSRTP(in.buffer)
 		} else if 19 < in.buffer[0] && in.buffer[0] < 64 {
 			p.handleDTLS(in.buffer, in.srcAddr.String())
 		} else if in.buffer[0] < 2 {
 			p.m.IceAgent.HandleInbound(in.buffer, p.listeningAddr, in.srcAddr)
+			isICE = true
+		}
+		if !isICE {
+			p.m.IceAgent.CandidateSeen(in.srcAddr)
 		}
 
 		p.m.certPairLock.RLock()

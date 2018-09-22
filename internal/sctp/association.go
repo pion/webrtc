@@ -481,33 +481,34 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	return sackDataPackets, nil
 }
 
-func packetDbg(sent bool, p *packet) {
-	dir := "<<<<<"
-	if sent {
-		dir = ">>>>>"
-	}
-
-	res := fmt.Sprintf("SCTP %s", dir)
-	doPrint := false
-	for _, c := range p.chunks {
-		switch c.(type) {
-		case *chunkPayloadData, *chunkSelectiveAck:
-			res += fmt.Sprintf(" %s", c)
-			doPrint = true
-		}
-	}
-
-	if doPrint {
-		fmt.Println(res)
-	}
-}
+// packetDbg can be used to debug the ICE packet flow
+// func packetDbg(sent bool, p *packet) {
+// 	dir := "<<<<<"
+// 	if sent {
+// 		dir = ">>>>>"
+// 	}
+//
+// 	res := fmt.Sprintf("SCTP %s", dir)
+// 	doPrint := false
+// 	for _, c := range p.chunks {
+// 		switch c.(type) {
+// 		case *chunkPayloadData, *chunkSelectiveAck:
+// 			res += fmt.Sprintf(" %s", c)
+// 			doPrint = true
+// 		}
+// 	}
+//
+// 	if doPrint {
+// 		fmt.Println(res)
+// 	}
+// }
 
 func (a *Association) send(p *packet) error {
 	raw, err := p.marshal()
 	if err != nil {
 		return errors.Wrap(err, "Failed to send packet to outbound handler")
 	}
-	packetDbg(true, p)
+	// packetDbg(true, p)
 
 	a.outboundHandler(raw)
 
@@ -515,7 +516,7 @@ func (a *Association) send(p *packet) error {
 }
 
 func (a *Association) handleChunk(p *packet, c chunk) error {
-	packetDbg(false, p)
+	// packetDbg(false, p)
 	if _, err := c.check(); err != nil {
 		return errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT

@@ -88,8 +88,7 @@ func main() {
 	check(err)
 
 	// Block forever
-	for {
-	}
+	select {}
 }
 
 // randSeq is used to generate a random message
