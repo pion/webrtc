@@ -159,6 +159,22 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 	}
 }
 
+// SendRTCP finds a connected port and sends the passed RTCP packet
+func (m *Manager) SendRTCP(pkt []byte) {
+	m.portsLock.Lock()
+	defer m.portsLock.Unlock()
+
+	local, remote := m.IceAgent.SelectedPair()
+	if local == nil || remote == nil {
+		return
+	}
+	for _, p := range m.ports {
+		if p.listeningAddr.Equal(local) {
+			p.sendRTCP(pkt, remote)
+		}
+	}
+}
+
 // SendDataChannelMessage sends a DataChannel message to a connected peer
 func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIdentifier uint16) error {
 	var data []byte
