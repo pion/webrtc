@@ -18,6 +18,7 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
@@ -717,6 +718,17 @@ func (pc *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
 func (pc *RTCPeerConnection) SetIdentityProvider(provider string) error {
 	return errors.Errorf("TODO SetIdentityProvider")
+}
+
+// SendRTCP sends a user provided RTCP packet to the connected peer
+// If no peer is connected the packet is discarded
+func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
+	raw, err := pkt.Marshal()
+	if err != nil {
+		return err
+	}
+	pc.networkManager.SendRTCP(raw)
+	return nil
 }
 
 // Close ends the RTCPeerConnection
