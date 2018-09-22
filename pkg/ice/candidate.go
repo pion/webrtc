@@ -19,10 +19,19 @@ type Candidate interface {
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
 type CandidateBase struct {
-	Protocol ProtoType
-	Address  string
-	Port     int
-	LastSeen time.Time
+	Protocol     ProtoType
+	Address      string
+	Port         int
+	LastSent     time.Time
+	LastReceived time.Time
+}
+
+func (c *CandidateBase) seen(outbound bool) {
+	if outbound {
+		c.LastSent = time.Now()
+	} else {
+		c.LastReceived = time.Now()
+	}
 }
 
 // Priority computes the priority for this ICE Candidate
