@@ -82,8 +82,14 @@ type Agent struct {
 }
 
 const (
-	agentTickerBaseInterval = 3 * time.Second
-	stunTimeout             = 10 * time.Second
+	// taskLoopInterval is the interval at which the agent performs checks
+	taskLoopInterval = 2 * time.Second
+
+	// keepaliveInterval used to keep candidates alive
+	keepaliveInterval = 10 * time.Second
+
+	// connectionTimeout used to declare a connection dead
+	connectionTimeout = 30 * time.Second
 )
 
 // NewAgent creates a new Agent
@@ -118,7 +124,7 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 	a.remoteUfrag = remoteUfrag
 	a.remotePwd = remotePwd
 
-	go a.agentTaskLoop()
+	go a.taskLoop()
 	return nil
 }
 
@@ -156,6 +162,22 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		return
 	}
 
+	a.sendSTUN(msg, local, remote)
+}
+
+// keepaliveCandidate sends a STUN Binding Indication to the remote candidate
+func (a *Agent) keepaliveCandidate(local, remote Candidate) {
+	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionId(), &stun.Fingerprint{})
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	a.sendSTUN(msg, local, remote)
+}
+
+func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
 	a.outboundCallback(msg.Pack(), &stun.TransportAddr{
 		IP:   net.ParseIP(local.GetBase().Address),
 		Port: local.GetBase().Port,
@@ -163,6 +185,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		IP:   net.ParseIP(remote.GetBase().Address),
 		Port: remote.GetBase().Port,
 	})
+	remote.GetBase().seen(true)
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
@@ -188,43 +211,65 @@ func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
 	}
 }
 
-func (a *Agent) agentTaskLoop() {
+func (a *Agent) taskLoop() {
 	// TODO this should be dynamic, and grow when the connection is stable
-	t := time.NewTicker(agentTickerBaseInterval)
+	t := time.NewTicker(taskLoopInterval)
 	a.updateConnectionState(ConnectionStateChecking)
-
-	assertSelectedPairValid := func() bool {
-		if a.selectedPair.remote == nil || a.selectedPair.local == nil {
-			return false
-		} else if time.Since(a.selectedPair.remote.GetBase().LastSeen) > stunTimeout {
-			a.selectedPair.remote = nil
-			a.selectedPair.local = nil
-			a.updateConnectionState(ConnectionStateDisconnected)
-			return false
-		}
-
-		return true
-	}
 
 	for {
 		select {
 		case <-t.C:
 			a.Lock()
-			if assertSelectedPairValid() {
-				a.Unlock()
-				continue
+			if a.validateSelectedPair() {
+				a.checkKeepalive()
+			} else {
+				a.pingAllCandidates()
 			}
-
-			for _, localCandidate := range a.LocalCandidates {
-				for _, remoteCandidate := range a.remoteCandidates {
-					a.pingCandidate(localCandidate, remoteCandidate)
-				}
-			}
-
 			a.Unlock()
 		case <-a.taskLoopChan:
 			t.Stop()
 			return
+		}
+	}
+}
+
+// validateSelectedPair checks if the selected pair is (still) valid
+// Note: the caller should hold the agent lock.
+func (a *Agent) validateSelectedPair() bool {
+	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+		// Not valid since not selected
+		return false
+	}
+
+	if time.Since(a.selectedPair.remote.GetBase().LastReceived) > connectionTimeout {
+		a.selectedPair.remote = nil
+		a.selectedPair.local = nil
+		a.updateConnectionState(ConnectionStateDisconnected)
+		return false
+	}
+
+	return true
+}
+
+// checkKeepalive sends STUN Binding Indications to the selected pair
+// if no packet has been sent on that pair in the last keepaliveInterval
+// Note: the caller should hold the agent lock.
+func (a *Agent) checkKeepalive() {
+	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+		return
+	}
+
+	if time.Since(a.selectedPair.remote.GetBase().LastSent) > keepaliveInterval {
+		a.keepaliveCandidate(a.selectedPair.local, a.selectedPair.remote)
+	}
+}
+
+// pingAllCandidates sends STUN Binding Requests to all candidates
+// Note: the caller should hold the agent lock.
+func (a *Agent) pingAllCandidates() {
+	for _, localCandidate := range a.LocalCandidates {
+		for _, remoteCandidate := range a.remoteCandidates {
+			a.pingCandidate(localCandidate, remoteCandidate)
 		}
 	}
 }
@@ -300,7 +345,6 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 	} else {
 		a.outboundCallback(out.Pack(), local, remote)
 	}
-
 }
 
 func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
@@ -349,7 +393,8 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
-	remoteCandidate.GetBase().LastSeen = time.Now()
+
+	remoteCandidate.GetBase().seen(false)
 
 	m, err := stun.NewMessage(buf)
 	if err != nil {
