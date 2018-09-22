@@ -83,8 +83,6 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
 func (m *Manager) AddURL(url *ice.URL) error {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
 
 	switch url.Scheme {
 	case ice.SchemeTypeSTUN:
@@ -97,6 +95,8 @@ func (m *Manager) AddURL(url *ice.URL) error {
 			return err
 		}
 
+		m.portsLock.Lock()
+		defer m.portsLock.Unlock()
 		m.ports = append(m.ports, p)
 		m.IceAgent.AddLocalCandidate(c)
 	default:
@@ -145,13 +145,14 @@ func (m *Manager) DTLSFingerprint() string {
 
 // SendRTP finds a connected port and sends the passed RTP packet
 func (m *Manager) SendRTP(packet *rtp.Packet) {
-	m.portsLock.RLock()
-	defer m.portsLock.RUnlock()
 
 	local, remote := m.IceAgent.SelectedPair()
 	if local == nil || remote == nil {
 		return
 	}
+
+	m.portsLock.RLock()
+	defer m.portsLock.RUnlock()
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
 			p.sendRTP(packet, remote)
@@ -161,13 +162,13 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 
 // SendRTCP finds a connected port and sends the passed RTCP packet
 func (m *Manager) SendRTCP(pkt []byte) {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-
 	local, remote := m.IceAgent.SelectedPair()
 	if local == nil || remote == nil {
 		return
 	}
+
+	m.portsLock.RLock()
+	defer m.portsLock.RUnlock()
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
 			p.sendRTCP(pkt, remote)
@@ -294,7 +295,6 @@ func (m *Manager) port(local *stun.TransportAddr) (*port, error) {
 func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
 	m.portsLock.RLock()
 	defer m.portsLock.RUnlock()
-
 	for _, p := range m.ports {
 		if p.listeningAddr.Equal(local) {
 			p.sendICE(raw, remote)
