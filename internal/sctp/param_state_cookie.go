@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -38,4 +39,9 @@ func (s *paramStateCookie) unmarshal(raw []byte) (param, error) {
 	s.paramHeader.unmarshal(raw)
 	s.cookie = s.raw
 	return s, nil
+}
+
+// String makes paramStateCookie printable
+func (s *paramStateCookie) String() string {
+	return fmt.Sprintf("%s: %s", s.paramHeader, s.cookie)
 }

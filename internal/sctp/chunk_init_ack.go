@@ -1,6 +1,8 @@
 package sctp
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -117,4 +119,9 @@ func (i *chunkInitAck) check() (abort bool, err error) {
 	}
 
 	return false, nil
+}
+
+// String makes chunkInitAck printable
+func (i *chunkInitAck) String() string {
+	return fmt.Sprintf("%s\n%s", i.chunkHeader, i.chunkInitCommon)
 }

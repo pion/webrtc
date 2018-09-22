@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/pkg/errors"
 )
@@ -35,4 +36,9 @@ func (e *errorCauseHeader) length() uint16 {
 
 func (e *errorCauseHeader) errorCauseCode() errorCauseCode {
 	return e.code
+}
+
+// String makes errorCauseHeader printable
+func (e errorCauseHeader) String() string {
+	return fmt.Sprintf("%s", e.code)
 }

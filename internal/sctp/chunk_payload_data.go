@@ -146,3 +146,8 @@ func (p *chunkPayloadData) marshal() ([]byte, error) {
 func (p *chunkPayloadData) check() (abort bool, err error) {
 	return false, nil
 }
+
+// String makes chunkPayloadData printable
+func (i *chunkPayloadData) String() string {
+	return fmt.Sprintf("%s\n%s", i.chunkHeader, i.tsn)
+}

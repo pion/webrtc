@@ -105,6 +105,9 @@ type Association struct {
 	reassemblyQueue           map[uint16]*reassemblyQueue
 	outboundStreams           map[uint16]uint16
 
+	isInitiating bool
+	notifier     func(AssociationState)
+
 	// TODO are these better as channels
 	// Put a blocking goroutine in port-receive (vs callbacks)
 	outboundHandler func([]byte)
@@ -169,7 +172,7 @@ func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, pay
 	return chunks, nil
 }
 
-// HandleOutbound parses incoming raw packets
+// HandleOutbound sends outbound raw packets
 func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
 	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
 	if err != nil {
@@ -199,25 +202,28 @@ func (a *Association) Close() error {
 }
 
 // NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier)) *Association {
+func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), notifier func(AssociationState)) *Association {
 	rs := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(rs)
 
+	tsn := r.Uint32()
 	return &Association{
-		myMaxNumOutboundStreams: math.MaxUint16,
-		myMaxNumInboundStreams:  math.MaxUint16,
-		myReceiverWindowCredit:  10 * 1500, // 10 Max MTU packets buffer
-		payloadQueue:            &payloadQueue{},
-		inflightQueue:           &payloadQueue{},
-		myMaxMTU:                1200,
-		firstSack:               true,
-		reassemblyQueue:         make(map[uint16]*reassemblyQueue),
-		outboundStreams:         make(map[uint16]uint16),
-		myVerificationTag:       r.Uint32(),
-		myNextTSN:               r.Uint32(),
-		outboundHandler:         outboundHandler,
-		dataHandler:             dataHandler,
-		state:                   Open,
+		myMaxNumOutboundStreams:   math.MaxUint16,
+		myMaxNumInboundStreams:    math.MaxUint16,
+		myReceiverWindowCredit:    10 * 1500, // 10 Max MTU packets buffer
+		payloadQueue:              &payloadQueue{},
+		inflightQueue:             &payloadQueue{},
+		myMaxMTU:                  1200,
+		firstSack:                 true,
+		reassemblyQueue:           make(map[uint16]*reassemblyQueue),
+		outboundStreams:           make(map[uint16]uint16),
+		myVerificationTag:         r.Uint32(),
+		myNextTSN:                 tsn,
+		outboundHandler:           outboundHandler,
+		dataHandler:               dataHandler,
+		state:                     Open,
+		notifier:                  notifier,
+		peerCumulativeTSNAckPoint: tsn - 1,
 	}
 }
 
@@ -270,8 +276,53 @@ func min(a, b uint16) uint16 {
 	return b
 }
 
-func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
+// Start starts the Association
+func (a *Association) Start(isInitiating bool) {
+	a.isInitiating = isInitiating
+}
 
+// Start starts the Association
+func (a *Association) setState(state AssociationState) {
+	if a.state != state {
+		a.state = state
+		go a.notifier(state)
+	}
+}
+
+// Connect
+func (a *Association) Connect() {
+	if a.isInitiating {
+		init := a.CreateInit()
+		err := a.send(init)
+		if err != nil {
+			fmt.Printf("Failed to send init: %s: %v", init, err)
+		}
+		a.setState(CookieWait)
+	}
+}
+
+func (a *Association) CreateInit() *packet {
+	outbound := &packet{}
+	outbound.verificationTag = a.peerVerificationTag
+	a.sourcePort = 5000      // TODO: Spec??
+	a.destinationPort = 5000 // TODO: Spec??
+	outbound.sourcePort = a.sourcePort
+	outbound.destinationPort = a.destinationPort
+
+	init := &chunkInit{}
+
+	init.initialTSN = a.myNextTSN
+	init.numOutboundStreams = a.myMaxNumOutboundStreams
+	init.numInboundStreams = a.myMaxNumInboundStreams
+	init.initiateTag = a.myVerificationTag
+	init.advertisedReceiverWindowCredit = a.myReceiverWindowCredit
+
+	outbound.chunks = []chunk{init}
+
+	return outbound
+}
+
+func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	// Should we be setting any of these permanently until we've ACKed further?
 	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
 	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
@@ -307,6 +358,37 @@ func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	outbound.chunks = []chunk{initAck}
 
 	return outbound
+}
+
+func (a *Association) handleInitAck(p *packet, i *chunkInitAck) (*packet, error) {
+	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
+	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
+	a.peerVerificationTag = i.initiateTag
+	a.peerLastTSN = i.initialTSN - 1
+
+	outbound := &packet{}
+	outbound.verificationTag = a.peerVerificationTag
+	outbound.sourcePort = a.sourcePort
+	outbound.destinationPort = a.destinationPort
+
+	var cookieParam *paramStateCookie
+	for _, param := range i.params {
+		switch v := param.(type) {
+		case *paramStateCookie:
+			cookieParam = v
+		}
+	}
+	if cookieParam == nil {
+		return nil, errors.New("no cookie in InitAck")
+	}
+
+	cookieEcho := &chunkCookieEcho{}
+
+	cookieEcho.cookie = cookieParam.cookie
+
+	outbound.chunks = []chunk{cookieEcho}
+
+	return outbound, nil
 }
 
 func (a *Association) handleData(d *chunkPayloadData) *packet {
@@ -358,12 +440,6 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	// monotonically increasing, a SACK whose Cumulative TSN Ack is
 	// less than the Cumulative TSN Ack Point indicates an out-of-
 	// order SACK.
-	if a.firstSack {
-		a.firstSack = false
-		// We need the ack point to be 1 less than the real one so that when we get our first CumTSN
-		// we act like it is an "new" ack point
-		a.peerCumulativeTSNAckPoint = d.cumulativeTSNAck - 1
-	}
 
 	// This is an old SACK, toss
 	if a.peerCumulativeTSNAckPoint >= d.cumulativeTSNAck {
@@ -405,11 +481,34 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	return sackDataPackets, nil
 }
 
+// packetDbg can be used to debug the ICE packet flow
+// func packetDbg(sent bool, p *packet) {
+// 	dir := "<<<<<"
+// 	if sent {
+// 		dir = ">>>>>"
+// 	}
+//
+// 	res := fmt.Sprintf("SCTP %s", dir)
+// 	doPrint := false
+// 	for _, c := range p.chunks {
+// 		switch c.(type) {
+// 		case *chunkPayloadData, *chunkSelectiveAck:
+// 			res += fmt.Sprintf(" %s", c)
+// 			doPrint = true
+// 		}
+// 	}
+//
+// 	if doPrint {
+// 		fmt.Println(res)
+// 	}
+// }
+
 func (a *Association) send(p *packet) error {
 	raw, err := p.marshal()
 	if err != nil {
 		return errors.Wrap(err, "Failed to send packet to outbound handler")
 	}
+	// packetDbg(true, p)
 
 	a.outboundHandler(raw)
 
@@ -417,6 +516,7 @@ func (a *Association) send(p *packet) error {
 }
 
 func (a *Association) handleChunk(p *packet, c chunk) error {
+	// packetDbg(false, p)
 	if _, err := c.check(); err != nil {
 		return errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
@@ -438,10 +538,23 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
+	case *chunkInitAck:
+		switch a.state {
+		case CookieWait:
+			r, err := a.handleInitAck(p, c)
+			err = a.send(r)
+			if err != nil {
+				return err
+			}
+			a.setState(CookieEchoed)
+			return nil
+		default:
+			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
+		}
 	case *chunkAbort:
-		fmt.Println("Abort chunk, with errors")
+		fmt.Println("Abort chunk, with errors:")
 		for _, e := range c.errorCauses {
-			fmt.Println(e.errorCauseCode())
+			fmt.Printf("error cause: %s\n", e)
 		}
 	case *chunkHeartbeat:
 		hbi, ok := c.params[0].(*paramHeartbeatInfo)
@@ -463,12 +576,27 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		})
 	case *chunkCookieEcho:
 		if bytes.Equal(a.myCookie.cookie, c.cookie) {
-			return a.send(&packet{
+			err := a.send(&packet{
 				verificationTag: a.peerVerificationTag,
 				sourcePort:      a.sourcePort,
 				destinationPort: a.destinationPort,
 				chunks:          []chunk{&chunkCookieAck{}},
 			})
+			if err != nil {
+				return err
+			}
+			a.setState(Established)
+
+			return nil
+		}
+
+	case *chunkCookieAck:
+		switch a.state {
+		case CookieEchoed:
+			a.setState(Established)
+			return nil
+		default:
+			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
 		}
 
 		// TODO Abort
@@ -485,6 +613,8 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 				return errors.Wrap(err, "Failure handling SACK")
 			}
 		}
+	default:
+		return errors.New("unhandled chunk type")
 	}
 
 	return nil

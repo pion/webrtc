@@ -54,14 +54,14 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
-	m.dtlsState, err = dtls.NewState()
+	m.dtlsState, err = dtls.NewState(m.wrapDTLSNotifier())
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.wrapSCTPNotifier())
 
-	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
+	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.wrapICENotifier())
 	for _, i := range localInterfaces() {
 		p, portErr := newPort(i+":0", m)
 		if portErr != nil {
@@ -79,6 +79,36 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	}
 
 	return m, err
+}
+
+func (m *Manager) wrapICENotifier() ICENotifier {
+	return func(newState ice.ConnectionState) {
+		// DTLS handshake
+		if newState == ice.ConnectionStateConnected &&
+			!m.isOffer { // TODO: should be DTLS state property
+			l, r := m.IceAgent.SelectedPair()
+			m.dtlsState.DoHandshake(l.String(), r.String())
+		}
+		// Caller ICEHandler
+		m.iceNotifier(newState)
+	}
+}
+
+func (m *Manager) wrapDTLSNotifier() func(dtls.DTLSState) {
+	return func(state dtls.DTLSState) {
+		if state == dtls.Established {
+			m.sctpAssociation.Connect()
+		}
+	}
+}
+
+func (m *Manager) wrapSCTPNotifier() func(sctp.AssociationState) {
+	return func(state sctp.AssociationState) {
+		if state == sctp.Established {
+			// Temporary way to signal sending OpenChannel messages
+			m.dataChannelEventHandler(&DataChannelOpen{})
+		}
+	}
 }
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
@@ -109,10 +139,17 @@ func (m *Manager) AddURL(url *ice.URL) error {
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	m.isOffer = isOffer
+
+	// Start the sctpAssociation
+	m.sctpAssociation.Start(isOffer)
+
 	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
 		return err
 	}
+
+	// Start DTLS
 	m.dtlsState.Start(isOffer)
+
 	return nil
 }
 
@@ -227,8 +264,10 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 				return
 			}
 			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
+		case *datachannel.ChannelAck:
+			// TODO: handle ChannelAck (https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.2)
 		default:
-			fmt.Println("Unhandled DataChannel message", m)
+			fmt.Println("Unhandled DataChannel message", msg)
 		}
 	case sctp.PayloadTypeWebRTCString:
 		fallthrough
@@ -300,6 +339,8 @@ func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) 
 	if err != nil {
 		return fmt.Errorf("Error Marshaling ChannelOpen %v", err)
 	}
+	m.sctpAssociation.Lock()
+	defer m.sctpAssociation.Unlock()
 	if err = m.sctpAssociation.HandleOutbound(rawMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
 		return fmt.Errorf("Error sending ChannelOpen %v", err)
 	}

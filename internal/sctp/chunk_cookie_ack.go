@@ -1,6 +1,8 @@
 package sctp
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -36,4 +38,9 @@ func (c *chunkCookieAck) marshal() ([]byte, error) {
 
 func (c *chunkCookieAck) check() (abort bool, err error) {
 	return false, nil
+}
+
+// String makes chunkCookieAck printable
+func (c *chunkCookieAck) String() string {
+	return fmt.Sprintf("%s", c.chunkHeader)
 }
