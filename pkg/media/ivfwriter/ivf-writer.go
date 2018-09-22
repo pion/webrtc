@@ -46,7 +46,7 @@ func New(fileName string) (*IVFWriter, error) {
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 
 	vp8Packet := codecs.VP8Packet{}
-	err := vp8Packet.Unmarshal(packet)
+	_, err := vp8Packet.Unmarshal(packet)
 	if err != nil {
 		return err
 	}

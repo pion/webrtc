@@ -15,6 +15,13 @@ type sampleBuilderTest struct {
 	bufferSize uint16
 }
 
+type fakeDepacketizer struct {
+}
+
+func (f *fakeDepacketizer) Unmarshal(packet *rtp.Packet) ([]byte, error) {
+	return packet.Payload, nil
+}
+
 var testCases = []sampleBuilderTest{
 	{
 		message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
@@ -83,7 +90,7 @@ func TestSampleBuilder(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, t := range testCases {
-		s := New(t.bufferSize)
+		s := New(t.bufferSize, &fakeDepacketizer{})
 		samples := []*media.RTCSample{}
 
 		for _, p := range t.packets {

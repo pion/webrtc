@@ -12,6 +12,9 @@ type SampleBuilder struct {
 	maxLate uint16
 	buffer  [65536]*rtp.Packet
 
+	// Interface that allows us to take RTP packets to samples
+	depacketizer rtp.Depacketizer
+
 	// Last seqnum that has been added to buffer
 	lastPush uint16
 
@@ -22,8 +25,8 @@ type SampleBuilder struct {
 }
 
 // New constructs a new SampleBuilder
-func New(maxLate uint16) *SampleBuilder {
-	return &SampleBuilder{maxLate: maxLate}
+func New(maxLate uint16, depacketizer rtp.Depacketizer) *SampleBuilder {
+	return &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer}
 }
 
 // Push adds a RTP Packet to the sample builder
@@ -57,7 +60,12 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
 			return &media.RTCSample{Data: data, Samples: samples}
 		}
 
-		data = append(data, s.buffer[i].Payload...)
+		p, err := s.depacketizer.Unmarshal(s.buffer[i])
+		if err != nil {
+			return nil
+		}
+
+		data = append(data, p...)
 	}
 	return nil
 }
