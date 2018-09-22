@@ -227,8 +227,10 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 				return
 			}
 			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
+		case *datachannel.ChannelAck:
+			// TODO: handle ChannelAck (https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.2)
 		default:
-			fmt.Println("Unhandled DataChannel message", m)
+			fmt.Println("Unhandled DataChannel message", msg)
 		}
 	case sctp.PayloadTypeWebRTCString:
 		fallthrough
