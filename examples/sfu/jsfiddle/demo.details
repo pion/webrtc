@@ -1,0 +1,5 @@
+---
+ name: gstreamer-receive
+ description: Example of using pion-WebRTC to play video using GStreamer
+ authors:
+   - Sean DuBois
