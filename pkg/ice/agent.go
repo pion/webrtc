@@ -59,7 +59,7 @@ type Agent struct {
 	sync.RWMutex
 
 	outboundCallback OutboundCallback
-	iceNotifier      func(ConnectionState)
+	notifier         func(ConnectionState)
 
 	tieBreaker      uint64
 	connectionState ConnectionState
@@ -93,10 +93,10 @@ const (
 )
 
 // NewAgent creates a new Agent
-func NewAgent(outboundCallback OutboundCallback, iceNotifier func(ConnectionState)) *Agent {
+func NewAgent(outboundCallback OutboundCallback, notifier func(ConnectionState)) *Agent {
 	return &Agent{
 		outboundCallback: outboundCallback,
-		iceNotifier:      iceNotifier,
+		notifier:         notifier,
 
 		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:  GatheringStateComplete, // TODO trickle-ice
@@ -192,10 +192,14 @@ func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
-	a.connectionState = newState
-	// Call handler async since we may be holding the agent lock
-	// and the handler may also require it
-	go a.iceNotifier(a.connectionState)
+	if a.connectionState != newState {
+		a.connectionState = newState
+		if a.notifier != nil {
+			// Call handler async since we may be holding the agent lock
+			// and the handler may also require it
+			go a.notifier(a.connectionState)
+		}
+	}
 }
 
 func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
