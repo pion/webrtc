@@ -83,6 +83,7 @@ func serve(addr string) error {
 // getExamples loads the examples from the examples.json file.
 func getExamples() (*Examples, error) {
 	file, err := os.Open("./examples.json")
+	defer file.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list examples (please run in the examples folder): %v", err)
 	}
