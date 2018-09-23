@@ -28,6 +28,26 @@ func init() {
 	}
 }
 
+// ConnectionState determines the DTLS connection state
+type ConnectionState uint8
+
+// ConnectionState enums
+const (
+	New ConnectionState = iota + 1
+	Established
+)
+
+func (a ConnectionState) String() string {
+	switch a {
+	case New:
+		return "New"
+	case Established:
+		return "Established"
+	default:
+		return fmt.Sprintf("Invalid ConnectionState %d", a)
+	}
+}
+
 var listenerMap = make(map[string]*ipv4.PacketConn)
 var listenerMapLock = &sync.Mutex{}
 
@@ -64,15 +84,20 @@ func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBu
 type State struct {
 	sync.Mutex
 
+	state    ConnectionState
+	notifier func(ConnectionState)
+
 	tlscfg      *_Ctype_struct_tlscfg
 	sslctx      *_Ctype_struct_ssl_ctx_st
 	dtlsSession *_Ctype_struct_dtls_sess
 }
 
 // NewState creates a new DTLS session
-func NewState() (s *State, err error) {
+func NewState(notifier func(ConnectionState)) (s *State, err error) {
 	s = &State{
-		tlscfg: C.dtls_build_tlscfg(),
+		tlscfg:   C.dtls_build_tlscfg(),
+		state:    New,
+		notifier: notifier,
 	}
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
@@ -83,6 +108,15 @@ func NewState() (s *State, err error) {
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (s *State) Start(isOffer bool) {
 	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(isOffer))
+}
+
+func (s *State) setState(state ConnectionState) {
+	if s.state != state {
+		s.state = state
+		if s.notifier != nil {
+			go s.notifier(state)
+		}
+	}
 }
 
 // Close cleans up the associated OpenSSL resources
@@ -128,6 +162,11 @@ func (s *State) HandleDTLSPacket(packet []byte, local, remote string) ([]byte, e
 			C.free(ret.buf)
 			C.free(unsafe.Pointer(ret))
 		}()
+
+		if bool(ret.init) && s.state == New {
+			s.setState(Established)
+		}
+
 		return C.GoBytes(ret.buf, ret.len), nil
 	}
 	return nil, nil
