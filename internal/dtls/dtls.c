@@ -297,16 +297,17 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *
 
   dtls_sess_send_pending(sess, local, remote);
 
-  if (SSL_is_init_finished(sess->ssl)) {
+  int finished = SSL_is_init_finished(sess->ssl);
+  if (finished) {
     sess->type = DTLS_CONTYPE_EXISTING;
   }
 
+  ret = (dtls_decrypted *)calloc(1, sizeof(dtls_decrypted));
+  ret->init = finished;
+
   if (decrypted_len > 1) {
-    ret = (dtls_decrypted *)calloc(1, sizeof(dtls_decrypted));
     ret->buf = decrypted;
     ret->len = decrypted_len;
-  } else {
-    free(decrypted);
   }
 
   return ret;

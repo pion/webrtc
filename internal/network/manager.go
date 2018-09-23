@@ -54,7 +54,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
-	m.dtlsState, err = dtls.NewState()
+	m.dtlsState, err = dtls.NewState(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,9 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
 		return err
 	}
+	// Start DTLS
 	m.dtlsState.Start(isOffer)
+
 	return nil
 }
 
