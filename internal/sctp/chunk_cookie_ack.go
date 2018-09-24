@@ -37,3 +37,8 @@ func (c *chunkCookieAck) marshal() ([]byte, error) {
 func (c *chunkCookieAck) check() (abort bool, err error) {
 	return false, nil
 }
+
+// String makes chunkCookieAck printable
+func (c *chunkCookieAck) String() string {
+	return c.chunkHeader.String()
+}

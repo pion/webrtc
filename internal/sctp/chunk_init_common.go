@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/pkg/errors"
 )
@@ -128,4 +129,26 @@ func (i *chunkInitCommon) marshal() ([]byte, error) {
 	}
 
 	return out, nil
+}
+
+// String makes chunkInitCommon printable
+func (i chunkInitCommon) String() string {
+	format := `initiateTag: %d
+	advertisedReceiverWindowCredit: %d
+	numOutboundStreams: %d
+	numInboundStreams: %d
+	initialTSN: %d`
+
+	res := fmt.Sprintf(format,
+		i.initiateTag,
+		i.advertisedReceiverWindowCredit,
+		i.numOutboundStreams,
+		i.numInboundStreams,
+		i.initialTSN,
+	)
+
+	for i, param := range i.params {
+		res = res + fmt.Sprintf("Param %d:\n %s", i, param)
+	}
+	return res
 }

@@ -36,3 +36,8 @@ func (e *errorCauseHeader) length() uint16 {
 func (e *errorCauseHeader) errorCauseCode() errorCauseCode {
 	return e.code
 }
+
+// String makes errorCauseHeader printable
+func (e errorCauseHeader) String() string {
+	return e.code.String()
+}
