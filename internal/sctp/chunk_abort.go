@@ -1,6 +1,8 @@
 package sctp
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -61,4 +63,15 @@ func (a *chunkAbort) marshal() ([]byte, error) {
 
 func (a *chunkAbort) check() (abort bool, err error) {
 	return false, nil
+}
+
+// String makes chunkAbort printable
+func (a *chunkAbort) String() string {
+	res := a.chunkHeader.String()
+
+	for _, cause := range a.errorCauses {
+		res += fmt.Sprintf("\n - %s", cause)
+	}
+
+	return res
 }

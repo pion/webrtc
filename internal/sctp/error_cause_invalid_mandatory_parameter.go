@@ -12,3 +12,8 @@ func (e *errorCauseInvalidMandatoryParameter) marshal() ([]byte, error) {
 func (e *errorCauseInvalidMandatoryParameter) unmarshal(raw []byte) error {
 	return e.errorCauseHeader.unmarshal(raw)
 }
+
+// String makes errorCauseInvalidMandatoryParameter printable
+func (e *errorCauseInvalidMandatoryParameter) String() string {
+	return e.errorCauseHeader.String()
+}

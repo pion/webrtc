@@ -54,12 +54,12 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
-	m.dtlsState, err = dtls.NewState(nil)
+	m.dtlsState, err = dtls.NewState(m.handleDTLSState)
 	if err != nil {
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler)
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, nil)
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
 	for _, i := range localInterfaces() {
@@ -79,6 +79,12 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	}
 
 	return m, err
+}
+
+func (m *Manager) handleDTLSState(state dtls.ConnectionState) {
+	if state == dtls.Established {
+		m.sctpAssociation.Connect()
+	}
 }
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
@@ -109,6 +115,10 @@ func (m *Manager) AddURL(url *ice.URL) error {
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	m.isOffer = isOffer
+
+	// Start the sctpAssociation
+	m.sctpAssociation.Start(isOffer)
+
 	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
 		return err
 	}
@@ -320,6 +330,8 @@ func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) 
 	if err != nil {
 		return fmt.Errorf("Error Marshaling ChannelOpen %v", err)
 	}
+	m.sctpAssociation.Lock()
+	defer m.sctpAssociation.Unlock()
 	if err = m.sctpAssociation.HandleOutbound(rawMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
 		return fmt.Errorf("Error sending ChannelOpen %v", err)
 	}

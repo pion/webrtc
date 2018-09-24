@@ -1,6 +1,9 @@
 package sctp
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 type paramHeader struct {
 	typ paramType
@@ -34,4 +37,9 @@ func (p *paramHeader) unmarshal(raw []byte) {
 
 func (p *paramHeader) length() int {
 	return p.len
+}
+
+// String makes paramHeader printable
+func (p paramHeader) String() string {
+	return fmt.Sprintf("%s (%d): %s", p.typ, p.len, p.raw)
 }

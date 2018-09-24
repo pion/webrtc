@@ -12,3 +12,8 @@ func (e *errorCauseUnrecognizedChunkType) marshal() ([]byte, error) {
 func (e *errorCauseUnrecognizedChunkType) unmarshal(raw []byte) error {
 	return e.errorCauseHeader.unmarshal(raw)
 }
+
+// String makes errorCauseUnrecognizedChunkType printable
+func (e *errorCauseUnrecognizedChunkType) String() string {
+	return e.errorCauseHeader.String()
+}

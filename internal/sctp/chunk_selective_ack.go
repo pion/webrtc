@@ -2,6 +2,7 @@ package sctp
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/pkg/errors"
 )
@@ -44,6 +45,11 @@ subsequences of DATA chunks as represented by their TSNs.
 type gapAckBlock struct {
 	start uint16
 	end   uint16
+}
+
+// String makes gapAckBlock printable
+func (g gapAckBlock) String() string {
+	return fmt.Sprintf("%d - %d", g.start, g.end)
 }
 
 type chunkSelectiveAck struct {
@@ -119,4 +125,15 @@ func (s *chunkSelectiveAck) marshal() ([]byte, error) {
 
 func (s *chunkSelectiveAck) check() (abort bool, err error) {
 	return false, nil
+}
+
+// String makes chunkSelectiveAck printable
+func (s *chunkSelectiveAck) String() string {
+	res := fmt.Sprintf("%s\n%d", s.chunkHeader, s.cumulativeTSNAck)
+
+	for _, gap := range s.gapAckBlocks {
+		res = fmt.Sprintf("\n gap ack: %s", gap)
+	}
+
+	return res
 }

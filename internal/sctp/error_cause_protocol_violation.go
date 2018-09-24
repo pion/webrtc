@@ -41,7 +41,10 @@ func (e *errorCauseProtocolViolation) unmarshal(raw []byte) error {
 
 	e.additionalInformation = e.raw
 
-	fmt.Printf("%v", e.additionalInformation)
-	fmt.Printf("%s", string(e.additionalInformation))
 	return nil
+}
+
+// String makes errorCauseProtocolViolation printable
+func (e *errorCauseProtocolViolation) String() string {
+	return fmt.Sprintf("%s: %s", e.errorCauseHeader, e.additionalInformation)
 }
