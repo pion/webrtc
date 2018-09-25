@@ -99,6 +99,10 @@ type RTCDataChannel struct {
 	// arrival over the sctp transport from a remote peer.
 	OnMessage func(datachannel.Payload)
 
+	// OnOpen designates an event handler which is invoked when
+	// the underlying data transport has been established (or re-established).
+	OnOpen func()
+
 	// Deprecated: Will be removed when networkManager is deprecated.
 	rtcPeerConnection *RTCPeerConnection
 }
@@ -122,8 +126,7 @@ type RTCDataChannel struct {
 // 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 // }
 
-// SendOpenChannelMessage is a test to send OpenChannel manually
-func (d *RTCDataChannel) SendOpenChannelMessage() error {
+func (d *RTCDataChannel) sendOpenChannelMessage() error {
 	if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(*d.ID, d.Label); err != nil {
 		return &rtcerr.UnknownError{Err: err}
 	}
@@ -137,4 +140,13 @@ func (d *RTCDataChannel) Send(p datachannel.Payload) error {
 		return &rtcerr.UnknownError{Err: err}
 	}
 	return nil
+}
+
+func (d *RTCDataChannel) doOnOpen() {
+	d.RLock()
+	onOpen := d.OnOpen
+	d.RUnlock()
+	if onOpen != nil {
+		onOpen()
+	}
 }
