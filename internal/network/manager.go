@@ -59,7 +59,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 		return nil, err
 	}
 
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, nil)
+	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.handleSCTPState)
 
 	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
 	for _, i := range localInterfaces() {
@@ -84,6 +84,13 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 func (m *Manager) handleDTLSState(state dtls.ConnectionState) {
 	if state == dtls.Established {
 		m.sctpAssociation.Connect()
+	}
+}
+
+func (m *Manager) handleSCTPState(state sctp.AssociationState) {
+	if state == sctp.Established {
+		// Temporary way to signal sending OpenChannel messages
+		m.dataChannelEventHandler(&DataChannelOpen{})
 	}
 }
 

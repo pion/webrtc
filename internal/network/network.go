@@ -51,3 +51,11 @@ type DataChannelMessage struct {
 func (d *DataChannelMessage) StreamIdentifier() uint16 {
 	return d.streamIdentifier
 }
+
+// DataChannelOpen is emitted when all channels should be opened
+type DataChannelOpen struct{}
+
+// StreamIdentifier returns the streamIdentifier
+func (d *DataChannelOpen) StreamIdentifier() uint16 {
+	return 0
+}

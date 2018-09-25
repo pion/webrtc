@@ -809,10 +809,15 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
 		id := event.StreamIdentifier()
-		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc}
+		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc, ReadyState: RTCDataChannelStateOpen}
 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
 		if pc.OnDataChannel != nil {
-			go pc.OnDataChannel(newDataChannel)
+			go func() {
+				pc.OnDataChannel(newDataChannel) // This should actually be called when processing the SDP answer.
+				if newDataChannel.OnOpen != nil {
+					go newDataChannel.doOnOpen()
+				}
+			}()
 		} else {
 			fmt.Println("OnDataChannel is unset, discarding message")
 		}
@@ -829,6 +834,20 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 		} else {
 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
 
+		}
+	case *network.DataChannelOpen:
+		for _, dc := range pc.dataChannels {
+			dc.Lock()
+			err := dc.sendOpenChannelMessage()
+			if err != nil {
+				fmt.Println("failed to send openchannel", err)
+				dc.Unlock()
+				continue
+			}
+			dc.ReadyState = RTCDataChannelStateOpen
+			dc.Unlock()
+
+			go dc.doOnOpen() // TODO: move to ChannelAck handling
 		}
 	default:
 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
