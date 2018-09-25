@@ -64,7 +64,7 @@ If you need commercial support or don't want to use public methods you can conta
 ### Related projects
 * [pions/turn](https://github.com/pions/turn): A simple extendable Golang TURN server
 * [WIP] [pions/media-server](https://github.com/pions/media-server): A Pion WebRTC powered media server, providing the building blocks for anything RTC.
-* [WIP] [pions/dcnet](https://github.com/pions/dcnet): A package providing Golang [net](https://godoc.org/net) interfaces around Pion WebRTC data channels. 
+* [WIP] [pions/dcnet](https://github.com/pions/dcnet): A package providing Golang [net](https://godoc.org/net) interfaces around Pion WebRTC data channels.
 
 ### Contributing
 Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
@@ -81,6 +81,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [wattanakorn495](https://github.com/wattanakorn495)
 * [Max Hawkins](https://github.com/maxhawkins) - *RTCP*
 * [Justin Okamoto](https://github.com/justinokamoto) - *Fix Docs*
+* [leeoxiang](https://github.com/notedit) - *Implement Janus examples*
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
