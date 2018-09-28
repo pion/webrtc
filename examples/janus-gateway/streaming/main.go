@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
@@ -121,5 +122,11 @@ func main() {
 			panic(err)
 		}
 	}
-	select {}
+	for {
+		if _, err := session.KeepAlive(); err != nil {
+			panic(err)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 }
