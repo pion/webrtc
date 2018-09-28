@@ -7,7 +7,9 @@ type OpusPayloader struct{}
 
 // Payload fragments an Opus packet across one or more byte arrays
 func (p *OpusPayloader) Payload(mtu int, payload []byte) [][]byte {
-	return [][]byte{payload}
+	out := make([]byte, len(payload))
+	copy(out, payload)
+	return [][]byte{out}
 }
 
 // OpusPacket represents the VP8 header that is stored in the payload of an RTP Packet
