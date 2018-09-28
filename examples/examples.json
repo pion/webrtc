@@ -24,6 +24,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Pion to pion",
+		"link": "#",
+		"description": "pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.",
+		"type": "browser"
+	},
+	{
 		"title": "Save-to-disk",
 		"link": "save-to-disk",
 		"description": "save-to-disk is a simple application that shows how to record your webcam using pion-WebRTC and save to disk.",
