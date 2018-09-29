@@ -172,8 +172,6 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 func (a *Agent) keepaliveCandidate(local, remote Candidate) {
 	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionId(),
 		&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
-		&stun.IceControlled{TieBreaker: a.tieBreaker},
-		&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 		&stun.MessageIntegrity{
 			Key: []byte(a.remotePwd),
 		},
