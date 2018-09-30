@@ -733,12 +733,12 @@ func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
 
 // Close ends the RTCPeerConnection
 func (pc *RTCPeerConnection) Close() error {
-	pc.networkManager.Close()
-
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
 	if pc.isClosed {
 		return nil
 	}
+
+	pc.networkManager.Close()
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.isClosed = true
