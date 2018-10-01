@@ -17,3 +17,10 @@ offer
 ```
 
 You should see them connect and start to exchange messages.
+
+## You can use Docker-compose to start this example:
+```sh
+docker-compose up -d
+```
+
+Now, you can see message exchanging, using `docker logs`.
