@@ -1,0 +1,19 @@
+version: '3'
+services:
+  answer:
+    container_name: answer
+    build: ./answer
+    hostname: answer
+    restart: always   
+    ports:
+      - 50000:50000
+    network_mode: "host"      
+      
+  offer:
+    depends_on:  
+      - answer
+    container_name: offer
+    build: ./offer
+    hostname: offer
+    restart: always
+    network_mode: "host"
