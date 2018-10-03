@@ -65,7 +65,6 @@ dtls_decrypted *dtls_handle_incoming(dtls_sess *sess, void *buf, int len, char *
 bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char *remote);
 
 dtls_cert_pair *dtls_get_certpair(dtls_sess *sess);
-char *dtls_tlscfg_fingerprint(tlscfg *cfg);
 
 void dtls_session_cleanup(SSL_CTX *ssl_ctx, dtls_sess *dtls_session, tlscfg *cfg);
 

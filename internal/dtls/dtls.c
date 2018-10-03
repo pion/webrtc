@@ -332,27 +332,7 @@ bool dtls_handle_outgoing(dtls_sess *sess, void *buf, int len, char *local, char
   return true;
 }
 
-char *dtls_tlscfg_fingerprint(tlscfg *cfg) {
-  if (cfg == NULL) {
-    return NULL;
-  }
 
-  unsigned int size;
-  unsigned char fingerprint[EVP_MAX_MD_SIZE];
-  if (X509_digest(cfg->cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
-    return NULL;
-  }
-
-  char *hex_fingeprint = calloc(1, sizeof(char) * 160);
-  char *curr = hex_fingeprint;
-  unsigned int i = 0;
-  for (i = 0; i < size; i++) {
-    sprintf(curr, "%.2X:", fingerprint[i]);
-    curr += 3;
-  }
-  *(curr - 1) = '\0';
-  return hex_fingeprint;
-}
 
 dtls_cert_pair *dtls_get_certpair(dtls_sess *sess) {
   if (sess->type == DTLS_CONTYPE_EXISTING) {
