@@ -83,6 +83,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Justin Okamoto](https://github.com/justinokamoto) - *Fix Docs*
 * [leeoxiang](https://github.com/notedit) - *Implement Janus examples*
 * [Denis](https://github.com/Hixon10) - *Adding docker-compose to pion-to-pion example*
+* [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
