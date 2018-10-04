@@ -14,8 +14,9 @@ import (
 // On success will return our XORMappedAddress
 func Allocate(url *ice.URL) (*ice.CandidateSrflx, error) {
 	// TODO Do we want the timeout to be configurable?
-	proto := url.Proto.String()
-	client, err := stun.NewClient(proto, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
+	// proto := url.Proto.String()
+	// TODO: Temporary fix for nat traversal issue: Find a permanent solution.
+	client, err := stun.NewClient("udp4", fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to create STUN client")
 	}
