@@ -10,47 +10,42 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Allocate crafts and sends a STUN binding
+// TODO: This file doesn't make sense
+// Package ICE should rely on stun, not the other way around.
+
+// AllocateUDP crafts and sends a STUN binding
 // On success will return our XORMappedAddress
-func Allocate(url *ice.URL) (*ice.CandidateSrflx, error) {
+func AllocateUDP(url *ice.URL) (*net.UDPAddr, *stun.XorAddress, error) {
 	// TODO Do we want the timeout to be configurable?
 	// proto := url.Proto.String()
 	// TODO: Temporary fix for nat traversal issue: Find a permanent solution.
 	client, err := stun.NewClient("udp4", fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to create STUN client")
+		return nil, nil, errors.Wrapf(err, "Failed to create STUN client")
 	}
 	localAddr, ok := client.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		return nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
+		return nil, nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
 	}
 
 	resp, err := client.Request()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to make STUN request")
+		return nil, nil, errors.Wrapf(err, "Failed to make STUN request")
 	}
 
 	if err = client.Close(); err != nil {
-		return nil, errors.Wrapf(err, "Failed to close STUN client")
+		return nil, nil, errors.Wrapf(err, "Failed to close STUN client")
 	}
 
 	attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
 	if !ok {
-		return nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
+		return nil, nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
 	}
 
 	var addr stun.XorAddress
 	if err = addr.Unpack(resp, attr); err != nil {
-		return nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
+		return nil, nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
 	}
 
-	return &ice.CandidateSrflx{
-		CandidateBase: ice.CandidateBase{
-			Protocol: ice.ProtoTypeUDP,
-			Address:  addr.IP.String(),
-			Port:     addr.Port,
-		},
-		RemoteAddress: localAddr.IP.String(),
-		RemotePort:    localAddr.Port,
-	}, nil
+	return localAddr, &addr, nil
 }

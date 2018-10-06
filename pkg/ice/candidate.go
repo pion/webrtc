@@ -1,8 +1,12 @@
 package ice
 
 import (
+	"fmt"
 	"math/rand"
+	"net"
 	"time"
+
+	"golang.org/x/net/ipv4"
 )
 
 // Preference enums when generate Priority
@@ -14,6 +18,7 @@ const (
 // Candidate represents an ICE candidate
 type Candidate interface {
 	GetBase() *CandidateBase
+	String() string
 }
 
 // CandidateBase represents an ICE candidate, a base with enough attributes
@@ -24,6 +29,22 @@ type CandidateBase struct {
 	Port         int
 	LastSent     time.Time
 	LastReceived time.Time
+	Conn         *ipv4.PacketConn // TODO: make private
+}
+
+func (c *CandidateBase) addr() net.Addr {
+	return &net.UDPAddr{
+		IP:   net.ParseIP(c.Address),
+		Port: c.Port,
+	}
+}
+
+func (c *CandidateBase) sendTo(raw []byte, dst *CandidateBase) error {
+	if _, err := c.Conn.WriteTo(raw, nil, dst.addr()); err != nil {
+		return fmt.Errorf("failed to send packet: %v", err)
+	}
+	c.seen(true)
+	return nil
 }
 
 func (c *CandidateBase) seen(outbound bool) {
@@ -62,6 +83,11 @@ func (c *CandidateHost) Port() int {
 	return c.CandidateBase.Port
 }
 
+// String makes the CandidateHost printable
+func (c *CandidateHost) String() string {
+	return fmt.Sprintf("%s:%d", c.CandidateBase.Address, c.CandidateBase.Port)
+}
+
 // CandidateSrflx is a Candidate of typ Server-Reflexive
 type CandidateSrflx struct {
 	CandidateBase
@@ -72,4 +98,9 @@ type CandidateSrflx struct {
 // GetBase returns the CandidateBase, attributes shared between all Candidates
 func (c *CandidateSrflx) GetBase() *CandidateBase {
 	return &c.CandidateBase
+}
+
+// String makes the CandidateSrflx printable
+func (c *CandidateSrflx) String() string {
+	return fmt.Sprintf("%s:%d", c.RemoteAddress, c.RemotePort)
 }
