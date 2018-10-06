@@ -8,7 +8,7 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-// TODO: Migrate address parsing to STUN/TURN packages?
+// TODO: Migrate address parsing to STUN/TURN
 
 // SchemeType indicates the type of server used in the ice.URL structure.
 type SchemeType int

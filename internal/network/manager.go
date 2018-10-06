@@ -2,8 +2,6 @@ package network
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 	"sync"
 
 	"github.com/pions/pkg/stun"
@@ -61,7 +59,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.handleSCTPState)
 
-	m.IceAgent = ice.NewAgent(m.iceOutboundHandler, m.iceNotifier)
+	m.IceAgent = ice.NewAgent(m.iceNotifier)
 	for _, i := range localInterfaces() {
 		p, portErr := newPort(i+":0", m)
 		if portErr != nil {
@@ -74,6 +72,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 				Protocol: ice.ProtoTypeUDP,
 				Address:  p.listeningAddr.IP.String(),
 				Port:     p.listeningAddr.Port,
+				Conn:     p.conn,
 			},
 		})
 	}
@@ -96,16 +95,27 @@ func (m *Manager) handleSCTPState(state sctp.AssociationState) {
 
 // AddURL takes an ICE Url, allocates any state and adds the candidate
 func (m *Manager) AddURL(url *ice.URL) error {
-
 	switch url.Scheme {
 	case ice.SchemeTypeSTUN:
-		c, err := webrtcStun.Allocate(url)
+		laddr, xoraddr, err := webrtcStun.AllocateUDP(url)
 		if err != nil {
 			return err
 		}
-		p, err := newPort(c.RemoteAddress+":"+strconv.Itoa(c.RemotePort), m)
+
+		p, err := newPort(laddr.String(), m)
 		if err != nil {
 			return err
+		}
+
+		c := &ice.CandidateSrflx{
+			CandidateBase: ice.CandidateBase{
+				Protocol: ice.ProtoTypeUDP,
+				Address:  xoraddr.IP.String(),
+				Port:     xoraddr.Port,
+				Conn:     p.conn,
+			},
+			RemoteAddress: laddr.IP.String(),
+			RemotePort:    laddr.Port,
 		}
 
 		m.portsLock.Lock()
@@ -309,17 +319,6 @@ func (m *Manager) port(local *stun.TransportAddr) (*port, error) {
 		}
 	}
 	return nil, errors.New("port not found")
-}
-
-func (m *Manager) iceOutboundHandler(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
-	m.portsLock.RLock()
-	defer m.portsLock.RUnlock()
-	for _, p := range m.ports {
-		if p.listeningAddr.Equal(local) {
-			p.sendICE(raw, remote)
-			return
-		}
-	}
 }
 
 // SendOpenChannelMessage sends the message to open a datachannel to the connected peer
