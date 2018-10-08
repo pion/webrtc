@@ -18,9 +18,6 @@ import (
 // comparisons when no value was defined.
 const Unknown = iota
 
-// OutboundCallback is the user defined Callback that is called when ICE traffic needs to sent
-type OutboundCallback func(raw []byte, local *stun.TransportAddr, remote *net.UDPAddr)
-
 func newCandidatePair(local, remote Candidate) CandidatePair {
 	return CandidatePair{
 		remote: remote,
@@ -58,8 +55,7 @@ func (c CandidatePair) getAddrs() (local *stun.TransportAddr, remote *net.UDPAdd
 type Agent struct {
 	sync.RWMutex
 
-	outboundCallback OutboundCallback
-	notifier         func(ConnectionState)
+	notifier func(ConnectionState)
 
 	tieBreaker      uint64
 	connectionState ConnectionState
@@ -93,10 +89,9 @@ const (
 )
 
 // NewAgent creates a new Agent
-func NewAgent(outboundCallback OutboundCallback, notifier func(ConnectionState)) *Agent {
+func NewAgent(notifier func(ConnectionState)) *Agent {
 	return &Agent{
-		outboundCallback: outboundCallback,
-		notifier:         notifier,
+		notifier: notifier,
 
 		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:  GatheringStateComplete, // TODO trickle-ice
@@ -187,14 +182,14 @@ func (a *Agent) keepaliveCandidate(local, remote Candidate) {
 }
 
 func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
-	a.outboundCallback(msg.Pack(), &stun.TransportAddr{
-		IP:   net.ParseIP(local.GetBase().Address),
-		Port: local.GetBase().Port,
-	}, &net.UDPAddr{
-		IP:   net.ParseIP(remote.GetBase().Address),
-		Port: remote.GetBase().Port,
-	})
-	remote.GetBase().seen(true)
+	err := local.GetBase().sendTo(msg.Pack(), remote.GetBase())
+	if err != nil {
+		// TODO: Determine if we should always drop the err
+		// E.g.: maybe handle for known valid pairs or to
+		// discard pairs faster.
+		_ = err
+		// fmt.Printf("failed to send STUN message: %v", err)
+	}
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
@@ -209,6 +204,7 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 }
 
 func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
+	// TODO: avoid duplicates
 	p := newCandidatePair(local, remote)
 
 	if selected {
@@ -341,11 +337,12 @@ func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
 	return nil
 }
 
-func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr) {
+func (a *Agent) sendBindingSuccess(m *stun.Message, localCandidate, remoteCandidate Candidate) {
+	remote := remoteCandidate.GetBase()
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
-				IP:   remote.IP,
+				IP:   net.ParseIP(remote.Address),
 				Port: remote.Port,
 			},
 		},
@@ -354,13 +351,13 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local *stun.TransportAddr, r
 		},
 		&stun.Fingerprint{},
 	); err != nil {
-		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
+		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", localCandidate.String(), remoteCandidate.String(), err.Error())
 	} else {
-		a.outboundCallback(out.Pack(), local, remote)
+		a.sendSTUN(out, localCandidate, remoteCandidate)
 	}
 }
 
-func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteCandidate Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
 		fmt.Println("inbound isControlled && a.isControlling == false")
 		return
@@ -373,11 +370,11 @@ func (a *Agent) handleInboundControlled(m *stun.Message, local *stun.TransportAd
 
 	if !successResponse {
 		// Send success response
-		a.sendBindingSuccess(m, local, remote)
+		a.sendBindingSuccess(m, localCandidate, remoteCandidate)
 	}
 }
 
-func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportAddr, remote *net.UDPAddr, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remoteCandidate Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
 		fmt.Println("inbound isControlling && a.isControlling == true")
 		return
@@ -392,7 +389,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, local *stun.TransportA
 
 	if !successResponse {
 		// Send success response
-		a.sendBindingSuccess(m, local, remote)
+		a.sendBindingSuccess(m, localCandidate, remoteCandidate)
 
 		// We received a ping from the controlled agent. We know the pair works so now we ping with use-candidate set:
 		a.pingCandidate(localCandidate, remoteCandidate)
@@ -427,9 +424,9 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 	}
 
 	if a.isControlling {
-		a.handleInboundControlling(m, local, remote, localCandidate, remoteCandidate)
+		a.handleInboundControlling(m, localCandidate, remoteCandidate)
 	} else {
-		a.handleInboundControlled(m, local, remote, localCandidate, remoteCandidate)
+		a.handleInboundControlled(m, localCandidate, remoteCandidate)
 	}
 
 }
