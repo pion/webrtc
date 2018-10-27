@@ -33,11 +33,11 @@ go get -u github.com/pions/webrtc
 #### Fedora
 `sudo yum install openssl-devel`
 #### Windows
-1. Install [mingw-w64](http://mingw-w64.sourceforge.net/)
-2. Install [pkg-config-lite](http://sourceforge.net/projects/pkgconfiglite)
-3. Build (or install precompiled) openssl for mingw32-w64
-4. Set __PKG\_CONFIG\_PATH__ to the directory containing openssl.pc
-   (i.e. c:\mingw64\mingw64\lib\pkgconfig)
+1. Install [MSYS2](https://www.msys2.org/)
+2. Download [pkg-config-lite](https://sourceforge.net/projects/pkgconfiglite/) and put `pkg-config.exe` on the `PATH` environment variable.
+3. From the MSYS2 console: Run `pacman -S mingw-w64-x86_64-openssl` to install OpenSSL.
+4. From the MSYS2 console: Run `pacman -S mingw-w64-x86_64-gcc` to install the C compiler.
+5. Set the `PKG_CONFIG_PATH` environment variable. ie. Run the following from the Windows console: `SETX PKG_CONFIG_PATH C:\msys64\mingw64\lib\pkgconfig`, That folder should contain `openssl.pc`.
 
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
@@ -84,6 +84,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [leeoxiang](https://github.com/notedit) - *Implement Janus examples*
 * [Denis](https://github.com/Hixon10) - *Adding docker-compose to pion-to-pion example*
 * [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
+* [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
