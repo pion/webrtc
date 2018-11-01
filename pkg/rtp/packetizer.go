@@ -43,6 +43,11 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
 func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
+	// Guard against an empty payload
+	if len(payload) == 0 {
+		return nil
+	}
+
 	payloads := p.Payloader.Payload(p.MTU-12, payload)
 	packets := make([]*Packet, len(payloads))
 

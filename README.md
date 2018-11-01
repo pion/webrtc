@@ -85,6 +85,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Denis](https://github.com/Hixon10) - *Adding docker-compose to pion-to-pion example*
 * [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
 * [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
+* [Michael MacDonald](https://github.com/mjmac)
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text
