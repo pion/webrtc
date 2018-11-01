@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/webrtc/pkg/media"
+	"github.com/pions/webrtc/pkg/rtp"
+
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
@@ -297,4 +300,45 @@ func TestSetRemoteDescription(t *testing.T) {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
 	}
+}
+
+func TestRTCPeerConnection_NewRawRTPTrack(t *testing.T) {
+	RegisterDefaultCodecs()
+
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	_, err = pc.NewRawRTPTrack(DefaultPayloadTypeH264, 0, "trackId", "trackLabel")
+	assert.NotNil(t, err)
+
+	track, err := pc.NewRawRTPTrack(DefaultPayloadTypeH264, 123456, "trackId", "trackLabel")
+	assert.Nil(t, err)
+
+	// This channel should not be set up for a RawRTP track
+	assert.Panics(t, func() {
+		track.Samples <- media.RTCSample{}
+	})
+
+	assert.NotPanics(t, func() {
+		track.RawRTP <- &rtp.Packet{}
+	})
+}
+
+func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
+	RegisterDefaultCodecs()
+
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	track, err := pc.NewRTCSampleTrack(DefaultPayloadTypeH264, "trackId", "trackLabel")
+	assert.Nil(t, err)
+
+	// This channel should not be set up for a RTCSample track
+	assert.Panics(t, func() {
+		track.RawRTP <- &rtp.Packet{}
+	})
+
+	assert.NotPanics(t, func() {
+		track.Samples <- media.RTCSample{}
+	})
 }
