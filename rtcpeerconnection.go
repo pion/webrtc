@@ -945,8 +945,7 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 	d.WithMedia(media)
 }
 
-// NewRTCTrack is used to create a new RTCTrack
-func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
+func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
 	codec, err := pc.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
@@ -956,31 +955,46 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 		return nil, errors.New("codec payloader not set")
 	}
 
-	buf := make([]byte, 4)
-	_, err = rand.Read(buf)
-	if err != nil {
-		return nil, errors.New("failed to generate random value")
-	}
-
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
-	ssrc := binary.LittleEndian.Uint32(buf)
-	go func() {
-		packetizer := rtp.NewPacketizer(
-			1400,
-			payloadType,
-			ssrc,
-			codec.Payloader,
-			rtp.NewRandomSequencer(),
-			codec.ClockRate,
-		)
-		for {
-			in := <-trackInput
-			packets := packetizer.Packetize(in.Data, in.Samples)
-			for _, p := range packets {
+	rawPackets := make(chan *rtp.Packet)
+	if ssrc == 0 {
+		buf := make([]byte, 4)
+		_, err = rand.Read(buf)
+		if err != nil {
+			return nil, errors.New("failed to generate random value")
+		}
+		ssrc = binary.LittleEndian.Uint32(buf)
+
+		go func() {
+			packetizer := rtp.NewPacketizer(
+				1400,
+				payloadType,
+				ssrc,
+				codec.Payloader,
+				rtp.NewRandomSequencer(),
+				codec.ClockRate,
+			)
+
+			for {
+				in := <-trackInput
+				packets := packetizer.Packetize(in.Data, in.Samples)
+				for _, p := range packets {
+					pc.networkManager.SendRTP(p)
+				}
+			}
+		}()
+		close(rawPackets)
+	} else {
+		// If SSRC is not 0, then we are working with an established RTP stream
+		// and need to accept raw RTP packets for forwarding.
+		go func() {
+			for {
+				p := <-rawPackets
 				pc.networkManager.SendRTP(p)
 			}
-		}
-	}()
+		}()
+		close(trackInput)
+	}
 
 	t := &RTCTrack{
 		PayloadType: payloadType,
@@ -990,9 +1004,33 @@ func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*
 		Ssrc:        ssrc,
 		Codec:       codec,
 		Samples:     trackInput,
+		RawRTP:      rawPackets,
 	}
 
 	return t, nil
+}
+
+// NewRawRTPTrack initializes a new *RTCTrack configured to accept raw *rtp.Packet
+//
+// NB: If the source RTP stream is being broadcast to multiple tracks, each track
+// must receive its own copies of the source packets in order to avoid packet corruption.
+func (pc *RTCPeerConnection) NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
+	if ssrc == 0 {
+		return nil, errors.New("SSRC supplied to NewRawRTPTrack() must be non-zero")
+	}
+	return pc.newRTCTrack(payloadType, ssrc, id, label)
+}
+
+// NewRTCSampleTrack initializes a new *RTCTrack configured to accept media.RTCSample
+func (pc *RTCPeerConnection) NewRTCSampleTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
+	return pc.newRTCTrack(payloadType, 0, id, label)
+}
+
+// NewRTCTrack is used to create a new RTCTrack
+//
+// Deprecated: Use NewRTCSampleTrack() instead
+func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
+	return pc.NewRTCSampleTrack(payloadType, id, label)
 }
 
 func (pc *RTCPeerConnection) newRTCRtpTransceiver(

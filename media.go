@@ -20,4 +20,5 @@ type RTCTrack struct {
 	Codec       *RTCRtpCodec
 	Packets     <-chan *rtp.Packet
 	Samples     chan<- media.RTCSample
+	RawRTP      chan<- *rtp.Packet
 }
