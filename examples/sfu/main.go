@@ -1,19 +1,19 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
-	"bufio"
 	"encoding/base64"
+	"encoding/binary"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/media/samplebuilder"
 	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp/codecs"
+	"github.com/pions/webrtc/pkg/sfu"
 )
 
 var peerConnectionConfig = webrtc.RTCConfiguration{
@@ -30,8 +30,13 @@ func check(err error) {
 	}
 }
 
-func mustReadStdin(reader *bufio.Reader) string {
-	rawSd, err := reader.ReadString('\n')
+func mustReadStdin(reader *terminal.Terminal) string {
+	// Set stty to raw mode in order to read > 1024 chars from stdin
+	old, err := terminal.MakeRaw(0)
+	check(err)
+	defer terminal.Restore(0, old)
+
+	rawSd, err := reader.ReadLine()
 	check(err)
 
 	fmt.Println("")
@@ -46,11 +51,13 @@ const (
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
+	reader := terminal.NewTerminal(os.Stdin, "SDP: ")
 	sd := mustReadStdin(reader)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
+
+	sfu := sfu.New()
 
 	// Only support VP8, this makes our proxying code simpler
 	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
@@ -59,8 +66,6 @@ func main() {
 	peerConnection, err := webrtc.New(peerConnectionConfig)
 	check(err)
 
-	outboundSamples := []chan<- media.RTCSample{}
-	var outboundSamplesLock sync.RWMutex
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
 	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
@@ -79,18 +84,7 @@ func main() {
 			}
 		}()
 
-		// Transform RTP packets into samples, allowing us to distribute incoming packets from the publisher to everyone who has joined the broadcast
-		builder := samplebuilder.New(256, &codecs.VP8Packet{})
-		for {
-			outboundSamplesLock.RLock()
-			builder.Push(<-track.Packets)
-			for s := builder.Pop(); s != nil; s = builder.Pop() {
-				for _, outChan := range outboundSamples {
-					outChan <- *s
-				}
-			}
-			outboundSamplesLock.RUnlock()
-		}
+		sfu.AddSource(track.Packets)
 	}
 
 	// Set the remote SessionDescription
@@ -115,16 +109,20 @@ func main() {
 		peerConnection, err := webrtc.New(peerConnectionConfig)
 		check(err)
 
+		// Generate a random ssrc for each sink track
+		buf := make([]byte, 4)
+		_, err = rand.Read(buf)
+		check(err)
+		ssrc := binary.LittleEndian.Uint32(buf)
+
 		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+		vp8Track, err := peerConnection.NewRawRTPTrack(webrtc.DefaultPayloadTypeVP8, ssrc, "video", "pion2")
 		check(err)
 
 		_, err = peerConnection.AddTrack(vp8Track)
 		check(err)
 
-		outboundSamplesLock.Lock()
-		outboundSamples = append(outboundSamples, vp8Track.Samples)
-		outboundSamplesLock.Unlock()
+		sfu.AddSink(vp8Track.RawRTP)
 
 		// Set the remote SessionDescription
 		check(peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{
