@@ -71,7 +71,7 @@ type Agent struct {
 
 	remoteUfrag      string
 	remotePwd        string
-	remoteCandidates []Candidate
+	remoteCandidates map[string]Candidate
 
 	selectedPair CandidatePair
 	validPairs   []CandidatePair
@@ -93,9 +93,10 @@ func NewAgent(notifier func(ConnectionState)) *Agent {
 	return &Agent{
 		notifier: notifier,
 
-		tieBreaker:      rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
-		gatheringState:  GatheringStateComplete, // TODO trickle-ice
-		connectionState: ConnectionStateNew,
+		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
+		gatheringState:   GatheringStateComplete, // TODO trickle-ice
+		connectionState:  ConnectionStateNew,
+		remoteCandidates: make(map[string]Candidate),
 
 		LocalUfrag: util.RandSeq(16),
 		LocalPwd:   util.RandSeq(32),
@@ -287,7 +288,9 @@ func (a *Agent) pingAllCandidates() {
 func (a *Agent) AddRemoteCandidate(c Candidate) {
 	a.Lock()
 	defer a.Unlock()
-	a.remoteCandidates = append(a.remoteCandidates, c)
+	if _, found := a.remoteCandidates[c.String()]; !found {
+		a.remoteCandidates[c.String()] = c
+	}
 }
 
 // AddLocalCandidate adds a new local candidate
@@ -328,7 +331,7 @@ func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr)
 	return nil
 }
 
-func getUDPAddrCandidate(candidates []Candidate, addr *net.UDPAddr) Candidate {
+func getUDPAddrCandidate(candidates map[string]Candidate, addr *net.UDPAddr) Candidate {
 	for _, c := range candidates {
 		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
 			return c

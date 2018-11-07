@@ -480,9 +480,15 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 	return pc.CurrentRemoteDescription
 }
 
-// func (pc *RTCPeerConnection) addIceCandidate() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
-// }
+// AddIceCandidate accepts an ICE candidate string and adds it
+// to the existing set of candidates
+func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
+	if c := sdp.ICECandidateUnmarshal(s); c != nil {
+		pc.networkManager.IceAgent.AddRemoteCandidate(c)
+		return nil
+	}
+	return fmt.Errorf("Unable to parse %q as remote candidate", s)
+}
 
 // ------------------------------------------------------------------------
 // --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#rtp-media-api
