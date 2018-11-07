@@ -89,22 +89,65 @@ type RTCDataChannel struct {
 	// OnError             func()
 	// OnClose             func()
 
-	// Onmessage designates an event handler which is invoked on a message
-	// arrival over the sctp transport from a remote peer.
-	//
-	// Deprecated: use OnMessage instead.
-	Onmessage func(datachannel.Payload)
-
-	// OnMessage designates an event handler which is invoked on a message
-	// arrival over the sctp transport from a remote peer.
-	OnMessage func(datachannel.Payload)
-
-	// OnOpen designates an event handler which is invoked when
-	// the underlying data transport has been established (or re-established).
-	OnOpen func()
+	onMessageHandler func(datachannel.Payload)
+	onOpenHandler    func()
 
 	// Deprecated: Will be removed when networkManager is deprecated.
 	rtcPeerConnection *RTCPeerConnection
+}
+
+// OnOpen sets an event handler which is invoked when
+// the underlying data transport has been established (or re-established).
+func (d *RTCDataChannel) OnOpen(f func()) {
+	d.Lock()
+	defer d.Unlock()
+	d.onOpenHandler = f
+}
+
+func (d *RTCDataChannel) onOpen() (done chan struct{}) {
+	d.RLock()
+	hdlr := d.onOpenHandler
+	d.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr()
+		close(done)
+	}()
+
+	return
+}
+
+// OnMessage sets an event handler which is invoked on a message
+// arrival over the sctp transport from a remote peer.
+func (d *RTCDataChannel) OnMessage(f func(p datachannel.Payload)) {
+	d.Lock()
+	defer d.Unlock()
+	d.onMessageHandler = f
+}
+
+func (d *RTCDataChannel) onMessage(p datachannel.Payload) {
+	d.RLock()
+	hdlr := d.onMessageHandler
+	d.RUnlock()
+
+	if hdlr == nil || p == nil {
+		return
+	}
+	hdlr(p)
+}
+
+// Onmessage sets an event handler which is invoked on a message
+// arrival over the sctp transport from a remote peer.
+//
+// Deprecated: use OnMessage instead.
+func (d *RTCDataChannel) Onmessage(f func(p datachannel.Payload)) {
+	d.OnMessage(f)
 }
 
 // func (d *RTCDataChannel) generateID() error {
@@ -140,13 +183,4 @@ func (d *RTCDataChannel) Send(p datachannel.Payload) error {
 		return &rtcerr.UnknownError{Err: err}
 	}
 	return nil
-}
-
-func (d *RTCDataChannel) doOnOpen() {
-	d.RLock()
-	onOpen := d.OnOpen
-	d.RUnlock()
-	if onOpen != nil {
-		onOpen()
-	}
 }

@@ -39,14 +39,12 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
 		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-	}
-
-	dataChannel.Lock()
+	})
 
 	// Register channel opening handling
-	dataChannel.OnOpen = func() {
+	dataChannel.OnOpen(func() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label, dataChannel.ID)
 
 		for range time.NewTicker(5 * time.Second).C {
@@ -56,10 +54,10 @@ func main() {
 			err := dataChannel.Send(datachannel.PayloadString{Data: []byte(message)})
 			util.Check(err)
 		}
-	}
+	})
 
-	// Register the Onmessage to handle incoming messages
-	dataChannel.Onmessage = func(payload datachannel.Payload) {
+	// Register the OnMessage to handle incoming messages
+	dataChannel.OnMessage(func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), dataChannel.Label, string(p.Data))
@@ -68,9 +66,7 @@ func main() {
 		default:
 			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), dataChannel.Label)
 		}
-	}
-
-	dataChannel.Unlock()
+	})
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)

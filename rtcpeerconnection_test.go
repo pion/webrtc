@@ -9,6 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/webrtc/internal/network"
+
+	"github.com/pions/webrtc/pkg/datachannel"
+
+	"github.com/pions/webrtc/pkg/ice"
+
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtp"
 
@@ -341,4 +347,101 @@ func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 	assert.NotPanics(t, func() {
 		track.Samples <- media.RTCSample{}
 	})
+}
+
+func TestRTCPeerConnection_EventHandlers(t *testing.T) {
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	onTrackCalled := make(chan bool)
+	onICEConnectionStateChangeCalled := make(chan bool)
+	onDataChannelCalled := make(chan bool)
+
+	// Verify that the noop case works
+	assert.NotPanics(t, func() { pc.onTrack(nil) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onDataChannel(nil) })
+
+	pc.OnTrack(func(t *RTCTrack) {
+		onTrackCalled <- true
+	})
+
+	pc.OnICEConnectionStateChange(func(cs ice.ConnectionState) {
+		onICEConnectionStateChangeCalled <- true
+	})
+
+	pc.OnDataChannel(func(dc *RTCDataChannel) {
+		onDataChannelCalled <- true
+	})
+
+	// Verify that the handlers deal with nil inputs
+	assert.NotPanics(t, func() { pc.onTrack(nil) })
+	assert.NotPanics(t, func() { pc.onDataChannel(nil) })
+
+	// Verify that the set handlers are called
+	assert.NotPanics(t, func() { pc.onTrack(&RTCTrack{}) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onDataChannel(&RTCDataChannel{}) })
+
+	allTrue := func(vals []bool) bool {
+		for _, val := range vals {
+			if !val {
+				return false
+			}
+		}
+		return true
+	}
+
+	assert.True(t, allTrue([]bool{
+		<-onTrackCalled,
+		<-onICEConnectionStateChangeCalled,
+		<-onDataChannelCalled,
+	}))
+}
+
+func TestRTCPeerConnection_OnDataChannelSync(t *testing.T) {
+	// This is a special case, where we need to ensure that any DataChannel setup
+	// in the supplied handler completes before allowing the calling code to
+	// resume running.
+	//
+	// This test also validates that the locking in RTCPeerConnection.dataChannelEventHandler()
+	// correctly interacts with the locking in the event handlers.
+	pc, err := New(RTCConfiguration{})
+	assert.Nil(t, err)
+
+	onOpenCalled := make(chan bool)
+	onDataChannelCalled := make(chan bool)
+	onMessageCalled := make(chan bool)
+	pc.OnDataChannel(func(dc *RTCDataChannel) {
+		onDataChannelCalled <- true
+		dc.OnOpen(func() {
+			onOpenCalled <- true
+		})
+
+		dc.OnMessage(func(p datachannel.Payload) {
+			onMessageCalled <- true
+		})
+	})
+
+	go func() {
+		dcEvents := []network.DataChannelEvent{
+			// NB: This order seems odd, but it matches what's emitted
+			// by networkManager
+			&network.DataChannelOpen{},
+			&network.DataChannelCreated{},
+			&network.DataChannelMessage{Payload: &datachannel.PayloadString{Data: []byte("o hai")}},
+		}
+
+		for _, event := range dcEvents {
+			pc.dataChannelEventHandler(event)
+		}
+	}()
+
+	// NB: If RTCPeerConnection.dataChannelEventHandler() does not correctly wait for
+	// OnDataChannel() to complete, this will hang until timeout because the handlers aren't set
+	// before the events are processed.
+	assert.EqualValues(t,
+		[]bool{true, true, true},
+		[]bool{<-onDataChannelCalled, <-onOpenCalled, <-onMessageCalled},
+	)
 }
