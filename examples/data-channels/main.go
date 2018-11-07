@@ -28,19 +28,16 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
 		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-	}
+	})
 
 	// Register data channel creation handling
-	peerConnection.OnDataChannel = func(d *webrtc.RTCDataChannel) {
+	peerConnection.OnDataChannel(func(d *webrtc.RTCDataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 
-		d.Lock()
-		defer d.Unlock()
-
 		// Register channel opening handling
-		d.OnOpen = func() {
+		d.OnOpen(func() {
 			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label, d.ID)
 			for {
 				time.Sleep(5 * time.Second)
@@ -50,10 +47,10 @@ func main() {
 				err := d.Send(datachannel.PayloadString{Data: []byte(message)})
 				util.Check(err)
 			}
-		}
+		})
 
 		// Register message handling
-		d.Onmessage = func(payload datachannel.Payload) {
+		d.OnMessage(func(payload datachannel.Payload) {
 			switch p := payload.(type) {
 			case *datachannel.PayloadString:
 				fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), d.Label, string(p.Data))
@@ -62,8 +59,8 @@ func main() {
 			default:
 				fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), d.Label)
 			}
-		}
-	}
+		})
+	})
 
 	// Wait for the offer to be pasted
 	sd := util.Decode(util.MustReadStdin())

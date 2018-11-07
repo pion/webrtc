@@ -100,20 +100,12 @@ type RTCPeerConnection struct {
 	// OnIceCandidateError        func() // FIXME NOT-USED
 	// OnSignalingStateChange     func() // FIXME NOT-USED
 
-	// OnIceConnectionStateChange designates an event handler which is called
-	// when an ice connection state is changed.
-	OnICEConnectionStateChange func(ice.ConnectionState)
-
 	// OnIceGatheringStateChange  func() // FIXME NOT-USED
 	// OnConnectionStateChange    func() // FIXME NOT-USED
 
-	// OnTrack designates an event handler which is called when remote track
-	// arrives from a remote peer.
-	OnTrack func(*RTCTrack)
-
-	// OnDataChannel designates an event handler which is invoked when a data
-	// channel message arrives from a remote peer.
-	OnDataChannel func(*RTCDataChannel)
+	onICEConnectionStateChangeHandler func(ice.ConnectionState)
+	onTrackHandler                    func(*RTCTrack)
+	onDataChannelHandler              func(*RTCDataChannel)
 
 	// Deprecated: Internal mechanism which will be removed.
 	networkManager *network.Manager
@@ -231,6 +223,90 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 		pc.configuration.IceServers = configuration.IceServers
 	}
 	return nil
+}
+
+// OnDataChannel sets an event handler which is invoked when a data
+// channel message arrives from a remote peer.
+func (pc *RTCPeerConnection) OnDataChannel(f func(*RTCDataChannel)) {
+	pc.Lock()
+	defer pc.Unlock()
+	pc.onDataChannelHandler = f
+}
+
+func (pc *RTCPeerConnection) onDataChannel(dc *RTCDataChannel) (done chan struct{}) {
+	pc.RLock()
+	hdlr := pc.onDataChannelHandler
+	pc.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil || dc == nil {
+		close(done)
+		return
+	}
+
+	// Run this synchronously to allow setup done in onDataChannelFn()
+	// to complete before datachannel event handlers might be called.
+	go func() {
+		hdlr(dc)
+		dc.onOpen() // TODO: move to ChannelAck handling
+		close(done)
+	}()
+
+	return
+}
+
+// OnTrack sets an event handler which is called when remote track
+// arrives from a remote peer.
+func (pc *RTCPeerConnection) OnTrack(f func(*RTCTrack)) {
+	pc.Lock()
+	defer pc.Unlock()
+	pc.onTrackHandler = f
+}
+
+func (pc *RTCPeerConnection) onTrack(t *RTCTrack) (done chan struct{}) {
+	pc.RLock()
+	hdlr := pc.onTrackHandler
+	pc.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil || t == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr(t)
+		close(done)
+	}()
+
+	return
+}
+
+// OnICEConnectionStateChange sets an event handler which is called
+// when an ICE connection state is changed.
+func (pc *RTCPeerConnection) OnICEConnectionStateChange(f func(ice.ConnectionState)) {
+	pc.Lock()
+	defer pc.Unlock()
+	pc.onICEConnectionStateChangeHandler = f
+}
+
+func (pc *RTCPeerConnection) onICEConnectionStateChange(cs ice.ConnectionState) (done chan struct{}) {
+	pc.RLock()
+	hdlr := pc.onICEConnectionStateChangeHandler
+	pc.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr(cs)
+		close(done)
+	}()
+
+	return
 }
 
 // SetConfiguration updates the configuration of this RTCPeerConnection object.
@@ -764,9 +840,12 @@ func (pc *RTCPeerConnection) Close() error {
 
 /* Everything below is private */
 func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
-	if pc.OnTrack == nil {
+	pc.RLock()
+	if pc.onTrackHandler == nil {
+		pc.RUnlock()
 		return nil
 	}
+	pc.RUnlock()
 
 	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
 	if err != nil {
@@ -794,54 +873,43 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 
 	// TODO: Register the receiving Track
 
-	go pc.OnTrack(track)
+	pc.onTrack(track)
 	return bufferTransport
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.Lock()
-	defer pc.Unlock()
-
-	if pc.OnICEConnectionStateChange != nil {
-		pc.OnICEConnectionStateChange(newState)
-	}
 	pc.IceConnectionState = newState
+	pc.Unlock()
+
+	pc.onICEConnectionStateChange(newState)
 }
 
 func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	pc.Lock()
-	defer pc.Unlock()
-
 	switch event := e.(type) {
 	case *network.DataChannelCreated:
 		id := event.StreamIdentifier()
 		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc, ReadyState: RTCDataChannelStateOpen}
+		pc.Lock()
 		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		if pc.OnDataChannel != nil {
-			go func() {
-				pc.OnDataChannel(newDataChannel) // This should actually be called when processing the SDP answer.
-				if newDataChannel.OnOpen != nil {
-					go newDataChannel.doOnOpen()
-				}
-			}()
-		} else {
-			fmt.Println("OnDataChannel is unset, discarding message")
-		}
+		pc.Unlock()
+
+		// NB: We block here waiting for the callback to finish before
+		// proceeding, in order to guarantee that all user setup of the channel
+		// has completed before moving on to process more events.
+		<-pc.onDataChannel(newDataChannel)
 	case *network.DataChannelMessage:
-		if datachannel, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-			datachannel.RLock()
-			defer datachannel.RUnlock()
-
-			if datachannel.Onmessage != nil {
-				go datachannel.Onmessage(event.Payload)
-			} else {
-				fmt.Printf("Onmessage has not been set for Datachannel %s %d \n", datachannel.Label, e.StreamIdentifier())
-			}
+		pc.RLock()
+		if dc, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
+			pc.RUnlock()
+			dc.onMessage(event.Payload)
 		} else {
+			pc.RUnlock()
 			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-
 		}
 	case *network.DataChannelOpen:
+		pc.RLock()
+		defer pc.RUnlock()
 		for _, dc := range pc.dataChannels {
 			dc.Lock()
 			err := dc.sendOpenChannelMessage()
@@ -853,7 +921,7 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 			dc.ReadyState = RTCDataChannelStateOpen
 			dc.Unlock()
 
-			go dc.doOnOpen() // TODO: move to ChannelAck handling
+			dc.onOpen() // TODO: move to ChannelAck handling
 		}
 	default:
 		fmt.Printf("Unhandled DataChannelEvent %v \n", event)

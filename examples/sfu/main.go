@@ -63,7 +63,7 @@ func main() {
 	var outboundSamplesLock sync.RWMutex
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
-	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
 		go func() {
@@ -91,7 +91,7 @@ func main() {
 			}
 			outboundSamplesLock.RUnlock()
 		}
-	}
+	})
 
 	// Set the remote SessionDescription
 	check(peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{

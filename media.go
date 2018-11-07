@@ -5,11 +5,6 @@ import (
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-// RTCSample contains media, and the amount of samples in it
-//
-// Deprecated: use RTCSample from github.com/pions/webrtc/pkg/media instead
-type RTCSample = media.RTCSample
-
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
 	ID          string

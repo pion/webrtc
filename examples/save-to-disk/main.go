@@ -33,7 +33,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
 		if track.Codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			i, err := ivfwriter.New("output.ivf")
@@ -43,13 +43,13 @@ func main() {
 				util.Check(err)
 			}
 		}
-	}
+	})
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
-	}
+	})
 
 	// Wait for the offer to be pasted
 	sd := util.Decode(util.MustReadStdin())

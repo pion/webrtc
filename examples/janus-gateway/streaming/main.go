@@ -52,11 +52,11 @@ func main() {
 	peerConnection, err := webrtc.New(config)
 	util.Check(err)
 
-	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
-	}
+	})
 
-	peerConnection.OnTrack = func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
 		if track.Codec.Name == webrtc.Opus {
 			return
 		}
@@ -68,7 +68,7 @@ func main() {
 			err = i.AddPacket(<-track.Packets)
 			util.Check(err)
 		}
-	}
+	})
 
 	// Janus
 	gateway, err := janus.Connect("ws://localhost:8188/")
