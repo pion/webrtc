@@ -52,6 +52,7 @@ func main() {
 	peerConnection, err := webrtc.New(config)
 	util.Check(err)
 
+
 	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})

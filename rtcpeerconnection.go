@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"github.com/pions/webrtc/pkg/logging"
 	"net"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ import (
 // Unknown defines default public constant to use for "enum" like struct
 // comparisons when no value was defined.
 const Unknown = iota
+
 
 // RTCPeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another RTCPeerConnection instance in a
@@ -109,6 +111,10 @@ type RTCPeerConnection struct {
 
 	// Deprecated: Internal mechanism which will be removed.
 	networkManager *network.Manager
+
+	// Default Logging member
+	pclog  *logging.RTCPeerLogger
+
 }
 
 // New creates a new RTCPeerConfiguration with the provided configuration
@@ -137,7 +143,10 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		mediaEngine:        DefaultMediaEngine,
 		sctpTransport:      newRTCSctpTransport(),
 		dataChannels:       make(map[uint16]*RTCDataChannel),
+		pclog: &logging.RTCPeerLogger{},
 	}
+
+	pc.pclog.SetLogLevel(logging.Debug)
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
@@ -159,7 +168,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 
 			err = pc.networkManager.AddURL(url)
 			if err != nil {
-				fmt.Println(err)
+				pc.pclog.Debug(err.Error())
 			}
 		}
 	}
@@ -702,7 +711,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
 					pc.networkManager.IceAgent.AddRemoteCandidate(c)
 				} else {
-					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
+					pc.pclog.Debug(fmt.Sprintf("Tried to parse ICE candidate, but failed %s ", a))
 				}
 			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
 				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
@@ -1007,6 +1016,7 @@ func (pc *RTCPeerConnection) Close() error {
 	return nil
 }
 
+
 /* Everything below is private */
 func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
 	pc.RLock()
@@ -1018,13 +1028,13 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 
 	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
 	if err != nil {
-		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+		pc.pclog.Debug(fmt.Sprintf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType))
 		return nil
 	}
 
 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
-		fmt.Printf("Codec %s in not registered\n", sdpCodec)
+		pc.pclog.Debug(fmt.Sprintf("Codec %s in not registered\n", sdpCodec))
 		return nil
 	}
 
@@ -1074,7 +1084,7 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 			dc.onMessage(event.Payload)
 		} else {
 			pc.RUnlock()
-			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
+			pc.pclog.Debug(fmt.Sprintf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier()))
 		}
 	case *network.DataChannelOpen:
 		pc.RLock()
@@ -1083,7 +1093,7 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 			dc.Lock()
 			err := dc.sendOpenChannelMessage()
 			if err != nil {
-				fmt.Println("failed to send openchannel", err)
+				pc.pclog.Debug("failed to send openchannel" + err.Error())
 				dc.Unlock()
 				continue
 			}
@@ -1093,7 +1103,7 @@ func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent)
 			dc.onOpen() // TODO: move to ChannelAck handling
 		}
 	default:
-		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
+		pc.pclog.Debug(fmt.Sprintf("Unhandled DataChannelEvent %v \n", event))
 	}
 }
 
@@ -1290,3 +1300,4 @@ func (pc *RTCPeerConnection) newRTCRtpTransceiver(
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
 	return t
 }
+
