@@ -98,11 +98,11 @@ type RTCPeerConnection struct {
 	// OnNegotiationNeeded        func() // FIXME NOT-USED
 	// OnIceCandidate             func() // FIXME NOT-USED
 	// OnIceCandidateError        func() // FIXME NOT-USED
-	// OnSignalingStateChange     func() // FIXME NOT-USED
 
 	// OnIceGatheringStateChange  func() // FIXME NOT-USED
 	// OnConnectionStateChange    func() // FIXME NOT-USED
 
+	onSignalingStateChangeHandler     func(RTCSignalingState)
 	onICEConnectionStateChangeHandler func(ice.ConnectionState)
 	onTrackHandler                    func(*RTCTrack)
 	onDataChannelHandler              func(*RTCDataChannel)
@@ -223,6 +223,33 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 		pc.configuration.IceServers = configuration.IceServers
 	}
 	return nil
+}
+
+// OnSignalingStateChange sets an event handler which is invoked when the
+// peer connection's signaling state changes
+func (pc *RTCPeerConnection) OnSignalingStateChange(f func(RTCSignalingState)) {
+	pc.Lock()
+	defer pc.Unlock()
+	pc.onSignalingStateChangeHandler = f
+}
+
+func (pc *RTCPeerConnection) onSignalingStateChange(newState RTCSignalingState) (done chan struct{}) {
+	pc.RLock()
+	hdlr := pc.onSignalingStateChangeHandler
+	pc.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr(newState)
+		close(done)
+	}()
+
+	return
 }
 
 // OnDataChannel sets an event handler which is invoked when a data
@@ -424,13 +451,19 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 		m.WithPropertyAttribute("setup:actpass")
 	}
 
-	pc.CurrentLocalDescription = &RTCSessionDescription{
+	desc := RTCSessionDescription{
 		Type:   RTCSdpTypeOffer,
 		Sdp:    d.Marshal(),
 		parsed: d,
 	}
+	pc.lastOffer = desc.Sdp
 
-	return *pc.CurrentLocalDescription, nil
+	// FIXME: This doesn't follow the JS API spec, but removing it
+	// would mean our examples and existing code have to change
+	if err := pc.SetLocalDescription(desc); err != nil {
+		return RTCSessionDescription{}, err
+	}
+	return desc, nil
 }
 
 // CreateAnswer starts the RTCPeerConnection and generates the localDescription
@@ -448,7 +481,7 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
 
 	bundleValue := "BUNDLE"
-	for _, remoteMedia := range pc.CurrentRemoteDescription.parsed.MediaDescriptions {
+	for _, remoteMedia := range pc.RemoteDescription().parsed.MediaDescriptions {
 		// TODO @trivigy better SDP parser
 		var peerDirection RTCRtpTransceiverDirection
 		midValue := ""
@@ -484,18 +517,148 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
-	pc.CurrentLocalDescription = &RTCSessionDescription{
+	desc := RTCSessionDescription{
 		Type:   RTCSdpTypeAnswer,
 		Sdp:    d.Marshal(),
 		parsed: d,
 	}
-	return *pc.CurrentLocalDescription, nil
+	pc.lastAnswer = desc.Sdp
+
+	// FIXME: This doesn't follow the JS API spec, but removing it
+	// would mean our examples and existing code have to change
+	if err := pc.SetLocalDescription(desc); err != nil {
+		return RTCSessionDescription{}, err
+	}
+	return desc, nil
 }
 
-// // SetLocalDescription sets the SessionDescription of the local peer
-// func (pc *RTCPeerConnection) SetLocalDescription() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
-// }
+// 4.4.1.6 Set the RTCSessionDescription
+func (pc *RTCPeerConnection) setDescription(sd *RTCSessionDescription, op rtcStateChangeOp) error {
+	if pc.isClosed {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	cur := pc.SignalingState
+	setLocal := rtcStateChangeOpSetLocal
+	setRemote := rtcStateChangeOpSetRemote
+	newSdpDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous offer")}
+	newSdpDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous answer")}
+
+	var nextState RTCSignalingState
+	var err error
+	switch op {
+	case setLocal:
+		switch sd.Type {
+		// stable->SetLocal(offer)->have-local-offer
+		case RTCSdpTypeOffer:
+			if sd.Sdp != pc.lastOffer {
+				return newSdpDoesNotMatchOffer
+			}
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateHaveLocalOffer, setLocal, sd.Type)
+			if err == nil {
+				pc.PendingLocalDescription = sd
+			}
+		// have-remote-offer->SetLocal(answer)->stable
+		// have-local-pranswer->SetLocal(answer)->stable
+		case RTCSdpTypeAnswer:
+			if sd.Sdp != pc.lastAnswer {
+				return newSdpDoesNotMatchAnswer
+			}
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateStable, setLocal, sd.Type)
+			if err == nil {
+				pc.CurrentLocalDescription = sd
+				pc.CurrentRemoteDescription = pc.PendingRemoteDescription
+				pc.PendingRemoteDescription = nil
+				pc.PendingLocalDescription = nil
+			}
+		case RTCSdpTypeRollback:
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateStable, setLocal, sd.Type)
+			if err == nil {
+				pc.PendingLocalDescription = nil
+			}
+		// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
+		case RTCSdpTypePranswer:
+			if sd.Sdp != pc.lastAnswer {
+				return newSdpDoesNotMatchAnswer
+			}
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateHaveLocalPranswer, setLocal, sd.Type)
+			if err == nil {
+				pc.PendingLocalDescription = sd
+			}
+		default:
+			return &rtcerr.OperationError{Err: fmt.Errorf("Invalid state change op: %s(%s)", op, sd.Type)}
+		}
+	case setRemote:
+		switch sd.Type {
+		// stable->SetRemote(offer)->have-remote-offer
+		case RTCSdpTypeOffer:
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateHaveRemoteOffer, setRemote, sd.Type)
+			if err == nil {
+				pc.PendingRemoteDescription = sd
+			}
+		// have-local-offer->SetRemote(answer)->stable
+		// have-remote-pranswer->SetRemote(answer)->stable
+		case RTCSdpTypeAnswer:
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateStable, setRemote, sd.Type)
+			if err == nil {
+				pc.CurrentRemoteDescription = sd
+				pc.CurrentLocalDescription = pc.PendingLocalDescription
+				pc.PendingRemoteDescription = nil
+				pc.PendingLocalDescription = nil
+			}
+		case RTCSdpTypeRollback:
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateStable, setRemote, sd.Type)
+			if err == nil {
+				pc.PendingRemoteDescription = nil
+			}
+		// have-local-offer->SetRemote(pranswer)->have-remote-pranswer
+		case RTCSdpTypePranswer:
+			nextState, err = checkNextSignalingState(cur, RTCSignalingStateHaveRemotePranswer, setRemote, sd.Type)
+			if err == nil {
+				pc.PendingRemoteDescription = sd
+			}
+		default:
+			return &rtcerr.OperationError{Err: fmt.Errorf("Invalid state change op: %s(%s)", op, sd.Type)}
+		}
+	default:
+		return &rtcerr.OperationError{Err: fmt.Errorf("Unhandled state change op: %q", op)}
+	}
+
+	if err == nil {
+		pc.SignalingState = nextState
+		pc.onSignalingStateChange(nextState)
+	}
+	return err
+}
+
+// SetLocalDescription sets the SessionDescription of the local peer
+func (pc *RTCPeerConnection) SetLocalDescription(desc RTCSessionDescription) error {
+	if pc.isClosed {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	// JSEP 5.4
+	if desc.Sdp == "" {
+		switch desc.Type {
+		case RTCSdpTypeAnswer, RTCSdpTypePranswer:
+			desc.Sdp = pc.lastAnswer
+		case RTCSdpTypeOffer:
+			desc.Sdp = pc.lastOffer
+		default:
+			return &rtcerr.InvalidModificationError{
+				Err: fmt.Errorf("Invalid SDP type supplied to SetLocalDescription(): %s", desc.Type),
+			}
+		}
+	}
+
+	// TODO: Initiate ICE candidate gathering?
+
+	desc.parsed = &sdp.SessionDescription{}
+	if err := desc.parsed.Unmarshal(desc.Sdp); err != nil {
+		return err
+	}
+	return pc.setDescription(&desc, rtcStateChangeOpSetLocal)
+}
 
 // LocalDescription returns PendingLocalDescription if it is not null and
 // otherwise it returns CurrentLocalDescription. This property is used to
@@ -510,8 +673,20 @@ func (pc *RTCPeerConnection) LocalDescription() *RTCSessionDescription {
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) error {
+	// FIXME: Remove this when renegotiation is supported
 	if pc.CurrentRemoteDescription != nil {
 		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
+	}
+	if pc.isClosed {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	desc.parsed = &sdp.SessionDescription{}
+	if err := desc.parsed.Unmarshal(desc.Sdp); err != nil {
+		return err
+	}
+	if err := pc.setDescription(&desc, rtcStateChangeOpSetRemote); err != nil {
+		return err
 	}
 
 	weOffer := true
@@ -521,13 +696,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		weOffer = false
 	}
 
-	pc.CurrentRemoteDescription = &desc
-	pc.CurrentRemoteDescription.parsed = &sdp.SessionDescription{}
-	if err := pc.CurrentRemoteDescription.parsed.Unmarshal(pc.CurrentRemoteDescription.Sdp); err != nil {
-		return err
-	}
-
-	for _, m := range pc.CurrentRemoteDescription.parsed.MediaDescriptions {
+	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(*a.String(), "candidate") {
 				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
