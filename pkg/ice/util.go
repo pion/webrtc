@@ -1,6 +1,9 @@
-package network
+package ice
 
-import "net"
+import (
+	"net"
+	"sync/atomic"
+)
 
 func localInterfaces() (ips []string) {
 	ifaces, err := net.Interfaces()
@@ -38,4 +41,14 @@ func localInterfaces() (ips []string) {
 		}
 	}
 	return ips
+}
+
+type atomicError struct{ v atomic.Value }
+
+func (a *atomicError) Store(err error) {
+	a.v.Store(struct{ error }{err})
+}
+func (a *atomicError) Load() error {
+	err, _ := a.v.Load().(struct{ error })
+	return err.error
 }
