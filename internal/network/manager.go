@@ -1,14 +1,13 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
-	"github.com/pions/pkg/stun"
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
-	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -19,6 +18,7 @@ import (
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
 	IceAgent    *ice.Agent
+	iceConn     *ice.Conn
 	iceNotifier ICENotifier
 	isOffer     bool
 
@@ -39,13 +39,10 @@ type Manager struct {
 	srtpOutboundContext     *srtp.Context
 
 	sctpAssociation *sctp.Association
-
-	portsLock sync.RWMutex
-	ports     []*port
 }
 
 // NewManager creates a new network.Manager
-func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
+func NewManager(urls []*ice.URL, btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
 	m = &Manager{
 		iceNotifier:              ntf,
 		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
@@ -59,23 +56,7 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.handleSCTPState)
 
-	m.IceAgent = ice.NewAgent(m.iceNotifier)
-	for _, i := range localInterfaces() {
-		p, portErr := newPort(i+":0", m)
-		if portErr != nil {
-			return nil, portErr
-		}
-
-		m.ports = append(m.ports, p)
-		m.IceAgent.AddLocalCandidate(&ice.CandidateHost{
-			CandidateBase: ice.CandidateBase{
-				Protocol: ice.ProtoTypeUDP,
-				Address:  p.listeningAddr.IP.String(),
-				Port:     p.listeningAddr.Port,
-				Conn:     p.conn,
-			},
-		})
-	}
+	m.IceAgent = ice.NewAgent(urls, m.iceNotifier)
 
 	return m, err
 }
@@ -93,42 +74,6 @@ func (m *Manager) handleSCTPState(state sctp.AssociationState) {
 	}
 }
 
-// AddURL takes an ICE Url, allocates any state and adds the candidate
-func (m *Manager) AddURL(url *ice.URL) error {
-	switch url.Scheme {
-	case ice.SchemeTypeSTUN:
-		laddr, xoraddr, err := webrtcStun.AllocateUDP(url)
-		if err != nil {
-			return err
-		}
-
-		p, err := newPort(laddr.String(), m)
-		if err != nil {
-			return err
-		}
-
-		c := &ice.CandidateSrflx{
-			CandidateBase: ice.CandidateBase{
-				Protocol: ice.ProtoTypeUDP,
-				Address:  xoraddr.IP.String(),
-				Port:     xoraddr.Port,
-				Conn:     p.conn,
-			},
-			RemoteAddress: laddr.IP.String(),
-			RemotePort:    laddr.Port,
-		}
-
-		m.portsLock.Lock()
-		defer m.portsLock.Unlock()
-		m.ports = append(m.ports, p)
-		m.IceAgent.AddLocalCandidate(c)
-	default:
-		return errors.Errorf("%s is not implemented", url.Scheme.String())
-	}
-
-	return nil
-}
-
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
 func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	m.isOffer = isOffer
@@ -136,35 +81,47 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 	// Start the sctpAssociation
 	m.sctpAssociation.Start(isOffer)
 
-	if err := m.IceAgent.Start(isOffer, remoteUfrag, remotePwd); err != nil {
+	var iceConn *ice.Conn
+	var err error
+	if isOffer {
+		iceConn, err = m.IceAgent.Dial(context.TODO(), remoteUfrag, remotePwd)
+	} else {
+		iceConn, err = m.IceAgent.Accept(context.TODO(), remoteUfrag, remotePwd)
+	}
+
+	if err != nil {
 		return err
 	}
+
+	m.iceConn = iceConn
+
 	// Start DTLS
-	m.dtlsState.Start(isOffer)
+	m.dtlsState.Start(isOffer, iceConn)
+
+	m.certPairLock.RLock()
+	if !m.isOffer && m.certPair == nil {
+		m.dtlsState.DoHandshake("0.0.0.0", "0.0.0.0")
+	}
+	m.certPairLock.RUnlock()
+
+	// Temporary networking glue
+	go m.networkLoop()
 
 	return nil
 }
 
 // Close cleans up all the allocated state
-func (m *Manager) Close() {
-	m.portsLock.Lock()
-	defer m.portsLock.Unlock()
-
-	err := m.sctpAssociation.Close()
+func (m *Manager) Close() error {
+	errSCTP := m.sctpAssociation.Close()
 	m.dtlsState.Close()
-	m.IceAgent.Close()
+	errICE := m.IceAgent.Close() // TODO: combine errors?
 
-	for i := len(m.ports) - 1; i >= 0; i-- {
-		if portError := m.ports[i].close(); portError != nil {
-			if err != nil {
-				err = errors.Wrapf(portError, " also: %s", err.Error())
-			} else {
-				err = portError
-			}
-		} else {
-			m.ports = append(m.ports[:i], m.ports[i+1:]...)
-		}
+	if errSCTP != nil ||
+		errICE != nil {
+		return fmt.Errorf("Failed to close: %v, %v", errSCTP, errICE)
 	}
+
+	return nil
 }
 
 // DTLSFingerprint generates the fingerprint included in an SessionDescription
@@ -174,34 +131,48 @@ func (m *Manager) DTLSFingerprint() string {
 
 // SendRTP finds a connected port and sends the passed RTP packet
 func (m *Manager) SendRTP(packet *rtp.Packet) {
-
-	local, remote := m.IceAgent.SelectedPair()
-	if local == nil || remote == nil {
+	m.srtpOutboundContextLock.Lock()
+	defer m.srtpOutboundContextLock.Unlock()
+	if m.srtpOutboundContext == nil {
+		// TODO log-level
+		// fmt.Printf("Tried to send RTP packet but no SRTP Context to handle it \n")
 		return
 	}
 
-	m.portsLock.RLock()
-	defer m.portsLock.RUnlock()
-	for _, p := range m.ports {
-		if p.listeningAddr.Equal(local) {
-			p.sendRTP(packet, remote)
-		}
+	if ok := m.srtpOutboundContext.EncryptRTP(packet); !ok {
+		fmt.Println("SendRTP failed to encrypt packet")
+		return
+	}
+
+	raw, err := packet.Marshal()
+	if err != nil {
+		fmt.Printf("SendRTP failed to marshal packet: %s \n", err.Error())
+	}
+
+	_, err = m.iceConn.Write(raw)
+	if err != nil {
+		fmt.Println("SendRTP failed to write:", err)
 	}
 }
 
 // SendRTCP finds a connected port and sends the passed RTCP packet
 func (m *Manager) SendRTCP(pkt []byte) {
-	local, remote := m.IceAgent.SelectedPair()
-	if local == nil || remote == nil {
+	m.srtpOutboundContextLock.Lock()
+	defer m.srtpOutboundContextLock.Unlock()
+	if m.srtpOutboundContext == nil {
+		fmt.Printf("Tried to send RTCP packet but no SRTP Context to handle it \n")
 		return
 	}
 
-	m.portsLock.RLock()
-	defer m.portsLock.RUnlock()
-	for _, p := range m.ports {
-		if p.listeningAddr.Equal(local) {
-			p.sendRTCP(pkt, remote)
-		}
+	encrypted, err := m.srtpOutboundContext.EncryptRTCP(pkt)
+	if err != nil {
+		fmt.Println("SendRTCP failed to encrypt packet:", err)
+		return
+	}
+
+	_, err = m.iceConn.Write(encrypted)
+	if err != nil {
+		fmt.Println("SendRTCP failed to write:", err)
 	}
 }
 
@@ -294,31 +265,10 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 }
 
 func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	local, remote := m.IceAgent.SelectedPair()
-	if remote == nil || local == nil {
-		// Send data on any valid pair
-		fmt.Println("dataChannelOutboundHandler: no valid candidates, dropping packet")
-		return
-	}
-
-	m.portsLock.RLock()
-	defer m.portsLock.RUnlock()
-	p, err := m.port(local)
+	_, err := m.dtlsState.Send(raw, "0.0.0.0", "0.0.0.0")
 	if err != nil {
-		fmt.Println("dataChannelOutboundHandler: no valid port for candidate, dropping packet")
-		return
-
+		fmt.Println(err)
 	}
-	p.sendSCTP(raw, remote)
-}
-
-func (m *Manager) port(local *stun.TransportAddr) (*port, error) {
-	for _, p := range m.ports {
-		if p.listeningAddr.Equal(local) {
-			return p, nil
-		}
-	}
-	return nil, errors.New("port not found")
 }
 
 // SendOpenChannelMessage sends the message to open a datachannel to the connected peer

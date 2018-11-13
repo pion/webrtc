@@ -25,4 +25,7 @@ var (
 
 	// ErrProtoType indicates an unsupported transport type was provided.
 	ErrProtoType = errors.New("invalid transport protocol type")
+
+	// ErrClosed indicates the agent is closed
+	ErrClosed = errors.New("the agent is closed")
 )

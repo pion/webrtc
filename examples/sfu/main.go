@@ -68,13 +68,10 @@ func main() {
 		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
-			for {
-				select {
-				case <-ticker.C:
-					err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.Ssrc})
-					if err != nil {
-						fmt.Println(err)
-					}
+			for range ticker.C {
+				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.Ssrc})
+				if err != nil {
+					fmt.Println(err)
 				}
 			}
 		}()
@@ -116,7 +113,7 @@ func main() {
 		check(err)
 
 		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+		vp8Track, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
 		check(err)
 
 		_, err = peerConnection.AddTrack(vp8Track)

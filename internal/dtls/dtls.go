@@ -13,12 +13,11 @@ package dtls
 import "C"
 import (
 	"fmt"
-	"net"
-	"strconv"
 	"sync"
 	"unsafe"
+
+	"github.com/pions/webrtc/internal/transport"
 	"github.com/pkg/errors"
-	"golang.org/x/net/ipv4"
 )
 
 func init() {
@@ -26,6 +25,9 @@ func init() {
 		panic("Failed to initalize OpenSSL") // nolint
 	}
 }
+
+// TODO FIXME
+var currentState *State
 
 // ConnectionState determines the DTLS connection state
 type ConnectionState uint8
@@ -47,35 +49,18 @@ func (a ConnectionState) String() string {
 	}
 }
 
-var listenerMap = make(map[string]*ipv4.PacketConn)
-var listenerMapLock = &sync.Mutex{}
-
 //export go_handle_sendto
 func go_handle_sendto(rawLocal *C.char, rawRemote *C.char, rawBuf *C.char, rawBufLen C.int) {
 	local := C.GoString(rawLocal)
+	_ = local
 	remote := C.GoString(rawRemote)
+	_ = remote
 	buf := []byte(C.GoStringN(rawBuf, rawBufLen))
 	C.free(unsafe.Pointer(rawBuf))
 
-	listenerMapLock.Lock()
-	defer listenerMapLock.Unlock()
-	if conn, ok := listenerMap[local]; ok {
-		strIP, strPort, err := net.SplitHostPort(remote)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		port, err := strconv.Atoi(strPort)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		_, err = conn.WriteTo(buf, nil, &net.UDPAddr{IP: net.ParseIP(strIP), Port: port})
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		fmt.Printf("Could not find ipv4.PacketConn for %s \n", local)
+	_, err := currentState.conn.Write(buf)
+	if err != nil {
+		fmt.Println("Failed go_handle_sendto", err)
 	}
 }
 
@@ -89,6 +74,8 @@ type State struct {
 	tlscfg      *_Ctype_struct_tlscfg
 	sslctx      *_Ctype_struct_ssl_ctx_st
 	dtlsSession *_Ctype_struct_dtls_sess
+
+	conn transport.Conn
 }
 
 // NewState creates a new DTLS session
@@ -101,11 +88,14 @@ func NewState(notifier func(ConnectionState)) (s *State, err error) {
 
 	s.sslctx = C.dtls_build_sslctx(s.tlscfg)
 
+	currentState = s
+
 	return s, err
 }
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
-func (s *State) Start(isOffer bool) {
+func (s *State) Start(isOffer bool, conn transport.Conn) {
+	s.conn = conn
 	s.dtlsSession = C.dtls_build_session(s.sslctx, C.bool(isOffer))
 }
 
@@ -126,18 +116,18 @@ func (s *State) Close() {
 // Fingerprint generates a SHA-256 fingerprint of the certificate
 func (s *State) Fingerprint() string {
 	cfg := s.tlscfg
-	if cfg == nil{
+	if cfg == nil {
 		return ""
 	}
 	var size uint
 	var fingerprint [C.EVP_MAX_MD_SIZE]byte
 	sizePtr := unsafe.Pointer(&size)
 	fingerprintPtr := unsafe.Pointer(&fingerprint)
-	if C.X509_digest(cfg.cert, C.EVP_sha256(), (*C.uchar)(fingerprintPtr), (*C.uint)(sizePtr)) == 0{
+	if C.X509_digest(cfg.cert, C.EVP_sha256(), (*C.uchar)(fingerprintPtr), (*C.uint)(sizePtr)) == 0 {
 		return ""
 	}
 	var hexFingerprint string
-	for i := uint(0); i < size; i++{
+	for i := uint(0); i < size; i++ {
 		hexFingerprint += fmt.Sprintf("%.2X:", fingerprint[i])
 	}
 	hexFingerprint = hexFingerprint[:len(hexFingerprint)-1]
@@ -243,20 +233,3 @@ func (s *State) DoHandshake(local, remote string) {
 
 	C.dtls_do_handshake(s.dtlsSession, rawLocal, rawRemote)
 }
-
-// AddListener adds the socket to a map that can be accessed by OpenSSL for sending
-// This only needed until DTLS is rewritten in native Go
-func AddListener(src string, conn *ipv4.PacketConn) {
-	listenerMapLock.Lock()
-	listenerMap[src] = conn
-	listenerMapLock.Unlock()
-}
-
-// RemoveListener removes the socket from a map that can be accessed by OpenSSL for sending
-// This only needed until DTLS is rewritten in native Go
-func RemoveListener(src string) {
-	listenerMapLock.Lock()
-	delete(listenerMap, src)
-	listenerMapLock.Unlock()
-}
-

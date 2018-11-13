@@ -60,7 +60,7 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 
 func iceSrflxCandidateString(c *ice.CandidateSrflx, component int) string {
 	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ srflx raddr %s rport %d generation 0",
-		component, c.CandidateBase.Priority(ice.SrflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RemoteAddress, c.RemotePort)
+		component, c.CandidateBase.Priority(ice.SrflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RelatedAddress, c.RelatedPort)
 }
 
 func iceHostCandidateString(c *ice.CandidateHost, component int) string {

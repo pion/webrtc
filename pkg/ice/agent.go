@@ -14,69 +14,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Unknown defines default public constant to use for "enum" like struct
-// comparisons when no value was defined.
-const Unknown = iota
-
-func newCandidatePair(local, remote Candidate) CandidatePair {
-	return CandidatePair{
-		remote: remote,
-		local:  local,
-	}
-}
-
-// CandidatePair represents a combination of a local and remote candidate
-type CandidatePair struct {
-	// lastUpdateTime ?
-	remote Candidate
-	local  Candidate
-}
-
-func (c CandidatePair) getAddrs() (local *stun.TransportAddr, remote *net.UDPAddr) {
-	localIP := net.ParseIP(c.local.GetBase().Address)
-	localPort := c.local.GetBase().Port
-
-	switch c := c.local.(type) {
-	case *CandidateSrflx:
-		localIP = net.ParseIP(c.RemoteAddress)
-		localPort = c.RemotePort
-	}
-
-	return &stun.TransportAddr{
-			IP:   localIP,
-			Port: localPort,
-		}, &net.UDPAddr{
-			IP:   net.ParseIP(c.remote.GetBase().Address),
-			Port: c.remote.GetBase().Port,
-		}
-}
-
-// Agent represents the ICE agent
-type Agent struct {
-	sync.RWMutex
-
-	notifier func(ConnectionState)
-
-	tieBreaker      uint64
-	connectionState ConnectionState
-	gatheringState  GatheringState
-
-	haveStarted   bool
-	isControlling bool
-	taskLoopChan  chan bool
-
-	LocalUfrag      string
-	LocalPwd        string
-	LocalCandidates []Candidate
-
-	remoteUfrag      string
-	remotePwd        string
-	remoteCandidates map[string]Candidate
-
-	selectedPair CandidatePair
-	validPairs   []CandidatePair
-}
-
 const (
 	// taskLoopInterval is the interval at which the agent performs checks
 	taskLoopInterval = 2 * time.Second
@@ -88,26 +25,202 @@ const (
 	connectionTimeout = 30 * time.Second
 )
 
-// NewAgent creates a new Agent
-func NewAgent(notifier func(ConnectionState)) *Agent {
-	return &Agent{
-		notifier: notifier,
+// Agent represents the ICE agent
+type Agent struct {
+	notifier func(ConnectionState)
 
+	// Used to block double Dial/Accept
+	opened bool
+
+	// State owned by the taskLoop
+	taskChan        chan task
+	onConnected     chan struct{}
+	onConnectedOnce sync.Once
+
+	connectivityTicker *time.Ticker
+	connectivityChan   <-chan time.Time
+
+	tieBreaker      uint64
+	connectionState ConnectionState
+	gatheringState  GatheringState
+
+	haveStarted   bool
+	isControlling bool
+
+	localUfrag      string
+	localPwd        string
+	localCandidates []Candidate
+
+	remoteUfrag      string
+	remotePwd        string
+	remoteCandidates map[string]Candidate
+
+	selectedPair *candidatePair
+	validPairs   []*candidatePair
+
+	// Channel for reading
+	rcvCh chan *bufIn
+
+	// State for closing
+	closeOnce sync.Once
+	done      chan struct{}
+	err       atomicError
+}
+
+type bufIn struct {
+	buf  []byte
+	size chan int
+}
+
+func (a *Agent) ok() error {
+	select {
+	case <-a.done:
+		return a.getErr()
+	default:
+	}
+	return nil
+}
+
+func (a *Agent) getErr() error {
+	err := a.err.Load()
+	if err != nil {
+		return err
+	}
+	return ErrClosed
+}
+
+// NewAgent creates a new Agent
+func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
+	a := &Agent{
+		notifier:         notifier,
 		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:   GatheringStateComplete, // TODO trickle-ice
 		connectionState:  ConnectionStateNew,
 		remoteCandidates: make(map[string]Candidate),
 
-		LocalUfrag: util.RandSeq(16),
-		LocalPwd:   util.RandSeq(32),
+		localUfrag:  util.RandSeq(16),
+		localPwd:    util.RandSeq(32),
+		taskChan:    make(chan task),
+		onConnected: make(chan struct{}),
+		rcvCh:       make(chan *bufIn),
+		done:        make(chan struct{}),
+	}
+
+	// Initialize local candidates
+	a.gatherCandidatesLocal()
+	a.gatherCandidatesReflective(urls)
+
+	go a.taskLoop()
+	return a
+}
+
+func (a *Agent) gatherCandidatesLocal() {
+	interfaces := localInterfaces()
+	networks := []string{"udp4"}
+	for _, network := range networks {
+		for _, i := range interfaces {
+
+			laddr, err := net.ResolveUDPAddr(network, i+":0")
+			if err != nil {
+				fmt.Printf("could not resolve %s %s %v\n", network, i, err)
+				continue
+			}
+
+			conn, err := net.ListenUDP(network, laddr)
+			if err != nil {
+				fmt.Printf("could not listen %s %s\n", network, i)
+				continue
+			}
+
+			c := &CandidateHost{
+				CandidateBase: CandidateBase{
+					Protocol: ProtoTypeUDP,
+					Address:  conn.LocalAddr().(*net.UDPAddr).IP.String(),
+					Port:     conn.LocalAddr().(*net.UDPAddr).Port,
+					conn:     conn,
+				},
+			}
+
+			a.localCandidates = append(a.localCandidates, c)
+
+			go a.recvLoop(c)
+		}
 	}
 }
 
-// Start starts the agent
-func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
-	a.Lock()
-	defer a.Unlock()
+func (a *Agent) gatherCandidatesReflective(urls []*URL) {
+	networks := []string{"udp4"}
+	for _, network := range networks {
+		for _, url := range urls {
+			switch url.Scheme {
+			case SchemeTypeSTUN:
+				laddr, xoraddr, err := allocateUDP(network, url)
+				if err != nil {
+					fmt.Printf("could not allocate %s %s: %v\n", network, url, err)
+					continue
+				}
+				conn, err := net.ListenUDP(network, laddr)
+				if err != nil {
+					fmt.Printf("could not listen %s %s: %v\n", network, laddr, err)
+				}
 
+				c := &CandidateSrflx{
+					CandidateBase: CandidateBase{
+						Protocol: ProtoTypeUDP,
+						Address:  xoraddr.IP.String(),
+						Port:     xoraddr.Port,
+						conn:     conn,
+					},
+					RelatedAddress: laddr.IP.String(),
+					RelatedPort:    laddr.Port,
+				}
+
+				a.localCandidates = append(a.localCandidates, c)
+
+				go a.recvLoop(c)
+
+			default:
+				fmt.Printf("scheme %s is not implemented\n", url.Scheme.String())
+				continue
+			}
+		}
+	}
+}
+
+func allocateUDP(network string, url *URL) (*net.UDPAddr, *stun.XorAddress, error) {
+	// TODO Do we want the timeout to be configurable?
+	client, err := stun.NewClient(network, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "Failed to create STUN client")
+	}
+	localAddr, ok := client.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return nil, nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
+	}
+
+	resp, err := client.Request()
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "Failed to make STUN request")
+	}
+
+	if err = client.Close(); err != nil {
+		return nil, nil, errors.Wrapf(err, "Failed to close STUN client")
+	}
+
+	attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
+	if !ok {
+		return nil, nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
+	}
+
+	var addr stun.XorAddress
+	if err = addr.Unpack(resp, attr); err != nil {
+		return nil, nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
+	}
+
+	return localAddr, &addr, nil
+}
+
+func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remotePwd string) error {
 	if a.haveStarted {
 		return errors.Errorf("Attempted to start agent twice")
 	} else if remoteUfrag == "" {
@@ -116,12 +229,18 @@ func (a *Agent) Start(isControlling bool, remoteUfrag, remotePwd string) error {
 		return errors.Errorf("remotePwd is empty")
 	}
 
-	a.isControlling = isControlling
-	a.remoteUfrag = remoteUfrag
-	a.remotePwd = remotePwd
+	return a.run(func(agent *Agent) {
+		a.isControlling = isControlling
+		a.remoteUfrag = remoteUfrag
+		a.remotePwd = remotePwd
 
-	go a.taskLoop()
-	return nil
+		// TODO this should be dynamic, and grow when the connection is stable
+		t := time.NewTicker(taskLoopInterval)
+		a.connectivityTicker = t
+		a.connectivityChan = t.C
+
+		agent.updateConnectionState(ConnectionStateChecking)
+	})
 }
 
 func (a *Agent) pingCandidate(local, remote Candidate) {
@@ -135,7 +254,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 
 	if a.isControlling {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
-			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
+			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
 			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
@@ -146,7 +265,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		)
 	} else {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
-			&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
+			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
 			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
 			&stun.MessageIntegrity{
@@ -162,35 +281,6 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 	}
 
 	a.sendSTUN(msg, local, remote)
-}
-
-// keepaliveCandidate sends a STUN Binding Indication to the remote candidate
-func (a *Agent) keepaliveCandidate(local, remote Candidate) {
-	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionId(),
-		&stun.Username{Username: a.remoteUfrag + ":" + a.LocalUfrag},
-		&stun.MessageIntegrity{
-			Key: []byte(a.remotePwd),
-		},
-		&stun.Fingerprint{},
-	)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	a.sendSTUN(msg, local, remote)
-}
-
-func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
-	err := local.GetBase().sendTo(msg.Pack(), remote.GetBase())
-	if err != nil {
-		// TODO: Determine if we should always drop the err
-		// E.g.: maybe handle for known valid pairs or to
-		// discard pairs faster.
-		_ = err
-		// fmt.Printf("failed to send STUN message: %v", err)
-	}
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
@@ -219,41 +309,96 @@ func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
 		// https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-12
 		a.validPairs = append(a.validPairs, p)
 	}
+
+	// Signal connected
+	a.onConnectedOnce.Do(func() { close(a.onConnected) })
+}
+
+// A task is a
+type task func(*Agent)
+
+func (a *Agent) run(t task) error {
+	err := a.ok()
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-a.done:
+		return a.getErr()
+	case a.taskChan <- t:
+	}
+	return nil
 }
 
 func (a *Agent) taskLoop() {
-	// TODO this should be dynamic, and grow when the connection is stable
-	t := time.NewTicker(taskLoopInterval)
-	a.updateConnectionState(ConnectionStateChecking)
-
 	for {
 		select {
-		case <-t.C:
-			a.Lock()
+		case <-a.connectivityChan:
 			if a.validateSelectedPair() {
 				a.checkKeepalive()
 			} else {
 				a.pingAllCandidates()
 			}
-			a.Unlock()
-		case <-a.taskLoopChan:
-			t.Stop()
-			return
+
+		case t := <-a.taskChan:
+			// Run the task
+			t(a)
+
+		case <-a.done:
+
 		}
+	}
+}
+
+func (a *Agent) recvLoop(c Candidate) {
+	base := c.GetBase()
+	buffer := make([]byte, receiveMTU)
+	for {
+		n, srcAddr, err := base.conn.ReadFrom(buffer)
+		if err != nil {
+			// TODO: handle connection close?
+			break
+		}
+
+		if len(buffer) == 0 {
+			fmt.Println("handleIncoming: inbound buffer is not long enough to demux")
+			continue
+		}
+
+		if stun.IsSTUN(buffer) {
+			m, err := stun.NewMessage(buffer[:n])
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to handle decode ICE from %s to %s: %v", base.addr(), srcAddr, err))
+				continue
+			}
+
+			err = a.run(func(agent *Agent) {
+				agent.handleInbound(m, c, srcAddr)
+			})
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to handle message: %v", err))
+			}
+
+			continue
+		}
+
+		bufin := <-a.rcvCh
+		copy(bufin.buf, buffer[:n]) // TODO: avoid copy in common case?
+		bufin.size <- n
 	}
 }
 
 // validateSelectedPair checks if the selected pair is (still) valid
 // Note: the caller should hold the agent lock.
 func (a *Agent) validateSelectedPair() bool {
-	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+	if a.selectedPair == nil {
 		// Not valid since not selected
 		return false
 	}
 
 	if time.Since(a.selectedPair.remote.GetBase().LastReceived) > connectionTimeout {
-		a.selectedPair.remote = nil
-		a.selectedPair.local = nil
+		a.selectedPair = nil
 		a.updateConnectionState(ConnectionStateDisconnected)
 		return false
 	}
@@ -265,7 +410,7 @@ func (a *Agent) validateSelectedPair() bool {
 // if no packet has been sent on that pair in the last keepaliveInterval
 // Note: the caller should hold the agent lock.
 func (a *Agent) checkKeepalive() {
-	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
+	if a.selectedPair == nil {
 		return
 	}
 
@@ -277,7 +422,7 @@ func (a *Agent) checkKeepalive() {
 // pingAllCandidates sends STUN Binding Requests to all candidates
 // Note: the caller should hold the agent lock.
 func (a *Agent) pingAllCandidates() {
-	for _, localCandidate := range a.LocalCandidates {
+	for _, localCandidate := range a.localCandidates {
 		for _, remoteCandidate := range a.remoteCandidates {
 			a.pingCandidate(localCandidate, remoteCandidate)
 		}
@@ -285,26 +430,44 @@ func (a *Agent) pingAllCandidates() {
 }
 
 // AddRemoteCandidate adds a new remote candidate
-func (a *Agent) AddRemoteCandidate(c Candidate) {
-	a.Lock()
-	defer a.Unlock()
-	if _, found := a.remoteCandidates[c.String()]; !found {
-		a.remoteCandidates[c.String()] = c
-	}
+func (a *Agent) AddRemoteCandidate(c Candidate) error {
+	return a.run(func(agent *Agent) {
+		if _, found := agent.remoteCandidates[c.String()]; !found {
+			agent.remoteCandidates[c.String()] = c
+		}
+	})
 }
 
-// AddLocalCandidate adds a new local candidate
-func (a *Agent) AddLocalCandidate(c Candidate) {
-	a.Lock()
-	defer a.Unlock()
-	a.LocalCandidates = append(a.LocalCandidates, c)
+// GetLocalCandidates returns the local candidates
+func (a *Agent) GetLocalCandidates() ([]Candidate, error) {
+	res := make(chan []Candidate)
+
+	err := a.run(func(agent *Agent) {
+		var candidates []Candidate
+		candidates = append(candidates, agent.localCandidates...)
+		res <- candidates
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return <-res, nil
+}
+
+// GetLocalUserCredentials returns the local user credentials
+func (a *Agent) GetLocalUserCredentials() (frag string, pwd string) {
+	return a.localUfrag, a.localPwd
 }
 
 // Close cleans up the Agent
-func (a *Agent) Close() {
-	if a.taskLoopChan != nil {
-		close(a.taskLoopChan)
+func (a *Agent) Close() error {
+	err := a.ok()
+	if err != nil {
+		return err
 	}
+	a.err.Store(ErrClosed)
+	a.closeOnce.Do(func() { close(a.done) })
+	return nil
 }
 
 func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
@@ -314,7 +477,7 @@ func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
 
 	switch c := c.(type) {
 	case *CandidateSrflx:
-		if c.RemoteAddress == testAddress && c.RemotePort == testPort {
+		if c.RelatedAddress == testAddress && c.RelatedPort == testPort {
 			return true
 		}
 	}
@@ -322,41 +485,44 @@ func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
 	return false
 }
 
-func getTransportAddrCandidate(candidates []Candidate, addr *stun.TransportAddr) Candidate {
+func getAddrCandidate(candidates map[string]Candidate, addr net.Addr) Candidate {
+	var ip string
+	var port int
+
+	switch a := addr.(type) {
+	case *net.UDPAddr:
+		ip = a.IP.String()
+		port = a.Port
+	default:
+		fmt.Printf("unsupported address type %T", a)
+		return nil
+	}
+
 	for _, c := range candidates {
-		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
+		if isCandidateMatch(c, ip, port) {
 			return c
 		}
 	}
 	return nil
 }
 
-func getUDPAddrCandidate(candidates map[string]Candidate, addr *net.UDPAddr) Candidate {
-	for _, c := range candidates {
-		if isCandidateMatch(c, addr.IP.String(), addr.Port) {
-			return c
-		}
-	}
-	return nil
-}
-
-func (a *Agent) sendBindingSuccess(m *stun.Message, localCandidate, remoteCandidate Candidate) {
-	remote := remoteCandidate.GetBase()
+func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
+	base := remote.GetBase()
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
-				IP:   net.ParseIP(remote.Address),
-				Port: remote.Port,
+				IP:   net.ParseIP(base.Address),
+				Port: base.Port,
 			},
 		},
 		&stun.MessageIntegrity{
-			Key: []byte(a.LocalPwd),
+			Key: []byte(a.localPwd),
 		},
 		&stun.Fingerprint{},
 	); err != nil {
-		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", localCandidate.String(), remoteCandidate.String(), err.Error())
+		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
 	} else {
-		a.sendSTUN(out, localCandidate, remoteCandidate)
+		a.sendSTUN(out, local, remote)
 	}
 }
 
@@ -399,19 +565,9 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 	}
 }
 
-// HandleInbound processes traffic from a remote candidate
-func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net.UDPAddr) {
-	a.Lock()
-	defer a.Unlock()
-
-	localCandidate := getTransportAddrCandidate(a.LocalCandidates, local)
-	if localCandidate == nil {
-		// TODO debug
-		// fmt.Printf("Could not find local candidate for %s:%d ", local.IP.String(), local.Port)
-		return
-	}
-
-	remoteCandidate := getUDPAddrCandidate(a.remoteCandidates, remote)
+// handleInbound processes traffic from a remote candidate
+func (a *Agent) handleInbound(m *stun.Message, local Candidate, remote net.Addr) {
+	remoteCandidate := getAddrCandidate(a.remoteCandidates, remote)
 	if remoteCandidate == nil {
 		// TODO debug
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
@@ -420,31 +576,35 @@ func (a *Agent) HandleInbound(buf []byte, local *stun.TransportAddr, remote *net
 
 	remoteCandidate.GetBase().seen(false)
 
-	m, err := stun.NewMessage(buf)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Failed to handle decode ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error()))
+	if m.Class == stun.ClassIndication {
 		return
 	}
 
 	if a.isControlling {
-		a.handleInboundControlling(m, localCandidate, remoteCandidate)
+		a.handleInboundControlling(m, local, remoteCandidate)
 	} else {
-		a.handleInboundControlled(m, localCandidate, remoteCandidate)
+		a.handleInboundControlled(m, local, remoteCandidate)
 	}
 
 }
 
-// SelectedPair gets the current selected pair's Addresses (or returns nil)
-func (a *Agent) SelectedPair() (local *stun.TransportAddr, remote *net.UDPAddr) {
-	a.RLock()
-	defer a.RUnlock()
+func (a *Agent) getBestPair() (*candidatePair, error) {
+	res := make(chan *candidatePair)
 
-	if a.selectedPair.remote == nil || a.selectedPair.local == nil {
-		for _, p := range a.validPairs {
-			return p.getAddrs()
+	err := a.run(func(agent *Agent) {
+		if agent.selectedPair != nil {
+			res <- agent.selectedPair
+			return
 		}
-		return nil, nil
+		for _, p := range agent.validPairs {
+			res <- p
+			return
+		}
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	return a.selectedPair.getAddrs()
+	return <-res, nil
 }

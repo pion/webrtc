@@ -63,20 +63,21 @@ func main() {
 
 	// Janus
 	gateway, err := janus.Connect("ws://localhost:8188/")
-
 	if err != nil {
 		panic(err)
 	}
 
 	// Create session
 	session, err := gateway.Create()
-
 	if err != nil {
 		panic(err)
 	}
 
 	// Create handle
 	handle, err := session.Attach("janus.plugin.streaming")
+	if err != nil {
+		panic(err)
+	}
 
 	go watchHandle(handle)
 
