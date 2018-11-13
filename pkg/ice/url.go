@@ -13,6 +13,10 @@ import (
 // SchemeType indicates the type of server used in the ice.URL structure.
 type SchemeType int
 
+// Unknown defines default public constant to use for "enum" like struct
+// comparisons when no value was defined.
+const Unknown = iota
+
 const (
 	// SchemeTypeSTUN indicates the URL represents a STUN server.
 	SchemeTypeSTUN SchemeType = iota + 1
