@@ -1,24 +1,17 @@
 package main
 
 import (
-	"bufio"
-	"encoding/base64"
 	"fmt"
-	"io"
-	"math/rand"
-	"os"
 	"time"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
 func main() {
-	// Wait for the offer to be pasted
-	sd := mustReadStdin()
-
-	/* Everything below is the pion-WebRTC API, thanks for using it! */
+	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.RTCConfiguration{
@@ -31,7 +24,7 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(config)
-	check(err)
+	util.Check(err)
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -51,11 +44,11 @@ func main() {
 			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label, d.ID)
 			for {
 				time.Sleep(5 * time.Second)
-				message := randSeq(15)
+				message := util.RandSeq(15)
 				fmt.Printf("Sending %s \n", message)
 
 				err := d.Send(datachannel.PayloadString{Data: []byte(message)})
-				check(err)
+				util.Check(err)
 			}
 		}
 
@@ -72,55 +65,24 @@ func main() {
 		}
 	}
 
+	// Wait for the offer to be pasted
+	sd := util.Decode(util.MustReadStdin())
+
 	// Set the remote SessionDescription
 	offer := webrtc.RTCSessionDescription{
 		Type: webrtc.RTCSdpTypeOffer,
 		Sdp:  string(sd),
 	}
-
 	err = peerConnection.SetRemoteDescription(offer)
-	check(err)
+	util.Check(err)
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	answer, err := peerConnection.CreateAnswer(nil)
-	check(err)
+	util.Check(err)
 
-	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
+	// Output the answer in base64 so we can paste it in browser
+	fmt.Println(util.Encode(answer.Sdp))
 
 	// Block forever
 	select {}
-}
-
-func randSeq(n int) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[r.Intn(len(letters))]
-	}
-	return string(b)
-}
-
-// mustReadStdin blocks untill input is received from stdin
-func mustReadStdin() string {
-	reader := bufio.NewReader(os.Stdin)
-	rawSd, err := reader.ReadString('\n')
-	if err != io.EOF {
-		check(err)
-	}
-
-	fmt.Println("")
-
-	sd, err := base64.StdEncoding.DecodeString(rawSd)
-	check(err)
-
-	return string(sd)
-}
-
-// check is used to panic in an error occurs.
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
