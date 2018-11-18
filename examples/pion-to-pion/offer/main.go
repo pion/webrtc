@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"time"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 )
@@ -17,6 +17,8 @@ import (
 func main() {
 	addr := flag.String("address", ":50000", "Address that the HTTP server is hosted on.")
 	flag.Parse()
+
+	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.RTCConfiguration{
@@ -29,11 +31,11 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(config)
-	check(err)
+	util.Check(err)
 
 	// Create a datachannel with label 'data'
 	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
-	check(err)
+	util.Check(err)
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -48,11 +50,11 @@ func main() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label, dataChannel.ID)
 
 		for range time.NewTicker(5 * time.Second).C {
-			message := randSeq(15)
+			message := util.RandSeq(15)
 			fmt.Printf("Sending %s \n", message)
 
 			err := dataChannel.Send(datachannel.PayloadString{Data: []byte(message)})
-			check(err)
+			util.Check(err)
 		}
 	}
 
@@ -72,14 +74,14 @@ func main() {
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)
-	check(err)
+	util.Check(err)
 
 	// Exchange the offer for the answer
 	answer := mustSignalViaHTTP(offer, *addr)
 
 	// Apply the answer as the remote description
 	err = peerConnection.SetRemoteDescription(answer)
-	check(err)
+	util.Check(err)
 
 	// Block forever
 	select {}
@@ -89,32 +91,15 @@ func main() {
 func mustSignalViaHTTP(offer webrtc.RTCSessionDescription, address string) webrtc.RTCSessionDescription {
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(offer)
-	check(err)
+	util.Check(err)
 
 	resp, err := http.Post("http://"+address, "application/json; charset=utf-8", b)
-	check(err)
+	util.Check(err)
 	defer resp.Body.Close()
 
 	var answer webrtc.RTCSessionDescription
 	err = json.NewDecoder(resp.Body).Decode(&answer)
-	check(err)
+	util.Check(err)
 
 	return answer
-}
-
-func randSeq(n int) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[r.Intn(len(letters))]
-	}
-	return string(b)
-}
-
-// check is used to panic in an error occurs.
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

@@ -6,6 +6,7 @@ import (
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media/ivfwriter"
 )
@@ -32,13 +33,24 @@ func watchHandle(handle *janus.Handle) {
 }
 
 func main() {
+	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
+
+	// Setup the codecs you want to use.
+	// We'll use the default ones but you can also define your own
 	webrtc.RegisterDefaultCodecs()
 
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{})
-	if err != nil {
-		panic(err)
+	// Prepare the configuration
+	config := webrtc.RTCConfiguration{
+		IceServers: []webrtc.RTCIceServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
 	}
+
+	// Create a new RTCPeerConnection
+	peerConnection, err := webrtc.New(config)
+	util.Check(err)
 
 	peerConnection.OnICEConnectionStateChange = func(connectionState ice.ConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
@@ -51,81 +63,63 @@ func main() {
 
 		fmt.Println("Got VP8 track, saving to disk as output.ivf")
 		i, err := ivfwriter.New("output.ivf")
-		if err != nil {
-			panic(err)
-		}
+		util.Check(err)
 		for {
-			if err := i.AddPacket(<-track.Packets); err != nil {
-				panic(err)
-			}
+			err = i.AddPacket(<-track.Packets)
+			util.Check(err)
 		}
 	}
 
 	// Janus
 	gateway, err := janus.Connect("ws://localhost:8188/")
-
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 
 	// Create session
 	session, err := gateway.Create()
-
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 
 	// Create handle
 	handle, err := session.Attach("janus.plugin.streaming")
+	util.Check(err)
 
 	go watchHandle(handle)
 
 	// Get streaming list
-	if _, err := handle.Request(map[string]interface{}{
+	_, err = handle.Request(map[string]interface{}{
 		"request": "list",
-	}); err != nil {
-		panic(err)
-	}
+	})
+	util.Check(err)
 
 	// Watch the second stream
 	msg, err := handle.Message(map[string]interface{}{
 		"request": "watch",
 		"id":      1,
 	}, nil)
-
-	if err != nil {
-		fmt.Print("message", msg)
-		panic(err)
-	}
+	util.Check(err)
 
 	if msg.Jsep != nil {
-		if err := peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{
+		err = peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{
 			Type: webrtc.RTCSdpTypeOffer,
 			Sdp:  msg.Jsep["sdp"].(string),
-		}); err != nil {
-			panic(err)
-		}
+		})
+		util.Check(err)
 
 		answer, err := peerConnection.CreateAnswer(nil)
-		if err != nil {
-			panic(err)
-		}
+		util.Check(err)
 
 		// now we start
-		if _, err := handle.Message(map[string]interface{}{
+		_, err = handle.Message(map[string]interface{}{
 			"request": "start",
 		}, map[string]interface{}{
 			"type":    "answer",
 			"sdp":     answer.Sdp,
 			"trickle": false,
-		}); err != nil {
-			panic(err)
-		}
+		})
+		util.Check(err)
 	}
 	for {
-		if _, err := session.KeepAlive(); err != nil {
-			panic(err)
-		}
+		_, err = session.KeepAlive()
+		util.Check(err)
 
 		time.Sleep(5 * time.Second)
 	}

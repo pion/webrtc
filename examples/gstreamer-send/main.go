@@ -2,47 +2,32 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
-
-	"bufio"
-	"encoding/base64"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/gstreamer-send/gst"
+	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	rawSd, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
-		panic(err)
-	}
-
-	fmt.Println("")
-	sd, err := base64.StdEncoding.DecodeString(rawSd)
-	if err != nil {
-		panic(err)
-	}
-
-	/* Everything below is the pion-WebRTC API, thanks for using it! */
+	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Setup the codecs you want to use.
 	// We'll use the default ones but you can also define your own
 	webrtc.RegisterDefaultCodecs()
 
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(webrtc.RTCConfiguration{
+	// Prepare the configuration
+	config := webrtc.RTCConfiguration{
 		IceServers: []webrtc.RTCIceServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
 		},
-	})
-	if err != nil {
-		panic(err)
 	}
+
+	// Create a new RTCPeerConnection
+	peerConnection, err := webrtc.New(config)
+	util.Check(err)
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -52,44 +37,38 @@ func main() {
 
 	// Create a audio track
 	opusTrack, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 	_, err = peerConnection.AddTrack(opusTrack)
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 
 	// Create a video track
 	vp8Track, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 	_, err = peerConnection.AddTrack(vp8Track)
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
+
+	// Wait for the offer to be pasted
+	sd := util.Decode(util.MustReadStdin())
 
 	// Set the remote SessionDescription
 	offer := webrtc.RTCSessionDescription{
 		Type: webrtc.RTCSdpTypeOffer,
 		Sdp:  string(sd),
 	}
-	if err := peerConnection.SetRemoteDescription(offer); err != nil {
-		panic(err)
-	}
+	err = peerConnection.SetRemoteDescription(offer)
+	util.Check(err)
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	answer, err := peerConnection.CreateAnswer(nil)
-	if err != nil {
-		panic(err)
-	}
+	util.Check(err)
 
-	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
+	// Output the answer in base64 so we can paste it in browser
+	fmt.Println(util.Encode(answer.Sdp))
 
 	// Start pushing buffers on these tracks
 	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples).Start()
 	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples).Start()
+
+	// Block forever
 	select {}
 }
