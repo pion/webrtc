@@ -33,7 +33,7 @@ const (
 
 // NewJSEPSessionDescription creates a new SessionDescription with
 // some settings that are required by the JSEP spec.
-func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescription {
+func NewJSEPSessionDescription(identity bool) *SessionDescription {
 	d := &SessionDescription{
 		Version: 0,
 		Origin: Origin{
@@ -56,7 +56,6 @@ func NewJSEPSessionDescription(fingerprint string, identity bool) *SessionDescri
 		},
 		Attributes: []Attribute{
 			// 	"Attribute(ice-options:trickle)", // TODO: implement trickle ICE
-			Attribute("fingerprint:sha-256 " + fingerprint),
 		},
 	}
 
@@ -77,6 +76,11 @@ func (s *SessionDescription) WithPropertyAttribute(key string) *SessionDescripti
 func (s *SessionDescription) WithValueAttribute(key, value string) *SessionDescription {
 	s.Attributes = append(s.Attributes, Attribute(fmt.Sprintf("%s:%s", key, value)))
 	return s
+}
+
+// WithFingerprint adds a fingerprint to the session description
+func (s *SessionDescription) WithFingerprint(algorithm, value string) *SessionDescription {
+	return s.WithValueAttribute("fingerprint", algorithm+" "+value)
 }
 
 // WithMedia adds a media description to the session description

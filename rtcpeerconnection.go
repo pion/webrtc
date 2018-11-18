@@ -430,7 +430,8 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
+	d := sdp.NewJSEPSessionDescription(useIdentity)
+	pc.addFingerprint(d)
 	candidates, err := pc.generateLocalCandidates()
 	if err != nil {
 		return RTCSessionDescription{}, err
@@ -482,7 +483,8 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 	if err != nil {
 		return RTCSessionDescription{}, err
 	}
-	d := sdp.NewJSEPSessionDescription(pc.networkManager.DTLSFingerprint(), useIdentity)
+	d := sdp.NewJSEPSessionDescription(useIdentity)
+	pc.addFingerprint(d)
 
 	bundleValue := "BUNDLE"
 	for _, remoteMedia := range pc.RemoteDescription().parsed.MediaDescriptions {
@@ -720,7 +722,8 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	}
 
 	go func() {
-		err := pc.networkManager.Start(weOffer, remoteUfrag, remotePwd)
+		cert := pc.configuration.Certificates[0] // TODO: handle multiple certs
+		err := pc.networkManager.Start(weOffer, remoteUfrag, remotePwd, cert.x509Cert, cert.privateKey)
 		if err != nil {
 			fmt.Println("Failed to start manager", err)
 		}
@@ -1137,6 +1140,13 @@ func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRt
 	}
 
 	return RTCRtpTransceiverDirectionInactive
+}
+
+func (pc *RTCPeerConnection) addFingerprint(d *sdp.SessionDescription) {
+	// TODO: Handle multiple certificates
+	for _, fingerprint := range pc.configuration.Certificates[0].GetFingerprints() {
+		d.WithFingerprint(fingerprint.Algorithm, strings.ToUpper(fingerprint.Value))
+	}
 }
 
 func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string, dtlsRole sdp.ConnectionRole) bool {

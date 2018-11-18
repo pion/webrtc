@@ -8,9 +8,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
@@ -89,8 +91,20 @@ func (c RTCCertificate) Expires() time.Time {
 
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
-func (c RTCCertificate) GetFingerprints() {
-	panic("not implemented yet.") // nolint
+func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
+	res := make([]RTCDtlsFingerprint, len(network.FingerprintAlgoritms))
+
+	i := 0
+	for _, algo := range network.FingerprintAlgoritms {
+		value, err := network.Fingerprint(c.x509Cert, algo)
+		if err != nil {
+			fmt.Printf("Failed to create fingerprint: %v\n", err)
+			continue
+		}
+		res[i] = RTCDtlsFingerprint{Algorithm: algo, Value: value}
+	}
+
+	return res[:i+1]
 }
 
 // GenerateCertificate causes the creation of an X.509 certificate and

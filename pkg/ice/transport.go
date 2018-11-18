@@ -3,6 +3,8 @@ package ice
 import (
 	"context"
 	"errors"
+	"net"
+	"time"
 
 	"github.com/pions/pkg/stun"
 )
@@ -92,4 +94,31 @@ func (c *Conn) Write(p []byte) (int, error) {
 // the connection. Any calls to Read and Write will be unblocked and return an error.
 func (c *Conn) Close() error {
 	return c.agent.Close()
+}
+
+// TODO: Maybe just switch to using io.ReadWriteCloser?
+
+// LocalAddr is a stub
+func (c *Conn) LocalAddr() net.Addr {
+	return nil
+}
+
+// RemoteAddr is a stub
+func (c *Conn) RemoteAddr() net.Addr {
+	return nil
+}
+
+// SetDeadline is a stub
+func (c *Conn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+// SetReadDeadline is a stub
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+// SetWriteDeadline is a stub
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return nil
 }
