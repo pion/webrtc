@@ -2,10 +2,12 @@ package network
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"fmt"
 	"sync"
 
-	"github.com/pions/webrtc/internal/dtls"
+	"github.com/pions/dtls/pkg/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/datachannel"
@@ -30,24 +32,20 @@ type Manager struct {
 	iceNotifier ICENotifier
 	isOffer     bool
 
-	dtlsState *dtls.State
-
-	certPairLock sync.RWMutex
-	certPair     *dtls.CertPair
-
-	dataChannelEventHandler DataChannelEventHandler
+	srtpInboundContextLock  sync.RWMutex
+	srtpInboundContext      *srtp.Context
+	srtpOutboundContextLock sync.RWMutex
+	srtpOutboundContext     *srtp.Context
 
 	bufferTransportGenerator BufferTransportGenerator
 	pairsLock                sync.RWMutex
 	bufferTransportPairs     map[uint32]*TransportPair
 
-	srtpInboundContextLock sync.RWMutex
-	srtpInboundContext     *srtp.Context
-
-	srtpOutboundContextLock sync.RWMutex
-	srtpOutboundContext     *srtp.Context
+	dtlsConn *dtls.Conn
 
 	sctpAssociation *sctp.Association
+
+	dataChannelEventHandler DataChannelEventHandler
 }
 
 //AddTransportPair notifies the network manager that an RTCTrack has
@@ -69,10 +67,6 @@ func NewManager(urls []*ice.URL, btg BufferTransportGenerator, dcet DataChannelE
 		bufferTransportPairs:     make(map[uint32]*TransportPair),
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
-	}
-	m.dtlsState, err = dtls.NewState(m.handleDTLSState)
-	if err != nil {
-		return nil, err
 	}
 
 	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.handleSCTPState)
@@ -101,12 +95,6 @@ func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *T
 	return bufferTransport
 }
 
-func (m *Manager) handleDTLSState(state dtls.ConnectionState) {
-	if state == dtls.Established {
-		m.sctpAssociation.Connect()
-	}
-}
-
 func (m *Manager) handleSCTPState(state sctp.AssociationState) {
 	if state == sctp.Established {
 		// Temporary way to signal sending OpenChannel messages
@@ -115,12 +103,13 @@ func (m *Manager) handleSCTPState(state sctp.AssociationState) {
 }
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
-func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
+func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey) error {
 	m.isOffer = isOffer
 
 	// Start the sctpAssociation
 	m.sctpAssociation.Start(isOffer)
 
+	// Spin up ICE
 	var iceConn *ice.Conn
 	var err error
 	if isOffer {
@@ -135,17 +124,39 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 
 	m.iceConn = iceConn
 
-	// Start DTLS
-	m.dtlsState.Start(isOffer, iceConn)
+	// Spin up SRTP
+	srtpConn := srtp.Wrap(iceConn, m.handleSRTP)
 
-	m.certPairLock.RLock()
-	if !m.isOffer && m.certPair == nil {
-		m.dtlsState.DoHandshake("0.0.0.0", "0.0.0.0")
+	// Spin up DTLS
+	var dtlsConn *dtls.Conn
+	if isOffer {
+		// Assumes we offer to be passive and this is accepted.
+		// TODO: Cert?
+		dtlsConn, err = dtls.Server(srtpConn, dtlsCert, dtlsPrivKey)
+	} else {
+		// Assumes the peer offered to be passive and we accepted.
+		// TODO: Cert?
+		dtlsConn, err = dtls.Dial(srtpConn, dtlsCert, dtlsPrivKey)
 	}
-	m.certPairLock.RUnlock()
 
-	// Temporary networking glue
+	if err != nil {
+		return err
+	}
+
+	m.dtlsConn = dtlsConn
+
+	serverWriteKey, clientWriteKey := dtlsConn.WritePair()
+	m.CreateContextSRTP(serverWriteKey, clientWriteKey, "") // TODO: Profile?
+
+	// TODO: Verify fingerprint
+	// fp, _ := Fingerprint(dtlsConn.RemoteCertificate(), "sha-256")
+	// fmt.Println("TODO: Verify fingerprint:", fp)
+
+	// Temporary networking glue for SCTP
 	go m.networkLoop()
+
+	// Spin up SCTP
+	m.sctpAssociation.Connect()
 
 	return nil
 }
@@ -153,20 +164,17 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string) error {
 // Close cleans up all the allocated state
 func (m *Manager) Close() error {
 	errSCTP := m.sctpAssociation.Close()
-	m.dtlsState.Close()
-	errICE := m.IceAgent.Close() // TODO: combine errors?
+	errDTLS := m.dtlsConn.Close()
+	errICE := m.IceAgent.Close()
 
+	// TODO: better way to combine/handle errors?
 	if errSCTP != nil ||
+		errDTLS != nil ||
 		errICE != nil {
-		return fmt.Errorf("Failed to close: %v, %v", errSCTP, errICE)
+		return fmt.Errorf("Failed to close: %v, %v, %v", errSCTP, errDTLS, errICE)
 	}
 
 	return nil
-}
-
-// DTLSFingerprint generates the fingerprint included in an SessionDescription
-func (m *Manager) DTLSFingerprint() string {
-	return m.dtlsState.Fingerprint()
 }
 
 // SendRTP finds a connected port and sends the passed RTP packet
@@ -305,7 +313,7 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 }
 
 func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	_, err := m.dtlsState.Send(raw, "0.0.0.0", "0.0.0.0")
+	_, err := m.dtlsConn.Write(raw)
 	if err != nil {
 		fmt.Println(err)
 	}
