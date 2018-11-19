@@ -17,12 +17,15 @@ import (
 	"github.com/pions/sdp"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
+
+var pcLog = logging.NewScopedLogger("pc")
 
 // Unknown defines default public constant to use for "enum" like struct
 // comparisons when no value was defined.
@@ -237,6 +240,7 @@ func (pc *RTCPeerConnection) onSignalingStateChange(newState RTCSignalingState) 
 	hdlr := pc.onSignalingStateChangeHandler
 	pc.RUnlock()
 
+	pcLog.Infof("signaling state changed to %s", newState)
 	done = make(chan struct{})
 	if hdlr == nil {
 		close(done)
@@ -264,6 +268,7 @@ func (pc *RTCPeerConnection) onDataChannel(dc *RTCDataChannel) (done chan struct
 	hdlr := pc.onDataChannelHandler
 	pc.RUnlock()
 
+	pcLog.Debugf("got new datachannel: %+v", dc)
 	done = make(chan struct{})
 	if hdlr == nil || dc == nil {
 		close(done)
@@ -293,6 +298,7 @@ func (pc *RTCPeerConnection) onTrack(t *RTCTrack) (done chan struct{}) {
 	hdlr := pc.onTrackHandler
 	pc.RUnlock()
 
+	pcLog.Debugf("got new track: %+v", t)
 	done = make(chan struct{})
 	if hdlr == nil || t == nil {
 		close(done)
@@ -320,6 +326,7 @@ func (pc *RTCPeerConnection) onICEConnectionStateChange(cs ice.ConnectionState) 
 	hdlr := pc.onICEConnectionStateChangeHandler
 	pc.RUnlock()
 
+	pcLog.Infof("ICE connection state changed: %s", cs)
 	done = make(chan struct{})
 	if hdlr == nil {
 		close(done)
@@ -742,7 +749,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			remoteUfrag, remotePwd,
 			cert.x509Cert, cert.privateKey, fingerprint, fingerprintHash)
 		if err != nil {
-			fmt.Println("Failed to start manager", err)
+			pcLog.Warningf("Failed to start manager: %s", err)
 		}
 
 		// Temporary data channel glue
@@ -768,7 +775,7 @@ func (pc *RTCPeerConnection) openDataChannels() {
 				Label:                rtcDC.Label,
 			})
 		if err != nil {
-			fmt.Println("failed to open data channel", err)
+			pcLog.Warningf("failed to open data channel: %s", err)
 			continue
 		}
 		rtcDC.ReadyState = RTCDataChannelStateOpen
@@ -782,7 +789,7 @@ func (pc *RTCPeerConnection) acceptDataChannels() {
 	for {
 		dc, err := pc.networkManager.AcceptDataChannel()
 		if err != nil {
-			fmt.Println("Failed to accept data channel:", err)
+			pcLog.Warningf("Failed to accept data channel: %s", err)
 			// TODO: Kill DataChannel/PeerConnection?
 			return
 		}
@@ -1109,13 +1116,13 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tp
 
 	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
 	if err != nil {
-		fmt.Printf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+		pcLog.Warningf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
 		return nil
 	}
 
 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
-		fmt.Printf("Codec %s in not registered\n", sdpCodec)
+		pcLog.Warningf("Codec %s in not registered\n", sdpCodec)
 		return nil
 	}
 

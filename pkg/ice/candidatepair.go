@@ -1,8 +1,6 @@
 package ice
 
 import (
-	"fmt"
-
 	"github.com/pions/pkg/stun"
 )
 
@@ -34,7 +32,7 @@ func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 	)
 
 	if err != nil {
-		fmt.Println(err)
+		iceLog.Warning(err.Error())
 		return
 	}
 
@@ -44,10 +42,6 @@ func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 func (a *Agent) sendSTUN(msg *stun.Message, local, remote *Candidate) {
 	_, err := local.writeTo(msg.Pack(), remote)
 	if err != nil {
-		// TODO: Determine if we should always drop the err
-		// E.g.: maybe handle for known valid pairs or to
-		// discard pairs faster.
-		_ = err
-		// fmt.Printf("failed to send STUN message: %v", err)
+		iceLog.Warningf("failed to send STUN message: %s", err)
 	}
 }
