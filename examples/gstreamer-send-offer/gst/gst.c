@@ -33,6 +33,9 @@ static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer d
     exit(1);
     break;
   }
+  default:
+    break;
+  }
 
   return TRUE;
 }
@@ -68,7 +71,7 @@ void gstreamer_send_start_pipeline(GstElement *pipeline, int pipelineId) {
   s->pipelineId = pipelineId;
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  gst_bus_add_watch(bus, gstreamer_send_bus_call, NULL);
+  guint bus_watch_id = gst_bus_add_watch(bus, gstreamer_send_bus_call, NULL);
   gst_object_unref(bus);
 
   GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
