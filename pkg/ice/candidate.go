@@ -89,14 +89,14 @@ func (c *Candidate) recvLoop() {
 		if stun.IsSTUN(buffer[:n]) {
 			m, err := stun.NewMessage(buffer[:n])
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err))
+				iceLog.Warningf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
 				continue
 			}
 			err = c.agent.run(func(agent *Agent) {
 				agent.handleInbound(m, c, srcAddr)
 			})
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to handle message: %v", err))
+				iceLog.Warningf("Failed to handle message: %v", err)
 			}
 
 			continue

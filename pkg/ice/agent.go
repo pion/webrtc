@@ -163,14 +163,14 @@ func (a *Agent) gatherCandidatesLocal() {
 		for _, network := range supportedNetworks {
 			conn, err := a.listenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
-				fmt.Printf("could not listen %s %s\n", network, ip)
+				iceLog.Warningf("could not listen %s %s\n", network, ip)
 				continue
 			}
 
 			port := conn.LocalAddr().(*net.UDPAddr).Port
 			c, err := NewCandidateHost(network, ip, port)
 			if err != nil {
-				fmt.Printf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
+				iceLog.Warningf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
 				continue
 			}
 
@@ -192,12 +192,12 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 			case SchemeTypeSTUN:
 				laddr, xoraddr, err := allocateUDP(network, url)
 				if err != nil {
-					fmt.Printf("could not allocate %s %s: %v\n", network, url, err)
+					iceLog.Warningf("could not allocate %s %s: %v\n", network, url, err)
 					continue
 				}
 				conn, err := net.ListenUDP(network, laddr)
 				if err != nil {
-					fmt.Printf("could not listen %s %s: %v\n", network, laddr, err)
+					iceLog.Warningf("could not listen %s %s: %v\n", network, laddr, err)
 				}
 
 				ip := xoraddr.IP
@@ -206,7 +206,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				relPort := laddr.Port
 				c, err := NewCandidateServerReflexive(network, ip, port, relIP, relPort)
 				if err != nil {
-					fmt.Printf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
+					iceLog.Warningf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
 					continue
 				}
 
@@ -218,7 +218,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				c.start(a, conn)
 
 			default:
-				fmt.Printf("scheme %s is not implemented\n", url.Scheme.String())
+				iceLog.Warningf("scheme %s is not implemented\n", url.Scheme)
 				continue
 			}
 		}
@@ -266,6 +266,7 @@ func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remoteP
 	} else if remotePwd == "" {
 		return errors.Errorf("remotePwd is empty")
 	}
+	iceLog.Debugf("Started agent: isControlling? %t, remoteUfrag: %q, remotePwd: %q", isControlling, remoteUfrag, remotePwd)
 
 	return a.run(func(agent *Agent) {
 		agent.isControlling = isControlling
@@ -314,7 +315,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
+		iceLog.Debug(err.Error())
 		return
 	}
 
@@ -335,6 +336,7 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 func (a *Agent) setValidPair(local, remote *Candidate, selected bool) {
 	// TODO: avoid duplicates
 	p := newCandidatePair(local, remote)
+	iceLog.Debugf("Found valid candidate pair: %s <-> %s (selected? %t)", local, remote, selected)
 
 	if selected {
 		a.selectedPair = p
@@ -374,8 +376,10 @@ func (a *Agent) taskLoop() {
 		select {
 		case <-a.connectivityChan:
 			if a.validateSelectedPair() {
+				iceLog.Trace("checking keepalive")
 				a.checkKeepalive()
 			} else {
+				iceLog.Trace("pinging all candidates")
 				a.pingAllCandidates()
 			}
 
@@ -490,7 +494,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					fmt.Printf("Failed to close candidate %s: %v", c, err)
+					iceLog.Warningf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.localCandidates, net)
@@ -499,7 +503,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					fmt.Printf("Failed to close candidate %s: %v", c, err)
+					iceLog.Warningf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.remoteCandidates, net)
@@ -526,7 +530,7 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) *Can
 		ip = a.IP
 		port = a.Port
 	default:
-		fmt.Printf("unsupported address type %T", a)
+		iceLog.Warningf("unsupported address type %T", a)
 		return nil
 	}
 
@@ -555,7 +559,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
 		},
 		&stun.Fingerprint{},
 	); err != nil {
-		fmt.Printf("Failed to handle inbound ICE from: %s to: %s error: %s", local.String(), remote.String(), err.Error())
+		iceLog.Warningf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
 	} else {
 		a.sendSTUN(out, local, remote)
 	}
@@ -563,12 +567,13 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
 
 func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
-		fmt.Println("inbound isControlled && a.isControlling == false")
+		iceLog.Debug("inbound isControlled && a.isControlling == false")
 		return
 	}
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	_, usepair := m.GetOneAttribute(stun.AttrUseCandidate)
+	iceLog.Debugf("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
 	// Remember the working pair and select it when marked with usepair
 	a.setValidPair(localCandidate, remoteCandidate, usepair)
 
@@ -580,12 +585,13 @@ func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteC
 
 func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
-		fmt.Println("inbound isControlling && a.isControlling == true")
+		iceLog.Debug("inbound isControlling && a.isControlling == true")
 		return
 	} else if _, useCandidate := m.GetOneAttribute(stun.AttrUseCandidate); useCandidate && a.isControlling {
-		fmt.Println("useCandidate && a.isControlling == true")
+		iceLog.Debug("useCandidate && a.isControlling == true")
 		return
 	}
+	iceLog.Debugf("got controlling message: %#v", m)
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	// Remember the working pair and select it when receiving a success response
@@ -604,8 +610,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
 	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
 	if remoteCandidate == nil {
-		// TODO debug
-		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
+		iceLog.Debugf("Could not find remote candidate for %s ", remote)
 		return
 	}
 
