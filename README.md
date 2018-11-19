@@ -88,6 +88,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
 * [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
 * [Michael MacDonald](https://github.com/mjmac)
+* [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
 
 ### License
 MIT License - see [LICENSE.md](LICENSE.md) for full text

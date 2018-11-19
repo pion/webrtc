@@ -1,8 +1,7 @@
 language: go
 
 go:
-  - "1.9"
-  - "1.11"
+  - "1.x" # use the latest Go release
 
 notifications:
   email: false
