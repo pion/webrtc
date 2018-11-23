@@ -20,27 +20,6 @@
 
 See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
 
-### Install
-Currently Pion uses CGO and OpenSSL for DTLS. We are actively working on replacing it. For now you have to make sure to install a C compliler and the OpenSSL headers for
-your platform:
-#### Ubuntu/Debian
-`sudo apt-get install libssl-dev`
-#### OSX
-```
-brew install openssl
-export CPATH=`brew --prefix`/opt/openssl/include
-export LIBRARY_PATH=`brew --prefix`/opt/openssl/lib
-go get -u github.com/pions/webrtc
-```
-#### Fedora
-`sudo yum install openssl-devel`
-#### Windows
-1. Install [MSYS2](https://www.msys2.org/)
-2. Download [pkg-config-lite](https://sourceforge.net/projects/pkgconfiglite/) and put `pkg-config.exe` on the `PATH` environment variable.
-3. From the MSYS2 console: Run `pacman -S mingw-w64-x86_64-openssl` to install OpenSSL.
-4. From the MSYS2 console: Run `pacman -S mingw-w64-x86_64-gcc` to install the C compiler.
-5. Set the `PKG_CONFIG_PATH` environment variable. ie. Run the following from the Windows console: `SETX PKG_CONFIG_PATH C:\msys64\mingw64\lib\pkgconfig`, That folder should contain `openssl.pc`.
-
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
 
