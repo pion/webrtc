@@ -721,9 +721,26 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		}
 	}
 
+	fingerprint, ok := desc.parsed.Attribute("fingerprint")
+	if !ok {
+		fingerprint, ok = desc.parsed.MediaDescriptions[0].Attribute("fingerprint")
+		if !ok {
+			return errors.New("could not find fingerprint")
+		}
+	}
+	var fingerprintHash string
+	parts := strings.Split(fingerprint, " ")
+	if len(parts) != 2 {
+		return errors.New("invalid fingerprint")
+	}
+	fingerprint = parts[1]
+	fingerprintHash = parts[0]
+
 	go func() {
 		cert := pc.configuration.Certificates[0] // TODO: handle multiple certs
-		err := pc.networkManager.Start(weOffer, remoteUfrag, remotePwd, cert.x509Cert, cert.privateKey)
+		err := pc.networkManager.Start(weOffer,
+			remoteUfrag, remotePwd,
+			cert.x509Cert, cert.privateKey, fingerprint, fingerprintHash)
 		if err != nil {
 			fmt.Println("Failed to start manager", err)
 		}

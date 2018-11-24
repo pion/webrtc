@@ -67,6 +67,16 @@ type SessionDescription struct {
 	MediaDescriptions []*MediaDescription
 }
 
+// Attribute returns the value of an attribute and if it exists
+func (s *SessionDescription) Attribute(key string) (string, bool) {
+	for _, a := range s.Attributes {
+		if a.Key == key {
+			return a.Value, true
+		}
+	}
+	return "", false
+}
+
 // Version describes the value provided by the "v=" field which gives
 // the version of the Session Description Protocol.
 type Version int

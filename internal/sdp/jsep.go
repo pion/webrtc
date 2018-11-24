@@ -68,13 +68,13 @@ func NewJSEPSessionDescription(identity bool) *SessionDescription {
 
 // WithPropertyAttribute adds a property attribute 'a=key' to the session description
 func (s *SessionDescription) WithPropertyAttribute(key string) *SessionDescription {
-	s.Attributes = append(s.Attributes, Attribute(key))
+	s.Attributes = append(s.Attributes, NewPropertyAttribute(key))
 	return s
 }
 
 // WithValueAttribute adds a value attribute 'a=key:value' to the session description
 func (s *SessionDescription) WithValueAttribute(key, value string) *SessionDescription {
-	s.Attributes = append(s.Attributes, Attribute(fmt.Sprintf("%s:%s", key, value)))
+	s.Attributes = append(s.Attributes, NewAttribute(key, value))
 	return s
 }
 
@@ -112,13 +112,13 @@ func NewJSEPMediaDescription(codecType string, codecPrefs []string) *MediaDescri
 
 // WithPropertyAttribute adds a property attribute 'a=key' to the media description
 func (d *MediaDescription) WithPropertyAttribute(key string) *MediaDescription {
-	d.Attributes = append(d.Attributes, Attribute(key))
+	d.Attributes = append(d.Attributes, NewPropertyAttribute(key))
 	return d
 }
 
 // WithValueAttribute adds a value attribute 'a=key:value' to the media description
 func (d *MediaDescription) WithValueAttribute(key, value string) *MediaDescription {
-	d.Attributes = append(d.Attributes, Attribute(fmt.Sprintf("%s:%s", key, value)))
+	d.Attributes = append(d.Attributes, NewAttribute(key, value))
 	return d
 }
 

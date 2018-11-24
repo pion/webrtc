@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/pions/webrtc/internal/network"
+	"github.com/pions/dtls/pkg/dtls"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
@@ -89,19 +89,24 @@ func (c RTCCertificate) Expires() time.Time {
 	return c.x509Cert.NotAfter
 }
 
+var FingerprintAlgorithms = []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
+
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
 func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
-	res := make([]RTCDtlsFingerprint, len(network.FingerprintAlgoritms))
+	res := make([]RTCDtlsFingerprint, len(FingerprintAlgorithms))
 
 	i := 0
-	for _, algo := range network.FingerprintAlgoritms {
-		value, err := network.Fingerprint(c.x509Cert, algo)
+	for _, algo := range FingerprintAlgorithms {
+		value, err := dtls.Fingerprint(c.x509Cert, algo)
 		if err != nil {
 			fmt.Printf("Failed to create fingerprint: %v\n", err)
 			continue
 		}
-		res[i] = RTCDtlsFingerprint{Algorithm: algo, Value: value}
+		res[i] = RTCDtlsFingerprint{
+			Algorithm: algo.String(),
+			Value:     value,
+		}
 	}
 
 	return res[:i+1]

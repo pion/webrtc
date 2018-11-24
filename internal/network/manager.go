@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/pions/dtls/pkg/dtls"
@@ -102,7 +103,10 @@ func (m *Manager) handleSCTPState(state sctp.AssociationState) {
 }
 
 // Start allocates DTLS/ICE state that is dependent on if we are offering or answering
-func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey) error {
+func (m *Manager) Start(isOffer bool,
+	remoteUfrag, remotePwd string,
+	dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
+
 	m.isOffer = isOffer
 
 	// Start the sctpAssociation
@@ -130,11 +134,9 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string, dtlsCert *x
 	var dtlsConn *dtls.Conn
 	if isOffer {
 		// Assumes we offer to be passive and this is accepted.
-		// TODO: Cert?
 		dtlsConn, err = dtls.Server(srtpConn, dtlsCert, dtlsPrivKey)
 	} else {
 		// Assumes the peer offered to be passive and we accepted.
-		// TODO: Cert?
 		dtlsConn, err = dtls.Dial(srtpConn, dtlsCert, dtlsPrivKey)
 	}
 
@@ -152,9 +154,21 @@ func (m *Manager) Start(isOffer bool, remoteUfrag, remotePwd string, dtlsCert *x
 		panic(err)
 	}
 
-	// TODO: Verify fingerprint
-	// fp, _ := Fingerprint(dtlsConn.RemoteCertificate(), "sha-256")
-	// fmt.Println("TODO: Verify fingerprint:", fp)
+	// Check the fingerprint if a certificate was exchanged
+	cert := dtlsConn.RemoteCertificate()
+	if cert != nil {
+		var hashAlgo dtls.HashAlgorithm
+		hashAlgo, err = dtls.HashAlgorithmString(fingerprintHash)
+
+		var fp string
+		fp, err = dtls.Fingerprint(cert, hashAlgo)
+
+		if strings.ToUpper(fp) != fingerprint {
+			return fmt.Errorf("invalid fingerprint: %s <> %s", fp, fingerprint)
+		}
+	} else {
+		fmt.Println("Warning: Certificate not checked")
+	}
 
 	// Temporary networking glue for SCTP
 	go m.networkLoop()

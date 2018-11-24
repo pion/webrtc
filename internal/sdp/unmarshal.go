@@ -782,7 +782,15 @@ func unmarshalSessionAttribute(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
-	l.desc.Attributes = append(l.desc.Attributes, Attribute(value))
+	i := strings.IndexRune(value, ':')
+	var a Attribute
+	if i > 0 {
+		a = NewAttribute(value[:i], value[i+1:])
+	} else {
+		a = NewPropertyAttribute(value)
+	}
+
+	l.desc.Attributes = append(l.desc.Attributes, a)
 	return s11, nil
 }
 
@@ -905,8 +913,16 @@ func unmarshalMediaAttribute(l *lexer) (stateFn, error) {
 		return nil, err
 	}
 
+	i := strings.IndexRune(value, ':')
+	var a Attribute
+	if i > 0 {
+		a = NewAttribute(value[:i], value[i+1:])
+	} else {
+		a = NewPropertyAttribute(value)
+	}
+
 	latestMediaDesc := l.desc.MediaDescriptions[len(l.desc.MediaDescriptions)-1]
-	latestMediaDesc.Attributes = append(latestMediaDesc.Attributes, Attribute(value))
+	latestMediaDesc.Attributes = append(latestMediaDesc.Attributes, a)
 	return s14, nil
 }
 
