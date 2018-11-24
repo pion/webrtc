@@ -1153,11 +1153,10 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 	if codecs := pc.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
 		return false
 	}
-	localUfrag, localPwd := pc.networkManager.IceAgent.GetLocalUserCredentials()
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
-		WithICECredentials(localUfrag, localPwd).
+		WithICECredentials(pc.networkManager.IceAgent.GetLocalUserCredentials()).
 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
@@ -1187,8 +1186,6 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 }
 
 func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string, dtlsRole sdp.ConnectionRole) {
-	localUfrag, localPwd := pc.networkManager.IceAgent.GetLocalUserCredentials()
-
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   "application",
@@ -1208,7 +1205,7 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
-		WithICECredentials(localUfrag, localPwd)
+		WithICECredentials(pc.networkManager.IceAgent.GetLocalUserCredentials())
 
 	for _, c := range candidates {
 		media.WithCandidate(c)
