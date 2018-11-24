@@ -82,9 +82,30 @@ func (s *EncryptionKey) String() *string {
 
 // Attribute describes the "a=" field which represents the primary means for
 // extending SDP.
-type Attribute string
+type Attribute struct {
+	Key   string
+	Value string
+}
+
+// NewPropertyAttribute constructs a new attribute
+func NewPropertyAttribute(key string) Attribute {
+	return Attribute{
+		Key: key,
+	}
+}
+
+// NewAttribute constructs a new attribute
+func NewAttribute(key, value string) Attribute {
+	return Attribute{
+		Key:   key,
+		Value: value,
+	}
+}
 
 func (a *Attribute) String() *string {
-	output := string(*a)
+	output := a.Key
+	if len(a.Value) > 0 {
+		output += ":" + a.Value
+	}
 	return &output
 }

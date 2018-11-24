@@ -35,6 +35,16 @@ type MediaDescription struct {
 	Attributes []Attribute
 }
 
+// Attribute returns the value of an attribute and if it exists
+func (s *MediaDescription) Attribute(key string) (string, bool) {
+	for _, a := range s.Attributes {
+		if a.Key == key {
+			return a.Value, true
+		}
+	}
+	return "", false
+}
+
 // RangedPort supports special format for the media field "m=" port value. If
 // it may be necessary to specify multiple transport ports, the protocol allows
 // to write it as: <port>/<number of ports> where number of ports is a an
