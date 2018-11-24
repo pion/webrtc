@@ -15,7 +15,7 @@ import (
 // Examples represents the examples loaded from examples.json.
 type Examples []Example
 
-// Examples represents an example loaded from examples.json.
+// Example represents an example loaded from examples.json.
 type Example struct {
 	Title       string `json:"title"`
 	Link        string `json:"link"`
@@ -83,10 +83,10 @@ func serve(addr string) error {
 // getExamples loads the examples from the examples.json file.
 func getExamples() (*Examples, error) {
 	file, err := os.Open("./examples.json")
-	defer file.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list examples (please run in the examples folder): %v", err)
 	}
+	defer file.Close()
 
 	var examples Examples
 	err = json.NewDecoder(file).Decode(&examples)

@@ -36,13 +36,13 @@ func main() {
 	})
 
 	// Create a audio track
-	opusTrack, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
+	opusTrack, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
 	util.Check(err)
 	_, err = peerConnection.AddTrack(opusTrack)
 	util.Check(err)
 
 	// Create a video track
-	vp8Track, err := peerConnection.NewRTCTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+	vp8Track, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
 	util.Check(err)
 	_, err = peerConnection.AddTrack(vp8Track)
 	util.Check(err)
