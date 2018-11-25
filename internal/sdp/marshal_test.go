@@ -109,8 +109,8 @@ func TestMarshalCanonical(t *testing.T) {
 		},
 		EncryptionKey: &(&struct{ x EncryptionKey }{"prompt"}).x,
 		Attributes: []Attribute{
-			Attribute("candidate:0 1 UDP 2113667327 203.0.113.1 54400 typ host"),
-			Attribute("recvonly"),
+			NewAttribute("candidate:0 1 UDP 2113667327 203.0.113.1 54400 typ host", ""),
+			NewAttribute("recvonly", ""),
 		},
 		MediaDescriptions: []*MediaDescription{
 			{
@@ -139,7 +139,7 @@ func TestMarshalCanonical(t *testing.T) {
 				},
 				EncryptionKey: &(&struct{ x EncryptionKey }{"prompt"}).x,
 				Attributes: []Attribute{
-					Attribute("sendrecv"),
+					NewAttribute("sendrecv", ""),
 				},
 			},
 			{
@@ -152,7 +152,7 @@ func TestMarshalCanonical(t *testing.T) {
 					Formats: []int{99},
 				},
 				Attributes: []Attribute{
-					Attribute("rtpmap:99 h263-1998/90000"),
+					NewAttribute("rtpmap:99 h263-1998/90000", ""),
 				},
 			},
 		},

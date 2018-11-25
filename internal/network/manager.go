@@ -148,20 +148,24 @@ func (m *Manager) Start(isOffer bool,
 
 	keyingMaterial, err := dtlsConn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	if err := m.CreateContextSRTP(keyingMaterial); err != nil {
-		panic(err)
+	if err = m.CreateContextSRTP(keyingMaterial); err != nil {
+		return err
 	}
 
 	// Check the fingerprint if a certificate was exchanged
 	cert := dtlsConn.RemoteCertificate()
 	if cert != nil {
-		var hashAlgo dtls.HashAlgorithm
-		hashAlgo, err = dtls.HashAlgorithmString(fingerprintHash)
+		hashAlgo, err := dtls.HashAlgorithmString(fingerprintHash)
+		if err != nil {
+			return err
+		}
 
-		var fp string
-		fp, err = dtls.Fingerprint(cert, hashAlgo)
+		fp, err := dtls.Fingerprint(cert, hashAlgo)
+		if err != nil {
+			return err
+		}
 
 		if strings.ToUpper(fp) != fingerprint {
 			return fmt.Errorf("invalid fingerprint: %s <> %s", fp, fingerprint)
