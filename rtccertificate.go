@@ -89,15 +89,15 @@ func (c RTCCertificate) Expires() time.Time {
 	return c.x509Cert.NotAfter
 }
 
-var FingerprintAlgorithms = []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
+var fingerprintAlgorithms = []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
 
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
 func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
-	res := make([]RTCDtlsFingerprint, len(FingerprintAlgorithms))
+	res := make([]RTCDtlsFingerprint, len(fingerprintAlgorithms))
 
 	i := 0
-	for _, algo := range FingerprintAlgorithms {
+	for _, algo := range fingerprintAlgorithms {
 		value, err := dtls.Fingerprint(c.x509Cert, algo)
 		if err != nil {
 			fmt.Printf("Failed to create fingerprint: %v\n", err)
