@@ -181,9 +181,16 @@ func (m *Manager) Start(isOffer bool,
 
 // Close cleans up all the allocated state
 func (m *Manager) Close() error {
-	errSCTP := m.sctpAssociation.Close()
-	errDTLS := m.dtlsConn.Close()
-	errICE := m.IceAgent.Close()
+	var errSCTP, errDTLS, errICE error
+	if m.sctpAssociation != nil {
+		errSCTP = m.sctpAssociation.Close()
+	}
+	if m.dtlsConn != nil {
+		errDTLS = m.dtlsConn.Close()
+	}
+	if m.IceAgent != nil {
+		errICE = m.IceAgent.Close()
+	}
 
 	// TODO: better way to combine/handle errors?
 	if errSCTP != nil ||
@@ -331,8 +338,7 @@ func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16
 }
 
 func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	_, err := m.dtlsConn.Write(raw)
-	if err != nil {
+	if _, err := m.dtlsConn.Write(raw); err != nil {
 		fmt.Println(err)
 	}
 }
