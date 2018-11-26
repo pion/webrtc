@@ -17,7 +17,5 @@ Connection State has changed Checking
 Connection State has changed Connected
 Got VP8 track, saving to disk as output.ivf
 ```
-Currently pion-WebRTC doesn't implement DTLS retransmissions so audio/video may not start successfully, and Janus will timeout with a DTLS error. Issue [#175](https://github.com/pions/webrtc/issues/175) is tracking this.
-If video does start in under 3 seconds stop and start the example again, this may take a few tries.
 
-If video did start successfully you will see output.ivf in the current folder.
+You will see output.ivf in the current folder.
