@@ -9,12 +9,13 @@ type PacketType uint8
 
 // RTCP packet types registered with IANA. See: https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml#rtp-parameters-4
 const (
-	TypeSenderReport            PacketType = 200 // RFC 3550, 6.4.1
-	TypeReceiverReport          PacketType = 201 // RFC 3550, 6.4.2
-	TypeSourceDescription       PacketType = 202 // RFC 3550, 6.5
-	TypeGoodbye                 PacketType = 203 // RFC 3550, 6.6
-	TypeApplicationDefined      PacketType = 204 // RFC 3550, 6.7 (unimplemented)
-	TypePayloadSpecificFeedback PacketType = 206 // RFC 4585, 6.3
+	TypeSenderReport                  PacketType = 200 // RFC 3550, 6.4.1
+	TypeReceiverReport                PacketType = 201 // RFC 3550, 6.4.2
+	TypeSourceDescription             PacketType = 202 // RFC 3550, 6.5
+	TypeGoodbye                       PacketType = 203 // RFC 3550, 6.6
+	TypeApplicationDefined            PacketType = 204 // RFC 3550, 6.7 (unimplemented)
+	TypeTransportSpecificFeedback     PacketType = 205 // RFC 4585, 6051
+	TypePayloadSpecificFeedback       PacketType = 206 // RFC 4585, 6.3
 
 )
 
@@ -30,6 +31,8 @@ func (p PacketType) String() string {
 		return "BYE"
 	case TypeApplicationDefined:
 		return "APP"
+	case TypeTransportSpecificFeedback:
+		return "TSFB"
 	case TypePayloadSpecificFeedback:
 		return "PSFB"
 	default:

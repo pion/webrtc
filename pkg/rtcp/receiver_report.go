@@ -61,6 +61,7 @@ func (r ReceiverReport) Marshal() ([]byte, error) {
 		rawPacket = append(rawPacket, data...)
 	}
 
+
 	if len(r.Reports) > countMax {
 		return nil, errTooManyReports
 	}
@@ -125,7 +126,7 @@ func (r *ReceiverReport) Unmarshal(rawPacket []byte) error {
 
 	r.SSRC = binary.BigEndian.Uint32(rawPacket[rrSSRCOffset:])
 
-	for i := rrReportOffset; i < len(rawPacket); i += receptionReportLength {
+	for i := rrReportOffset; i < len(rawPacket) && len(r.Reports) < int(h.Count); i += receptionReportLength {
 		var rr ReceptionReport
 		if err := rr.Unmarshal(rawPacket[i:]); err != nil {
 			return err

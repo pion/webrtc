@@ -3,6 +3,7 @@ package webrtc
 import (
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pions/webrtc/pkg/rtcp"
 )
 
 // RTCTrack represents a track that is communicated
@@ -14,6 +15,7 @@ type RTCTrack struct {
 	Ssrc        uint32
 	Codec       *RTCRtpCodec
 	Packets     <-chan *rtp.Packet
+	RtcpPackets <-chan *rtcp.PacketWithHeader
 	Samples     chan<- media.RTCSample
 	RawRTP      chan<- *rtp.Packet
 }
