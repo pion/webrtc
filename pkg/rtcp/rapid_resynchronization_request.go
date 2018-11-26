@@ -4,24 +4,24 @@ import (
 	"encoding/binary"
 )
 
-// The PictureLossIndication packet informs the encoder about the loss of an undefined amount of coded video data belonging to one or more pictures
-type PictureLossIndication struct {
+// The RapidResynchronizationRequest packet informs the encoder about the loss of an undefined amount of coded video data belonging to one or more pictures
+type RapidResynchronizationRequest struct {
 	// SSRC of sender
 	SenderSSRC uint32
 
-	// SSRC where the loss was experienced
+	// SSRC of the media source
 	MediaSSRC uint32
 }
 
 const (
-	pliFMT    = 1
-	pliLength = 2
+	rrrFMT    = 5
+	rrrLength = 2
 )
 
-// Marshal encodes the PictureLossIndication in binary
-func (p PictureLossIndication) Marshal() ([]byte, error) {
+// Marshal encodes the RapidResynchronizationRequest in binary
+func (p RapidResynchronizationRequest) Marshal() ([]byte, error) {
 	/*
-	 * PLI does not require parameters.  Therefore, the length field MUST be
+	 * RRR does not require parameters.  Therefore, the length field MUST be
 	 * 2, and there MUST NOT be any Feedback Control Information.
 	 *
 	 * The semantics of this FB message is independent of the payload type.
@@ -31,9 +31,9 @@ func (p PictureLossIndication) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint32(rawPacket[4:], p.MediaSSRC)
 
 	h := Header{
-		Count:  pliFMT,
-		Type:   TypePayloadSpecificFeedback,
-		Length: pliLength,
+		Count:  rrrFMT,
+		Type:   TypeTransportSpecificFeedback,
+		Length: rrrLength,
 	}
 	hData, err := h.Marshal()
 	if err != nil {
@@ -43,8 +43,9 @@ func (p PictureLossIndication) Marshal() ([]byte, error) {
 	return append(hData, rawPacket...), nil
 }
 
-// Unmarshal decodes the PictureLossIndication from binary
-func (p *PictureLossIndication) Unmarshal(rawPacket []byte) error {
+// Unmarshal decodes the RapidResynchronizationRequest from binary
+func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
+	
 	if len(rawPacket) < (headerLength + (ssrcLength * 2)) {
 		return errPacketTooShort
 	}
@@ -54,7 +55,7 @@ func (p *PictureLossIndication) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypePayloadSpecificFeedback || h.Count != 1 {
+	if h.Type != TypeTransportSpecificFeedback || h.Count != 1 {		
 		return errWrongType
 	}
 

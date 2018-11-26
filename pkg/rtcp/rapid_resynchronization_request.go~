@@ -54,7 +54,7 @@ func (p *PictureLossIndication) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypePayloadSpecificFeedback || h.Count != 1 {
+	if h.Type != TypePayloadSpecificFeedback || h.Count != pliFMT {
 		return errWrongType
 	}
 

@@ -1008,7 +1008,7 @@ func (pc *RTCPeerConnection) Close() error {
 }
 
 /* Everything below is private */
-func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (buffers chan<- *rtp.Packet) {
+func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.Transportpair) {
 	pc.RLock()
 	if pc.onTrackHandler == nil {
 		pc.RUnlock()
@@ -1028,22 +1028,24 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (bu
 		return nil
 	}
 
-	bufferTransport := make(chan *rtp.Packet, 15)
+	rtpTransport := make(chan *rtp.Packet, 15)
+	rtcpTransport := make(chan *rtcp.PacketWithHeader, 15)
 
 	track := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          "0", // TODO extract from remoteDescription
-		Label:       "",  // TODO extract from remoteDescription
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Packets:     bufferTransport,
+		PayloadType:     payloadType,
+		Kind:            codec.Type,
+		ID:              "0", // TODO extract from remoteDescription
+		Label:           "",  // TODO extract from remoteDescription
+		Ssrc:            ssrc,
+		Codec:           codec,
+		Packets:         rtpTransport,
+		RtcpPackets:     rtcpTransport,
 	}
 
 	// TODO: Register the receiving Track
 
 	pc.onTrack(track)
-	return bufferTransport
+	return &network.Transportpair{rtpTransport, rtcpTransport}
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
@@ -1200,6 +1202,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
 	rawPackets := make(chan *rtp.Packet)
+	rtcpPackets := make(chan *rtcp.PacketWithHeader)
 	if ssrc == 0 {
 		buf := make([]byte, 4)
 		_, err = rand.Read(buf)
@@ -1246,9 +1249,12 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		Label:       label,
 		Ssrc:        ssrc,
 		Codec:       codec,
+		RtcpPackets: rtcpPackets,
 		Samples:     trackInput,
 		RawRTP:      rawPackets,
 	}
+
+	pc.networkManager.AddTransportPair(ssrc, nil, rtcpPackets)
 
 	return t, nil
 }

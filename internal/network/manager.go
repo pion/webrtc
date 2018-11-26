@@ -12,8 +12,14 @@ import (
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pkg/errors"
 )
+
+type Transportpair struct {
+	Rtp chan<- *rtp.Packet
+	Rtcp chan<- *rtcp.PacketWithHeader
+}
 
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
@@ -30,7 +36,7 @@ type Manager struct {
 	dataChannelEventHandler DataChannelEventHandler
 
 	bufferTransportGenerator BufferTransportGenerator
-	bufferTransports         map[uint32]chan<- *rtp.Packet
+	bufferTransportPairs     map[uint32]*Transportpair
 
 	srtpInboundContextLock sync.RWMutex
 	srtpInboundContext     *srtp.Context
@@ -44,11 +50,20 @@ type Manager struct {
 	ports     []*port
 }
 
+func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- *rtcp.PacketWithHeader) {
+	bufferTransport := m.bufferTransportPairs[ssrc]
+	if bufferTransport == nil {
+		bufferTransport = &Transportpair{Rtp, Rtcp}
+		m.bufferTransportPairs[ssrc] = bufferTransport
+	}
+}
+
+
 // NewManager creates a new network.Manager
 func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
 	m = &Manager{
 		iceNotifier:              ntf,
-		bufferTransports:         make(map[uint32]chan<- *rtp.Packet),
+		bufferTransportPairs:     make(map[uint32]*Transportpair),
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
@@ -78,6 +93,22 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	}
 
 	return m, err
+}
+
+func (m *Manager) getBufferTransports(ssrc uint32) *Transportpair {
+	fmt.Println(m.bufferTransportPairs)
+	return m.bufferTransportPairs[ssrc]
+}
+
+func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *Transportpair {
+	bufferTransport := m.bufferTransportPairs[ssrc]
+	if bufferTransport == nil {
+		bufferTransport = m.bufferTransportGenerator(ssrc, payloadtype)
+		fmt.Printf("CREATE FOR %x %v\n", ssrc, bufferTransport)
+		m.bufferTransportPairs[ssrc] = bufferTransport
+	}
+
+	return bufferTransport
 }
 
 func (m *Manager) handleDTLSState(state dtls.ConnectionState) {

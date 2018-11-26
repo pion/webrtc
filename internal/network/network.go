@@ -3,12 +3,11 @@ package network
 import (
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 // BufferTransportGenerator generates a new channel for the associated SSRC
 // This channel is used to send RTP packets to users of pion-WebRTC
-type BufferTransportGenerator func(uint32, uint8) chan<- *rtp.Packet
+type BufferTransportGenerator func(uint32, uint8) *Transportpair
 
 // ICENotifier notifies the RTCPeerConnection if ICE state has changed
 type ICENotifier func(ice.ConnectionState)
