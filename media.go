@@ -2,8 +2,8 @@ package webrtc
 
 import (
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pions/webrtc/pkg/rtcp"
+	"github.com/pions/webrtc/pkg/rtp"
 )
 
 // RTCTrack represents a track that is communicated

@@ -6,20 +6,24 @@ type Packet interface {
 	Unmarshal(rawPacket []byte) error
 }
 
+// PacketWithHeader is a pair to represent an RTCP header and it's
+// packet's polymorphic parsed and unparsed forms.
 type PacketWithHeader struct {
- 	Header
+	Header
 	Packet
 	RawPacket []byte
 }
 
+//Marshal a PakcetWithHeader to a bytearray
 func (p PacketWithHeader) Marshal() ([]byte, error) {
 	return p.Packet.Marshal()
 }
 
+//Unmarshal a bytearray to a header-packet pair
 func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 
 	p.RawPacket = rawPacket
-	
+
 	if err := p.Header.Unmarshal(rawPacket); err != nil {
 		return err
 	}
@@ -28,7 +32,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypeSenderReport:
 		sr := new(SenderReport)
 		err := sr.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = sr
 		} else {
 			return err
@@ -36,7 +40,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypeReceiverReport:
 		rr := new(ReceiverReport)
 		err := rr.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = rr
 		} else {
 			return err
@@ -44,7 +48,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypeSourceDescription:
 		sdes := new(SourceDescription)
 		err := sdes.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = sdes
 		} else {
 			return err
@@ -52,7 +56,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypeGoodbye:
 		bye := new(Goodbye)
 		err := bye.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = bye
 		} else {
 			return err
@@ -60,7 +64,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypeTransportSpecificFeedback:
 		rrr := new(RapidResynchronizationRequest)
 		err := rrr.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = rrr
 		} else {
 			return err
@@ -68,7 +72,7 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 	case TypePayloadSpecificFeedback:
 		psfb := new(PictureLossIndication)
 		err := psfb.Unmarshal(rawPacket)
-		if (err == nil) {
+		if err == nil {
 			p.Packet = psfb
 		} else {
 			return err
@@ -77,6 +81,5 @@ func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
 		return errWrongType
 	}
 
-	
 	return nil
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/pions/webrtc/internal/dtls"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pions/webrtc/pkg/rtcp"
+	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 
@@ -36,58 +36,52 @@ func (p *port) handleSRTP(buffer []byte) {
 			return
 		}
 
-
 		if rtcpPacketType >= 192 && rtcpPacketType <= 223 {
 			decrypted, err := p.m.srtpInboundContext.DecryptRTCP(buffer)
 			if err != nil {
 				fmt.Println(err)
 				fmt.Println(decrypted)
 				return
-			} else {
+			}
+			{
 				var report rtcp.PacketWithHeader
 				err = report.Unmarshal(decrypted)
-				if (err != nil) {
+				if err != nil {
 					fmt.Println(err)
 					return
-				} else {
-					
-					f := func(ssrc uint32) {
-						bufferTransport := p.m.getBufferTransports(ssrc)
-						fmt.Printf("send to %x, %v\n", ssrc, bufferTransport);
-						if bufferTransport != nil {
-							select {
-							case bufferTransport.Rtcp <- &report:
-							default:
-							}
+				}
+
+				f := func(ssrc uint32) {
+					bufferTransport := p.m.getBufferTransports(ssrc)
+					if bufferTransport != nil && bufferTransport.Rtcp != nil {
+						select {
+						case bufferTransport.Rtcp <- &report:
+						default:
 						}
 					}
-					
-					switch report.Header.Type {
-					case rtcp.TypeSenderReport:
-						for _, ssrc := range report.Packet.(*rtcp.SenderReport).Reports {
-							f(ssrc.SSRC)
-						}
-					case rtcp.TypeReceiverReport:
-						for _, ssrc := range report.Packet.(*rtcp.ReceiverReport).Reports {
-							fmt.Println("ssrc ", ssrc.SSRC);
-							f(ssrc.SSRC)
-						}
-					case rtcp.TypeSourceDescription:
-						for _, ssrc := range report.Packet.(*rtcp.SourceDescription).Chunks {
-							f(ssrc.Source)
-						}
-					case rtcp.TypeGoodbye:
-						for _, ssrc := range report.Packet.(*rtcp.Goodbye).Sources {
-							f(ssrc)
-						}
-					case rtcp.TypeTransportSpecificFeedback:
-						f(report.Packet.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
-					case rtcp.TypePayloadSpecificFeedback:
-						f(report.Packet.(*rtcp.PictureLossIndication).MediaSSRC)
+				}
+
+				switch report.Header.Type {
+				case rtcp.TypeSenderReport:
+					for _, ssrc := range report.Packet.(*rtcp.SenderReport).Reports {
+						f(ssrc.SSRC)
 					}
-
-
-					
+				case rtcp.TypeReceiverReport:
+					for _, ssrc := range report.Packet.(*rtcp.ReceiverReport).Reports {
+						f(ssrc.SSRC)
+					}
+				case rtcp.TypeSourceDescription:
+					for _, ssrc := range report.Packet.(*rtcp.SourceDescription).Chunks {
+						f(ssrc.Source)
+					}
+				case rtcp.TypeGoodbye:
+					for _, ssrc := range report.Packet.(*rtcp.Goodbye).Sources {
+						f(ssrc)
+					}
+				case rtcp.TypeTransportSpecificFeedback:
+					f(report.Packet.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
+				case rtcp.TypePayloadSpecificFeedback:
+					f(report.Packet.(*rtcp.PictureLossIndication).MediaSSRC)
 				}
 			}
 			return
@@ -106,7 +100,7 @@ func (p *port) handleSRTP(buffer []byte) {
 	}
 
 	bufferTransport := p.m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
-	if bufferTransport != nil {
+	if bufferTransport != nil && bufferTransport.Rtp != nil {
 		select {
 		case bufferTransport.Rtp <- packet:
 		default:

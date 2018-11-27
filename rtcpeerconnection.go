@@ -1032,20 +1032,20 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tp
 	rtcpTransport := make(chan *rtcp.PacketWithHeader, 15)
 
 	track := &RTCTrack{
-		PayloadType:     payloadType,
-		Kind:            codec.Type,
-		ID:              "0", // TODO extract from remoteDescription
-		Label:           "",  // TODO extract from remoteDescription
-		Ssrc:            ssrc,
-		Codec:           codec,
-		Packets:         rtpTransport,
-		RtcpPackets:     rtcpTransport,
+		PayloadType: payloadType,
+		Kind:        codec.Type,
+		ID:          "0", // TODO extract from remoteDescription
+		Label:       "",  // TODO extract from remoteDescription
+		Ssrc:        ssrc,
+		Codec:       codec,
+		Packets:     rtpTransport,
+		RtcpPackets: rtcpTransport,
 	}
 
 	// TODO: Register the receiving Track
 
 	pc.onTrack(track)
-	return &network.Transportpair{rtpTransport, rtcpTransport}
+	return &network.Transportpair{Rtp: rtpTransport, Rtcp: rtcpTransport}
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
