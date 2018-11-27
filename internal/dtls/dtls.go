@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"sync"
 	"unsafe"
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
 )
@@ -126,18 +127,18 @@ func (s *State) Close() {
 // Fingerprint generates a SHA-256 fingerprint of the certificate
 func (s *State) Fingerprint() string {
 	cfg := s.tlscfg
-	if cfg == nil{
+	if cfg == nil {
 		return ""
 	}
 	var size uint
 	var fingerprint [C.EVP_MAX_MD_SIZE]byte
 	sizePtr := unsafe.Pointer(&size)
 	fingerprintPtr := unsafe.Pointer(&fingerprint)
-	if C.X509_digest(cfg.cert, C.EVP_sha256(), (*C.uchar)(fingerprintPtr), (*C.uint)(sizePtr)) == 0{
+	if C.X509_digest(cfg.cert, C.EVP_sha256(), (*C.uchar)(fingerprintPtr), (*C.uint)(sizePtr)) == 0 {
 		return ""
 	}
 	var hexFingerprint string
-	for i := uint(0); i < size; i++{
+	for i := uint(0); i < size; i++ {
 		hexFingerprint += fmt.Sprintf("%.2X:", fingerprint[i])
 	}
 	hexFingerprint = hexFingerprint[:len(hexFingerprint)-1]
@@ -259,4 +260,3 @@ func RemoveListener(src string) {
 	delete(listenerMap, src)
 	listenerMapLock.Unlock()
 }
-

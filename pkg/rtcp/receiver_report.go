@@ -61,7 +61,6 @@ func (r ReceiverReport) Marshal() ([]byte, error) {
 		rawPacket = append(rawPacket, data...)
 	}
 
-
 	if len(r.Reports) > countMax {
 		return nil, errTooManyReports
 	}

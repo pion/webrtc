@@ -11,13 +11,15 @@ import (
 	webrtcStun "github.com/pions/webrtc/internal/stun"
 	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pions/webrtc/pkg/rtcp"
+	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 
+// Transportpair allows the application to be notified about both Rtp
+// and Rtcp messages incoming from the remote host
 type Transportpair struct {
-	Rtp chan<- *rtp.Packet
+	Rtp  chan<- *rtp.Packet
 	Rtcp chan<- *rtcp.PacketWithHeader
 }
 
@@ -50,6 +52,8 @@ type Manager struct {
 	ports     []*port
 }
 
+//AddTransportPair notifies the network manager that an RTCTrack has
+//been created externally, and packets may be incoming with this ssrc
 func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- *rtcp.PacketWithHeader) {
 	bufferTransport := m.bufferTransportPairs[ssrc]
 	if bufferTransport == nil {
@@ -57,7 +61,6 @@ func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp cha
 		m.bufferTransportPairs[ssrc] = bufferTransport
 	}
 }
-
 
 // NewManager creates a new network.Manager
 func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {

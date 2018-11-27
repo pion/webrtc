@@ -45,7 +45,7 @@ func (p RapidResynchronizationRequest) Marshal() ([]byte, error) {
 
 // Unmarshal decodes the RapidResynchronizationRequest from binary
 func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
-	
+
 	if len(rawPacket) < (headerLength + (ssrcLength * 2)) {
 		return errPacketTooShort
 	}
@@ -55,7 +55,7 @@ func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypeTransportSpecificFeedback || h.Count != 1 {		
+	if h.Type != TypeTransportSpecificFeedback || h.Count != 1 {
 		return errWrongType
 	}
 
