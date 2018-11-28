@@ -55,7 +55,7 @@ func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypeTransportSpecificFeedback || h.Count != 1 {
+	if h.Type != TypeTransportSpecificFeedback || h.Count != rrrFMT {
 		return errWrongType
 	}
 

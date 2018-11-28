@@ -5,6 +5,8 @@ import (
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // An RTCP packet from a packet dump
@@ -53,6 +55,20 @@ var realPacket = []byte{
 	0x81, 0xcb, 0x0, 0x1,
 	// source=0x902f9e2e
 	0x90, 0x2f, 0x9e, 0x2e,
+
+	// Picture Loss Indication (offset=92)
+	0x81, 0xce, 0x0, 0x2,
+	// sender=0x902f9e2e
+	0x90, 0x2f, 0x9e, 0x2e,
+	// media=0x902f9e2e
+	0x90, 0x2f, 0x9e, 0x2e,
+
+	// RapidResynchronizationRequest (offset=104)
+	0x85, 0xcd, 0x0, 0x2,
+	// sender=0x902f9e2e
+	0x90, 0x2f, 0x9e, 0x2e,
+	// media=0x902f9e2e
+	0x90, 0x2f, 0x9e, 0x2e,
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -63,11 +79,13 @@ func TestUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read rr: %v", err)
 	}
-	var rr ReceiverReport
-	if err = rr.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal rr: %v", err)
+	var pwh PacketWithHeader
+	if err = pwh.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal pwh: %v", err)
 	}
-	wantRR := ReceiverReport{
+	assert.IsType(t, pwh.Packet, (*ReceiverReport)(nil), "Unmarshalled to incorrect type")
+
+	wantRR := &ReceiverReport{
 		SSRC: 0x902f9e2e,
 		Reports: []ReceptionReport{{
 			SSRC:               0xbc5e9a40,
@@ -79,7 +97,7 @@ func TestUnmarshal(t *testing.T) {
 			Delay:              150137,
 		}},
 	}
-	if got, want := wantRR, rr; !reflect.DeepEqual(got, want) {
+	if got, want := wantRR, pwh.Packet; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal rr: got %#v, want %#v", got, want)
 	}
 
@@ -88,11 +106,13 @@ func TestUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read sdes: %v", err)
 	}
-	var sdes SourceDescription
-	if err = sdes.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal: %v", err)
+
+	if err = pwh.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal pwh: %v", err)
 	}
-	wantSdes := SourceDescription{
+	assert.IsType(t, pwh.Packet, (*SourceDescription)(nil), "Unmarshalled to incorrect type")
+
+	wantSdes := &SourceDescription{
 		Chunks: []SourceDescriptionChunk{
 			{
 				Source: 0x902f9e2e,
@@ -105,7 +125,8 @@ func TestUnmarshal(t *testing.T) {
 			},
 		},
 	}
-	if got, want := sdes, wantSdes; !reflect.DeepEqual(got, want) {
+
+	if got, want := pwh.Packet, wantSdes; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal sdes: got %#v, want %#v", got, want)
 	}
 
@@ -114,15 +135,58 @@ func TestUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read bye: %v", err)
 	}
-	var bye Goodbye
-	if err := bye.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal bye: %v", err)
+
+	if err = pwh.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal pwh: %v", err)
 	}
-	wantBye := Goodbye{
+
+	assert.IsType(t, pwh.Packet, (*Goodbye)(nil), "Unmarshalled to incorrect type")
+
+	wantBye := &Goodbye{
 		Sources: []uint32{0x902f9e2e},
 	}
-	if got, want := bye, wantBye; !reflect.DeepEqual(got, want) {
+	if got, want := pwh.Packet, wantBye; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal bye: got %#v, want %#v", got, want)
+	}
+
+	// PictureLossIndication
+	_, packet, err = r.ReadPacket()
+	if err != nil {
+		t.Fatalf("Read pli: %v", err)
+	}
+
+	if err = pwh.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal pwh: %v", err)
+	}
+
+	assert.IsType(t, pwh.Packet, (*PictureLossIndication)(nil), "Unmarshalled to incorrect type")
+
+	wantPli := &PictureLossIndication{
+		SenderSSRC: 0x902f9e2e,
+		MediaSSRC:  0x902f9e2e,
+	}
+	if got, want := pwh.Packet, wantPli; !reflect.DeepEqual(got, want) {
+		t.Errorf("Unmarshal pli: got %#v, want %#v", got, want)
+	}
+
+	// RapidResynchronizationRequest
+	_, packet, err = r.ReadPacket()
+	if err != nil {
+		t.Fatalf("Read rrr: %v", err)
+	}
+
+	if err = pwh.Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal pwh: %v", err)
+	}
+
+	assert.IsType(t, pwh.Packet, (*RapidResynchronizationRequest)(nil), "Unmarshalled to incorrect type")
+
+	wantRrr := &RapidResynchronizationRequest{
+		SenderSSRC: 0x902f9e2e,
+		MediaSSRC:  0x902f9e2e,
+	}
+	if got, want := pwh.Packet, wantRrr; !reflect.DeepEqual(got, want) {
+		t.Errorf("Unmarshal rrr: got %#v, want %#v", got, want)
 	}
 }
 
