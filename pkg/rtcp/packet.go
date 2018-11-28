@@ -6,80 +6,40 @@ type Packet interface {
 	Unmarshal(rawPacket []byte) error
 }
 
-// PacketWithHeader is a pair to represent an RTCP header and its
-// packet's polymorphic parsed and unparsed forms.
-type PacketWithHeader struct {
-	Header
-	Packet
-	RawPacket []byte
-}
+// Unmarshal is a factory a polymorphic RTCP packet, and its header,
+func Unmarshal(rawPacket []byte) (Packet, Header, error) {
+	var h Header
+	var p Packet
 
-//Marshal a PakcetWithHeader to a bytearray
-func (p PacketWithHeader) Marshal() ([]byte, error) {
-	return p.Packet.Marshal()
-}
-
-//Unmarshal a bytearray to a header-packet pair
-func (p *PacketWithHeader) Unmarshal(rawPacket []byte) error {
-
-	p.RawPacket = rawPacket
-
-	if err := p.Header.Unmarshal(rawPacket); err != nil {
-		return err
+	err := h.Unmarshal(rawPacket)
+	if err != nil {
+		return nil, h, err
 	}
 
-	switch p.Header.Type {
+	switch h.Type {
 	case TypeSenderReport:
-		sr := new(SenderReport)
-		err := sr.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = sr
+		p = new(SenderReport)
 
 	case TypeReceiverReport:
-		rr := new(ReceiverReport)
-		err := rr.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = rr
+		p = new(ReceiverReport)
 
 	case TypeSourceDescription:
-		sdes := new(SourceDescription)
-		err := sdes.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = sdes
+		p = new(SourceDescription)
 
 	case TypeGoodbye:
-		bye := new(Goodbye)
-		err := bye.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = bye
+		p = new(Goodbye)
 
 	case TypeTransportSpecificFeedback:
-		rrr := new(RapidResynchronizationRequest)
-		err := rrr.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = rrr
+		p = new(RapidResynchronizationRequest)
 
 	case TypePayloadSpecificFeedback:
-		psfb := new(PictureLossIndication)
-		err := psfb.Unmarshal(rawPacket)
-		if err != nil {
-			return err
-		}
-		p.Packet = psfb
+		p = new(PictureLossIndication)
 
 	default:
-		return errWrongType
+		return nil, h, errWrongType
 	}
 
-	return nil
+	err = p.Unmarshal(rawPacket)
+	return p, h, err
+
 }

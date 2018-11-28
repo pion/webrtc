@@ -20,7 +20,7 @@ import (
 // and Rtcp messages incoming from the remote host
 type TransportPair struct {
 	RTP  chan<- *rtp.Packet
-	RTCP chan<- *rtcp.PacketWithHeader
+	RTCP chan<- rtcp.Packet
 }
 
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
@@ -55,7 +55,7 @@ type Manager struct {
 
 //AddTransportPair notifies the network manager that an RTCTrack has
 //been created externally, and packets may be incoming with this ssrc
-func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- *rtcp.PacketWithHeader) {
+func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- rtcp.Packet) {
 	m.pairsLock.Lock()
 	defer m.pairsLock.Unlock()
 	bufferTransport := m.bufferTransportPairs[ssrc]

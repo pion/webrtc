@@ -1029,7 +1029,7 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tp
 	}
 
 	rtpTransport := make(chan *rtp.Packet, 15)
-	rtcpTransport := make(chan *rtcp.PacketWithHeader, 15)
+	rtcpTransport := make(chan rtcp.Packet, 15)
 
 	track := &RTCTrack{
 		PayloadType: payloadType,
@@ -1202,7 +1202,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
 	rawPackets := make(chan *rtp.Packet)
-	rtcpPackets := make(chan *rtcp.PacketWithHeader)
+	rtcpPackets := make(chan rtcp.Packet)
 	if ssrc == 0 {
 		buf := make([]byte, 4)
 		_, err = rand.Read(buf)

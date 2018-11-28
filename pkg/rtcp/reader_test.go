@@ -79,11 +79,11 @@ func TestUnmarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read rr: %v", err)
 	}
-	var pwh PacketWithHeader
-	if err = pwh.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal pwh: %v", err)
+	var parsed Packet
+	if parsed, _, err = Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal parsed: %v", err)
 	}
-	assert.IsType(t, pwh.Packet, (*ReceiverReport)(nil), "Unmarshalled to incorrect type")
+	assert.IsType(t, parsed, (*ReceiverReport)(nil), "Unmarshalled to incorrect type")
 
 	wantRR := &ReceiverReport{
 		SSRC: 0x902f9e2e,
@@ -97,7 +97,7 @@ func TestUnmarshal(t *testing.T) {
 			Delay:              150137,
 		}},
 	}
-	if got, want := wantRR, pwh.Packet; !reflect.DeepEqual(got, want) {
+	if got, want := wantRR, parsed; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal rr: got %#v, want %#v", got, want)
 	}
 
@@ -107,10 +107,10 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read sdes: %v", err)
 	}
 
-	if err = pwh.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal pwh: %v", err)
+	if parsed, _, err = Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal parsed: %v", err)
 	}
-	assert.IsType(t, pwh.Packet, (*SourceDescription)(nil), "Unmarshalled to incorrect type")
+	assert.IsType(t, parsed, (*SourceDescription)(nil), "Unmarshalled to incorrect type")
 
 	wantSdes := &SourceDescription{
 		Chunks: []SourceDescriptionChunk{
@@ -126,7 +126,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 	}
 
-	if got, want := pwh.Packet, wantSdes; !reflect.DeepEqual(got, want) {
+	if got, want := parsed, wantSdes; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal sdes: got %#v, want %#v", got, want)
 	}
 
@@ -136,16 +136,16 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read bye: %v", err)
 	}
 
-	if err = pwh.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal pwh: %v", err)
+	if parsed, _, err = Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal parsed: %v", err)
 	}
 
-	assert.IsType(t, pwh.Packet, (*Goodbye)(nil), "Unmarshalled to incorrect type")
+	assert.IsType(t, parsed, (*Goodbye)(nil), "Unmarshalled to incorrect type")
 
 	wantBye := &Goodbye{
 		Sources: []uint32{0x902f9e2e},
 	}
-	if got, want := pwh.Packet, wantBye; !reflect.DeepEqual(got, want) {
+	if got, want := parsed, wantBye; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal bye: got %#v, want %#v", got, want)
 	}
 
@@ -155,17 +155,17 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read pli: %v", err)
 	}
 
-	if err = pwh.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal pwh: %v", err)
+	if parsed, _, err = Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal parsed: %v", err)
 	}
 
-	assert.IsType(t, pwh.Packet, (*PictureLossIndication)(nil), "Unmarshalled to incorrect type")
+	assert.IsType(t, parsed, (*PictureLossIndication)(nil), "Unmarshalled to incorrect type")
 
 	wantPli := &PictureLossIndication{
 		SenderSSRC: 0x902f9e2e,
 		MediaSSRC:  0x902f9e2e,
 	}
-	if got, want := pwh.Packet, wantPli; !reflect.DeepEqual(got, want) {
+	if got, want := parsed, wantPli; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal pli: got %#v, want %#v", got, want)
 	}
 
@@ -175,17 +175,17 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("Read rrr: %v", err)
 	}
 
-	if err = pwh.Unmarshal(packet); err != nil {
-		t.Errorf("Unmarshal pwh: %v", err)
+	if parsed, _, err = Unmarshal(packet); err != nil {
+		t.Errorf("Unmarshal parsed: %v", err)
 	}
 
-	assert.IsType(t, pwh.Packet, (*RapidResynchronizationRequest)(nil), "Unmarshalled to incorrect type")
+	assert.IsType(t, parsed, (*RapidResynchronizationRequest)(nil), "Unmarshalled to incorrect type")
 
 	wantRrr := &RapidResynchronizationRequest{
 		SenderSSRC: 0x902f9e2e,
 		MediaSSRC:  0x902f9e2e,
 	}
-	if got, want := pwh.Packet, wantRrr; !reflect.DeepEqual(got, want) {
+	if got, want := parsed, wantRrr; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal rrr: got %#v, want %#v", got, want)
 	}
 }
