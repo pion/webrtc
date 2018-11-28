@@ -132,12 +132,13 @@ func (m *Manager) Start(isOffer bool,
 
 	// Spin up DTLS
 	var dtlsConn *dtls.Conn
+	dtlsCofig := &dtls.Config{Certificate: dtlsCert, PrivateKey: dtlsPrivKey}
 	if isOffer {
 		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err = dtls.Server(srtpConn, dtlsCert, dtlsPrivKey)
+		dtlsConn, err = dtls.Server(srtpConn, dtlsCofig)
 	} else {
 		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err = dtls.Dial(srtpConn, dtlsCert, dtlsPrivKey)
+		dtlsConn, err = dtls.Client(srtpConn, dtlsCofig)
 	}
 
 	if err != nil {
