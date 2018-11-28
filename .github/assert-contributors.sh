@@ -3,7 +3,9 @@ set -e
 
 # Unshallow the repo, this check doesn't work with this enabled
 # https://github.com/travis-ci/travis-ci/issues/3412
-git fetch --unshallow || true
+if [ -f $(git rev-parse --git-dir)/shallow ]; then
+	git fetch --unshallow || true
+fi
 
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 
