@@ -14,7 +14,6 @@ it failed '$2' of the following checks
 * Capitalize the subject line
 * Do not end the subject line with a period
 * Wrap the body at 72 characters
-* Must include 'Relates to #' or 'Resolves #' on its own line
 EndOfMessage
 
      exit 1
@@ -39,10 +38,6 @@ lint_commit_message() {
 
     if [[ "$(echo "$1" | awk '{print length}' | sort -nr | head -1)" -gt 72 ]]; then
         display_commit_message_error "$1" 'Wrap the body at 72 characters'
-    fi
-
-    if [[ $(echo "$1" | grep -c "^Resolves #") -lt 1 ]] && [[ $(echo "$1" | grep -c "^Relates to #") -lt 1 ]] ; then
-        display_commit_message_error "$1" "Must include 'Relates to #' or 'Resolves #' on its own line"
     fi
 }
 
