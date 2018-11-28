@@ -1008,7 +1008,7 @@ func (pc *RTCPeerConnection) Close() error {
 }
 
 /* Everything below is private */
-func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.Transportpair) {
+func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.TransportPair) {
 	pc.RLock()
 	if pc.onTrackHandler == nil {
 		pc.RUnlock()
@@ -1039,13 +1039,13 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tp
 		Ssrc:        ssrc,
 		Codec:       codec,
 		Packets:     rtpTransport,
-		RtcpPackets: rtcpTransport,
+		RTCPPackets: rtcpTransport,
 	}
 
 	// TODO: Register the receiving Track
 
 	pc.onTrack(track)
-	return &network.Transportpair{Rtp: rtpTransport, Rtcp: rtcpTransport}
+	return &network.TransportPair{RTP: rtpTransport, RTCP: rtcpTransport}
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
@@ -1249,7 +1249,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		Label:       label,
 		Ssrc:        ssrc,
 		Codec:       codec,
-		RtcpPackets: rtcpPackets,
+		RTCPPackets: rtcpPackets,
 		Samples:     trackInput,
 		RawRTP:      rawPackets,
 	}

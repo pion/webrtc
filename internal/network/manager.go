@@ -16,11 +16,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Transportpair allows the application to be notified about both Rtp
+// TransportPair allows the application to be notified about both Rtp
 // and Rtcp messages incoming from the remote host
-type Transportpair struct {
-	Rtp  chan<- *rtp.Packet
-	Rtcp chan<- *rtcp.PacketWithHeader
+type TransportPair struct {
+	RTP  chan<- *rtp.Packet
+	RTCP chan<- *rtcp.PacketWithHeader
 }
 
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
@@ -38,7 +38,8 @@ type Manager struct {
 	dataChannelEventHandler DataChannelEventHandler
 
 	bufferTransportGenerator BufferTransportGenerator
-	bufferTransportPairs     map[uint32]*Transportpair
+	pairsLock                sync.RWMutex
+	bufferTransportPairs     map[uint32]*TransportPair
 
 	srtpInboundContextLock sync.RWMutex
 	srtpInboundContext     *srtp.Context
@@ -55,9 +56,11 @@ type Manager struct {
 //AddTransportPair notifies the network manager that an RTCTrack has
 //been created externally, and packets may be incoming with this ssrc
 func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- *rtcp.PacketWithHeader) {
+	m.pairsLock.Lock()
+	defer m.pairsLock.Unlock()
 	bufferTransport := m.bufferTransportPairs[ssrc]
 	if bufferTransport == nil {
-		bufferTransport = &Transportpair{Rtp, Rtcp}
+		bufferTransport = &TransportPair{Rtp, Rtcp}
 		m.bufferTransportPairs[ssrc] = bufferTransport
 	}
 }
@@ -66,7 +69,7 @@ func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp cha
 func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
 	m = &Manager{
 		iceNotifier:              ntf,
-		bufferTransportPairs:     make(map[uint32]*Transportpair),
+		bufferTransportPairs:     make(map[uint32]*TransportPair),
 		bufferTransportGenerator: btg,
 		dataChannelEventHandler:  dcet,
 	}
@@ -98,12 +101,15 @@ func NewManager(btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf 
 	return m, err
 }
 
-func (m *Manager) getBufferTransports(ssrc uint32) *Transportpair {
-	fmt.Println(m.bufferTransportPairs)
+func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
+	m.pairsLock.RLock()
+	defer m.pairsLock.RUnlock()
 	return m.bufferTransportPairs[ssrc]
 }
 
-func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *Transportpair {
+func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
+	m.pairsLock.Lock()
+	defer m.pairsLock.Unlock()
 	bufferTransport := m.bufferTransportPairs[ssrc]
 	if bufferTransport == nil {
 		bufferTransport = m.bufferTransportGenerator(ssrc, payloadtype)

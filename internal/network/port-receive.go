@@ -53,9 +53,9 @@ func (p *port) handleSRTP(buffer []byte) {
 
 				f := func(ssrc uint32) {
 					bufferTransport := p.m.getBufferTransports(ssrc)
-					if bufferTransport != nil && bufferTransport.Rtcp != nil {
+					if bufferTransport != nil && bufferTransport.RTCP != nil {
 						select {
-						case bufferTransport.Rtcp <- &report:
+						case bufferTransport.RTCP <- &report:
 						default:
 						}
 					}
@@ -100,9 +100,9 @@ func (p *port) handleSRTP(buffer []byte) {
 	}
 
 	bufferTransport := p.m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
-	if bufferTransport != nil && bufferTransport.Rtp != nil {
+	if bufferTransport != nil && bufferTransport.RTP != nil {
 		select {
-		case bufferTransport.Rtp <- packet:
+		case bufferTransport.RTP <- packet:
 		default:
 		}
 	}
