@@ -87,7 +87,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 
 	for i := range p.CSRC {
 		offset := csrcOffset + (i * csrcLength)
-		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:offset])
+		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
 	}
 
 	if p.Extension {
@@ -155,7 +155,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 
 	for i := range p.CSRC {
 		offset := csrcOffset + (i * csrcLength)
-		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:offset])
+		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
 	}
 
 	if p.Extension {
