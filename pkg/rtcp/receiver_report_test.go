@@ -46,6 +46,42 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 			},
 		},
 		{
+			Name: "valid with extension data",
+			Data: []byte{
+				// v=2, p=0, count=1, RR, len=9
+				0x81, 0xc9, 0x0, 0x9,
+				// ssrc=0x902f9e2e
+				0x90, 0x2f, 0x9e, 0x2e,
+				// ssrc=0xbc5e9a40
+				0xbc, 0x5e, 0x9a, 0x40,
+				// fracLost=0, totalLost=0
+				0x0, 0x0, 0x0, 0x0,
+				// lastSeq=0x46e1
+				0x0, 0x0, 0x46, 0xe1,
+				// jitter=273
+				0x0, 0x0, 0x1, 0x11,
+				// lsr=0x9f36432
+				0x9, 0xf3, 0x64, 0x32,
+				// delay=150137
+				0x0, 0x2, 0x4a, 0x79,
+				// profile-specific extension data
+				0x54, 0x45, 0x53, 0x54,
+				0x44, 0x41, 0x54, 0x41,
+			},
+			Want: ReceiverReport{
+				SSRC: 0x902f9e2e,
+				Reports: []ReceptionReport{{
+					SSRC:               0xbc5e9a40,
+					FractionLost:       0,
+					TotalLost:          0,
+					LastSequenceNumber: 0x46e1,
+					Jitter:             273,
+					LastSenderReport:   0x9f36432,
+					Delay:              150137,
+				}},
+			},
+		},
+		{
 			Name: "short report",
 			Data: []byte{
 				// v=2, p=0, count=1, RR, len=7

@@ -309,27 +309,27 @@ func TestSetRemoteDescription(t *testing.T) {
 }
 
 func TestCreateOfferAnswer(t *testing.T) {
-	OfferPeerConn, err := New(RTCConfiguration{})
+	offerPeerConn, err := New(RTCConfiguration{})
 	if err != nil {
 		t.Errorf("New RTCPeerConnection: got error: %v", err)
 	}
-	offer, err := OfferPeerConn.CreateOffer(nil)
+	offer, err := offerPeerConn.CreateOffer(nil)
 	if err != nil {
 		t.Errorf("Create Offer: got error: %v", err)
 	}
-	AnswerPeerConn, err := New(RTCConfiguration{})
+	answerPeerConn, err := New(RTCConfiguration{})
 	if err != nil {
 		t.Errorf("New RTCPeerConnection: got error: %v", err)
 	}
-	err = AnswerPeerConn.SetRemoteDescription(offer)
+	err = answerPeerConn.SetRemoteDescription(offer)
 	if err != nil {
 		t.Errorf("SetRemoteDescription: got error: %v", err)
 	}
-	answer, err := AnswerPeerConn.CreateAnswer(nil)
+	answer, err := answerPeerConn.CreateAnswer(nil)
 	if err != nil {
 		t.Errorf("Create Answer: got error: %v", err)
 	}
-	err = OfferPeerConn.SetRemoteDescription(answer)
+	err = offerPeerConn.SetRemoteDescription(answer)
 	if err != nil {
 		t.Errorf("SetRemoteDescription (Originator): got error: %v", err)
 	}
