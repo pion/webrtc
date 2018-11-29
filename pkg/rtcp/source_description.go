@@ -98,7 +98,7 @@ func (s SourceDescription) Marshal() ([]byte, error) {
 	h := Header{
 		Count:  uint8(len(s.Chunks)),
 		Type:   TypeSourceDescription,
-		Length: uint16(headerLength + len(rawPacket)),
+		Length: uint16(((headerLength + len(rawPacket)) / 4) - 1),
 	}
 	hData, err := h.Marshal()
 	if err != nil {

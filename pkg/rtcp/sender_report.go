@@ -110,7 +110,7 @@ func (r SenderReport) Marshal() ([]byte, error) {
 	h := Header{
 		Count:  uint8(len(r.Reports)),
 		Type:   TypeSenderReport,
-		Length: uint16(headerLength + len(rawPacket)),
+		Length: uint16(((headerLength + len(rawPacket)) / 4) - 1),
 	}
 	hData, err := h.Marshal()
 	if err != nil {

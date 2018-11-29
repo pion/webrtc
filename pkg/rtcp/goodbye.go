@@ -58,7 +58,7 @@ func (g Goodbye) Marshal() ([]byte, error) {
 		Padding: false,
 		Count:   uint8(len(g.Sources)),
 		Type:    TypeGoodbye,
-		Length:  uint16(headerLength + len(rawPacket)),
+		Length:  uint16(((headerLength + len(rawPacket)) / 4) - 1),
 	}
 	hData, err := h.Marshal()
 	if err != nil {
