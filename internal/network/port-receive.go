@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/pions/webrtc/internal/dtls"
@@ -17,6 +18,62 @@ import (
 type incomingPacket struct {
 	srcAddr *net.UDPAddr
 	buffer  []byte
+}
+
+func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) {
+	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
+	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
+	for {
+		header, rawrtcp, err := compoundPacket.ReadPacket()
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println(err)
+			return
+		}
+
+		var report rtcp.Packet
+		report, header, err = rtcp.Unmarshal(rawrtcp)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		f := func(ssrc uint32) {
+			bufferTransport := getBufferTransports(ssrc)
+			if bufferTransport != nil && bufferTransport.RTCP != nil {
+				select {
+				case bufferTransport.RTCP <- report:
+				default:
+				}
+			}
+		}
+
+		switch header.Type {
+		case rtcp.TypeSenderReport:
+			for _, ssrc := range report.(*rtcp.SenderReport).Reports {
+				f(ssrc.SSRC)
+			}
+		case rtcp.TypeReceiverReport:
+			for _, ssrc := range report.(*rtcp.ReceiverReport).Reports {
+				f(ssrc.SSRC)
+			}
+		case rtcp.TypeSourceDescription:
+			for _, ssrc := range report.(*rtcp.SourceDescription).Chunks {
+				f(ssrc.Source)
+			}
+		case rtcp.TypeGoodbye:
+			for _, ssrc := range report.(*rtcp.Goodbye).Sources {
+				f(ssrc)
+			}
+		case rtcp.TypeTransportSpecificFeedback:
+			f(report.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
+		case rtcp.TypePayloadSpecificFeedback:
+			f(report.(*rtcp.PictureLossIndication).MediaSSRC)
+		}
+	}
 }
 
 func (p *port) handleSRTP(buffer []byte) {
@@ -43,48 +100,8 @@ func (p *port) handleSRTP(buffer []byte) {
 				fmt.Println(decrypted)
 				return
 			}
-			{
-				var report rtcp.Packet
-				var header rtcp.Header
-				report, header, err = rtcp.Unmarshal(decrypted)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
 
-				f := func(ssrc uint32) {
-					bufferTransport := p.m.getBufferTransports(ssrc)
-					if bufferTransport != nil && bufferTransport.RTCP != nil {
-						select {
-						case bufferTransport.RTCP <- report:
-						default:
-						}
-					}
-				}
-
-				switch header.Type {
-				case rtcp.TypeSenderReport:
-					for _, ssrc := range report.(*rtcp.SenderReport).Reports {
-						f(ssrc.SSRC)
-					}
-				case rtcp.TypeReceiverReport:
-					for _, ssrc := range report.(*rtcp.ReceiverReport).Reports {
-						f(ssrc.SSRC)
-					}
-				case rtcp.TypeSourceDescription:
-					for _, ssrc := range report.(*rtcp.SourceDescription).Chunks {
-						f(ssrc.Source)
-					}
-				case rtcp.TypeGoodbye:
-					for _, ssrc := range report.(*rtcp.Goodbye).Sources {
-						f(ssrc)
-					}
-				case rtcp.TypeTransportSpecificFeedback:
-					f(report.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
-				case rtcp.TypePayloadSpecificFeedback:
-					f(report.(*rtcp.PictureLossIndication).MediaSSRC)
-				}
-			}
+			handleRTCP(p.m.getBufferTransports, decrypted)
 			return
 		}
 	}
