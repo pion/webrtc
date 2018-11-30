@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media/ivfwriter"
-	"github.com/pions/webrtc/pkg/rtcp"
 )
 
 func main() {
@@ -36,18 +34,6 @@ func main() {
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
 	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
-		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
-		go func() {
-			ticker := time.NewTicker(time.Second * 3)
-			for range ticker.C {
-				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.Ssrc})
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		}()
-
 		if track.Codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			i, err := ivfwriter.New("output.ivf")
