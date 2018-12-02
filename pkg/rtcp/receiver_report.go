@@ -49,33 +49,29 @@ func (r ReceiverReport) Marshal() ([]byte, error) {
 	 *        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	rawPacket := make([]byte, ssrcLength)
+	rawPacket := make([]byte, r.len())
+	packetBody := rawPacket[headerLength:]
 
-	binary.BigEndian.PutUint32(rawPacket, r.SSRC)
+	binary.BigEndian.PutUint32(packetBody, r.SSRC)
 
-	for _, rp := range r.Reports {
+	for i, rp := range r.Reports {
 		data, err := rp.Marshal()
 		if err != nil {
 			return nil, err
 		}
-		rawPacket = append(rawPacket, data...)
+		offset := ssrcLength + receptionReportLength*i
+		copy(packetBody[offset:], data)
 	}
 
 	if len(r.Reports) > countMax {
 		return nil, errTooManyReports
 	}
 
-	h := Header{
-		Count:  uint8(len(r.Reports)),
-		Type:   TypeReceiverReport,
-		Length: uint16(((headerLength + len(rawPacket)) / 4) - 1),
-	}
-	hData, err := h.Marshal()
+	hData, err := r.Header().Marshal()
 	if err != nil {
 		return nil, err
 	}
-
-	rawPacket = append(hData, rawPacket...)
+	copy(rawPacket, hData)
 
 	return rawPacket, nil
 }
@@ -138,4 +134,21 @@ func (r *ReceiverReport) Unmarshal(rawPacket []byte) error {
 	}
 
 	return nil
+}
+
+func (r *ReceiverReport) len() int {
+	repsLength := 0
+	for _, rep := range r.Reports {
+		repsLength += rep.len()
+	}
+	return headerLength + ssrcLength + repsLength
+}
+
+// Header returns the Header associated with this packet.
+func (r *ReceiverReport) Header() Header {
+	return Header{
+		Count:  uint8(len(r.Reports)),
+		Type:   TypeReceiverReport,
+		Length: uint16((r.len() / 4) - 1),
+	}
 }

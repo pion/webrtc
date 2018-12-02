@@ -124,3 +124,7 @@ func (r *ReceptionReport) Unmarshal(rawPacket []byte) error {
 
 	return nil
 }
+
+func (r *ReceptionReport) len() int {
+	return receptionReportLength
+}
