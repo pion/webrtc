@@ -23,3 +23,12 @@ func (r *RawPacket) Unmarshal(b []byte) error {
 
 	return nil
 }
+
+// Header returns the Header associated with this packet.
+func (r RawPacket) Header() Header {
+	var h Header
+	if err := h.Unmarshal(r); err != nil {
+		return Header{}
+	}
+	return h
+}

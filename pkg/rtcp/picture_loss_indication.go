@@ -11,6 +11,8 @@ type PictureLossIndication struct {
 
 	// SSRC where the loss was experienced
 	MediaSSRC uint32
+
+	header Header
 }
 
 const (
@@ -26,9 +28,11 @@ func (p PictureLossIndication) Marshal() ([]byte, error) {
 	 *
 	 * The semantics of this FB message is independent of the payload type.
 	 */
-	rawPacket := make([]byte, 8)
-	binary.BigEndian.PutUint32(rawPacket, p.SenderSSRC)
-	binary.BigEndian.PutUint32(rawPacket[4:], p.MediaSSRC)
+	rawPacket := make([]byte, p.len())
+	packetBody := rawPacket[headerLength:]
+
+	binary.BigEndian.PutUint32(packetBody, p.SenderSSRC)
+	binary.BigEndian.PutUint32(packetBody[4:], p.MediaSSRC)
 
 	h := Header{
 		Count:  pliFMT,
@@ -39,8 +43,9 @@ func (p PictureLossIndication) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	copy(rawPacket, hData)
 
-	return append(hData, rawPacket...), nil
+	return rawPacket, nil
 }
 
 // Unmarshal decodes the PictureLossIndication from binary
@@ -61,4 +66,13 @@ func (p *PictureLossIndication) Unmarshal(rawPacket []byte) error {
 	p.SenderSSRC = binary.BigEndian.Uint32(rawPacket[headerLength:])
 	p.MediaSSRC = binary.BigEndian.Uint32(rawPacket[headerLength+ssrcLength:])
 	return nil
+}
+
+// Header returns the Header associated with this packet.
+func (p *PictureLossIndication) Header() Header {
+	return p.header
+}
+
+func (p *PictureLossIndication) len() int {
+	return headerLength + ssrcLength*2
 }
