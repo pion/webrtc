@@ -14,8 +14,10 @@ type RapidResynchronizationRequest struct {
 }
 
 const (
-	rrrFMT    = 5
-	rrrLength = 2
+	rrrFMT          = 5
+	rrrLength       = 2
+	rrrHeaderLength = ssrcLength * 2
+	rrrMediaOffset  = 4
 )
 
 // Marshal encodes the RapidResynchronizationRequest in binary
@@ -26,21 +28,19 @@ func (p RapidResynchronizationRequest) Marshal() ([]byte, error) {
 	 *
 	 * The semantics of this FB message is independent of the payload type.
 	 */
-	rawPacket := make([]byte, 8)
-	binary.BigEndian.PutUint32(rawPacket, p.SenderSSRC)
-	binary.BigEndian.PutUint32(rawPacket[4:], p.MediaSSRC)
+	rawPacket := make([]byte, p.len())
+	packetBody := rawPacket[headerLength:]
 
-	h := Header{
-		Count:  rrrFMT,
-		Type:   TypeTransportSpecificFeedback,
-		Length: rrrLength,
-	}
-	hData, err := h.Marshal()
+	binary.BigEndian.PutUint32(packetBody, p.SenderSSRC)
+	binary.BigEndian.PutUint32(packetBody[rrrMediaOffset:], p.MediaSSRC)
+
+	hData, err := p.Header().Marshal()
 	if err != nil {
 		return nil, err
 	}
+	copy(rawPacket, hData)
 
-	return append(hData, rawPacket...), nil
+	return rawPacket, nil
 }
 
 // Unmarshal decodes the RapidResynchronizationRequest from binary
@@ -62,4 +62,17 @@ func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
 	p.SenderSSRC = binary.BigEndian.Uint32(rawPacket[headerLength:])
 	p.MediaSSRC = binary.BigEndian.Uint32(rawPacket[headerLength+ssrcLength:])
 	return nil
+}
+
+func (p *RapidResynchronizationRequest) len() int {
+	return headerLength + rrrHeaderLength
+}
+
+// Header returns the Header associated with this packet.
+func (p *RapidResynchronizationRequest) Header() Header {
+	return Header{
+		Count:  rrrFMT,
+		Type:   TypeTransportSpecificFeedback,
+		Length: rrrLength,
+	}
 }

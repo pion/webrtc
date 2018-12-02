@@ -82,30 +82,28 @@ func (s SourceDescription) Marshal() ([]byte, error) {
 	 *        +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 	 */
 
-	rawPacket := make([]byte, 0)
+	rawPacket := make([]byte, s.len())
+	packetBody := rawPacket[headerLength:]
+
+	chunkOffset := 0
 	for _, c := range s.Chunks {
 		data, err := c.Marshal()
 		if err != nil {
 			return nil, err
 		}
-		rawPacket = append(rawPacket, data...)
+		copy(packetBody[chunkOffset:], data)
+		chunkOffset += len(data)
 	}
 
 	if len(s.Chunks) > countMax {
 		return nil, errTooManyChunks
 	}
 
-	h := Header{
-		Count:  uint8(len(s.Chunks)),
-		Type:   TypeSourceDescription,
-		Length: uint16(((headerLength + len(rawPacket)) / 4) - 1),
-	}
-	hData, err := h.Marshal()
+	hData, err := s.Header().Marshal()
 	if err != nil {
 		return nil, err
 	}
-
-	rawPacket = append(hData, rawPacket...)
+	copy(rawPacket, hData)
 
 	return rawPacket, nil
 }
@@ -154,6 +152,23 @@ func (s *SourceDescription) Unmarshal(rawPacket []byte) error {
 	}
 
 	return nil
+}
+
+func (s *SourceDescription) len() int {
+	chunksLength := 0
+	for _, c := range s.Chunks {
+		chunksLength += c.len()
+	}
+	return headerLength + chunksLength
+}
+
+// Header returns the Header associated with this packet.
+func (s *SourceDescription) Header() Header {
+	return Header{
+		Count:  uint8(len(s.Chunks)),
+		Type:   TypeSourceDescription,
+		Length: uint16((s.len() / 4) - 1),
+	}
 }
 
 // A SourceDescriptionChunk contains items describing a single RTP source

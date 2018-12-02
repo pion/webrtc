@@ -30,14 +30,15 @@ func (g Goodbye) Marshal() ([]byte, error) {
 	 *       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	rawPacket := make([]byte, len(g.Sources)*ssrcLength)
+	rawPacket := make([]byte, g.len())
+	packetBody := rawPacket[headerLength:]
 
 	if len(g.Sources) > countMax {
 		return nil, errTooManySources
 	}
 
 	for i, s := range g.Sources {
-		binary.BigEndian.PutUint32(rawPacket[i*ssrcLength:], s)
+		binary.BigEndian.PutUint32(packetBody[i*ssrcLength:], s)
 	}
 
 	if g.Reason != "" {
@@ -47,25 +48,16 @@ func (g Goodbye) Marshal() ([]byte, error) {
 			return nil, errReasonTooLong
 		}
 
-		rawPacket = append(rawPacket, uint8(len(reason)))
-		rawPacket = append(rawPacket, reason...)
-
-		// align to 32-bit boundary
-		rawPacket = append(rawPacket, make([]byte, util.GetPadding(len(rawPacket)))...)
+		reasonOffset := len(g.Sources) * ssrcLength
+		packetBody[reasonOffset] = uint8(len(reason))
+		copy(packetBody[reasonOffset+1:], reason)
 	}
 
-	h := Header{
-		Padding: false,
-		Count:   uint8(len(g.Sources)),
-		Type:    TypeGoodbye,
-		Length:  uint16(((headerLength + len(rawPacket)) / 4) - 1),
-	}
-	hData, err := h.Marshal()
+	hData, err := g.Header().Marshal()
 	if err != nil {
 		return nil, err
 	}
-
-	rawPacket = append(hData, rawPacket...)
+	copy(rawPacket, hData)
 
 	return rawPacket, nil
 }
@@ -125,4 +117,24 @@ func (g *Goodbye) Unmarshal(rawPacket []byte) error {
 	}
 
 	return nil
+}
+
+// Header returns the Header associated with this packet.
+func (g *Goodbye) Header() Header {
+	return Header{
+		Padding: false,
+		Count:   uint8(len(g.Sources)),
+		Type:    TypeGoodbye,
+		Length:  uint16((g.len() / 4) - 1),
+	}
+}
+
+func (g *Goodbye) len() int {
+	srcsLength := len(g.Sources) * ssrcLength
+	reasonLength := len(g.Reason) + 1
+
+	l := headerLength + srcsLength + reasonLength
+
+	// align to 32-bit boundary
+	return l + util.GetPadding(l)
 }
