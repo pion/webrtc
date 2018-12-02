@@ -8,14 +8,18 @@ type Packet interface {
 	Unmarshal(rawPacket []byte) error
 }
 
-// Unmarshal is a factory a polymorphic RTCP packet, and its header,
-func Unmarshal(rawPacket []byte) (Packet, Header, error) {
+// Unmarshal parses a raw RTCP byte array and returns a Packet.
+//
+// If the packet has an implemented type you can use a type assertion
+// to access the fields of the packet. If the packet's type is unknown
+// then a RawPacket will be returned instead.
+func Unmarshal(rawPacket []byte) (Packet, error) {
 	var h Header
 	var p Packet
 
 	err := h.Unmarshal(rawPacket)
 	if err != nil {
-		return nil, h, err
+		return nil, err
 	}
 
 	switch h.Type {
@@ -42,5 +46,5 @@ func Unmarshal(rawPacket []byte) (Packet, Header, error) {
 	}
 
 	err = p.Unmarshal(rawPacket)
-	return p, h, err
+	return p, err
 }

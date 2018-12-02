@@ -24,17 +24,10 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
 	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
 	for {
-		_, rawrtcp, err := compoundPacket.ReadPacket()
-
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println(err)
-			return
+		packet, err := compoundPacket.ReadPacket()
+		if err == io.EOF {
+			break
 		}
-
-		packet, _, err := rtcp.Unmarshal(rawrtcp)
 		if err != nil {
 			fmt.Println(err)
 			return
