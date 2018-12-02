@@ -36,10 +36,9 @@ func Unmarshal(rawPacket []byte) (Packet, Header, error) {
 		p = new(PictureLossIndication)
 
 	default:
-		return nil, h, errWrongType
+		p = new(RawPacket)
 	}
 
 	err = p.Unmarshal(rawPacket)
 	return p, h, err
-
 }
