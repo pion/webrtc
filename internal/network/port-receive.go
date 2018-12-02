@@ -24,7 +24,7 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
 	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
 	for {
-		header, rawrtcp, err := compoundPacket.ReadPacket()
+		_, rawrtcp, err := compoundPacket.ReadPacket()
 
 		if err != nil {
 			if err == io.EOF {
@@ -34,8 +34,7 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 			return
 		}
 
-		var report rtcp.Packet
-		report, header, err = rtcp.Unmarshal(rawrtcp)
+		packet, _, err := rtcp.Unmarshal(rawrtcp)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -45,33 +44,33 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 			bufferTransport := getBufferTransports(ssrc)
 			if bufferTransport != nil && bufferTransport.RTCP != nil {
 				select {
-				case bufferTransport.RTCP <- report:
+				case bufferTransport.RTCP <- packet:
 				default:
 				}
 			}
 		}
 
-		switch header.Type {
-		case rtcp.TypeSenderReport:
-			for _, ssrc := range report.(*rtcp.SenderReport).Reports {
+		switch p := packet.(type) {
+		case *rtcp.SenderReport:
+			for _, ssrc := range p.Reports {
 				f(ssrc.SSRC)
 			}
-		case rtcp.TypeReceiverReport:
-			for _, ssrc := range report.(*rtcp.ReceiverReport).Reports {
+		case *rtcp.ReceiverReport:
+			for _, ssrc := range p.Reports {
 				f(ssrc.SSRC)
 			}
-		case rtcp.TypeSourceDescription:
-			for _, ssrc := range report.(*rtcp.SourceDescription).Chunks {
+		case *rtcp.SourceDescription:
+			for _, ssrc := range p.Chunks {
 				f(ssrc.Source)
 			}
-		case rtcp.TypeGoodbye:
-			for _, ssrc := range report.(*rtcp.Goodbye).Sources {
+		case *rtcp.Goodbye:
+			for _, ssrc := range p.Sources {
 				f(ssrc)
 			}
-		case rtcp.TypeTransportSpecificFeedback:
-			f(report.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
-		case rtcp.TypePayloadSpecificFeedback:
-			f(report.(*rtcp.PictureLossIndication).MediaSSRC)
+		case *rtcp.RapidResynchronizationRequest:
+			f(p.MediaSSRC)
+		case *rtcp.PictureLossIndication:
+			f(p.MediaSSRC)
 		}
 	}
 }
