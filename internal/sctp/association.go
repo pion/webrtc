@@ -280,12 +280,19 @@ func (a *Association) Start(isInitiating bool) {
 }
 
 func (a *Association) setState(state AssociationState) {
+	a.Lock()
+
+	notifier := a.notifier
 	if a.state != state {
 		a.state = state
-		if a.notifier != nil {
-			go a.notifier(state)
+		a.Unlock()
+		if notifier != nil {
+			go notifier(state)
 		}
+		// return early to avoid double-unlock
+		return
 	}
+	a.Unlock()
 }
 
 // Connect initiates the SCTP connection
