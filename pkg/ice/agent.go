@@ -49,11 +49,11 @@ type Agent struct {
 
 	localUfrag      string
 	localPwd        string
-	localCandidates []Candidate
+	localCandidates map[NetworkType][]Candidate
 
 	remoteUfrag      string
 	remotePwd        string
-	remoteCandidates map[string]Candidate
+	remoteCandidates map[NetworkType][]Candidate
 
 	selectedPair *candidatePair
 	validPairs   []*candidatePair
@@ -96,7 +96,8 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:   GatheringStateComplete, // TODO trickle-ice
 		connectionState:  ConnectionStateNew,
-		remoteCandidates: make(map[string]Candidate),
+		localCandidates:  make(map[NetworkType][]Candidate),
+		remoteCandidates: make(map[NetworkType][]Candidate),
 
 		localUfrag:  util.RandSeq(16),
 		localPwd:    util.RandSeq(32),
@@ -115,33 +116,29 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 }
 
 func (a *Agent) gatherCandidatesLocal() {
-	interfaces := localInterfaces()
-	networks := []string{"udp4"}
-	for _, network := range networks {
-		for _, i := range interfaces {
-
-			laddr, err := net.ResolveUDPAddr(network, i+":0")
+	localIPs := localInterfaces()
+	for _, ip := range localIPs {
+		for _, network := range supportedNetworks {
+			conn, err := net.ListenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
-				fmt.Printf("could not resolve %s %s %v\n", network, i, err)
+				fmt.Printf("could not listen %s %s\n", network, ip)
 				continue
 			}
 
-			conn, err := net.ListenUDP(network, laddr)
-			if err != nil {
-				fmt.Printf("could not listen %s %s\n", network, i)
-				continue
-			}
+			networkType := DetermineNetworkType(network, ip)
 
 			c := &CandidateHost{
 				CandidateBase: CandidateBase{
-					Protocol: ProtoTypeUDP,
-					Address:  conn.LocalAddr().(*net.UDPAddr).IP.String(),
-					Port:     conn.LocalAddr().(*net.UDPAddr).Port,
-					conn:     conn,
+					NetworkType: networkType,
+					IP:          ip,
+					Port:        conn.LocalAddr().(*net.UDPAddr).Port,
+					conn:        conn,
 				},
 			}
 
-			a.localCandidates = append(a.localCandidates, c)
+			set := a.localCandidates[networkType]
+			set = append(set, c)
+			a.localCandidates[networkType] = set
 
 			go a.recvLoop(c)
 		}
@@ -149,8 +146,8 @@ func (a *Agent) gatherCandidatesLocal() {
 }
 
 func (a *Agent) gatherCandidatesReflective(urls []*URL) {
-	networks := []string{"udp4"}
-	for _, network := range networks {
+	for _, networkType := range supportedNetworkTypes {
+		network := networkType.String()
 		for _, url := range urls {
 			switch url.Scheme {
 			case SchemeTypeSTUN:
@@ -166,16 +163,18 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 
 				c := &CandidateSrflx{
 					CandidateBase: CandidateBase{
-						Protocol: ProtoTypeUDP,
-						Address:  xoraddr.IP.String(),
-						Port:     xoraddr.Port,
-						conn:     conn,
+						NetworkType: networkType,
+						IP:          xoraddr.IP,
+						Port:        xoraddr.Port,
+						conn:        conn,
 					},
 					RelatedAddress: laddr.IP.String(),
 					RelatedPort:    laddr.Port,
 				}
 
-				a.localCandidates = append(a.localCandidates, c)
+				set := a.localCandidates[networkType]
+				set = append(set, c)
+				a.localCandidates[networkType] = set
 
 				go a.recvLoop(c)
 
@@ -230,14 +229,14 @@ func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remoteP
 	}
 
 	return a.run(func(agent *Agent) {
-		a.isControlling = isControlling
-		a.remoteUfrag = remoteUfrag
-		a.remotePwd = remotePwd
+		agent.isControlling = isControlling
+		agent.remoteUfrag = remoteUfrag
+		agent.remotePwd = remotePwd
 
 		// TODO this should be dynamic, and grow when the connection is stable
 		t := time.NewTicker(taskLoopInterval)
-		a.connectivityTicker = t
-		a.connectivityChan = t.C
+		agent.connectivityTicker = t
+		agent.connectivityChan = t.C
 
 		agent.updateConnectionState(ConnectionStateChecking)
 	})
@@ -422,9 +421,15 @@ func (a *Agent) checkKeepalive() {
 // pingAllCandidates sends STUN Binding Requests to all candidates
 // Note: the caller should hold the agent lock.
 func (a *Agent) pingAllCandidates() {
-	for _, localCandidate := range a.localCandidates {
-		for _, remoteCandidate := range a.remoteCandidates {
-			a.pingCandidate(localCandidate, remoteCandidate)
+	for networkType, localCandidates := range a.localCandidates {
+		if remoteCandidates, ok := a.remoteCandidates[networkType]; ok {
+
+			for _, localCandidate := range localCandidates {
+				for _, remoteCandidate := range remoteCandidates {
+					a.pingCandidate(localCandidate, remoteCandidate)
+				}
+			}
+
 		}
 	}
 }
@@ -432,9 +437,17 @@ func (a *Agent) pingAllCandidates() {
 // AddRemoteCandidate adds a new remote candidate
 func (a *Agent) AddRemoteCandidate(c Candidate) error {
 	return a.run(func(agent *Agent) {
-		if _, found := agent.remoteCandidates[c.String()]; !found {
-			agent.remoteCandidates[c.String()] = c
+		networkType := c.GetBase().NetworkType
+		set := agent.remoteCandidates[networkType]
+
+		for _, candidate := range set {
+			if candidate.Equal(c) {
+				return
+			}
 		}
+
+		set = append(set, c)
+		agent.remoteCandidates[networkType] = set
 	})
 }
 
@@ -444,7 +457,9 @@ func (a *Agent) GetLocalCandidates() ([]Candidate, error) {
 
 	err := a.run(func(agent *Agent) {
 		var candidates []Candidate
-		candidates = append(candidates, agent.localCandidates...)
+		for _, set := range agent.localCandidates {
+			candidates = append(candidates, set...)
+		}
 		res <- candidates
 	})
 	if err != nil {
@@ -470,36 +485,27 @@ func (a *Agent) Close() error {
 	return nil
 }
 
-func isCandidateMatch(c Candidate, testAddress string, testPort int) bool {
-	if c.GetBase().Address == testAddress && c.GetBase().Port == testPort {
-		return true
-	}
-
-	switch c := c.(type) {
-	case *CandidateSrflx:
-		if c.RelatedAddress == testAddress && c.RelatedPort == testPort {
-			return true
-		}
-	}
-
-	return false
-}
-
-func getAddrCandidate(candidates map[string]Candidate, addr net.Addr) Candidate {
-	var ip string
+func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) Candidate {
+	var ip net.IP
 	var port int
 
 	switch a := addr.(type) {
 	case *net.UDPAddr:
-		ip = a.IP.String()
+		ip = a.IP
+		port = a.Port
+	case *net.TCPAddr:
+		ip = a.IP
 		port = a.Port
 	default:
 		fmt.Printf("unsupported address type %T", a)
 		return nil
 	}
 
-	for _, c := range candidates {
-		if isCandidateMatch(c, ip, port) {
+	set := a.remoteCandidates[networkType]
+	for _, c := range set {
+		base := c.GetBase()
+		if base.IP.Equal(ip) &&
+			base.Port == port {
 			return c
 		}
 	}
@@ -511,7 +517,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
-				IP:   net.ParseIP(base.Address),
+				IP:   base.IP,
 				Port: base.Port,
 			},
 		},
@@ -567,7 +573,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 
 // handleInbound processes traffic from a remote candidate
 func (a *Agent) handleInbound(m *stun.Message, local Candidate, remote net.Addr) {
-	remoteCandidate := getAddrCandidate(a.remoteCandidates, remote)
+	remoteCandidate := a.findRemoteCandidate(local.GetBase().NetworkType, remote)
 	if remoteCandidate == nil {
 		// TODO debug
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)

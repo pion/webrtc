@@ -79,9 +79,9 @@ func pipe() (*Conn, *Conn) {
 
 func copyCandidate(orig Candidate) Candidate {
 	base := CandidateBase{
-		Protocol: orig.GetBase().Protocol,
-		Address:  orig.GetBase().Address,
-		Port:     orig.GetBase().Port,
+		NetworkType: orig.GetBase().NetworkType,
+		IP:          orig.GetBase().IP,
+		Port:        orig.GetBase().Port,
 	}
 
 	switch v := orig.(type) {

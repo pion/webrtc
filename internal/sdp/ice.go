@@ -2,6 +2,7 @@ package sdp
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 )
 
 // ICECandidateUnmarshal takes a candidate strings and returns a ice.Candidate or nil if it fails to parse
+// TODO: return error if parsing fails
 func ICECandidateUnmarshal(raw string) ice.Candidate {
 	split := strings.Fields(raw)
 	if len(split) < 8 {
@@ -33,24 +35,31 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 		return nil
 	}
 
+	transport := split[2]
+
 	// TODO verify valid address
-	address := split[4]
+	ip := net.ParseIP(split[4])
+	if ip == nil {
+		return nil
+	}
+
+	networkType := ice.DetermineNetworkType(transport, ip)
 
 	switch getValue("typ") {
 	case "host":
 		return &ice.CandidateHost{
 			CandidateBase: ice.CandidateBase{
-				Protocol: ice.ProtoTypeUDP,
-				Address:  address,
-				Port:     port,
+				NetworkType: networkType,
+				IP:          ip,
+				Port:        port,
 			},
 		}
 	case "srflx":
 		return &ice.CandidateSrflx{
 			CandidateBase: ice.CandidateBase{
-				Protocol: ice.ProtoTypeUDP,
-				Address:  address,
-				Port:     port,
+				NetworkType: networkType,
+				IP:          ip,
+				Port:        port,
 			},
 		}
 	default:
@@ -59,13 +68,15 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 }
 
 func iceSrflxCandidateString(c *ice.CandidateSrflx, component int) string {
-	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ srflx raddr %s rport %d generation 0",
-		component, c.CandidateBase.Priority(ice.SrflxCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port, c.RelatedAddress, c.RelatedPort)
+	// TODO: calculate foundation
+	return fmt.Sprintf("foundation %d %s %d %s %d typ srflx raddr %s rport %d generation 0",
+		component, c.CandidateBase.NetworkShort(), c.CandidateBase.Priority(ice.SrflxCandidatePreference, uint16(component)), c.CandidateBase.IP, c.CandidateBase.Port, c.RelatedAddress, c.RelatedPort)
 }
 
 func iceHostCandidateString(c *ice.CandidateHost, component int) string {
-	return fmt.Sprintf("udpcandidate %d udp %d %s %d typ host generation 0",
-		component, c.CandidateBase.Priority(ice.HostCandidatePreference, uint16(component)), c.CandidateBase.Address, c.CandidateBase.Port)
+	// TODO: calculate foundation
+	return fmt.Sprintf("foundation %d %s %d %s %d typ host generation 0",
+		component, c.CandidateBase.NetworkShort(), c.CandidateBase.Priority(ice.HostCandidatePreference, uint16(component)), c.CandidateBase.IP, c.CandidateBase.Port)
 }
 
 // ICECandidateMarshal takes a candidate and returns a string representation

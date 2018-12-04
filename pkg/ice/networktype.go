@@ -1,0 +1,101 @@
+package ice
+
+import (
+	"net"
+	"strings"
+)
+
+const (
+	udp = "udp"
+	tcp = "tcp"
+)
+
+var supportedNetworks = []string{
+	udp,
+	// tcp, // Not supported yet
+}
+
+var supportedNetworkTypes = []NetworkType{
+	NetworkTypeUDP4,
+	NetworkTypeUDP6,
+	// NetworkTypeTCP4, // Not supported yet
+	// NetworkTypeTCP6, // Not supported yet
+}
+
+// NetworkType represents the type of network
+type NetworkType int
+
+const (
+	// NetworkTypeUDP4 indicates UDP over IPv4.
+	NetworkTypeUDP4 NetworkType = iota + 1
+
+	// NetworkTypeUDP6 indicates UDP over IPv4.
+	NetworkTypeUDP6
+
+	// NetworkTypeTCP4 indicates TCP over IPv4.
+	NetworkTypeTCP4
+
+	// NetworkTypeTCP6 indicates TCP over IPv4.
+	NetworkTypeTCP6
+)
+
+func (t NetworkType) String() string {
+	switch t {
+	case NetworkTypeUDP4:
+		return "udp4"
+	case NetworkTypeUDP6:
+		return "udp6"
+	case NetworkTypeTCP4:
+		return "tcp4"
+	case NetworkTypeTCP6:
+		return "tcp6"
+	default:
+		return ErrUnknownType.Error()
+	}
+}
+
+// NetworkShort returns the short network description
+func (t NetworkType) NetworkShort() string {
+	switch t {
+	case NetworkTypeUDP4, NetworkTypeUDP6:
+		return udp
+	case NetworkTypeTCP4, NetworkTypeTCP6:
+		return tcp
+	default:
+		return ErrUnknownType.Error()
+	}
+}
+
+// IsReliable returns true if the network is reliable
+func (t NetworkType) IsReliable() bool {
+	switch t {
+	case NetworkTypeUDP4, NetworkTypeUDP6:
+		return false
+	case NetworkTypeTCP4, NetworkTypeTCP6:
+		return true
+	}
+	return false
+}
+
+// DetermineNetworkType determines the type of network based on
+// the short network string and an IP address.
+func DetermineNetworkType(network string, ip net.IP) NetworkType {
+	ipv4 := ip.To4() != nil
+
+	switch {
+	case strings.HasPrefix(network, udp):
+		if ipv4 {
+			return NetworkTypeUDP4
+		}
+		return NetworkTypeUDP6
+
+	case strings.HasPrefix(network, tcp):
+		if ipv4 {
+			return NetworkTypeTCP4
+		}
+		return NetworkTypeTCP6
+
+	}
+
+	return NetworkType(0)
+}

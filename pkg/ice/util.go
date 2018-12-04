@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-func localInterfaces() (ips []string) {
+func localInterfaces() (ips []net.IP) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return ips
@@ -33,11 +33,7 @@ func localInterfaces() (ips []string) {
 			if ip == nil || ip.IsLoopback() {
 				continue
 			}
-			ip = ip.To4()
-			if ip == nil {
-				continue // not an ipv4 address
-			}
-			ips = append(ips, ip.String())
+			ips = append(ips, ip)
 		}
 	}
 	return ips
