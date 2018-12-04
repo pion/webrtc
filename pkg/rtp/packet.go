@@ -2,6 +2,7 @@ package rtp
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/pkg/errors"
 )
@@ -46,6 +47,21 @@ const (
 	csrcOffset      = 12
 	csrcLength      = 4
 )
+
+// String helps with debugging by printing packet information in a readable way
+func (p Packet) String() string {
+	out := "RTP PACKET:\n"
+
+	out += fmt.Sprintf("\tVersion: %v\n", p.Version)
+	out += fmt.Sprintf("\tMarker: %v\n", p.Marker)
+	out += fmt.Sprintf("\tPayload Type: %d\n", p.PayloadType)
+	out += fmt.Sprintf("\tSequence Number: %d\n", p.SequenceNumber)
+	out += fmt.Sprintf("\tTimestamp: %d\n", p.Timestamp)
+	out += fmt.Sprintf("\tSSRC: %d (%x)\n", p.SSRC, p.SSRC)
+	out += fmt.Sprintf("\tPayload Length: %d\n", len(p.Payload))
+
+	return out
+}
 
 // Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon
 func (p *Packet) Unmarshal(rawPacket []byte) error {

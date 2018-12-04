@@ -332,3 +332,12 @@ func (s *SourceDescriptionItem) Unmarshal(rawPacket []byte) error {
 
 	return nil
 }
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (s *SourceDescription) DestinationSSRC() []uint32 {
+	out := make([]uint32, len(s.Chunks))
+	for i, v := range s.Chunks {
+		out[i] = v.Source
+	}
+	return out
+}

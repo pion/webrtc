@@ -3,6 +3,8 @@ package rtcp
 // Packet represents an RTCP packet, a protocol used for out-of-band statistics and control information for an RTP session
 type Packet interface {
 	Header() Header
+	// DestinationSSRC returns an array of SSRC values that this packet refers to.
+	DestinationSSRC() []uint32
 
 	Marshal() ([]byte, error)
 	Unmarshal(rawPacket []byte) error
@@ -32,10 +34,24 @@ func Unmarshal(rawPacket []byte) (Packet, Header, error) {
 		p = new(Goodbye)
 
 	case TypeTransportSpecificFeedback:
-		p = new(RapidResynchronizationRequest)
+		switch h.Count {
+		case tlnFMT:
+			p = new(TransportLayerNack)
+		case rrrFMT:
+			p = new(RapidResynchronizationRequest)
+		default:
+			p = new(RawPacket)
+		}
 
 	case TypePayloadSpecificFeedback:
-		p = new(PictureLossIndication)
+		switch h.Count {
+		case pliFMT:
+			p = new(PictureLossIndication)
+		case sliFMT:
+			p = new(SliceLossIndication)
+		default:
+			p = new(RawPacket)
+		}
 
 	default:
 		p = new(RawPacket)

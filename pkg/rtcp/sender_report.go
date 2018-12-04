@@ -31,8 +31,6 @@ type SenderReport struct {
 	// block conveys statistics on the reception of RTP packets from a
 	// single synchronization source.
 	Reports []ReceptionReport
-
-	header Header
 }
 
 var (
@@ -194,6 +192,15 @@ func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 	}
 
 	return nil
+}
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (r *SenderReport) DestinationSSRC() []uint32 {
+	out := make([]uint32, len(r.Reports))
+	for i, v := range r.Reports {
+		out[i] = v.SSRC
+	}
+	return out
 }
 
 func (r *SenderReport) len() int {

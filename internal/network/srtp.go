@@ -56,7 +56,7 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
 	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
 	for {
-		header, rawrtcp, err := compoundPacket.ReadPacket()
+		_, rawrtcp, err := compoundPacket.ReadPacket()
 
 		if err != nil {
 			if err == io.EOF {
@@ -67,7 +67,7 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 		}
 
 		var report rtcp.Packet
-		report, header, err = rtcp.Unmarshal(rawrtcp)
+		report, _, err = rtcp.Unmarshal(rawrtcp)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -83,27 +83,8 @@ func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) 
 			}
 		}
 
-		switch header.Type {
-		case rtcp.TypeSenderReport:
-			for _, ssrc := range report.(*rtcp.SenderReport).Reports {
-				f(ssrc.SSRC)
-			}
-		case rtcp.TypeReceiverReport:
-			for _, ssrc := range report.(*rtcp.ReceiverReport).Reports {
-				f(ssrc.SSRC)
-			}
-		case rtcp.TypeSourceDescription:
-			for _, ssrc := range report.(*rtcp.SourceDescription).Chunks {
-				f(ssrc.Source)
-			}
-		case rtcp.TypeGoodbye:
-			for _, ssrc := range report.(*rtcp.Goodbye).Sources {
-				f(ssrc)
-			}
-		case rtcp.TypeTransportSpecificFeedback:
-			f(report.(*rtcp.RapidResynchronizationRequest).MediaSSRC)
-		case rtcp.TypePayloadSpecificFeedback:
-			f(report.(*rtcp.PictureLossIndication).MediaSSRC)
+		for _, ssrc := range report.DestinationSSRC() {
+			f(ssrc)
 		}
 	}
 }

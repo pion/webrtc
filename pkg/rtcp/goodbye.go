@@ -138,3 +138,10 @@ func (g *Goodbye) len() int {
 	// align to 32-bit boundary
 	return l + util.GetPadding(l)
 }
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (g *Goodbye) DestinationSSRC() []uint32 {
+	out := make([]uint32, len(g.Sources))
+	copy(out, g.Sources)
+	return out
+}
