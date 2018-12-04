@@ -43,7 +43,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 					LastSenderReport:   0x9f36432,
 					Delay:              150137,
 				}},
-				ProfileExtensions: []uint8{},
+				ProfileExtensions: []byte{},
 			},
 		},
 		{
@@ -80,7 +80,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 					LastSenderReport:   0x9f36432,
 					Delay:              150137,
 				}},
-				ProfileExtensions: []uint8{
+				ProfileExtensions: []byte{
 					0x54, 0x45, 0x53, 0x54,
 					0x44, 0x41, 0x54, 0x41},
 			},
@@ -187,7 +187,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 						SSRC: 0,
 					},
 				},
-				ProfileExtensions: []uint8{},
+				ProfileExtensions: []byte{},
 			},
 		},
 		{
@@ -205,7 +205,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 						Delay:              46,
 					},
 				},
-				ProfileExtensions: []uint8{},
+				ProfileExtensions: []byte{},
 			},
 		},
 		{

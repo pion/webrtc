@@ -35,9 +35,9 @@ func Unmarshal(rawPacket []byte) (Packet, Header, error) {
 
 	case TypeTransportSpecificFeedback:
 		switch h.Count {
-		case tlnFMT:
+		case FormatTLN:
 			p = new(TransportLayerNack)
-		case rrrFMT:
+		case FormatRRR:
 			p = new(RapidResynchronizationRequest)
 		default:
 			p = new(RawPacket)
@@ -45,9 +45,9 @@ func Unmarshal(rawPacket []byte) (Packet, Header, error) {
 
 	case TypePayloadSpecificFeedback:
 		switch h.Count {
-		case pliFMT:
+		case FormatPLI:
 			p = new(PictureLossIndication)
-		case sliFMT:
+		case FormatSLI:
 			p = new(SliceLossIndication)
 		default:
 			p = new(RawPacket)
