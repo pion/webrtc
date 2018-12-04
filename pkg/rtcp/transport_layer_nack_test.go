@@ -27,7 +27,7 @@ func TestTransportLayerNackUnmarshal(t *testing.T) {
 			Want: TransportLayerNack{
 				SenderSSRC: 0x902f9e2e,
 				MediaSSRC:  0x902f9e2e,
-				Nacks:      []NackPair{NackPair{0xaaaa, 0x5555}},
+				Nacks:      []NackPair{{0xaaaa, 0x5555}},
 			},
 		},
 		{
@@ -94,7 +94,7 @@ func TestTransportLayerNackRoundTrip(t *testing.T) {
 			Report: TransportLayerNack{
 				SenderSSRC: 0x902f9e2e,
 				MediaSSRC:  0x902f9e2e,
-				Nacks:      []NackPair{NackPair{1, 0xAA}, NackPair{1034, 0x05}},
+				Nacks:      []NackPair{{1, 0xAA}, {1034, 0x05}},
 			},
 		},
 	} {
