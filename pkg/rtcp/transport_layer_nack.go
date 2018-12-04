@@ -6,7 +6,21 @@ import (
 	"math"
 )
 
+type PacketBitmap uint16
+
+// NackPair is a wire-representation of a collection of
+// Lost RTP packets
+type NackPair struct {
+	// ID of lost packets
+	PacketID uint16
+
+	// Bitmask of following lost packets
+	LostPackets PacketBitmap
+}
+
 // The TransportLayerNack packet informs the encoder about the loss of a transport packet
+// IETF RFC 4585, Section 6.2.1
+// https://tools.ietf.org/html/rfc4585#section-6.2.1
 type TransportLayerNack struct {
 	// SSRC of sender
 	SenderSSRC uint32
@@ -14,17 +28,24 @@ type TransportLayerNack struct {
 	// SSRC of the media source
 	MediaSSRC uint32
 
-	Nacks []struct {
-		// ID of lost packets
-		PacketID uint16
+	Nacks []NackPair
+}
 
-		// Bitmask of following lost packets
-		BLP uint16
+// PacketList returns a list of Nack'd packets that's referenced by a NackPair
+func (n *NackPair) PacketList() []uint16 {
+	out := make([]uint16, 1, 17)
+	out[0] = n.PacketID
+	b := n.LostPackets
+	for i := uint16(0); b != 0; i++ {
+		if (b & (1 << i)) != 0 {
+			b &^= (1 << i)
+			out = append(out, n.PacketID+i+1)
+		}
 	}
+	return out
 }
 
 const (
-	tlnFMT     = 1
 	tlnLength  = 2
 	nackOffset = 8
 )
@@ -41,7 +62,7 @@ func (p TransportLayerNack) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint32(rawPacket[4:], p.MediaSSRC)
 	for i := 0; i < len(p.Nacks); i++ {
 		binary.BigEndian.PutUint16(rawPacket[nackOffset+(4*i):], p.Nacks[i].PacketID)
-		binary.BigEndian.PutUint16(rawPacket[nackOffset+(4*i)+2:], p.Nacks[i].BLP)
+		binary.BigEndian.PutUint16(rawPacket[nackOffset+(4*i)+2:], uint16(p.Nacks[i].LostPackets))
 	}
 	h := p.Header()
 	hData, err := h.Marshal()
@@ -63,19 +84,17 @@ func (p *TransportLayerNack) Unmarshal(rawPacket []byte) error {
 		return errPacketTooShort
 	}
 
-	if h.Type != TypeTransportSpecificFeedback || h.Count != tlnFMT {
+	if h.Type != TypeTransportSpecificFeedback || h.Count != FormatTLN {
 		return errWrongType
 	}
 
 	p.SenderSSRC = binary.BigEndian.Uint32(rawPacket[headerLength:])
 	p.MediaSSRC = binary.BigEndian.Uint32(rawPacket[headerLength+ssrcLength:])
 	for i := headerLength + nackOffset; i < (headerLength + int(h.Length*4)); i += 4 {
-		p.Nacks = append(p.Nacks, struct {
-			PacketID uint16
-			BLP      uint16
-		}{
+		p.Nacks = append(p.Nacks, NackPair{
 			binary.BigEndian.Uint16(rawPacket[i:]),
-			binary.BigEndian.Uint16(rawPacket[i+2:])})
+			PacketBitmap(binary.BigEndian.Uint16(rawPacket[i+2:])),
+		})
 	}
 	return nil
 }
@@ -87,7 +106,7 @@ func (p *TransportLayerNack) len() int {
 // Header returns the Header associated with this packet.
 func (p *TransportLayerNack) Header() Header {
 	return Header{
-		Count:  tlnFMT,
+		Count:  FormatTLN,
 		Type:   TypeTransportSpecificFeedback,
 		Length: uint16((p.len() / 4) - 1),
 	}
@@ -96,13 +115,8 @@ func (p *TransportLayerNack) Header() Header {
 func (p *TransportLayerNack) String() string {
 	o := "Packets Lost:\n"
 	for _, n := range p.Nacks {
-		b := n.BLP
-		o += fmt.Sprintf("\t%d\n", n.PacketID)
-		for i := uint16(0); b != 0; i++ {
-			if (b & (1 << i)) != 0 {
-				b &^= (1 << i)
-				o += fmt.Sprintf("\t%d\n", n.PacketID+i+1)
-			}
+		for _, m := range n.PacketList() {
+			o += fmt.Sprintf("\t%d\n", m)
 		}
 	}
 	return o

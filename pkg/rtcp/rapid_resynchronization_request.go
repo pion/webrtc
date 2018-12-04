@@ -15,7 +15,6 @@ type RapidResynchronizationRequest struct {
 }
 
 const (
-	rrrFMT          = 5
 	rrrLength       = 2
 	rrrHeaderLength = ssrcLength * 2
 	rrrMediaOffset  = 4
@@ -56,7 +55,7 @@ func (p *RapidResynchronizationRequest) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypeTransportSpecificFeedback || h.Count != rrrFMT {
+	if h.Type != TypeTransportSpecificFeedback || h.Count != FormatRRR {
 		return errWrongType
 	}
 
@@ -72,7 +71,7 @@ func (p *RapidResynchronizationRequest) len() int {
 // Header returns the Header associated with this packet.
 func (p *RapidResynchronizationRequest) Header() Header {
 	return Header{
-		Count:  rrrFMT,
+		Count:  FormatRRR,
 		Type:   TypeTransportSpecificFeedback,
 		Length: rrrLength,
 	}

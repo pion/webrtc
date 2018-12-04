@@ -19,6 +19,14 @@ const (
 
 )
 
+// Transport and Payload specific feedback messages overload the count field to act as a message type. those are listed here
+const (
+	FormatSLI uint8 = 2
+	FormatPLI uint8 = 1
+	FormatTLN uint8 = 1
+	FormatRRR uint8 = 5
+)
+
 func (p PacketType) String() string {
 	switch p {
 	case TypeSenderReport:

@@ -96,7 +96,7 @@ func TestUnmarshal(t *testing.T) {
 			LastSenderReport:   0x9f36432,
 			Delay:              150137,
 		}},
-		ProfileExtensions: []uint8{},
+		ProfileExtensions: []byte{},
 	}
 	if got, want := wantRR, parsed; !reflect.DeepEqual(got, want) {
 		t.Errorf("Unmarshal rr: got %#v, want %#v", got, want)

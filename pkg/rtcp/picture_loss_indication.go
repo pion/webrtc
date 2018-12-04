@@ -17,7 +17,6 @@ type PictureLossIndication struct {
 }
 
 const (
-	pliFMT    = 1
 	pliLength = 2
 )
 
@@ -36,7 +35,7 @@ func (p PictureLossIndication) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint32(packetBody[4:], p.MediaSSRC)
 
 	h := Header{
-		Count:  pliFMT,
+		Count:  FormatPLI,
 		Type:   TypePayloadSpecificFeedback,
 		Length: pliLength,
 	}
@@ -60,7 +59,7 @@ func (p *PictureLossIndication) Unmarshal(rawPacket []byte) error {
 		return err
 	}
 
-	if h.Type != TypePayloadSpecificFeedback || h.Count != pliFMT {
+	if h.Type != TypePayloadSpecificFeedback || h.Count != FormatPLI {
 		return errWrongType
 	}
 
