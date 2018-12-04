@@ -6,6 +6,8 @@ import (
 	"math"
 )
 
+// PacketBitmap shouldn't be used like a normal integral,
+// so it's type is masked here. Access it with PacketList().
 type PacketBitmap uint16
 
 // NackPair is a wire-representation of a collection of

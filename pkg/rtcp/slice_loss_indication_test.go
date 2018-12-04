@@ -27,7 +27,7 @@ func TestSliceLossIndicationUnmarshal(t *testing.T) {
 			Want: SliceLossIndication{
 				SenderSSRC: 0x902f9e2e,
 				MediaSSRC:  0x902f9e2e,
-				SLI:        []SLIEntry{SLIEntry{0xaaa, 0, 0x2C}},
+				SLI:        []SLIEntry{{0xaaa, 0, 0x2C}},
 			},
 		},
 		{
@@ -94,7 +94,7 @@ func TestSliceLossIndicationRoundTrip(t *testing.T) {
 			Report: SliceLossIndication{
 				SenderSSRC: 0x902f9e2e,
 				MediaSSRC:  0x902f9e2e,
-				SLI:        []SLIEntry{SLIEntry{1, 0xAA, 0x1F}, SLIEntry{1034, 0x05, 0x6}},
+				SLI:        []SLIEntry{{1, 0xAA, 0x1F}, {1034, 0x05, 0x6}},
 			},
 		},
 	} {

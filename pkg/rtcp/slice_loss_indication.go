@@ -6,6 +6,8 @@ import (
 	"math"
 )
 
+// SLIEntry represents a single entry to the SLI packet's
+// list of lost slices.
 type SLIEntry struct {
 	// ID of first lost slice
 	First uint16
