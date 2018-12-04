@@ -75,6 +75,10 @@ func (p TransportLayerNack) Marshal() ([]byte, error) {
 
 // Unmarshal decodes the TransportLayerNack from binary
 func (p *TransportLayerNack) Unmarshal(rawPacket []byte) error {
+	if len(rawPacket) < (headerLength + ssrcLength) {
+		return errPacketTooShort
+	}
+
 	var h Header
 	if err := h.Unmarshal(rawPacket); err != nil {
 		return err
