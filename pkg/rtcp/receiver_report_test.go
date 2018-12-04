@@ -43,6 +43,7 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 					LastSenderReport:   0x9f36432,
 					Delay:              150137,
 				}},
+				ProfileExtensions: []uint8{},
 			},
 		},
 		{
@@ -79,6 +80,9 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 					LastSenderReport:   0x9f36432,
 					Delay:              150137,
 				}},
+				ProfileExtensions: []uint8{
+					0x54, 0x45, 0x53, 0x54,
+					0x44, 0x41, 0x54, 0x41},
 			},
 		},
 		{
@@ -147,14 +151,14 @@ func TestReceiverReportUnmarshal(t *testing.T) {
 		var rr ReceiverReport
 		err := rr.Unmarshal(test.Data)
 		if got, want := err, test.WantError; got != want {
-			t.Fatalf("Unmarshal %q rr: err = %v, want %v", test.Name, got, want)
+			t.Fatalf("Unmarshal %q rr: err = %#v, want %#v", test.Name, got, want)
 		}
 		if err != nil {
 			continue
 		}
 
 		if got, want := rr, test.Want; !reflect.DeepEqual(got, want) {
-			t.Fatalf("Unmarshal %q rr: got %v, want %v", test.Name, got, want)
+			t.Fatalf("Unmarshal %q rr: got %#v, want %#v", test.Name, got, want)
 		}
 	}
 }
@@ -183,6 +187,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 						SSRC: 0,
 					},
 				},
+				ProfileExtensions: []uint8{},
 			},
 		},
 		{
@@ -200,6 +205,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 						Delay:              46,
 					},
 				},
+				ProfileExtensions: []uint8{},
 			},
 		},
 		{
@@ -223,7 +229,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 	} {
 		data, err := test.Report.Marshal()
 		if got, want := err, test.WantError; got != want {
-			t.Fatalf("Marshal %q: err = %v, want %v", test.Name, got, want)
+			t.Fatalf("Marshal %q: err = %#v, want %#v", test.Name, got, want)
 		}
 		if err != nil {
 			continue
@@ -231,7 +237,7 @@ func TestReceiverReportRoundTrip(t *testing.T) {
 
 		var decoded ReceiverReport
 		if err := decoded.Unmarshal(data); err != nil {
-			t.Fatalf("Unmarshal %q: %v", test.Name, err)
+			t.Fatalf("Unmarshal %q: %#v", test.Name, err)
 		}
 
 		if got, want := decoded, test.Report; !reflect.DeepEqual(got, want) {

@@ -2,6 +2,7 @@ package rtcp
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 // The PictureLossIndication packet informs the encoder about the loss of an undefined amount of coded video data belonging to one or more pictures
@@ -75,4 +76,13 @@ func (p *PictureLossIndication) Header() Header {
 
 func (p *PictureLossIndication) len() int {
 	return headerLength + ssrcLength*2
+}
+
+func (p *PictureLossIndication) String() string {
+	return fmt.Sprintf("PictureLossIndication %x %x", p.SenderSSRC, p.MediaSSRC)
+}
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (p *PictureLossIndication) DestinationSSRC() []uint32 {
+	return []uint32{p.MediaSSRC}
 }

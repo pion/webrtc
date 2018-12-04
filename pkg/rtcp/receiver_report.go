@@ -1,6 +1,9 @@
 package rtcp
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 // A ReceiverReport (RR) packet provides reception quality feedback for an RTP stream
 type ReceiverReport struct {
@@ -11,6 +14,8 @@ type ReceiverReport struct {
 	// block conveys statistics on the reception of RTP packets from a
 	// single synchronization source.
 	Reports []ReceptionReport
+	// extra data from the end of the packet; the application can parse this if needed.
+	ProfileExtensions []byte
 }
 
 const (
@@ -67,7 +72,10 @@ func (r ReceiverReport) Marshal() ([]byte, error) {
 		return nil, errTooManyReports
 	}
 
+	rawPacket = append(rawPacket, r.ProfileExtensions...)
+
 	hData, err := r.Header().Marshal()
+
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +136,7 @@ func (r *ReceiverReport) Unmarshal(rawPacket []byte) error {
 		}
 		r.Reports = append(r.Reports, rr)
 	}
+	r.ProfileExtensions = rawPacket[rrReportOffset+(len(r.Reports)*receptionReportLength):]
 
 	if uint8(len(r.Reports)) != h.Count {
 		return errInvalidHeader
@@ -151,4 +160,23 @@ func (r *ReceiverReport) Header() Header {
 		Type:   TypeReceiverReport,
 		Length: uint16((r.len() / 4) - 1),
 	}
+}
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (r *ReceiverReport) DestinationSSRC() []uint32 {
+	out := make([]uint32, len(r.Reports))
+	for i, v := range r.Reports {
+		out[i] = v.SSRC
+	}
+	return out
+}
+
+func (r ReceiverReport) String() string {
+	out := fmt.Sprintf("ReceiverReport from %x\n", r.SSRC)
+	out += fmt.Sprintf("\tSSRC    \tLost\tLastSequence\n")
+	for _, i := range r.Reports {
+		out += fmt.Sprintf("\t%x\t%d/%d\t%d\n", i.SSRC, i.FractionLost, i.TotalLost, i.LastSequenceNumber)
+	}
+	out += fmt.Sprintf("\tProfile Extension Data: %v\n", r.ProfileExtensions)
+	return out
 }

@@ -32,3 +32,8 @@ func (r RawPacket) Header() Header {
 	}
 	return h
 }
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (r *RawPacket) DestinationSSRC() []uint32 {
+	return []uint32{}
+}

@@ -2,6 +2,7 @@ package rtcp
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 // The RapidResynchronizationRequest packet informs the encoder about the loss of an undefined amount of coded video data belonging to one or more pictures
@@ -75,4 +76,13 @@ func (p *RapidResynchronizationRequest) Header() Header {
 		Type:   TypeTransportSpecificFeedback,
 		Length: rrrLength,
 	}
+}
+
+// DestinationSSRC returns an array of SSRC values that this packet refers to.
+func (p *RapidResynchronizationRequest) DestinationSSRC() []uint32 {
+	return []uint32{p.MediaSSRC}
+}
+
+func (p *RapidResynchronizationRequest) String() string {
+	return fmt.Sprintf("RapidResynchronizationRequest %x %x", p.SenderSSRC, p.MediaSSRC)
 }
