@@ -396,7 +396,7 @@ func (a *Agent) validateSelectedPair() bool {
 		return false
 	}
 
-	if time.Since(a.selectedPair.remote.GetBase().LastReceived) > connectionTimeout {
+	if time.Since(a.selectedPair.remote.GetBase().LastReceived()) > connectionTimeout {
 		a.selectedPair = nil
 		a.updateConnectionState(ConnectionStateDisconnected)
 		return false
@@ -413,7 +413,7 @@ func (a *Agent) checkKeepalive() {
 		return
 	}
 
-	if time.Since(a.selectedPair.remote.GetBase().LastSent) > keepaliveInterval {
+	if time.Since(a.selectedPair.remote.GetBase().LastSent()) > keepaliveInterval {
 		a.keepaliveCandidate(a.selectedPair.local, a.selectedPair.remote)
 	}
 }
