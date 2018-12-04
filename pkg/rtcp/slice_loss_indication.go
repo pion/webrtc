@@ -59,6 +59,10 @@ func (p SliceLossIndication) Marshal() ([]byte, error) {
 
 // Unmarshal decodes the SliceLossIndication from binary
 func (p *SliceLossIndication) Unmarshal(rawPacket []byte) error {
+	if len(rawPacket) < (headerLength + ssrcLength) {
+		return errPacketTooShort
+	}
+
 	var h Header
 	if err := h.Unmarshal(rawPacket); err != nil {
 		return err
