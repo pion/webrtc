@@ -19,13 +19,14 @@ const receiveMTU = 8192
 type Candidate interface {
 	GetBase() *CandidateBase
 	String() string
+	Equal(Candidate) bool
 }
 
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
 type CandidateBase struct {
-	Protocol     ProtoType
-	Address      string
+	NetworkType
+	IP           net.IP
 	Port         int
 	LastSent     time.Time
 	LastReceived time.Time
@@ -34,7 +35,7 @@ type CandidateBase struct {
 
 func (c *CandidateBase) addr() net.Addr {
 	return &net.UDPAddr{
-		IP:   net.ParseIP(c.Address),
+		IP:   c.IP,
 		Port: c.Port,
 	}
 }
@@ -64,6 +65,13 @@ func (c *CandidateBase) Priority(typePreference uint16, component uint16) uint16
 		(2^0)*(256-component)
 }
 
+// Equal is used to compare two CandidateBases
+func (c *CandidateBase) Equal(other *CandidateBase) bool {
+	return c.NetworkType == other.NetworkType &&
+		c.IP.Equal(other.IP) &&
+		c.Port == other.Port
+}
+
 // CandidateHost is a Candidate of typ Host
 type CandidateHost struct {
 	CandidateBase
@@ -74,11 +82,6 @@ func (c *CandidateHost) GetBase() *CandidateBase {
 	return &c.CandidateBase
 }
 
-// Address for CandidateHost
-func (c *CandidateHost) Address() string {
-	return c.CandidateBase.Address
-}
-
 // Port for CandidateHost
 func (c *CandidateHost) Port() int {
 	return c.CandidateBase.Port
@@ -86,7 +89,17 @@ func (c *CandidateHost) Port() int {
 
 // String makes the CandidateHost printable
 func (c *CandidateHost) String() string {
-	return fmt.Sprintf("%s:%d", c.CandidateBase.Address, c.CandidateBase.Port)
+	return fmt.Sprintf("%s:%d", c.CandidateBase.IP, c.CandidateBase.Port)
+}
+
+// Equal is used to compare two Candidates
+func (c *CandidateHost) Equal(other Candidate) bool {
+	switch other.(type) {
+	case *CandidateHost:
+		return c.GetBase().Equal(other.GetBase())
+	default:
+		return false
+	}
 }
 
 // CandidateSrflx is a Candidate of typ Server-Reflexive
@@ -104,4 +117,16 @@ func (c *CandidateSrflx) GetBase() *CandidateBase {
 // String makes the CandidateSrflx printable
 func (c *CandidateSrflx) String() string {
 	return fmt.Sprintf("%s:%d", c.RelatedAddress, c.RelatedPort)
+}
+
+// Equal is used to compare two Candidates
+func (c *CandidateSrflx) Equal(other Candidate) bool {
+	switch v := other.(type) {
+	case *CandidateSrflx:
+		return c.GetBase().Equal(v.GetBase()) &&
+			c.RelatedAddress == v.RelatedAddress &&
+			c.RelatedPort == v.RelatedPort
+	default:
+		return false
+	}
 }
