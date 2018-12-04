@@ -2,7 +2,7 @@ module github.com/pions/webrtc
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pions/dtls v1.0.0
+	github.com/pions/dtls v1.0.1
 	github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712
 	github.com/pkg/errors v0.8.0
 	github.com/pmezard/go-difflib v1.0.0 // indirect

@@ -2,6 +2,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pions/dtls v1.0.0 h1:Ag73lDzm08Z8lpuhzS+h5YTUkf1KmREuHwN6fsWWktw=
 github.com/pions/dtls v1.0.0/go.mod h1:T22vu8VCOxNmIrbe3nnM1UdIo3m1Bx5CJNkHyehahLg=
+github.com/pions/dtls v1.0.1 h1:HAOaQCXL62butEul8Hc4pOMcx/pUC9htdcWEzxG73UU=
+github.com/pions/dtls v1.0.1/go.mod h1:T22vu8VCOxNmIrbe3nnM1UdIo3m1Bx5CJNkHyehahLg=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712 h1:ciXO7F7PusyAzW/EZJt01bETgfTxP/BIGoWQ15pBP54=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712/go.mod h1:r9wKZs+Xxv2acLspex4CHQiIhFjGK1zGP+nUm/8klXA=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
