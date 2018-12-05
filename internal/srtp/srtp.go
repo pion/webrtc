@@ -13,10 +13,19 @@ func (c *Context) DecryptRTP(packet *rtp.Packet) bool {
 
 	c.updateRolloverCount(packet.SequenceNumber, s)
 
+	auth := packet.Payload[len(packet.Payload)-10:]
+	fullPkt := packet.Raw[:]
+	fullPkt = append(fullPkt, make([]byte, 4)...)
+	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], s.rolloverCounter)
+
+	verified, err := c.verifyAuthTag(fullPkt, auth, c.srtpSessionAuthTag)
+	if err != nil || !verified {
+		return false
+	}
+
 	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(packet.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
 	stream.XORKeyStream(packet.Payload, packet.Payload)
 
-	// TODO remove tags, need to assert value
 	packet.Payload = packet.Payload[:len(packet.Payload)-10]
 
 	// Replace payload with decrypted
@@ -49,6 +58,7 @@ func (c *Context) EncryptRTP(packet *rtp.Packet) bool {
 	}
 
 	packet.Payload = append(packet.Payload, authTag...)
+
 	return true
 }
 
