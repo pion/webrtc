@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
@@ -20,7 +18,7 @@ const (
 // TODO: Migrate to srtp.Conn
 
 // CreateContextSRTP takes the exported keying material from DTLS and creates Client/Server contexts
-func (m *Manager) CreateContextSRTP(keyingMaterial []byte) error {
+func (m *Manager) CreateContextSRTP(keyingMaterial []byte, isOffer bool) error {
 	offset := 0
 
 	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
@@ -36,57 +34,28 @@ func (m *Manager) CreateContextSRTP(keyingMaterial []byte) error {
 
 	var err error
 	m.srtpInboundContextLock.Lock()
-	m.srtpInboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:] /* Profile */, "")
+	if isOffer {
+		m.srtpInboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:] /* Profile */, "")
+	} else {
+		m.srtpInboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:] /* Profile */, "")
+	}
 	m.srtpInboundContextLock.Unlock()
 	if err != nil {
 		return errors.New("failed to build inbound SRTP context")
 	}
 
 	m.srtpOutboundContextLock.Lock()
-	m.srtpOutboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:] /* Profile */, "")
+	if isOffer {
+		m.srtpOutboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:] /* Profile */, "")
+	} else {
+		m.srtpOutboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:] /* Profile */, "")
+	}
 	m.srtpOutboundContextLock.Unlock()
 	if err != nil {
 		return errors.New("failed to build outbound SRTP context")
 	}
 
 	return nil
-}
-
-func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) {
-	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
-	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
-	for {
-		_, rawrtcp, err := compoundPacket.ReadPacket()
-
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println(err)
-			return
-		}
-
-		var report rtcp.Packet
-		report, _, err = rtcp.Unmarshal(rawrtcp)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		f := func(ssrc uint32) {
-			bufferTransport := getBufferTransports(ssrc)
-			if bufferTransport != nil && bufferTransport.RTCP != nil {
-				select {
-				case bufferTransport.RTCP <- report:
-				default:
-				}
-			}
-		}
-
-		for _, ssrc := range report.DestinationSSRC() {
-			f(ssrc)
-		}
-	}
 }
 
 func (m *Manager) handleSRTP(buffer []byte) {
@@ -113,8 +82,6 @@ func (m *Manager) handleSRTP(buffer []byte) {
 				fmt.Println(decrypted)
 				return
 			}
-
-			handleRTCP(m.getBufferTransports, decrypted)
 			return
 		}
 	}
@@ -131,11 +98,9 @@ func (m *Manager) handleSRTP(buffer []byte) {
 	}
 
 	bufferTransport := m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
-	if bufferTransport != nil && bufferTransport.RTP != nil {
-		select {
-		case bufferTransport.RTP <- packet:
-		default:
-		}
+	select {
+	case bufferTransport.RTP <- packet:
+	default:
 	}
 
 }
