@@ -77,12 +77,6 @@ func NewManager(urls []*ice.URL, btg BufferTransportGenerator, dcet DataChannelE
 	return m, err
 }
 
-func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
-	m.pairsLock.RLock()
-	defer m.pairsLock.RUnlock()
-	return m.bufferTransportPairs[ssrc]
-}
-
 func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
 	m.pairsLock.Lock()
 	defer m.pairsLock.Unlock()
@@ -151,7 +145,7 @@ func (m *Manager) Start(isOffer bool,
 	if err != nil {
 		return err
 	}
-	if err = m.CreateContextSRTP(keyingMaterial); err != nil {
+	if err = m.CreateContextSRTP(keyingMaterial, isOffer); err != nil {
 		return err
 	}
 
