@@ -69,6 +69,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Michael MacDonald](https://github.com/mjmac)
 * [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
 * [Woodrow Douglass](https://github.com/wdouglass) *Application notification of incoming RTCP messages*
+* [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

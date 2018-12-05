@@ -222,5 +222,5 @@ func (c *Context) verifyAuthTag(buf, expectedAuthTag, authTag []byte) (bool, err
 	if _, err := mac.Write(buf); err != nil {
 		return false, err
 	}
-	return bytes.Compare(expectedAuthTag, mac.Sum(nil)[0:10]) == 0, nil
+	return bytes.Equal(expectedAuthTag, mac.Sum(nil)[0:10]), nil
 }

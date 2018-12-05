@@ -13,6 +13,7 @@ func (c *Context) DecryptRTP(packet *rtp.Packet) bool {
 
 	c.updateRolloverCount(packet.SequenceNumber, s)
 
+	// Extract auth tag and verify it
 	auth := packet.Payload[len(packet.Payload)-10:]
 	fullPkt := packet.Raw[:]
 	fullPkt = append(fullPkt, make([]byte, 4)...)
