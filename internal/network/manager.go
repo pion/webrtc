@@ -77,6 +77,12 @@ func NewManager(urls []*ice.URL, btg BufferTransportGenerator, dcet DataChannelE
 	return m, err
 }
 
+func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
+	m.pairsLock.RLock()
+	defer m.pairsLock.RUnlock()
+	return m.bufferTransportPairs[ssrc]
+}
+
 func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
 	m.pairsLock.Lock()
 	defer m.pairsLock.Unlock()
