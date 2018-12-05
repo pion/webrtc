@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -25,12 +24,11 @@ type Candidate interface {
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
 type CandidateBase struct {
-	sync.RWMutex
 	Protocol     ProtoType
 	Address      string
 	Port         int
-	lastSent     time.Time
-	lastReceived time.Time
+	LastSent     time.Time
+	LastReceived time.Time
 	conn         net.PacketConn
 }
 
@@ -39,34 +37,6 @@ func (c *CandidateBase) addr() net.Addr {
 		IP:   net.ParseIP(c.Address),
 		Port: c.Port,
 	}
-}
-
-// LastSent returns a time.Time indicating the last time
-// this candidate was sent
-func (c *CandidateBase) LastSent() time.Time {
-	c.RLock()
-	defer c.RUnlock()
-	return c.lastSent
-}
-
-func (c *CandidateBase) setLastSent(t time.Time) {
-	c.Lock()
-	defer c.Unlock()
-	c.lastSent = t
-}
-
-// LastReceived returns a time.Time indicating the last time
-// this candidate was received
-func (c *CandidateBase) LastReceived() time.Time {
-	c.RLock()
-	defer c.RUnlock()
-	return c.lastReceived
-}
-
-func (c *CandidateBase) setLastReceived(t time.Time) {
-	c.Lock()
-	defer c.Unlock()
-	c.lastReceived = t
 }
 
 func (c *CandidateBase) writeTo(raw []byte, dst *CandidateBase) (int, error) {
@@ -80,9 +50,9 @@ func (c *CandidateBase) writeTo(raw []byte, dst *CandidateBase) (int, error) {
 
 func (c *CandidateBase) seen(outbound bool) {
 	if outbound {
-		c.setLastSent(time.Now())
+		c.LastSent = time.Now()
 	} else {
-		c.setLastReceived(time.Now())
+		c.LastReceived = time.Now()
 	}
 }
 

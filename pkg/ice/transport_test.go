@@ -78,22 +78,17 @@ func pipe() (*Conn, *Conn) {
 }
 
 func copyCandidate(orig Candidate) Candidate {
-	// Quiet go vet kvetching about mutex copying
-	base := func() CandidateBase {
-		return CandidateBase{
-			Protocol: orig.GetBase().Protocol,
-			Address:  orig.GetBase().Address,
-			Port:     orig.GetBase().Port,
-		}
+	base := CandidateBase{
+		Protocol: orig.GetBase().Protocol,
+		Address:  orig.GetBase().Address,
+		Port:     orig.GetBase().Port,
 	}
 
 	switch v := orig.(type) {
 	case *CandidateHost:
-		return &CandidateHost{
-			CandidateBase: base(),
-		}
+		return &CandidateHost{CandidateBase: base}
 	case *CandidateSrflx:
-		return &CandidateSrflx{CandidateBase: base(),
+		return &CandidateSrflx{CandidateBase: base,
 			RelatedAddress: v.RelatedAddress,
 			RelatedPort:    v.RelatedPort}
 	default:
