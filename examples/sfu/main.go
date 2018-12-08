@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/media/samplebuilder"
 	"github.com/pions/webrtc/pkg/rtcp"
@@ -47,7 +48,7 @@ const (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	sd := mustReadStdin(reader)
+	offer := util.Decode(mustReadStdin(reader))
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
@@ -90,22 +91,19 @@ func main() {
 	})
 
 	// Set the remote SessionDescription
-	check(peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{
-		Type: webrtc.RTCSdpTypeOffer,
-		Sdp:  string(sd),
-	}))
+	check(peerConnection.SetRemoteDescription(offer))
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	answer, err := peerConnection.CreateAnswer(nil)
 	check(err)
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
+	fmt.Println(util.Encode(answer))
 
 	for {
 		fmt.Println("")
 		fmt.Println("Paste an SDP to start sendonly peer connection")
-		recvOnlyOffer := mustReadStdin(reader)
+		recvOnlyOffer := util.Decode(mustReadStdin(reader))
 
 		// Create a new RTCPeerConnection
 		peerConnection, err := webrtc.New(peerConnectionConfig)
@@ -123,16 +121,14 @@ func main() {
 		outboundSamplesLock.Unlock()
 
 		// Set the remote SessionDescription
-		check(peerConnection.SetRemoteDescription(webrtc.RTCSessionDescription{
-			Type: webrtc.RTCSdpTypeOffer,
-			Sdp:  string(recvOnlyOffer),
-		}))
+		err = peerConnection.SetRemoteDescription(recvOnlyOffer)
+		check(err)
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		answer, err := peerConnection.CreateAnswer(nil)
 		check(err)
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser
-		fmt.Println(base64.StdEncoding.EncodeToString([]byte(answer.Sdp)))
+		fmt.Println(util.Encode(answer))
 	}
 }

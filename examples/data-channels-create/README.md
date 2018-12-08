@@ -8,7 +8,7 @@ go get github.com/pions/webrtc/examples/data-channels-create
 ```
 
 ### Open data-channels-create example page
-[jsfiddle.net](https://jsfiddle.net/swgxrp94/19/)
+[jsfiddle.net](https://jsfiddle.net/swgxrp94/20/)
 
 ### Run data-channels-create
 Just run run `data-channels-create`.

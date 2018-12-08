@@ -18,7 +18,7 @@ navigator.mediaDevices.getUserMedia({video: true, audio: true})
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 pc.onicecandidate = event => {
   if (event.candidate === null) {
-    document.getElementById('localSessionDescription').value = btoa(pc.localDescription.sdp)
+    document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
   }
 }
 
@@ -32,7 +32,7 @@ window.startSession = () => {
   }
 
   try {
-    pc.setRemoteDescription(new RTCSessionDescription({type: 'answer', sdp: atob(sd)}))
+    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
   } catch (e) {
     alert(e)
   }

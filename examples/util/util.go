@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pions/webrtc"
 )
 
 // Allows compressing offer/answer to bypass terminal input limits.
@@ -49,27 +52,32 @@ func MustReadStdin() string {
 
 // Encode encodes the input in base64
 // It can optionally zip the input before encoding
-func Encode(in string) string {
+func Encode(sdp webrtc.RTCSessionDescription) string {
+	b, err := json.Marshal(sdp)
+	Check(err)
+
 	if compress {
-		in = zip(in)
+		b = zip(b)
 	}
 
-	return base64.StdEncoding.EncodeToString([]byte(in))
+	return base64.StdEncoding.EncodeToString(b)
 }
 
 // Decode decodes the input from base64
 // It can optionally unzip the input after decoding
-func Decode(in string) string {
+func Decode(in string) webrtc.RTCSessionDescription {
 	b, err := base64.StdEncoding.DecodeString(in)
 	Check(err)
 
-	out := string(b)
-
 	if compress {
-		out = unzip(out)
+		b = unzip(b)
 	}
 
-	return out
+	var sdp webrtc.RTCSessionDescription
+	err = json.Unmarshal(b, &sdp)
+	Check(err)
+
+	return sdp
 }
 
 // RandSeq generates a random string to serve as dummy data
@@ -83,25 +91,25 @@ func RandSeq(n int) string {
 	return string(b)
 }
 
-func zip(in string) string {
+func zip(in []byte) []byte {
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
-	_, err := gz.Write([]byte(in))
+	_, err := gz.Write(in)
 	Check(err)
 	err = gz.Flush()
 	Check(err)
 	err = gz.Close()
 	Check(err)
-	return string(b.Bytes())
+	return b.Bytes()
 }
 
-func unzip(in string) string {
+func unzip(in []byte) []byte {
 	var b bytes.Buffer
-	_, err := b.Write([]byte(in))
+	_, err := b.Write(in)
 	Check(err)
 	r, err := gzip.NewReader(&b)
 	Check(err)
 	res, err := ioutil.ReadAll(r)
 	Check(err)
-	return string(res)
+	return res
 }

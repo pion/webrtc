@@ -15,7 +15,7 @@ pc.onsignalingstatechange = e => log(pc.signalingState)
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 pc.onicecandidate = event => {
   if (event.candidate === null) {
-    document.getElementById('localSessionDescription').value = btoa(pc.localDescription.sdp)
+    document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
   }
 }
 
@@ -41,6 +41,6 @@ window.startSession = () => {
     return alert('Session Description must not be empty')
   }
 
-  pc.setRemoteDescription(new RTCSessionDescription({type: 'offer', sdp: atob(sd)})).catch(log)
+  pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd)))).catch(log)
   pc.createAnswer().then(d => pc.setLocalDescription(d)).catch(log)
 }
