@@ -48,13 +48,9 @@ func main() {
 	util.Check(err)
 
 	// Wait for the offer to be pasted
-	sd := util.Decode(util.MustReadStdin())
+	offer := util.Decode(util.MustReadStdin())
 
 	// Set the remote SessionDescription
-	offer := webrtc.RTCSessionDescription{
-		Type: webrtc.RTCSdpTypeOffer,
-		Sdp:  string(sd),
-	}
 	err = peerConnection.SetRemoteDescription(offer)
 	util.Check(err)
 
@@ -63,7 +59,7 @@ func main() {
 	util.Check(err)
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(util.Encode(answer.Sdp))
+	fmt.Println(util.Encode(answer))
 
 	// Start pushing buffers on these tracks
 	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples).Start()
