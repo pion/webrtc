@@ -26,7 +26,7 @@ type Candidate interface {
 // CandidateBase represents an ICE candidate, a base with enough attributes
 // for host candidates, see CandidateSrflx and CandidateRelay for more
 type CandidateBase struct {
-	sync.RWMutex
+	lock sync.RWMutex
 	NetworkType
 	IP           net.IP
 	Port         int
@@ -45,28 +45,28 @@ func (c *CandidateBase) addr() net.Addr {
 // LastSent returns a time.Time indicating the last time
 // this candidate was sent
 func (c *CandidateBase) LastSent() time.Time {
-	c.RLock()
-	defer c.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	return c.lastSent
 }
 
 func (c *CandidateBase) setLastSent(t time.Time) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.lastSent = t
 }
 
 // LastReceived returns a time.Time indicating the last time
 // this candidate was received
 func (c *CandidateBase) LastReceived() time.Time {
-	c.RLock()
-	defer c.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	return c.lastReceived
 }
 
 func (c *CandidateBase) setLastReceived(t time.Time) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.lastReceived = t
 }
 
