@@ -9,13 +9,12 @@ import (
 	"sync"
 
 	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/webrtc/internal/datachannel"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
-	"github.com/pkg/errors"
 )
 
 // TransportPair allows the application to be notified about both Rtp
@@ -28,11 +27,11 @@ type TransportPair struct {
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	IceAgent    *ice.Agent
-	iceConn     *ice.Conn
-	iceNotifier ICENotifier
-	isOffer     bool
+	IceAgent *ice.Agent
+	iceConn  *ice.Conn
+	isOffer  bool
 
+	srtpConn                *srtp.Conn
 	srtpInboundContextLock  sync.RWMutex
 	srtpInboundContext      *srtp.Context
 	srtpOutboundContextLock sync.RWMutex
@@ -45,8 +44,6 @@ type Manager struct {
 	dtlsConn *dtls.Conn
 
 	sctpAssociation *sctp.Association
-
-	dataChannelEventHandler DataChannelEventHandler
 }
 
 //AddTransportPair notifies the network manager that an RTCTrack has
@@ -62,19 +59,14 @@ func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp cha
 }
 
 // NewManager creates a new network.Manager
-func NewManager(urls []*ice.URL, btg BufferTransportGenerator, dcet DataChannelEventHandler, ntf ICENotifier) (m *Manager, err error) {
-	m = &Manager{
-		iceNotifier:              ntf,
+func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier) *Manager {
+	iceAgent := ice.NewAgent(urls, ntf)
+
+	return &Manager{
+		IceAgent:                 iceAgent,
 		bufferTransportPairs:     make(map[uint32]*TransportPair),
 		bufferTransportGenerator: btg,
-		dataChannelEventHandler:  dcet,
 	}
-
-	m.sctpAssociation = sctp.NewAssocation(m.dataChannelOutboundHandler, m.dataChannelInboundHandler, m.handleSCTPState)
-
-	m.IceAgent = ice.NewAgent(urls, m.iceNotifier)
-
-	return m, err
 }
 
 func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
@@ -95,75 +87,96 @@ func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *T
 	return bufferTransport
 }
 
-func (m *Manager) handleSCTPState(state sctp.AssociationState) {
-	if state == sctp.Established {
-		// Temporary way to signal sending OpenChannel messages
-		m.dataChannelEventHandler(&DataChannelOpen{})
-	}
-}
-
-// Start allocates DTLS/ICE state that is dependent on if we are offering or answering
+// Start allocates the network stack
+// TODO: Turn into the ORTC constructors
 func (m *Manager) Start(isOffer bool,
 	remoteUfrag, remotePwd string,
 	dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
 
 	m.isOffer = isOffer
 
-	// Start the sctpAssociation
-	m.sctpAssociation.Start(isOffer)
-
-	// Spin up ICE
-	var iceConn *ice.Conn
-	var err error
-	if isOffer {
-		iceConn, err = m.IceAgent.Dial(context.TODO(), remoteUfrag, remotePwd)
-	} else {
-		iceConn, err = m.IceAgent.Accept(context.TODO(), remoteUfrag, remotePwd)
-	}
-
-	if err != nil {
+	if err := m.startICE(isOffer, remoteUfrag, remotePwd); err != nil {
 		return err
 	}
 
-	m.iceConn = iceConn
+	m.startSRTP()
 
-	// Spin up SRTP
-	srtpConn := srtp.Wrap(iceConn, m.handleSRTP)
-
-	// Spin up DTLS
-	var dtlsConn *dtls.Conn
-	dtlsCofig := &dtls.Config{Certificate: dtlsCert, PrivateKey: dtlsPrivKey}
-	if isOffer {
-		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err = dtls.Server(srtpConn, dtlsCofig)
-	} else {
-		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err = dtls.Client(srtpConn, dtlsCofig)
-	}
-
-	if err != nil {
+	if err := m.startDTLS(isOffer, dtlsCert, dtlsPrivKey, fingerprint, fingerprintHash); err != nil {
 		return err
 	}
 
-	m.dtlsConn = dtlsConn
+	if err := m.createContextSRTP(isOffer); err != nil {
+		return err
+	}
 
-	keyingMaterial, err := dtlsConn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
+	if err := m.startSCTP(isOffer); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
+	if isOffer {
+		iceConn, err := m.IceAgent.Dial(context.TODO(), remoteUfrag, remotePwd)
+		if err != nil {
+			return err
+		}
+		m.iceConn = iceConn
+	} else {
+		iceConn, err := m.IceAgent.Accept(context.TODO(), remoteUfrag, remotePwd)
+		if err != nil {
+			return err
+		}
+		m.iceConn = iceConn
+	}
+	return nil
+}
+
+func (m *Manager) startSRTP() {
+	srtpConn := srtp.Wrap(m.iceConn, m.handleSRTP)
+	m.srtpConn = srtpConn
+}
+
+func (m *Manager) createContextSRTP(isOffer bool) error {
+	keyingMaterial, err := m.dtlsConn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
 	if err != nil {
 		return err
 	}
 	if err = m.CreateContextSRTP(keyingMaterial, isOffer); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
+	dtlsCofig := &dtls.Config{Certificate: dtlsCert, PrivateKey: dtlsPrivKey}
+	if isOffer {
+		// Assumes we offer to be passive and this is accepted.
+		dtlsConn, err := dtls.Server(m.srtpConn, dtlsCofig)
+		if err != nil {
+			return err
+		}
+		m.dtlsConn = dtlsConn
+	} else {
+		// Assumes the peer offered to be passive and we accepted.
+		dtlsConn, err := dtls.Client(m.srtpConn, dtlsCofig)
+		if err != nil {
+			return err
+		}
+		m.dtlsConn = dtlsConn
+	}
 
 	// Check the fingerprint if a certificate was exchanged
-	cert := dtlsConn.RemoteCertificate()
+	cert := m.dtlsConn.RemoteCertificate()
 	if cert != nil {
 		hashAlgo, err := dtls.HashAlgorithmString(fingerprintHash)
 		if err != nil {
 			return err
 		}
 
-		fp, err := dtls.Fingerprint(cert, hashAlgo)
+		fp := ""
+		fp, err = dtls.Fingerprint(cert, hashAlgo)
 		if err != nil {
 			return err
 		}
@@ -174,14 +187,36 @@ func (m *Manager) Start(isOffer bool,
 	} else {
 		fmt.Println("Warning: Certificate not checked")
 	}
-
-	// Temporary networking glue for SCTP
-	go m.networkLoop()
-
-	// Spin up SCTP
-	m.sctpAssociation.Connect()
-
 	return nil
+}
+
+func (m *Manager) startSCTP(isOffer bool) error {
+	if isOffer {
+		sctpAssociation, err := sctp.Client(m.dtlsConn)
+		if err != nil {
+			return err
+		}
+		m.sctpAssociation = sctpAssociation
+	} else {
+		sctpAssociation, err := sctp.Server(m.dtlsConn)
+		if err != nil {
+			return err
+		}
+		m.sctpAssociation = sctpAssociation
+	}
+	return nil
+}
+
+// OpenDataChannel is used to open a data channel
+// TODO: Move to RTCSctpTransport
+func (m *Manager) OpenDataChannel(id uint16, config *datachannel.Config) (*datachannel.DataChannel, error) {
+	return datachannel.Dial(m.sctpAssociation, id, config)
+}
+
+// AcceptDataChannel is used to accept incoming data channels
+// TODO: Move to RTCSctpTransport
+func (m *Manager) AcceptDataChannel() (*datachannel.DataChannel, error) {
+	return datachannel.Accept(m.sctpAssociation)
 }
 
 // Close cleans up all the allocated state
@@ -252,121 +287,4 @@ func (m *Manager) SendRTCP(pkt []byte) {
 	if err != nil {
 		fmt.Println("SendRTCP failed to write:", err)
 	}
-}
-
-// SendDataChannelMessage sends a DataChannel message to a connected peer
-func (m *Manager) SendDataChannelMessage(payload datachannel.Payload, streamIdentifier uint16) error {
-	var data []byte
-	var ppi sctp.PayloadProtocolIdentifier
-
-	/*
-		https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-12#section-6.6
-		SCTP does not support the sending of empty user messages.  Therefore,
-		if an empty message has to be sent, the appropriate PPID (WebRTC
-		String Empty or WebRTC Binary Empty) is used and the SCTP user
-		message of one zero byte is sent.  When receiving an SCTP user
-		message with one of these PPIDs, the receiver MUST ignore the SCTP
-		user message and process it as an empty message.
-	*/
-	switch p := payload.(type) {
-	case datachannel.PayloadString:
-		data = p.Data
-		if len(data) == 0 {
-			data = []byte{0}
-			ppi = sctp.PayloadTypeWebRTCStringEmpty
-		} else {
-			ppi = sctp.PayloadTypeWebRTCString
-		}
-	case datachannel.PayloadBinary:
-		data = p.Data
-		if len(data) == 0 {
-			data = []byte{0}
-			ppi = sctp.PayloadTypeWebRTCBinaryEmpty
-		} else {
-			ppi = sctp.PayloadTypeWebRTCBinary
-		}
-	default:
-		return errors.Errorf("Unknown DataChannel Payload (%s)", payload.PayloadType().String())
-	}
-
-	m.sctpAssociation.Lock()
-	err := m.sctpAssociation.HandleOutbound(data, streamIdentifier, ppi)
-	m.sctpAssociation.Unlock()
-
-	if err != nil {
-		return errors.Wrap(err, "SCTP Association failed handling outbound packet")
-	}
-
-	return nil
-}
-
-func (m *Manager) dataChannelInboundHandler(data []byte, streamIdentifier uint16, payloadType sctp.PayloadProtocolIdentifier) {
-	switch payloadType {
-	case sctp.PayloadTypeWebRTCDCEP:
-		msg, err := datachannel.Parse(data)
-		if err != nil {
-			fmt.Println(errors.Wrap(err, "Failed to parse DataChannel packet"))
-			return
-		}
-		switch msg := msg.(type) {
-		case *datachannel.ChannelOpen:
-			// Cannot return err
-			ack := datachannel.ChannelAck{}
-			ackMsg, err := ack.Marshal()
-			if err != nil {
-				fmt.Println("Error Marshaling ChannelOpen ACK", err)
-				return
-			}
-			if err = m.sctpAssociation.HandleOutbound(ackMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
-				fmt.Println("Error sending ChannelOpen ACK", err)
-				return
-			}
-			m.dataChannelEventHandler(&DataChannelCreated{streamIdentifier: streamIdentifier, Label: string(msg.Label)})
-		case *datachannel.ChannelAck:
-			// TODO: handle ChannelAck (https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.2)
-		default:
-			fmt.Println("Unhandled DataChannel message", msg)
-		}
-	case sctp.PayloadTypeWebRTCString:
-		fallthrough
-	case sctp.PayloadTypeWebRTCStringEmpty:
-		payload := &datachannel.PayloadString{Data: data}
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: payload})
-	case sctp.PayloadTypeWebRTCBinary:
-		fallthrough
-	case sctp.PayloadTypeWebRTCBinaryEmpty:
-		payload := &datachannel.PayloadBinary{Data: data}
-		m.dataChannelEventHandler(&DataChannelMessage{streamIdentifier: streamIdentifier, Payload: payload})
-	default:
-		fmt.Printf("Unhandled Payload Protocol Identifier %v \n", payloadType)
-	}
-}
-
-func (m *Manager) dataChannelOutboundHandler(raw []byte) {
-	if _, err := m.dtlsConn.Write(raw); err != nil {
-		fmt.Println(err)
-	}
-}
-
-// SendOpenChannelMessage sends the message to open a datachannel to the connected peer
-func (m *Manager) SendOpenChannelMessage(streamIdentifier uint16, label string) error {
-	msg := &datachannel.ChannelOpen{
-		ChannelType:          datachannel.ChannelTypeReliable,
-		Priority:             datachannel.ChannelPriorityNormal,
-		ReliabilityParameter: 0,
-
-		Label:    []byte(label),
-		Protocol: []byte(""),
-	}
-
-	rawMsg, err := msg.Marshal()
-	if err != nil {
-		return fmt.Errorf("Error Marshaling ChannelOpen %v", err)
-	}
-	m.sctpAssociation.Lock()
-	defer m.sctpAssociation.Unlock()
-	if err = m.sctpAssociation.HandleOutbound(rawMsg, streamIdentifier, sctp.PayloadTypeWebRTCDCEP); err != nil {
-		return fmt.Errorf("Error sending ChannelOpen %v", err)
-	}
-	return nil
 }

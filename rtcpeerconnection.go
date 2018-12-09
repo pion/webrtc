@@ -13,6 +13,7 @@ import (
 
 	"encoding/binary"
 
+	"github.com/pions/webrtc/internal/datachannel"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
@@ -157,10 +158,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		}
 	}
 
-	pc.networkManager, err = network.NewManager(urls, pc.generateChannel, pc.dataChannelEventHandler, pc.iceStateChange)
-	if err != nil {
-		return nil, err
-	}
+	pc.networkManager = network.NewManager(urls, pc.generateChannel, pc.iceStateChange)
 
 	return &pc, nil
 }
@@ -273,7 +271,6 @@ func (pc *RTCPeerConnection) onDataChannel(dc *RTCDataChannel) (done chan struct
 	// to complete before datachannel event handlers might be called.
 	go func() {
 		hdlr(dc)
-		dc.onOpen() // TODO: move to ChannelAck handling
 		close(done)
 	}()
 
@@ -744,9 +741,63 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		if err != nil {
 			fmt.Println("Failed to start manager", err)
 		}
+
+		// Temporary data channel glue
+		pc.openDataChannels()
+		pc.acceptDataChannels()
 	}()
 
 	return nil
+}
+
+// openDataChannels opens the existing data channels
+// TODO: Move to RTCDataChannel
+func (pc *RTCPeerConnection) openDataChannels() {
+	pc.RLock()
+	defer pc.RUnlock()
+	for _, rtcDC := range pc.dataChannels {
+		dc, err := pc.networkManager.OpenDataChannel(
+			*rtcDC.ID,
+			&datachannel.Config{
+				ChannelType:          datachannel.ChannelTypeReliable,   // TODO: Wiring
+				Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
+				ReliabilityParameter: 0,                                 // TODO: Wiring
+				Label:                rtcDC.Label,
+			})
+		if err != nil {
+			fmt.Println("failed to open data channel", err)
+			continue
+		}
+		rtcDC.ReadyState = RTCDataChannelStateOpen
+		rtcDC.handleOpen(dc)
+	}
+}
+
+// acceptDataChannels accepts data channels
+// TODO: Move to RTCSctpTransport
+func (pc *RTCPeerConnection) acceptDataChannels() {
+	for {
+		dc, err := pc.networkManager.AcceptDataChannel()
+		if err != nil {
+			fmt.Println("Failed to accept data channel:", err)
+			continue
+		}
+
+		sid := dc.StreamIdentifier()
+		rtcDC := &RTCDataChannel{
+			ID:                &sid,
+			Label:             dc.Config.Label,
+			rtcPeerConnection: pc,
+			ReadyState:        RTCDataChannelStateOpen,
+		}
+
+		pc.Lock()
+		pc.dataChannels[sid] = rtcDC
+		pc.Unlock()
+
+		<-pc.onDataChannel(rtcDC)
+		rtcDC.handleOpen(dc)
+	}
 }
 
 // RemoteDescription returns PendingRemoteDescription if it is not null and
@@ -913,7 +964,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 			channel.Protocol = *options.Protocol
 		}
 
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #12)
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-da	ta-api (Step #12)
 		if options.Negotiated != nil {
 			channel.Negotiated = *options.Negotiated
 		}
@@ -1088,49 +1139,6 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.Unlock()
 
 	pc.onICEConnectionStateChange(newState)
-}
-
-func (pc *RTCPeerConnection) dataChannelEventHandler(e network.DataChannelEvent) {
-	switch event := e.(type) {
-	case *network.DataChannelCreated:
-		id := event.StreamIdentifier()
-		newDataChannel := &RTCDataChannel{ID: &id, Label: event.Label, rtcPeerConnection: pc, ReadyState: RTCDataChannelStateOpen}
-		pc.Lock()
-		pc.dataChannels[e.StreamIdentifier()] = newDataChannel
-		pc.Unlock()
-
-		// NB: We block here waiting for the callback to finish before
-		// proceeding, in order to guarantee that all user setup of the channel
-		// has completed before moving on to process more events.
-		<-pc.onDataChannel(newDataChannel)
-	case *network.DataChannelMessage:
-		pc.RLock()
-		if dc, ok := pc.dataChannels[e.StreamIdentifier()]; ok {
-			pc.RUnlock()
-			dc.onMessage(event.Payload)
-		} else {
-			pc.RUnlock()
-			fmt.Printf("No datachannel found for streamIdentifier %d \n", e.StreamIdentifier())
-		}
-	case *network.DataChannelOpen:
-		pc.RLock()
-		defer pc.RUnlock()
-		for _, dc := range pc.dataChannels {
-			dc.Lock()
-			err := dc.sendOpenChannelMessage()
-			if err != nil {
-				fmt.Println("failed to send openchannel", err)
-				dc.Unlock()
-				continue
-			}
-			dc.ReadyState = RTCDataChannelStateOpen
-			dc.Unlock()
-
-			dc.onOpen() // TODO: move to ChannelAck handling
-		}
-	default:
-		fmt.Printf("Unhandled DataChannelEvent %v \n", event)
-	}
 }
 
 func (pc *RTCPeerConnection) generateLocalCandidates() ([]string, error) {
