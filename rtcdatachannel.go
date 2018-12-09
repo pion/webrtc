@@ -1,11 +1,15 @@
 package webrtc
 
 import (
+	"fmt"
 	"sync"
 
-	"github.com/pions/webrtc/pkg/datachannel"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pions/webrtc/internal/datachannel"
+	sugar "github.com/pions/webrtc/pkg/datachannel"
+	"github.com/pkg/errors"
 )
+
+const receiveMTU = 8192
 
 // RTCDataChannel represents a WebRTC DataChannel
 // The RTCDataChannel interface represents a network channel
@@ -89,11 +93,13 @@ type RTCDataChannel struct {
 	// OnError             func()
 	// OnClose             func()
 
-	onMessageHandler func(datachannel.Payload)
+	onMessageHandler func(sugar.Payload)
 	onOpenHandler    func()
 
 	// Deprecated: Will be removed when networkManager is deprecated.
 	rtcPeerConnection *RTCPeerConnection
+
+	dataChannel *datachannel.DataChannel
 }
 
 // OnOpen sets an event handler which is invoked when
@@ -125,13 +131,13 @@ func (d *RTCDataChannel) onOpen() (done chan struct{}) {
 
 // OnMessage sets an event handler which is invoked on a message
 // arrival over the sctp transport from a remote peer.
-func (d *RTCDataChannel) OnMessage(f func(p datachannel.Payload)) {
+func (d *RTCDataChannel) OnMessage(f func(p sugar.Payload)) {
 	d.Lock()
 	defer d.Unlock()
 	d.onMessageHandler = f
 }
 
-func (d *RTCDataChannel) onMessage(p datachannel.Payload) {
+func (d *RTCDataChannel) onMessage(p sugar.Payload) {
 	d.RLock()
 	hdlr := d.onMessageHandler
 	d.RUnlock()
@@ -146,7 +152,7 @@ func (d *RTCDataChannel) onMessage(p datachannel.Payload) {
 // arrival over the sctp transport from a remote peer.
 //
 // Deprecated: use OnMessage instead.
-func (d *RTCDataChannel) Onmessage(f func(p datachannel.Payload)) {
+func (d *RTCDataChannel) Onmessage(f func(p sugar.Payload)) {
 	d.OnMessage(f)
 }
 
@@ -169,18 +175,51 @@ func (d *RTCDataChannel) Onmessage(f func(p datachannel.Payload)) {
 // 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 // }
 
-func (d *RTCDataChannel) sendOpenChannelMessage() error {
-	if err := d.rtcPeerConnection.networkManager.SendOpenChannelMessage(*d.ID, d.Label); err != nil {
-		return &rtcerr.UnknownError{Err: err}
-	}
-	return nil
+func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
+	d.dataChannel = dc
 
+	// Ensure on
+	d.onOpen()
+
+	go d.readLoop()
+}
+
+func (d *RTCDataChannel) readLoop() {
+	for {
+		buffer := make([]byte, receiveMTU)
+		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
+		if err != nil {
+			fmt.Println("Failed to read from data channel", err)
+			continue
+		}
+
+		if isString {
+			d.onMessage(&sugar.PayloadString{Data: buffer[:n]})
+			continue
+		}
+		d.onMessage(&sugar.PayloadBinary{Data: buffer[:n]})
+	}
 }
 
 // Send sends the passed message to the DataChannel peer
-func (d *RTCDataChannel) Send(p datachannel.Payload) error {
-	if err := d.rtcPeerConnection.networkManager.SendDataChannelMessage(p, *d.ID); err != nil {
-		return &rtcerr.UnknownError{Err: err}
+func (d *RTCDataChannel) Send(payload sugar.Payload) error {
+	var data []byte
+	isString := false
+
+	switch p := payload.(type) {
+	case sugar.PayloadString:
+		data = p.Data
+		isString = true
+	case sugar.PayloadBinary:
+		data = p.Data
+	default:
+		return errors.Errorf("unknown DataChannel Payload (%s)", payload.PayloadType())
 	}
-	return nil
+
+	if len(data) == 0 {
+		data = []byte{0}
+	}
+
+	_, err := d.dataChannel.WriteDataChannel(data, isString)
+	return err
 }

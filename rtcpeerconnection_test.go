@@ -9,10 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/webrtc/internal/network"
-
-	"github.com/pions/webrtc/pkg/datachannel"
-
 	"github.com/pions/webrtc/pkg/ice"
 
 	"github.com/pions/webrtc/pkg/media"
@@ -424,51 +420,4 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 		<-onICEConnectionStateChangeCalled,
 		<-onDataChannelCalled,
 	}))
-}
-
-func TestRTCPeerConnection_OnDataChannelSync(t *testing.T) {
-	// This is a special case, where we need to ensure that any DataChannel setup
-	// in the supplied handler completes before allowing the calling code to
-	// resume running.
-	//
-	// This test also validates that the locking in RTCPeerConnection.dataChannelEventHandler()
-	// correctly interacts with the locking in the event handlers.
-	pc, err := New(RTCConfiguration{})
-	assert.Nil(t, err)
-
-	onOpenCalled := make(chan bool)
-	onDataChannelCalled := make(chan bool)
-	onMessageCalled := make(chan bool)
-	pc.OnDataChannel(func(dc *RTCDataChannel) {
-		onDataChannelCalled <- true
-		dc.OnOpen(func() {
-			onOpenCalled <- true
-		})
-
-		dc.OnMessage(func(p datachannel.Payload) {
-			onMessageCalled <- true
-		})
-	})
-
-	go func() {
-		dcEvents := []network.DataChannelEvent{
-			// NB: This order seems odd, but it matches what's emitted
-			// by networkManager
-			&network.DataChannelOpen{},
-			&network.DataChannelCreated{},
-			&network.DataChannelMessage{Payload: &datachannel.PayloadString{Data: []byte("o hai")}},
-		}
-
-		for _, event := range dcEvents {
-			pc.dataChannelEventHandler(event)
-		}
-	}()
-
-	// NB: If RTCPeerConnection.dataChannelEventHandler() does not correctly wait for
-	// OnDataChannel() to complete, this will hang until timeout because the handlers aren't set
-	// before the events are processed.
-	assert.EqualValues(t,
-		[]bool{true, true, true},
-		[]bool{<-onDataChannelCalled, <-onOpenCalled, <-onMessageCalled},
-	)
 }

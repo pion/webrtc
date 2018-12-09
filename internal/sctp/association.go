@@ -3,6 +3,7 @@ package sctp
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"sync"
 
 	"math"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/pkg/errors"
 )
+
+const receiveMTU = 8192
 
 // AssociationState is an enum for the states that an Association will transition
 // through while connecting
@@ -70,7 +73,9 @@ func (a AssociationState) String() string {
 //               Note: No "CLOSED" state is illustrated since if a
 //               association is "CLOSED" its TCB SHOULD be removed.
 type Association struct {
-	sync.Mutex
+	lock sync.Mutex
+
+	nextConn net.Conn
 
 	peerVerificationTag uint32
 	myVerificationTag   uint32
@@ -101,20 +106,92 @@ type Association struct {
 	inflightQueue             *payloadQueue
 	myMaxMTU                  uint16
 	peerCumulativeTSNAckPoint uint32
-	reassemblyQueue           map[uint16]*reassemblyQueue
-	outboundStreams           map[uint16]uint16
 
-	isInitiating bool
-	notifier     func(AssociationState)
+	streams              map[uint16]*Stream
+	acceptCh             chan *Stream
+	handshakeCompletedCh chan struct{}
+}
 
-	// TODO are these better as channels
-	// Put a blocking goroutine in port-receive (vs callbacks)
-	outboundHandler func([]byte)
-	dataHandler     func([]byte, uint16, PayloadProtocolIdentifier)
+// Server accepts a SCTP stream over a conn
+func Server(nextConn net.Conn) (*Association, error) {
+	a := createAssocation(nextConn)
+	go a.readLoop()
+	<-a.handshakeCompletedCh
+
+	return a, nil
+}
+
+// Client opens a SCTP stream over a conn
+func Client(nextConn net.Conn) (*Association, error) {
+	a := createAssocation(nextConn)
+	a.init()
+	go a.readLoop()
+	<-a.handshakeCompletedCh
+
+	return a, nil
+}
+
+func createAssocation(nextConn net.Conn) *Association {
+	rs := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(rs)
+
+	tsn := r.Uint32()
+	return &Association{
+		nextConn:                  nextConn,
+		myMaxNumOutboundStreams:   math.MaxUint16,
+		myMaxNumInboundStreams:    math.MaxUint16,
+		myReceiverWindowCredit:    10 * 1500, // 10 Max MTU packets buffer
+		payloadQueue:              &payloadQueue{},
+		inflightQueue:             &payloadQueue{},
+		myMaxMTU:                  1200,
+		myVerificationTag:         r.Uint32(),
+		myNextTSN:                 tsn,
+		state:                     Open,
+		streams:                   make(map[uint16]*Stream),
+		acceptCh:                  make(chan *Stream),
+		handshakeCompletedCh:      make(chan struct{}),
+		peerCumulativeTSNAckPoint: tsn - 1,
+	}
+}
+
+func (a *Association) init() {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	err := a.send(a.createInit())
+	if err != nil {
+		fmt.Printf("Failed to send init: %v", err)
+	}
+	a.setState(CookieWait)
+}
+
+// Close ends the SCTP Association and cleans up any state
+func (a *Association) Close() error {
+	// TODO: Close all streams
+	return nil
+}
+
+func (a *Association) readLoop() {
+	for {
+		// buffer is recreated because the user data is
+		// passed to the reassembly queue without copying
+		buffer := make([]byte, receiveMTU)
+		n, err := a.nextConn.Read(buffer)
+
+		if err != nil {
+			fmt.Println("sctp: failed to read", err)
+			// TODO: shutdown
+			continue
+		}
+
+		if err = a.handleInbound(buffer[:n]); err != nil {
+			fmt.Println(errors.Wrap(err, "Failed to push SCTP packet"))
+		}
+	}
 }
 
 // HandleInbound parses incoming raw packets
-func (a *Association) HandleInbound(raw []byte) error {
+func (a *Association) handleInbound(raw []byte) error {
 	p := &packet{}
 	if err := p.unmarshal(raw); err != nil {
 		return errors.Wrap(err, "Unable to parse SCTP packet")
@@ -131,98 +208,6 @@ func (a *Association) HandleInbound(raw []byte) error {
 	}
 
 	return nil
-}
-
-func (a *Association) packetizeOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) ([]*chunkPayloadData, error) {
-
-	if len(raw) > math.MaxUint16 {
-		return nil, errors.Errorf("Outbound packet larger than maximum message size %v", math.MaxUint16)
-	}
-
-	seqNum, ok := a.outboundStreams[streamIdentifier]
-
-	if !ok {
-		seqNum = 0
-	}
-
-	i := uint16(0)
-	remaining := uint16(len(raw))
-
-	var chunks []*chunkPayloadData
-	for remaining != 0 {
-		l := min(a.myMaxMTU, remaining)
-		chunks = append(chunks, &chunkPayloadData{
-			streamIdentifier:     streamIdentifier,
-			userData:             raw[i : i+l],
-			beginingFragment:     i == 0,
-			endingFragment:       remaining-l == 0,
-			immediateSack:        false,
-			payloadType:          payloadType,
-			streamSequenceNumber: seqNum,
-			tsn:                  a.myNextTSN,
-		})
-		a.myNextTSN++
-		remaining -= l
-		i += l
-	}
-
-	a.outboundStreams[streamIdentifier] = seqNum + 1
-
-	return chunks, nil
-}
-
-// HandleOutbound sends outbound raw packets
-func (a *Association) HandleOutbound(raw []byte, streamIdentifier uint16, payloadType PayloadProtocolIdentifier) error {
-	chunks, err := a.packetizeOutbound(raw, streamIdentifier, payloadType)
-	if err != nil {
-		return errors.Wrap(err, "Unable to packetize outbound packet")
-	}
-
-	for _, c := range chunks {
-		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for inbound SACK generation
-		a.inflightQueue.pushNoCheck(c)
-
-		p := &packet{
-			sourcePort:      a.sourcePort,
-			destinationPort: a.destinationPort,
-			verificationTag: a.peerVerificationTag,
-			chunks:          []chunk{c}}
-		if err := a.send(p); err != nil {
-			return errors.Wrap(err, "Unable to send outbound packet")
-		}
-
-	}
-	return nil
-}
-
-// Close ends the SCTP Association and cleans up any state
-func (a *Association) Close() error {
-	return nil
-}
-
-// NewAssocation creates a new Association and the state needed to manage it
-func NewAssocation(outboundHandler func([]byte), dataHandler func([]byte, uint16, PayloadProtocolIdentifier), notifier func(AssociationState)) *Association {
-	rs := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(rs)
-
-	tsn := r.Uint32()
-	return &Association{
-		myMaxNumOutboundStreams:   math.MaxUint16,
-		myMaxNumInboundStreams:    math.MaxUint16,
-		myReceiverWindowCredit:    10 * 1500, // 10 Max MTU packets buffer
-		payloadQueue:              &payloadQueue{},
-		inflightQueue:             &payloadQueue{},
-		myMaxMTU:                  1200,
-		reassemblyQueue:           make(map[uint16]*reassemblyQueue),
-		outboundStreams:           make(map[uint16]uint16),
-		myVerificationTag:         r.Uint32(),
-		myNextTSN:                 tsn,
-		outboundHandler:           outboundHandler,
-		dataHandler:               dataHandler,
-		state:                     Open,
-		notifier:                  notifier,
-		peerCumulativeTSNAckPoint: tsn - 1,
-	}
 }
 
 func checkPacket(p *packet) error {
@@ -274,31 +259,14 @@ func min(a, b uint16) uint16 {
 	return b
 }
 
-// Start starts the Association
-func (a *Association) Start(isInitiating bool) {
-	a.isInitiating = isInitiating
-}
-
+// setState sets the state of the Association.
 func (a *Association) setState(state AssociationState) {
 	if a.state != state {
 		a.state = state
-		if a.notifier != nil {
-			go a.notifier(state)
-		}
 	}
 }
 
-// Connect initiates the SCTP connection
-func (a *Association) Connect() {
-	if a.isInitiating {
-		err := a.send(a.createInit())
-		if err != nil {
-			fmt.Printf("Failed to send init: %v", err)
-		}
-		a.setState(CookieWait)
-	}
-}
-
+// The caller should hold the lock.
 func (a *Association) createInit() *packet {
 	outbound := &packet{}
 	outbound.verificationTag = a.peerVerificationTag
@@ -320,6 +288,7 @@ func (a *Association) createInit() *packet {
 	return outbound
 }
 
+// The caller should hold the lock.
 func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	// Should we be setting any of these permanently until we've ACKed further?
 	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
@@ -358,6 +327,7 @@ func (a *Association) handleInit(p *packet, i *chunkInit) *packet {
 	return outbound
 }
 
+// The caller should hold the lock.
 func (a *Association) handleInitAck(p *packet, i *chunkInitAck) (*packet, error) {
 	a.myMaxNumInboundStreams = min(i.numInboundStreams, a.myMaxNumInboundStreams)
 	a.myMaxNumOutboundStreams = min(i.numOutboundStreams, a.myMaxNumOutboundStreams)
@@ -393,28 +363,15 @@ func (a *Association) handleInitAck(p *packet, i *chunkInitAck) (*packet, error)
 	return outbound, nil
 }
 
+// The caller should hold the lock.
 func (a *Association) handleData(d *chunkPayloadData) *packet {
-
 	a.payloadQueue.push(d, a.peerLastTSN)
 
 	pd, popOk := a.payloadQueue.pop(a.peerLastTSN + 1)
 
 	for popOk {
-		rq, ok := a.reassemblyQueue[pd.streamIdentifier]
-		if !ok {
-			// If this is the first time we've seen a stream identifier
-			// Expected SeqNum == 0
-			rq = &reassemblyQueue{}
-			a.reassemblyQueue[pd.streamIdentifier] = rq
-		}
-
-		rq.push(pd)
-		userData, ok := rq.pop()
-		if ok {
-			// We know the popped data will have the same stream
-			// identifier as the pushed data
-			a.dataHandler(userData, pd.streamIdentifier, pd.payloadType)
-		}
+		s := a.getOrCreateStream(pd.streamIdentifier)
+		s.handleData(pd)
 
 		a.peerLastTSN++
 		pd, popOk = a.payloadQueue.pop(a.peerLastTSN)
@@ -436,6 +393,55 @@ func (a *Association) handleData(d *chunkPayloadData) *packet {
 	return outbound
 }
 
+// OpenStream opens a stream
+func (a *Association) OpenStream(streamIdentifier uint16, defaultPayloadType PayloadProtocolIdentifier) (*Stream, error) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if _, ok := a.streams[streamIdentifier]; ok {
+		return nil, fmt.Errorf("there already exists a stream with identifier %d", streamIdentifier)
+	}
+
+	s := a.createStream(streamIdentifier, false)
+	s.setDefaultPayloadType(defaultPayloadType)
+
+	return s, nil
+}
+
+// AcceptStream accepts a stream
+func (a *Association) AcceptStream() (*Stream, error) {
+	s := <-a.acceptCh
+	return s, nil
+}
+
+// createStream creates a stream. The caller should hold the lock and check no stream exists for this id.
+func (a *Association) createStream(streamIdentifier uint16, accept bool) *Stream {
+	s := &Stream{
+		association:      a,
+		streamIdentifier: streamIdentifier,
+		reassemblyQueue:  &reassemblyQueue{},
+		readNotifier:     make(chan struct{}),
+	}
+
+	a.streams[streamIdentifier] = s
+
+	if accept {
+		a.acceptCh <- s
+	}
+
+	return s
+}
+
+// getOrCreateStream gets or creates a stream. The caller should hold the lock.
+func (a *Association) getOrCreateStream(streamIdentifier uint16) *Stream {
+	if s, ok := a.streams[streamIdentifier]; ok {
+		return s
+	}
+
+	return a.createStream(streamIdentifier, true)
+}
+
+// The caller should hold the lock.
 func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	// i) If Cumulative TSN Ack is less than the Cumulative TSN Ack
 	// Point, then drop the SACK.  Since Cumulative TSN Ack is
@@ -483,18 +489,53 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	return sackDataPackets, nil
 }
 
+// sendPayloadData sends the data chunks.
+func (a *Association) sendPayloadData(chunks []*chunkPayloadData) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	for _, c := range chunks {
+		c.tsn = a.generateNextTSN()
+
+		// TODO: FIX THIS HACK, inflightQueue uses PayloadQueue which is really meant for inbound SACK generation
+		a.inflightQueue.pushNoCheck(c)
+
+		p := &packet{
+			sourcePort:      a.sourcePort,
+			destinationPort: a.destinationPort,
+			verificationTag: a.peerVerificationTag,
+			chunks:          []chunk{c}}
+		if err := a.send(p); err != nil {
+			return errors.Wrap(err, "Unable to send outbound packet")
+		}
+
+	}
+	return nil
+}
+
+// generateNextTSN returns the myNextTSN and increases it. The caller should hold the lock.
+func (a *Association) generateNextTSN() uint32 {
+	tsn := a.myNextTSN
+	a.myNextTSN++
+	return tsn
+}
+
+// send sends a packet over nextConn. The caller should hold the lock.
 func (a *Association) send(p *packet) error {
+
 	raw, err := p.marshal()
 	if err != nil {
 		return errors.Wrap(err, "Failed to send packet to outbound handler")
 	}
 
-	a.outboundHandler(raw)
-
-	return nil
+	_, err = a.nextConn.Write(raw)
+	return err
 }
 
 func (a *Association) handleChunk(p *packet, c chunk) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
 	if _, err := c.check(); err != nil {
 		return errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
@@ -516,6 +557,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
 			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
+
 	case *chunkInitAck:
 		switch a.state {
 		case CookieWait:
@@ -532,11 +574,13 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		default:
 			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
 		}
+
 	case *chunkAbort:
 		fmt.Println("Abort chunk, with errors:")
 		for _, e := range c.errorCauses {
 			fmt.Printf("error cause: %s\n", e)
 		}
+
 	case *chunkHeartbeat:
 		hbi, ok := c.params[0].(*paramHeartbeatInfo)
 		if !ok {
@@ -555,6 +599,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 				},
 			}},
 		})
+
 	case *chunkCookieEcho:
 		if bytes.Equal(a.myCookie.cookie, c.cookie) {
 			err := a.send(&packet{
@@ -567,6 +612,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 				return err
 			}
 			a.setState(Established)
+			close(a.handshakeCompletedCh)
 
 			return nil
 		}
@@ -575,6 +621,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		switch a.state {
 		case CookieEchoed:
 			a.setState(Established)
+			close(a.handshakeCompletedCh)
 			return nil
 		default:
 			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
@@ -583,6 +630,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		// TODO Abort
 	case *chunkPayloadData:
 		return a.send(a.handleData(c))
+
 	case *chunkSelectiveAck:
 		p, err := a.handleSack(c)
 		if err != nil {
@@ -594,6 +642,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 				return errors.Wrap(err, "Failure handling SACK")
 			}
 		}
+
 	default:
 		return errors.New("unhandled chunk type")
 	}

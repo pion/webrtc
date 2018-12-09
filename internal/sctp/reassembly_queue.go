@@ -2,9 +2,9 @@ package sctp
 
 import "sort"
 
-type dataChannelMessageArray []*dataChannelMessage
+type payloadDataMessageArray []*payloadDataMessage
 
-func (s dataChannelMessageArray) search(seqNum uint16) (*dataChannelMessage, bool) {
+func (s payloadDataMessageArray) search(seqNum uint16) (*payloadDataMessage, bool) {
 	i := sort.Search(len(s), func(i int) bool {
 		return s[i].seqNum >= seqNum
 	})
@@ -16,17 +16,18 @@ func (s dataChannelMessageArray) search(seqNum uint16) (*dataChannelMessage, boo
 	return nil, false
 }
 
-func (s dataChannelMessageArray) sort() {
+func (s payloadDataMessageArray) sort() {
 	sort.Slice(s, func(i, j int) bool { return s[i].seqNum < s[j].seqNum })
 }
 
-type dataChannelMessage struct {
+type payloadDataMessage struct {
 	seqNum        uint16
+	payloadType   PayloadProtocolIdentifier
 	fragmentQueue []*chunkPayloadData
 	length        int
 }
 
-func (m *dataChannelMessage) complete() bool {
+func (m *payloadDataMessage) complete() bool {
 
 	if len(m.fragmentQueue) == 0 {
 		// this should be impossible
@@ -43,12 +44,12 @@ func (m *dataChannelMessage) complete() bool {
 
 }
 
-func (m *dataChannelMessage) clear() {
+func (m *payloadDataMessage) clear() {
 	m.length = 0
 	m.fragmentQueue = []*chunkPayloadData{}
 }
 
-func (m *dataChannelMessage) assemble() ([]byte, bool) {
+func (m *payloadDataMessage) assemble() ([]byte, bool) {
 	if m.complete() {
 		b := make([]byte, m.length)
 		i := 0
@@ -64,8 +65,8 @@ func (m *dataChannelMessage) assemble() ([]byte, bool) {
 }
 
 type reassemblyQueue struct {
-	messageQueue     dataChannelMessageArray
-	unorderedMessage dataChannelMessage
+	messageQueue     payloadDataMessageArray
+	unorderedMessage payloadDataMessage
 	expectedSeqNum   uint16
 }
 
@@ -73,12 +74,13 @@ func (r *reassemblyQueue) push(p *chunkPayloadData) {
 	if p.unordered {
 		r.unorderedMessage.fragmentQueue = append(r.unorderedMessage.fragmentQueue, p)
 		r.unorderedMessage.length += len(p.userData)
+		r.unorderedMessage.payloadType = p.payloadType
 		return
 	}
 
 	m, ok := r.messageQueue.search(p.streamSequenceNumber)
 	if !ok {
-		m = &dataChannelMessage{seqNum: p.streamSequenceNumber}
+		m = &payloadDataMessage{seqNum: p.streamSequenceNumber, payloadType: p.payloadType}
 		r.messageQueue = append(r.messageQueue, m)
 		r.messageQueue.sort()
 	}
@@ -87,12 +89,12 @@ func (r *reassemblyQueue) push(p *chunkPayloadData) {
 	m.length += len(p.userData)
 }
 
-func (r *reassemblyQueue) pop() ([]byte, bool) {
-
+func (r *reassemblyQueue) pop() ([]byte, PayloadProtocolIdentifier, bool) {
 	b, ok := r.unorderedMessage.assemble()
 	if ok {
+		ppi := r.unorderedMessage.payloadType
 		r.unorderedMessage.clear()
-		return b, true
+		return b, ppi, true
 	}
 
 	// Is there any chance that if the message was in the queue, it wouldn't be
@@ -105,10 +107,10 @@ func (r *reassemblyQueue) pop() ([]byte, bool) {
 			if ok {
 				r.messageQueue = r.messageQueue[1:]
 				r.expectedSeqNum++
-				return b, true
+				return b, m.payloadType, true
 			}
 
 		}
 	}
-	return nil, false
+	return nil, PayloadProtocolIdentifier(0), false
 }
