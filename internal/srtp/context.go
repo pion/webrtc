@@ -1,7 +1,6 @@
 package srtp
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -216,11 +215,12 @@ func (c *Context) generateAuthTag(buf, authTag []byte) ([]byte, error) {
 	return mac.Sum(nil)[0:10], nil
 }
 
-func (c *Context) verifyAuthTag(buf, expectedAuthTag, authTag []byte) (bool, error) {
-	// Validate incoming auth tag, see generateAuthTag
-	mac := hmac.New(sha1.New, authTag)
-	if _, err := mac.Write(buf); err != nil {
-		return false, err
-	}
-	return bytes.Equal(expectedAuthTag, mac.Sum(nil)[0:10]), nil
-}
+// (TODO re-enable auth tag verification #270)
+// func (c *Context) verifyAuthTag(buf, expectedAuthTag, authTag []byte) (bool, error) {
+// 	// Validate incoming auth tag, see generateAuthTag
+// 	mac := hmac.New(sha1.New, authTag)
+// 	if _, err := mac.Write(buf); err != nil {
+// 		return false, err
+// 	}
+// 	return bytes.Equal(expectedAuthTag, mac.Sum(nil)[0:10]), nil
+// }
