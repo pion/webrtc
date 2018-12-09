@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/gstreamer-send/gst"
 	"github.com/pions/webrtc/examples/util"
+	"github.com/pions/webrtc/examples/util/gstreamer-src"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
