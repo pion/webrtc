@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/gstreamer-receive/gst"
 	"github.com/pions/webrtc/examples/util"
+	"github.com/pions/webrtc/examples/util/gstreamer-sink"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtcp"
 )

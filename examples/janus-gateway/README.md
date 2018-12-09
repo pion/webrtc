@@ -19,3 +19,13 @@ Got VP8 track, saving to disk as output.ivf
 ```
 
 You will see output.ivf in the current folder.
+
+## video-room
+This example demonstrates how to stream to a Janus video-room using pion-WebRTC
+
+### Running
+run `main.go` in `github.com/pions/webrtc/examples/janus-gateway/video-room`
+
+If this worked you should see a test video in video-room `1234`
+
+This is the default demo-room that exists in the sample configs, and can quickly be accessed via the Janus demos.
