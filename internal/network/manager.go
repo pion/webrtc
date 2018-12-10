@@ -10,12 +10,15 @@ import (
 
 	"github.com/pions/dtls/pkg/dtls"
 	"github.com/pions/webrtc/internal/datachannel"
+	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
 )
+
+const receiveMTU = 8192
 
 // TransportPair allows the application to be notified about both Rtp
 // and Rtcp messages incoming from the remote host
@@ -31,7 +34,9 @@ type Manager struct {
 	iceConn  *ice.Conn
 	isOffer  bool
 
-	srtpConn                *srtp.Conn
+	dtlsEndpoint *mux.Endpoint
+	srtpEndpoint *mux.Endpoint
+
 	srtpInboundContextLock  sync.RWMutex
 	srtpInboundContext      *srtp.Context
 	srtpOutboundContextLock sync.RWMutex
@@ -99,6 +104,10 @@ func (m *Manager) Start(isOffer bool,
 		return err
 	}
 
+	mx := mux.NewMux(m.iceConn, receiveMTU)
+	m.dtlsEndpoint = mx.NewEndpoint(mux.MatchDTLS)
+	m.srtpEndpoint = mx.NewEndpoint(mux.MatchSRTP)
+
 	m.startSRTP()
 
 	if err := m.startDTLS(isOffer, dtlsCert, dtlsPrivKey, fingerprint, fingerprintHash); err != nil {
@@ -134,8 +143,17 @@ func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
 }
 
 func (m *Manager) startSRTP() {
-	srtpConn := srtp.Wrap(m.iceConn, m.handleSRTP)
-	m.srtpConn = srtpConn
+	// Glue code until SRTP is a Conn.
+	go func() {
+		buf := make([]byte, receiveMTU)
+		for {
+			n, err := m.srtpEndpoint.Read(buf)
+			if err != nil {
+				return
+			}
+			m.handleSRTP(buf[:n])
+		}
+	}()
 }
 
 func (m *Manager) createContextSRTP(isOffer bool) error {
@@ -153,14 +171,14 @@ func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKe
 	dtlsCofig := &dtls.Config{Certificate: dtlsCert, PrivateKey: dtlsPrivKey}
 	if isOffer {
 		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err := dtls.Server(m.srtpConn, dtlsCofig)
+		dtlsConn, err := dtls.Server(m.dtlsEndpoint, dtlsCofig)
 		if err != nil {
 			return err
 		}
 		m.dtlsConn = dtlsConn
 	} else {
 		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err := dtls.Client(m.srtpConn, dtlsCofig)
+		dtlsConn, err := dtls.Client(m.dtlsEndpoint, dtlsCofig)
 		if err != nil {
 			return err
 		}
