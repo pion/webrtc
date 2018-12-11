@@ -76,6 +76,21 @@ func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier) 
 	}
 }
 
+// NewLimitedManager creates a new network.Manager (and a UDP limited ICE agent)
+func NewLimitedManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
+	iceAgent, err := ice.NewLimitedAgent(urls, ntf, minport, maxport)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Manager{
+		IceAgent:                 iceAgent,
+		bufferTransportPairs:     make(map[uint32]*TransportPair),
+		bufferTransportGenerator: btg,
+	}, nil
+}
+
 func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
 	m.pairsLock.RLock()
 	defer m.pairsLock.RUnlock()
