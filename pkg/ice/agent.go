@@ -117,15 +117,19 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 	return a
 }
 
-// SetLocalPortRange allows the range of local ephemeral ports used by the
-// ICE agent to be limited.
-func (a *Agent) SetLocalPortRange(min, max uint16) error {
+// NewLimitedAgent creates a new agent, which limits the ephemeral UDP ports it allocates
+// This is usually not required, and not part of the WebRTC protocol, but may be helpful
+// in some edge cases. It's also important to note that this limitation only affects host
+// candidates, and not reflective candidates.
+func NewLimitedAgent(urls []*URL, notifier func(ConnectionState), min, max uint16) (*Agent, error) {
 	if max < min {
-		return ErrPort
+		return nil, ErrPort
 	}
+
+	a := NewAgent(urls, notifier)
 	a.portmin = min
 	a.portmax = max
-	return nil
+	return a, nil
 }
 
 func (a *Agent) listenUDP(network string, laddr *net.UDPAddr) (*net.UDPConn, error) {
