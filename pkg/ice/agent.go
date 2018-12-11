@@ -47,6 +47,9 @@ type Agent struct {
 	haveStarted   bool
 	isControlling bool
 
+	portmin uint16
+	portmax uint16
+
 	localUfrag      string
 	localPwd        string
 	localCandidates map[NetworkType][]*Candidate
@@ -114,11 +117,45 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 	return a
 }
 
+// SetLocalPortRange allows the range of local ephemeral ports used by the
+// ICE agent to be limited.
+func (a *Agent) SetLocalPortRange(min, max uint16) error {
+	if max < min {
+		return ErrPort
+	}
+	a.portmin = min
+	a.portmax = max
+	return nil
+}
+
+func (a *Agent) listenUDP(network string, laddr *net.UDPAddr) (*net.UDPConn, error) {
+	if (laddr.Port != 0) || ((a.portmin == 0) && (a.portmax == 0)) {
+		return net.ListenUDP(network, laddr)
+	}
+	var i, j int
+	i = int(a.portmin)
+	if i == 0 {
+		i = 1
+	}
+	j = int(a.portmax)
+	if j == 0 {
+		j = 0xFFFF
+	}
+	for i <= j {
+		c, e := net.ListenUDP(network, &net.UDPAddr{IP: laddr.IP, Port: i})
+		if e == nil {
+			return c, e
+		}
+		i++
+	}
+	return nil, ErrPort
+}
+
 func (a *Agent) gatherCandidatesLocal() {
 	localIPs := localInterfaces()
 	for _, ip := range localIPs {
 		for _, network := range supportedNetworks {
-			conn, err := net.ListenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
+			conn, err := a.listenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
 				fmt.Printf("could not listen %s %s\n", network, ip)
 				continue

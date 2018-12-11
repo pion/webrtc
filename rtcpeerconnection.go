@@ -160,6 +160,13 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 
 	pc.networkManager = network.NewManager(urls, pc.generateChannel, pc.iceStateChange)
 
+	if (configuration.MinLocalPort != 0) || (configuration.MaxLocalPort != 0) {
+		err := pc.networkManager.IceAgent.SetLocalPortRange(configuration.MinLocalPort, configuration.MaxLocalPort)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &pc, nil
 }
 
