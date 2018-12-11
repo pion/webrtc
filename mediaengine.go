@@ -18,6 +18,7 @@ func RegisterCodec(codec *RTCRtpCodec) {
 
 // PayloadTypes for the default codecs
 const (
+	DefaultPayloadTypeG722 = 9
 	DefaultPayloadTypeOpus = 111
 	DefaultPayloadTypeVP8  = 96
 	DefaultPayloadTypeVP9  = 98
@@ -26,6 +27,7 @@ const (
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
 func RegisterDefaultCodecs() {
+	RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000, 1))
 	RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
 	RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
 	RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
@@ -86,11 +88,24 @@ func (m *MediaEngine) getCodecsByKind(kind RTCRtpCodecType) []*RTCRtpCodec {
 
 // Names for the default codecs supported by pions-webrtc
 const (
+	G722 = "G722"
 	Opus = "opus"
 	VP8  = "VP8"
 	VP9  = "VP9"
 	H264 = "H264"
 )
+
+// NewRTCRtpG722Codec is a helper to create a G722 codec
+func NewRTCRtpG722Codec(payloadType uint8, clockrate uint32, channels uint16) *RTCRtpCodec {
+	c := NewRTCRtpCodec(RTCRtpCodecTypeAudio,
+		G722,
+		clockrate,
+		channels,
+		"",
+		payloadType,
+		&codecs.G722Payloader{})
+	return c
+}
 
 // NewRTCRtpOpusCodec is a helper to create an Opus codec
 func NewRTCRtpOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *RTCRtpCodec {
