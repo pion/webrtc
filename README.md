@@ -68,7 +68,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
 * [Michael MacDonald](https://github.com/mjmac)
 * [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
-* [Woodrow Douglass](https://github.com/wdouglass) *Application notification of incoming RTCP messages*
+* [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements*
 * [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification
 
 ### License
