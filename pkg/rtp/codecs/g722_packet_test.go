@@ -2,8 +2,8 @@ package codecs
 
 import (
 	"bytes"
+	"crypto/rand"
 	"math"
-	"math/rand"
 	"testing"
 )
 
@@ -20,8 +20,7 @@ func TestG722Payloader(t *testing.T) {
 	_, err := rand.Read(samples)
 
 	if err != nil {
-		//according to go docs, this should never ever happen
-		t.Fatal("RNG Error!")
+		t.Fatal("RNG Error: ", err)
 	}
 
 	//make a copy, for payloader input
