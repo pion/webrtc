@@ -6,71 +6,133 @@ import (
 	"net"
 	"sync"
 	"time"
-)
 
-// Preference enums when generate Priority
-const (
-	HostCandidatePreference  uint16 = 126
-	SrflxCandidatePreference uint16 = 100
+	"github.com/pions/pkg/stun"
 )
 
 const receiveMTU = 8192
 
 // Candidate represents an ICE candidate
-type Candidate interface {
-	GetBase() *CandidateBase
-	String() string
-	Equal(Candidate) bool
-}
-
-// CandidateBase represents an ICE candidate, a base with enough attributes
-// for host candidates, see CandidateSrflx and CandidateRelay for more
-type CandidateBase struct {
-	lock sync.RWMutex
+type Candidate struct {
 	NetworkType
-	IP           net.IP
-	Port         int
+
+	Type           CandidateType
+	IP             net.IP
+	Port           int
+	RelatedAddress *CandidateRelatedAddress
+
+	lock         sync.RWMutex
 	lastSent     time.Time
 	lastReceived time.Time
-	conn         net.PacketConn
+
+	agent    *Agent
+	conn     net.PacketConn
+	closeCh  chan struct{}
+	closedCh chan struct{}
 }
 
-func (c *CandidateBase) addr() net.Addr {
-	return &net.UDPAddr{
-		IP:   c.IP,
-		Port: c.Port,
+// NewCandidateHost creates a new host candidate
+func NewCandidateHost(network string, ip net.IP, port int) (*Candidate, error) {
+	networkType, err := determineNetworkType(network, ip)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Candidate{
+		Type:        CandidateTypeHost,
+		NetworkType: networkType,
+		IP:          ip,
+		Port:        port,
+	}, nil
+}
+
+// NewCandidateServerReflexive creates a new server reflective candidate
+func NewCandidateServerReflexive(network string, ip net.IP, port int, relAddr string, relPort int) (*Candidate, error) {
+	networkType, err := determineNetworkType(network, ip)
+	if err != nil {
+		return nil, err
+	}
+	return &Candidate{
+		Type:        CandidateTypeServerReflexive,
+		NetworkType: networkType,
+		IP:          ip,
+		Port:        port,
+		RelatedAddress: &CandidateRelatedAddress{
+			Address: relAddr,
+			Port:    relPort,
+		},
+	}, nil
+}
+
+// start runs the candidate using the provided connection
+func (c *Candidate) start(a *Agent, conn net.PacketConn) {
+	c.agent = a
+	c.conn = conn
+	c.closeCh = make(chan struct{})
+	c.closedCh = make(chan struct{})
+
+	go c.recvLoop()
+}
+
+func (c *Candidate) recvLoop() {
+	defer func() {
+		close(c.closedCh)
+	}()
+
+	buffer := make([]byte, receiveMTU)
+	for {
+		n, srcAddr, err := c.conn.ReadFrom(buffer)
+		if err != nil {
+			return
+		}
+
+		if stun.IsSTUN(buffer[:n]) {
+			m, err := stun.NewMessage(buffer[:n])
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err))
+				continue
+			}
+			err = c.agent.run(func(agent *Agent) {
+				agent.handleInbound(m, c, srcAddr)
+			})
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to handle message: %v", err))
+			}
+
+			continue
+		}
+
+		select {
+		case bufin := <-c.agent.rcvCh:
+			copy(bufin.buf, buffer[:n]) // TODO: avoid copy in common case?
+			bufin.size <- n
+		case <-c.closeCh:
+			return
+		}
 	}
 }
 
-// LastSent returns a time.Time indicating the last time
-// this candidate was sent
-func (c *CandidateBase) LastSent() time.Time {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lastSent
-}
-
-func (c *CandidateBase) setLastSent(t time.Time) {
+// close stops the recvLoop
+func (c *Candidate) close() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.lastSent = t
+	if c.conn != nil {
+		// Unblock recvLoop
+		close(c.closeCh)
+		// Close the conn
+		err := c.conn.Close()
+		if err != nil {
+			return err
+		}
+
+		// Wait until the recvLoop is closed
+		<-c.closedCh
+	}
+
+	return nil
 }
 
-// LastReceived returns a time.Time indicating the last time
-// this candidate was received
-func (c *CandidateBase) LastReceived() time.Time {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.lastReceived
-}
-
-func (c *CandidateBase) setLastReceived(t time.Time) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.lastReceived = t
-}
-
-func (c *CandidateBase) writeTo(raw []byte, dst *CandidateBase) (int, error) {
+func (c *Candidate) writeTo(raw []byte, dst *Candidate) (int, error) {
 	n, err := c.conn.WriteTo(raw, dst.addr())
 	if err != nil {
 		return n, fmt.Errorf("failed to send packet: %v", err)
@@ -79,16 +141,8 @@ func (c *CandidateBase) writeTo(raw []byte, dst *CandidateBase) (int, error) {
 	return n, nil
 }
 
-func (c *CandidateBase) seen(outbound bool) {
-	if outbound {
-		c.setLastSent(time.Now())
-	} else {
-		c.setLastReceived(time.Now())
-	}
-}
-
 // Priority computes the priority for this ICE Candidate
-func (c *CandidateBase) Priority(typePreference uint16, component uint16) uint16 {
+func (c *Candidate) Priority(typePreference uint16, component uint16) uint16 {
 	localPreference := uint16(rand.New(rand.NewSource(time.Now().UnixNano())).Uint32() / 2)
 	return (2^24)*typePreference +
 		(2^8)*localPreference +
@@ -96,67 +150,58 @@ func (c *CandidateBase) Priority(typePreference uint16, component uint16) uint16
 }
 
 // Equal is used to compare two CandidateBases
-func (c *CandidateBase) Equal(other *CandidateBase) bool {
+func (c *Candidate) Equal(other *Candidate) bool {
 	return c.NetworkType == other.NetworkType &&
+		c.Type == other.Type &&
 		c.IP.Equal(other.IP) &&
-		c.Port == other.Port
-}
-
-// CandidateHost is a Candidate of typ Host
-type CandidateHost struct {
-	CandidateBase
-}
-
-// GetBase returns the CandidateBase, attributes shared between all Candidates
-func (c *CandidateHost) GetBase() *CandidateBase {
-	return &c.CandidateBase
-}
-
-// Port for CandidateHost
-func (c *CandidateHost) Port() int {
-	return c.CandidateBase.Port
+		c.Port == other.Port &&
+		c.RelatedAddress.Equal(other.RelatedAddress)
 }
 
 // String makes the CandidateHost printable
-func (c *CandidateHost) String() string {
-	return fmt.Sprintf("%s:%d", c.CandidateBase.IP, c.CandidateBase.Port)
+func (c *Candidate) String() string {
+	return fmt.Sprintf("%s %s:%d%s", c.Type, c.IP, c.Port, c.RelatedAddress)
 }
 
-// Equal is used to compare two Candidates
-func (c *CandidateHost) Equal(other Candidate) bool {
-	switch other.(type) {
-	case *CandidateHost:
-		return c.GetBase().Equal(other.GetBase())
-	default:
-		return false
+// LastReceived returns a time.Time indicating the last time
+// this candidate was received
+func (c *Candidate) LastReceived() time.Time {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.lastReceived
+}
+
+func (c *Candidate) setLastReceived(t time.Time) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.lastReceived = t
+}
+
+// LastSent returns a time.Time indicating the last time
+// this candidate was sent
+func (c *Candidate) LastSent() time.Time {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.lastSent
+}
+
+func (c *Candidate) setLastSent(t time.Time) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.lastSent = t
+}
+
+func (c *Candidate) seen(outbound bool) {
+	if outbound {
+		c.setLastSent(time.Now())
+	} else {
+		c.setLastReceived(time.Now())
 	}
 }
 
-// CandidateSrflx is a Candidate of typ Server-Reflexive
-type CandidateSrflx struct {
-	CandidateBase
-	RelatedAddress string
-	RelatedPort    int
-}
-
-// GetBase returns the CandidateBase, attributes shared between all Candidates
-func (c *CandidateSrflx) GetBase() *CandidateBase {
-	return &c.CandidateBase
-}
-
-// String makes the CandidateSrflx printable
-func (c *CandidateSrflx) String() string {
-	return fmt.Sprintf("%s:%d", c.RelatedAddress, c.RelatedPort)
-}
-
-// Equal is used to compare two Candidates
-func (c *CandidateSrflx) Equal(other Candidate) bool {
-	switch v := other.(type) {
-	case *CandidateSrflx:
-		return c.GetBase().Equal(v.GetBase()) &&
-			c.RelatedAddress == v.RelatedAddress &&
-			c.RelatedPort == v.RelatedPort
-	default:
-		return false
+func (c *Candidate) addr() net.Addr {
+	return &net.UDPAddr{
+		IP:   c.IP,
+		Port: c.Port,
 	}
 }

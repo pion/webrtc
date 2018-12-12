@@ -1,6 +1,7 @@
 package ice
 
 import (
+	"fmt"
 	"net"
 	"strings"
 )
@@ -77,25 +78,25 @@ func (t NetworkType) IsReliable() bool {
 	return false
 }
 
-// DetermineNetworkType determines the type of network based on
+// determineNetworkType determines the type of network based on
 // the short network string and an IP address.
-func DetermineNetworkType(network string, ip net.IP) NetworkType {
+func determineNetworkType(network string, ip net.IP) (NetworkType, error) {
 	ipv4 := ip.To4() != nil
 
 	switch {
 	case strings.HasPrefix(strings.ToLower(network), udp):
 		if ipv4 {
-			return NetworkTypeUDP4
+			return NetworkTypeUDP4, nil
 		}
-		return NetworkTypeUDP6
+		return NetworkTypeUDP6, nil
 
 	case strings.HasPrefix(strings.ToLower(network), tcp):
 		if ipv4 {
-			return NetworkTypeTCP4
+			return NetworkTypeTCP4, nil
 		}
-		return NetworkTypeTCP6
+		return NetworkTypeTCP6, nil
 
 	}
 
-	return NetworkType(0)
+	return NetworkType(0), fmt.Errorf("unable to determine networkType from %s %s", network, ip)
 }

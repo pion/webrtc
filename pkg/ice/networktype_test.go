@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNetworkTypeParsing(t *testing.T) {
+func TestNetworkTypeParsing_Success(t *testing.T) {
 	ipv4 := net.ParseIP("192.168.0.1")
 	ipv6 := net.ParseIP("fe80::a3:6ff:fec4:5454")
 
@@ -39,17 +39,36 @@ func TestNetworkTypeParsing(t *testing.T) {
 			ipv6,
 			NetworkTypeUDP6,
 		},
+	} {
+		actual, err := determineNetworkType(test.inNetwork, test.inIP)
+		if err != nil {
+			t.Errorf("NetworkTypeParsing failed: %v", err)
+		}
+		if actual != test.expected {
+			t.Errorf("NetworkTypeParsing: '%s' -- input:%s expected:%s actual:%s",
+				test.name, test.inNetwork, test.expected, actual)
+		}
+	}
+}
+
+func TestNetworkTypeParsing_Failure(t *testing.T) {
+	ipv6 := net.ParseIP("fe80::a3:6ff:fec4:5454")
+
+	for _, test := range []struct {
+		name      string
+		inNetwork string
+		inIP      net.IP
+	}{
 		{
 			"invalid network",
 			"junkNetwork",
 			ipv6,
-			NetworkType(0),
 		},
 	} {
-		actual := DetermineNetworkType(test.inNetwork, test.inIP)
-		if actual != test.expected {
-			t.Errorf("NetworkTypeParsing: '%s' -- input:%s expected:%s actual:%s",
-				test.name, test.inNetwork, test.expected, actual)
+		actual, err := determineNetworkType(test.inNetwork, test.inIP)
+		if err == nil {
+			t.Errorf("NetworkTypeParsing should fail: '%s' -- input:%s actual:%s",
+				test.name, test.inNetwork, actual)
 		}
 	}
 }
