@@ -12,6 +12,7 @@ type Mux struct {
 	nextConn   net.Conn
 	endpoints  map[*Endpoint]MatchFunc
 	bufferSize int
+	closedCh   chan struct{}
 }
 
 // NewMux creates a new Mux
@@ -20,6 +21,7 @@ func NewMux(conn net.Conn, bufferSize int) *Mux {
 		nextConn:   conn,
 		endpoints:  make(map[*Endpoint]MatchFunc),
 		bufferSize: bufferSize,
+		closedCh:   make(chan struct{}),
 	}
 
 	go m.readLoop()
@@ -67,10 +69,21 @@ func (m *Mux) Close() error {
 		m.removeEndpoint(e)
 	}
 
-	return m.nextConn.Close()
+	err := m.nextConn.Close()
+	if err != nil {
+		return err
+	}
+
+	// Wait for readLoop to end
+	<-m.closedCh
+
+	return nil
 }
 
 func (m *Mux) readLoop() {
+	defer func() {
+		close(m.closedCh)
+	}()
 	buf := make([]byte, m.bufferSize)
 	for {
 		n, err := m.nextConn.Read(buf)
