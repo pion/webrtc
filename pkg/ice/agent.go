@@ -49,11 +49,11 @@ type Agent struct {
 
 	localUfrag      string
 	localPwd        string
-	localCandidates map[NetworkType][]Candidate
+	localCandidates map[NetworkType][]*Candidate
 
 	remoteUfrag      string
 	remotePwd        string
-	remoteCandidates map[NetworkType][]Candidate
+	remoteCandidates map[NetworkType][]*Candidate
 
 	selectedPair *candidatePair
 	validPairs   []*candidatePair
@@ -62,9 +62,8 @@ type Agent struct {
 	rcvCh chan *bufIn
 
 	// State for closing
-	closeOnce sync.Once
-	done      chan struct{}
-	err       atomicError
+	done chan struct{}
+	err  atomicError
 }
 
 type bufIn struct {
@@ -96,8 +95,8 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:   GatheringStateComplete, // TODO trickle-ice
 		connectionState:  ConnectionStateNew,
-		localCandidates:  make(map[NetworkType][]Candidate),
-		remoteCandidates: make(map[NetworkType][]Candidate),
+		localCandidates:  make(map[NetworkType][]*Candidate),
+		remoteCandidates: make(map[NetworkType][]*Candidate),
 
 		localUfrag:  util.RandSeq(16),
 		localPwd:    util.RandSeq(32),
@@ -125,22 +124,19 @@ func (a *Agent) gatherCandidatesLocal() {
 				continue
 			}
 
-			networkType := DetermineNetworkType(network, ip)
-
-			c := &CandidateHost{
-				CandidateBase: CandidateBase{
-					NetworkType: networkType,
-					IP:          ip,
-					Port:        conn.LocalAddr().(*net.UDPAddr).Port,
-					conn:        conn,
-				},
+			port := conn.LocalAddr().(*net.UDPAddr).Port
+			c, err := NewCandidateHost(network, ip, port)
+			if err != nil {
+				fmt.Printf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
+				continue
 			}
 
+			networkType := c.NetworkType
 			set := a.localCandidates[networkType]
 			set = append(set, c)
 			a.localCandidates[networkType] = set
 
-			go a.recvLoop(c)
+			c.start(a, conn)
 		}
 	}
 }
@@ -161,22 +157,22 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 					fmt.Printf("could not listen %s %s: %v\n", network, laddr, err)
 				}
 
-				c := &CandidateSrflx{
-					CandidateBase: CandidateBase{
-						NetworkType: networkType,
-						IP:          xoraddr.IP,
-						Port:        xoraddr.Port,
-						conn:        conn,
-					},
-					RelatedAddress: laddr.IP.String(),
-					RelatedPort:    laddr.Port,
+				ip := xoraddr.IP
+				port := xoraddr.Port
+				relIP := laddr.IP.String()
+				relPort := laddr.Port
+				c, err := NewCandidateServerReflexive(network, ip, port, relIP, relPort)
+				if err != nil {
+					fmt.Printf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
+					continue
 				}
 
+				networkType := c.NetworkType
 				set := a.localCandidates[networkType]
 				set = append(set, c)
 				a.localCandidates[networkType] = set
 
-				go a.recvLoop(c)
+				c.start(a, conn)
 
 			default:
 				fmt.Printf("scheme %s is not implemented\n", url.Scheme.String())
@@ -242,7 +238,7 @@ func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remoteP
 	})
 }
 
-func (a *Agent) pingCandidate(local, remote Candidate) {
+func (a *Agent) pingCandidate(local, remote *Candidate) {
 	var msg *stun.Message
 	var err error
 
@@ -256,7 +252,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.Priority(CandidateTypeHost.Preference(), 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -266,7 +262,7 @@ func (a *Agent) pingCandidate(local, remote Candidate) {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.GetBase().Priority(HostCandidatePreference, 1))},
+			&stun.Priority{Priority: uint32(local.Priority(CandidateTypeHost.Preference(), 1))},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -293,7 +289,7 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 	}
 }
 
-func (a *Agent) setValidPair(local, remote Candidate, selected bool) {
+func (a *Agent) setValidPair(local, remote *Candidate, selected bool) {
 	// TODO: avoid duplicates
 	p := newCandidatePair(local, remote)
 
@@ -345,46 +341,8 @@ func (a *Agent) taskLoop() {
 			t(a)
 
 		case <-a.done:
-
+			return
 		}
-	}
-}
-
-func (a *Agent) recvLoop(c Candidate) {
-	base := c.GetBase()
-	buffer := make([]byte, receiveMTU)
-	for {
-		n, srcAddr, err := base.conn.ReadFrom(buffer)
-		if err != nil {
-			// TODO: handle connection close?
-			break
-		}
-
-		if len(buffer) == 0 {
-			fmt.Println("handleIncoming: inbound buffer is not long enough to demux")
-			continue
-		}
-
-		if stun.IsSTUN(buffer) {
-			m, err := stun.NewMessage(buffer[:n])
-			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to handle decode ICE from %s to %s: %v", base.addr(), srcAddr, err))
-				continue
-			}
-
-			err = a.run(func(agent *Agent) {
-				agent.handleInbound(m, c, srcAddr)
-			})
-			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to handle message: %v", err))
-			}
-
-			continue
-		}
-
-		bufin := <-a.rcvCh
-		copy(bufin.buf, buffer[:n]) // TODO: avoid copy in common case?
-		bufin.size <- n
 	}
 }
 
@@ -396,7 +354,7 @@ func (a *Agent) validateSelectedPair() bool {
 		return false
 	}
 
-	if time.Since(a.selectedPair.remote.GetBase().LastReceived()) > connectionTimeout {
+	if time.Since(a.selectedPair.remote.LastReceived()) > connectionTimeout {
 		a.selectedPair = nil
 		a.updateConnectionState(ConnectionStateDisconnected)
 		return false
@@ -413,7 +371,7 @@ func (a *Agent) checkKeepalive() {
 		return
 	}
 
-	if time.Since(a.selectedPair.remote.GetBase().LastSent()) > keepaliveInterval {
+	if time.Since(a.selectedPair.remote.LastSent()) > keepaliveInterval {
 		a.keepaliveCandidate(a.selectedPair.local, a.selectedPair.remote)
 	}
 }
@@ -435,9 +393,9 @@ func (a *Agent) pingAllCandidates() {
 }
 
 // AddRemoteCandidate adds a new remote candidate
-func (a *Agent) AddRemoteCandidate(c Candidate) error {
+func (a *Agent) AddRemoteCandidate(c *Candidate) error {
 	return a.run(func(agent *Agent) {
-		networkType := c.GetBase().NetworkType
+		networkType := c.NetworkType
 		set := agent.remoteCandidates[networkType]
 
 		for _, candidate := range set {
@@ -452,11 +410,11 @@ func (a *Agent) AddRemoteCandidate(c Candidate) error {
 }
 
 // GetLocalCandidates returns the local candidates
-func (a *Agent) GetLocalCandidates() ([]Candidate, error) {
-	res := make(chan []Candidate)
+func (a *Agent) GetLocalCandidates() ([]*Candidate, error) {
+	res := make(chan []*Candidate)
 
 	err := a.run(func(agent *Agent) {
-		var candidates []Candidate
+		var candidates []*Candidate
 		for _, set := range agent.localCandidates {
 			candidates = append(candidates, set...)
 		}
@@ -476,16 +434,44 @@ func (a *Agent) GetLocalUserCredentials() (frag string, pwd string) {
 
 // Close cleans up the Agent
 func (a *Agent) Close() error {
-	err := a.ok()
+	done := make(chan struct{})
+	err := a.run(func(agent *Agent) {
+		defer func() {
+			close(done)
+		}()
+		agent.err.Store(ErrClosed)
+		close(agent.done)
+
+		// Cleanup all candidates
+		for net, cs := range agent.localCandidates {
+			for _, c := range cs {
+				err := c.close()
+				if err != nil {
+					fmt.Printf("Failed to close candidate %s: %v", c, err)
+				}
+			}
+			delete(agent.localCandidates, net)
+		}
+		for net, cs := range agent.remoteCandidates {
+			for _, c := range cs {
+				err := c.close()
+				if err != nil {
+					fmt.Printf("Failed to close candidate %s: %v", c, err)
+				}
+			}
+			delete(agent.remoteCandidates, net)
+		}
+	})
 	if err != nil {
 		return err
 	}
-	a.err.Store(ErrClosed)
-	a.closeOnce.Do(func() { close(a.done) })
+
+	<-done
+
 	return nil
 }
 
-func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) Candidate {
+func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) *Candidate {
 	var ip net.IP
 	var port int
 
@@ -503,7 +489,7 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) Cand
 
 	set := a.remoteCandidates[networkType]
 	for _, c := range set {
-		base := c.GetBase()
+		base := c
 		if base.IP.Equal(ip) &&
 			base.Port == port {
 			return c
@@ -512,8 +498,8 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) Cand
 	return nil
 }
 
-func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
-	base := remote.GetBase()
+func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
+	base := remote
 	if out, err := stun.Build(stun.ClassSuccessResponse, stun.MethodBinding, m.TransactionID,
 		&stun.XorMappedAddress{
 			XorAddress: stun.XorAddress{
@@ -532,7 +518,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
 	}
 }
 
-func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
 		fmt.Println("inbound isControlled && a.isControlling == false")
 		return
@@ -549,7 +535,7 @@ func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteC
 	}
 }
 
-func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remoteCandidate Candidate) {
+func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
 		fmt.Println("inbound isControlling && a.isControlling == true")
 		return
@@ -572,15 +558,15 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 }
 
 // handleInbound processes traffic from a remote candidate
-func (a *Agent) handleInbound(m *stun.Message, local Candidate, remote net.Addr) {
-	remoteCandidate := a.findRemoteCandidate(local.GetBase().NetworkType, remote)
+func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
+	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
 	if remoteCandidate == nil {
 		// TODO debug
 		// fmt.Printf("Could not find remote candidate for %s:%d ", remote.IP.String(), remote.Port)
 		return
 	}
 
-	remoteCandidate.GetBase().seen(false)
+	remoteCandidate.seen(false)
 
 	if m.Class == stun.ClassIndication {
 		return

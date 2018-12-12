@@ -6,7 +6,7 @@ import (
 	"github.com/pions/pkg/stun"
 )
 
-func newCandidatePair(local, remote Candidate) *candidatePair {
+func newCandidatePair(local, remote *Candidate) *candidatePair {
 	return &candidatePair{
 		remote: remote,
 		local:  local,
@@ -15,16 +15,16 @@ func newCandidatePair(local, remote Candidate) *candidatePair {
 
 // candidatePair represents a combination of a local and remote candidate
 type candidatePair struct {
-	remote Candidate
-	local  Candidate
+	remote *Candidate
+	local  *Candidate
 }
 
 func (p *candidatePair) Write(b []byte) (int, error) {
-	return p.local.GetBase().writeTo(b, p.remote.GetBase())
+	return p.local.writeTo(b, p.remote)
 }
 
 // keepaliveCandidate sends a STUN Binding Indication to the remote candidate
-func (a *Agent) keepaliveCandidate(local, remote Candidate) {
+func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionId(),
 		&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 		&stun.MessageIntegrity{
@@ -41,8 +41,8 @@ func (a *Agent) keepaliveCandidate(local, remote Candidate) {
 	a.sendSTUN(msg, local, remote)
 }
 
-func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
-	_, err := local.GetBase().writeTo(msg.Pack(), remote.GetBase())
+func (a *Agent) sendSTUN(msg *stun.Message, local, remote *Candidate) {
+	_, err := local.writeTo(msg.Pack(), remote)
 	if err != nil {
 		// TODO: Determine if we should always drop the err
 		// E.g.: maybe handle for known valid pairs or to

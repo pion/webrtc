@@ -2,7 +2,6 @@ package ice
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,21 +9,35 @@ import (
 )
 
 func TestStressDuplex(t *testing.T) {
-	lim := test.TimeOut(time.Second * 5)
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
 
+	// Check for leaking routines
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Run the test
+	stressDuplex(t)
+}
+
+func stressDuplex(t *testing.T) {
 	ca, cb := pipe()
 
 	defer func() {
 		err := ca.Close()
-		check(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = cb.Close()
-		check(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	opt := test.Options{
-		MsgSize:  2048,
-		MsgCount: 1, // Can't rely on UDP message order in CI
+		MsgSize:  10,
+		MsgCount: 1, // Order not reliable due to UDP & potentially multiple candidate pairs.
 	}
 
 	err := test.StressDuplex(ca, cb, opt)
@@ -108,29 +121,22 @@ func pipe() (*Conn, *Conn) {
 	return aConn, bConn
 }
 
-func copyCandidate(orig Candidate) Candidate {
-	// Quiet go vet kvetching about mutex copying
-	base := func() CandidateBase {
-		return CandidateBase{
-			NetworkType: orig.GetBase().NetworkType,
-			IP:          orig.GetBase().IP,
-			Port:        orig.GetBase().Port,
+func copyCandidate(orig *Candidate) *Candidate {
+	c := &Candidate{
+		Type:        orig.Type,
+		NetworkType: orig.NetworkType,
+		IP:          orig.IP,
+		Port:        orig.Port,
+	}
+
+	if orig.RelatedAddress != nil {
+		c.RelatedAddress = &CandidateRelatedAddress{
+			Address: orig.RelatedAddress.Address,
+			Port:    orig.RelatedAddress.Port,
 		}
 	}
 
-	switch v := orig.(type) {
-	case *CandidateHost:
-		return &CandidateHost{
-			CandidateBase: base(),
-		}
-	case *CandidateSrflx:
-		return &CandidateSrflx{CandidateBase: base(),
-			RelatedAddress: v.RelatedAddress,
-			RelatedPort:    v.RelatedPort}
-	default:
-		fmt.Printf("I don't know about type %T!\n", v)
-	}
-	return nil
+	return c
 }
 
 func onConnected() (func(ConnectionState), chan struct{}) {

@@ -6,12 +6,10 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"math/big"
-	"os"
-	"runtime"
-	"runtime/pprof"
 	"testing"
 	"time"
 
+	"github.com/pions/transport/test"
 	"github.com/pions/webrtc/pkg/ice"
 
 	"github.com/pions/webrtc/pkg/media"
@@ -426,7 +424,8 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 }
 
 func TestRTCPeerConnection_Close(t *testing.T) {
-	expectedGoRoutineCount := runtime.NumGoroutine()
+	report := test.CheckRoutines(t)
+	defer report()
 
 	pcOffer, pcAnswer, err := newPair()
 	if err != nil {
@@ -459,8 +458,6 @@ func TestRTCPeerConnection_Close(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	checkGoRoutineCount(t, expectedGoRoutineCount)
 }
 
 func newPair() (pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection, err error) {
@@ -499,14 +496,4 @@ func signalPair(pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection) error {
 	}
 
 	return nil
-}
-
-func checkGoRoutineCount(t *testing.T, expectedGoRoutineCount int) {
-	goRoutineCount := runtime.NumGoroutine()
-	if goRoutineCount != expectedGoRoutineCount {
-		if err := pprof.Lookup("goroutine").WriteTo(os.Stderr, 1); err != nil {
-			t.Fatal(err)
-		}
-		t.Fatalf("goRoutineCount != expectedGoRoutineCount, possible leak: %d %d", goRoutineCount, expectedGoRoutineCount)
-	}
 }
