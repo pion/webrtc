@@ -11,7 +11,6 @@ type Mux struct {
 	lock       sync.RWMutex
 	nextConn   net.Conn
 	endpoints  map[*Endpoint]MatchFunc
-	doneCh     chan struct{}
 	bufferSize int
 }
 
@@ -20,7 +19,6 @@ func NewMux(conn net.Conn, bufferSize int) *Mux {
 	m := &Mux{
 		nextConn:   conn,
 		endpoints:  make(map[*Endpoint]MatchFunc),
-		doneCh:     make(chan struct{}),
 		bufferSize: bufferSize,
 	}
 
@@ -61,7 +59,7 @@ func (m *Mux) removeEndpoint(e *Endpoint) {
 }
 
 // Close closes the Mux and all associated Endpoints.
-func (m *Mux) Close() {
+func (m *Mux) Close() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -69,21 +67,12 @@ func (m *Mux) Close() {
 		m.removeEndpoint(e)
 	}
 
-	select {
-	case <-m.doneCh:
-	default:
-		close(m.doneCh)
-	}
+	return m.nextConn.Close()
 }
 
 func (m *Mux) readLoop() {
 	buf := make([]byte, m.bufferSize)
 	for {
-		select {
-		case <-m.doneCh:
-			return
-		default:
-		}
 		n, err := m.nextConn.Read(buf)
 		if err != nil {
 			return

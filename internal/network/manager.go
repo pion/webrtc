@@ -34,6 +34,8 @@ type Manager struct {
 	iceConn  *ice.Conn
 	isOffer  bool
 
+	mux *mux.Mux
+
 	dtlsEndpoint *mux.Endpoint
 	srtpEndpoint *mux.Endpoint
 
@@ -104,9 +106,9 @@ func (m *Manager) Start(isOffer bool,
 		return err
 	}
 
-	mx := mux.NewMux(m.iceConn, receiveMTU)
-	m.dtlsEndpoint = mx.NewEndpoint(mux.MatchDTLS)
-	m.srtpEndpoint = mx.NewEndpoint(mux.MatchSRTP)
+	m.mux = mux.NewMux(m.iceConn, receiveMTU)
+	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
+	m.srtpEndpoint = m.mux.NewEndpoint(mux.MatchSRTP)
 
 	m.startSRTP()
 
@@ -239,22 +241,27 @@ func (m *Manager) AcceptDataChannel() (*datachannel.DataChannel, error) {
 
 // Close cleans up all the allocated state
 func (m *Manager) Close() error {
-	var errSCTP, errDTLS, errICE error
+	// Shutdown strategy:
+	// 1. All Conn close by closing their underlying Conn.
+	// 2. A Mux stops this chain. It won't close the underlying
+	//    Conn if one of the endpoints is closed down. To
+	//    continue the chain the Mux has to be closed.
+
+	// Close SCTP. This should close the data channels, SCTP, and DTLS
+	var errSCTP, errMux error
 	if m.sctpAssociation != nil {
 		errSCTP = m.sctpAssociation.Close()
 	}
-	if m.dtlsConn != nil {
-		errDTLS = m.dtlsConn.Close()
-	}
-	if m.IceAgent != nil {
-		errICE = m.IceAgent.Close()
+
+	// Close the Mux. This should close the Mux and ICE.
+	if m.mux != nil {
+		errMux = m.mux.Close()
 	}
 
 	// TODO: better way to combine/handle errors?
 	if errSCTP != nil ||
-		errDTLS != nil ||
-		errICE != nil {
-		return fmt.Errorf("Failed to close: %v, %v, %v", errSCTP, errDTLS, errICE)
+		errMux != nil {
+		return fmt.Errorf("Failed to close: %v, %v", errSCTP, errMux)
 	}
 
 	return nil

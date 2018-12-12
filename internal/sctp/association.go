@@ -179,9 +179,7 @@ func (a *Association) readLoop() {
 		n, err := a.nextConn.Read(buffer)
 
 		if err != nil {
-			fmt.Println("sctp: failed to read", err)
-			// TODO: shutdown
-			continue
+			return
 		}
 
 		if err = a.handleInbound(buffer[:n]); err != nil {
