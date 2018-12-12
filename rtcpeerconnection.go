@@ -702,13 +702,13 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
 			if strings.HasPrefix(*a.String(), "candidate") {
-				if c := sdp.ICECandidateUnmarshal(*a.String()); c != nil {
-					err := pc.networkManager.IceAgent.AddRemoteCandidate(c)
-					if err != nil {
-						return err
-					}
-				} else {
-					fmt.Printf("Tried to parse ICE candidate, but failed %s ", a)
+				c, err := sdp.ICECandidateUnmarshal(*a.String())
+				if err != nil {
+					return err
+				}
+
+				if err := pc.networkManager.IceAgent.AddRemoteCandidate(c); err != nil {
+					return err
 				}
 			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
 				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
@@ -814,10 +814,12 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 // AddIceCandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates
 func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
-	if c := sdp.ICECandidateUnmarshal(s); c != nil {
-		return pc.networkManager.IceAgent.AddRemoteCandidate(c)
+	c, err := sdp.ICECandidateUnmarshal(s)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("Unable to parse %q as remote candidate", s)
+
+	return pc.networkManager.IceAgent.AddRemoteCandidate(c)
 }
 
 // ------------------------------------------------------------------------

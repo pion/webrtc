@@ -11,11 +11,10 @@ import (
 
 // ICECandidateUnmarshal takes a candidate strings and returns a ice.Candidate or nil if it fails to parse
 // TODO: return error if parsing fails
-func ICECandidateUnmarshal(raw string) ice.Candidate {
+func ICECandidateUnmarshal(raw string) (ice.Candidate, error) {
 	split := strings.Fields(raw)
 	if len(split) < 8 {
-		fmt.Printf("Attribute not long enough to be ICE candidate (%d) %s \n", len(split), raw)
-		return nil
+		return nil, fmt.Errorf("attribute not long enough to be ICE candidate (%d) %s", len(split), raw)
 	}
 
 	getValue := func(key string) string {
@@ -32,7 +31,7 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 
 	port, err := strconv.Atoi(split[5])
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	transport := split[2]
@@ -40,10 +39,13 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 	// TODO verify valid address
 	ip := net.ParseIP(split[4])
 	if ip == nil {
-		return nil
+		return nil, err
 	}
 
 	networkType := ice.DetermineNetworkType(transport, ip)
+	if networkType == ice.NetworkType(0) {
+		return nil, fmt.Errorf("Unable to determine networkType from %s %s", transport, ip.String())
+	}
 
 	switch getValue("typ") {
 	case "host":
@@ -53,7 +55,7 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 				IP:          ip,
 				Port:        port,
 			},
-		}
+		}, nil
 	case "srflx":
 		return &ice.CandidateSrflx{
 			CandidateBase: ice.CandidateBase{
@@ -61,9 +63,9 @@ func ICECandidateUnmarshal(raw string) ice.Candidate {
 				IP:          ip,
 				Port:        port,
 			},
-		}
+		}, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("Unhandled candidate typ %s", getValue("typ"))
 	}
 }
 

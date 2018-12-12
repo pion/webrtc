@@ -83,13 +83,13 @@ func DetermineNetworkType(network string, ip net.IP) NetworkType {
 	ipv4 := ip.To4() != nil
 
 	switch {
-	case strings.HasPrefix(network, udp):
+	case strings.HasPrefix(strings.ToLower(network), udp):
 		if ipv4 {
 			return NetworkTypeUDP4
 		}
 		return NetworkTypeUDP6
 
-	case strings.HasPrefix(network, tcp):
+	case strings.HasPrefix(strings.ToLower(network), tcp):
 		if ipv4 {
 			return NetworkTypeTCP4
 		}
