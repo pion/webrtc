@@ -4,12 +4,43 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
-	"github.com/pions/webrtc/internal/transport/test"
+	"github.com/pions/transport/test"
 )
+
+func TestStressDuplex(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	ca, cb := pipe()
+
+	defer func() {
+		err := ca.Close()
+		check(err)
+		err = cb.Close()
+		check(err)
+	}()
+
+	opt := test.Options{
+		MsgSize:  2048,
+		MsgCount: 1, // Can't rely on UDP message order in CI
+	}
+
+	err := test.StressDuplex(ca, cb, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func Benchmark(b *testing.B) {
 	ca, cb := pipe()
+	defer func() {
+		err := ca.Close()
+		check(err)
+		err = cb.Close()
+		check(err)
+	}()
 
 	b.ResetTimer()
 
@@ -18,7 +49,7 @@ func Benchmark(b *testing.B) {
 		MsgCount: b.N,
 	}
 
-	err := test.Stress(ca, cb, opt)
+	err := test.StressDuplex(ca, cb, opt)
 	check(err)
 }
 
