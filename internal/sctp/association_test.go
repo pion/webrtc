@@ -19,3 +19,92 @@ func TestAssociationInit(t *testing.T) {
 		// t.Error(errors.Wrap(err, "Failed to HandleInbound"))
 	}
 }
+
+// Causes deadlock since both sides can be holding the lock in
+// Association.send while they are also both trying to
+// acquire the lock in Association.handleChunk.
+// func TestStressDuplex(t *testing.T) {
+// 	lim := test.TimeOut(time.Second * 5)
+// 	defer lim.Stop()
+//
+// 	ca, cb, err := pipeMemory()
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+//
+// 	defer func() {
+// 		err = ca.Close()
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 		err = cb.Close()
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 	}()
+//
+// 	opt := test.Options{
+// 		MsgSize:  500,
+// 		MsgCount: 2,
+// 	}
+//
+// 	err = test.StressDuplex(ca, cb, opt)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// }
+
+// func pipeMemory() (*Stream, *Stream, error) {
+// 	var err error
+//
+// 	var aa, ab *Association
+// 	aa, ab, err = associationMemory()
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	var sa, sb *Stream
+// 	sa, err = aa.OpenStream(0, 0)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	sb, err = ab.OpenStream(0, 0)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	return sa, sb, nil
+// }
+
+// func associationMemory() (*Association, *Association, error) {
+// 	// In memory pipe
+// 	ca, cb := net.Pipe()
+//
+// 	type result struct {
+// 		a   *Association
+// 		err error
+// 	}
+//
+// 	c := make(chan result)
+//
+// 	// Setup client
+// 	go func() {
+// 		client, err := Client(ca)
+// 		c <- result{client, err}
+// 	}()
+//
+// 	// Setup server
+// 	server, err := Server(cb)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	// Receive client
+// 	res := <-c
+// 	if res.err != nil {
+// 		return nil, nil, res.err
+// 	}
+//
+// 	return res.a, server, nil
+// }

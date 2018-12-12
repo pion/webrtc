@@ -522,7 +522,6 @@ func (a *Association) generateNextTSN() uint32 {
 
 // send sends a packet over nextConn. The caller should hold the lock.
 func (a *Association) send(p *packet) error {
-
 	raw, err := p.marshal()
 	if err != nil {
 		return errors.Wrap(err, "Failed to send packet to outbound handler")
