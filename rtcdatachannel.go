@@ -190,7 +190,8 @@ func (d *RTCDataChannel) readLoop() {
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
 			fmt.Println("Failed to read from data channel", err)
-			continue
+			// TODO: Kill DataChannel/PeerConnection?
+			return
 		}
 
 		if isString {

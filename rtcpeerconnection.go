@@ -780,7 +780,8 @@ func (pc *RTCPeerConnection) acceptDataChannels() {
 		dc, err := pc.networkManager.AcceptDataChannel()
 		if err != nil {
 			fmt.Println("Failed to accept data channel:", err)
-			continue
+			// TODO: Kill DataChannel/PeerConnection?
+			return
 		}
 
 		sid := dc.StreamIdentifier()
