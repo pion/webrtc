@@ -63,11 +63,10 @@ func (m *Mux) removeEndpoint(e *Endpoint) {
 // Close closes the Mux and all associated Endpoints.
 func (m *Mux) Close() error {
 	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	for e := range m.endpoints {
 		m.removeEndpoint(e)
 	}
+	m.lock.Unlock()
 
 	err := m.nextConn.Close()
 	if err != nil {

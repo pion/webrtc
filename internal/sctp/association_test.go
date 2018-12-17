@@ -20,32 +20,34 @@ func TestAssociationInit(t *testing.T) {
 	}
 }
 
-// Causes deadlock since both sides can be holding the lock in
-// Association.send while they are also both trying to
-// acquire the lock in Association.handleChunk.
+// TODO: find a good way to avoid deadlocking in the test
 // func TestStressDuplex(t *testing.T) {
+// 	// Limit runtime in case of deadlocks
+// 	lim := test.TimeOut(time.Second * 20)
+// 	defer lim.Stop()
+//
+// 	// Check for leaking routines
+// 	report := test.CheckRoutines(t)
+// 	defer report()
+//
+// 	// Run the test
+// 	stressDuplex(t)
+// }
+//
+// func stressDuplex(t *testing.T) {
 // 	lim := test.TimeOut(time.Second * 5)
 // 	defer lim.Stop()
 //
-// 	ca, cb, err := pipeMemory()
+// 	ca, cb, stop, err := pipeMemory()
 // 	if err != nil {
 // 		t.Fatal(err)
 // 	}
 //
-// 	defer func() {
-// 		err = ca.Close()
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		err = cb.Close()
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
+// 	defer stop(t)
 //
 // 	opt := test.Options{
-// 		MsgSize:  500,
-// 		MsgCount: 2,
+// 		MsgSize:  2048,
+// 		MsgCount: 50,
 // 	}
 //
 // 	err = test.StressDuplex(ca, cb, opt)
@@ -53,33 +55,52 @@ func TestAssociationInit(t *testing.T) {
 // 		t.Fatal(err)
 // 	}
 // }
-
-// func pipeMemory() (*Stream, *Stream, error) {
+//
+// func pipeMemory() (*Stream, *Stream, func(*testing.T), error) {
 // 	var err error
 //
 // 	var aa, ab *Association
 // 	aa, ab, err = associationMemory()
 // 	if err != nil {
-// 		return nil, nil, err
+// 		return nil, nil, nil, err
 // 	}
 //
 // 	var sa, sb *Stream
 // 	sa, err = aa.OpenStream(0, 0)
 // 	if err != nil {
-// 		return nil, nil, err
+// 		return nil, nil, nil, err
 // 	}
 //
 // 	sb, err = ab.OpenStream(0, 0)
 // 	if err != nil {
-// 		return nil, nil, err
+// 		return nil, nil, nil, err
 // 	}
 //
-// 	return sa, sb, nil
+// 	stop := func(t *testing.T) {
+// 		err = sa.Close()
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 		err = sb.Close()
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 		err = aa.Close()
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 		err = ab.Close()
+// 		if err != nil {
+// 			t.Error(err)
+// 		}
+// 	}
+//
+// 	return sa, sb, stop, nil
 // }
-
+//
 // func associationMemory() (*Association, *Association, error) {
 // 	// In memory pipe
-// 	ca, cb := net.Pipe()
+// 	ca, cb := test.PacketPipe(100) // TODO: Find a better way to avoid blocking
 //
 // 	type result struct {
 // 		a   *Association

@@ -15,6 +15,8 @@ import (
 
 const receiveMTU = 8192
 
+var errAssociationClosed = errors.New("The association is closed")
+
 // AssociationState is an enum for the states that an Association will transition
 // through while connecting
 // https://tools.ietf.org/html/rfc4960#section-13.2
@@ -109,6 +111,7 @@ type Association struct {
 
 	streams              map[uint16]*Stream
 	acceptCh             chan *Stream
+	doneCh               chan struct{}
 	handshakeCompletedCh chan struct{}
 }
 
@@ -124,8 +127,8 @@ func Server(nextConn net.Conn) (*Association, error) {
 // Client opens a SCTP stream over a conn
 func Client(nextConn net.Conn) (*Association, error) {
 	a := createAssocation(nextConn)
-	a.init()
 	go a.readLoop()
+	a.init()
 	<-a.handshakeCompletedCh
 
 	return a, nil
@@ -149,6 +152,7 @@ func createAssocation(nextConn net.Conn) *Association {
 		state:                     Open,
 		streams:                   make(map[uint16]*Stream),
 		acceptCh:                  make(chan *Stream),
+		doneCh:                    make(chan struct{}),
 		handshakeCompletedCh:      make(chan struct{}),
 		peerCumulativeTSNAckPoint: tsn - 1,
 	}
@@ -167,17 +171,34 @@ func (a *Association) init() {
 
 // Close ends the SCTP Association and cleans up any state
 func (a *Association) Close() error {
-	// TODO: Close all streams
+	err := a.nextConn.Close()
+	if err != nil {
+		return err
+	}
+
+	// Wait for readLoop to end
+	<-a.doneCh
+
 	return nil
 }
 
 func (a *Association) readLoop() {
+	defer func() {
+		a.lock.Lock()
+		for _, s := range a.streams {
+			close(s.closeCh)
+			close(s.readNotifier)
+			delete(a.streams, s.streamIdentifier)
+		}
+		a.lock.Unlock()
+		close(a.acceptCh)
+		close(a.doneCh)
+	}()
 	for {
 		// buffer is recreated because the user data is
 		// passed to the reassembly queue without copying
 		buffer := make([]byte, receiveMTU)
 		n, err := a.nextConn.Read(buffer)
-
 		if err != nil {
 			return
 		}
@@ -200,8 +221,15 @@ func (a *Association) handleInbound(raw []byte) error {
 	}
 
 	for _, c := range p.chunks {
-		if err := a.handleChunk(p, c); err != nil {
+		packets, err := a.handleChunk(p, c)
+		if err != nil {
 			return errors.Wrap(err, "Failed handling chunk")
+		}
+		for _, p := range packets {
+			err = a.send(p)
+			if err != nil {
+				return errors.Wrap(err, "Failed sending reply")
+			}
 		}
 	}
 
@@ -408,7 +436,10 @@ func (a *Association) OpenStream(streamIdentifier uint16, defaultPayloadType Pay
 
 // AcceptStream accepts a stream
 func (a *Association) AcceptStream() (*Stream, error) {
-	s := <-a.acceptCh
+	s, ok := <-a.acceptCh
+	if !ok {
+		return nil, errAssociationClosed
+	}
 	return s, nil
 }
 
@@ -419,6 +450,7 @@ func (a *Association) createStream(streamIdentifier uint16, accept bool) *Stream
 		streamIdentifier: streamIdentifier,
 		reassemblyQueue:  &reassemblyQueue{},
 		readNotifier:     make(chan struct{}),
+		closeCh:          make(chan struct{}),
 	}
 
 	a.streams[streamIdentifier] = s
@@ -489,9 +521,9 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 
 // sendPayloadData sends the data chunks.
 func (a *Association) sendPayloadData(chunks []*chunkPayloadData) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	packets := []*packet{}
 
+	a.lock.Lock()
 	for _, c := range chunks {
 		c.tsn = a.generateNextTSN()
 
@@ -503,11 +535,16 @@ func (a *Association) sendPayloadData(chunks []*chunkPayloadData) error {
 			destinationPort: a.destinationPort,
 			verificationTag: a.peerVerificationTag,
 			chunks:          []chunk{c}}
+		packets = append(packets, p)
+	}
+	a.lock.Unlock()
+
+	for _, p := range packets {
 		if err := a.send(p); err != nil {
 			return errors.Wrap(err, "Unable to send outbound packet")
 		}
-
 	}
+
 	return nil
 }
 
@@ -529,12 +566,16 @@ func (a *Association) send(p *packet) error {
 	return err
 }
 
-func (a *Association) handleChunk(p *packet, c chunk) error {
+func pack(p *packet) []*packet {
+	return []*packet{p}
+}
+
+func (a *Association) handleChunk(p *packet, c chunk) ([]*packet, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	if _, err := c.check(); err != nil {
-		return errors.Wrap(err, "Failed validating chunk")
+		return nil, errors.Wrap(err, "Failed validating chunk")
 		// TODO: Create ABORT
 	}
 
@@ -542,17 +583,17 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 	case *chunkInit:
 		switch a.state {
 		case Open:
-			return a.send(a.handleInit(p, c))
+			return pack(a.handleInit(p, c)), nil
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
 			// respond with an INIT ACK using the same parameters it sent in its
 			// original INIT chunk (including its Initiate Tag, unchanged)
-			return errors.Errorf("TODO respond with original cookie %s", a.state.String())
+			return nil, errors.Errorf("TODO respond with original cookie %s", a.state.String())
 		default:
 			// 5.2.2.  Unexpected INIT in States Other than CLOSED, COOKIE-ECHOED,
 			//        COOKIE-WAIT, and SHUTDOWN-ACK-SENT
-			return errors.Errorf("TODO Handle Init when in state %s", a.state.String())
+			return nil, errors.Errorf("TODO Handle Init when in state %s", a.state.String())
 		}
 
 	case *chunkInitAck:
@@ -560,16 +601,12 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		case CookieWait:
 			r, err := a.handleInitAck(p, c)
 			if err != nil {
-				return err
-			}
-			err = a.send(r)
-			if err != nil {
-				return err
+				return nil, err
 			}
 			a.setState(CookieEchoed)
-			return nil
+			return pack(r), nil
 		default:
-			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
+			return nil, errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
 		}
 
 	case *chunkAbort:
@@ -584,7 +621,7 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 			fmt.Println("Failed to handle Heartbeat, no ParamHeartbeatInfo")
 		}
 
-		return a.send(&packet{
+		return pack(&packet{
 			verificationTag: a.peerVerificationTag,
 			sourcePort:      a.sourcePort,
 			destinationPort: a.destinationPort,
@@ -595,23 +632,20 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 					},
 				},
 			}},
-		})
+		}), nil
 
 	case *chunkCookieEcho:
 		if bytes.Equal(a.myCookie.cookie, c.cookie) {
-			err := a.send(&packet{
+			p := &packet{
 				verificationTag: a.peerVerificationTag,
 				sourcePort:      a.sourcePort,
 				destinationPort: a.destinationPort,
 				chunks:          []chunk{&chunkCookieAck{}},
-			})
-			if err != nil {
-				return err
 			}
 			a.setState(Established)
 			close(a.handshakeCompletedCh)
 
-			return nil
+			return pack(p), nil
 		}
 
 	case *chunkCookieAck:
@@ -619,30 +653,25 @@ func (a *Association) handleChunk(p *packet, c chunk) error {
 		case CookieEchoed:
 			a.setState(Established)
 			close(a.handshakeCompletedCh)
-			return nil
+			return nil, nil
 		default:
-			return errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
+			return nil, errors.Errorf("TODO Handle Init acks when in state %s", a.state.String())
 		}
 
 		// TODO Abort
 	case *chunkPayloadData:
-		return a.send(a.handleData(c))
+		return pack(a.handleData(c)), nil
 
 	case *chunkSelectiveAck:
 		p, err := a.handleSack(c)
 		if err != nil {
-			return errors.Wrap(err, "Failure handling SACK")
+			return nil, errors.Wrap(err, "Failure handling SACK")
 		}
-		for _, pp := range p {
-			err := a.send(pp)
-			if err != nil {
-				return errors.Wrap(err, "Failure handling SACK")
-			}
-		}
+		return p, nil
 
 	default:
-		return errors.New("unhandled chunk type")
+		return nil, errors.New("unhandled chunk type")
 	}
 
-	return nil
+	return nil, nil
 }
