@@ -92,12 +92,16 @@ func (m *Mux) dispatch(buf []byte) {
 	defer m.lock.Unlock()
 	for e, f := range m.endpoints {
 		if f(buf) {
-			readBuf, ok := <-e.readCh
-			if !ok {
+			select {
+			case readBuf, ok := <-e.readCh:
+				if !ok {
+					return
+				}
+				n := copy(readBuf, buf)
+				e.wroteCh <- n
+			case <-e.doneCh:
 				return
 			}
-			n := copy(readBuf, buf)
-			e.wroteCh <- n
 			return
 		}
 	}
