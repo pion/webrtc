@@ -20,6 +20,7 @@ type Stream struct {
 	sequenceNumber  uint16
 
 	readNotifier chan struct{}
+	closeCh      chan struct{}
 }
 
 // StreamIdentifier returns the Stream identifier associated to the stream.
@@ -70,7 +71,10 @@ func (s *Stream) handleData(pd *chunkPayloadData) {
 	s.lock.Unlock()
 
 	// Notify the reader
-	s.readNotifier <- struct{}{}
+	select {
+	case s.readNotifier <- struct{}{}:
+	case <-s.closeCh:
+	}
 }
 
 // Write writes len(p) bytes from p with the default Payload Protocol Identifier
@@ -119,7 +123,19 @@ func (s *Stream) packetize(raw []byte, ppi PayloadProtocolIdentifier) []*chunkPa
 
 // Close closes the conn and releases any Read calls
 func (s *Stream) Close() error {
-	// TODO: reset stream
+	s.unregister()
+
+	// TODO: reset stream?
 	// https://tools.ietf.org/html/rfc6525
+
 	return nil
+}
+
+func (s *Stream) unregister() {
+	a := s.association
+	close(s.closeCh)
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	close(s.readNotifier)
+	delete(a.streams, s.streamIdentifier)
 }

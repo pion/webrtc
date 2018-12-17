@@ -21,7 +21,11 @@ func (e *Endpoint) Close() error {
 }
 
 func (e *Endpoint) close() {
-	close(e.doneCh)
+	select {
+	case <-e.doneCh:
+	default:
+		close(e.doneCh)
+	}
 }
 
 // Read reads a packet of len(p) bytes from the underlying conn
