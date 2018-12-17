@@ -43,6 +43,8 @@ func CreatePipeline(codecName string, in chan<- media.RTCSample) *Pipeline {
 		pipelineStr = "videotestsrc ! video/x-raw,format=I420 ! x264enc bframes=0 speed-preset=veryfast key-int-max=60 ! video/x-h264,stream-format=byte-stream ! " + pipelineStr
 	case webrtc.Opus:
 		pipelineStr = "audiotestsrc ! opusenc ! " + pipelineStr
+	case webrtc.G722:
+		pipelineStr = "audiotestsrc ! avenc_g722 ! " + pipelineStr
 	default:
 		panic("Unhandled codec " + codecName)
 	}

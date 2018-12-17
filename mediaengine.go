@@ -27,7 +27,7 @@ const (
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
 func RegisterDefaultCodecs() {
-	RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000, 1))
+	RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
 	RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
 	RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
 	RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
@@ -96,11 +96,11 @@ const (
 )
 
 // NewRTCRtpG722Codec is a helper to create a G722 codec
-func NewRTCRtpG722Codec(payloadType uint8, clockrate uint32, channels uint16) *RTCRtpCodec {
+func NewRTCRtpG722Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
 	c := NewRTCRtpCodec(RTCRtpCodecTypeAudio,
 		G722,
 		clockrate,
-		channels,
+		0,
 		"",
 		payloadType,
 		&codecs.G722Payloader{})
