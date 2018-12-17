@@ -49,14 +49,6 @@ func (m *Mux) NewEndpoint(f MatchFunc) *Endpoint {
 func (m *Mux) RemoveEndpoint(e *Endpoint) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	m.removeEndpoint(e)
-}
-
-// removeEndpoint removes an endpoint from the Mux
-// The caller should hold the lock
-func (m *Mux) removeEndpoint(e *Endpoint) {
-	e.close()
 	delete(m.endpoints, e)
 }
 
@@ -64,7 +56,8 @@ func (m *Mux) removeEndpoint(e *Endpoint) {
 func (m *Mux) Close() error {
 	m.lock.Lock()
 	for e := range m.endpoints {
-		m.removeEndpoint(e)
+		e.close()
+		delete(m.endpoints, e)
 	}
 	m.lock.Unlock()
 
@@ -99,7 +92,10 @@ func (m *Mux) dispatch(buf []byte) {
 	defer m.lock.Unlock()
 	for e, f := range m.endpoints {
 		if f(buf) {
-			readBuf := <-e.readCh
+			readBuf, ok := <-e.readCh
+			if !ok {
+				return
+			}
 			n := copy(readBuf, buf)
 			e.wroteCh <- n
 			return

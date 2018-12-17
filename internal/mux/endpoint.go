@@ -16,6 +16,7 @@ type Endpoint struct {
 
 // Close unregisters the endpoint from the Mux
 func (e *Endpoint) Close() error {
+	e.close()
 	e.mux.RemoveEndpoint(e)
 	return nil
 }
@@ -36,6 +37,12 @@ func (e *Endpoint) Read(p []byte) (int, error) {
 		n := <-e.wroteCh
 		return n, nil
 	case <-e.doneCh:
+		// Unblock Mux.dispatch
+		select {
+		case <-e.readCh:
+		default:
+			close(e.readCh)
+		}
 		return 0, errors.New("Endpoint closed")
 	}
 }
