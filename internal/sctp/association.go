@@ -584,6 +584,15 @@ func (a *Association) handleChunk(p *packet, c chunk) ([]*packet, error) {
 		switch a.state {
 		case Open:
 			return pack(a.handleInit(p, c)), nil
+		case CookieWait:
+			// https://tools.ietf.org/html/rfc4960#section-5.2.1
+			// Upon receipt of an INIT in the COOKIE-WAIT state, an endpoint MUST
+			// respond with an INIT ACK using the same parameters it sent in its
+			// original INIT chunk (including its Initiate Tag, unchanged).  When
+			// responding, the endpoint MUST send the INIT ACK back to the same
+			// address that the original INIT (sent by this endpoint) was sent.
+			return pack(a.handleInit(p, c)), nil
+
 		case CookieEchoed:
 			// https://tools.ietf.org/html/rfc4960#section-5.2.1
 			// Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
