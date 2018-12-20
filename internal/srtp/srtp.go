@@ -13,26 +13,23 @@ func (c *Context) DecryptRTP(packet *rtp.Packet) bool {
 
 	c.updateRolloverCount(packet.SequenceNumber, s)
 
-	// Extract auth tag and verify it (TODO re-enable auth tag verification #270)
-	// auth := packet.Payload[len(packet.Payload)-10:]
-	fullPkt := packet.Raw[:]
-	fullPkt = append(fullPkt, make([]byte, 4)...)
-	binary.BigEndian.PutUint32(fullPkt[len(fullPkt)-4:], s.rolloverCounter)
+	pktWithROC := append([]byte{}, packet.Raw[:len(packet.Raw)-authTagSize]...)
+	pktWithROC = append(pktWithROC, make([]byte, 4)...)
+	binary.BigEndian.PutUint32(pktWithROC[len(pktWithROC)-4:], s.rolloverCounter)
 
-	// (TODO re-enable auth tag verification #270)
-	// verified, err := c.verifyAuthTag(fullPkt, auth, c.srtpSessionAuthTag)
-	// if err != nil || !verified {
-	// 	return false
-	// }
+	actualAuthTag := packet.Payload[len(packet.Payload)-authTagSize:]
+	verified, err := c.verifyAuthTag(pktWithROC, actualAuthTag)
+	if err != nil || !verified {
+		return false
+	}
+
+	packet.Payload = packet.Payload[:len(packet.Payload)-authTagSize]
 
 	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(packet.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
 	stream.XORKeyStream(packet.Payload, packet.Payload)
 
-	packet.Payload = packet.Payload[:len(packet.Payload)-10]
-
 	// Replace payload with decrypted
-	packet.Raw = packet.Raw[0:packet.PayloadOffset]
-	packet.Raw = append(packet.Raw, packet.Payload...)
+	packet.Raw = append(packet.Raw[0:packet.PayloadOffset], packet.Payload...)
 
 	return true
 }
@@ -60,6 +57,7 @@ func (c *Context) EncryptRTP(packet *rtp.Packet) bool {
 	}
 
 	packet.Payload = append(packet.Payload, authTag...)
+	packet.Raw = append(packet.Raw[0:packet.PayloadOffset], packet.Payload...)
 
 	return true
 }

@@ -1,6 +1,7 @@
 package srtp
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -190,7 +191,7 @@ func (c *Context) generateCounter(sequenceNumber uint16, rolloverCounter uint32,
 	return counter
 }
 
-func (c *Context) generateAuthTag(buf, authTag []byte) ([]byte, error) {
+func (c *Context) generateAuthTag(buf, sessionAuthTag []byte) ([]byte, error) {
 	// https://tools.ietf.org/html/rfc3711#section-4.2
 	// In the case of SRTP, M SHALL consist of the Authenticated
 	// Portion of the packet (as specified in Figure 1) concatenated with
@@ -206,7 +207,7 @@ func (c *Context) generateAuthTag(buf, authTag []byte) ([]byte, error) {
 	// - k_a is the session message authentication key
 	// - n_tag is the bit-length of the output authentication tag
 	// - ROC is already added by caller (to allow RTP + RTCP support)
-	mac := hmac.New(sha1.New, authTag)
+	mac := hmac.New(sha1.New, sessionAuthTag)
 
 	if _, err := mac.Write(buf); err != nil {
 		return nil, err
@@ -215,12 +216,10 @@ func (c *Context) generateAuthTag(buf, authTag []byte) ([]byte, error) {
 	return mac.Sum(nil)[0:10], nil
 }
 
-// (TODO re-enable auth tag verification #270)
-// func (c *Context) verifyAuthTag(buf, expectedAuthTag, authTag []byte) (bool, error) {
-// 	// Validate incoming auth tag, see generateAuthTag
-// 	mac := hmac.New(sha1.New, authTag)
-// 	if _, err := mac.Write(buf); err != nil {
-// 		return false, err
-// 	}
-// 	return bytes.Equal(expectedAuthTag, mac.Sum(nil)[0:10]), nil
-// }
+func (c *Context) verifyAuthTag(buf, actualAuthTag []byte) (bool, error) {
+	expectedAuthTag, err := c.generateAuthTag(buf, c.srtpSessionAuthTag)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(actualAuthTag, expectedAuthTag), nil
+}

@@ -126,7 +126,7 @@ func TestRTPLifecyle(t *testing.T) {
 	assert := assert.New(t)
 	masterKey := []byte{0x0d, 0xcd, 0x21, 0x3e, 0x4c, 0xbc, 0xf2, 0x8f, 0x01, 0x7f, 0x69, 0x94, 0x40, 0x1e, 0x28, 0x89}
 	masterSalt := []byte{0x62, 0x77, 0x60, 0x38, 0xc0, 0x6d, 0xc9, 0x41, 0x9f, 0x6d, 0xd9, 0x43, 0x3e, 0x7c}
-	// invalidSalt := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	invalidSalt := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 	encryptContext, err := CreateContext(masterKey, masterSalt, cipherContextAlgo)
 	if err != nil {
@@ -137,7 +137,7 @@ func TestRTPLifecyle(t *testing.T) {
 	if err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
-	// invalidContext, err := CreateContext(masterKey, invalidSalt, cipherContextAlgo)
+	invalidContext, err := CreateContext(masterKey, invalidSalt, cipherContextAlgo)
 	if err != nil {
 		t.Error(errors.Wrap(err, "CreateContext failed"))
 	}
@@ -179,14 +179,13 @@ func TestRTPLifecyle(t *testing.T) {
 
 	}
 
-	// TODO Issue #270
-	// for _, testCase := range testCases {
-	// 	pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
-	// 	encryptContext.EncryptRTP(pkt)
-	// 	if invalidContext.DecryptRTP(pkt) {
-	// 		t.Errorf("Managed to decrypt with incorrect salt for packet with SeqNum: %d", testCase.sequenceNumber)
-	// 	}
-	// }
+	for _, testCase := range testCases {
+		pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
+		encryptContext.EncryptRTP(pkt)
+		if invalidContext.DecryptRTP(pkt) {
+			t.Errorf("Managed to decrypt with incorrect salt for packet with SeqNum: %d", testCase.sequenceNumber)
+		}
+	}
 }
 
 func TestRTCPLifecycle(t *testing.T) {
