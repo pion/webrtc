@@ -78,8 +78,19 @@ func pipe() (*Conn, *Conn) {
 	aNotifier, aConnected := onConnected()
 	bNotifier, bConnected := onConnected()
 
-	aAgent := NewAgent(urls, aNotifier)
-	bAgent := NewAgent(urls, bNotifier)
+	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
 
 	// Manual signaling
 	aUfrag, aPwd := aAgent.GetLocalUserCredentials()
