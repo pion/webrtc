@@ -120,7 +120,7 @@ func TestMarshalCanonical(t *testing.T) {
 						Value: 49170,
 					},
 					Protos:  []string{"RTP", "AVP"},
-					Formats: []int{0},
+					Formats: []string{"0"},
 				},
 				MediaTitle: &(&struct{ x Information }{"Vivamus a posuere nisl"}).x,
 				ConnectionInformation: &ConnectionInformation{
@@ -149,7 +149,7 @@ func TestMarshalCanonical(t *testing.T) {
 						Value: 51372,
 					},
 					Protos:  []string{"RTP", "AVP"},
-					Formats: []int{99},
+					Formats: []string{"99"},
 				},
 				Attributes: []Attribute{
 					NewAttribute("rtpmap:99 h263-1998/90000", ""),
