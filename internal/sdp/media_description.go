@@ -67,20 +67,15 @@ type MediaName struct {
 	Media   string
 	Port    RangedPort
 	Protos  []string
-	Formats []int
+	Formats []string
 }
 
 func (m *MediaName) String() *string {
-	formats := make([]string, 0)
-	for _, format := range m.Formats {
-		formats = append(formats, strconv.Itoa(format))
-	}
-
 	output := strings.Join([]string{
 		m.Media,
 		m.Port.String(),
 		strings.Join(m.Protos, "/"),
-		strings.Join(formats, " "),
+		strings.Join(m.Formats, " "),
 	}, " ")
 	return &output
 }

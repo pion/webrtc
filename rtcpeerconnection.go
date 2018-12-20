@@ -1219,7 +1219,7 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 			Media:   "application",
 			Port:    sdp.RangedPort{Value: 9},
 			Protos:  []string{"DTLS", "SCTP"},
-			Formats: []int{5000},
+			Formats: []string{"5000"},
 		},
 		ConnectionInformation: &sdp.ConnectionInformation{
 			NetworkType: "IN",

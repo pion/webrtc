@@ -842,11 +842,7 @@ func unmarshalMediaDescription(l *lexer) (stateFn, error) {
 
 	// <fmt>...
 	for i := 3; i < len(fields); i++ {
-		format, err := strconv.Atoi(fields[i])
-		if err != nil {
-			return nil, errors.Errorf("sdp: invalid numeric value `%v`", fields[i])
-		}
-		newMediaDesc.MediaName.Formats = append(newMediaDesc.MediaName.Formats, format)
+		newMediaDesc.MediaName.Formats = append(newMediaDesc.MediaName.Formats, fields[i])
 	}
 
 	l.desc.MediaDescriptions = append(l.desc.MediaDescriptions, newMediaDesc)
