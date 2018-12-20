@@ -3,6 +3,7 @@ package sdp
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -131,7 +132,7 @@ func (d *MediaDescription) WithICECredentials(username, password string) *MediaD
 
 // WithCodec adds codec information to the media description
 func (d *MediaDescription) WithCodec(payloadType uint8, name string, clockrate uint32, channels uint16, fmtp string) *MediaDescription {
-	d.MediaName.Formats = append(d.MediaName.Formats, string(payloadType))
+	d.MediaName.Formats = append(d.MediaName.Formats, strconv.Itoa(int(payloadType)))
 	rtpmap := fmt.Sprintf("%d %s/%d", payloadType, name, clockrate)
 	if channels > 0 {
 		rtpmap = rtpmap + fmt.Sprintf("/%d", channels)
