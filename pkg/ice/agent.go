@@ -91,11 +91,15 @@ func (a *Agent) getErr() error {
 	return ErrClosed
 }
 
+// AgentConfig collects the arguements to ice.Agent construction into
+// a single structure, for future-proofness of the interface
 type AgentConfig struct {
 	Urls     []*URL
 	Notifier func(ConnectionState)
-	PortMin  uint16
-	PortMax  uint16
+
+	// PortMin and PortMax are optional. Leave them 0 for the default UDP port allocation strategy.
+	PortMin uint16
+	PortMax uint16
 }
 
 // NewAgent creates a new Agent
