@@ -91,10 +91,21 @@ func (a *Agent) getErr() error {
 	return ErrClosed
 }
 
+type AgentConfig struct {
+	Urls     []*URL
+	Notifier func(ConnectionState)
+	PortMin  uint16
+	PortMax  uint16
+}
+
 // NewAgent creates a new Agent
-func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
+func NewAgent(config *AgentConfig) (*Agent, error) {
+	if config.PortMax < config.PortMin {
+		return nil, ErrPort
+	}
+
 	a := &Agent{
-		notifier:         notifier,
+		notifier:         config.Notifier,
 		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:   GatheringStateComplete, // TODO trickle-ice
 		connectionState:  ConnectionStateNew,
@@ -107,28 +118,15 @@ func NewAgent(urls []*URL, notifier func(ConnectionState)) *Agent {
 		onConnected: make(chan struct{}),
 		rcvCh:       make(chan *bufIn),
 		done:        make(chan struct{}),
+		portmin:     config.PortMin,
+		portmax:     config.PortMax,
 	}
 
 	// Initialize local candidates
 	a.gatherCandidatesLocal()
-	a.gatherCandidatesReflective(urls)
+	a.gatherCandidatesReflective(config.Urls)
 
 	go a.taskLoop()
-	return a
-}
-
-// NewLimitedAgent creates a new agent, which limits the ephemeral UDP ports it allocates
-// This is usually not required, and not part of the WebRTC protocol, but may be helpful
-// in some edge cases. It's also important to note that this limitation only affects host
-// candidates, and not reflective candidates.
-func NewLimitedAgent(urls []*URL, notifier func(ConnectionState), min, max uint16) (*Agent, error) {
-	if max < min {
-		return nil, ErrPort
-	}
-
-	a := NewAgent(urls, notifier)
-	a.portmin = min
-	a.portmax = max
 	return a, nil
 }
 
