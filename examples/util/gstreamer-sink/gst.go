@@ -34,6 +34,8 @@ func CreatePipeline(codecName string) *Pipeline {
 		pipelineStr += " ! rtpvp9depay ! decodebin ! autovideosink"
 	case webrtc.H264:
 		pipelineStr += " ! rtph264depay ! decodebin ! autovideosink"
+	case webrtc.G722:
+		pipelineStr += " clock-rate=8000 ! rtpg722depay ! decodebin ! autoaudiosink"
 	default:
 		panic("Unhandled codec " + codecName)
 	}
