@@ -44,11 +44,6 @@ type RTCConfiguration struct {
 
 	// IceCandidatePoolSize describes the size of the prefetched ICE pool.
 	IceCandidatePoolSize uint8
-
-	// MinLocalPort and MaxLocalPort, if nonzero, set limits to local ephemeral
-	// UDP ports that are allocated by the ICE agent.
-	MinLocalPort uint16
-	MaxLocalPort uint16
 }
 
 func (c RTCConfiguration) getIceServers() (*[]*ice.URL, error) {
