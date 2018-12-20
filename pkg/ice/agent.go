@@ -91,7 +91,7 @@ func (a *Agent) getErr() error {
 	return ErrClosed
 }
 
-// AgentConfig collects the arguements to ice.Agent construction into
+// AgentConfig collects the arguments to ice.Agent construction into
 // a single structure, for future-proofness of the interface
 type AgentConfig struct {
 	Urls     []*URL
