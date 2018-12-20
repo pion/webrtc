@@ -66,19 +66,9 @@ func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp cha
 }
 
 // NewManager creates a new network.Manager
-func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier) *Manager {
-	iceAgent := ice.NewAgent(urls, ntf)
-
-	return &Manager{
-		IceAgent:                 iceAgent,
-		bufferTransportPairs:     make(map[uint32]*TransportPair),
-		bufferTransportGenerator: btg,
-	}
-}
-
-// NewLimitedManager creates a new network.Manager (and a UDP limited ICE agent)
-func NewLimitedManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
-	iceAgent, err := ice.NewLimitedAgent(urls, ntf, minport, maxport)
+func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
+	config := &ice.AgentConfig{Urls: urls, Notifier: ntf, PortMin: minport, PortMax: maxport}
+	iceAgent, err := ice.NewAgent(config)
 
 	if err != nil {
 		return nil, err

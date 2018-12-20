@@ -158,13 +158,9 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		}
 	}
 
-	if (configuration.MinLocalPort != 0) || (configuration.MaxLocalPort != 0) {
-		pc.networkManager, err = network.NewLimitedManager(urls, pc.generateChannel, pc.iceStateChange, configuration.MinLocalPort, configuration.MaxLocalPort)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		pc.networkManager = network.NewManager(urls, pc.generateChannel, pc.iceStateChange)
+	pc.networkManager, err = network.NewManager(urls, pc.generateChannel, pc.iceStateChange, configuration.MinLocalPort, configuration.MaxLocalPort)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pc, nil
