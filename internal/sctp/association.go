@@ -400,7 +400,7 @@ func (a *Association) handleData(d *chunkPayloadData) *packet {
 		s.handleData(pd)
 
 		a.peerLastTSN++
-		pd, popOk = a.payloadQueue.pop(a.peerLastTSN)
+		pd, popOk = a.payloadQueue.pop(a.peerLastTSN + 1)
 	}
 
 	outbound := &packet{}
