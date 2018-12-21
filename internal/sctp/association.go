@@ -480,7 +480,7 @@ func (a *Association) handleSack(d *chunkSelectiveAck) ([]*packet, error) {
 	// order SACK.
 
 	// This is an old SACK, toss
-	if a.peerCumulativeTSNAckPoint >= d.cumulativeTSNAck {
+	if a.peerCumulativeTSNAckPoint > d.cumulativeTSNAck {
 		return nil, errors.Errorf("SACK Cumulative ACK %v is older than ACK point %v",
 			d.cumulativeTSNAck, a.peerCumulativeTSNAckPoint)
 	}
