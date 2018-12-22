@@ -4,10 +4,12 @@
   Pion WebRTC
   <br>
 </h1>
-<h4 align="center">A Golang implementation of the WebRTC API</h4>
+<h4 align="center">A pure Go implementation of the WebRTC API</h4>
 <p align="center">
+  <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion webrtc"></a>
   <a href="https://sourcegraph.com/github.com/pions/webrtc?badge"><img src="https://sourcegraph.com/github.com/pions/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
   <a href="http://gophers.slack.com/messages/pion"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a>
+  <a href="https://waffle.io/pions/webrtc"><img src="https://img.shields.io/badge/pm-waffle-gray.svg?longCache=true&colorB=brightgreen" alt="Waffle board"></a>
   <br>
   <a href="https://travis-ci.org/pions/webrtc"><img src="https://travis-ci.org/pions/webrtc.svg?branch=master" alt="Build Status"></a>
   <a href="https://godoc.org/github.com/pions/webrtc"><img src="https://godoc.org/github.com/pions/webrtc?status.svg" alt="GoDoc"></a>
