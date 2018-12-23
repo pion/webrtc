@@ -107,12 +107,21 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	}
 
 	if p.Extension {
+		if len(rawPacket) < currOffset+4 {
+			return errors.Errorf("RTP header size insufficient for extension; %d < %d", len(rawPacket), currOffset)
+		}
+
 		p.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
 		currOffset += 2
-		extensionLength := binary.BigEndian.Uint16(rawPacket[currOffset:])
+		extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:])) * 4
 		currOffset += 2
-		p.ExtensionPayload = rawPacket[currOffset : currOffset+int(extensionLength)]
-		currOffset += len(p.ExtensionPayload) * 4
+
+		if len(rawPacket) < currOffset+extensionLength {
+			return errors.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
+		}
+
+		p.ExtensionPayload = rawPacket[currOffset : currOffset+extensionLength]
+		currOffset += len(p.ExtensionPayload)
 	}
 
 	p.Payload = rawPacket[currOffset:]
