@@ -13,19 +13,22 @@ func TestBasic(t *testing.T) {
 	}
 
 	rawPkt := []byte{
-		0x80, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
 	parsedPacket := &Packet{
-		Raw:            rawPkt,
-		Version:        2,
-		PayloadOffset:  12,
-		PayloadType:    96,
-		SequenceNumber: 27023,
-		Timestamp:      3653407706,
-		SSRC:           476325762,
-		Payload:        rawPkt[12:],
-		CSRC:           []uint32{},
+		Raw:              rawPkt,
+		Extension:        true,
+		ExtensionProfile: 1,
+		ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
+		Version:          2,
+		PayloadOffset:    20,
+		PayloadType:      96,
+		SequenceNumber:   27023,
+		Timestamp:        3653407706,
+		SSRC:             476325762,
+		Payload:          rawPkt[20:],
+		CSRC:             []uint32{},
 	}
 
 	if err := p.Unmarshal(rawPkt); err != nil {
@@ -40,4 +43,25 @@ func TestBasic(t *testing.T) {
 	} else if !reflect.DeepEqual(raw, rawPkt) {
 		t.Errorf("TestBasic marshal: got %#v, want %#v", raw, rawPkt)
 	}
+}
+
+func TestExtension(t *testing.T) {
+	p := &Packet{}
+
+	missingExtensionPkt := []byte{
+		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82,
+	}
+	if err := p.Unmarshal(missingExtensionPkt); err == nil {
+		t.Fatal("Unmarshal did not error on packet with missing extension data")
+	}
+
+	invalidExtensionLengthPkt := []byte{
+		0x90, 0x60, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x99, 0x99, 0x99, 0x99,
+	}
+	if err := p.Unmarshal(invalidExtensionLengthPkt); err == nil {
+		t.Fatal("Unmarshal did not error on packet with invalid extension length")
+	}
+
 }
