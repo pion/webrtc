@@ -1,12 +1,16 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
+github.com/pions/datachannel v1.0.0 h1:WaWR78JgIn6CiqChtkuZ6eEbf4KZ3i8c6E5pkp0+ICo=
+github.com/pions/datachannel v1.0.0/go.mod h1:1paHW6g1jjst80gtFvBYCnMWNMoS8tLS2t+6ZdsdysU=
 github.com/pions/dtls v1.0.2 h1:VOIp3whGooFWS4X0RBOXaykNORYr05yjs8mlNYqRc+4=
 github.com/pions/dtls v1.0.2/go.mod h1:T22vu8VCOxNmIrbe3nnM1UdIo3m1Bx5CJNkHyehahLg=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712 h1:ciXO7F7PusyAzW/EZJt01bETgfTxP/BIGoWQ15pBP54=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712/go.mod h1:r9wKZs+Xxv2acLspex4CHQiIhFjGK1zGP+nUm/8klXA=
 github.com/pions/sctp v1.0.0 h1:ScxSzY867GGr0peNGYqOdw6bPBymM0V9UcbKrsTfeDA=
 github.com/pions/sctp v1.0.0/go.mod h1:lamdubZNMS+X5BjlMmsjWrg78Aa87tjYswD7p+AIZhc=
+github.com/pions/transport v0.0.0-20181219213214-cd29ef7d0726 h1:kQFdB0RkBeK7TavRC09+5OAN73/NCSdz3AMxZS8v6H8=
+github.com/pions/transport v0.0.0-20181219213214-cd29ef7d0726/go.mod h1:HLhzI7I0k8TyiQ99hfRZNRf84lG76eaFnZHnVy/wFnM=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
