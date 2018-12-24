@@ -181,7 +181,12 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 	// Ensure on
 	d.onOpen()
 
-	go d.readLoop()
+	d.Lock()
+	defer d.Unlock()
+
+	if !defaultSettingEngine.Detach.DataChannels {
+		go d.readLoop()
+	}
 }
 
 func (d *RTCDataChannel) readLoop() {
@@ -223,4 +228,27 @@ func (d *RTCDataChannel) Send(payload sugar.Payload) error {
 
 	_, err := d.dataChannel.WriteDataChannel(data, isString)
 	return err
+}
+
+// Detach allows you to detach the underlying datachannel. This provides
+// an idiomatic API to work with, however it disables the OnMessage callback.
+// Before calling Detach you have to enable this behavior by calling
+// webrtc.DetachDataChannels(). Combining detached and normal data channels
+// is not supported.
+// Please reffer to the data-channels-detach example and the
+// pions/datachannel documentation for the correct way to handle the
+// resulting DataChannel object.
+func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
+	d.Lock()
+	defer d.Unlock()
+
+	if !defaultSettingEngine.Detach.DataChannels {
+		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
+	}
+
+	if d.dataChannel == nil {
+		return nil, errors.New("datachannel not opened yet, try calling Detach from OnOpen")
+	}
+
+	return d.dataChannel, nil
 }
