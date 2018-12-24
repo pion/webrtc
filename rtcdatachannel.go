@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pions/webrtc/internal/datachannel"
+	"github.com/pions/datachannel"
 	sugar "github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pkg/errors"
 )
