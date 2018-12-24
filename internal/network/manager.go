@@ -9,9 +9,9 @@ import (
 	"sync"
 
 	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/sctp"
 	"github.com/pions/webrtc/internal/datachannel"
 	"github.com/pions/webrtc/internal/mux"
-	"github.com/pions/webrtc/internal/sctp"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/rtcp"
