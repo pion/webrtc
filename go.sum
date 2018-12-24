@@ -1,9 +1,12 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
 github.com/pions/dtls v1.0.2 h1:VOIp3whGooFWS4X0RBOXaykNORYr05yjs8mlNYqRc+4=
 github.com/pions/dtls v1.0.2/go.mod h1:T22vu8VCOxNmIrbe3nnM1UdIo3m1Bx5CJNkHyehahLg=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712 h1:ciXO7F7PusyAzW/EZJt01bETgfTxP/BIGoWQ15pBP54=
 github.com/pions/pkg v0.0.0-20181115215726-b60cd756f712/go.mod h1:r9wKZs+Xxv2acLspex4CHQiIhFjGK1zGP+nUm/8klXA=
+github.com/pions/sctp v1.0.0 h1:ScxSzY867GGr0peNGYqOdw6bPBymM0V9UcbKrsTfeDA=
+github.com/pions/sctp v1.0.0/go.mod h1:lamdubZNMS+X5BjlMmsjWrg78Aa87tjYswD7p+AIZhc=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -14,3 +17,4 @@ golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 h1:mKdxBk7AujPs8kU4m80U72
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20181220203305-927f97764cc3 h1:eH6Eip3UpmR+yM/qI9Ijluzb1bNv/cAU/n+6l8tRSis=
 golang.org/x/net v0.0.0-20181220203305-927f97764cc3/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
+gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81HFBacw=

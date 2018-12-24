@@ -3,7 +3,7 @@ package datachannel
 import (
 	"fmt"
 
-	"github.com/pions/webrtc/internal/sctp"
+	"github.com/pions/sctp"
 	"github.com/pkg/errors"
 )
 
