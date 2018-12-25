@@ -62,8 +62,8 @@ func main() {
 	util.Check(err)
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples).Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples).Start()
+	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples, "audiotestsrc").Start()
+	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples, "videotestsrc").Start()
 
 	// Block forever
 	select {}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/pions/webrtc"
@@ -10,6 +11,10 @@ import (
 )
 
 func main() {
+	audioSrc := flag.String("audio-src", "audiotestsrc", "GStreamer audio src")
+	videoSrc := flag.String("video-src", "videotestsrc", "GStreamer video src")
+	flag.Parse()
+
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Setup the codecs you want to use.
@@ -62,8 +67,8 @@ func main() {
 	fmt.Println(util.Encode(answer))
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples).Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples).Start()
+	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples, *videoSrc).Start()
 
 	// Block forever
 	select {}
