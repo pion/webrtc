@@ -31,3 +31,22 @@ Copy the text that `gstreamer-send` just emitted and copy into second text area
 A video should start playing in your browser above the input boxes, and will continue playing until you close the application.
 
 Congrats, you have used pion-WebRTC! Now start building something cool
+
+## Customizing your video or audio
+`gstreamer-send` also accepts the command line arguments `-video-src` and `-audio-src` allowing you to provide custom inputs.
+
+When prototyping with GStreamer it is highly recommended that you enable debug output, this is done by setting the `GST_DEBUG` enviroment variable.
+You can read about that [here](https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/gst-running.html) a good default value is `GST_DEBUG=*:3`
+
+You can also prototype a GStreamer pipeline by using `gst-launch-1.0` to see how things look before trying them with `gstreamer-send` for the examples below you
+also may need additional setup to enable extra video codecs like H264. The output from GST_DEBUG should give you hints
+
+These pipelines work on Linux, they may have issues on other platforms. We would love PRs for more example pipelines that people find helpful!
+
+* a webcam, with computer generated audio.
+
+  `echo $BROWSER_SDP | gstreamer-send -video-src "autovideosrc ! video/x-raw, width=320, height=240 ! videoconvert ! queue"`
+
+* a pre-recorded video, sintel.mkv is available [here](https://durian.blender.org/download/)
+
+  `echo $BROWSER_SDP | gstreamer-send -video-src "uridecodebin uri=file:///tmp/sintel.mkv ! videoscale ! video/x-raw, width=320, height=240 ! queue " -audio-src "uridecodebin uri=file:///tmp/sintel.mkv ! queue ! audioconvert"`
