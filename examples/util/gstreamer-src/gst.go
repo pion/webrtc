@@ -10,7 +10,10 @@ import "C"
 import (
 	"fmt"
 	"sync"
+	"time"
 	"unsafe"
+
+	"github.com/pions/webrtc/pkg/rtp"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/media"
@@ -26,10 +29,67 @@ type Pipeline struct {
 	in        chan<- media.RTCSample
 	id        int
 	codecName string
+
+	done chan struct{}
 }
 
 var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
+
+// CreateRawRTPPipeline create a GStreamer with rtp payload
+// user push a channel of *rtp.Packet
+func CreateRawRTPPipeline(codecName string, in chan<- *rtp.Packet, pipelineSrc string) *Pipeline {
+	inSample := make(chan media.RTCSample, 10)
+
+	pipelineStr := "appsink name=appsink"
+	switch codecName {
+	case webrtc.VP8:
+		pipelineStr = pipelineSrc + " ! vp8enc ! rtpvp8pay ! " + pipelineStr
+	case webrtc.VP9:
+		pipelineStr = pipelineSrc + " ! vp9enc ! rtpvp9pay ! " + pipelineStr
+	case webrtc.H264:
+		pipelineStr = pipelineSrc + " ! video/x-raw,format=I420 ! x264enc bframes=0 speed-preset=veryfast key-int-max=60 ! video/x-h264,stream-format=byte-stream ! rtph264pay ! " + pipelineStr
+	case webrtc.Opus:
+		pipelineStr = pipelineSrc + " ! opusenc ! rtpopuspay ! " + pipelineStr
+	case webrtc.G722:
+		pipelineStr = pipelineSrc + " ! avenc_g722 ! rtpg722pay ! " + pipelineStr
+	default:
+		panic("Unhandled codec " + codecName)
+	}
+
+	pipelineStrUnsafe := C.CString(pipelineStr)
+	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
+
+	pipelinesLock.Lock()
+	defer pipelinesLock.Unlock()
+
+	pipeline := &Pipeline{
+		Pipeline:  C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
+		in:        inSample,
+		id:        len(pipelines),
+		codecName: codecName,
+		done:      make(chan struct{}),
+	}
+
+	// push sample data to rtp packet
+	go func(pipeline *Pipeline) {
+		for {
+			select {
+			case temp := <-inSample:
+				p := rtp.Packet{}
+				p.Unmarshal(temp.Data)
+				in <- &p
+			case <-pipeline.done:
+				//close
+				break
+			}
+			time.Sleep(time.Microsecond * 100)
+		}
+	}(pipeline)
+
+	pipelines[pipeline.id] = pipeline
+	return pipeline
+}
 
 // CreatePipeline creates a GStreamer Pipeline
 func CreatePipeline(codecName string, in chan<- media.RTCSample, pipelineSrc string) *Pipeline {
