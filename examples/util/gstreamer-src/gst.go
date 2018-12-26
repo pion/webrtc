@@ -37,7 +37,6 @@ var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
 
 // CreateRawRTPPipeline create a GStreamer with rtp payload
-// user push a channel of *rtp.Packet
 func CreateRawRTPPipeline(codecName string, in chan<- *rtp.Packet, pipelineSrc string) *Pipeline {
 	inSample := make(chan media.RTCSample, 10)
 
