@@ -48,7 +48,9 @@ const (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	offer := util.Decode(mustReadStdin(reader))
+
+	offer := webrtc.RTCSessionDescription{}
+	util.Decode(mustReadStdin(reader), &offer)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
@@ -103,7 +105,9 @@ func main() {
 	for {
 		fmt.Println("")
 		fmt.Println("Paste an SDP to start sendonly peer connection")
-		recvOnlyOffer := util.Decode(mustReadStdin(reader))
+
+		recvOnlyOffer := webrtc.RTCSessionDescription{}
+		util.Decode(mustReadStdin(reader), &recvOnlyOffer)
 
 		// Create a new RTCPeerConnection
 		peerConnection, err := webrtc.New(peerConnectionConfig)

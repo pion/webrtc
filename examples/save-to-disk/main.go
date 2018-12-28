@@ -66,7 +66,8 @@ func main() {
 	})
 
 	// Wait for the offer to be pasted
-	offer := util.Decode(util.MustReadStdin())
+	offer := webrtc.RTCSessionDescription{}
+	util.Decode(util.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
