@@ -17,11 +17,7 @@ func (r *RawPacket) Unmarshal(b []byte) error {
 	*r = b
 
 	var h Header
-	if err := h.Unmarshal(b); err != nil {
-		return err
-	}
-
-	return nil
+	return h.Unmarshal(b)
 }
 
 // Header returns the Header associated with this packet.

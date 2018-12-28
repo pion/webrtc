@@ -24,7 +24,7 @@ var (
 	ErrTurnCredencials = errors.New("invalid turn server credentials")
 
 	// ErrExistingTrack indicates that a track already exists.
-	ErrExistingTrack = errors.New("track aready exists")
+	ErrExistingTrack = errors.New("track already exists")
 
 	// ErrPrivateKeyType indicates that a particular private key encryption
 	// chosen to generate a certificate is not supported.

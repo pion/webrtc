@@ -125,11 +125,7 @@ func (m *Manager) Start(isOffer bool,
 		return err
 	}
 
-	if err := m.startSCTP(isOffer); err != nil {
-		return err
-	}
-
-	return nil
+	return m.startSCTP(isOffer)
 }
 
 func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
@@ -168,10 +164,8 @@ func (m *Manager) createContextSRTP(isOffer bool) error {
 	if err != nil {
 		return err
 	}
-	if err = m.CreateContextSRTP(keyingMaterial, isOffer); err != nil {
-		return err
-	}
-	return nil
+
+	return m.CreateContextSRTP(keyingMaterial, isOffer)
 }
 
 func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
