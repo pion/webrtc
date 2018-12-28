@@ -3,7 +3,7 @@ package webrtc
 import (
 	"strconv"
 
-	"github.com/pions/webrtc/internal/sdp"
+	"github.com/pions/sdp"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pions/webrtc/pkg/rtp/codecs"
 	"github.com/pkg/errors"

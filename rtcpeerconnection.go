@@ -14,8 +14,8 @@ import (
 	"encoding/binary"
 
 	"github.com/pions/datachannel"
+	"github.com/pions/sdp"
 	"github.com/pions/webrtc/internal/network"
-	"github.com/pions/webrtc/internal/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtcerr"
