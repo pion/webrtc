@@ -20,7 +20,8 @@ script:
   - rm -rf examples
   # Remove examples, no test coverage for them
   - golangci-lint run
-  - goveralls -v -race -covermode=atomic -service=travis-ci
+  - go test -coverpkg=$(go list ./... | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
+  - goveralls -coverprofile=cover.out -service=travis-ci
   - bash .github/assert-contributors.sh
   - bash .github/lint-disallowed-functions-in-library.sh
   - bash .github/lint-commit-message.sh
