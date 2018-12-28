@@ -21,6 +21,61 @@ func TestStressDuplex(t *testing.T) {
 	stressDuplex(t)
 }
 
+func testTimeout(t *testing.T, c *Conn, timeout time.Duration) {
+	const pollrate = 100 * time.Millisecond
+	statechan := make(chan ConnectionState)
+	ticker := time.NewTicker(pollrate)
+
+	for cnt := time.Duration(0); cnt <= timeout+taskLoopInterval; cnt += pollrate {
+		<-ticker.C
+		err := c.agent.run(func(agent *Agent) {
+			statechan <- agent.connectionState
+		})
+
+		if err != nil {
+			//we should never get here.
+			panic(err)
+		}
+
+		cs := <-statechan
+		if cs != ConnectionStateConnected {
+			if cnt < timeout {
+				t.Fatalf("Connection timed out early. (after %d ms)", cnt/time.Millisecond)
+			} else {
+				return
+			}
+		}
+	}
+	t.Fatalf("Connection failed to time out in time.")
+
+}
+
+func TestTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	ca, cb := pipe()
+	err := cb.Close()
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	testTimeout(t, ca, 30*time.Second)
+
+	ca, cb = pipeWithTimeout(5*time.Second, 3*time.Second)
+	err = cb.Close()
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	testTimeout(t, ca, 5*time.Second)
+}
+
 func stressDuplex(t *testing.T) {
 	ca, cb := pipe()
 
@@ -72,26 +127,7 @@ func check(err error) {
 	}
 }
 
-func pipe() (*Conn, *Conn) {
-	var urls []*URL
-
-	aNotifier, aConnected := onConnected()
-	bNotifier, bConnected := onConnected()
-
-	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier})
-
-	if err != nil {
-		//we should never get here.
-		panic(err)
-	}
-
-	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier})
-
-	if err != nil {
-		//we should never get here.
-		panic(err)
-	}
-
+func connect(aAgent, bAgent *Agent) (*Conn, *Conn) {
 	// Manual signaling
 	aUfrag, aPwd := aAgent.GetLocalUserCredentials()
 	bUfrag, bPwd := bAgent.GetLocalUserCredentials()
@@ -123,6 +159,60 @@ func pipe() (*Conn, *Conn) {
 
 	// Ensure accepted
 	<-accepted
+	return aConn, bConn
+}
+
+func pipe() (*Conn, *Conn) {
+	var urls []*URL
+
+	aNotifier, aConnected := onConnected()
+	bNotifier, bConnected := onConnected()
+
+	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	aConn, bConn := connect(aAgent, bAgent)
+
+	// Ensure pair selected
+	// Note: this assumes ConnectionStateConnected is thrown after selecting the final pair
+	<-aConnected
+	<-bConnected
+
+	return aConn, bConn
+}
+
+func pipeWithTimeout(ICETimeout time.Duration, ICEKeepalive time.Duration) (*Conn, *Conn) {
+	var urls []*URL
+
+	aNotifier, aConnected := onConnected()
+	bNotifier, bConnected := onConnected()
+
+	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier, ConnectionTimeout: ICETimeout, KeepaliveInterval: ICEKeepalive})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier, ConnectionTimeout: ICETimeout, KeepaliveInterval: ICEKeepalive})
+
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	aConn, bConn := connect(aAgent, bAgent)
 
 	// Ensure pair selected
 	// Note: this assumes ConnectionStateConnected is thrown after selecting the final pair

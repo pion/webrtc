@@ -160,7 +160,9 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		}
 	}
 
-	pc.networkManager, err = network.NewManager(urls, pc.iceStateChange, defaultSettingEngine.EphemeralUDP.PortMin, defaultSettingEngine.EphemeralUDP.PortMax)
+	pc.networkManager, err = network.NewManager(urls, pc.iceStateChange,
+		defaultSettingEngine.EphemeralUDP.PortMin, defaultSettingEngine.EphemeralUDP.PortMax,
+		defaultSettingEngine.Timeout.ICEConnection, defaultSettingEngine.Timeout.ICEKeepalive)
 	if err != nil {
 		return nil, err
 	}
