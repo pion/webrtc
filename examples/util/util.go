@@ -13,8 +13,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/pions/webrtc"
 )
 
 // Allows compressing offer/answer to bypass terminal input limits.
@@ -52,8 +50,8 @@ func MustReadStdin() string {
 
 // Encode encodes the input in base64
 // It can optionally zip the input before encoding
-func Encode(sdp webrtc.RTCSessionDescription) string {
-	b, err := json.Marshal(sdp)
+func Encode(obj interface{}) string {
+	b, err := json.Marshal(obj)
 	Check(err)
 
 	if compress {
@@ -65,7 +63,7 @@ func Encode(sdp webrtc.RTCSessionDescription) string {
 
 // Decode decodes the input from base64
 // It can optionally unzip the input after decoding
-func Decode(in string) webrtc.RTCSessionDescription {
+func Decode(in string, obj interface{}) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	Check(err)
 
@@ -73,11 +71,8 @@ func Decode(in string) webrtc.RTCSessionDescription {
 		b = unzip(b)
 	}
 
-	var sdp webrtc.RTCSessionDescription
-	err = json.Unmarshal(b, &sdp)
+	err = json.Unmarshal(b, obj)
 	Check(err)
-
-	return sdp
 }
 
 // RandSeq generates a random string to serve as dummy data

@@ -32,7 +32,8 @@ func TestRTCIceServer_validate(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
-			assert.Nil(t, testCase.iceServer.validate(), "testCase: %d %v", i, testCase)
+			_, err := testCase.iceServer.validate()
+			assert.Nil(t, err, "testCase: %d %v", i, testCase)
 		}
 	})
 	t.Run("Failure", func(t *testing.T) {
@@ -70,8 +71,9 @@ func TestRTCIceServer_validate(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
+			_, err := testCase.iceServer.validate()
 			assert.EqualError(t,
-				testCase.iceServer.validate(),
+				err,
 				testCase.expectedErr.Error(),
 				"testCase: %d %v", i, testCase,
 			)

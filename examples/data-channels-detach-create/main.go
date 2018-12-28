@@ -66,7 +66,8 @@ func main() {
 	fmt.Println(util.Encode(offer))
 
 	// Wait for the answer to be pasted
-	answer := util.Decode(util.MustReadStdin())
+	answer := webrtc.RTCSessionDescription{}
+	util.Decode(util.MustReadStdin(), answer)
 
 	// Apply the answer as the remote description
 	err = peerConnection.SetRemoteDescription(answer)

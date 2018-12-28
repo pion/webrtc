@@ -138,7 +138,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		IceGatheringState:  RTCIceGatheringStateNew,
 		ConnectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
-		sctpTransport:      newRTCSctpTransport(),
+		sctpTransport:      NewRTCSctpTransport(nil),
 		dataChannels:       make(map[uint16]*RTCDataChannel),
 	}
 
@@ -222,7 +222,7 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 
 	if len(configuration.IceServers) > 0 {
 		for _, server := range configuration.IceServers {
-			if err := server.validate(); err != nil {
+			if _, err := server.validate(); err != nil {
 				return err
 			}
 		}
@@ -408,7 +408,7 @@ func (pc *RTCPeerConnection) SetConfiguration(configuration RTCConfiguration) er
 	if len(configuration.IceServers) > 0 {
 		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
 		for _, server := range configuration.IceServers {
-			if err := server.validate(); err != nil {
+			if _, err := server.validate(); err != nil {
 				return err
 			}
 		}
