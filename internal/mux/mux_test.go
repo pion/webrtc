@@ -65,3 +65,23 @@ func pipeMemory() (*Endpoint, net.Conn, func(*testing.T)) {
 
 	return e, cb, stop
 }
+
+func TestNoEndpoints(t *testing.T) {
+	// In memory pipe
+	ca, cb := net.Pipe()
+	err := cb.Close()
+	if err != nil {
+		panic("Failed to close network pipe")
+	}
+	m := NewMux(ca, 8192)
+	m.dispatch(make([]byte, 1))
+	err = m.Close()
+	if err != nil {
+		t.Fatalf("Failed to close empty mux")
+	}
+	err = ca.Close()
+	if err != nil {
+		panic("Failed to close network pipe")
+	}
+
+}

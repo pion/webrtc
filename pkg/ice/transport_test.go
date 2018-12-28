@@ -76,6 +76,29 @@ func TestTimeout(t *testing.T) {
 	testTimeout(t, ca, 5*time.Second)
 }
 
+func TestReadClosed(t *testing.T) {
+	ca, cb := pipe()
+
+	err := ca.Close()
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	err = cb.Close()
+	if err != nil {
+		//we should never get here.
+		panic(err)
+	}
+
+	empty := make([]byte, 10)
+	_, err = ca.Read(empty)
+	if err == nil {
+		t.Fatalf("Reading from a closed channel should return an error")
+	}
+
+}
+
 func stressDuplex(t *testing.T) {
 	ca, cb := pipe()
 
