@@ -102,6 +102,45 @@ type RTCDataChannel struct {
 	dataChannel *datachannel.DataChannel
 }
 
+// NewRTCDataChannel creates a new RTCDataChannel.
+// This constructor is part of the ORTC API. It is not
+// meant to be used together with the basic WebRTC API.
+func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
+	c := &RTCDataChannel{
+		Transport: transport,
+		Label:     params.Label,
+		ID:        &params.ID,
+	}
+
+	if err := c.ensureSCTP(); err != nil {
+		return nil, err
+	}
+
+	cfg := &datachannel.Config{
+		ChannelType:          datachannel.ChannelTypeReliable,   // TODO: Wiring
+		Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
+		ReliabilityParameter: 0,                                 // TODO: Wiring
+		Label:                c.Label,
+	}
+
+	dc, err := datachannel.Dial(c.Transport.association, *c.ID, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	c.handleOpen(dc)
+
+	return c, nil
+}
+
+func (d *RTCDataChannel) ensureSCTP() error {
+	if d.Transport == nil ||
+		d.Transport.association == nil {
+		return errors.New("SCTP not establisched")
+	}
+	return nil
+}
+
 // OnOpen sets an event handler which is invoked when
 // the underlying data transport has been established (or re-established).
 func (d *RTCDataChannel) OnOpen(f func()) {
