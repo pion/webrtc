@@ -1,6 +1,10 @@
 package webrtc
 
-import "github.com/pions/webrtc/pkg/ice"
+import (
+	"time"
+
+	"github.com/pions/webrtc/pkg/ice"
+)
 
 var defaultSettingEngine = newSettingEngine()
 
@@ -8,13 +12,7 @@ var defaultSettingEngine = newSettingEngine()
 // ICE UDP connections can allocate from. This setting currently only
 // affects host candidates, not server reflexive candidates.
 func SetEphemeralUDPPortRange(portMin, portMax uint16) error {
-	if portMax < portMin {
-		return ice.ErrPort
-	}
-
-	defaultSettingEngine.EphemeralUDP.PortMin = portMin
-	defaultSettingEngine.EphemeralUDP.PortMax = portMax
-	return nil
+	return defaultSettingEngine.SetEphemeralUDPPortRange(portMin, portMax)
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -22,6 +20,12 @@ func SetEphemeralUDPPortRange(portMin, portMax uint16) error {
 // RTCDataChannel.Detach method.
 func DetachDataChannels() {
 	defaultSettingEngine.DetachDataChannels()
+}
+
+// SetConnectionTimeout sets the amount of silence needed on a given candidate pair
+// before the ICE agent considers the pair timed out.
+func SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
+	defaultSettingEngine.SetConnectionTimeout(connectionTimeout, keepAlive)
 }
 
 // settingEngine allows influencing behavior in ways that are not
@@ -35,6 +39,10 @@ type settingEngine struct {
 	Detach struct {
 		DataChannels bool
 	}
+	Timeout struct {
+		ICEConnection time.Duration
+		ICEKeepalive  time.Duration
+	}
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -42,6 +50,26 @@ type settingEngine struct {
 // RTCDataChannel.Detach method.
 func (e *settingEngine) DetachDataChannels() {
 	e.Detach.DataChannels = true
+}
+
+// SetConnectionTimeout sets the amount of silence needed on a given candidate pair
+// before the ICE agent considers the pair timed out.
+func (e *settingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
+	e.Timeout.ICEConnection = connectionTimeout
+	e.Timeout.ICEKeepalive = keepAlive
+}
+
+// SetEphemeralUDPPortRange limits the pool of ephemeral ports that
+// ICE UDP connections can allocate from. This setting currently only
+// affects host candidates, not server reflexive candidates.
+func (e *settingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error {
+	if portMax < portMin {
+		return ice.ErrPort
+	}
+
+	e.EphemeralUDP.PortMin = portMin
+	e.EphemeralUDP.PortMax = portMax
+	return nil
 }
 
 func newSettingEngine() *settingEngine {
