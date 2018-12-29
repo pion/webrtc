@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const cipherContextAlgo = "SRTP_AES128_CM_SHA1_80"
+const cipherContextAlgo = ProtectionProfileAes128CmHmacSha1_80
 const defaultSsrc = 0
 
 type rtpTestCase struct {

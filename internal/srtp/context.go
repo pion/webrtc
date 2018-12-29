@@ -11,6 +11,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ProtectionProfile specifies Cipher and AuthTag details, similar to TLS cipher suite
+type ProtectionProfile uint16
+
+// Supported protection profiles
+const (
+	ProtectionProfileAes128CmHmacSha1_80 ProtectionProfile = 0x0001
+)
+
 const (
 	labelSRTPEncryption        = 0x00
 	labelSRTPAuthenticationTag = 0x01
@@ -59,7 +67,7 @@ type Context struct {
 }
 
 // CreateContext creates a new SRTP Context
-func CreateContext(masterKey, masterSalt []byte, profile string) (c *Context, err error) {
+func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile) (c *Context, err error) {
 	if masterKeyLen := len(masterKey); masterKeyLen != keyLen {
 		return c, errors.Errorf("SRTP Master Key must be len %d, got %d", masterKey, keyLen)
 	} else if masterSaltLen := len(masterSalt); masterSaltLen != saltLen {
