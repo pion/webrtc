@@ -127,14 +127,15 @@ func (m *Manager) handleSRTP(buffer []byte) {
 		}
 	}
 
-	packet := &rtp.Packet{}
-	if err := packet.Unmarshal(buffer); err != nil {
-		fmt.Println("Failed to unmarshal RTP packet")
+	decrypted, err := m.srtpInboundContext.DecryptRTP(buffer)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	if ok := m.srtpInboundContext.DecryptRTP(packet); !ok {
-		fmt.Println("Failed to decrypt packet")
+	packet := &rtp.Packet{}
+	if err := packet.Unmarshal(decrypted); err != nil {
+		fmt.Println("Failed to unmarshal RTP packet")
 		return
 	}
 

@@ -276,18 +276,19 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 		return
 	}
 
-	if ok := m.srtpOutboundContext.EncryptRTP(packet); !ok {
-		fmt.Println("SendRTP failed to encrypt packet")
-		return
-	}
-
 	raw, err := packet.Marshal()
 	if err != nil {
 		fmt.Printf("SendRTP failed to marshal packet: %s \n", err.Error())
+		return
 	}
 
-	_, err = m.iceConn.Write(raw)
+	encrypted, err := m.srtpOutboundContext.EncryptRTP(raw)
 	if err != nil {
+		fmt.Printf("SendRTP failed to encrypt packet: %s \n", err.Error())
+		return
+	}
+
+	if _, err = m.iceConn.Write(encrypted); err != nil {
 		fmt.Println("SendRTP failed to write:", err)
 	}
 }

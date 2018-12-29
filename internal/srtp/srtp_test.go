@@ -166,23 +166,44 @@ func TestRTPLifecyle(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
-		if !encryptContext.EncryptRTP(pkt) {
-			t.Errorf("Failed to encrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
+		decryptedPkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
+		decryptedRaw, err := decryptedPkt.Marshal()
+		if err != nil {
+			t.Fatal(err)
 		}
-		assert.Equalf(pkt.Payload, testCase.encrypted, "RTP packet with SeqNum invalid encryption: %d", testCase.sequenceNumber)
 
-		if !decryptContext.DecryptRTP(pkt) {
-			t.Errorf("Failed to decrypt RTP packet with SeqNum: %d", testCase.sequenceNumber)
+		encryptedPkt := &rtp.Packet{Payload: append([]byte{}, testCase.encrypted...), SequenceNumber: testCase.sequenceNumber}
+		encryptedRaw, err := encryptedPkt.Marshal()
+		if err != nil {
+			t.Fatal(err)
 		}
-		assert.Equalf(pkt.Payload, decrypted, "RTP packet with SeqNum invalid decryption: %d", testCase.sequenceNumber)
 
+		actualEncrypted, err := decryptContext.EncryptRTP(decryptedRaw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equalf(actualEncrypted, encryptedRaw, "RTP packet with SeqNum invalid encryption: %d", testCase.sequenceNumber)
+
+		actualDecrypted, err := encryptContext.DecryptRTP(encryptedRaw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equalf(actualDecrypted, decryptedRaw, "RTP packet with SeqNum invalid decryption: %d", testCase.sequenceNumber)
 	}
 
 	for _, testCase := range testCases {
 		pkt := &rtp.Packet{Payload: append([]byte{}, decrypted...), SequenceNumber: testCase.sequenceNumber}
-		encryptContext.EncryptRTP(pkt)
-		if invalidContext.DecryptRTP(pkt) {
+		pktRaw, err := pkt.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		out, err := encryptContext.EncryptRTP(pktRaw)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := invalidContext.DecryptRTP(out); err == nil {
 			t.Errorf("Managed to decrypt with incorrect salt for packet with SeqNum: %d", testCase.sequenceNumber)
 		}
 	}

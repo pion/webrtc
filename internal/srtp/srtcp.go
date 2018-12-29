@@ -6,7 +6,6 @@ import (
 )
 
 // DecryptRTCP decrypts a buffer that contains a RTCP packet
-// We can't pass *rtcp.Packet as the encrypt will obscure significant fields
 func (c *Context) DecryptRTCP(encrypted []byte) ([]byte, error) {
 	tailOffset := len(encrypted) - (authTagSize + srtcpIndexSize)
 	out := append([]byte{}, encrypted[0:tailOffset]...)
