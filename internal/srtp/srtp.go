@@ -5,47 +5,57 @@ import (
 	"encoding/binary"
 
 	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pkg/errors"
 )
 
 // DecryptRTP decrypts a RTP packet with an encrypted payload
-func (c *Context) DecryptRTP(packet *rtp.Packet) bool {
-	s := c.getSSRCState(packet.SSRC)
+func (c *Context) DecryptRTP(encrypted []byte) ([]byte, error) {
+	p := &rtp.Packet{}
+	if err := p.Unmarshal(append([]byte{}, encrypted...)); err != nil {
+		return nil, err
+	}
 
-	c.updateRolloverCount(packet.SequenceNumber, s)
+	s := c.getSSRCState(p.SSRC)
 
-	pktWithROC := append([]byte{}, packet.Raw[:len(packet.Raw)-authTagSize]...)
+	c.updateRolloverCount(p.SequenceNumber, s)
+
+	pktWithROC := append([]byte{}, p.Raw[:len(p.Raw)-authTagSize]...)
 	pktWithROC = append(pktWithROC, make([]byte, 4)...)
 	binary.BigEndian.PutUint32(pktWithROC[len(pktWithROC)-4:], s.rolloverCounter)
 
-	actualAuthTag := packet.Payload[len(packet.Payload)-authTagSize:]
+	actualAuthTag := p.Payload[len(p.Payload)-authTagSize:]
 	verified, err := c.verifyAuthTag(pktWithROC, actualAuthTag)
-	if err != nil || !verified {
-		return false
+	if err != nil {
+		return nil, err
+	} else if !verified {
+		return nil, errors.Errorf("Failed to verify auth tag")
 	}
 
-	packet.Payload = packet.Payload[:len(packet.Payload)-authTagSize]
+	p.Payload = p.Payload[:len(p.Payload)-authTagSize]
 
-	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(packet.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
-	stream.XORKeyStream(packet.Payload, packet.Payload)
+	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(p.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
+	stream.XORKeyStream(p.Payload, p.Payload)
 
-	// Replace payload with decrypted
-	packet.Raw = append(packet.Raw[0:packet.PayloadOffset], packet.Payload...)
-
-	return true
+	return append(p.Raw[0:p.PayloadOffset], p.Payload...), nil
 }
 
 // EncryptRTP Encrypts a SRTP packet in place
-func (c *Context) EncryptRTP(packet *rtp.Packet) bool {
-	s := c.getSSRCState(packet.SSRC)
+func (c *Context) EncryptRTP(encrypted []byte) ([]byte, error) {
+	p := &rtp.Packet{}
+	if err := p.Unmarshal(append([]byte{}, encrypted...)); err != nil {
+		return nil, err
+	}
 
-	c.updateRolloverCount(packet.SequenceNumber, s)
+	s := c.getSSRCState(p.SSRC)
 
-	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(packet.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
-	stream.XORKeyStream(packet.Payload, packet.Payload)
+	c.updateRolloverCount(p.SequenceNumber, s)
 
-	fullPkt, err := packet.Marshal()
+	stream := cipher.NewCTR(c.srtpBlock, c.generateCounter(p.SequenceNumber, s.rolloverCounter, s.ssrc, c.srtpSessionSalt))
+	stream.XORKeyStream(p.Payload, p.Payload)
+
+	fullPkt, err := p.Marshal()
 	if err != nil {
-		return false
+		return nil, err
 	}
 
 	fullPkt = append(fullPkt, make([]byte, 4)...)
@@ -53,13 +63,10 @@ func (c *Context) EncryptRTP(packet *rtp.Packet) bool {
 
 	authTag, err := c.generateAuthTag(fullPkt, c.srtpSessionAuthTag)
 	if err != nil {
-		return false
+		return nil, err
 	}
 
-	packet.Payload = append(packet.Payload, authTag...)
-	packet.Raw = append(packet.Raw[0:packet.PayloadOffset], packet.Payload...)
-
-	return true
+	return append(p.Raw[0:p.PayloadOffset], append(p.Payload, authTag...)...), nil
 }
 
 // https://tools.ietf.org/html/rfc3550#appendix-A.1
