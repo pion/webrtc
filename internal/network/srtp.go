@@ -37,9 +37,9 @@ func (m *Manager) CreateContextSRTP(keyingMaterial []byte, isOffer bool) error {
 	var err error
 	m.srtpInboundContextLock.Lock()
 	if isOffer {
-		m.srtpInboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:] /* Profile */, "")
+		m.srtpInboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:], srtp.ProtectionProfileAes128CmHmacSha1_80)
 	} else {
-		m.srtpInboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:] /* Profile */, "")
+		m.srtpInboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:], srtp.ProtectionProfileAes128CmHmacSha1_80)
 	}
 	m.srtpInboundContextLock.Unlock()
 	if err != nil {
@@ -48,9 +48,9 @@ func (m *Manager) CreateContextSRTP(keyingMaterial []byte, isOffer bool) error {
 
 	m.srtpOutboundContextLock.Lock()
 	if isOffer {
-		m.srtpOutboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:] /* Profile */, "")
+		m.srtpOutboundContext, err = srtp.CreateContext(serverWriteKey[0:16], serverWriteKey[16:], srtp.ProtectionProfileAes128CmHmacSha1_80)
 	} else {
-		m.srtpOutboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:] /* Profile */, "")
+		m.srtpOutboundContext, err = srtp.CreateContext(clientWriteKey[0:16], clientWriteKey[16:], srtp.ProtectionProfileAes128CmHmacSha1_80)
 	}
 	m.srtpOutboundContextLock.Unlock()
 	if err != nil {
