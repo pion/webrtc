@@ -337,10 +337,12 @@ func TestRTCPeerConnection_NewRawRTPTrack(t *testing.T) {
 	pc, err := New(RTCConfiguration{})
 	assert.Nil(t, err)
 
-	_, err = pc.NewRawRTPTrack(DefaultPayloadTypeH264, 0, "trackId", "trackLabel")
+	videoCodec := NewRTCRtpVP8Codec(90000)
+	RegisterCodec(videoCodec)
+	_, err = pc.NewRawRTPTrack(videoCodec, 0, "trackId", "trackLabel")
 	assert.NotNil(t, err)
 
-	track, err := pc.NewRawRTPTrack(DefaultPayloadTypeH264, 123456, "trackId", "trackLabel")
+	track, err := pc.NewRawRTPTrack(videoCodec, 123456, "trackId", "trackLabel")
 	assert.Nil(t, err)
 
 	// This channel should not be set up for a RawRTP track
@@ -359,7 +361,9 @@ func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 	pc, err := New(RTCConfiguration{})
 	assert.Nil(t, err)
 
-	track, err := pc.NewRTCSampleTrack(DefaultPayloadTypeH264, "trackId", "trackLabel")
+	videoCodec := NewRTCRtpVP8Codec(90000)
+	RegisterCodec(videoCodec)
+	track, err := pc.NewRTCSampleTrack(videoCodec, "trackId", "trackLabel")
 	assert.Nil(t, err)
 
 	// This channel should not be set up for a RTCSample track

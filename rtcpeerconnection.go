@@ -1246,14 +1246,12 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 	d.WithMedia(media)
 }
 
-func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
-	codec, err := pc.mediaEngine.getCodec(payloadType)
-	if err != nil {
-		return nil, err
-	}
-
+func (pc *RTCPeerConnection) newRTCTrack(codec *RTCRtpCodec, ssrc uint32, id, label string) (*RTCTrack, error) {
 	if codec.Payloader == nil {
 		return nil, errors.New("codec payloader not set")
+	}
+	if codec.PayloadType == nil {
+		return nil, errors.New("codec not registered")
 	}
 
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
@@ -1261,7 +1259,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	rtcpPackets := make(chan rtcp.Packet)
 	if ssrc == 0 {
 		buf := make([]byte, 4)
-		_, err = rand.Read(buf)
+		_, err := rand.Read(buf)
 		if err != nil {
 			return nil, errors.New("failed to generate random value")
 		}
@@ -1270,7 +1268,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		go func() {
 			packetizer := rtp.NewPacketizer(
 				1400,
-				payloadType,
+				*codec.PayloadType,
 				ssrc,
 				codec.Payloader,
 				rtp.NewRandomSequencer(),
@@ -1319,23 +1317,23 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 //
 // NB: If the source RTP stream is being broadcast to multiple tracks, each track
 // must receive its own copies of the source packets in order to avoid packet corruption.
-func (pc *RTCPeerConnection) NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
+func (pc *RTCPeerConnection) NewRawRTPTrack(codec *RTCRtpCodec, ssrc uint32, id, label string) (*RTCTrack, error) {
 	if ssrc == 0 {
 		return nil, errors.New("SSRC supplied to NewRawRTPTrack() must be non-zero")
 	}
-	return pc.newRTCTrack(payloadType, ssrc, id, label)
+	return pc.newRTCTrack(codec, ssrc, id, label)
 }
 
 // NewRTCSampleTrack initializes a new *RTCTrack configured to accept media.RTCSample
-func (pc *RTCPeerConnection) NewRTCSampleTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
-	return pc.newRTCTrack(payloadType, 0, id, label)
+func (pc *RTCPeerConnection) NewRTCSampleTrack(codec *RTCRtpCodec, id, label string) (*RTCTrack, error) {
+	return pc.newRTCTrack(codec, 0, id, label)
 }
 
 // NewRTCTrack is used to create a new RTCTrack
 //
 // Deprecated: Use NewRTCSampleTrack() instead
-func (pc *RTCPeerConnection) NewRTCTrack(payloadType uint8, id, label string) (*RTCTrack, error) {
-	return pc.NewRTCSampleTrack(payloadType, id, label)
+func (pc *RTCPeerConnection) NewRTCTrack(codec *RTCRtpCodec, id, label string) (*RTCTrack, error) {
+	return pc.NewRTCSampleTrack(codec, id, label)
 }
 
 func (pc *RTCPeerConnection) newRTCRtpTransceiver(

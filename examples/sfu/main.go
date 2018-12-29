@@ -54,7 +54,8 @@ func main() {
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Only support VP8, this makes our proxying code simpler
-	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	videoCodec := webrtc.NewRTCRtpVP8Codec(90000)
+	webrtc.RegisterCodec(videoCodec)
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(peerConnectionConfig)
@@ -110,7 +111,7 @@ func main() {
 		check(err)
 
 		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+		vp8Track, err := peerConnection.NewRTCSampleTrack(videoCodec, "video", "pion2")
 		check(err)
 
 		_, err = peerConnection.AddTrack(vp8Track)
