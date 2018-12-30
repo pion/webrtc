@@ -18,7 +18,11 @@ import (
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
-const receiveMTU = 8192
+const (
+	srtpMasterKeyLen     = 16
+	srtpMasterKeySaltLen = 14
+	receiveMTU           = 8192
+)
 
 // TransportPair allows the application to be notified about both Rtp
 // and Rtcp messages incoming from the remote host
@@ -39,16 +43,13 @@ type Manager struct {
 	dtlsEndpoint *mux.Endpoint
 	srtpEndpoint *mux.Endpoint
 
-	srtpInboundContextLock  sync.RWMutex
-	srtpInboundContext      *srtp.Context
-	srtpOutboundContextLock sync.RWMutex
-	srtpOutboundContext     *srtp.Context
-
 	bufferTransportGenerator BufferTransportGenerator
 	pairsLock                sync.RWMutex
 	bufferTransportPairs     map[uint32]*TransportPair
 
 	dtlsConn *dtls.Conn
+
+	srtpSession *srtp.SessionSRTP
 
 	sctpAssociation *sctp.Association
 }
@@ -115,13 +116,11 @@ func (m *Manager) Start(isOffer bool,
 	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
 	m.srtpEndpoint = m.mux.NewEndpoint(mux.MatchSRTP)
 
-	m.startSRTP()
-
 	if err := m.startDTLS(isOffer, dtlsCert, dtlsPrivKey, fingerprint, fingerprintHash); err != nil {
 		return err
 	}
 
-	if err := m.createContextSRTP(isOffer); err != nil {
+	if err := m.startSRTP(isOffer); err != nil {
 		return err
 	}
 
@@ -145,27 +144,65 @@ func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
 	return nil
 }
 
-func (m *Manager) startSRTP() {
-	// Glue code until SRTP is a Conn.
-	go func() {
-		buf := make([]byte, receiveMTU)
-		for {
-			n, err := m.srtpEndpoint.Read(buf)
-			if err != nil {
-				return
-			}
-			m.handleSRTP(buf[:n])
-		}
-	}()
-}
-
-func (m *Manager) createContextSRTP(isOffer bool) error {
+func (m *Manager) startSRTP(isOffer bool) error {
 	keyingMaterial, err := m.dtlsConn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
 	if err != nil {
 		return err
 	}
 
-	return m.CreateContextSRTP(keyingMaterial, isOffer)
+	offset := 0
+	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	serverWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	clientWriteKey = append(clientWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+	offset += srtpMasterKeySaltLen
+
+	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+
+	if isOffer {
+		m.srtpSession, err = srtp.CreateSessionSRTP(
+			serverWriteKey[0:16], serverWriteKey[16:],
+			clientWriteKey[0:16], clientWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
+		)
+	} else {
+		m.srtpSession, err = srtp.CreateSessionSRTP(
+			clientWriteKey[0:16], clientWriteKey[16:],
+			serverWriteKey[0:16], serverWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
+		)
+	}
+
+	if err == nil {
+		go func() {
+			buf := make([]byte, receiveMTU)
+			for {
+				i, err := m.srtpSession.Read(buf)
+				if err != nil {
+					return
+				}
+
+				packet := &rtp.Packet{}
+				if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
+					fmt.Println("Failed to unmarshal RTP packet")
+					return
+				}
+
+				bufferTransport := m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
+				if bufferTransport != nil && bufferTransport.RTP != nil {
+					select {
+					case bufferTransport.RTP <- packet:
+					default:
+					}
+				}
+			}
+		}()
+	}
+
+	return err
 }
 
 func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
@@ -268,9 +305,7 @@ func (m *Manager) Close() error {
 
 // SendRTP finds a connected port and sends the passed RTP packet
 func (m *Manager) SendRTP(packet *rtp.Packet) {
-	m.srtpOutboundContextLock.Lock()
-	defer m.srtpOutboundContextLock.Unlock()
-	if m.srtpOutboundContext == nil {
+	if m.srtpSession == nil {
 		// TODO log-level
 		// fmt.Printf("Tried to send RTP packet but no SRTP Context to handle it \n")
 		return
@@ -282,34 +317,12 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 		return
 	}
 
-	encrypted, err := m.srtpOutboundContext.EncryptRTP(raw)
-	if err != nil {
-		fmt.Printf("SendRTP failed to encrypt packet: %s \n", err.Error())
-		return
-	}
-
-	if _, err = m.iceConn.Write(encrypted); err != nil {
+	if _, err = m.srtpSession.Write(raw); err != nil {
 		fmt.Println("SendRTP failed to write:", err)
 	}
 }
 
 // SendRTCP finds a connected port and sends the passed RTCP packet
 func (m *Manager) SendRTCP(pkt []byte) {
-	m.srtpOutboundContextLock.Lock()
-	defer m.srtpOutboundContextLock.Unlock()
-	if m.srtpOutboundContext == nil {
-		fmt.Printf("Tried to send RTCP packet but no SRTP Context to handle it \n")
-		return
-	}
-
-	encrypted, err := m.srtpOutboundContext.EncryptRTCP(pkt)
-	if err != nil {
-		fmt.Println("SendRTCP failed to encrypt packet:", err)
-		return
-	}
-
-	_, err = m.iceConn.Write(encrypted)
-	if err != nil {
-		fmt.Println("SendRTCP failed to write:", err)
-	}
+	fmt.Println("Manager.SendRTCP() TODO")
 }
