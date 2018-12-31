@@ -1,5 +1,10 @@
 package mux
 
+import (
+	"bytes"
+	"encoding/binary"
+)
+
 // MatchFunc allows custom logic for mapping packets to an Endpoint
 type MatchFunc func([]byte) bool
 
@@ -44,6 +49,33 @@ var MatchDTLS = MatchRange(20, 63)
 // as defied in RFC7983
 var MatchTURN = MatchRange(64, 79)
 
-// MatchSRTP is a MatchFunc that accepts packets with the first byte in [128..191]
+// MatchSRTPOrSRTCP is a MatchFunc that accepts packets with the first byte in [128..191]
 // as defied in RFC7983
-var MatchSRTP = MatchRange(128, 191)
+var MatchSRTPOrSRTCP = MatchRange(128, 191)
+
+func isRTCP(buf []byte) bool {
+	// Not long enough to determine RTP/RTCP
+	if len(buf) < 4 {
+		return false
+	}
+
+	var rtcpPacketType uint8
+	r := bytes.NewReader([]byte{buf[1]})
+	if err := binary.Read(r, binary.BigEndian, &rtcpPacketType); err != nil {
+		return false
+	} else if rtcpPacketType >= 192 && rtcpPacketType <= 223 {
+		return true
+	}
+
+	return false
+}
+
+// MatchSRTP is a MatchFunc that only matches SRTP and not SRTCP
+var MatchSRTP = func(buf []byte) bool {
+	return MatchSRTPOrSRTCP(buf) && !isRTCP(buf)
+}
+
+// MatchSRTCP is a MatchFunc that only matches SRTCP and not SRTP
+var MatchSRTCP = func(buf []byte) bool {
+	return MatchSRTPOrSRTCP(buf) && isRTCP(buf)
+}
