@@ -1,10 +1,12 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 
@@ -40,8 +42,9 @@ type Manager struct {
 
 	mux *mux.Mux
 
-	dtlsEndpoint *mux.Endpoint
-	srtpEndpoint *mux.Endpoint
+	dtlsEndpoint  *mux.Endpoint
+	srtpEndpoint  *mux.Endpoint
+	srtcpEndpoint *mux.Endpoint
 
 	bufferTransportGenerator BufferTransportGenerator
 	pairsLock                sync.RWMutex
@@ -49,7 +52,8 @@ type Manager struct {
 
 	dtlsConn *dtls.Conn
 
-	srtpSession *srtp.SessionSRTP
+	srtpSession  *srtp.SessionSRTP
+	srtcpSession *srtp.SessionSRTCP
 
 	sctpAssociation *sctp.Association
 }
@@ -115,6 +119,7 @@ func (m *Manager) Start(isOffer bool,
 	m.mux = mux.NewMux(m.iceConn, receiveMTU)
 	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
 	m.srtpEndpoint = m.mux.NewEndpoint(mux.MatchSRTP)
+	m.srtcpEndpoint = m.mux.NewEndpoint(mux.MatchSRTCP)
 
 	if err := m.startDTLS(isOffer, dtlsCert, dtlsPrivKey, fingerprint, fingerprintHash); err != nil {
 		return err
@@ -144,6 +149,41 @@ func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
 	return nil
 }
 
+func (m *Manager) handleSRTP() {
+	buf := make([]byte, receiveMTU)
+	for {
+		i, err := m.srtpSession.Read(buf)
+		if err != nil {
+			return
+		}
+
+		packet := &rtp.Packet{}
+		if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
+			fmt.Println("Failed to unmarshal RTP packet")
+			return
+		}
+
+		bufferTransport := m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
+		if bufferTransport != nil && bufferTransport.RTP != nil {
+			select {
+			case bufferTransport.RTP <- packet:
+			default:
+			}
+		}
+	}
+}
+
+func (m *Manager) handleSRTCP() {
+	buf := make([]byte, receiveMTU)
+	for {
+		i, err := m.srtcpSession.Read(buf)
+		if err != nil {
+			return
+		}
+		handleRTCP(m.getBufferTransports, buf[:i])
+	}
+}
+
 func (m *Manager) startSRTP(isOffer bool) error {
 	keyingMaterial, err := m.dtlsConn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
 	if err != nil {
@@ -168,38 +208,33 @@ func (m *Manager) startSRTP(isOffer bool) error {
 			clientWriteKey[0:16], clientWriteKey[16:],
 			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
 		)
+
+		if err == nil {
+			m.srtcpSession, err = srtp.CreateSessionSRTCP(
+				serverWriteKey[0:16], serverWriteKey[16:],
+				clientWriteKey[0:16], clientWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtcpEndpoint,
+			)
+		}
 	} else {
 		m.srtpSession, err = srtp.CreateSessionSRTP(
 			clientWriteKey[0:16], clientWriteKey[16:],
 			serverWriteKey[0:16], serverWriteKey[16:],
 			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
 		)
+
+		if err == nil {
+			m.srtcpSession, err = srtp.CreateSessionSRTCP(
+				clientWriteKey[0:16], clientWriteKey[16:],
+				serverWriteKey[0:16], serverWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtcpEndpoint,
+			)
+		}
 	}
 
 	if err == nil {
-		go func() {
-			buf := make([]byte, receiveMTU)
-			for {
-				i, err := m.srtpSession.Read(buf)
-				if err != nil {
-					return
-				}
-
-				packet := &rtp.Packet{}
-				if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
-					fmt.Println("Failed to unmarshal RTP packet")
-					return
-				}
-
-				bufferTransport := m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
-				if bufferTransport != nil && bufferTransport.RTP != nil {
-					select {
-					case bufferTransport.RTP <- packet:
-					default:
-					}
-				}
-			}
-		}()
+		go m.handleSRTP()
+		go m.handleSRTCP()
 	}
 
 	return err
@@ -284,9 +319,17 @@ func (m *Manager) Close() error {
 	//    continue the chain the Mux has to be closed.
 
 	// Close SCTP. This should close the data channels, SCTP, and DTLS
-	var errSCTP, errMux error
+	var errSCTP, errMux, errSRTP, errSRTCP error
 	if m.sctpAssociation != nil {
 		errSCTP = m.sctpAssociation.Close()
+	}
+
+	if m.srtpSession != nil {
+		errSRTP = m.srtpSession.Close()
+	}
+
+	if m.srtcpSession != nil {
+		errSRTCP = m.srtcpSession.Close()
 	}
 
 	// Close the Mux. This should close the Mux and ICE.
@@ -296,8 +339,10 @@ func (m *Manager) Close() error {
 
 	// TODO: better way to combine/handle errors?
 	if errSCTP != nil ||
-		errMux != nil {
-		return fmt.Errorf("Failed to close: %v, %v", errSCTP, errMux)
+		errMux != nil ||
+		errSRTP != nil ||
+		errSRTCP != nil {
+		return fmt.Errorf("Failed to close: %v, %v, %v, %v", errSCTP, errMux, errSRTP, errSRTCP)
 	}
 
 	return nil
@@ -324,5 +369,50 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 
 // SendRTCP finds a connected port and sends the passed RTCP packet
 func (m *Manager) SendRTCP(pkt []byte) {
-	fmt.Println("Manager.SendRTCP() TODO")
+	if m.srtpSession == nil {
+		// TODO log-level
+		// fmt.Printf("Tried to send RTCP packet but no SRTCP Context to handle it \n")
+		return
+	}
+
+	if _, err := m.srtcpSession.Write(pkt); err != nil {
+		fmt.Println("SendRTCP failed to write:", err)
+	}
+}
+
+func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) {
+	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
+	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
+	for {
+		_, rawrtcp, err := compoundPacket.ReadPacket()
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println(err)
+			return
+		}
+
+		var report rtcp.Packet
+		report, _, err = rtcp.Unmarshal(rawrtcp)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		f := func(ssrc uint32) {
+			bufferTransport := getBufferTransports(ssrc)
+			if bufferTransport != nil && bufferTransport.RTCP != nil {
+				select {
+				case bufferTransport.RTCP <- report:
+				default:
+				}
+			}
+		}
+
+		for _, ssrc := range report.DestinationSSRC() {
+			f(ssrc)
+		}
+	}
 }
