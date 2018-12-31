@@ -72,6 +72,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
 * [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements, G.722 support, Bugfixes*
 * [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification*
+* [Yutaka Takeda](https://github.com/enobufs) *Fix ICE connection timeout*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
