@@ -418,7 +418,7 @@ func (a *Agent) checkKeepalive() {
 		return
 	}
 
-	if time.Since(a.selectedPair.remote.LastSent()) > keepaliveInterval {
+	if time.Since(a.selectedPair.local.LastSent()) > keepaliveInterval {
 		a.keepaliveCandidate(a.selectedPair.local, a.selectedPair.remote)
 	}
 }
