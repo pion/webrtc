@@ -161,7 +161,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		}
 	}
 
-	pc.networkManager, err = network.NewManager(urls, pc.generateChannel, pc.iceStateChange, defaultSettingEngine.EphemeralUDP.PortMin, defaultSettingEngine.EphemeralUDP.PortMax)
+	pc.networkManager, err = network.NewManager(urls, pc.iceStateChange, defaultSettingEngine.EphemeralUDP.PortMin, defaultSettingEngine.EphemeralUDP.PortMax)
 	if err != nil {
 		return nil, err
 	}
@@ -1106,45 +1106,45 @@ func (pc *RTCPeerConnection) Close() error {
 }
 
 /* Everything below is private */
-func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.TransportPair) {
-	pc.RLock()
-	if pc.onTrackHandler == nil {
-		pc.RUnlock()
-		return nil
-	}
-	pc.RUnlock()
-
-	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
-	if err != nil {
-		pcLog.Warningf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
-		return nil
-	}
-
-	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
-	if err != nil {
-		pcLog.Warningf("Codec %s in not registered\n", sdpCodec)
-		return nil
-	}
-
-	rtpTransport := make(chan *rtp.Packet, 15)
-	rtcpTransport := make(chan rtcp.Packet, 15)
-
-	track := &RTCTrack{
-		PayloadType: payloadType,
-		Kind:        codec.Type,
-		ID:          "0", // TODO extract from remoteDescription
-		Label:       "",  // TODO extract from remoteDescription
-		Ssrc:        ssrc,
-		Codec:       codec,
-		Packets:     rtpTransport,
-		RTCPPackets: rtcpTransport,
-	}
-
-	// TODO: Register the receiving Track
-
-	pc.onTrack(track)
-	return &network.TransportPair{RTP: rtpTransport, RTCP: rtcpTransport}
-}
+// func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.TransportPair) {
+// 	pc.RLock()
+// 	if pc.onTrackHandler == nil {
+// 		pc.RUnlock()
+// 		return nil
+// 	}
+// 	pc.RUnlock()
+//
+// 	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
+// 	if err != nil {
+// 		pcLog.Warningf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+// 		return nil
+// 	}
+//
+// 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
+// 	if err != nil {
+// 		pcLog.Warningf("Codec %s in not registered\n", sdpCodec)
+// 		return nil
+// 	}
+//
+// 	rtpTransport := make(chan *rtp.Packet, 15)
+// 	rtcpTransport := make(chan rtcp.Packet, 15)
+//
+// 	track := &RTCTrack{
+// 		PayloadType: payloadType,
+// 		Kind:        codec.Type,
+// 		ID:          "0", // TODO extract from remoteDescription
+// 		Label:       "",  // TODO extract from remoteDescription
+// 		Ssrc:        ssrc,
+// 		Codec:       codec,
+// 		Packets:     rtpTransport,
+// 		RTCPPackets: rtcpTransport,
+// 	}
+//
+// 	// TODO: Register the receiving Track
+//
+// 	pc.onTrack(track)
+// 	return &network.TransportPair{RTP: rtpTransport, RTCP: rtcpTransport}
+// }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.Lock()
@@ -1257,9 +1257,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	codec, err := pc.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
-	}
-
-	if codec.Payloader == nil {
+	} else if codec.Payloader == nil {
 		return nil, errors.New("codec payloader not set")
 	}
 
@@ -1317,8 +1315,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		RawRTP:      rawPackets,
 	}
 
-	pc.networkManager.AddTransportPair(ssrc, nil, rtcpPackets)
-
+	// TODO Sean-Der inbound RTCP
 	return t, nil
 }
 
