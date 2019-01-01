@@ -1,14 +1,11 @@
 package network
 
 import (
-	"bytes"
 	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"strings"
-	"sync"
 
 	"github.com/pions/datachannel"
 	"github.com/pions/dtls/pkg/dtls"
@@ -16,7 +13,6 @@ import (
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
@@ -25,13 +21,6 @@ const (
 	srtpMasterKeySaltLen = 14
 	receiveMTU           = 8192
 )
-
-// TransportPair allows the application to be notified about both Rtp
-// and Rtcp messages incoming from the remote host
-type TransportPair struct {
-	RTP  chan<- *rtp.Packet
-	RTCP chan<- rtcp.Packet
-}
 
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
@@ -46,10 +35,6 @@ type Manager struct {
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
 
-	bufferTransportGenerator BufferTransportGenerator
-	pairsLock                sync.RWMutex
-	bufferTransportPairs     map[uint32]*TransportPair
-
 	dtlsConn *dtls.Conn
 
 	srtpSession  *srtp.SessionSRTP
@@ -58,20 +43,8 @@ type Manager struct {
 	sctpAssociation *sctp.Association
 }
 
-//AddTransportPair notifies the network manager that an RTCTrack has
-//been created externally, and packets may be incoming with this ssrc
-func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp chan<- rtcp.Packet) {
-	m.pairsLock.Lock()
-	defer m.pairsLock.Unlock()
-	bufferTransport := m.bufferTransportPairs[ssrc]
-	if bufferTransport == nil {
-		bufferTransport = &TransportPair{Rtp, Rtcp}
-		m.bufferTransportPairs[ssrc] = bufferTransport
-	}
-}
-
 // NewManager creates a new network.Manager
-func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
+func NewManager(urls []*ice.URL, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
 	config := &ice.AgentConfig{Urls: urls, Notifier: ntf, PortMin: minport, PortMax: maxport}
 	iceAgent, err := ice.NewAgent(config)
 
@@ -80,28 +53,8 @@ func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, 
 	}
 
 	return &Manager{
-		IceAgent:                 iceAgent,
-		bufferTransportPairs:     make(map[uint32]*TransportPair),
-		bufferTransportGenerator: btg,
+		IceAgent: iceAgent,
 	}, nil
-}
-
-func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
-	m.pairsLock.RLock()
-	defer m.pairsLock.RUnlock()
-	return m.bufferTransportPairs[ssrc]
-}
-
-func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
-	m.pairsLock.Lock()
-	defer m.pairsLock.Unlock()
-	bufferTransport := m.bufferTransportPairs[ssrc]
-	if bufferTransport == nil {
-		bufferTransport = m.bufferTransportGenerator(ssrc, payloadtype)
-		m.bufferTransportPairs[ssrc] = bufferTransport
-	}
-
-	return bufferTransport
 }
 
 // Start allocates the network stack
@@ -150,38 +103,32 @@ func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
 }
 
 func (m *Manager) handleSRTP() {
-	buf := make([]byte, receiveMTU)
 	for {
-		i, err := m.srtpSession.Read(buf)
+		r, ssrc, err := m.srtpSession.AcceptStream()
 		if err != nil {
 			return
 		}
 
-		packet := &rtp.Packet{}
-		if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
-			fmt.Println("Failed to unmarshal RTP packet")
-			return
-		}
+		go func() {
+			buf := make([]byte, receiveMTU)
+			for {
+				i, err := r.Read(buf)
+				if err != nil {
+					return
+				}
 
-		bufferTransport := m.getOrCreateBufferTransports(packet.SSRC, packet.PayloadType)
-		if bufferTransport != nil && bufferTransport.RTP != nil {
-			select {
-			case bufferTransport.RTP <- packet:
-			default:
+				packet := &rtp.Packet{}
+				if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
+					fmt.Println("Failed to unmarshal RTP packet")
+					return
+				}
+				fmt.Println("Unmarshalled:", ssrc)
 			}
-		}
+		}()
 	}
 }
 
 func (m *Manager) handleSRTCP() {
-	buf := make([]byte, receiveMTU)
-	for {
-		i, err := m.srtcpSession.Read(buf)
-		if err != nil {
-			return
-		}
-		handleRTCP(m.getBufferTransports, buf[:i])
-	}
 }
 
 func (m *Manager) startSRTP(isOffer bool) error {
@@ -362,7 +309,13 @@ func (m *Manager) SendRTP(packet *rtp.Packet) {
 		return
 	}
 
-	if _, err = m.srtpSession.Write(raw); err != nil {
+	writeStream, err := m.srtpSession.OpenWriteStream()
+	if err != nil {
+		fmt.Println("SendRTP failed to open WriteStream:", err)
+		return
+	}
+
+	if _, err := writeStream.Write(raw); err != nil {
 		fmt.Println("SendRTP failed to write:", err)
 	}
 }
@@ -375,44 +328,13 @@ func (m *Manager) SendRTCP(pkt []byte) {
 		return
 	}
 
-	if _, err := m.srtcpSession.Write(pkt); err != nil {
-		fmt.Println("SendRTCP failed to write:", err)
+	writeStream, err := m.srtcpSession.OpenWriteStream()
+	if err != nil {
+		fmt.Println("SendRTCP failed to open WriteStream:", err)
+		return
 	}
-}
 
-func handleRTCP(getBufferTransports func(uint32) *TransportPair, buffer []byte) {
-	//decrypted packets can also be compound packets, so we have to nest our reader loop here.
-	compoundPacket := rtcp.NewReader(bytes.NewReader(buffer))
-	for {
-		_, rawrtcp, err := compoundPacket.ReadPacket()
-
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println(err)
-			return
-		}
-
-		var report rtcp.Packet
-		report, _, err = rtcp.Unmarshal(rawrtcp)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		f := func(ssrc uint32) {
-			bufferTransport := getBufferTransports(ssrc)
-			if bufferTransport != nil && bufferTransport.RTCP != nil {
-				select {
-				case bufferTransport.RTCP <- report:
-				default:
-				}
-			}
-		}
-
-		for _, ssrc := range report.DestinationSSRC() {
-			f(ssrc)
-		}
+	if _, err := writeStream.Write(pkt); err != nil {
+		fmt.Println("SendRTCP failed to write:", err)
 	}
 }
