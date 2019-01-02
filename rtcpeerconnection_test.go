@@ -441,7 +441,7 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&RTCTrack{}) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&RTCDataChannel{}) })
+	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&RTCDataChannel{settingEngine: defaultSettingEngine}) })
 
 	allTrue := func(vals []bool) bool {
 		for _, val := range vals {

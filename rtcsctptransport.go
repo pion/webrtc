@@ -134,9 +134,10 @@ func (r *RTCSctpTransport) acceptDataChannels() {
 
 		sid := dc.StreamIdentifier()
 		rtcDC := &RTCDataChannel{
-			ID:         &sid,
-			Label:      dc.Config.Label,
-			ReadyState: RTCDataChannelStateOpen,
+			ID:            &sid,
+			Label:         dc.Config.Label,
+			ReadyState:    RTCDataChannelStateOpen,
+			settingEngine: defaultSettingEngine,
 		}
 
 		<-r.onDataChannel(rtcDC)

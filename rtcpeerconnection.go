@@ -125,10 +125,12 @@ type RTCPeerConnection struct {
 
 	srtcpSession  *srtp.SessionSRTCP
 	srtcpEndpoint *mux.Endpoint
+
+	// A reference to the associated setting engine used by this peerconnection
+	settingEngine *settingEngine
 }
 
-// New creates a new RTCPeerConfiguration with the provided configuration
-func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+func newPC(settings *settingEngine, configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -154,6 +156,7 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		dataChannels:       make(map[uint16]*RTCDataChannel),
 		srtpSession:        srtp.CreateSessionSRTP(),
 		srtcpSession:       srtp.CreateSessionSRTCP(),
+		settingEngine:      settings,
 	}
 
 	var err error
@@ -169,11 +172,17 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	pc.iceGatherer = gatherer
 
 	err = pc.gather()
+
 	if err != nil {
 		return nil, err
 	}
 
 	return &pc, nil
+}
+
+// New creates a new RTCPeerConfiguration with the provided configuration
+func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+	return newPC(defaultSettingEngine, configuration)
 }
 
 // initConfiguration defines validation of the specified RTCConfiguration and
@@ -1273,7 +1282,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 		}
 	*/
 
-	d, err := newRTCDataChannel(params)
+	d, err := newRTCDataChannel(params, pc.settingEngine)
 	if err != nil {
 		return nil, err
 	}
