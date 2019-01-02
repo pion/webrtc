@@ -51,7 +51,11 @@ type Agent struct {
 	portmax uint16
 
 	//How long should a pair stay quiet before we declare it dead?
+	//0 means never timeout
 	connectionTimeout time.Duration
+
+	//How often should we send keepalive packets?
+	//0 means never
 	keepaliveInterval time.Duration
 
 	localUfrag      string
@@ -105,12 +109,14 @@ type AgentConfig struct {
 	PortMin uint16
 	PortMax uint16
 
-	// ConnectionTimeout defaults to 30 seconds when this property is 0.
-	ConnectionTimeout time.Duration
+	// ConnectionTimeout defaults to 30 seconds when this property is nil.
+	// If the duration is 0, we will never timeout this connection.
+	ConnectionTimeout *time.Duration
 	// KeepaliveInterval determines how often should we send ICE
 	// keepalives (should be less then connectiontimeout above)
-	// when this is 0, it defaults to 10 seconds.
-	KeepaliveInterval time.Duration
+	// when this is nil, it defaults to 10 seconds.
+	// A keepalive interval of 0 means we never send keepalive packets
+	KeepaliveInterval *time.Duration
 }
 
 // NewAgent creates a new Agent
@@ -138,16 +144,16 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	}
 
 	// connectionTimeout used to declare a connection dead
-	if config.ConnectionTimeout == 0 {
+	if config.ConnectionTimeout == nil {
 		a.connectionTimeout = defaultConnectionTimeout
 	} else {
-		a.connectionTimeout = config.ConnectionTimeout
+		a.connectionTimeout = *config.ConnectionTimeout
 	}
 
-	if config.KeepaliveInterval == 0 {
+	if config.KeepaliveInterval == nil {
 		a.keepaliveInterval = defaultKeepaliveInterval
 	} else {
-		a.keepaliveInterval = config.KeepaliveInterval
+		a.keepaliveInterval = *config.KeepaliveInterval
 	}
 
 	// Initialize local candidates
@@ -425,7 +431,8 @@ func (a *Agent) validateSelectedPair() bool {
 		return false
 	}
 
-	if time.Since(a.selectedPair.remote.LastReceived()) > a.connectionTimeout {
+	if (a.connectionTimeout != 0) &&
+		(time.Since(a.selectedPair.remote.LastReceived()) > a.connectionTimeout) {
 		a.selectedPair = nil
 		a.updateConnectionState(ConnectionStateDisconnected)
 		return false
@@ -442,7 +449,8 @@ func (a *Agent) checkKeepalive() {
 		return
 	}
 
-	if time.Since(a.selectedPair.local.LastSent()) > a.keepaliveInterval {
+	if (a.keepaliveInterval != 0) &&
+		(time.Since(a.selectedPair.local.LastSent()) > a.keepaliveInterval) {
 		a.keepaliveCandidate(a.selectedPair.local, a.selectedPair.remote)
 	}
 }

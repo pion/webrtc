@@ -221,14 +221,14 @@ func pipeWithTimeout(ICETimeout time.Duration, ICEKeepalive time.Duration) (*Con
 	aNotifier, aConnected := onConnected()
 	bNotifier, bConnected := onConnected()
 
-	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier, ConnectionTimeout: ICETimeout, KeepaliveInterval: ICEKeepalive})
+	aAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: aNotifier, ConnectionTimeout: &ICETimeout, KeepaliveInterval: &ICEKeepalive})
 
 	if err != nil {
 		//we should never get here.
 		panic(err)
 	}
 
-	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier, ConnectionTimeout: ICETimeout, KeepaliveInterval: ICEKeepalive})
+	bAgent, err := NewAgent(&AgentConfig{Urls: urls, Notifier: bNotifier, ConnectionTimeout: &ICETimeout, KeepaliveInterval: &ICEKeepalive})
 
 	if err != nil {
 		//we should never get here.

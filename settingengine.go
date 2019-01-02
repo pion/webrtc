@@ -40,8 +40,8 @@ type settingEngine struct {
 		DataChannels bool
 	}
 	Timeout struct {
-		ICEConnection time.Duration
-		ICEKeepalive  time.Duration
+		ICEConnection *time.Duration
+		ICEKeepalive  *time.Duration
 	}
 }
 
@@ -55,8 +55,8 @@ func (e *settingEngine) DetachDataChannels() {
 // SetConnectionTimeout sets the amount of silence needed on a given candidate pair
 // before the ICE agent considers the pair timed out.
 func (e *settingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
-	e.Timeout.ICEConnection = connectionTimeout
-	e.Timeout.ICEKeepalive = keepAlive
+	e.Timeout.ICEConnection = &connectionTimeout
+	e.Timeout.ICEKeepalive = &keepAlive
 }
 
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
