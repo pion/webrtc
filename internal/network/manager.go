@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/pions/datachannel"
 	"github.com/pions/dtls/pkg/dtls"
@@ -46,8 +45,7 @@ type Manager struct {
 }
 
 // NewManager creates a new network.Manager
-func NewManager(urls []*ice.URL, ntf ICENotifier, minport, maxport uint16, connectionTimeout, keepaliveInterval time.Duration) (*Manager, error) {
-	config := &ice.AgentConfig{Urls: urls, Notifier: ntf, PortMin: minport, PortMax: maxport, ConnectionTimeout: connectionTimeout, KeepaliveInterval: keepaliveInterval}
+func NewManager(config *ice.AgentConfig) (*Manager, error) {
 	iceAgent, err := ice.NewAgent(config)
 
 	if err != nil {
