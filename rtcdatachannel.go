@@ -93,13 +93,16 @@ type RTCDataChannel struct {
 
 	sctpTransport *RTCSctpTransport
 	dataChannel   *datachannel.DataChannel
+
+	// A reference to the associated setting engine used by this datachannel
+	settingEngine *settingEngine
 }
 
 // NewRTCDataChannel creates a new RTCDataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
-	d, err := newRTCDataChannel(params)
+	d, err := newRTCDataChannel(params, defaultSettingEngine)
 	if err != nil {
 		return nil, err
 	}
@@ -114,16 +117,17 @@ func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParame
 
 // newRTCDataChannel is an internal constructor for the data channel used to
 // create the RTCDataChannel object before the networking is set up.
-func newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataChannel, error) {
+func newRTCDataChannel(params *RTCDataChannelParameters, settingEngine *settingEngine) (*RTCDataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
 	d := &RTCDataChannel{
-		Label:      params.Label,
-		ID:         &params.ID,
-		ReadyState: RTCDataChannelStateConnecting,
+		Label:         params.Label,
+		ID:            &params.ID,
+		ReadyState:    RTCDataChannelStateConnecting,
+		settingEngine: settingEngine,
 	}
 
 	return d, nil
@@ -239,7 +243,7 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !defaultSettingEngine.Detach.DataChannels {
+	if !d.settingEngine.Detach.DataChannels {
 		go d.readLoop()
 	}
 }
@@ -297,7 +301,7 @@ func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !defaultSettingEngine.Detach.DataChannels {
+	if !d.settingEngine.Detach.DataChannels {
 		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	}
 
