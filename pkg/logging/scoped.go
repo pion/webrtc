@@ -73,11 +73,11 @@ func NewScopedLogger(scope string) *LeveledLogger {
 
 func init() {
 	logLevels := map[string]LogLevel{
-		"ERROR":   LogLevelError,
-		"WARNING": LogLevelWarning,
-		"INFO":    LogLevelInfo,
-		"DEBUG":   LogLevelDebug,
-		"TRACE":   LogLevelTrace,
+		"ERROR": LogLevelError,
+		"WARN":  LogLevelWarn,
+		"INFO":  LogLevelInfo,
+		"DEBUG": LogLevelDebug,
+		"TRACE": LogLevelTrace,
 	}
 
 	for name, level := range logLevels {

@@ -5,13 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
-
-	"encoding/binary"
 
 	"github.com/pions/datachannel"
 	"github.com/pions/sdp"
@@ -749,12 +748,20 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			remoteUfrag, remotePwd,
 			cert.x509Cert, cert.privateKey, fingerprint, fingerprintHash)
 		if err != nil {
-			pcLog.Warningf("Failed to start manager: %s", err)
+			pcLog.Warnf("Failed to start manager: %s", err)
 		}
 
+		// Temporary SRTP glue
+		go pc.acceptSRTP()
+		go pc.acceptSRTCP()
+
 		// Temporary data channel glue
+		if err = pc.networkManager.StartSCTP(weOffer); err != nil {
+			pcLog.Warnf("Failed to start SCTP: %s", err)
+		}
 		pc.openDataChannels()
 		pc.acceptDataChannels()
+
 	}()
 
 	return nil
@@ -775,7 +782,7 @@ func (pc *RTCPeerConnection) openDataChannels() {
 				Label:                rtcDC.Label,
 			})
 		if err != nil {
-			pcLog.Warningf("failed to open data channel: %s", err)
+			pcLog.Warnf("failed to open data channel: %s", err)
 			continue
 		}
 		rtcDC.ReadyState = RTCDataChannelStateOpen
@@ -789,7 +796,7 @@ func (pc *RTCPeerConnection) acceptDataChannels() {
 	for {
 		dc, err := pc.networkManager.AcceptDataChannel()
 		if err != nil {
-			pcLog.Warningf("Failed to accept data channel: %s", err)
+			pcLog.Warnf("Failed to accept data channel: %s", err)
 			// TODO: Kill DataChannel/PeerConnection?
 			return
 		}
@@ -808,6 +815,111 @@ func (pc *RTCPeerConnection) acceptDataChannels() {
 
 		<-pc.onDataChannel(rtcDC)
 		rtcDC.handleOpen(dc)
+	}
+}
+
+// TODO: Move to RTCRTpSender?
+func (pc *RTCPeerConnection) acceptSRTCP() {
+	for {
+		r, ssrc, err := pc.networkManager.SrtcpSession.AcceptStream()
+		if err != nil {
+			pcLog.Warnf("Failed to accept RTCP %v \n", err)
+			return
+		}
+
+		go func() {
+			rtcpBuf := make([]byte, receiveMTU)
+			var rtcpPacket rtcp.Packet
+
+			for {
+				i, err := r.Read(rtcpBuf)
+				if err != nil {
+					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
+					return
+				}
+
+				rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:i])
+				if err != nil {
+					pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
+					continue
+				}
+				pcLog.Debugf("got RTCP: %+v", rtcpPacket)
+			}
+		}()
+
+	}
+}
+
+// TODO: Move to RTCRTpSender?
+func (pc *RTCPeerConnection) acceptSRTP() {
+	for {
+		r, ssrc, err := pc.networkManager.SrtpSession.AcceptStream()
+		if err != nil {
+			return
+		}
+
+		rtpBuf := make([]byte, receiveMTU)
+		rtpPacket := &rtp.Packet{}
+
+		i, err := r.Read(rtpBuf)
+		if err != nil {
+			pcLog.Warnf("Failed to read, ignoring AcceptStream: %v \n", err)
+			continue
+		} else if err = rtpPacket.Unmarshal(append([]byte{}, rtpBuf[:i]...)); err != nil {
+			pcLog.Warnf("Failed to unmarshal RTP packet, ignoring AcceptStream: %v \n", err)
+			continue
+		}
+
+		rtpChannel, rtcpChannel := pc.generateChannel(ssrc, rtpPacket.PayloadType)
+
+		// RTP
+		go func() {
+			for {
+				i, err = r.Read(rtpBuf)
+				if err != nil {
+					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
+					return
+				} else if err := rtpPacket.Unmarshal(append([]byte{}, rtpBuf[:i]...)); err != nil {
+					pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
+					continue
+				}
+
+				select {
+				case rtpChannel <- rtpPacket:
+				default:
+				}
+			}
+		}()
+
+		// RTCP
+		go func() {
+			readStream, err := pc.networkManager.SrtcpSession.OpenReadStream(ssrc)
+			if err != nil {
+				pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, ssrc)
+				return
+			}
+
+			rtcpBuf := make([]byte, receiveMTU)
+			var rtcpPacket rtcp.Packet
+
+			for {
+				i, err = readStream.Read(rtcpBuf)
+				if err != nil {
+					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
+					return
+				}
+
+				rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:i])
+				if err != nil {
+					pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
+					continue
+				}
+				select {
+				case rtcpChannel <- rtcpPacket:
+				default:
+				}
+			}
+		}()
 	}
 }
 
@@ -1076,7 +1188,15 @@ func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
 	if err != nil {
 		return err
 	}
-	pc.networkManager.SendRTCP(raw)
+
+	writeStream, err := pc.networkManager.SrtcpSession.OpenWriteStream()
+	if err != nil {
+		return fmt.Errorf("SendRTCP failed to open WriteStream: %v", err)
+	}
+
+	if _, err := writeStream.Write(raw); err != nil {
+		return fmt.Errorf("SendRTCP failed to write: %v", err)
+	}
 	return nil
 }
 
@@ -1106,45 +1226,44 @@ func (pc *RTCPeerConnection) Close() error {
 }
 
 /* Everything below is private */
-// func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (tpair *network.TransportPair) {
-// 	pc.RLock()
-// 	if pc.onTrackHandler == nil {
-// 		pc.RUnlock()
-// 		return nil
-// 	}
-// 	pc.RUnlock()
-//
-// 	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
-// 	if err != nil {
-// 		pcLog.Warningf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
-// 		return nil
-// 	}
-//
-// 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
-// 	if err != nil {
-// 		pcLog.Warningf("Codec %s in not registered\n", sdpCodec)
-// 		return nil
-// 	}
-//
-// 	rtpTransport := make(chan *rtp.Packet, 15)
-// 	rtcpTransport := make(chan rtcp.Packet, 15)
-//
-// 	track := &RTCTrack{
-// 		PayloadType: payloadType,
-// 		Kind:        codec.Type,
-// 		ID:          "0", // TODO extract from remoteDescription
-// 		Label:       "",  // TODO extract from remoteDescription
-// 		Ssrc:        ssrc,
-// 		Codec:       codec,
-// 		Packets:     rtpTransport,
-// 		RTCPPackets: rtcpTransport,
-// 	}
-//
-// 	// TODO: Register the receiving Track
-//
-// 	pc.onTrack(track)
-// 	return &network.TransportPair{RTP: rtpTransport, RTCP: rtcpTransport}
-// }
+func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (chan *rtp.Packet, chan rtcp.Packet) {
+	pc.RLock()
+	if pc.onTrackHandler == nil {
+		pc.RUnlock()
+		return nil, nil
+	}
+	pc.RUnlock()
+
+	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
+	if err != nil {
+		pcLog.Warnf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
+		return nil, nil
+	}
+
+	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
+	if err != nil {
+		pcLog.Warnf("Codec %s in not registered\n", sdpCodec)
+		return nil, nil
+	}
+
+	rtpTransport := make(chan *rtp.Packet, 15)
+	rtcpTransport := make(chan rtcp.Packet, 15)
+
+	track := &RTCTrack{
+		PayloadType: payloadType,
+		Kind:        codec.Type,
+		ID:          "0", // TODO extract from remoteDescription
+		Label:       "",  // TODO extract from remoteDescription
+		Ssrc:        ssrc,
+		Codec:       codec,
+		Packets:     rtpTransport,
+		RTCPPackets: rtcpTransport,
+	}
+
+	// TODO: Register the receiving Track
+	pc.onTrack(track)
+	return rtpTransport, rtcpTransport
+}
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.Lock()
@@ -1253,6 +1372,25 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 	d.WithMedia(media)
 }
 
+// TODO RTCRtpSender
+func (pc *RTCPeerConnection) sendRTP(packet *rtp.Packet) {
+	raw, err := packet.Marshal()
+	if err != nil {
+		pcLog.Warnf("SendRTP failed to marshal packet: %s \n", err.Error())
+		return
+	}
+
+	writeStream, err := pc.networkManager.SrtpSession.OpenWriteStream()
+	if err != nil {
+		pcLog.Warnf("SendRTP failed to open WriteStream: %v", err)
+		return
+	}
+
+	if _, err := writeStream.Write(raw); err != nil {
+		pcLog.Warnf("SendRTP failed to write: %v", err)
+	}
+}
+
 func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
 	codec, err := pc.mediaEngine.getCodec(payloadType)
 	if err != nil {
@@ -1286,7 +1424,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 				in := <-trackInput
 				packets := packetizer.Packetize(in.Data, in.Samples)
 				for _, p := range packets {
-					pc.networkManager.SendRTP(p)
+					pc.sendRTP(p)
 				}
 			}
 		}()
@@ -1297,7 +1435,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		go func() {
 			for {
 				p := <-rawPackets
-				pc.networkManager.SendRTP(p)
+				pc.sendRTP(p)
 			}
 		}()
 		close(trackInput)
@@ -1315,7 +1453,36 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 		RawRTP:      rawPackets,
 	}
 
-	// TODO Sean-Der inbound RTCP
+	// Inbound RTCP
+	go func() {
+		readStream, err := pc.networkManager.SrtcpSession.OpenReadStream(ssrc)
+		if err != nil {
+			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, ssrc)
+			return
+		}
+
+		rtcpBuf := make([]byte, receiveMTU)
+		var rtcpPacket rtcp.Packet
+
+		for {
+			i, err := readStream.Read(rtcpBuf)
+			if err != nil {
+				pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
+				return
+			}
+
+			rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:i])
+			if err != nil {
+				pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
+				continue
+			}
+			select {
+			case rtcpPackets <- rtcpPacket:
+			default:
+			}
+		}
+	}()
+
 	return t, nil
 }
 

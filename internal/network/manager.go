@@ -13,7 +13,6 @@ import (
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 const (
@@ -29,6 +28,9 @@ type Manager struct {
 	iceConn  *ice.Conn
 	isOffer  bool
 
+	SrtpSession  *srtp.SessionSRTP
+	SrtcpSession *srtp.SessionSRTCP
+
 	mux *mux.Mux
 
 	dtlsEndpoint  *mux.Endpoint
@@ -36,9 +38,6 @@ type Manager struct {
 	srtcpEndpoint *mux.Endpoint
 
 	dtlsConn *dtls.Conn
-
-	srtpSession  *srtp.SessionSRTP
-	srtcpSession *srtp.SessionSRTCP
 
 	sctpAssociation *sctp.Association
 }
@@ -53,7 +52,9 @@ func NewManager(urls []*ice.URL, ntf ICENotifier, minport, maxport uint16) (*Man
 	}
 
 	return &Manager{
-		IceAgent: iceAgent,
+		IceAgent:     iceAgent,
+		SrtpSession:  srtp.CreateSessionSRTP(),
+		SrtcpSession: srtp.CreateSessionSRTCP(),
 	}, nil
 }
 
@@ -78,11 +79,7 @@ func (m *Manager) Start(isOffer bool,
 		return err
 	}
 
-	if err := m.startSRTP(isOffer); err != nil {
-		return err
-	}
-
-	return m.startSCTP(isOffer)
+	return m.startSRTP(isOffer)
 }
 
 func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
@@ -100,35 +97,6 @@ func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
 		m.iceConn = iceConn
 	}
 	return nil
-}
-
-func (m *Manager) handleSRTP() {
-	for {
-		r, ssrc, err := m.srtpSession.AcceptStream()
-		if err != nil {
-			return
-		}
-
-		go func() {
-			buf := make([]byte, receiveMTU)
-			for {
-				i, err := r.Read(buf)
-				if err != nil {
-					return
-				}
-
-				packet := &rtp.Packet{}
-				if err := packet.Unmarshal(append([]byte{}, buf[:i]...)); err != nil {
-					fmt.Println("Failed to unmarshal RTP packet")
-					return
-				}
-				fmt.Println("Unmarshalled:", ssrc)
-			}
-		}()
-	}
-}
-
-func (m *Manager) handleSRTCP() {
 }
 
 func (m *Manager) startSRTP(isOffer bool) error {
@@ -150,38 +118,33 @@ func (m *Manager) startSRTP(isOffer bool) error {
 	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
 
 	if isOffer {
-		m.srtpSession, err = srtp.CreateSessionSRTP(
+		err = m.SrtpSession.Start(
 			serverWriteKey[0:16], serverWriteKey[16:],
 			clientWriteKey[0:16], clientWriteKey[16:],
 			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
 		)
 
 		if err == nil {
-			m.srtcpSession, err = srtp.CreateSessionSRTCP(
+			err = m.SrtcpSession.Start(
 				serverWriteKey[0:16], serverWriteKey[16:],
 				clientWriteKey[0:16], clientWriteKey[16:],
 				srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtcpEndpoint,
 			)
 		}
 	} else {
-		m.srtpSession, err = srtp.CreateSessionSRTP(
+		err = m.SrtpSession.Start(
 			clientWriteKey[0:16], clientWriteKey[16:],
 			serverWriteKey[0:16], serverWriteKey[16:],
 			srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtpEndpoint,
 		)
 
 		if err == nil {
-			m.srtcpSession, err = srtp.CreateSessionSRTCP(
+			err = m.SrtcpSession.Start(
 				clientWriteKey[0:16], clientWriteKey[16:],
 				serverWriteKey[0:16], serverWriteKey[16:],
 				srtp.ProtectionProfileAes128CmHmacSha1_80, m.srtcpEndpoint,
 			)
 		}
-	}
-
-	if err == nil {
-		go m.handleSRTP()
-		go m.handleSRTCP()
 	}
 
 	return err
@@ -228,7 +191,8 @@ func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKe
 	return nil
 }
 
-func (m *Manager) startSCTP(isOffer bool) error {
+// StartSCTP starts the SCTP association
+func (m *Manager) StartSCTP(isOffer bool) error {
 	if isOffer {
 		sctpAssociation, err := sctp.Client(m.dtlsConn)
 		if err != nil {
@@ -271,13 +235,8 @@ func (m *Manager) Close() error {
 		errSCTP = m.sctpAssociation.Close()
 	}
 
-	if m.srtpSession != nil {
-		errSRTP = m.srtpSession.Close()
-	}
-
-	if m.srtcpSession != nil {
-		errSRTCP = m.srtcpSession.Close()
-	}
+	errSRTP = m.SrtpSession.Close()
+	errSRTCP = m.SrtcpSession.Close()
 
 	// Close the Mux. This should close the Mux and ICE.
 	if m.mux != nil {
@@ -293,48 +252,4 @@ func (m *Manager) Close() error {
 	}
 
 	return nil
-}
-
-// SendRTP finds a connected port and sends the passed RTP packet
-func (m *Manager) SendRTP(packet *rtp.Packet) {
-	if m.srtpSession == nil {
-		// TODO log-level
-		// fmt.Printf("Tried to send RTP packet but no SRTP Context to handle it \n")
-		return
-	}
-
-	raw, err := packet.Marshal()
-	if err != nil {
-		fmt.Printf("SendRTP failed to marshal packet: %s \n", err.Error())
-		return
-	}
-
-	writeStream, err := m.srtpSession.OpenWriteStream()
-	if err != nil {
-		fmt.Println("SendRTP failed to open WriteStream:", err)
-		return
-	}
-
-	if _, err := writeStream.Write(raw); err != nil {
-		fmt.Println("SendRTP failed to write:", err)
-	}
-}
-
-// SendRTCP finds a connected port and sends the passed RTCP packet
-func (m *Manager) SendRTCP(pkt []byte) {
-	if m.srtpSession == nil {
-		// TODO log-level
-		// fmt.Printf("Tried to send RTCP packet but no SRTCP Context to handle it \n")
-		return
-	}
-
-	writeStream, err := m.srtcpSession.OpenWriteStream()
-	if err != nil {
-		fmt.Println("SendRTCP failed to open WriteStream:", err)
-		return
-	}
-
-	if _, err := writeStream.Write(pkt); err != nil {
-		fmt.Println("SendRTCP failed to write:", err)
-	}
 }

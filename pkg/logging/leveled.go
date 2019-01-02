@@ -28,8 +28,8 @@ const (
 	// LogLevelError is for fatal errors which should be handled by user code,
 	// but are logged to ensure that they are seen
 	LogLevelError
-	// LogLevelWarning is for logging abnormal, but non-fatal library operation
-	LogLevelWarning
+	// LogLevelWarn is for logging abnormal, but non-fatal library operation
+	LogLevelWarn
 	// LogLevelInfo is for logging normal library operation (e.g. state transitions, etc.)
 	LogLevelInfo
 	// LogLevelDebug is for logging low-level library information (e.g. internal operations)
@@ -102,9 +102,9 @@ func (ll *LeveledLogger) WithInfoLogger(log *log.Logger) *LeveledLogger {
 	return ll
 }
 
-// WithWarningLogger is a chainable configuration function which sets the
-// Warning-level logger
-func (ll *LeveledLogger) WithWarningLogger(log *log.Logger) *LeveledLogger {
+// WithWarnLogger is a chainable configuration function which sets the
+// Warn-level logger
+func (ll *LeveledLogger) WithWarnLogger(log *log.Logger) *LeveledLogger {
 	ll.warn = log
 	return ll
 }
@@ -177,14 +177,14 @@ func (ll *LeveledLogger) Infof(format string, args ...interface{}) {
 	ll.logf(ll.info, LogLevelInfo, format, args...)
 }
 
-// Warning emits the preformatted message if the logger is at or below LogLevelWarning
-func (ll *LeveledLogger) Warning(msg string) {
-	ll.logf(ll.warn, LogLevelWarning, msg)
+// Warn emits the preformatted message if the logger is at or below LogLevelWarn
+func (ll *LeveledLogger) Warn(msg string) {
+	ll.logf(ll.warn, LogLevelWarn, msg)
 }
 
-// Warningf formats and emits a message if the logger is at or below LogLevelWarning
-func (ll *LeveledLogger) Warningf(format string, args ...interface{}) {
-	ll.logf(ll.warn, LogLevelWarning, format, args...)
+// Warnf formats and emits a message if the logger is at or below LogLevelWarn
+func (ll *LeveledLogger) Warnf(format string, args ...interface{}) {
+	ll.logf(ll.warn, LogLevelWarn, format, args...)
 }
 
 // Error emits the preformatted message if the logger is at or below LogLevelError
@@ -214,6 +214,6 @@ func NewLeveledLoggerForScope(scope string) *LeveledLogger {
 		WithTraceLogger(log.New(logger.writer, fmt.Sprintf("%s TRACE: ", scope), log.Lmicroseconds|log.Lshortfile)).
 		WithDebugLogger(log.New(logger.writer, fmt.Sprintf("%s DEBUG: ", scope), log.Lmicroseconds|log.Lshortfile)).
 		WithInfoLogger(log.New(logger.writer, fmt.Sprintf("%s INFO: ", scope), log.LstdFlags)).
-		WithWarningLogger(log.New(logger.writer, fmt.Sprintf("%s WARNING: ", scope), log.LstdFlags)).
+		WithWarnLogger(log.New(logger.writer, fmt.Sprintf("%s WARNING: ", scope), log.LstdFlags)).
 		WithErrorLogger(log.New(logger.writer, fmt.Sprintf("%s ERROR: ", scope), log.LstdFlags))
 }
