@@ -12,7 +12,7 @@ func TestScopedLogger(t *testing.T) {
 	var outBuf bytes.Buffer
 	logger := logging.NewScopedLogger("test1").
 		WithOutput(&outBuf).
-		WithLogLevel(logging.LogLevelWarning)
+		WithLogLevel(logging.LogLevelWarn)
 
 	logger.Debug("this shouldn't be logged")
 	if outBuf.Len() > 0 {
@@ -20,7 +20,7 @@ func TestScopedLogger(t *testing.T) {
 	}
 
 	warnMsg := "this is a warning message"
-	logger.Warning(warnMsg)
+	logger.Warn(warnMsg)
 	if !strings.Contains(outBuf.String(), warnMsg) {
 		t.Errorf("Expected to find %q in %q, but didn't", warnMsg, outBuf.String())
 	}

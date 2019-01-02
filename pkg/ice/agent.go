@@ -163,14 +163,14 @@ func (a *Agent) gatherCandidatesLocal() {
 		for _, network := range supportedNetworks {
 			conn, err := a.listenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
-				iceLog.Warningf("could not listen %s %s\n", network, ip)
+				iceLog.Warnf("could not listen %s %s\n", network, ip)
 				continue
 			}
 
 			port := conn.LocalAddr().(*net.UDPAddr).Port
 			c, err := NewCandidateHost(network, ip, port)
 			if err != nil {
-				iceLog.Warningf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
+				iceLog.Warnf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
 				continue
 			}
 
@@ -192,12 +192,12 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 			case SchemeTypeSTUN:
 				laddr, xoraddr, err := allocateUDP(network, url)
 				if err != nil {
-					iceLog.Warningf("could not allocate %s %s: %v\n", network, url, err)
+					iceLog.Warnf("could not allocate %s %s: %v\n", network, url, err)
 					continue
 				}
 				conn, err := net.ListenUDP(network, laddr)
 				if err != nil {
-					iceLog.Warningf("could not listen %s %s: %v\n", network, laddr, err)
+					iceLog.Warnf("could not listen %s %s: %v\n", network, laddr, err)
 				}
 
 				ip := xoraddr.IP
@@ -206,7 +206,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				relPort := laddr.Port
 				c, err := NewCandidateServerReflexive(network, ip, port, relIP, relPort)
 				if err != nil {
-					iceLog.Warningf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
+					iceLog.Warnf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
 					continue
 				}
 
@@ -218,7 +218,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				c.start(a, conn)
 
 			default:
-				iceLog.Warningf("scheme %s is not implemented\n", url.Scheme)
+				iceLog.Warnf("scheme %s is not implemented\n", url.Scheme)
 				continue
 			}
 		}
@@ -494,7 +494,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					iceLog.Warningf("Failed to close candidate %s: %v", c, err)
+					iceLog.Warnf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.localCandidates, net)
@@ -503,7 +503,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					iceLog.Warningf("Failed to close candidate %s: %v", c, err)
+					iceLog.Warnf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.remoteCandidates, net)
@@ -530,7 +530,7 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) *Can
 		ip = a.IP
 		port = a.Port
 	default:
-		iceLog.Warningf("unsupported address type %T", a)
+		iceLog.Warnf("unsupported address type %T", a)
 		return nil
 	}
 
@@ -559,7 +559,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
 		},
 		&stun.Fingerprint{},
 	); err != nil {
-		iceLog.Warningf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
+		iceLog.Warnf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
 	} else {
 		a.sendSTUN(out, local, remote)
 	}
