@@ -57,6 +57,7 @@ func signalPair(pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection) error {
 }
 
 func TestNew(t *testing.T) {
+	api := NewAPI()
 	t.Run("Success", func(t *testing.T) {
 		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		assert.Nil(t, err)
@@ -64,7 +65,7 @@ func TestNew(t *testing.T) {
 		certificate, err := GenerateCertificate(secretKey)
 		assert.Nil(t, err)
 
-		pc, err := New(RTCConfiguration{
+		pc, err := api.New(RTCConfiguration{
 			IceServers: []RTCIceServer{
 				{
 					URLs: []string{
@@ -106,12 +107,12 @@ func TestNew(t *testing.T) {
 				})
 				assert.Nil(t, err)
 
-				return New(RTCConfiguration{
+				return api.New(RTCConfiguration{
 					Certificates: []RTCCertificate{*certificate},
 				})
 			}, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}},
 			{func() (*RTCPeerConnection, error) {
-				return New(RTCConfiguration{
+				return api.New(RTCConfiguration{
 					IceServers: []RTCIceServer{
 						{
 							URLs: []string{
@@ -135,6 +136,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
+	api := NewAPI()
 	t.Run("Success", func(t *testing.T) {
 		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		assert.Nil(t, err)
@@ -142,7 +144,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 		certificate, err := GenerateCertificate(secretKey)
 		assert.Nil(t, err)
 
-		pc, err := New(RTCConfiguration{
+		pc, err := api.New(RTCConfiguration{
 			PeerIdentity:         "unittest",
 			Certificates:         []RTCCertificate{*certificate},
 			IceCandidatePoolSize: 5,
@@ -180,7 +182,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 			expectedErr    error
 		}{
 			{func() (*RTCPeerConnection, error) {
-				pc, err := New(RTCConfiguration{})
+				pc, err := api.New(RTCConfiguration{})
 				assert.Nil(t, err)
 
 				err = pc.Close()
@@ -190,7 +192,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				return RTCConfiguration{}
 			}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}},
 			{func() (*RTCPeerConnection, error) {
-				return New(RTCConfiguration{})
+				return api.New(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					PeerIdentity: "unittest",
@@ -411,7 +413,8 @@ func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 }
 
 func TestRTCPeerConnection_EventHandlers(t *testing.T) {
-	pc, err := New(RTCConfiguration{})
+	api := NewAPI()
+	pc, err := api.New(RTCConfiguration{})
 	assert.Nil(t, err)
 
 	onTrackCalled := make(chan bool)
@@ -441,7 +444,7 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&RTCTrack{}) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&RTCDataChannel{settingEngine: defaultSettingEngine}) })
+	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&RTCDataChannel{settingEngine: &api.settingEngine}) })
 
 	allTrue := func(vals []bool) bool {
 		for _, val := range vals {

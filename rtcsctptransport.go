@@ -35,22 +35,30 @@ type RTCSctpTransport struct {
 
 	association          *sctp.Association
 	onDataChannelHandler func(*RTCDataChannel)
+
+	settingEngine *settingEngine
 }
 
 // NewRTCSctpTransport creates a new RTCSctpTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
+func (api *API) NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
 	res := &RTCSctpTransport{
 		dtlsTransport: dtls,
 		State:         RTCSctpTransportStateConnecting,
 		port:          5000, // TODO
+		settingEngine: &api.settingEngine,
 	}
 
 	res.updateMessageSize()
 	res.updateMaxChannels()
 
 	return res
+}
+
+// NewRTCSctpTransport does the same as above, except with the default API object
+func NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
+	return defaultAPI.NewRTCSctpTransport(dtls)
 }
 
 // Transport returns the RTCDtlsTransport instance the RTCSctpTransport is sending over.
@@ -137,7 +145,7 @@ func (r *RTCSctpTransport) acceptDataChannels() {
 			ID:            &sid,
 			Label:         dc.Config.Label,
 			ReadyState:    RTCDataChannelStateOpen,
-			settingEngine: defaultSettingEngine,
+			settingEngine: r.settingEngine,
 		}
 
 		<-r.onDataChannel(rtcDC)

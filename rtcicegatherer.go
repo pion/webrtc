@@ -25,7 +25,7 @@ type RTCIceGatherer struct {
 // NewRTCIceGatherer creates a new NewRTCIceGatherer.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, error) {
+func (api *API) NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, error) {
 	validatedServers := []*ice.URL{}
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
@@ -40,8 +40,13 @@ func NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, error) {
 	return &RTCIceGatherer{
 		state:            RTCIceGathererStateNew,
 		validatedServers: validatedServers,
-		settingEngine:    defaultSettingEngine,
+		settingEngine:    &api.settingEngine,
 	}, nil
+}
+
+// NewRTCIceGatherer does the same as above, except with the default API object
+func NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, error) {
+	return defaultAPI.NewRTCIceGatherer(opts)
 }
 
 // State indicates the current state of the ICE gatherer.
