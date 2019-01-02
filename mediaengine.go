@@ -11,7 +11,7 @@ import (
 
 // RegisterCodec is used to register a codec with the DefaultMediaEngine
 func RegisterCodec(codec *RTCRtpCodec) {
-	DefaultMediaEngine.RegisterCodec(codec)
+	defaultAPI.mediaEngine.RegisterCodec(codec)
 }
 
 // TODO: Phase out DefaultPayloadTypes in favor or dynamic assignment in 96-127 range
@@ -26,20 +26,22 @@ const (
 )
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
-func RegisterDefaultCodecs() {
-	RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
-	RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
-	RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
-	RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
-	RegisterCodec(NewRTCRtpVP9Codec(DefaultPayloadTypeVP9, 90000))
+func (api *API) RegisterDefaultCodecs() {
+	api.mediaEngine.RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
+	api.mediaEngine.RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
+	api.mediaEngine.RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
+	api.mediaEngine.RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
+	api.mediaEngine.RegisterCodec(NewRTCRtpVP9Codec(DefaultPayloadTypeVP9, 90000))
 }
 
-// DefaultMediaEngine is the default MediaEngine used by RTCPeerConnections
-var DefaultMediaEngine = NewMediaEngine()
+// RegisterDefaultCodecs calls the above on the default api object.
+func RegisterDefaultCodecs() {
+	defaultAPI.RegisterDefaultCodecs()
+}
 
-// NewMediaEngine creates a new MediaEngine
-func NewMediaEngine() *MediaEngine {
-	return &MediaEngine{}
+// InitMediaEngine initializes an empty media engine object.
+func InitMediaEngine(m *MediaEngine) {
+	*m = MediaEngine{}
 }
 
 // MediaEngine defines the codecs supported by a RTCPeerConnection

@@ -96,8 +96,6 @@ type RTCPeerConnection struct {
 	lastOffer  string
 	lastAnswer string
 
-	// Media
-	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
 
 	// DataChannels
@@ -126,11 +124,12 @@ type RTCPeerConnection struct {
 	srtcpSession  *srtp.SessionSRTCP
 	srtcpEndpoint *mux.Endpoint
 
-	// A reference to the associated setting engine used by this peerconnection
-	settingEngine *settingEngine
+	// A reference to the associated API state used by this connection
+	api *API
 }
 
-func newPC(settings *settingEngine, configuration RTCConfiguration) (*RTCPeerConnection, error) {
+// New creates a new RTCPeerConfiguration with the provided configuration against the received API object
+func (api *API) New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -152,11 +151,12 @@ func newPC(settings *settingEngine, configuration RTCConfiguration) (*RTCPeerCon
 		IceConnectionState: ice.ConnectionStateNew, // FIXME REMOVE
 		IceGatheringState:  RTCIceGatheringStateNew,
 		ConnectionState:    RTCPeerConnectionStateNew,
-		mediaEngine:        DefaultMediaEngine,
 		dataChannels:       make(map[uint16]*RTCDataChannel),
-		srtpSession:        srtp.CreateSessionSRTP(),
-		srtcpSession:       srtp.CreateSessionSRTCP(),
-		settingEngine:      settings,
+
+		srtpSession:  srtp.CreateSessionSRTP(),
+		srtcpSession: srtp.CreateSessionSRTCP(),
+
+		api: api,
 	}
 
 	var err error
@@ -182,7 +182,7 @@ func newPC(settings *settingEngine, configuration RTCConfiguration) (*RTCPeerCon
 
 // New creates a new RTCPeerConfiguration with the provided configuration
 func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
-	return newPC(defaultSettingEngine, configuration)
+	return defaultAPI.New(configuration)
 }
 
 // initConfiguration defines validation of the specified RTCConfiguration and
@@ -1282,7 +1282,7 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 		}
 	*/
 
-	d, err := newRTCDataChannel(params, pc.settingEngine)
+	d, err := pc.api.newRTCDataChannel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -1319,12 +1319,6 @@ func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) 
 		}
 	}
 	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
-}
-
-// SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
-// This enables RTCPeerConnection with support for different codecs
-func (pc *RTCPeerConnection) SetMediaEngine(m *MediaEngine) {
-	pc.mediaEngine = m
 }
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
@@ -1448,7 +1442,7 @@ func (pc *RTCPeerConnection) generateChannel(h *rtp.Header) (chan *rtp.Packet, c
 		return nil, nil, fmt.Errorf("no codec could be found in RemoteDescription for payloadType %d", h.PayloadType)
 	}
 
-	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
+	codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
 		return nil, nil, fmt.Errorf("codec %s in not registered", sdpCodec)
 	}
@@ -1501,7 +1495,7 @@ func (pc *RTCPeerConnection) addFingerprint(d *sdp.SessionDescription) {
 }
 
 func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, iceParams RTCIceParameters, peerDirection RTCRtpTransceiverDirection, candidates []RTCIceCandidate, dtlsRole sdp.ConnectionRole) bool {
-	if codecs := pc.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
+	if codecs := pc.api.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
 		return false
 	}
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
@@ -1511,7 +1505,7 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
-	for _, codec := range pc.mediaEngine.getCodecsByKind(codecType) {
+	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
 	}
 
@@ -1590,7 +1584,7 @@ func (pc *RTCPeerConnection) sendRTP(packet *rtp.Packet) {
 }
 
 func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
-	codec, err := pc.mediaEngine.getCodec(payloadType)
+	codec, err := pc.api.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
 	} else if codec.Payloader == nil {

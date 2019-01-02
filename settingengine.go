@@ -6,26 +6,24 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 )
 
-var defaultSettingEngine = newSettingEngine()
-
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
 // ICE UDP connections can allocate from. This setting currently only
 // affects host candidates, not server reflexive candidates.
 func SetEphemeralUDPPortRange(portMin, portMax uint16) error {
-	return defaultSettingEngine.SetEphemeralUDPPortRange(portMin, portMax)
+	return defaultAPI.settingEngine.SetEphemeralUDPPortRange(portMin, portMax)
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
 // data channels have to be detached in the OnOpen callback using the
 // RTCDataChannel.Detach method.
 func DetachDataChannels() {
-	defaultSettingEngine.DetachDataChannels()
+	defaultAPI.settingEngine.DetachDataChannels()
 }
 
 // SetConnectionTimeout sets the amount of silence needed on a given candidate pair
 // before the ICE agent considers the pair timed out.
 func SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
-	defaultSettingEngine.SetConnectionTimeout(connectionTimeout, keepAlive)
+	defaultAPI.settingEngine.SetConnectionTimeout(connectionTimeout, keepAlive)
 }
 
 // settingEngine allows influencing behavior in ways that are not
@@ -72,6 +70,6 @@ func (e *settingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 	return nil
 }
 
-func newSettingEngine() *settingEngine {
-	return new(settingEngine)
+func initSettingEngine(s *settingEngine) {
+	*s = settingEngine{}
 }

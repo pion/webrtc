@@ -17,16 +17,16 @@ func TestGenerateDataChannelID(t *testing.T) {
 		c      *RTCPeerConnection
 		result uint16
 	}{
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, settingEngine: defaultSettingEngine}, 0},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, settingEngine: defaultSettingEngine}, 0},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, settingEngine: defaultSettingEngine}, 2},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 2: nil}, settingEngine: defaultSettingEngine}, 4},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 4: nil}, settingEngine: defaultSettingEngine}, 2},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, settingEngine: defaultSettingEngine}, 1},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, settingEngine: defaultSettingEngine}, 1},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, settingEngine: defaultSettingEngine}, 3},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 3: nil}, settingEngine: defaultSettingEngine}, 5},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 5: nil}, settingEngine: defaultSettingEngine}, 3},
+		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: defaultAPI}, 0},
+		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: defaultAPI}, 0},
+		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: defaultAPI}, 2},
+		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 2: nil}, api: defaultAPI}, 4},
+		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 4: nil}, api: defaultAPI}, 2},
+		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: defaultAPI}, 1},
+		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: defaultAPI}, 1},
+		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: defaultAPI}, 3},
+		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 3: nil}, api: defaultAPI}, 5},
+		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 5: nil}, api: defaultAPI}, 3},
 	}
 
 	for _, testCase := range testCases {
@@ -42,7 +42,7 @@ func TestGenerateDataChannelID(t *testing.T) {
 }
 
 func TestRTCDataChannel_EventHandlers(t *testing.T) {
-	dc := &RTCDataChannel{settingEngine: defaultSettingEngine}
+	dc := &RTCDataChannel{settingEngine: &defaultAPI.settingEngine}
 
 	onOpenCalled := make(chan bool)
 	onMessageCalled := make(chan bool)
@@ -84,7 +84,7 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 }
 
 func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
-	dc := &RTCDataChannel{settingEngine: defaultSettingEngine}
+	dc := &RTCDataChannel{settingEngine: &defaultAPI.settingEngine}
 
 	max := 512
 	out := make(chan int)

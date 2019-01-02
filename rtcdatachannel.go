@@ -102,7 +102,14 @@ type RTCDataChannel struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
-	d, err := newRTCDataChannel(params, defaultSettingEngine)
+	return defaultAPI.NewRTCDataChannel(transport, params)
+}
+
+// NewRTCDataChannel creates a new RTCDataChannel.
+// This constructor is part of the ORTC API. It is not
+// meant to be used together with the basic WebRTC API.
+func (api *API) NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
+	d, err := api.newRTCDataChannel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +124,7 @@ func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParame
 
 // newRTCDataChannel is an internal constructor for the data channel used to
 // create the RTCDataChannel object before the networking is set up.
-func newRTCDataChannel(params *RTCDataChannelParameters, settingEngine *settingEngine) (*RTCDataChannel, error) {
+func (api *API) newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
@@ -127,7 +134,7 @@ func newRTCDataChannel(params *RTCDataChannelParameters, settingEngine *settingE
 		Label:         params.Label,
 		ID:            &params.ID,
 		ReadyState:    RTCDataChannelStateConnecting,
-		settingEngine: settingEngine,
+		settingEngine: &api.settingEngine,
 	}
 
 	return d, nil
