@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/pions/datachannel"
 	"github.com/pions/dtls/pkg/dtls"
@@ -39,7 +40,8 @@ type Manager struct {
 
 	dtlsConn *dtls.Conn
 
-	sctpAssociation *sctp.Association
+	sctpAssociationMutex sync.RWMutex
+	sctpAssociation      *sctp.Association
 }
 
 // NewManager creates a new network.Manager
@@ -198,13 +200,19 @@ func (m *Manager) StartSCTP(isOffer bool) error {
 		if err != nil {
 			return err
 		}
+
+		m.sctpAssociationMutex.Lock()
 		m.sctpAssociation = sctpAssociation
+		m.sctpAssociationMutex.Unlock()
 	} else {
 		sctpAssociation, err := sctp.Server(m.dtlsConn)
 		if err != nil {
 			return err
 		}
+
+		m.sctpAssociationMutex.Lock()
 		m.sctpAssociation = sctpAssociation
+		m.sctpAssociationMutex.Unlock()
 	}
 	return nil
 }
@@ -231,9 +239,12 @@ func (m *Manager) Close() error {
 
 	// Close SCTP. This should close the data channels, SCTP, and DTLS
 	var errSCTP, errMux, errSRTP, errSRTCP error
+
+	m.sctpAssociationMutex.RLock()
 	if m.sctpAssociation != nil {
 		errSCTP = m.sctpAssociation.Close()
 	}
+	m.sctpAssociationMutex.RUnlock()
 
 	errSRTP = m.SrtpSession.Close()
 	errSRTCP = m.SrtcpSession.Close()
