@@ -859,27 +859,27 @@ func (pc *RTCPeerConnection) acceptSRTP() {
 		}
 
 		rtpBuf := make([]byte, receiveMTU)
-		rtpPacket := &rtp.Packet{}
-
-		i, err := r.Read(rtpBuf)
+		rtpLen, err := r.Read(rtpBuf)
 		if err != nil {
 			pcLog.Warnf("Failed to read, ignoring AcceptStream: %v \n", err)
 			continue
-		} else if err = rtpPacket.Unmarshal(append([]byte{}, rtpBuf[:i]...)); err != nil {
-			pcLog.Warnf("Failed to unmarshal RTP packet, ignoring AcceptStream: %v \n", err)
-			continue
 		}
 
-		rtpChannel, rtcpChannel := pc.generateChannel(ssrc, rtpPacket.PayloadType)
+		rtpChannel, rtcpChannel, err := pc.generateChannel(rtpBuf)
+		if err != nil {
+			pcLog.Warnf("Failed to create output channels, ignoring AcceptStream: %v \n", err)
+			continue
+		}
 
 		// RTP
 		go func() {
 			for {
-				i, err = r.Read(rtpBuf)
+				rtpPacket := &rtp.Packet{}
+				rtpLen, err = r.Read(rtpBuf)
 				if err != nil {
 					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
 					return
-				} else if err := rtpPacket.Unmarshal(append([]byte{}, rtpBuf[:i]...)); err != nil {
+				} else if err := rtpPacket.Unmarshal(append([]byte{}, rtpBuf[:rtpLen]...)); err != nil {
 					pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
 					continue
 				}
@@ -900,16 +900,19 @@ func (pc *RTCPeerConnection) acceptSRTP() {
 			}
 
 			rtcpBuf := make([]byte, receiveMTU)
-			var rtcpPacket rtcp.Packet
 
 			for {
-				i, err = readStream.Read(rtcpBuf)
+				var (
+					rtcpPacket rtcp.Packet
+					rtcpLen    int
+				)
+				rtcpLen, err = readStream.Read(rtcpBuf)
 				if err != nil {
 					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
 					return
 				}
 
-				rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:i])
+				rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:rtcpLen])
 				if err != nil {
 					pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
 					continue
@@ -1207,6 +1210,16 @@ func (pc *RTCPeerConnection) Close() error {
 		return nil
 	}
 
+	for _, t := range pc.rtpTransceivers {
+		if track := t.Sender.Track; track != nil {
+			if track.isRawRTP {
+				close(track.RawRTP)
+			} else {
+				close(track.Samples)
+			}
+		}
+	}
+
 	err := pc.networkManager.Close()
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
@@ -1217,7 +1230,7 @@ func (pc *RTCPeerConnection) Close() error {
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	// pc.IceConnectionState = RTCIceConnectionStateClosed
-	pc.IceConnectionState = ice.ConnectionStateClosed // FIXME REMOVE
+	pc.iceStateChange(ice.ConnectionStateClosed) // FIXME REMOVE
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
 	pc.ConnectionState = RTCPeerConnectionStateClosed
@@ -1226,35 +1239,38 @@ func (pc *RTCPeerConnection) Close() error {
 }
 
 /* Everything below is private */
-func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (chan *rtp.Packet, chan rtcp.Packet) {
+func (pc *RTCPeerConnection) generateChannel(rawRTP []byte) (chan *rtp.Packet, chan rtcp.Packet, error) {
 	pc.RLock()
 	if pc.onTrackHandler == nil {
 		pc.RUnlock()
-		return nil, nil
+		return nil, nil, fmt.Errorf("OnTrack unset, unable to handle incoming")
 	}
 	pc.RUnlock()
 
-	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(payloadType)
+	rtpPacket := &rtp.Packet{}
+	if err := rtpPacket.Unmarshal(rawRTP); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal RTP packet, discarding: %v", err)
+	}
+
+	sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(rtpPacket.PayloadType)
 	if err != nil {
-		pcLog.Warnf("No codec could be found in RemoteDescription for payloadType %d \n", payloadType)
-		return nil, nil
+		return nil, nil, fmt.Errorf("no codec could be found in RemoteDescription for payloadType %d", rtpPacket.PayloadType)
 	}
 
 	codec, err := pc.mediaEngine.getCodecSDP(sdpCodec)
 	if err != nil {
-		pcLog.Warnf("Codec %s in not registered\n", sdpCodec)
-		return nil, nil
+		return nil, nil, fmt.Errorf("codec %s in not registered", sdpCodec)
 	}
 
 	rtpTransport := make(chan *rtp.Packet, 15)
 	rtcpTransport := make(chan rtcp.Packet, 15)
 
 	track := &RTCTrack{
-		PayloadType: payloadType,
+		PayloadType: rtpPacket.PayloadType,
 		Kind:        codec.Type,
 		ID:          "0", // TODO extract from remoteDescription
 		Label:       "",  // TODO extract from remoteDescription
-		Ssrc:        ssrc,
+		Ssrc:        rtpPacket.SSRC,
 		Codec:       codec,
 		Packets:     rtpTransport,
 		RTCPPackets: rtcpTransport,
@@ -1262,7 +1278,7 @@ func (pc *RTCPeerConnection) generateChannel(ssrc uint32, payloadType uint8) (ch
 
 	// TODO: Register the receiving Track
 	pc.onTrack(track)
-	return rtpTransport, rtcpTransport
+	return rtpTransport, rtcpTransport, nil
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
@@ -1402,6 +1418,8 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
 	rawPackets := make(chan *rtp.Packet)
 	rtcpPackets := make(chan rtcp.Packet)
+	isRawRTP := false
+
 	if ssrc == 0 {
 		buf := make([]byte, 4)
 		_, err = rand.Read(buf)
@@ -1421,7 +1439,10 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 			)
 
 			for {
-				in := <-trackInput
+				in, ok := <-trackInput
+				if !ok {
+					return
+				}
 				packets := packetizer.Packetize(in.Data, in.Samples)
 				for _, p := range packets {
 					pc.sendRTP(p)
@@ -1432,9 +1453,14 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	} else {
 		// If SSRC is not 0, then we are working with an established RTP stream
 		// and need to accept raw RTP packets for forwarding.
+		isRawRTP = true
 		go func() {
 			for {
-				p := <-rawPackets
+				p, ok := <-rawPackets
+				if !ok {
+					return
+				}
+
 				pc.sendRTP(p)
 			}
 		}()
@@ -1442,6 +1468,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	}
 
 	t := &RTCTrack{
+		isRawRTP:    isRawRTP,
 		PayloadType: payloadType,
 		Kind:        codec.Type,
 		ID:          id,

@@ -18,4 +18,5 @@ type RTCTrack struct {
 	RTCPPackets <-chan rtcp.Packet
 	Samples     chan<- media.RTCSample
 	RawRTP      chan<- *rtp.Packet
+	isRawRTP    bool
 }

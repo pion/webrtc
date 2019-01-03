@@ -18,6 +18,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newPair() (pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection, err error) {
+	pca, err := New(RTCConfiguration{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pcb, err := New(RTCConfiguration{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pca, pcb, nil
+}
+
+func signalPair(pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection) error {
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		return err
+	}
+
+	err = pcAnswer.SetRemoteDescription(offer)
+	if err != nil {
+		return err
+	}
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	if err != nil {
+		return err
+	}
+
+	err = pcOffer.SetRemoteDescription(answer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func TestNew(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
