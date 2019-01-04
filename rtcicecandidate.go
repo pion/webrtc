@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/pions/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -19,6 +20,44 @@ type RTCIceCandidate struct {
 	RelatedAddress string              `json:"relatedAddress"`
 	RelatedPort    uint16              `json:"relatedPort"`
 }
+
+// Conversion for package sdp
+
+func newRTCIceCandidateFromSDP(c sdp.ICECandidate) (RTCIceCandidate, error) {
+	typ, err := newRTCIceCandidateType(c.Typ)
+	if err != nil {
+		return RTCIceCandidate{}, err
+	}
+	protocol, err := newRTCIceProtocol(c.Protocol)
+	if err != nil {
+		return RTCIceCandidate{}, err
+	}
+	return RTCIceCandidate{
+		Foundation:     c.Foundation,
+		Priority:       c.Priority,
+		IP:             c.IP,
+		Protocol:       protocol,
+		Port:           c.Port,
+		Typ:            typ,
+		RelatedAddress: c.RelatedAddress,
+		RelatedPort:    c.RelatedPort,
+	}, nil
+}
+
+func (c RTCIceCandidate) toSDP() sdp.ICECandidate {
+	return sdp.ICECandidate{
+		Foundation:     c.Foundation,
+		Priority:       c.Priority,
+		IP:             c.IP,
+		Protocol:       c.Protocol.String(),
+		Port:           c.Port,
+		Typ:            c.Typ.String(),
+		RelatedAddress: c.RelatedAddress,
+		RelatedPort:    c.RelatedPort,
+	}
+}
+
+// Conversion for package ice
 
 func newRTCIceCandidatesFromICE(iceCandidates []*ice.Candidate) ([]RTCIceCandidate, error) {
 	candidates := []RTCIceCandidate{}
@@ -39,16 +78,26 @@ func newRTCIceCandidateFromICE(i *ice.Candidate) (RTCIceCandidate, error) {
 	if err != nil {
 		return RTCIceCandidate{}, err
 	}
-	return RTCIceCandidate{
-		Foundation:     "foundation",
-		Priority:       uint32(i.Priority(i.Type.Preference(), uint16(1))), // TODO: component support
-		IP:             i.IP.String(),
-		Protocol:       newRTCIceProtocol(i.NetworkType.NetworkShort()),
-		Port:           uint16(i.Port), // TODO store differently in ICE package
-		Typ:            typ,
-		RelatedAddress: "", // TODO
-		RelatedPort:    0,  // TODO (parse & store port correctly in ICE package)
-	}, nil
+	protocol, err := newRTCIceProtocol(i.NetworkType.NetworkShort())
+	if err != nil {
+		return RTCIceCandidate{}, err
+	}
+
+	c := RTCIceCandidate{
+		Foundation: "foundation",
+		Priority:   uint32(i.Priority(i.Type.Preference(), uint16(1))),
+		IP:         i.IP.String(),
+		Protocol:   protocol,
+		Port:       uint16(i.Port),
+		Typ:        typ,
+	}
+
+	if i.RelatedAddress != nil {
+		c.RelatedAddress = i.RelatedAddress.Address
+		c.RelatedPort = uint16(i.RelatedAddress.Port)
+	}
+
+	return c, nil
 }
 
 func (c RTCIceCandidate) toICE() (*ice.Candidate, error) {

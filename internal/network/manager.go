@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
@@ -25,9 +24,8 @@ const (
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	IceAgent *ice.Agent
-	iceConn  *ice.Conn
-	isOffer  bool
+	iceConn *ice.Conn
+	isOffer bool
 
 	SrtpSession  *srtp.SessionSRTP
 	SrtcpSession *srtp.SessionSRTCP
@@ -45,31 +43,23 @@ type Manager struct {
 }
 
 // NewManager creates a new network.Manager
-func NewManager(config *ice.AgentConfig) (*Manager, error) {
-	iceAgent, err := ice.NewAgent(config)
-
-	if err != nil {
-		return nil, err
-	}
-
+func NewManager() *Manager {
 	return &Manager{
-		IceAgent:     iceAgent,
 		SrtpSession:  srtp.CreateSessionSRTP(),
 		SrtcpSession: srtp.CreateSessionSRTCP(),
-	}, nil
+	}
 }
 
-// Start allocates the network stack
-// TODO: Turn into the ORTC constructors
-func (m *Manager) Start(isOffer bool,
-	remoteUfrag, remotePwd string,
+// Start starts the network manager
+func (m *Manager) Start(iceConn *ice.Conn, isOffer bool,
 	dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
+	// m := &Manager{
+	// 	iceConn:                  iceConn,
+	// 	bufferTransportGenerator: btg,
+	// }
 
+	m.iceConn = iceConn
 	m.isOffer = isOffer
-
-	if err := m.startICE(isOffer, remoteUfrag, remotePwd); err != nil {
-		return err
-	}
 
 	m.mux = mux.NewMux(m.iceConn, receiveMTU)
 	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
@@ -81,23 +71,6 @@ func (m *Manager) Start(isOffer bool,
 	}
 
 	return m.startSRTP(isOffer)
-}
-
-func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
-	if isOffer {
-		iceConn, err := m.IceAgent.Dial(context.TODO(), remoteUfrag, remotePwd)
-		if err != nil {
-			return err
-		}
-		m.iceConn = iceConn
-	} else {
-		iceConn, err := m.IceAgent.Accept(context.TODO(), remoteUfrag, remotePwd)
-		if err != nil {
-			return err
-		}
-		m.iceConn = iceConn
-	}
-	return nil
 }
 
 func (m *Manager) startSRTP(isOffer bool) error {

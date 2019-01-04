@@ -54,11 +54,13 @@ func (g *RTCIceGatherer) Gather() error {
 	defer g.lock.Unlock()
 
 	config := &ice.AgentConfig{
-		Urls:     g.validatedServers,
-		Notifier: nil, // TODO
-		PortMin:  defaultSettingEngine.EphemeralUDP.PortMin,
-		PortMax:  defaultSettingEngine.EphemeralUDP.PortMax,
+		Urls:              g.validatedServers,
+		PortMin:           defaultSettingEngine.EphemeralUDP.PortMin,
+		PortMax:           defaultSettingEngine.EphemeralUDP.PortMax,
+		ConnectionTimeout: defaultSettingEngine.Timeout.ICEConnection,
+		KeepaliveInterval: defaultSettingEngine.Timeout.ICEKeepalive,
 	}
+
 	agent, err := ice.NewAgent(config)
 	if err != nil {
 		return err
@@ -66,6 +68,24 @@ func (g *RTCIceGatherer) Gather() error {
 
 	g.agent = agent
 	g.state = RTCIceGathererStateComplete
+
+	return nil
+}
+
+// Close prunes all local candidates, and closes the ports.
+func (g *RTCIceGatherer) Close() error {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	if g.agent == nil {
+		return nil
+	}
+
+	err := g.agent.Close()
+	if err != nil {
+		return err
+	}
+	g.agent = nil
 
 	return nil
 }

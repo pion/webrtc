@@ -9,19 +9,24 @@ import (
 func TestRTCIceCandidateType(t *testing.T) {
 	testCases := []struct {
 		typeString   string
+		shouldFail   bool
 		expectedType RTCIceCandidateType
 	}{
-		{"unknown", RTCIceCandidateType(Unknown)},
-		{"host", RTCIceCandidateTypeHost},
-		{"srflx", RTCIceCandidateTypeSrflx},
-		{"prflx", RTCIceCandidateTypePrflx},
-		{"relay", RTCIceCandidateTypeRelay},
+		{"unknown", true, RTCIceCandidateType(Unknown)},
+		{"host", false, RTCIceCandidateTypeHost},
+		{"srflx", false, RTCIceCandidateTypeSrflx},
+		{"prflx", false, RTCIceCandidateTypePrflx},
+		{"relay", false, RTCIceCandidateTypeRelay},
 	}
 
 	for i, testCase := range testCases {
+		actual, err := newRTCIceCandidateType(testCase.typeString)
+		if (err != nil) != testCase.shouldFail {
+			t.Error(err)
+		}
 		assert.Equal(t,
 			testCase.expectedType,
-			newRTCIceCandidateType(testCase.typeString),
+			actual,
 			"testCase: %d %v", i, testCase,
 		)
 	}
