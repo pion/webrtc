@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
@@ -85,8 +86,8 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 		return err
 	}
 
-	// TODO: Mux
-	dtlsEndpoint := t.iceTransport.conn
+	mx := t.iceTransport.mux
+	dtlsEndpoint := mx.NewEndpoint(mux.MatchDTLS)
 
 	// TODO: handle multiple certs
 	cert := t.certificates[0]
@@ -156,7 +157,8 @@ func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameter
 
 func (t *RTCDtlsTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
-		t.iceTransport.conn == nil {
+		t.iceTransport.conn == nil ||
+		t.iceTransport.mux == nil {
 		return errors.New("ICE connection not started")
 	}
 
