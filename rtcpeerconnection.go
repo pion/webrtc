@@ -30,6 +30,8 @@ var pcLog = logging.NewScopedLogger("pc")
 // comparisons when no value was defined.
 const Unknown = iota
 
+const receiveMTU = 8192
+
 // RTCPeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another RTCPeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
@@ -113,8 +115,9 @@ type RTCPeerConnection struct {
 	// Deprecated: Internal mechanism which will be removed.
 	networkManager *network.Manager
 
-	iceGatherer  *RTCIceGatherer
-	iceTransport *RTCIceTransport
+	iceGatherer   *RTCIceGatherer
+	iceTransport  *RTCIceTransport
+	dtlsTransport *RTCDtlsTransport
 }
 
 // New creates a new RTCPeerConfiguration with the provided configuration
@@ -496,7 +499,7 @@ func (pc *RTCPeerConnection) gather() error {
 	return pc.iceGatherer.Gather()
 }
 
-func (pc *RTCPeerConnection) createIceTransport() *RTCIceTransport {
+func (pc *RTCPeerConnection) createICETransport() *RTCIceTransport {
 	t := NewRTCIceTransport(pc.iceGatherer)
 
 	t.OnConnectionStateChange(func(state RTCIceTransportState) {
@@ -507,6 +510,11 @@ func (pc *RTCPeerConnection) createIceTransport() *RTCIceTransport {
 	})
 
 	return t
+}
+
+func (pc *RTCPeerConnection) createDTLSTransport() (*RTCDtlsTransport, error) {
+	dtlsTransport, err := NewRTCDtlsTransport(pc.iceTransport, pc.configuration.Certificates)
+	return dtlsTransport, err
 }
 
 // CreateAnswer starts the RTCPeerConnection and generates the localDescription
@@ -750,7 +758,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	}
 
 	// Create the ice transport
-	iceTransport := pc.createIceTransport()
+	iceTransport := pc.createICETransport()
 	pc.iceTransport = iceTransport
 
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
@@ -776,6 +784,13 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			}
 		}
 	}
+
+	// Create the DTLS transport
+	dtlsTransport, err := pc.createDTLSTransport()
+	if err != nil {
+		return err
+	}
+	pc.dtlsTransport = dtlsTransport
 
 	fingerprint, ok := desc.parsed.Attribute("fingerprint")
 	if !ok {
@@ -816,9 +831,17 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			pcLog.Warnf("Failed to start manager: %s", err)
 		}
 
-		cert := pc.configuration.Certificates[0] // TODO: handle multiple certs
-		err = pc.networkManager.Start(pc.iceTransport.conn, weOffer,
-			cert.x509Cert, cert.privateKey, fingerprint, fingerprintHash)
+		// Start the dtls transport
+		err = pc.dtlsTransport.Start(RTCDtlsParameters{
+			Role:         RTCDtlsRoleAuto,
+			Fingerprints: []RTCDtlsFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
+		})
+		if err != nil {
+			// TODO: Handle error
+			pcLog.Warnf("Failed to start manager: %s", err)
+		}
+
+		err = pc.networkManager.Start(pc.iceTransport.mux, pc.dtlsTransport.conn, weOffer)
 		if err != nil {
 			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
@@ -1315,13 +1338,41 @@ func (pc *RTCPeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
 	pc.ConnectionState = RTCPeerConnectionStateClosed
 
+	// Try closing everything and collect the errors
+	var closeErrs []error
+
 	if pc.networkManager != nil {
 		if err := pc.networkManager.Close(); err != nil {
-			return err
+			closeErrs = append(closeErrs, err)
 		}
 	}
 
-	return nil
+	if pc.iceTransport != nil {
+		if err := pc.iceTransport.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	// TODO: Figure out stopping ICE transport & Gatherer independently.
+	// pc.iceGatherer()
+
+	return flattenErrs(closeErrs)
+}
+
+func flattenErrs(errs []error) error {
+	var errstrings []string
+
+	for _, err := range errs {
+		if err != nil {
+			errstrings = append(errstrings, err.Error())
+		}
+	}
+
+	if len(errstrings) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(strings.Join(errstrings, "\n"))
 }
 
 /* Everything below is private */
