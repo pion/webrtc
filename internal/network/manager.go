@@ -1,10 +1,7 @@
 package network
 
 import (
-	"crypto"
-	"crypto/x509"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/pions/datachannel"
@@ -12,19 +9,16 @@ import (
 	"github.com/pions/sctp"
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/internal/srtp"
-	"github.com/pions/webrtc/pkg/ice"
 )
 
 const (
 	srtpMasterKeyLen     = 16
 	srtpMasterKeySaltLen = 14
-	receiveMTU           = 8192
 )
 
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	iceConn *ice.Conn
 	isOffer bool
 
 	SrtpSession  *srtp.SessionSRTP
@@ -32,7 +26,6 @@ type Manager struct {
 
 	mux *mux.Mux
 
-	dtlsEndpoint  *mux.Endpoint
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
 
@@ -51,24 +44,14 @@ func NewManager() *Manager {
 }
 
 // Start starts the network manager
-func (m *Manager) Start(iceConn *ice.Conn, isOffer bool,
-	dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
-	// m := &Manager{
-	// 	iceConn:                  iceConn,
-	// 	bufferTransportGenerator: btg,
-	// }
-
-	m.iceConn = iceConn
+func (m *Manager) Start(mx *mux.Mux, dtlsConn *dtls.Conn, isOffer bool) error {
 	m.isOffer = isOffer
 
-	m.mux = mux.NewMux(m.iceConn, receiveMTU)
-	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
+	m.mux = mx
 	m.srtpEndpoint = m.mux.NewEndpoint(mux.MatchSRTP)
 	m.srtcpEndpoint = m.mux.NewEndpoint(mux.MatchSRTCP)
 
-	if err := m.startDTLS(isOffer, dtlsCert, dtlsPrivKey, fingerprint, fingerprintHash); err != nil {
-		return err
-	}
+	m.dtlsConn = dtlsConn
 
 	return m.startSRTP(isOffer)
 }
@@ -124,47 +107,6 @@ func (m *Manager) startSRTP(isOffer bool) error {
 	return err
 }
 
-func (m *Manager) startDTLS(isOffer bool, dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
-	dtlsCofig := &dtls.Config{Certificate: dtlsCert, PrivateKey: dtlsPrivKey}
-	if isOffer {
-		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err := dtls.Server(m.dtlsEndpoint, dtlsCofig)
-		if err != nil {
-			return err
-		}
-		m.dtlsConn = dtlsConn
-	} else {
-		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err := dtls.Client(m.dtlsEndpoint, dtlsCofig)
-		if err != nil {
-			return err
-		}
-		m.dtlsConn = dtlsConn
-	}
-
-	// Check the fingerprint if a certificate was exchanged
-	cert := m.dtlsConn.RemoteCertificate()
-	if cert != nil {
-		hashAlgo, err := dtls.HashAlgorithmString(fingerprintHash)
-		if err != nil {
-			return err
-		}
-
-		fp := ""
-		fp, err = dtls.Fingerprint(cert, hashAlgo)
-		if err != nil {
-			return err
-		}
-
-		if strings.ToUpper(fp) != fingerprint {
-			return fmt.Errorf("invalid fingerprint: %s <> %s", fp, fingerprint)
-		}
-	} else {
-		fmt.Println("Warning: Certificate not checked")
-	}
-	return nil
-}
-
 // StartSCTP starts the SCTP association
 func (m *Manager) StartSCTP(isOffer bool) error {
 	if isOffer {
@@ -210,7 +152,7 @@ func (m *Manager) Close() error {
 	//    continue the chain the Mux has to be closed.
 
 	// Close SCTP. This should close the data channels, SCTP, and DTLS
-	var errSCTP, errMux, errSRTP, errSRTCP error
+	var errSCTP, errSRTP, errSRTCP error
 
 	m.sctpAssociationMutex.RLock()
 	if m.sctpAssociation != nil {
@@ -221,17 +163,11 @@ func (m *Manager) Close() error {
 	errSRTP = m.SrtpSession.Close()
 	errSRTCP = m.SrtcpSession.Close()
 
-	// Close the Mux. This should close the Mux and ICE.
-	if m.mux != nil {
-		errMux = m.mux.Close()
-	}
-
 	// TODO: better way to combine/handle errors?
 	if errSCTP != nil ||
-		errMux != nil ||
 		errSRTP != nil ||
 		errSRTCP != nil {
-		return fmt.Errorf("Failed to close: %v, %v, %v, %v", errSCTP, errMux, errSRTP, errSRTCP)
+		return fmt.Errorf("Failed to close: %v, %v, %v", errSCTP, errSRTP, errSRTCP)
 	}
 
 	return nil

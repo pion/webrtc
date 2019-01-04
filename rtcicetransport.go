@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -22,6 +23,7 @@ type RTCIceTransport struct {
 
 	gatherer *RTCIceGatherer
 	conn     *ice.Conn
+	mux      *mux.Mux
 }
 
 // func (t *RTCIceTransport) GetLocalCandidates() []RTCIceCandidate {
@@ -101,7 +103,15 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 		return errors.New("Unknown ICE Role")
 	}
 
+	t.mux = mux.NewMux(t.conn, receiveMTU)
+
 	return nil
+}
+
+// Stop irreversibly stops the RTCIceTransport.
+func (t *RTCIceTransport) Stop() error {
+	// Close the Mux. This closes the Mux and the underlying ICE conn.
+	return t.mux.Close()
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
