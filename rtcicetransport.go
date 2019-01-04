@@ -18,6 +18,8 @@ type RTCIceTransport struct {
 	// State RTCIceTransportState
 	// gatheringState RTCIceGathererState
 
+	onConnectionStateChangeHdlr func(RTCIceTransportState)
+
 	gatherer *RTCIceGatherer
 	conn     *ice.Conn
 }
@@ -62,6 +64,14 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 		return err
 	}
 
+	agent := t.gatherer.agent
+	err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
+		t.onConnectionStateChange(newRTCIceTransportStateFromICE(iceState))
+	})
+	if err != nil {
+		return err
+	}
+
 	if role == nil {
 		controlled := RTCIceRoleControlled
 		role = &controlled
@@ -70,7 +80,7 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 
 	switch t.role {
 	case RTCIceRoleControlling:
-		iceConn, err := t.gatherer.agent.Dial(context.TODO(),
+		iceConn, err := agent.Dial(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
 		if err != nil {
@@ -79,7 +89,7 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 		t.conn = iceConn
 
 	case RTCIceRoleControlled:
-		iceConn, err := t.gatherer.agent.Accept(context.TODO(),
+		iceConn, err := agent.Accept(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
 		if err != nil {
@@ -92,6 +102,23 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 	}
 
 	return nil
+}
+
+// OnConnectionStateChange sets a handler that is fired when the ICE
+// connection state changes.
+func (t *RTCIceTransport) OnConnectionStateChange(f func(RTCIceTransportState)) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.onConnectionStateChangeHdlr = f
+}
+
+func (t *RTCIceTransport) onConnectionStateChange(state RTCIceTransportState) {
+	t.lock.RLock()
+	hdlr := t.onConnectionStateChangeHdlr
+	t.lock.RUnlock()
+	if hdlr != nil {
+		hdlr(state)
+	}
 }
 
 // Role indicates the current role of the ICE transport.
@@ -120,6 +147,27 @@ func (t *RTCIceTransport) SetRemoteCandidates(remoteCandidates []RTCIceCandidate
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// AddRemoteCandidate adds a candidate associated with the remote RTCIceTransport.
+func (t *RTCIceTransport) AddRemoteCandidate(remoteCandidate RTCIceCandidate) error {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	if err := t.ensureGatherer(); err != nil {
+		return err
+	}
+
+	c, err := remoteCandidate.toICE()
+	if err != nil {
+		return err
+	}
+	err = t.gatherer.agent.AddRemoteCandidate(c)
+	if err != nil {
+		return err
 	}
 
 	return nil

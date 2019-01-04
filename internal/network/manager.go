@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
@@ -30,9 +29,8 @@ type TransportPair struct {
 // Manager contains all network state (DTLS, SRTP) that is shared between ports
 // It is also used to perform operations that involve multiple ports
 type Manager struct {
-	IceAgent *ice.Agent
-	iceConn  *ice.Conn
-	isOffer  bool
+	iceConn *ice.Conn
+	isOffer bool
 
 	mux *mux.Mux
 
@@ -66,50 +64,24 @@ func (m *Manager) AddTransportPair(ssrc uint32, Rtp chan<- *rtp.Packet, Rtcp cha
 }
 
 // NewManager creates a new network.Manager
-func NewManager(urls []*ice.URL, btg BufferTransportGenerator, ntf ICENotifier, minport, maxport uint16) (*Manager, error) {
-	config := &ice.AgentConfig{Urls: urls, Notifier: ntf, PortMin: minport, PortMax: maxport}
-	iceAgent, err := ice.NewAgent(config)
-
-	if err != nil {
-		return nil, err
-	}
-
+func NewManager() *Manager {
 	return &Manager{
-		IceAgent:                 iceAgent,
-		bufferTransportPairs:     make(map[uint32]*TransportPair),
-		bufferTransportGenerator: btg,
-	}, nil
-}
-
-func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
-	m.pairsLock.RLock()
-	defer m.pairsLock.RUnlock()
-	return m.bufferTransportPairs[ssrc]
-}
-
-func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
-	m.pairsLock.Lock()
-	defer m.pairsLock.Unlock()
-	bufferTransport := m.bufferTransportPairs[ssrc]
-	if bufferTransport == nil {
-		bufferTransport = m.bufferTransportGenerator(ssrc, payloadtype)
-		m.bufferTransportPairs[ssrc] = bufferTransport
+		bufferTransportPairs: make(map[uint32]*TransportPair),
 	}
-
-	return bufferTransport
 }
 
-// Start allocates the network stack
-// TODO: Turn into the ORTC constructors
-func (m *Manager) Start(isOffer bool,
-	remoteUfrag, remotePwd string,
+// Start starts the network manager
+func (m *Manager) Start(iceConn *ice.Conn, btg BufferTransportGenerator, isOffer bool,
 	dtlsCert *x509.Certificate, dtlsPrivKey crypto.PrivateKey, fingerprint, fingerprintHash string) error {
+	// m := &Manager{
+	// 	iceConn:                  iceConn,
+	// 	bufferTransportGenerator: btg,
+	// }
+
+	m.iceConn = iceConn
+	m.bufferTransportGenerator = btg
 
 	m.isOffer = isOffer
-
-	if err := m.startICE(isOffer, remoteUfrag, remotePwd); err != nil {
-		return err
-	}
 
 	m.mux = mux.NewMux(m.iceConn, receiveMTU)
 	m.dtlsEndpoint = m.mux.NewEndpoint(mux.MatchDTLS)
@@ -128,21 +100,22 @@ func (m *Manager) Start(isOffer bool,
 	return m.startSCTP(isOffer)
 }
 
-func (m *Manager) startICE(isOffer bool, remoteUfrag, remotePwd string) error {
-	if isOffer {
-		iceConn, err := m.IceAgent.Dial(context.TODO(), remoteUfrag, remotePwd)
-		if err != nil {
-			return err
-		}
-		m.iceConn = iceConn
-	} else {
-		iceConn, err := m.IceAgent.Accept(context.TODO(), remoteUfrag, remotePwd)
-		if err != nil {
-			return err
-		}
-		m.iceConn = iceConn
+func (m *Manager) getBufferTransports(ssrc uint32) *TransportPair {
+	m.pairsLock.RLock()
+	defer m.pairsLock.RUnlock()
+	return m.bufferTransportPairs[ssrc]
+}
+
+func (m *Manager) getOrCreateBufferTransports(ssrc uint32, payloadtype uint8) *TransportPair {
+	m.pairsLock.Lock()
+	defer m.pairsLock.Unlock()
+	bufferTransport := m.bufferTransportPairs[ssrc]
+	if bufferTransport == nil {
+		bufferTransport = m.bufferTransportGenerator(ssrc, payloadtype)
+		m.bufferTransportPairs[ssrc] = bufferTransport
 	}
-	return nil
+
+	return bufferTransport
 }
 
 func (m *Manager) startSRTP() {

@@ -1,5 +1,7 @@
 package webrtc
 
+import "fmt"
+
 // RTCIceCandidateType represents the type of the ICE candidate used.
 type RTCIceCandidateType int
 
@@ -39,18 +41,18 @@ const (
 	rtcIceCandidateTypeRelayStr = "relay"
 )
 
-func newRTCIceCandidateType(raw string) RTCIceCandidateType {
+func newRTCIceCandidateType(raw string) (RTCIceCandidateType, error) {
 	switch raw {
 	case rtcIceCandidateTypeHostStr:
-		return RTCIceCandidateTypeHost
+		return RTCIceCandidateTypeHost, nil
 	case rtcIceCandidateTypeSrflxStr:
-		return RTCIceCandidateTypeSrflx
+		return RTCIceCandidateTypeSrflx, nil
 	case rtcIceCandidateTypePrflxStr:
-		return RTCIceCandidateTypePrflx
+		return RTCIceCandidateTypePrflx, nil
 	case rtcIceCandidateTypeRelayStr:
-		return RTCIceCandidateTypeRelay
+		return RTCIceCandidateTypeRelay, nil
 	default:
-		return RTCIceCandidateType(Unknown)
+		return RTCIceCandidateType(Unknown), fmt.Errorf("Unknown ICE candidate type: %s", raw)
 	}
 }
 
