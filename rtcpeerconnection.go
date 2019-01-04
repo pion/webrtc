@@ -112,6 +112,9 @@ type RTCPeerConnection struct {
 
 	// Deprecated: Internal mechanism which will be removed.
 	networkManager *network.Manager
+
+	iceGatherer  *RTCIceGatherer
+	iceTransport *RTCIceTransport
 }
 
 // New creates a new RTCPeerConfiguration with the provided configuration
@@ -147,25 +150,17 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		return nil, err
 	}
 
-	var urls []*ice.URL
-	for _, server := range pc.configuration.IceServers {
-		for _, rawURL := range server.URLs {
-			var url *ice.URL
-			url, err = ice.ParseURL(rawURL)
-			if err != nil {
-				return nil, err
-			}
+	// TODO: Phase out
+	pc.networkManager = network.NewManager()
 
-			urls = append(urls, url)
-		}
+	// For now we eagerly allocate and start the gatherer
+	gatherer, err := pc.createIceGatherer()
+	if err != nil {
+		return nil, err
 	}
+	pc.iceGatherer = gatherer
 
-	pc.networkManager, err = network.NewManager(
-		&ice.AgentConfig{Urls: urls, Notifier: pc.iceStateChange,
-			PortMin:           defaultSettingEngine.EphemeralUDP.PortMin,
-			PortMax:           defaultSettingEngine.EphemeralUDP.PortMax,
-			ConnectionTimeout: defaultSettingEngine.Timeout.ICEConnection,
-			KeepaliveInterval: defaultSettingEngine.Timeout.ICEKeepalive})
+	err = pc.gather()
 	if err != nil {
 		return nil, err
 	}
@@ -443,21 +438,27 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 
 	d := sdp.NewJSEPSessionDescription(useIdentity)
 	pc.addFingerprint(d)
-	candidates, err := pc.generateLocalCandidates()
+
+	iceParams, err := pc.iceGatherer.GetLocalParameters()
+	if err != nil {
+		return RTCSessionDescription{}, err
+	}
+
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
 	if err != nil {
 		return RTCSessionDescription{}, err
 	}
 
 	bundleValue := "BUNDLE"
 
-	if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+	if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, "audio", iceParams, RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
 		bundleValue += " audio"
 	}
-	if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+	if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, "video", iceParams, RTCRtpTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
 		bundleValue += " video"
 	}
 
-	pc.addDataMediaSection(d, "data", candidates, sdp.ConnectionRoleActpass)
+	pc.addDataMediaSection(d, "data", iceParams, candidates, sdp.ConnectionRoleActpass)
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
 
 	for _, m := range d.MediaDescriptions {
@@ -479,6 +480,35 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 	return desc, nil
 }
 
+func (pc *RTCPeerConnection) createIceGatherer() (*RTCIceGatherer, error) {
+	g, err := NewRTCIceGatherer(RTCIceGatherOptions{
+		ICEServers: pc.configuration.IceServers,
+		// TODO: GatherPolicy
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return g, nil
+}
+
+func (pc *RTCPeerConnection) gather() error {
+	return pc.iceGatherer.Gather()
+}
+
+func (pc *RTCPeerConnection) createIceTransport() *RTCIceTransport {
+	t := NewRTCIceTransport(pc.iceGatherer)
+
+	t.OnConnectionStateChange(func(state RTCIceTransportState) {
+		// We convert the state back to the ICE state to not brake the
+		// existing public API at this point.
+		iceState := state.toICE()
+		pc.iceStateChange(iceState)
+	})
+
+	return t
+}
+
 // CreateAnswer starts the RTCPeerConnection and generates the localDescription
 func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
@@ -490,10 +520,16 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 		return RTCSessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	candidates, err := pc.generateLocalCandidates()
+	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
 		return RTCSessionDescription{}, err
 	}
+
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
+	if err != nil {
+		return RTCSessionDescription{}, err
+	}
+
 	d := sdp.NewJSEPSessionDescription(useIdentity)
 	pc.addFingerprint(d)
 
@@ -519,15 +555,15 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 		}
 
 		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
-			if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+			if pc.addRTPMediaSection(d, RTCRtpCodecTypeAudio, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
 				appendBundle()
 			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
-			if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, peerDirection, candidates, sdp.ConnectionRoleActive) {
+			if pc.addRTPMediaSection(d, RTCRtpCodecTypeVideo, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
 				appendBundle()
 			}
 		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
-			pc.addDataMediaSection(d, midValue, candidates, sdp.ConnectionRoleActive)
+			pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
 			appendBundle()
 		}
 	}
@@ -713,15 +749,24 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		weOffer = false
 	}
 
+	// Create the ice transport
+	iceTransport := pc.createIceTransport()
+	pc.iceTransport = iceTransport
+
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
-			if strings.HasPrefix(*a.String(), "candidate") {
-				c, err := sdp.ICECandidateUnmarshal(*a.String())
+			if a.IsICECandidate() {
+				sdpCandidate, err := a.ToICECandidate()
 				if err != nil {
 					return err
 				}
 
-				if err := pc.networkManager.IceAgent.AddRemoteCandidate(c); err != nil {
+				candidate, err := newRTCIceCandidateFromSDP(sdpCandidate)
+				if err != nil {
+					return err
+				}
+
+				if err = pc.iceTransport.AddRemoteCandidate(candidate); err != nil {
 					return err
 				}
 			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
@@ -748,11 +793,34 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	fingerprintHash = parts[0]
 
 	go func() {
+		// Star the networking in a new routine since it will block until
+		// the connection is actually established.
+
+		// Start the ice transport
+		iceRole := RTCIceRoleControlled
+		if weOffer {
+			iceRole = RTCIceRoleControlling
+		}
+		err := pc.iceTransport.Start(
+			pc.iceGatherer,
+			RTCIceParameters{
+				UsernameFragment: remoteUfrag,
+				Password:         remotePwd,
+				IceLite:          false,
+			},
+			&iceRole,
+		)
+
+		if err != nil {
+			// TODO: Handle error
+			pcLog.Warnf("Failed to start manager: %s", err)
+		}
+
 		cert := pc.configuration.Certificates[0] // TODO: handle multiple certs
-		err := pc.networkManager.Start(weOffer,
-			remoteUfrag, remotePwd,
+		err = pc.networkManager.Start(pc.iceTransport.conn, weOffer,
 			cert.x509Cert, cert.privateKey, fingerprint, fingerprintHash)
 		if err != nil {
+			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
 		}
 
@@ -945,12 +1013,21 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 // AddIceCandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates
 func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
-	c, err := sdp.ICECandidateUnmarshal(s)
+	// TODO: AddIceCandidate should take RTCIceCandidateInit
+	s = strings.TrimPrefix(s, "candidate:")
+
+	attribute := sdp.NewAttribute("candidate", s)
+	sdpCandidate, err := attribute.ToICECandidate()
 	if err != nil {
 		return err
 	}
 
-	return pc.networkManager.IceAgent.AddRemoteCandidate(c)
+	candidate, err := newRTCIceCandidateFromSDP(sdpCandidate)
+	if err != nil {
+		return err
+	}
+
+	return pc.iceTransport.AddRemoteCandidate(candidate)
 }
 
 // ------------------------------------------------------------------------
@@ -1225,8 +1302,6 @@ func (pc *RTCPeerConnection) Close() error {
 		}
 	}
 
-	err := pc.networkManager.Close()
-
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.isClosed = true
 
@@ -1240,7 +1315,13 @@ func (pc *RTCPeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
 	pc.ConnectionState = RTCPeerConnectionStateClosed
 
-	return err
+	if pc.networkManager != nil {
+		if err := pc.networkManager.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 /* Everything below is private */
@@ -1294,19 +1375,6 @@ func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
 	pc.onICEConnectionStateChange(newState)
 }
 
-func (pc *RTCPeerConnection) generateLocalCandidates() ([]string, error) {
-	candidates, err := pc.networkManager.IceAgent.GetLocalCandidates()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]string, 0)
-	for _, c := range candidates {
-		res = append(res, sdp.ICECandidateMarshal(c)...)
-	}
-	return res, nil
-}
-
 func localDirection(weSend bool, peerDirection RTCRtpTransceiverDirection) RTCRtpTransceiverDirection {
 	theySend := (peerDirection == RTCRtpTransceiverDirectionSendrecv || peerDirection == RTCRtpTransceiverDirectionSendonly)
 	if weSend && theySend {
@@ -1327,14 +1395,14 @@ func (pc *RTCPeerConnection) addFingerprint(d *sdp.SessionDescription) {
 	}
 }
 
-func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, peerDirection RTCRtpTransceiverDirection, candidates []string, dtlsRole sdp.ConnectionRole) bool {
+func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTCRtpCodecType, midValue string, iceParams RTCIceParameters, peerDirection RTCRtpTransceiverDirection, candidates []RTCIceCandidate, dtlsRole sdp.ConnectionRole) bool {
 	if codecs := pc.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
 		return false
 	}
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
-		WithICECredentials(pc.networkManager.IceAgent.GetLocalUserCredentials()).
+		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
@@ -1356,14 +1424,19 @@ func (pc *RTCPeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codec
 	media = media.WithPropertyAttribute(localDirection(weSend, peerDirection).String())
 
 	for _, c := range candidates {
-		media.WithCandidate(c)
+		sdpCandidate := c.toSDP()
+		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
+		sdpCandidate.Component = 1
+		media.WithICECandidate(sdpCandidate)
+		sdpCandidate.Component = 2
+		media.WithICECandidate(sdpCandidate)
 	}
 	media.WithPropertyAttribute("end-of-candidates")
 	d.WithMedia(media)
 	return true
 }
 
-func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, candidates []string, dtlsRole sdp.ConnectionRole) {
+func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams RTCIceParameters, candidates []RTCIceCandidate, dtlsRole sdp.ConnectionRole) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   "application",
@@ -1383,10 +1456,15 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTCRtpTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
-		WithICECredentials(pc.networkManager.IceAgent.GetLocalUserCredentials())
+		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
 	for _, c := range candidates {
-		media.WithCandidate(c)
+		sdpCandidate := c.toSDP()
+		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
+		sdpCandidate.Component = 1
+		media.WithICECandidate(sdpCandidate)
+		sdpCandidate.Component = 2
+		media.WithICECandidate(sdpCandidate)
 	}
 	media.WithPropertyAttribute("end-of-candidates")
 

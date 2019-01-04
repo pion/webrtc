@@ -27,7 +27,7 @@ const (
 
 // Agent represents the ICE agent
 type Agent struct {
-	notifier func(ConnectionState)
+	onConnectionStateChangeHdlr func(ConnectionState)
 
 	// Used to block double Dial/Accept
 	opened bool
@@ -102,8 +102,7 @@ func (a *Agent) getErr() error {
 // AgentConfig collects the arguments to ice.Agent construction into
 // a single structure, for future-proofness of the interface
 type AgentConfig struct {
-	Urls     []*URL
-	Notifier func(ConnectionState)
+	Urls []*URL
 
 	// PortMin and PortMax are optional. Leave them 0 for the default UDP port allocation strategy.
 	PortMin uint16
@@ -126,7 +125,6 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	}
 
 	a := &Agent{
-		notifier:         config.Notifier,
 		tieBreaker:       rand.New(rand.NewSource(time.Now().UnixNano())).Uint64(),
 		gatheringState:   GatheringStateComplete, // TODO trickle-ice
 		connectionState:  ConnectionStateNew,
@@ -162,6 +160,13 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 
 	go a.taskLoop()
 	return a, nil
+}
+
+// OnConnectionStateChange sets a handler that is fired when the connection state changes
+func (a *Agent) OnConnectionStateChange(f func(ConnectionState)) error {
+	return a.run(func(agent *Agent) {
+		agent.onConnectionStateChangeHdlr = f
+	})
 }
 
 func (a *Agent) listenUDP(network string, laddr *net.UDPAddr) (*net.UDPConn, error) {
@@ -355,10 +360,11 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	if a.connectionState != newState {
 		a.connectionState = newState
-		if a.notifier != nil {
+		hdlr := a.onConnectionStateChangeHdlr
+		if hdlr != nil {
 			// Call handler async since we may be holding the agent lock
 			// and the handler may also require it
-			go a.notifier(a.connectionState)
+			go hdlr(newState)
 		}
 	}
 }

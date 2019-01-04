@@ -9,17 +9,22 @@ import (
 func TestNewRTCIceProtocol(t *testing.T) {
 	testCases := []struct {
 		protoString   string
+		shouldFail    bool
 		expectedProto RTCIceProtocol
 	}{
-		{"unknown", RTCIceProtocol(Unknown)},
-		{"udp", RTCIceProtocolUDP},
-		{"tcp", RTCIceProtocolTCP},
+		{"unknown", true, RTCIceProtocol(Unknown)},
+		{"udp", false, RTCIceProtocolUDP},
+		{"tcp", false, RTCIceProtocolTCP},
 	}
 
 	for i, testCase := range testCases {
+		actual, err := newRTCIceProtocol(testCase.protoString)
+		if (err != nil) != testCase.shouldFail {
+			t.Error(err)
+		}
 		assert.Equal(t,
 			testCase.expectedProto,
-			newRTCIceProtocol(testCase.protoString),
+			actual,
 			"testCase: %d %v", i, testCase,
 		)
 	}
