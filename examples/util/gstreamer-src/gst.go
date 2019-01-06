@@ -36,7 +36,7 @@ func CreatePipeline(codecName string, in chan<- media.RTCSample, pipelineSrc str
 	pipelineStr := "appsink name=appsink"
 	switch codecName {
 	case webrtc.VP8:
-		pipelineStr = pipelineSrc + " ! vp8enc ! " + pipelineStr
+		pipelineStr = pipelineSrc + " ! vp8enc error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5 deadline=1 ! " + pipelineStr
 	case webrtc.VP9:
 		pipelineStr = pipelineSrc + " ! vp9enc ! " + pipelineStr
 	case webrtc.H264:
