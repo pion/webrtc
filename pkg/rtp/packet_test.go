@@ -17,18 +17,21 @@ func TestBasic(t *testing.T) {
 		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
 	}
 	parsedPacket := &Packet{
-		Raw:              rawPkt,
-		Extension:        true,
-		ExtensionProfile: 1,
-		ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
-		Version:          2,
-		PayloadOffset:    20,
-		PayloadType:      96,
-		SequenceNumber:   27023,
-		Timestamp:        3653407706,
-		SSRC:             476325762,
-		Payload:          rawPkt[20:],
-		CSRC:             []uint32{},
+		Header: Header{
+			Extension:        true,
+			ExtensionProfile: 1,
+			ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
+			Version:          2,
+			PayloadOffset:    20,
+			PayloadType:      96,
+			SequenceNumber:   27023,
+			Timestamp:        3653407706,
+			SSRC:             476325762,
+			CSRC:             []uint32{},
+		},
+
+		Payload: rawPkt[20:],
+		Raw:     rawPkt,
 	}
 
 	if err := p.Unmarshal(rawPkt); err != nil {
