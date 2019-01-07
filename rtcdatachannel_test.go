@@ -35,7 +35,7 @@ func TestGenerateDataChannelID(t *testing.T) {
 			t.Errorf("failed to generate id: %v", err)
 			return
 		}
-		if *id != testCase.result {
+		if id != testCase.result {
 			t.Errorf("Wrong id: %d expected %d", id, testCase.result)
 		}
 	}

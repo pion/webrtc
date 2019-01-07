@@ -2,11 +2,8 @@ package network
 
 import (
 	"fmt"
-	"sync"
 
-	"github.com/pions/datachannel"
 	"github.com/pions/dtls/pkg/dtls"
-	"github.com/pions/sctp"
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/internal/srtp"
 )
@@ -30,9 +27,6 @@ type Manager struct {
 	srtcpEndpoint *mux.Endpoint
 
 	dtlsConn *dtls.Conn
-
-	sctpAssociationMutex sync.RWMutex
-	sctpAssociation      *sctp.Association
 }
 
 // NewManager creates a new network.Manager
@@ -107,67 +101,17 @@ func (m *Manager) startSRTP(isOffer bool) error {
 	return err
 }
 
-// StartSCTP starts the SCTP association
-func (m *Manager) StartSCTP(isOffer bool) error {
-	if isOffer {
-		sctpAssociation, err := sctp.Client(m.dtlsConn)
-		if err != nil {
-			return err
-		}
-
-		m.sctpAssociationMutex.Lock()
-		m.sctpAssociation = sctpAssociation
-		m.sctpAssociationMutex.Unlock()
-	} else {
-		sctpAssociation, err := sctp.Server(m.dtlsConn)
-		if err != nil {
-			return err
-		}
-
-		m.sctpAssociationMutex.Lock()
-		m.sctpAssociation = sctpAssociation
-		m.sctpAssociationMutex.Unlock()
-	}
-	return nil
-}
-
-// OpenDataChannel is used to open a data channel
-// TODO: Move to RTCSctpTransport
-func (m *Manager) OpenDataChannel(id uint16, config *datachannel.Config) (*datachannel.DataChannel, error) {
-	return datachannel.Dial(m.sctpAssociation, id, config)
-}
-
-// AcceptDataChannel is used to accept incoming data channels
-// TODO: Move to RTCSctpTransport
-func (m *Manager) AcceptDataChannel() (*datachannel.DataChannel, error) {
-	return datachannel.Accept(m.sctpAssociation)
-}
-
 // Close cleans up all the allocated state
 func (m *Manager) Close() error {
-	// Shutdown strategy:
-	// 1. All Conn close by closing their underlying Conn.
-	// 2. A Mux stops this chain. It won't close the underlying
-	//    Conn if one of the endpoints is closed down. To
-	//    continue the chain the Mux has to be closed.
-
-	// Close SCTP. This should close the data channels, SCTP, and DTLS
-	var errSCTP, errSRTP, errSRTCP error
-
-	m.sctpAssociationMutex.RLock()
-	if m.sctpAssociation != nil {
-		errSCTP = m.sctpAssociation.Close()
-	}
-	m.sctpAssociationMutex.RUnlock()
+	var errSRTP, errSRTCP error
 
 	errSRTP = m.SrtpSession.Close()
 	errSRTCP = m.SrtcpSession.Close()
 
 	// TODO: better way to combine/handle errors?
-	if errSCTP != nil ||
-		errSRTP != nil ||
+	if errSRTP != nil ||
 		errSRTCP != nil {
-		return fmt.Errorf("Failed to close: %v, %v, %v", errSCTP, errSRTP, errSRTCP)
+		return fmt.Errorf("Failed to close: %v, %v", errSRTP, errSRTCP)
 	}
 
 	return nil

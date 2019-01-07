@@ -6,6 +6,7 @@ import (
 
 	"github.com/pions/datachannel"
 	sugar "github.com/pions/webrtc/pkg/datachannel"
+	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pkg/errors"
 )
 
@@ -14,10 +15,6 @@ import (
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
 type RTCDataChannel struct {
 	sync.RWMutex
-
-	// Transport represents the associated underlying data transport that is
-	// used to transport actual data to the other peer.
-	Transport *RTCSctpTransport
 
 	// Label represents a label that can be used to distinguish this
 	// RTCDataChannel object from other RTCDataChannel objects. Scripts are
@@ -94,49 +91,88 @@ type RTCDataChannel struct {
 	onMessageHandler func(sugar.Payload)
 	onOpenHandler    func()
 
-	// Deprecated: Will be removed when networkManager is deprecated.
-	rtcPeerConnection *RTCPeerConnection
-
-	dataChannel *datachannel.DataChannel
+	sctpTransport *RTCSctpTransport
+	dataChannel   *datachannel.DataChannel
 }
 
 // NewRTCDataChannel creates a new RTCDataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
-	c := &RTCDataChannel{
-		Transport: transport,
-		Label:     params.Label,
-		ID:        &params.ID,
+	d, err := newRTCDataChannel(params)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := c.ensureSCTP(); err != nil {
+	err = d.open(transport)
+	if err != nil {
 		return nil, err
+	}
+
+	return d, nil
+}
+
+// newRTCDataChannel is an internal constructor for the data channel used to
+// create the RTCDataChannel object before the networking is set up.
+func newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataChannel, error) {
+	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
+	if len(params.Label) > 65535 {
+		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
+	}
+
+	d := &RTCDataChannel{
+		Label:      params.Label,
+		ID:         &params.ID,
+		ReadyState: RTCDataChannelStateConnecting,
+	}
+
+	return d, nil
+}
+
+// open opens the datachannel over the sctp transport
+func (d *RTCDataChannel) open(sctpTransport *RTCSctpTransport) error {
+	d.RLock()
+	d.sctpTransport = sctpTransport
+
+	if err := d.ensureSCTP(); err != nil {
+		d.RUnlock()
+		return err
 	}
 
 	cfg := &datachannel.Config{
 		ChannelType:          datachannel.ChannelTypeReliable,   // TODO: Wiring
 		Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
 		ReliabilityParameter: 0,                                 // TODO: Wiring
-		Label:                c.Label,
+		Label:                d.Label,
 	}
 
-	dc, err := datachannel.Dial(c.Transport.association, *c.ID, cfg)
+	dc, err := datachannel.Dial(d.sctpTransport.association, *d.ID, cfg)
 	if err != nil {
-		return nil, err
+		d.RUnlock()
+		return err
 	}
 
-	c.handleOpen(dc)
+	d.ReadyState = RTCDataChannelStateOpen
+	d.RUnlock()
 
-	return c, nil
+	d.handleOpen(dc)
+	return nil
 }
 
 func (d *RTCDataChannel) ensureSCTP() error {
-	if d.Transport == nil ||
-		d.Transport.association == nil {
+	if d.sctpTransport == nil ||
+		d.sctpTransport.association == nil {
 		return errors.New("SCTP not establisched")
 	}
 	return nil
+}
+
+// Transport returns the RTCSctpTransport instance the RTCDataChannel is sending over.
+func (d *RTCDataChannel) Transport() *RTCSctpTransport {
+	d.RLock()
+	defer d.RUnlock()
+
+	return d.sctpTransport
 }
 
 // OnOpen sets an event handler which is invoked when
@@ -193,29 +229,11 @@ func (d *RTCDataChannel) Onmessage(f func(p sugar.Payload)) {
 	d.OnMessage(f)
 }
 
-// func (d *RTCDataChannel) generateID() error {
-// 	// TODO: base on DTLS role, currently static at "true".
-// 	client := true
-//
-// 	var id uint16
-// 	if !client {
-// 		id++
-// 	}
-//
-// 	for ; id < *d.Transport.MaxChannels-1; id += 2 {
-// 		_, ok := d.rtcPeerConnection.dataChannels[id]
-// 		if !ok {
-// 			d.ID = &id
-// 			return nil
-// 		}
-// 	}
-// 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
-// }
-
 func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
+	d.Lock()
 	d.dataChannel = dc
+	d.Unlock()
 
-	// Ensure on
 	d.onOpen()
 
 	d.Lock()
