@@ -11,7 +11,7 @@ func TestNewRTCIceGatheringState(t *testing.T) {
 		stateString   string
 		expectedState RTCIceGatheringState
 	}{
-		{"unknown", RTCIceGatheringState(Unknown)},
+		{unknownStr, RTCIceGatheringState(Unknown)},
 		{"new", RTCIceGatheringStateNew},
 		{"gathering", RTCIceGatheringStateGathering},
 		{"complete", RTCIceGatheringStateComplete},
@@ -31,7 +31,7 @@ func TestRTCIceGatheringState_String(t *testing.T) {
 		state          RTCIceGatheringState
 		expectedString string
 	}{
-		{RTCIceGatheringState(Unknown), "unknown"},
+		{RTCIceGatheringState(Unknown), unknownStr},
 		{RTCIceGatheringStateNew, "new"},
 		{RTCIceGatheringStateGathering, "gathering"},
 		{RTCIceGatheringStateComplete, "complete"},

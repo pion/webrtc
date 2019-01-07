@@ -60,7 +60,7 @@ func (c RTCIceTransportState) String() string {
 	case RTCIceTransportStateClosed:
 		return "closed"
 	default:
-		return "invalid"
+		return unknownStr
 	}
 }
 
@@ -81,7 +81,7 @@ func newRTCIceTransportStateFromICE(i ice.ConnectionState) RTCIceTransportState 
 	case ice.ConnectionStateClosed:
 		return RTCIceTransportStateClosed
 	default:
-		return RTCIceTransportState(0)
+		return RTCIceTransportState(Unknown)
 	}
 }
 
@@ -102,7 +102,7 @@ func (c RTCIceTransportState) toICE() ice.ConnectionState {
 	case RTCIceTransportStateClosed:
 		return ice.ConnectionStateClosed
 	default:
-		return ice.ConnectionState(0)
+		return ice.ConnectionState(Unknown)
 	}
 
 }

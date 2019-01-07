@@ -11,7 +11,7 @@ func TestNewRTCIceRole(t *testing.T) {
 		roleString   string
 		expectedRole RTCIceRole
 	}{
-		{"unknown", RTCIceRole(Unknown)},
+		{unknownStr, RTCIceRole(Unknown)},
 		{"controlling", RTCIceRoleControlling},
 		{"controlled", RTCIceRoleControlled},
 	}
@@ -30,7 +30,7 @@ func TestRTCIceRole_String(t *testing.T) {
 		proto          RTCIceRole
 		expectedString string
 	}{
-		{RTCIceRole(Unknown), "unknown"},
+		{RTCIceRole(Unknown), unknownStr},
 		{RTCIceRoleControlling, "controlling"},
 		{RTCIceRoleControlled, "controlled"},
 	}

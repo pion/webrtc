@@ -11,7 +11,7 @@ func TestNewRTCIceTransportPolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy RTCIceTransportPolicy
 	}{
-		{"unknown", RTCIceTransportPolicy(Unknown)},
+		{unknownStr, RTCIceTransportPolicy(Unknown)},
 		{"relay", RTCIceTransportPolicyRelay},
 		{"all", RTCIceTransportPolicyAll},
 	}
@@ -30,7 +30,7 @@ func TestRTCIceTransportPolicy_String(t *testing.T) {
 		policy         RTCIceTransportPolicy
 		expectedString string
 	}{
-		{RTCIceTransportPolicy(Unknown), "unknown"},
+		{RTCIceTransportPolicy(Unknown), unknownStr},
 		{RTCIceTransportPolicyRelay, "relay"},
 		{RTCIceTransportPolicyAll, "all"},
 	}

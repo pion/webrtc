@@ -8,6 +8,11 @@ import (
 // MatchFunc allows custom logic for mapping packets to an Endpoint
 type MatchFunc func([]byte) bool
 
+// MatchAll always returns true
+func MatchAll(b []byte) bool {
+	return true
+}
+
 // MatchRange is a MatchFunc that accepts packets with the first byte in [lower..upper]
 func MatchRange(lower, upper byte) MatchFunc {
 	return func(buf []byte) bool {

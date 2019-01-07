@@ -11,7 +11,7 @@ func TestNewRTCDtlsTransportState(t *testing.T) {
 		stateString   string
 		expectedState RTCDtlsTransportState
 	}{
-		{"unknown", RTCDtlsTransportState(Unknown)},
+		{unknownStr, RTCDtlsTransportState(Unknown)},
 		{"new", RTCDtlsTransportStateNew},
 		{"connecting", RTCDtlsTransportStateConnecting},
 		{"connected", RTCDtlsTransportStateConnected},
@@ -33,7 +33,7 @@ func TestRTCDtlsTransportState_String(t *testing.T) {
 		state          RTCDtlsTransportState
 		expectedString string
 	}{
-		{RTCDtlsTransportState(Unknown), "unknown"},
+		{RTCDtlsTransportState(Unknown), unknownStr},
 		{RTCDtlsTransportStateNew, "new"},
 		{RTCDtlsTransportStateConnecting, "connecting"},
 		{RTCDtlsTransportStateConnected, "connected"},

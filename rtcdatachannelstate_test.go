@@ -11,7 +11,7 @@ func TestNewRTCDataChannelState(t *testing.T) {
 		stateString   string
 		expectedState RTCDataChannelState
 	}{
-		{"unknown", RTCDataChannelState(Unknown)},
+		{unknownStr, RTCDataChannelState(Unknown)},
 		{"connecting", RTCDataChannelStateConnecting},
 		{"open", RTCDataChannelStateOpen},
 		{"closing", RTCDataChannelStateClosing},
@@ -32,7 +32,7 @@ func TestRTCDataChannelState_String(t *testing.T) {
 		state          RTCDataChannelState
 		expectedString string
 	}{
-		{RTCDataChannelState(Unknown), "unknown"},
+		{RTCDataChannelState(Unknown), unknownStr},
 		{RTCDataChannelStateConnecting, "connecting"},
 		{RTCDataChannelStateOpen, "open"},
 		{RTCDataChannelStateClosing, "closing"},

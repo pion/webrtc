@@ -88,3 +88,14 @@ func (s *Session) AcceptStream() (*Stream, error) {
 func (s *Session) GetRemoteCertificates() []*x509.Certificate {
 	return s.s.ConnectionState().PeerCertificates
 }
+
+// Close the connection
+func (s *Session) Close() error {
+	return s.s.Close()
+}
+
+// CloseWithError closes the connection with an error.
+// The error must not be nil.
+func (s *Session) CloseWithError(code uint16, err error) error {
+	return s.s.CloseWithError(quic.ErrorCode(code), err)
+}

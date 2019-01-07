@@ -11,7 +11,7 @@ func TestNewRTCIceCredentialType(t *testing.T) {
 		credentialTypeString   string
 		expectedCredentialType RTCIceCredentialType
 	}{
-		{"unknown", RTCIceCredentialType(Unknown)},
+		{unknownStr, RTCIceCredentialType(Unknown)},
 		{"password", RTCIceCredentialTypePassword},
 		{"oauth", RTCIceCredentialTypeOauth},
 	}
@@ -30,7 +30,7 @@ func TestRTCIceCredentialType_String(t *testing.T) {
 		credentialType RTCIceCredentialType
 		expectedString string
 	}{
-		{RTCIceCredentialType(Unknown), "unknown"},
+		{RTCIceCredentialType(Unknown), unknownStr},
 		{RTCIceCredentialTypePassword, "password"},
 		{RTCIceCredentialTypeOauth, "oauth"},
 	}

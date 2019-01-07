@@ -12,7 +12,7 @@ func TestNewRTCPriorityType(t *testing.T) {
 		priorityUint16   uint16
 		expectedPriority RTCPriorityType
 	}{
-		{"unknown", 0, RTCPriorityType(Unknown)},
+		{unknownStr, 0, RTCPriorityType(Unknown)},
 		{"very-low", 100, RTCPriorityTypeVeryLow},
 		{"low", 200, RTCPriorityTypeLow},
 		{"medium", 300, RTCPriorityTypeMedium},
@@ -44,7 +44,7 @@ func TestRTCPriorityType_String(t *testing.T) {
 		priority       RTCPriorityType
 		expectedString string
 	}{
-		{RTCPriorityType(Unknown), "unknown"},
+		{RTCPriorityType(Unknown), unknownStr},
 		{RTCPriorityTypeVeryLow, "very-low"},
 		{RTCPriorityTypeLow, "low"},
 		{RTCPriorityTypeMedium, "medium"},

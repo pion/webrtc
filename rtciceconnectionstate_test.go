@@ -11,7 +11,7 @@ func TestNewRTCIceConnectionState(t *testing.T) {
 		stateString   string
 		expectedState RTCIceConnectionState
 	}{
-		{"unknown", RTCIceConnectionState(Unknown)},
+		{unknownStr, RTCIceConnectionState(Unknown)},
 		{"new", RTCIceConnectionStateNew},
 		{"checking", RTCIceConnectionStateChecking},
 		{"connected", RTCIceConnectionStateConnected},
@@ -35,7 +35,7 @@ func TestRTCIceConnectionState_String(t *testing.T) {
 		state          RTCIceConnectionState
 		expectedString string
 	}{
-		{RTCIceConnectionState(Unknown), "unknown"},
+		{RTCIceConnectionState(Unknown), unknownStr},
 		{RTCIceConnectionStateNew, "new"},
 		{RTCIceConnectionStateChecking, "checking"},
 		{RTCIceConnectionStateConnected, "connected"},

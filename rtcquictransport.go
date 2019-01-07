@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/quic"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
@@ -103,7 +104,8 @@ func (t *RTCQuicTransport) Start(remoteParameters RTCQuicParameters) error {
 		Certificate: cert.x509Cert,
 		PrivateKey:  cert.privateKey,
 	}
-	err := t.TransportBase.StartBase(t.iceTransport.conn, cfg)
+	endpoint := t.iceTransport.mux.NewEndpoint(mux.MatchAll)
+	err := t.TransportBase.StartBase(endpoint, cfg)
 	if err != nil {
 		return err
 	}
@@ -145,7 +147,8 @@ func (t *RTCQuicTransport) validateFingerPrint(remoteParameters RTCQuicParameter
 
 func (t *RTCQuicTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
-		t.iceTransport.conn == nil {
+		t.iceTransport.conn == nil ||
+		t.iceTransport.mux == nil {
 		return errors.New("ICE connection not started")
 	}
 
