@@ -7,10 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Packet represents an RTP Packet
-// RTP is a network protocol for delivering audio and video over IP networks.
-type Packet struct {
-	Raw              []byte
+// Header represents an RTP packet header
+type Header struct {
 	Version          uint8
 	Padding          bool
 	Extension        bool
@@ -23,7 +21,13 @@ type Packet struct {
 	CSRC             []uint32
 	ExtensionProfile uint16
 	ExtensionPayload []byte
-	Payload          []byte
+}
+
+// Packet represents an RTP Packet
+type Packet struct {
+	Header
+	Raw     []byte
+	Payload []byte
 }
 
 const (
@@ -63,8 +67,8 @@ func (p Packet) String() string {
 	return out
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon
-func (p *Packet) Unmarshal(rawPacket []byte) error {
+// Unmarshal parses the passed byte slice and stores the result in the Header this method is called upon
+func (h *Header) Unmarshal(rawPacket []byte) error {
 	if len(rawPacket) < headerLength {
 		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), headerLength)
 	}
@@ -84,34 +88,34 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	p.Version = rawPacket[0] >> versionShift & versionMask
-	p.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
-	p.Extension = (rawPacket[0] >> extensionShift & extensionMask) > 0
-	p.CSRC = make([]uint32, rawPacket[0]&ccMask)
+	h.Version = rawPacket[0] >> versionShift & versionMask
+	h.Padding = (rawPacket[0] >> paddingShift & paddingMask) > 0
+	h.Extension = (rawPacket[0] >> extensionShift & extensionMask) > 0
+	h.CSRC = make([]uint32, rawPacket[0]&ccMask)
 
-	p.Marker = (rawPacket[1] >> markerShift & markerMask) > 0
-	p.PayloadType = rawPacket[1] & ptMask
+	h.Marker = (rawPacket[1] >> markerShift & markerMask) > 0
+	h.PayloadType = rawPacket[1] & ptMask
 
-	p.SequenceNumber = binary.BigEndian.Uint16(rawPacket[seqNumOffset : seqNumOffset+seqNumLength])
-	p.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
-	p.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
+	h.SequenceNumber = binary.BigEndian.Uint16(rawPacket[seqNumOffset : seqNumOffset+seqNumLength])
+	h.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
+	h.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
 
-	currOffset := csrcOffset + (len(p.CSRC) * csrcLength)
+	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
 	if len(rawPacket) < currOffset {
 		return errors.Errorf("RTP header size insufficient; %d < %d", len(rawPacket), currOffset)
 	}
 
-	for i := range p.CSRC {
+	for i := range h.CSRC {
 		offset := csrcOffset + (i * csrcLength)
-		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
+		h.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
 	}
 
-	if p.Extension {
+	if h.Extension {
 		if len(rawPacket) < currOffset+4 {
 			return errors.Errorf("RTP header size insufficient for extension; %d < %d", len(rawPacket), currOffset)
 		}
 
-		p.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
+		h.ExtensionProfile = binary.BigEndian.Uint16(rawPacket[currOffset:])
 		currOffset += 2
 		extensionLength := int(binary.BigEndian.Uint16(rawPacket[currOffset:])) * 4
 		currOffset += 2
@@ -120,19 +124,26 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 			return errors.Errorf("RTP header size insufficient for extension length; %d < %d", len(rawPacket), currOffset+extensionLength)
 		}
 
-		p.ExtensionPayload = rawPacket[currOffset : currOffset+extensionLength]
-		currOffset += len(p.ExtensionPayload)
+		h.ExtensionPayload = rawPacket[currOffset : currOffset+extensionLength]
+		currOffset += len(h.ExtensionPayload)
+	}
+	h.PayloadOffset = currOffset
+	return nil
+}
+
+// Unmarshal parses the passed byte slice and stores the result in the Packet this method is called upon
+func (p *Packet) Unmarshal(rawPacket []byte) error {
+	if err := p.Header.Unmarshal(rawPacket); err != nil {
+		return err
 	}
 
-	p.Payload = rawPacket[currOffset:]
-	p.PayloadOffset = currOffset
+	p.Payload = rawPacket[p.PayloadOffset:]
 	p.Raw = rawPacket
 	return nil
 }
 
-// Marshal returns a raw RTP packet for the instance it is called upon
-func (p *Packet) Marshal() ([]byte, error) {
-
+// Marshal returns a raw RTP header for the instance it is called upon
+func (h *Header) Marshal() ([]byte, error) {
 	/*
 	 *  0                   1                   2                   3
 	 *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -148,53 +159,61 @@ func (p *Packet) Marshal() ([]byte, error) {
 	 * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 	 */
 
-	rawPacketLength := 12 + (len(p.CSRC) * csrcLength)
-	if p.Extension {
-		rawPacketLength += 4 + len(p.ExtensionPayload)
+	rawHeaderLength := 12 + (len(h.CSRC) * csrcLength)
+	if h.Extension {
+		rawHeaderLength += 4 + len(h.ExtensionPayload)
 	}
-	rawPacket := make([]byte, rawPacketLength)
+	rawHeader := make([]byte, rawHeaderLength)
 
-	rawPacket[0] |= p.Version << versionShift
-	if p.Padding {
-		rawPacket[0] |= 1 << paddingShift
+	rawHeader[0] |= h.Version << versionShift
+	if h.Padding {
+		rawHeader[0] |= 1 << paddingShift
 	}
-	if p.Extension {
-		rawPacket[0] |= 1 << extensionShift
+	if h.Extension {
+		rawHeader[0] |= 1 << extensionShift
 	}
-	rawPacket[0] |= uint8(len(p.CSRC))
+	rawHeader[0] |= uint8(len(h.CSRC))
 
-	if p.Marker {
-		rawPacket[1] |= 1 << markerShift
+	if h.Marker {
+		rawHeader[1] |= 1 << markerShift
 	}
-	rawPacket[1] |= p.PayloadType
+	rawHeader[1] |= h.PayloadType
 
-	binary.BigEndian.PutUint16(rawPacket[seqNumOffset:], p.SequenceNumber)
-	binary.BigEndian.PutUint32(rawPacket[timestampOffset:], p.Timestamp)
-	binary.BigEndian.PutUint32(rawPacket[ssrcOffset:], p.SSRC)
+	binary.BigEndian.PutUint16(rawHeader[seqNumOffset:], h.SequenceNumber)
+	binary.BigEndian.PutUint32(rawHeader[timestampOffset:], h.Timestamp)
+	binary.BigEndian.PutUint32(rawHeader[ssrcOffset:], h.SSRC)
 
-	for i, csrc := range p.CSRC {
-		binary.BigEndian.PutUint32(rawPacket[csrcOffset+(i*csrcLength):], csrc)
+	for i, csrc := range h.CSRC {
+		binary.BigEndian.PutUint32(rawHeader[csrcOffset+(i*csrcLength):], csrc)
 	}
 
-	currOffset := csrcOffset + (len(p.CSRC) * csrcLength)
+	currOffset := csrcOffset + (len(h.CSRC) * csrcLength)
 
-	for i := range p.CSRC {
+	for i := range h.CSRC {
 		offset := csrcOffset + (i * csrcLength)
-		p.CSRC[i] = binary.BigEndian.Uint32(rawPacket[offset:])
+		h.CSRC[i] = binary.BigEndian.Uint32(rawHeader[offset:])
 	}
 
-	if p.Extension {
-		binary.BigEndian.PutUint16(rawPacket[currOffset:], p.ExtensionProfile)
+	if h.Extension {
+		binary.BigEndian.PutUint16(rawHeader[currOffset:], h.ExtensionProfile)
 		currOffset += 2
-		binary.BigEndian.PutUint16(rawPacket[currOffset:], uint16(len(p.ExtensionPayload))/4)
+		binary.BigEndian.PutUint16(rawHeader[currOffset:], uint16(len(h.ExtensionPayload))/4)
 		currOffset += 2
-		copy(rawPacket[currOffset:], p.ExtensionPayload)
+		copy(rawHeader[currOffset:], h.ExtensionPayload)
 	}
 
-	p.PayloadOffset = csrcOffset + (len(p.CSRC) * csrcLength)
+	h.PayloadOffset = csrcOffset + (len(h.CSRC) * csrcLength)
+	return rawHeader, nil
+}
+
+// Marshal returns a raw RTP packet for the instance it is called upon
+func (p *Packet) Marshal() ([]byte, error) {
+	rawPacket, err := p.Header.Marshal()
+	if err != nil {
+		return nil, err
+	}
 
 	rawPacket = append(rawPacket, p.Payload...)
 	p.Raw = rawPacket
-
 	return rawPacket, nil
 }
