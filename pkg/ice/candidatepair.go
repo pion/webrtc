@@ -42,6 +42,6 @@ func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 func (a *Agent) sendSTUN(msg *stun.Message, local, remote *Candidate) {
 	_, err := local.writeTo(msg.Pack(), remote)
 	if err != nil {
-		iceLog.Warnf("failed to send STUN message: %s", err)
+		iceLog.Tracef("failed to send STUN message: %s", err)
 	}
 }

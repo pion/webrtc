@@ -421,7 +421,6 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 	// Verify that the noop case works
 	assert.NotPanics(t, func() { pc.onTrack(nil) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { pc.onDataChannel(nil) })
 
 	pc.OnTrack(func(t *RTCTrack) {
 		onTrackCalled <- true
@@ -437,12 +436,12 @@ func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 
 	// Verify that the handlers deal with nil inputs
 	assert.NotPanics(t, func() { pc.onTrack(nil) })
-	assert.NotPanics(t, func() { pc.onDataChannel(nil) })
+	assert.NotPanics(t, func() { go pc.onDataChannelHandler(nil) })
 
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&RTCTrack{}) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { pc.onDataChannel(&RTCDataChannel{}) })
+	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&RTCDataChannel{}) })
 
 	allTrue := func(vals []bool) bool {
 		for _, val := range vals {

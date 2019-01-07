@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/datachannel"
 	"github.com/pions/sdp"
 	"github.com/pions/webrtc/internal/network"
 	"github.com/pions/webrtc/pkg/ice"
@@ -94,9 +93,6 @@ type RTCPeerConnection struct {
 	mediaEngine     *MediaEngine
 	rtpTransceivers []*RTCRtpTransceiver
 
-	// sctpTransport
-	sctpTransport *RTCSctpTransport
-
 	// DataChannels
 	dataChannels map[uint16]*RTCDataChannel
 
@@ -118,6 +114,7 @@ type RTCPeerConnection struct {
 	iceGatherer   *RTCIceGatherer
 	iceTransport  *RTCIceTransport
 	dtlsTransport *RTCDtlsTransport
+	sctpTransport *RTCSctpTransport
 }
 
 // New creates a new RTCPeerConfiguration with the provided configuration
@@ -144,7 +141,6 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		IceGatheringState:  RTCIceGatheringStateNew,
 		ConnectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
-		sctpTransport:      NewRTCSctpTransport(nil),
 		dataChannels:       make(map[uint16]*RTCDataChannel),
 	}
 
@@ -263,28 +259,6 @@ func (pc *RTCPeerConnection) OnDataChannel(f func(*RTCDataChannel)) {
 	pc.Lock()
 	defer pc.Unlock()
 	pc.onDataChannelHandler = f
-}
-
-func (pc *RTCPeerConnection) onDataChannel(dc *RTCDataChannel) (done chan struct{}) {
-	pc.RLock()
-	hdlr := pc.onDataChannelHandler
-	pc.RUnlock()
-
-	pcLog.Debugf("got new datachannel: %+v", dc)
-	done = make(chan struct{})
-	if hdlr == nil || dc == nil {
-		close(done)
-		return
-	}
-
-	// Run this synchronously to allow setup done in onDataChannelFn()
-	// to complete before datachannel event handlers might be called.
-	go func() {
-		hdlr(dc)
-		close(done)
-	}()
-
-	return
 }
 
 // OnTrack sets an event handler which is called when remote track
@@ -807,6 +781,20 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	fingerprint = parts[1]
 	fingerprintHash = parts[0]
 
+	// Create the SCTP transport
+	sctp := NewRTCSctpTransport(pc.dtlsTransport)
+	pc.sctpTransport = sctp
+
+	// Wire up the on datachannel handler
+	sctp.OnDataChannel(func(d *RTCDataChannel) {
+		pc.RLock()
+		hdlr := pc.onDataChannelHandler
+		pc.RUnlock()
+		if hdlr != nil {
+			hdlr(d)
+		}
+	})
+
 	go func() {
 		// Star the networking in a new routine since it will block until
 		// the connection is actually established.
@@ -841,6 +829,15 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			pcLog.Warnf("Failed to start manager: %s", err)
 		}
 
+		// Start sctp
+		err = pc.sctpTransport.Start(RTCSctpCapabilities{
+			MaxMessageSize: 0,
+		})
+		if err != nil {
+			// TODO: Handle error
+			pcLog.Warnf("Failed to start manager: %s", err)
+		}
+
 		err = pc.networkManager.Start(pc.iceTransport.mux, pc.dtlsTransport.conn, weOffer)
 		if err != nil {
 			// TODO: Handle error
@@ -851,66 +848,21 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		go pc.acceptSRTP()
 		go pc.acceptSRTCP()
 
-		// Temporary data channel glue
-		if err = pc.networkManager.StartSCTP(weOffer); err != nil {
-			pcLog.Warnf("Failed to start SCTP: %s", err)
-		}
+		// Open data channels that where created before signaling
 		pc.openDataChannels()
-		pc.acceptDataChannels()
-
 	}()
 
 	return nil
 }
 
 // openDataChannels opens the existing data channels
-// TODO: Move to RTCDataChannel
 func (pc *RTCPeerConnection) openDataChannels() {
-	pc.RLock()
-	defer pc.RUnlock()
-	for _, rtcDC := range pc.dataChannels {
-		dc, err := pc.networkManager.OpenDataChannel(
-			*rtcDC.ID,
-			&datachannel.Config{
-				ChannelType:          datachannel.ChannelTypeReliable,   // TODO: Wiring
-				Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
-				ReliabilityParameter: 0,                                 // TODO: Wiring
-				Label:                rtcDC.Label,
-			})
+	for _, d := range pc.dataChannels {
+		err := d.open(pc.sctpTransport)
 		if err != nil {
 			pcLog.Warnf("failed to open data channel: %s", err)
 			continue
 		}
-		rtcDC.ReadyState = RTCDataChannelStateOpen
-		rtcDC.handleOpen(dc)
-	}
-}
-
-// acceptDataChannels accepts data channels
-// TODO: Move to RTCSctpTransport
-func (pc *RTCPeerConnection) acceptDataChannels() {
-	for {
-		dc, err := pc.networkManager.AcceptDataChannel()
-		if err != nil {
-			pcLog.Warnf("Failed to accept data channel: %s", err)
-			// TODO: Kill DataChannel/PeerConnection?
-			return
-		}
-
-		sid := dc.StreamIdentifier()
-		rtcDC := &RTCDataChannel{
-			ID:                &sid,
-			Label:             dc.Config.Label,
-			rtcPeerConnection: pc,
-			ReadyState:        RTCDataChannelStateOpen,
-		}
-
-		pc.Lock()
-		pc.dataChannels[sid] = rtcDC
-		pc.Unlock()
-
-		<-pc.onDataChannel(rtcDC)
-		rtcDC.handleOpen(dc)
 	}
 }
 
@@ -1140,7 +1092,7 @@ func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 // ------------------------------------------------------------------------
 
 // CreateDataChannel creates a new RTCDataChannel object with the given label
-// and optitional RTCDataChannelInit used to configure properties of the
+// and optional RTCDataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
 func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataChannelInit) (*RTCDataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
@@ -1148,134 +1100,151 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
-	if len(label) > 65535 {
-		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
+	// TODO: Add additional options once implemented. RTCDataChannelInit
+	// implements all options. RTCDataChannelParameters implements the
+	// options that actually have an effect at this point.
+	params := &RTCDataChannelParameters{
+		Label: label,
 	}
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #3)
-	// Some variables defined explicitly despite their implicit zero values to
-	// allow better readability to understand what is happening. Additionally,
-	// some members are set to a non zero value default due to the default
-	// definitions in https://w3c.github.io/webrtc-pc/#dom-rtcdatachannelinit
-	// which are later overwriten by the options if any were specified.
-	channel := RTCDataChannel{
-		rtcPeerConnection: pc,
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
-		Label:             label,
-		Ordered:           true,
-		MaxPacketLifeTime: nil,
-		MaxRetransmits:    nil,
-		Protocol:          "",
-		Negotiated:        false,
-		ID:                nil,
-		Priority:          RTCPriorityTypeLow,
-		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #2)
-		ReadyState: RTCDataChannelStateConnecting,
-		// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #3)
-		BufferedAmount: 0,
-	}
-
-	if options != nil {
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #7)
-		if options.MaxPacketLifeTime != nil {
-			channel.MaxPacketLifeTime = options.MaxPacketLifeTime
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #8)
-		if options.MaxRetransmits != nil {
-			channel.MaxRetransmits = options.MaxRetransmits
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
-		if options.Ordered != nil {
-			channel.Ordered = *options.Ordered
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #10)
-		if options.Protocol != nil {
-			channel.Protocol = *options.Protocol
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-da	ta-api (Step #12)
-		if options.Negotiated != nil {
-			channel.Negotiated = *options.Negotiated
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #13)
-		if options.ID != nil && channel.Negotiated {
-			channel.ID = options.ID
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #15)
-		if options.Priority != nil {
-			channel.Priority = *options.Priority
-		}
-	}
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
-	if len(channel.Protocol) > 65535 {
-		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
-	}
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #14)
-	if channel.Negotiated && channel.ID == nil {
-		return nil, &rtcerr.TypeError{Err: ErrNegotiatedWithoutID}
-	}
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
-	if channel.MaxPacketLifeTime != nil && channel.MaxRetransmits != nil {
-		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
-	}
-
-	// FIXME https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
-
-	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #20)
-	channel.Transport = pc.sctpTransport
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
-	if channel.ID == nil {
-		var err error
-		if channel.ID, err = pc.generateDataChannelID(true); err != nil {
-			return nil, err
+	if options != nil {
+		if options.ID == nil {
+			var err error
+			if params.ID, err = pc.generateDataChannelID(true); err != nil {
+				return nil, err
+			}
+		} else {
+			params.ID = *options.ID
 		}
-		// if err := channel.generateID(); err != nil {
-		// 	return nil, err
-		// }
 	}
 
-	// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
-	if *channel.ID > 65534 {
-		return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
-	}
+	// TODO: Re-enable validation of the parameters once they are implemented.
+	/*
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #3)
+		// Some variables defined explicitly despite their implicit zero values to
+		// allow better readability to understand what is happening. Additionally,
+		// some members are set to a non zero value default due to the default
+		// definitions in https://w3c.github.io/webrtc-pc/#dom-rtcdatachannelinit
+		// which are later overwriten by the options if any were specified.
+		channel := RTCDataChannel{
+			rtcPeerConnection: pc,
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
+			Label:             label,
+			Ordered:           true,
+			MaxPacketLifeTime: nil,
+			MaxRetransmits:    nil,
+			Protocol:          "",
+			Negotiated:        false,
+			ID:                nil,
+			Priority:          RTCPriorityTypeLow,
+			// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #3)
+			BufferedAmount: 0,
+		}
 
-	if pc.sctpTransport.State == RTCSctpTransportStateConnected &&
-		*channel.ID >= *pc.sctpTransport.MaxChannels {
-		return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+		if options != nil {
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #7)
+			if options.MaxPacketLifeTime != nil {
+				channel.MaxPacketLifeTime = options.MaxPacketLifeTime
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #8)
+			if options.MaxRetransmits != nil {
+				channel.MaxRetransmits = options.MaxRetransmits
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
+			if options.Ordered != nil {
+				channel.Ordered = *options.Ordered
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #10)
+			if options.Protocol != nil {
+				channel.Protocol = *options.Protocol
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-da	ta-api (Step #12)
+			if options.Negotiated != nil {
+				channel.Negotiated = *options.Negotiated
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #13)
+			if options.ID != nil && channel.Negotiated {
+				channel.ID = options.ID
+			}
+
+			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #15)
+			if options.Priority != nil {
+				channel.Priority = *options.Priority
+			}
+		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
+		if len(channel.Protocol) > 65535 {
+			return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
+		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #14)
+		if channel.Negotiated && channel.ID == nil {
+			return nil, &rtcerr.TypeError{Err: ErrNegotiatedWithoutID}
+		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
+		if channel.MaxPacketLifeTime != nil && channel.MaxRetransmits != nil {
+			return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
+		}
+
+		// FIXME https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
+
+
+		// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
+		if *channel.ID > 65534 {
+			return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
+		}
+
+		if pc.sctpTransport.State == RTCSctpTransportStateConnected &&
+			*channel.ID >= *pc.sctpTransport.MaxChannels {
+			return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+		}
+	*/
+
+	d, err := newRTCDataChannel(params)
+	if err != nil {
+		return nil, err
 	}
 
 	// Remember datachannel
-	pc.dataChannels[*channel.ID] = &channel
+	pc.dataChannels[params.ID] = d
 
-	// Send opening message
-	// pc.networkManager.SendOpenChannelMessage(id, label)
+	// Open if networking already started
+	if pc.sctpTransport != nil {
+		err = d.open(pc.sctpTransport)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	return &channel, nil
+	return d, nil
 }
 
-func (pc *RTCPeerConnection) generateDataChannelID(client bool) (*uint16, error) {
+func (pc *RTCPeerConnection) generateDataChannelID(client bool) (uint16, error) {
 	var id uint16
 	if !client {
 		id++
 	}
 
-	for ; id < *pc.sctpTransport.MaxChannels-1; id += 2 {
+	max := sctpMaxChannels
+	if pc.sctpTransport != nil {
+		max = *pc.sctpTransport.MaxChannels
+	}
+
+	for ; id < max-1; id += 2 {
 		_, ok := pc.dataChannels[id]
 		if !ok {
-			return &id, nil
+			return id, nil
 		}
 	}
-	return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetMediaEngine allows overwriting the default media engine used by the RTCPeerConnection
@@ -1341,11 +1310,25 @@ func (pc *RTCPeerConnection) Close() error {
 	// Try closing everything and collect the errors
 	var closeErrs []error
 
+	// Shutdown strategy:
+	// 1. All Conn close by closing their underlying Conn.
+	// 2. A Mux stops this chain. It won't close the underlying
+	//    Conn if one of the endpoints is closed down. To
+	//    continue the chain the Mux has to be closed.
+
 	if pc.networkManager != nil {
 		if err := pc.networkManager.Close(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
+
+	if pc.sctpTransport != nil {
+		if err := pc.sctpTransport.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	// TODO: Close DTLS?
 
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
