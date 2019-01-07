@@ -10,13 +10,13 @@ import (
 	"github.com/pions/sctp"
 )
 
+const sctpMaxChannels = uint16(65535)
+
 // RTCSctpTransport provides details about the SCTP transport.
 type RTCSctpTransport struct {
 	lock sync.RWMutex
 
-	// Transport represents the transport over which all SCTP packets for data
-	// channels will be sent and received.
-	Transport *RTCDtlsTransport
+	dtlsTransport *RTCDtlsTransport
 
 	// State represents the current state of the SCTP transport.
 	State RTCSctpTransportState
@@ -33,9 +33,6 @@ type RTCSctpTransport struct {
 
 	// OnStateChange  func()
 
-	// dataChannels
-	// dataChannels map[uint16]*RTCDataChannel
-
 	association          *sctp.Association
 	onDataChannelHandler func(*RTCDataChannel)
 }
@@ -43,17 +40,25 @@ type RTCSctpTransport struct {
 // NewRTCSctpTransport creates a new RTCSctpTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCSctpTransport(transport *RTCDtlsTransport) *RTCSctpTransport {
+func NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
 	res := &RTCSctpTransport{
-		Transport: transport,
-		State:     RTCSctpTransportStateConnecting,
-		port:      5000, // TODO
+		dtlsTransport: dtls,
+		State:         RTCSctpTransportStateConnecting,
+		port:          5000, // TODO
 	}
 
 	res.updateMessageSize()
 	res.updateMaxChannels()
 
 	return res
+}
+
+// Transport returns the RTCDtlsTransport instance the RTCSctpTransport is sending over.
+func (r *RTCSctpTransport) Transport() *RTCDtlsTransport {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.dtlsTransport
 }
 
 // GetCapabilities returns the RTCSctpCapabilities of the RTCSctpTransport.
@@ -77,7 +82,7 @@ func (r *RTCSctpTransport) Start(remoteCaps RTCSctpCapabilities) error {
 		return err
 	}
 
-	sctpAssociation, err := sctp.Client(r.Transport.conn)
+	sctpAssociation, err := sctp.Client(r.dtlsTransport.conn)
 	if err != nil {
 		return err
 	}
@@ -88,9 +93,27 @@ func (r *RTCSctpTransport) Start(remoteCaps RTCSctpCapabilities) error {
 	return nil
 }
 
+// Stop stops the RTCSctpTransport
+func (r *RTCSctpTransport) Stop() error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.association == nil {
+		return nil
+	}
+	err := r.association.Close()
+	if err != nil {
+		return err
+	}
+
+	r.association = nil
+	r.State = RTCSctpTransportStateClosed
+
+	return nil
+}
+
 func (r *RTCSctpTransport) ensureDTLS() error {
-	if r.Transport == nil ||
-		r.Transport.conn == nil {
+	if r.dtlsTransport == nil ||
+		r.dtlsTransport.conn == nil {
 		return errors.New("DTLS not establisched")
 	}
 
@@ -98,8 +121,11 @@ func (r *RTCSctpTransport) ensureDTLS() error {
 }
 
 func (r *RTCSctpTransport) acceptDataChannels() {
+	r.lock.RLock()
+	a := r.association
+	r.lock.RUnlock()
 	for {
-		dc, err := datachannel.Accept(r.association)
+		dc, err := datachannel.Accept(a)
 		if err != nil {
 			fmt.Println("Failed to accept data channel:", err)
 			// TODO: Kill DataChannel/PeerConnection?
@@ -175,6 +201,6 @@ func (r *RTCSctpTransport) calcMessageSize(remoteMaxMessageSize, canSendSize flo
 }
 
 func (r *RTCSctpTransport) updateMaxChannels() {
-	val := uint16(65535)
-	r.MaxChannels = &val // TODO: Get from implementation
+	val := sctpMaxChannels
+	r.MaxChannels = &val
 }
