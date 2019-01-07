@@ -25,6 +25,6 @@ func (r RTCQuicRole) String() string {
 	case RTCQuicRoleServer:
 		return "server"
 	default:
-		return "Unknown Quic role"
+		return unknownStr
 	}
 }

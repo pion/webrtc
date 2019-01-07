@@ -11,7 +11,7 @@ func TestNewRTCRtpTransceiverDirection(t *testing.T) {
 		priorityString   string
 		expectedPriority RTCRtpTransceiverDirection
 	}{
-		{"unknown", RTCRtpTransceiverDirection(Unknown)},
+		{unknownStr, RTCRtpTransceiverDirection(Unknown)},
 		{"sendrecv", RTCRtpTransceiverDirectionSendrecv},
 		{"sendonly", RTCRtpTransceiverDirectionSendonly},
 		{"recvonly", RTCRtpTransceiverDirectionRecvonly},
@@ -32,7 +32,7 @@ func TestRTCRtpTransceiverDirection_String(t *testing.T) {
 		priority       RTCRtpTransceiverDirection
 		expectedString string
 	}{
-		{RTCRtpTransceiverDirection(Unknown), "unknown"},
+		{RTCRtpTransceiverDirection(Unknown), unknownStr},
 		{RTCRtpTransceiverDirectionSendrecv, "sendrecv"},
 		{RTCRtpTransceiverDirectionSendonly, "sendonly"},
 		{RTCRtpTransceiverDirectionRecvonly, "recvonly"},

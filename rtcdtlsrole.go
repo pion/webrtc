@@ -25,6 +25,6 @@ func (r RTCDtlsRole) String() string {
 	case RTCDtlsRoleServer:
 		return "server"
 	default:
-		return "Unknown DTLS role"
+		return unknownStr
 	}
 }

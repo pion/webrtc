@@ -12,7 +12,7 @@ func TestNewRTCIceProtocol(t *testing.T) {
 		shouldFail    bool
 		expectedProto RTCIceProtocol
 	}{
-		{"unknown", true, RTCIceProtocol(Unknown)},
+		{unknownStr, true, RTCIceProtocol(Unknown)},
 		{"udp", false, RTCIceProtocolUDP},
 		{"tcp", false, RTCIceProtocolTCP},
 	}
@@ -35,7 +35,7 @@ func TestRTCIceProtocol_String(t *testing.T) {
 		proto          RTCIceProtocol
 		expectedString string
 	}{
-		{RTCIceProtocol(Unknown), "unknown"},
+		{RTCIceProtocol(Unknown), unknownStr},
 		{RTCIceProtocolUDP, "udp"},
 		{RTCIceProtocolTCP, "tcp"},
 	}

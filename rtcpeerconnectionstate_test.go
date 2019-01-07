@@ -11,7 +11,7 @@ func TestNewRTCPeerConnectionState(t *testing.T) {
 		stateString   string
 		expectedState RTCPeerConnectionState
 	}{
-		{"unknown", RTCPeerConnectionState(Unknown)},
+		{unknownStr, RTCPeerConnectionState(Unknown)},
 		{"new", RTCPeerConnectionStateNew},
 		{"connecting", RTCPeerConnectionStateConnecting},
 		{"connected", RTCPeerConnectionStateConnected},
@@ -34,7 +34,7 @@ func TestRTCPeerConnectionState_String(t *testing.T) {
 		state          RTCPeerConnectionState
 		expectedString string
 	}{
-		{RTCPeerConnectionState(Unknown), "unknown"},
+		{RTCPeerConnectionState(Unknown), unknownStr},
 		{RTCPeerConnectionStateNew, "new"},
 		{RTCPeerConnectionStateConnecting, "connecting"},
 		{RTCPeerConnectionStateConnected, "connected"},

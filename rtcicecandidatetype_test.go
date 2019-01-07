@@ -12,7 +12,7 @@ func TestRTCIceCandidateType(t *testing.T) {
 		shouldFail   bool
 		expectedType RTCIceCandidateType
 	}{
-		{"unknown", true, RTCIceCandidateType(Unknown)},
+		{unknownStr, true, RTCIceCandidateType(Unknown)},
 		{"host", false, RTCIceCandidateTypeHost},
 		{"srflx", false, RTCIceCandidateTypeSrflx},
 		{"prflx", false, RTCIceCandidateTypePrflx},
@@ -37,7 +37,7 @@ func TestRTCIceCandidateType_String(t *testing.T) {
 		cType          RTCIceCandidateType
 		expectedString string
 	}{
-		{RTCIceCandidateType(Unknown), "unknown"},
+		{RTCIceCandidateType(Unknown), unknownStr},
 		{RTCIceCandidateTypeHost, "host"},
 		{RTCIceCandidateTypeSrflx, "srflx"},
 		{RTCIceCandidateTypePrflx, "prflx"},

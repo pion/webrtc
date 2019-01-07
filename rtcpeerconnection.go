@@ -29,6 +29,8 @@ var pcLog = logging.NewScopedLogger("pc")
 // comparisons when no value was defined.
 const Unknown = iota
 
+const unknownStr = "unknown"
+
 const receiveMTU = 8192
 
 // RTCPeerConnection represents a WebRTC connection that establishes a

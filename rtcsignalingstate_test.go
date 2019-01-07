@@ -13,7 +13,7 @@ func TestNewRTCSignalingState(t *testing.T) {
 		stateString   string
 		expectedState RTCSignalingState
 	}{
-		{"unknown", RTCSignalingState(Unknown)},
+		{unknownStr, RTCSignalingState(Unknown)},
 		{"stable", RTCSignalingStateStable},
 		{"have-local-offer", RTCSignalingStateHaveLocalOffer},
 		{"have-remote-offer", RTCSignalingStateHaveRemoteOffer},
@@ -36,7 +36,7 @@ func TestRTCSignalingState_String(t *testing.T) {
 		state          RTCSignalingState
 		expectedString string
 	}{
-		{RTCSignalingState(Unknown), "unknown"},
+		{RTCSignalingState(Unknown), unknownStr},
 		{RTCSignalingStateStable, "stable"},
 		{RTCSignalingStateHaveLocalOffer, "have-local-offer"},
 		{RTCSignalingStateHaveRemoteOffer, "have-remote-offer"},

@@ -11,7 +11,7 @@ func TestNewRTCSdpType(t *testing.T) {
 		sdpTypeString   string
 		expectedSdpType RTCSdpType
 	}{
-		{"unknown", RTCSdpType(Unknown)},
+		{unknownStr, RTCSdpType(Unknown)},
 		{"offer", RTCSdpTypeOffer},
 		{"pranswer", RTCSdpTypePranswer},
 		{"answer", RTCSdpTypeAnswer},
@@ -32,7 +32,7 @@ func TestRTCSdpType_String(t *testing.T) {
 		sdpType        RTCSdpType
 		expectedString string
 	}{
-		{RTCSdpType(Unknown), "unknown"},
+		{RTCSdpType(Unknown), unknownStr},
 		{RTCSdpTypeOffer, "offer"},
 		{RTCSdpTypePranswer, "pranswer"},
 		{RTCSdpTypeAnswer, "answer"},

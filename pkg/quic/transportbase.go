@@ -3,6 +3,7 @@ package quic
 import (
 	"crypto"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -109,4 +110,21 @@ func (b *TransportBase) acceptStreams() {
 		stream := &BidirectionalStream{s: s}
 		b.onBidirectionalStream(stream)
 	}
+}
+
+// Stop stops and closes the TransportBase.
+func (b *TransportBase) Stop(stopInfo TransportStopInfo) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.session == nil {
+		return nil
+	}
+
+	if stopInfo.ErrorCode > 0 ||
+		len(stopInfo.Reason) > 0 {
+		return b.session.CloseWithError(stopInfo.ErrorCode, errors.New(stopInfo.Reason))
+	}
+
+	return b.session.Close()
 }

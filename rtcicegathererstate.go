@@ -31,6 +31,6 @@ func (s RTCIceGathererState) String() string {
 	case RTCIceGathererStateClosed:
 		return "closed"
 	default:
-		return "Unknown state"
+		return unknownStr
 	}
 }

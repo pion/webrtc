@@ -11,7 +11,7 @@ func TestNewRTCBundlePolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy RTCBundlePolicy
 	}{
-		{"unknown", RTCBundlePolicy(Unknown)},
+		{unknownStr, RTCBundlePolicy(Unknown)},
 		{"balanced", RTCBundlePolicyBalanced},
 		{"max-compat", RTCBundlePolicyMaxCompat},
 		{"max-bundle", RTCBundlePolicyMaxBundle},
@@ -31,7 +31,7 @@ func TestRTCBundlePolicy_String(t *testing.T) {
 		policy         RTCBundlePolicy
 		expectedString string
 	}{
-		{RTCBundlePolicy(Unknown), "unknown"},
+		{RTCBundlePolicy(Unknown), unknownStr},
 		{RTCBundlePolicyBalanced, "balanced"},
 		{RTCBundlePolicyMaxCompat, "max-compat"},
 		{RTCBundlePolicyMaxBundle, "max-bundle"},

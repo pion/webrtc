@@ -11,7 +11,7 @@ func TestRTCIceComponent(t *testing.T) {
 		componentString   string
 		expectedComponent RTCIceComponent
 	}{
-		{"unknown", RTCIceComponent(Unknown)},
+		{unknownStr, RTCIceComponent(Unknown)},
 		{"rtp", RTCIceComponentRtp},
 		{"rtcp", RTCIceComponentRtcp},
 	}
@@ -30,7 +30,7 @@ func TestRTCIceComponent_String(t *testing.T) {
 		state          RTCIceComponent
 		expectedString string
 	}{
-		{RTCIceComponent(Unknown), "unknown"},
+		{RTCIceComponent(Unknown), unknownStr},
 		{RTCIceComponentRtp, "rtp"},
 		{RTCIceComponentRtcp, "rtcp"},
 	}

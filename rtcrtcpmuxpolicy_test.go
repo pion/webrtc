@@ -11,7 +11,7 @@ func TestNewRTCRtcpMuxPolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy RTCRtcpMuxPolicy
 	}{
-		{"unknown", RTCRtcpMuxPolicy(Unknown)},
+		{unknownStr, RTCRtcpMuxPolicy(Unknown)},
 		{"negotiate", RTCRtcpMuxPolicyNegotiate},
 		{"require", RTCRtcpMuxPolicyRequire},
 	}
@@ -30,7 +30,7 @@ func TestRTCRtcpMuxPolicy_String(t *testing.T) {
 		policy         RTCRtcpMuxPolicy
 		expectedString string
 	}{
-		{RTCRtcpMuxPolicy(Unknown), "unknown"},
+		{RTCRtcpMuxPolicy(Unknown), unknownStr},
 		{RTCRtcpMuxPolicyNegotiate, "negotiate"},
 		{RTCRtcpMuxPolicyRequire, "require"},
 	}
