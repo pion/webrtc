@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Certificate *x509.Certificate
 	PrivateKey  crypto.PrivateKey
+	SkipVerify  bool
 }
 
 var quicConfig = &quic.Config{
@@ -39,6 +40,16 @@ func Client(conn net.Conn, config *Config) (*Session, error) {
 	return &Session{s: s}, nil
 }
 
+// Dial dials the address over quic
+func Dial(addr string, config *Config) (*Session, error) {
+	tlscfg := getTLSConfig(config)
+	s, err := quic.DialAddr(addr, tlscfg, quicConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &Session{s: s}, nil
+}
+
 // Server creates a listener for listens for incoming QUIC sessions
 func Server(conn net.Conn, config *Config) (*Listener, error) {
 	tlscfg := getTLSConfig(config)
@@ -49,10 +60,20 @@ func Server(conn net.Conn, config *Config) (*Listener, error) {
 	return &Listener{l: l}, nil
 }
 
+// Listen listens on the address over quic
+func Listen(addr string, config *Config) (*Listener, error) {
+	tlscfg := getTLSConfig(config)
+	l, err := quic.ListenAddr(addr, tlscfg, quicConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &Listener{l: l}, nil
+}
+
 func getTLSConfig(config *Config) *tls.Config {
 	/* #nosec G402 */
 	return &tls.Config{
-		InsecureSkipVerify: true, // Using self signed certificates; WebRTC will check the fingerprint
+		InsecureSkipVerify: config.SkipVerify,
 		ClientAuth:         tls.RequireAnyClientCert,
 		Certificates: []tls.Certificate{{
 			Certificate: [][]byte{config.Certificate.Raw},

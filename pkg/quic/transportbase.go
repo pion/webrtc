@@ -32,25 +32,32 @@ type Config struct {
 // webrtc.RTCQuicTransport to setup a Quic connection.
 func (b *TransportBase) StartBase(conn net.Conn, config *Config) error {
 	cfg := config.clone()
+	cfg.SkipVerify = true // Using self signed certificates; WebRTC will check the fingerprint
+
+	var s *wrapper.Session
+	var err error
 	if config.Client {
 		// Assumes the peer offered to be passive and we accepted.
-		s, err := wrapper.Client(conn, cfg)
-		if err != nil {
-			return err
-		}
-		b.session = s
+		s, err = wrapper.Client(conn, cfg)
 	} else {
 		// Assumes we offer to be passive and this is accepted.
-		l, err := wrapper.Server(conn, cfg)
+		var l *wrapper.Listener
+		l, err = wrapper.Server(conn, cfg)
 		if err != nil {
 			return err
 		}
-		s, err := l.Accept()
-		if err != nil {
-			return err
-		}
-		b.session = s
+		s, err = l.Accept()
 	}
+
+	if err != nil {
+		return err
+	}
+
+	return b.startBase(s)
+}
+
+func (b *TransportBase) startBase(s *wrapper.Session) error {
+	b.session = s
 
 	go b.acceptStreams()
 
