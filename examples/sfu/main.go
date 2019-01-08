@@ -1,20 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"bufio"
-	"encoding/base64"
-
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/media/samplebuilder"
 	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp/codecs"
+	"github.com/pions/webrtc/pkg/rtp"
 )
 
 var peerConnectionConfig = webrtc.RTCConfiguration{
@@ -25,21 +21,12 @@ var peerConnectionConfig = webrtc.RTCConfiguration{
 	},
 }
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func mustReadStdin(reader *bufio.Reader) string {
 	rawSd, err := reader.ReadString('\n')
-	check(err)
-
+	util.Check(err)
 	fmt.Println("")
-	sd, err := base64.StdEncoding.DecodeString(rawSd)
-	check(err)
 
-	return string(sd)
+	return rawSd
 }
 
 const (
@@ -60,15 +47,18 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.New(peerConnectionConfig)
-	check(err)
+	util.Check(err)
 
-	outboundSamples := []chan<- media.RTCSample{}
-	var outboundSamplesLock sync.RWMutex
+	inboundSSRC := make(chan uint32)
+	inboundPayloadType := make(chan uint8)
+
+	outboundRTP := []chan<- *rtp.Packet{}
+	var outboundRTPLock sync.RWMutex
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
 	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
+		// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
@@ -78,59 +68,66 @@ func main() {
 			}
 		}()
 
-		// Transform RTP packets into samples, allowing us to distribute incoming packets from the publisher to everyone who has joined the broadcast
-		builder := samplebuilder.New(256, &codecs.VP8Packet{})
+		inboundSSRC <- track.Ssrc
+		inboundPayloadType <- track.PayloadType
+
 		for {
-			outboundSamplesLock.RLock()
-			builder.Push(<-track.Packets)
-			for s := builder.Pop(); s != nil; s = builder.Pop() {
-				for _, outChan := range outboundSamples {
-					outChan <- *s
+			rtpPacket := <-track.Packets
+
+			outboundRTPLock.RLock()
+			for _, outChan := range outboundRTP {
+				outPacket := rtpPacket
+				outPacket.Payload = append([]byte{}, outPacket.Payload...)
+				select {
+				case outChan <- outPacket:
+				default:
 				}
 			}
-			outboundSamplesLock.RUnlock()
+			outboundRTPLock.RUnlock()
 		}
 	})
 
 	// Set the remote SessionDescription
-	check(peerConnection.SetRemoteDescription(offer))
+	util.Check(peerConnection.SetRemoteDescription(offer))
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	answer, err := peerConnection.CreateAnswer(nil)
-	check(err)
+	util.Check(err)
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
 	fmt.Println(util.Encode(answer))
 
+	outboundSsrc := <-inboundSSRC
+	outboundPayloadType := <-inboundPayloadType
 	for {
 		fmt.Println("")
-		fmt.Println("Paste an SDP to start sendonly peer connection")
+		fmt.Println("Paste an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.RTCSessionDescription{}
 		util.Decode(mustReadStdin(reader), &recvOnlyOffer)
 
 		// Create a new RTCPeerConnection
 		peerConnection, err := webrtc.New(peerConnectionConfig)
-		check(err)
+		util.Check(err)
 
 		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
-		check(err)
+		vp8Track, err := peerConnection.NewRawRTPTrack(outboundPayloadType, outboundSsrc, "video", "pion")
+		util.Check(err)
 
 		_, err = peerConnection.AddTrack(vp8Track)
-		check(err)
+		util.Check(err)
 
-		outboundSamplesLock.Lock()
-		outboundSamples = append(outboundSamples, vp8Track.Samples)
-		outboundSamplesLock.Unlock()
+		outboundRTPLock.Lock()
+		outboundRTP = append(outboundRTP, vp8Track.RawRTP)
+		outboundRTPLock.Unlock()
 
 		// Set the remote SessionDescription
 		err = peerConnection.SetRemoteDescription(recvOnlyOffer)
-		check(err)
+		util.Check(err)
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		answer, err := peerConnection.CreateAnswer(nil)
-		check(err)
+		util.Check(err)
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser
 		fmt.Println(util.Encode(answer))
