@@ -11,6 +11,8 @@ import (
 // in rtcpeerconnection_test.go are leaky, making the goroutine report useless.
 
 func TestRTCPeerConnection_Close(t *testing.T) {
+	api := NewAPI()
+
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -18,7 +20,7 @@ func TestRTCPeerConnection_Close(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, pcAnswer, err := newPair()
+	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)
 	}

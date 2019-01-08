@@ -10,14 +10,20 @@ func TestSettingEngine(t *testing.T) {
 
 	if (api.settingEngine.EphemeralUDP.PortMin != 0) ||
 		(api.settingEngine.EphemeralUDP.PortMax != 0) ||
-		(api.settingEngine.Detach.DataChannels) ||
 		(api.settingEngine.Timeout.ICEConnection != nil) ||
 		(api.settingEngine.Timeout.ICEKeepalive != nil) {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
+	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
+	_, err := dc.Detach()
+
+	if err == nil {
+		t.Fatalf("Should not be able to detach data channels before calling DetachDataChannels()")
+	}
+
 	//set bad ephemeral ports
-	err := api.settingEngine.SetEphemeralUDPPortRange(3000, 2999)
+	err = api.settingEngine.SetEphemeralUDPPortRange(3000, 2999)
 	if err == nil {
 		t.Fatalf("Setting engine should fail bad ephemeral ports.")
 	}
@@ -35,8 +41,11 @@ func TestSettingEngine(t *testing.T) {
 
 	api.settingEngine.DetachDataChannels()
 
-	if !api.settingEngine.Detach.DataChannels {
-		t.Fatalf("Datachannels didn't detach when requested")
+	dc = &RTCDataChannel{settingEngine: &api.settingEngine}
+	_, err = dc.Detach()
+
+	if err == nil {
+		t.Fatalf("Cannot detach data channels after calling DetachDataChannels()")
 	}
 
 	api.settingEngine.SetConnectionTimeout(5*time.Second, 1*time.Second)
