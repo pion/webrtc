@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/webrtc/pkg/datachannel"
+	sugar "github.com/pions/webrtc/pkg/datachannel"
+
+	"github.com/pions/transport/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +45,69 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
+func TestRTCDataChannel_Send(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	offerPC, answerPC, err := api.newPair()
+
+	if err != nil {
+		t.Fatalf("Failed to create a PC pair for testing")
+	}
+
+	done := make(chan bool)
+
+	dc, err := offerPC.CreateDataChannel("data", nil)
+
+	if err != nil {
+		t.Fatalf("Failed to create a PC pair for testing")
+	}
+
+	dc.OnOpen(func() {
+		e := dc.Send(sugar.PayloadString{Data: []byte("Ping")})
+		if e != nil {
+			t.Fatalf("Failed to send string on data channel")
+		}
+	})
+	dc.OnMessage(func(payload sugar.Payload) {
+		done <- true
+	})
+
+	answerPC.OnDataChannel(func(d *RTCDataChannel) {
+		d.OnMessage(func(payload sugar.Payload) {
+			e := d.Send(sugar.PayloadBinary{Data: []byte("Pong")})
+			if e != nil {
+				t.Fatalf("Failed to send string on data channel")
+			}
+		})
+	})
+
+	err = signalPair(offerPC, answerPC)
+
+	if err != nil {
+		t.Fatalf("Failed to signal our PC pair for testing")
+	}
+
+	select {
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Datachannel Send Test Timeout")
+	case <-done:
+		err = offerPC.Close()
+		if err != nil {
+			t.Fatalf("Failed to close offer PC")
+		}
+		err = answerPC.Close()
+		if err != nil {
+			t.Fatalf("Failed to close answer PC")
+		}
+	}
+}
+
 func TestRTCDataChannel_EventHandlers(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	api := NewAPI()
 	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
 
@@ -58,7 +122,7 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 		onOpenCalled <- true
 	})
 
-	dc.OnMessage(func(p datachannel.Payload) {
+	dc.OnMessage(func(p sugar.Payload) {
 		go func() {
 			onMessageCalled <- true
 		}()
@@ -69,7 +133,7 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { dc.onOpen() })
-	assert.NotPanics(t, func() { dc.onMessage(&datachannel.PayloadString{Data: []byte("o hai")}) })
+	assert.NotPanics(t, func() { dc.onMessage(&sugar.PayloadString{Data: []byte("o hai")}) })
 
 	allTrue := func(vals []bool) bool {
 		for _, val := range vals {
@@ -87,12 +151,15 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 }
 
 func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	api := NewAPI()
 	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
 
 	max := 512
 	out := make(chan int)
-	inner := func(p datachannel.Payload) {
+	inner := func(p sugar.Payload) {
 		// randomly sleep
 		// NB: The big.Int/crypto.Rand is overkill but makes the linter happy
 		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
@@ -101,12 +168,12 @@ func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
 		}
 		time.Sleep(time.Duration(randInt.Int64()) * time.Microsecond)
 		switch p := p.(type) {
-		case *datachannel.PayloadBinary:
+		case *sugar.PayloadBinary:
 			s, _ := binary.Varint(p.Data)
 			out <- int(s)
 		}
 	}
-	dc.OnMessage(func(p datachannel.Payload) {
+	dc.OnMessage(func(p sugar.Payload) {
 		inner(p)
 	})
 
@@ -114,11 +181,11 @@ func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
 		for i := 1; i <= max; i++ {
 			buf := make([]byte, 8)
 			binary.PutVarint(buf, int64(i))
-			dc.onMessage(&datachannel.PayloadBinary{Data: buf})
+			dc.onMessage(&sugar.PayloadBinary{Data: buf})
 			// Change the registered handler a couple of times to make sure
 			// that everything continues to work, we don't lose messages, etc.
 			if i%2 == 0 {
-				hdlr := func(p datachannel.Payload) {
+				hdlr := func(p sugar.Payload) {
 					inner(p)
 				}
 				dc.OnMessage(hdlr)
