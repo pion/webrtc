@@ -831,15 +831,6 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			pcLog.Warnf("Failed to start manager: %s", err)
 		}
 
-		// Start sctp
-		err = pc.sctpTransport.Start(RTCSctpCapabilities{
-			MaxMessageSize: 0,
-		})
-		if err != nil {
-			// TODO: Handle error
-			pcLog.Warnf("Failed to start manager: %s", err)
-		}
-
 		err = pc.networkManager.Start(pc.iceTransport.mux, pc.dtlsTransport.conn, weOffer)
 		if err != nil {
 			// TODO: Handle error
@@ -849,6 +840,15 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		// Temporary SRTP glue
 		go pc.acceptSRTP()
 		go pc.acceptSRTCP()
+
+		// Start sctp
+		err = pc.sctpTransport.Start(RTCSctpCapabilities{
+			MaxMessageSize: 0,
+		})
+		if err != nil {
+			// TODO: Handle error
+			pcLog.Warnf("Failed to start manager: %s", err)
+		}
 
 		// Open data channels that where created before signaling
 		pc.openDataChannels()
