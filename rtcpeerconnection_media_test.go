@@ -11,14 +11,15 @@ import (
 )
 
 func TestRTCPeerConnection_Media_Sample(t *testing.T) {
+	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
 	defer report()
 
-	RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := newPair()
+	api.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)
 	}
