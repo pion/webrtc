@@ -80,29 +80,33 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 	}
 	t.role = *role
 
-	switch t.role {
+	// Drop the lock here to allow trickle-ICE candidates to be
+	// added so that the agent can complete a connection
+	t.lock.Unlock()
+
+	var iceConn *ice.Conn
+	switch *role {
 	case RTCIceRoleControlling:
-		iceConn, err := agent.Dial(context.TODO(),
+		iceConn, err = agent.Dial(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
-		if err != nil {
-			return err
-		}
-		t.conn = iceConn
 
 	case RTCIceRoleControlled:
-		iceConn, err := agent.Accept(context.TODO(),
+		iceConn, err = agent.Accept(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
-		if err != nil {
-			return err
-		}
-		t.conn = iceConn
 
 	default:
-		return errors.New("Unknown ICE Role")
+		err = errors.New("Unknown ICE Role")
 	}
 
+	// Reacquire the lock to set the connection/mux
+	t.lock.Lock()
+	if err != nil {
+		return err
+	}
+
+	t.conn = iceConn
 	t.mux = mux.NewMux(t.conn, receiveMTU)
 
 	return nil
@@ -111,7 +115,13 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 // Stop irreversibly stops the RTCIceTransport.
 func (t *RTCIceTransport) Stop() error {
 	// Close the Mux. This closes the Mux and the underlying ICE conn.
-	return t.mux.Close()
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if t.mux != nil {
+		return t.mux.Close()
+	}
+	return errors.New("No Mux configured for transport; nothing to close")
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE

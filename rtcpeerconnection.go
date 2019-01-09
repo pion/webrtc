@@ -819,6 +819,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		if err != nil {
 			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
+			return
 		}
 
 		// Start the dtls transport
@@ -829,12 +830,14 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		if err != nil {
 			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
+			return
 		}
 
 		err = pc.networkManager.Start(pc.iceTransport.mux, pc.dtlsTransport.conn, weOffer)
 		if err != nil {
 			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
+			return
 		}
 
 		// Temporary SRTP glue
@@ -848,6 +851,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		if err != nil {
 			// TODO: Handle error
 			pcLog.Warnf("Failed to start manager: %s", err)
+			return
 		}
 
 		// Open data channels that where created before signaling
