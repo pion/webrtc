@@ -1,6 +1,9 @@
 package webrtc
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // RTCIceProtocol indicates the transport protocol type that is used in the
 // ice.URL structure.
@@ -21,10 +24,10 @@ const (
 )
 
 func newRTCIceProtocol(raw string) (RTCIceProtocol, error) {
-	switch raw {
-	case rtcIceProtocolUDPStr:
+	switch {
+	case strings.EqualFold(rtcIceProtocolUDPStr, raw):
 		return RTCIceProtocolUDP, nil
-	case rtcIceProtocolTCPStr:
+	case strings.EqualFold(rtcIceProtocolTCPStr, raw):
 		return RTCIceProtocolTCP, nil
 	default:
 		return RTCIceProtocol(Unknown), fmt.Errorf("unknown protocol: %s", raw)

@@ -15,6 +15,8 @@ func TestNewRTCIceProtocol(t *testing.T) {
 		{unknownStr, true, RTCIceProtocol(Unknown)},
 		{"udp", false, RTCIceProtocolUDP},
 		{"tcp", false, RTCIceProtocolTCP},
+		{"UDP", false, RTCIceProtocolUDP},
+		{"TCP", false, RTCIceProtocolTCP},
 	}
 
 	for i, testCase := range testCases {
