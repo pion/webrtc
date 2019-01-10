@@ -1,6 +1,10 @@
 package rtcp
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/pions/webrtc/pkg/ntp"
+)
 
 // A ReceptionReport block conveys statistics on the reception of RTP packets
 // from a single synchronization source.
@@ -27,7 +31,7 @@ type ReceptionReport struct {
 	// The middle 32 bits out of 64 in the NTP timestamp received as part of
 	// the most recent RTCP sender report (SR) packet from source SSRC. If no
 	// SR has been received yet, the field is set to zero.
-	LastSenderReport uint32
+	LastSenderReport ntp.Time32
 	// The delay, expressed in units of 1/65536 seconds, between receiving the
 	// last SR packet from source SSRC and sending this reception report block.
 	// If no SR packet has been received yet from SSRC, the field is set to zero.
@@ -81,7 +85,7 @@ func (r ReceptionReport) Marshal() ([]byte, error) {
 
 	binary.BigEndian.PutUint32(rawPacket[lastSeqOffset:], r.LastSequenceNumber)
 	binary.BigEndian.PutUint32(rawPacket[jitterOffset:], r.Jitter)
-	binary.BigEndian.PutUint32(rawPacket[lastSROffset:], r.LastSenderReport)
+	binary.BigEndian.PutUint32(rawPacket[lastSROffset:], uint32(r.LastSenderReport))
 	binary.BigEndian.PutUint32(rawPacket[delayOffset:], r.Delay)
 
 	return rawPacket, nil
@@ -119,7 +123,7 @@ func (r *ReceptionReport) Unmarshal(rawPacket []byte) error {
 
 	r.LastSequenceNumber = binary.BigEndian.Uint32(rawPacket[lastSeqOffset:])
 	r.Jitter = binary.BigEndian.Uint32(rawPacket[jitterOffset:])
-	r.LastSenderReport = binary.BigEndian.Uint32(rawPacket[lastSROffset:])
+	r.LastSenderReport = ntp.Time32(binary.BigEndian.Uint32(rawPacket[lastSROffset:]))
 	r.Delay = binary.BigEndian.Uint32(rawPacket[delayOffset:])
 
 	return nil

@@ -3,6 +3,8 @@ package rtp
 import (
 	"math/rand"
 	"time"
+
+	"github.com/pions/webrtc/pkg/ntp"
 )
 
 // Payloader payloads a byte array for use as rtp.Packet payloads
@@ -12,7 +14,7 @@ type Payloader interface {
 
 // Packetizer packetizes a payload
 type Packetizer interface {
-	Packetize(payload []byte, samples uint32) []*Packet
+	Packetize(payload []byte, duration ntp.Time32) []*Packet
 }
 
 type packetizer struct {
@@ -21,7 +23,7 @@ type packetizer struct {
 	SSRC        uint32
 	Payloader   Payloader
 	Sequencer   Sequencer
-	Timestamp   uint32
+	Timestamp   ntp.Time32
 	ClockRate   uint32
 }
 
@@ -36,13 +38,13 @@ func NewPacketizer(mtu int, pt uint8, ssrc uint32, payloader Payloader, sequence
 		SSRC:        ssrc,
 		Payloader:   payloader,
 		Sequencer:   sequencer,
-		Timestamp:   r.Uint32(),
+		Timestamp:   ntp.Time32(r.Uint32()),
 		ClockRate:   clockRate,
 	}
 }
 
 // Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
-func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
+func (p *packetizer) Packetize(payload []byte, duration ntp.Time32) []*Packet {
 	// Guard against an empty payload
 	if len(payload) == 0 {
 		return nil
@@ -64,7 +66,8 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 			Payload:        pp,
 		}
 	}
-	p.Timestamp += samples
+
+	p.Timestamp += duration
 
 	return packets
 }

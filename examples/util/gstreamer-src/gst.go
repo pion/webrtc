@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"sync"
 	"unsafe"
+	"time"
 
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/media"
@@ -87,13 +88,7 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 	defer pipelinesLock.Unlock()
 
 	if pipeline, ok := pipelines[int(pipelineID)]; ok {
-		var samples uint32
-		if pipeline.codecName == webrtc.Opus {
-			samples = uint32(audioClockRate * (float32(duration) / 1000000000))
-		} else {
-			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
-		}
-		pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}
+		pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Duration: time.Duration(duration)}
 	} else {
 		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineID))
 	}

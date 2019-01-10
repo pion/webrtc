@@ -75,7 +75,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			vp8Track.Samples <- media.RTCSample{Data: []byte{0x00}, Samples: 1}
+			vp8Track.Samples <- media.RTCSample{Data: []byte{0x00}, Duration: time.Millisecond}
 
 			select {
 			case <-awaitRTPRecv:

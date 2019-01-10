@@ -1,6 +1,10 @@
 package rtcp
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/pions/webrtc/pkg/ntp"
+)
 
 // A SenderReport (SR) packet provides reception quality feedback for an RTP stream
 type SenderReport struct {
@@ -9,14 +13,14 @@ type SenderReport struct {
 	// The wallclock time when this report was sent so that it may be used in
 	// combination with timestamps returned in reception reports from other
 	// receivers to measure round-trip propagation to those receivers.
-	NTPTime uint64
+	NTPTime ntp.Time64
 	// Corresponds to the same time as the NTP timestamp (above), but in
 	// the same units and with the same random offset as the RTP
 	// timestamps in data packets. This correspondence may be used for
 	// intra- and inter-media synchronization for sources whose NTP
 	// timestamps are synchronized, and may be used by media-independent
 	// receivers to estimate the nominal RTP clock frequency.
-	RTPTime uint32
+	RTPTime ntp.Time32
 	// The total number of RTP data packets transmitted by the sender
 	// since starting transmission up until the time this SR packet was
 	// generated.
@@ -91,8 +95,8 @@ func (r SenderReport) Marshal() ([]byte, error) {
 	packetBody := rawPacket[headerLength:]
 
 	binary.BigEndian.PutUint32(packetBody[srSSRCOffset:], r.SSRC)
-	binary.BigEndian.PutUint64(packetBody[srNTPOffset:], r.NTPTime)
-	binary.BigEndian.PutUint32(packetBody[srRTPOffset:], r.RTPTime)
+	binary.BigEndian.PutUint64(packetBody[srNTPOffset:], uint64(r.NTPTime))
+	binary.BigEndian.PutUint32(packetBody[srRTPOffset:], uint32(r.RTPTime))
 	binary.BigEndian.PutUint32(packetBody[srPacketCountOffset:], r.PacketCount)
 	binary.BigEndian.PutUint32(packetBody[srOctetCountOffset:], r.OctetCount)
 
@@ -174,8 +178,8 @@ func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 	packetBody := rawPacket[headerLength:]
 
 	r.SSRC = binary.BigEndian.Uint32(packetBody[srSSRCOffset:])
-	r.NTPTime = binary.BigEndian.Uint64(packetBody[srNTPOffset:])
-	r.RTPTime = binary.BigEndian.Uint32(packetBody[srRTPOffset:])
+	r.NTPTime = ntp.Time64(binary.BigEndian.Uint64(packetBody[srNTPOffset:]))
+	r.RTPTime = ntp.Time32(binary.BigEndian.Uint32(packetBody[srRTPOffset:]))
 	r.PacketCount = binary.BigEndian.Uint32(packetBody[srPacketCountOffset:])
 	r.OctetCount = binary.BigEndian.Uint32(packetBody[srOctetCountOffset:])
 

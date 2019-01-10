@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/pions/webrtc/pkg/ntp"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +19,7 @@ type Packet struct {
 	PayloadOffset    int
 	PayloadType      uint8
 	SequenceNumber   uint16
-	Timestamp        uint32
+	Timestamp        ntp.Time32
 	SSRC             uint32
 	CSRC             []uint32
 	ExtensionProfile uint16
@@ -93,7 +94,7 @@ func (p *Packet) Unmarshal(rawPacket []byte) error {
 	p.PayloadType = rawPacket[1] & ptMask
 
 	p.SequenceNumber = binary.BigEndian.Uint16(rawPacket[seqNumOffset : seqNumOffset+seqNumLength])
-	p.Timestamp = binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength])
+	p.Timestamp = ntp.Time32(binary.BigEndian.Uint32(rawPacket[timestampOffset : timestampOffset+timestampLength]))
 	p.SSRC = binary.BigEndian.Uint32(rawPacket[ssrcOffset : ssrcOffset+ssrcLength])
 
 	currOffset := csrcOffset + (len(p.CSRC) * csrcLength)
@@ -169,7 +170,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 	rawPacket[1] |= p.PayloadType
 
 	binary.BigEndian.PutUint16(rawPacket[seqNumOffset:], p.SequenceNumber)
-	binary.BigEndian.PutUint32(rawPacket[timestampOffset:], p.Timestamp)
+	binary.BigEndian.PutUint32(rawPacket[timestampOffset:], uint32(p.Timestamp))
 	binary.BigEndian.PutUint32(rawPacket[ssrcOffset:], p.SSRC)
 
 	for i, csrc := range p.CSRC {

@@ -2,6 +2,7 @@ package samplebuilder
 
 import (
 	"github.com/pions/webrtc/pkg/media"
+	"github.com/pions/webrtc/pkg/ntp"
 	"github.com/pions/webrtc/pkg/rtp"
 )
 
@@ -21,7 +22,7 @@ type SampleBuilder struct {
 	// Last seqnum that has been successfully popped
 	hasPopped        bool
 	lastPopSeq       uint16
-	lastPopTimestamp uint32
+	lastPopTimestamp ntp.Time32
 }
 
 // New constructs a new SampleBuilder
@@ -50,14 +51,14 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
 				lastTimeStamp = s.buffer[firstBuffer-1].Timestamp
 			}
 
-			samples := s.buffer[i-1].Timestamp - lastTimeStamp
+			duration := (s.buffer[i-1].Timestamp - lastTimeStamp).Duration()
 			s.lastPopSeq = i - 1
 			s.hasPopped = true
 			s.lastPopTimestamp = s.buffer[i-1].Timestamp
 			for j := firstBuffer; j < i; j++ {
 				s.buffer[j] = nil
 			}
-			return &media.RTCSample{Data: data, Samples: samples}
+			return &media.RTCSample{Data: data, Duration: duration}
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i])

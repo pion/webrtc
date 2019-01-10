@@ -17,6 +17,7 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/media"
+	"github.com/pions/webrtc/pkg/ntp"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pions/webrtc/pkg/rtcp"
 	"github.com/pions/webrtc/pkg/rtp"
@@ -1566,7 +1567,11 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 				if !ok {
 					return
 				}
-				packets := packetizer.Packetize(in.Data, in.Samples)
+				dur, err := ntp.NewTime32(in.Duration)
+				if err != nil {
+					continue
+				}
+				packets := packetizer.Packetize(in.Data, dur)
 				for _, p := range packets {
 					pc.sendRTP(p)
 				}
