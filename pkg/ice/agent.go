@@ -373,7 +373,7 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 func (a *Agent) setValidPair(local, remote *Candidate, selected bool) {
 	// TODO: avoid duplicates
 	p := newCandidatePair(local, remote)
-	iceLog.Debugf("Found valid candidate pair: %s <-> %s (selected? %t)", local, remote, selected)
+	iceLog.Tracef("Found valid candidate pair: %s <-> %s (selected? %t)", local, remote, selected)
 
 	if selected {
 		a.selectedPair = p
@@ -617,7 +617,7 @@ func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteC
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	_, usepair := m.GetOneAttribute(stun.AttrUseCandidate)
-	iceLog.Debugf("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
+	iceLog.Tracef("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
 	// Remember the working pair and select it when marked with usepair
 	a.setValidPair(localCandidate, remoteCandidate, usepair)
 
