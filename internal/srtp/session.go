@@ -158,7 +158,7 @@ func (s *SessionSRTCP) write(buf []byte) (int, error) {
 	s.session.localContextMutex.Lock()
 	defer s.session.localContextMutex.Unlock()
 
-	encrypted, err := s.localContext.EncryptRTCP(buf)
+	encrypted, err := s.localContext.EncryptRTCP(nil, buf, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -166,7 +166,7 @@ func (s *SessionSRTCP) write(buf []byte) (int, error) {
 }
 
 func (s *SessionSRTCP) decrypt(buf []byte) error {
-	decrypted, err := s.remoteContext.DecryptRTCP(buf)
+	decrypted, err := s.remoteContext.DecryptRTCP(nil, buf, nil)
 	if err != nil {
 		return err
 	}

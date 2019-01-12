@@ -3,7 +3,7 @@ package srtp
 import "bytes"
 
 // Check if buffers match, if not allocate a new buffer and return it
-func allocateIsMismatch(dst, src []byte) []byte {
+func allocateIfMismatch(dst, src []byte) []byte {
 	if dst == nil {
 		dst = make([]byte, len(src))
 		copy(dst, src)

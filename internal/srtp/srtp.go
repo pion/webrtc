@@ -9,7 +9,7 @@ import (
 )
 
 func (c *Context) decryptRTP(dst, encrypted []byte, header *rtp.Header) ([]byte, error) {
-	dst = allocateIsMismatch(dst, encrypted)
+	dst = allocateIfMismatch(dst, encrypted)
 
 	s := c.getSSRCState(header.SSRC)
 	c.updateRolloverCount(header.SequenceNumber, s)
@@ -45,7 +45,7 @@ func (c *Context) DecryptRTP(dst, encrypted []byte, header *rtp.Header) ([]byte,
 }
 
 func (c *Context) encryptRTP(dst, decrypted []byte, header *rtp.Header) ([]byte, error) {
-	dst = allocateIsMismatch(dst, decrypted)
+	dst = allocateIfMismatch(dst, decrypted)
 
 	s := c.getSSRCState(header.SSRC)
 

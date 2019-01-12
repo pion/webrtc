@@ -3,19 +3,22 @@ package srtp
 import (
 	"crypto/cipher"
 	"encoding/binary"
+
+	"github.com/pions/webrtc/pkg/rtcp"
 )
 
-// DecryptRTCP decrypts a buffer that contains a RTCP packet
-func (c *Context) DecryptRTCP(encrypted []byte) ([]byte, error) {
+func (c *Context) decryptRTCP(dst, encrypted []byte, header *rtcp.Header) ([]byte, error) {
+	out := allocateIfMismatch(dst, encrypted)
+
 	tailOffset := len(encrypted) - (authTagSize + srtcpIndexSize)
-	out := append([]byte{}, encrypted[0:tailOffset]...)
+	out = out[0:tailOffset]
 
 	isEncrypted := encrypted[tailOffset] >> 7
 	if isEncrypted == 0 {
 		return out, nil
 	}
 
-	srtcpIndexBuffer := append([]byte{}, encrypted[tailOffset:tailOffset+srtcpIndexSize]...)
+	srtcpIndexBuffer := out[tailOffset : tailOffset+srtcpIndexSize]
 	srtcpIndexBuffer[0] &= 0x7f // unset Encryption bit
 
 	index := binary.BigEndian.Uint32(srtcpIndexBuffer)
@@ -27,10 +30,22 @@ func (c *Context) DecryptRTCP(encrypted []byte) ([]byte, error) {
 	return out, nil
 }
 
-// EncryptRTCP encrypts a buffer that contains a RTCP packet
-func (c *Context) EncryptRTCP(decrypted []byte) ([]byte, error) {
-	out := append([]byte{}, decrypted[:]...)
-	ssrc := binary.BigEndian.Uint32(decrypted[4:])
+// DecryptRTCP decrypts a buffer that contains a RTCP packet
+func (c *Context) DecryptRTCP(dst, encrypted []byte, header *rtcp.Header) ([]byte, error) {
+	if header == nil {
+		header = &rtcp.Header{}
+	}
+
+	if err := header.Unmarshal(encrypted); err != nil {
+		return nil, err
+	}
+
+	return c.decryptRTCP(dst, encrypted, header)
+}
+
+func (c *Context) encryptRTCP(dst, decrypted []byte, header *rtcp.Header) ([]byte, error) {
+	out := allocateIfMismatch(dst, decrypted)
+	ssrc := binary.BigEndian.Uint32(out[4:])
 
 	// We roll over early because MSB is used for marking as encrypted
 	c.srtcpIndex++
@@ -52,4 +67,17 @@ func (c *Context) EncryptRTCP(decrypted []byte) ([]byte, error) {
 		return nil, err
 	}
 	return append(out, authTag...), nil
+}
+
+// EncryptRTCP Encrypts a RTCP packet
+func (c *Context) EncryptRTCP(dst, decrypted []byte, header *rtcp.Header) ([]byte, error) {
+	if header == nil {
+		header = &rtcp.Header{}
+	}
+
+	if err := header.Unmarshal(decrypted); err != nil {
+		return nil, err
+	}
+
+	return c.encryptRTCP(dst, decrypted, header)
 }
