@@ -354,6 +354,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 		return
 	}
 
+	iceLog.Tracef("ping STUN from %s to %s\n", local.String(), remote.String())
 	a.sendSTUN(msg, local, remote)
 }
 
@@ -646,22 +647,60 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 
 // handleInbound processes traffic from a remote candidate
 func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
+	iceLog.Tracef("inbound STUN from %s to %s", remote.String(), local.String())
 	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
 	if remoteCandidate == nil {
-		iceLog.Debugf("Could not find remote candidate for %s ", remote)
-		return
-	}
+		//iceLog.Debugf("Could not find remote candidate for %s ", remote)
+		iceLog.Debugf("detected a new peer-reflexive candiate: %s ", remote)
+		var ip net.IP
+		var port int
 
-	remoteCandidate.seen(false)
+		switch addr := remote.(type) {
+		case *net.UDPAddr:
+			ip = addr.IP
+			port = addr.Port
+		case *net.TCPAddr:
+			ip = addr.IP
+			port = addr.Port
+		default:
+			iceLog.Warnf("unsupported address type %T", addr)
+		}
 
-	if m.Class == stun.ClassIndication {
-		return
-	}
+		if ip != nil {
+			pflxCandidate, err := NewCandidatePeerReflexive(
+				local.NetworkType.String(), // assume, same as that of local
+				ip,
+				port,
+				"", // unknown at this moment. TODO: need a review
+				0,  // unknown at this moment. TODO: need a review
+			)
 
-	if a.isControlling {
-		a.handleInboundControlling(m, local, remoteCandidate)
+			if err == nil {
+				// Add pflxCandidate to the remote candidate list
+				// TODO: review if this wouldn't cause any race
+				networkType := pflxCandidate.NetworkType
+				set := a.remoteCandidates[networkType]
+				set = append(set, pflxCandidate)
+				a.remoteCandidates[networkType] = set
+
+			} else {
+				iceLog.Warnf("failed to create peer-reflexive candidate: %v", remote)
+			}
+		} else {
+			iceLog.Warnf("invalid remote address %v", remote)
+		}
 	} else {
-		a.handleInboundControlled(m, local, remoteCandidate)
+		remoteCandidate.seen(false)
+
+		if m.Class == stun.ClassIndication {
+			return
+		}
+
+		if a.isControlling {
+			a.handleInboundControlling(m, local, remoteCandidate)
+		} else {
+			a.handleInboundControlled(m, local, remoteCandidate)
+		}
 	}
 
 }
