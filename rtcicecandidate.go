@@ -114,6 +114,9 @@ func (c RTCIceCandidate) toICE() (*ice.Candidate, error) {
 		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port),
 			c.RelatedAddress, int(c.RelatedPort))
 
+	case RTCIceCandidateTypePrflx:
+		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port),
+			c.RelatedAddress, int(c.RelatedPort))
 	default:
 		return nil, fmt.Errorf("Unknown candidate type: %s", c.Typ)
 	}
@@ -125,8 +128,8 @@ func convertTypeFromICE(t ice.CandidateType) (RTCIceCandidateType, error) {
 		return RTCIceCandidateTypeHost, nil
 	case ice.CandidateTypeServerReflexive:
 		return RTCIceCandidateTypeSrflx, nil
-		// case ice.CandidateTypePeerReflexive:
-		// 	return RTCIceCandidateTypePrflx, nil
+	case ice.CandidateTypePeerReflexive:
+		return RTCIceCandidateTypePrflx, nil
 		// case ice.CandidateTypeRelay:
 		// 	return RTCIceCandidateTypeRelay, nil
 	default:

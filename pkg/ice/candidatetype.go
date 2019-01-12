@@ -7,7 +7,7 @@ type CandidateType byte
 const (
 	CandidateTypeHost CandidateType = iota + 1
 	CandidateTypeServerReflexive
-	// CandidateTypePeerReflexive // TODO
+	CandidateTypePeerReflexive
 	// CandidateTypeRelay // TODO
 )
 
@@ -18,8 +18,8 @@ func (c CandidateType) String() string {
 		return "host"
 	case CandidateTypeServerReflexive:
 		return "srflx"
-		// case CandidateTypePeerReflexive:
-		// 	return "prflx"
+	case CandidateTypePeerReflexive:
+		return "prflx"
 		// case CandidateTypeRelay:
 		// 	return "relay"
 	}

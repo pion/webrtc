@@ -64,6 +64,24 @@ func NewCandidateServerReflexive(network string, ip net.IP, port int, relAddr st
 	}, nil
 }
 
+// NewCandidatePeerReflexive creates a new peer reflective candidate
+func NewCandidatePeerReflexive(network string, ip net.IP, port int, relAddr string, relPort int) (*Candidate, error) {
+	networkType, err := determineNetworkType(network, ip)
+	if err != nil {
+		return nil, err
+	}
+	return &Candidate{
+		Type:        CandidateTypePeerReflexive,
+		NetworkType: networkType,
+		IP:          ip,
+		Port:        port,
+		RelatedAddress: &CandidateRelatedAddress{
+			Address: relAddr,
+			Port:    relPort,
+		},
+	}, nil
+}
+
 // start runs the candidate using the provided connection
 func (c *Candidate) start(a *Agent, conn net.PacketConn) {
 	c.agent = a
