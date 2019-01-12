@@ -645,64 +645,69 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 	}
 }
 
+// handleNewPeerReflexiveCandidate adds an unseen remote transport address
+// to the remote candidate list as a peer-reflexive candidate.
+func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Addr) error {
+	var ip net.IP
+	var port int
+
+	switch addr := remote.(type) {
+	case *net.UDPAddr:
+		ip = addr.IP
+		port = addr.Port
+	case *net.TCPAddr:
+		ip = addr.IP
+		port = addr.Port
+	default:
+		return errors.Errorf("unsupported address type %T", addr)
+	}
+
+	pflxCandidate, err := NewCandidatePeerReflexive(
+		local.NetworkType.String(), // assume, same as that of local
+		ip,
+		port,
+		"", // unknown at this moment. TODO: need a review
+		0,  // unknown at this moment. TODO: need a review
+	)
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to create peer-reflexive candidate: %v", remote)
+	}
+
+	// Add pflxCandidate to the remote candidate list
+	// TODO: review if this wouldn't cause any race
+	networkType := pflxCandidate.NetworkType
+	set := a.remoteCandidates[networkType]
+	set = append(set, pflxCandidate)
+	a.remoteCandidates[networkType] = set
+	return nil
+}
+
 // handleInbound processes traffic from a remote candidate
 func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
 	iceLog.Tracef("inbound STUN from %s to %s", remote.String(), local.String())
 	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
 	if remoteCandidate == nil {
-		//iceLog.Debugf("Could not find remote candidate for %s ", remote)
 		iceLog.Debugf("detected a new peer-reflexive candiate: %s ", remote)
-		var ip net.IP
-		var port int
-
-		switch addr := remote.(type) {
-		case *net.UDPAddr:
-			ip = addr.IP
-			port = addr.Port
-		case *net.TCPAddr:
-			ip = addr.IP
-			port = addr.Port
-		default:
-			iceLog.Warnf("unsupported address type %T", addr)
+		err := a.handleNewPeerReflexiveCandidate(local, remote)
+		if err != nil {
+			// Log warning, then move on..
+			iceLog.Warn(err.Error())
 		}
-
-		if ip != nil {
-			pflxCandidate, err := NewCandidatePeerReflexive(
-				local.NetworkType.String(), // assume, same as that of local
-				ip,
-				port,
-				"", // unknown at this moment. TODO: need a review
-				0,  // unknown at this moment. TODO: need a review
-			)
-
-			if err == nil {
-				// Add pflxCandidate to the remote candidate list
-				// TODO: review if this wouldn't cause any race
-				networkType := pflxCandidate.NetworkType
-				set := a.remoteCandidates[networkType]
-				set = append(set, pflxCandidate)
-				a.remoteCandidates[networkType] = set
-
-			} else {
-				iceLog.Warnf("failed to create peer-reflexive candidate: %v", remote)
-			}
-		} else {
-			iceLog.Warnf("invalid remote address %v", remote)
-		}
-	} else {
-		remoteCandidate.seen(false)
-
-		if m.Class == stun.ClassIndication {
-			return
-		}
-
-		if a.isControlling {
-			a.handleInboundControlling(m, local, remoteCandidate)
-		} else {
-			a.handleInboundControlled(m, local, remoteCandidate)
-		}
+		return
 	}
 
+	remoteCandidate.seen(false)
+
+	if m.Class == stun.ClassIndication {
+		return
+	}
+
+	if a.isControlling {
+		a.handleInboundControlling(m, local, remoteCandidate)
+	} else {
+		a.handleInboundControlled(m, local, remoteCandidate)
+	}
 }
 
 func (a *Agent) getBestPair() (*candidatePair, error) {
