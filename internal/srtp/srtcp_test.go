@@ -85,3 +85,42 @@ func TestRTCPLifecycleInPlace(t *testing.T) {
 
 	assert.Equal(actualEncrypted, rtcpTestEncrypted, "RTCP failed to encrypt")
 }
+
+// Assert that passing a dst buffer that is too short doesn't result in a failure
+func TestRTCPLifecyclePartialAllocation(t *testing.T) {
+	assert := assert.New(t)
+
+	encryptHeader := &rtcp.Header{}
+	encryptContext, err := CreateContext(rtcpTestMasterKey, rtcpTestMasterSalt, cipherContextAlgo)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	decryptHeader := &rtcp.Header{}
+	decryptContext, err := CreateContext(rtcpTestMasterKey, rtcpTestMasterSalt, cipherContextAlgo)
+	if err != nil {
+		t.Error(errors.Wrap(err, "CreateContext failed"))
+	}
+
+	// Copy packet, asserts that partial buffers can be used
+	decryptDst := make([]byte, len(rtcpTestDecrypted)*2)
+
+	actualDecrypted, err := decryptContext.DecryptRTCP(decryptDst, rtcpTestEncrypted, decryptHeader)
+	if err != nil {
+		t.Error(err)
+	} else if decryptHeader.Type != rtcp.TypeSenderReport {
+		t.Fatal("DecryptRTCP failed to populate input rtcp.Header")
+	}
+	assert.Equal(actualDecrypted, rtcpTestDecrypted, "RTCP failed to decrypt")
+
+	// Copy packet, asserts that partial buffers can be used
+	encryptDst := make([]byte, len(rtcpTestEncrypted)/2)
+
+	actualEncrypted, err := encryptContext.EncryptRTCP(encryptDst, rtcpTestDecrypted, encryptHeader)
+	if err != nil {
+		t.Error(err)
+	} else if encryptHeader.Type != rtcp.TypeSenderReport {
+		t.Fatal("EncryptRTCP failed to populate input rtcp.Header")
+	}
+	assert.Equal(actualEncrypted, rtcpTestEncrypted, "RTCP failed to encrypt")
+}
