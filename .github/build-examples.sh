@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+GO111MODULE=off
+
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 TEMP_DIR=$(mktemp -d)
 
@@ -15,6 +17,13 @@ done
 find $TEMP_DIR -name 'main.go' | while read fname; do
   BUILD_DIR=$(dirname "$fname")
   cd $BUILD_DIR
+
+  GET_OUTPUT=$(go get 2>&1 >/dev/null || true)
+  if [ -n "$BUILD_GET" ]; then
+    echo "Failed to get $BUILD_DIR"
+    echo "$BUILD_GET"
+    exit 1;
+  fi
 
   BUILD_OUTPUT=$(go build 2>&1 >/dev/null || true)
   if [ -n "$BUILD_OUTPUT" ]; then

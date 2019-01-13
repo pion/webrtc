@@ -20,9 +20,8 @@ before_script:
 
 script:
   - bash .github/build-examples.sh
-  - rm -rf examples
-  # Remove examples, no test coverage for them
-  - golangci-lint run
+  - golangci-lint run ./...
+  - rm -rf examples # Remove examples, no test coverage for them
   - go test -coverpkg=$(go list ./... | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
   - goveralls -coverprofile=cover.out -service=travis-ci
   - bash .github/assert-contributors.sh
