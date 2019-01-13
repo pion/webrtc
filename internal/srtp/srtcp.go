@@ -7,7 +7,7 @@ import (
 	"github.com/pions/webrtc/pkg/rtcp"
 )
 
-func (c *Context) decryptRTCP(dst, encrypted []byte, header *rtcp.Header) ([]byte, error) {
+func (c *Context) decryptRTCP(dst, encrypted []byte) ([]byte, error) {
 	out := allocateIfMismatch(dst, encrypted)
 
 	tailOffset := len(encrypted) - (authTagSize + srtcpIndexSize)
@@ -40,10 +40,10 @@ func (c *Context) DecryptRTCP(dst, encrypted []byte, header *rtcp.Header) ([]byt
 		return nil, err
 	}
 
-	return c.decryptRTCP(dst, encrypted, header)
+	return c.decryptRTCP(dst, encrypted)
 }
 
-func (c *Context) encryptRTCP(dst, decrypted []byte, header *rtcp.Header) ([]byte, error) {
+func (c *Context) encryptRTCP(dst, decrypted []byte) ([]byte, error) {
 	out := allocateIfMismatch(dst, decrypted)
 	ssrc := binary.BigEndian.Uint32(out[4:])
 
@@ -79,5 +79,5 @@ func (c *Context) EncryptRTCP(dst, decrypted []byte, header *rtcp.Header) ([]byt
 		return nil, err
 	}
 
-	return c.encryptRTCP(dst, decrypted, header)
+	return c.encryptRTCP(dst, decrypted)
 }
