@@ -36,19 +36,16 @@ func (s *session) getOrCreateReadStream(ssrc uint32, child streamSession, proto 
 		return nil, false
 	}
 
-	isNew := false
 	r, ok := s.readStreams[ssrc]
 	if !ok {
 		if err := proto.init(child, ssrc); err != nil {
 			return nil, false
 		}
 
-		r = proto
-		isNew = true
-		s.readStreams[ssrc] = r
+		s.readStreams[ssrc] = proto
+		return proto, true
 	}
-
-	return r, isNew
+	return r, false
 }
 
 func (s *session) initalize() {

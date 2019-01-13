@@ -9,11 +9,6 @@ import (
 	"github.com/pions/webrtc/pkg/rtcp"
 )
 
-type readResultSRTCP struct {
-	len    int
-	header *rtcp.Header
-}
-
 // SessionSRTCP implements io.ReadWriteCloser and provides a bi-directional SRTCP session
 // SRTCP itself does not have a design like this, but it is common in most applications
 // for local/remote to each have their own keying material. This provides those patterns
@@ -21,16 +16,11 @@ type readResultSRTCP struct {
 type SessionSRTCP struct {
 	session
 	writeStream *WriteStreamSRTCP
-	readCh      chan []byte
-	readRetCh   chan readResultSRTCP
 }
 
 // CreateSessionSRTCP creates a new SessionSRTCP
 func CreateSessionSRTCP() *SessionSRTCP {
-	s := &SessionSRTCP{
-		readCh:    make(chan []byte),
-		readRetCh: make(chan readResultSRTCP),
-	}
+	s := &SessionSRTCP{}
 	s.writeStream = &WriteStreamSRTCP{s}
 	s.session.initalize()
 	return s
@@ -125,7 +115,12 @@ func (s *SessionSRTCP) decrypt(buf []byte) error {
 				s.session.newStream <- r // Notify AcceptStream
 			}
 
-			readBuf := <-s.readCh
+			readStream, ok := r.(*ReadStreamSRTCP)
+			if !ok {
+				return fmt.Errorf("Failed to get/create ReadStreamSRTP")
+			}
+
+			readBuf := <-readStream.readCh
 			if len(readBuf) < len(decrypted) {
 				return fmt.Errorf("Input buffer was not long enough to contain decrypted RTCP")
 			}
@@ -133,7 +128,7 @@ func (s *SessionSRTCP) decrypt(buf []byte) error {
 			copy(readBuf, decrypted)
 			h := report.Header()
 
-			s.readRetCh <- readResultSRTCP{
+			readStream.readRetCh <- readResultSRTCP{
 				len:    len(decrypted),
 				header: &h,
 			}

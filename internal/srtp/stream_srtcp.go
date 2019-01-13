@@ -6,10 +6,17 @@ import (
 	"github.com/pions/webrtc/pkg/rtcp"
 )
 
+type readResultSRTCP struct {
+	len    int
+	header *rtcp.Header
+}
+
 // ReadStreamSRTCP handles decryption for a single RTCP SSRC
 type ReadStreamSRTCP struct {
-	session *SessionSRTCP
-	ssrc    uint32
+	session   *SessionSRTCP
+	ssrc      uint32
+	readCh    chan []byte
+	readRetCh chan readResultSRTCP
 }
 
 // ReadRTCP reads and decrypts full RTCP packet and its header from the nextConn
@@ -17,13 +24,13 @@ func (r *ReadStreamSRTCP) ReadRTCP(payload []byte) (int, *rtcp.Header, error) {
 	select {
 	case <-r.session.closed:
 		return 0, nil, fmt.Errorf("SRTCP session is closed")
-	case r.session.readCh <- payload:
+	case r.readCh <- payload:
 	}
 
 	select {
 	case <-r.session.closed:
 		return 0, nil, fmt.Errorf("SRTCP session is closed")
-	case res := <-r.session.readRetCh:
+	case res := <-r.readRetCh:
 		return res.len, res.header, nil
 	}
 }
@@ -33,13 +40,13 @@ func (r *ReadStreamSRTCP) Read(b []byte) (int, error) {
 	select {
 	case <-r.session.closed:
 		return 0, fmt.Errorf("SRTCP session is closed")
-	case r.session.readCh <- b:
+	case r.readCh <- b:
 	}
 
 	select {
 	case <-r.session.closed:
 		return 0, fmt.Errorf("SRTCP session is closed")
-	case res := <-r.session.readRetCh:
+	case res := <-r.readRetCh:
 		return res.len, nil
 	}
 }
@@ -52,8 +59,9 @@ func (r *ReadStreamSRTCP) init(child streamSession, ssrc uint32) error {
 
 	r.session = sessionSRTCP
 	r.ssrc = ssrc
+	r.readCh = make(chan []byte)
+	r.readRetCh = make(chan readResultSRTCP)
 	return nil
-
 }
 
 // GetSSRC returns the SSRC we are demuxing for
