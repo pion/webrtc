@@ -882,10 +882,10 @@ func (pc *RTCPeerConnection) acceptSRTCP() {
 		}
 
 		go func() {
-			rtcpBuf := make([]byte, receiveMTU)
 			var rtcpPacket rtcp.Packet
 
 			for {
+				rtcpBuf := make([]byte, receiveMTU)
 				i, err := r.Read(rtcpBuf)
 				if err != nil {
 					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
@@ -928,6 +928,7 @@ func (pc *RTCPeerConnection) acceptSRTP() {
 		// RTP
 		go func() {
 			for {
+				rtpBuf = make([]byte, receiveMTU)
 				rtpPacket := &rtp.Packet{}
 				rtpLen, err = r.Read(rtpBuf)
 				if err != nil {
@@ -953,13 +954,12 @@ func (pc *RTCPeerConnection) acceptSRTP() {
 				return
 			}
 
-			rtcpBuf := make([]byte, receiveMTU)
-
 			for {
 				var (
 					rtcpPacket rtcp.Packet
 					rtcpLen    int
 				)
+				rtcpBuf := make([]byte, receiveMTU)
 				rtcpLen, err = readStream.Read(rtcpBuf)
 				if err != nil {
 					pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
@@ -1539,8 +1539,8 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 	}
 
 	trackInput := make(chan media.RTCSample, 15) // Is the buffering needed?
-	rawPackets := make(chan *rtp.Packet)
-	rtcpPackets := make(chan rtcp.Packet)
+	rawPackets := make(chan *rtp.Packet, 15)     // Is the buffering needed?
+	rtcpPackets := make(chan rtcp.Packet, 15)    // Is the buffering needed?
 	isRawRTP := false
 
 	if ssrc == 0 {
@@ -1611,10 +1611,10 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 			return
 		}
 
-		rtcpBuf := make([]byte, receiveMTU)
 		var rtcpPacket rtcp.Packet
 
 		for {
+			rtcpBuf := make([]byte, receiveMTU)
 			i, err := readStream.Read(rtcpBuf)
 			if err != nil {
 				pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, ssrc)
