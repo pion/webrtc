@@ -3,6 +3,9 @@ language: go
 go:
   - "1.x" # use the latest Go release
 
+env:
+  - GO111MODULE=on
+
 notifications:
   email: false
   slack:
