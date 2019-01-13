@@ -8,9 +8,13 @@ func allocateIfMismatch(dst, src []byte) []byte {
 		dst = make([]byte, len(src))
 		copy(dst, src)
 	} else if !bytes.Equal(dst, src) { // bytes.Equal returns on ref equality, no optimization needed
-		if extraNeeded := len(dst) - len(src); extraNeeded > 0 {
+		extraNeeded := len(src) - len(dst)
+		if extraNeeded > 0 {
 			dst = append(dst, make([]byte, extraNeeded)...)
+		} else if extraNeeded < 0 {
+			dst = dst[:len(dst)+extraNeeded]
 		}
+
 		copy(dst, src)
 	}
 
