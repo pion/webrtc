@@ -481,18 +481,23 @@ func (a *Agent) pingAllCandidates() {
 // AddRemoteCandidate adds a new remote candidate
 func (a *Agent) AddRemoteCandidate(c *Candidate) error {
 	return a.run(func(agent *Agent) {
-		networkType := c.NetworkType
-		set := agent.remoteCandidates[networkType]
-
-		for _, candidate := range set {
-			if candidate.Equal(c) {
-				return
-			}
-		}
-
-		set = append(set, c)
-		agent.remoteCandidates[networkType] = set
+		a.addRemoteCandidate(c)
 	})
+}
+
+// addRemoteCandidate assumes you are holding the lock (must be execute using a.run)
+func (a *Agent) addRemoteCandidate(c *Candidate) {
+	networkType := c.NetworkType
+	set := a.remoteCandidates[networkType]
+
+	for _, candidate := range set {
+		if candidate.Equal(c) {
+			return
+		}
+	}
+
+	set = append(set, c)
+	a.remoteCandidates[networkType] = set
 }
 
 // GetLocalCandidates returns the local candidates
@@ -675,11 +680,7 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 	}
 
 	// Add pflxCandidate to the remote candidate list
-	// TODO: review if this wouldn't cause any race
-	networkType := pflxCandidate.NetworkType
-	set := a.remoteCandidates[networkType]
-	set = append(set, pflxCandidate)
-	a.remoteCandidates[networkType] = set
+	a.addRemoteCandidate(pflxCandidate)
 	return nil
 }
 
