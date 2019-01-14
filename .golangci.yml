@@ -10,6 +10,9 @@ linters:
     - maligned
     - lll
     - dupl
+    - gocritic
+    - gochecknoinits
+    - gochecknoglobals
 
 issues:
   exclude-use-default: false

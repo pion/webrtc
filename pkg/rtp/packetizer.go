@@ -53,15 +53,17 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 
 	for i, pp := range payloads {
 		packets[i] = &Packet{
-			Version:        2,
-			Padding:        false,
-			Extension:      false,
-			Marker:         i == len(payloads)-1,
-			PayloadType:    p.PayloadType,
-			SequenceNumber: p.Sequencer.NextSequenceNumber(),
-			Timestamp:      p.Timestamp, // Figure out how to do timestamps
-			SSRC:           p.SSRC,
-			Payload:        pp,
+			Header: Header{
+				Version:        2,
+				Padding:        false,
+				Extension:      false,
+				Marker:         i == len(payloads)-1,
+				PayloadType:    p.PayloadType,
+				SequenceNumber: p.Sequencer.NextSequenceNumber(),
+				Timestamp:      p.Timestamp, // Figure out how to do timestamps
+				SSRC:           p.SSRC,
+			},
+			Payload: pp,
 		}
 	}
 	p.Timestamp += samples

@@ -5,7 +5,7 @@ require (
 	github.com/cloudflare/sidh v0.0.0-20181111220428-fc8e6378752b // indirect
 	github.com/golang/mock v1.2.0 // indirect
 	github.com/lucas-clemente/quic-go v0.7.1-0.20190107031857-6fbe8d563eca
-	github.com/marten-seemann/qtls v0.0.0-20190106034547-26b223ad36d4 // indirect
+	github.com/marten-seemann/qtls v0.0.0-20190110111248-7a090b30c3ab // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pions/datachannel v1.0.0

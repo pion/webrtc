@@ -231,3 +231,37 @@ func (c *Context) verifyAuthTag(buf, actualAuthTag []byte) (bool, error) {
 	}
 	return bytes.Equal(actualAuthTag, expectedAuthTag), nil
 }
+
+// https://tools.ietf.org/html/rfc3550#appendix-A.1
+func (c *Context) updateRolloverCount(sequenceNumber uint16, s *ssrcState) {
+	if !s.rolloverHasProcessed {
+		s.rolloverHasProcessed = true
+	} else if sequenceNumber == 0 { // We exactly hit the rollover count
+
+		// Only update rolloverCounter if lastSequenceNumber is greater then maxROCDisorder
+		// otherwise we already incremented for disorder
+		if s.lastSequenceNumber > maxROCDisorder {
+			s.rolloverCounter++
+		}
+	} else if s.lastSequenceNumber < maxROCDisorder && sequenceNumber > (maxSequenceNumber-maxROCDisorder) {
+		// Our last sequence number incremented because we crossed 0, but then our current number was within maxROCDisorder of the max
+		// So we fell behind, drop to account for jitter
+		s.rolloverCounter--
+	} else if sequenceNumber < maxROCDisorder && s.lastSequenceNumber > (maxSequenceNumber-maxROCDisorder) {
+		// our current is within a maxROCDisorder of 0
+		// and our last sequence number was a high sequence number, increment to account for jitter
+		s.rolloverCounter++
+	}
+	s.lastSequenceNumber = sequenceNumber
+}
+
+func (c *Context) getSSRCState(ssrc uint32) *ssrcState {
+	s, ok := c.ssrcStates[ssrc]
+	if ok {
+		return s
+	}
+
+	s = &ssrcState{ssrc: ssrc}
+	c.ssrcStates[ssrc] = s
+	return s
+}
