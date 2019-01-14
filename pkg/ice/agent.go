@@ -481,7 +481,7 @@ func (a *Agent) pingAllCandidates() {
 // AddRemoteCandidate adds a new remote candidate
 func (a *Agent) AddRemoteCandidate(c *Candidate) error {
 	return a.run(func(agent *Agent) {
-		a.addRemoteCandidate(c)
+		agent.addRemoteCandidate(c)
 	})
 }
 
