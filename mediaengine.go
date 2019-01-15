@@ -6,7 +6,6 @@ import (
 	"github.com/pions/sdp"
 	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pions/webrtc/pkg/rtp/codecs"
-	"github.com/pkg/errors"
 )
 
 // RegisterCodec is used to register a codec with the DefaultMediaEngine
@@ -62,7 +61,7 @@ func (m *MediaEngine) getCodec(payloadType uint8) (*RTCRtpCodec, error) {
 			return codec, nil
 		}
 	}
-	return nil, errors.New("Codec not found")
+	return nil, ErrCodecNotFound
 }
 
 func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTCRtpCodec, error) {
@@ -75,7 +74,7 @@ func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTCRtpCodec, error) {
 			return codec, nil
 		}
 	}
-	return nil, errors.New("Codec not found")
+	return nil, ErrCodecNotFound
 }
 
 func (m *MediaEngine) getCodecsByKind(kind RTCRtpCodecType) []*RTCRtpCodec {
