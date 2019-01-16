@@ -8,9 +8,9 @@ require (
 	github.com/marten-seemann/qtls v0.0.0-20190110111248-7a090b30c3ab // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
-	github.com/pions/datachannel v1.0.0
+	github.com/pions/datachannel v1.1.0
 	github.com/pions/dtls v1.0.2
-	github.com/pions/sctp v1.0.0
+	github.com/pions/sctp v1.1.0
 	github.com/pions/sdp v1.1.0
 	github.com/pions/stun v0.1.0
 	github.com/pions/transport v0.0.0-20190123145644-fbbbdd95131a

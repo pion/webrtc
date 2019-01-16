@@ -12,6 +12,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Data channels close",
+		"link": "data-channels-close",
+		"description": "data-channels-close is a variant of data-channels that allow playing with the life cycle of data channels.",
+		"type": "browser"
+	},
+	{
 		"title": "Gstreamer receive",
 		"link": "gstreamer-receive",
 		"description": "gstreamer-receive is a simple application that shows how to receive media using pion-WebRTC and play live using GStreamer.",

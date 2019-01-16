@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/pions/datachannel"
@@ -90,6 +91,7 @@ type RTCDataChannel struct {
 
 	onMessageHandler func(sugar.Payload)
 	onOpenHandler    func()
+	onCloseHandler   func()
 
 	sctpTransport *RTCSctpTransport
 	dataChannel   *datachannel.DataChannel
@@ -213,6 +215,33 @@ func (d *RTCDataChannel) onOpen() (done chan struct{}) {
 	return
 }
 
+// OnClose sets an event handler which is invoked when
+// the underlying data transport has been closed.
+func (d *RTCDataChannel) OnClose(f func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.onCloseHandler = f
+}
+
+func (d *RTCDataChannel) onClose() (done chan struct{}) {
+	d.mu.RLock()
+	hdlr := d.onCloseHandler
+	d.mu.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr()
+		close(done)
+	}()
+
+	return
+}
+
 // OnMessage sets an event handler which is invoked on a message
 // arrival over the sctp transport from a remote peer.
 func (d *RTCDataChannel) OnMessage(f func(p sugar.Payload)) {
@@ -260,8 +289,14 @@ func (d *RTCDataChannel) readLoop() {
 		buffer := make([]byte, receiveMTU)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
-			fmt.Println("Failed to read from data channel", err)
-			// TODO: Kill DataChannel/PeerConnection?
+			d.mu.Lock()
+			d.ReadyState = RTCDataChannelStateClosed
+			d.mu.Unlock()
+			if err != io.EOF {
+				// TODO: Throw OnError
+				fmt.Println("Failed to read from data channel", err)
+			}
+			d.onClose()
 			return
 		}
 
@@ -275,6 +310,11 @@ func (d *RTCDataChannel) readLoop() {
 
 // Send sends the passed message to the DataChannel peer
 func (d *RTCDataChannel) Send(payload sugar.Payload) error {
+	err := d.ensureOpen()
+	if err != nil {
+		return err
+	}
+
 	var data []byte
 	isString := false
 
@@ -292,8 +332,17 @@ func (d *RTCDataChannel) Send(payload sugar.Payload) error {
 		data = []byte{0}
 	}
 
-	_, err := d.dataChannel.WriteDataChannel(data, isString)
+	_, err = d.dataChannel.WriteDataChannel(data, isString)
 	return err
+}
+
+func (d *RTCDataChannel) ensureOpen() error {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if d.ReadyState != RTCDataChannelStateOpen {
+		return &rtcerr.InvalidStateError{Err: ErrDataChannelNotOpen}
+	}
+	return nil
 }
 
 // Detach allows you to detach the underlying datachannel. This provides
@@ -317,4 +366,20 @@ func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
 	}
 
 	return d.dataChannel, nil
+}
+
+// Close Closes the RTCDataChannel. It may be called regardless of whether
+// the RTCDataChannel object was created by this peer or the remote peer.
+func (d *RTCDataChannel) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.ReadyState == RTCDataChannelStateClosing ||
+		d.ReadyState == RTCDataChannelStateClosed {
+		return nil
+	}
+
+	d.ReadyState = RTCDataChannelStateClosing
+
+	return d.dataChannel.Close()
 }
