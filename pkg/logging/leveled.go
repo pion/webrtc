@@ -22,6 +22,25 @@ func (ll *LogLevel) Get() LogLevel {
 	return LogLevel(atomic.LoadInt32((*int32)(ll)))
 }
 
+func (ll LogLevel) String() string {
+	switch ll {
+	case LogLevelDisabled:
+		return "Disabled"
+	case LogLevelError:
+		return "Error"
+	case LogLevelWarn:
+		return "Warn"
+	case LogLevelInfo:
+		return "Info"
+	case LogLevelDebug:
+		return "Debug"
+	case LogLevelTrace:
+		return "Trace"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	// LogLevelDisabled completely disables logging of any events
 	LogLevelDisabled LogLevel = iota
