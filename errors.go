@@ -12,6 +12,10 @@ var (
 	// has already been closed.
 	ErrConnectionClosed = errors.New("connection closed")
 
+	// ErrDataChannelNotOpen indicates an operation executed when the data
+	// channel is not (yet) open.
+	ErrDataChannelNotOpen = errors.New("data channel not open")
+
 	// ErrCertificateExpired indicates that an x509 certificate has expired.
 	ErrCertificateExpired = errors.New("x509Cert expired")
 

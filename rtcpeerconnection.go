@@ -1186,15 +1186,14 @@ func (pc *RTCPeerConnection) CreateDataChannel(label string, options *RTCDataCha
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
-	if options != nil {
-		if options.ID == nil {
-			var err error
-			if params.ID, err = pc.generateDataChannelID(true); err != nil {
-				return nil, err
-			}
-		} else {
-			params.ID = *options.ID
+	if options == nil ||
+		options.ID == nil {
+		var err error
+		if params.ID, err = pc.generateDataChannelID(true); err != nil {
+			return nil, err
 		}
+	} else {
+		params.ID = *options.ID
 	}
 
 	// TODO: Re-enable validation of the parameters once they are implemented.
