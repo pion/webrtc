@@ -635,7 +635,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 		iceLog.Debug("useCandidate && a.isControlling == true")
 		return
 	}
-	iceLog.Debugf("got controlling message: %#v", m)
+	iceLog.Tracef("got controlling message: %#v", m)
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	// Remember the working pair and select it when receiving a success response
