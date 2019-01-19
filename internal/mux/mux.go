@@ -88,23 +88,30 @@ func (m *Mux) readLoop() {
 }
 
 func (m *Mux) dispatch(buf []byte) {
+	var endpoint *Endpoint
+
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	for e, f := range m.endpoints {
 		if f(buf) {
-			select {
-			case readBuf, ok := <-e.readCh:
-				if !ok {
-					return
-				}
-				n := copy(readBuf, buf)
-				e.wroteCh <- n
-			case <-e.doneCh:
-				return
-			}
-			return
+			endpoint = e
+			break
 		}
 	}
+	m.lock.Unlock()
 
-	fmt.Printf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+	if endpoint == nil {
+		fmt.Printf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+		return
+	}
+
+	select {
+	case readBuf, ok := <-endpoint.readCh:
+		if !ok {
+			return
+		}
+		n := copy(readBuf, buf)
+		endpoint.wroteCh <- n
+	case <-endpoint.doneCh:
+		return
+	}
 }
