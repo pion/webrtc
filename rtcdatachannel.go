@@ -14,7 +14,7 @@ import (
 // The RTCDataChannel interface represents a network channel
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
 type RTCDataChannel struct {
-	sync.RWMutex
+	mu sync.RWMutex
 
 	// Label represents a label that can be used to distinguish this
 	// RTCDataChannel object from other RTCDataChannel objects. Scripts are
@@ -131,11 +131,11 @@ func newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataChannel, error
 
 // open opens the datachannel over the sctp transport
 func (d *RTCDataChannel) open(sctpTransport *RTCSctpTransport) error {
-	d.RLock()
+	d.mu.RLock()
 	d.sctpTransport = sctpTransport
 
 	if err := d.ensureSCTP(); err != nil {
-		d.RUnlock()
+		d.mu.RUnlock()
 		return err
 	}
 
@@ -148,12 +148,12 @@ func (d *RTCDataChannel) open(sctpTransport *RTCSctpTransport) error {
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.ID, cfg)
 	if err != nil {
-		d.RUnlock()
+		d.mu.RUnlock()
 		return err
 	}
 
 	d.ReadyState = RTCDataChannelStateOpen
-	d.RUnlock()
+	d.mu.RUnlock()
 
 	d.handleOpen(dc)
 	return nil
@@ -169,8 +169,8 @@ func (d *RTCDataChannel) ensureSCTP() error {
 
 // Transport returns the RTCSctpTransport instance the RTCDataChannel is sending over.
 func (d *RTCDataChannel) Transport() *RTCSctpTransport {
-	d.RLock()
-	defer d.RUnlock()
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
 	return d.sctpTransport
 }
@@ -178,15 +178,15 @@ func (d *RTCDataChannel) Transport() *RTCSctpTransport {
 // OnOpen sets an event handler which is invoked when
 // the underlying data transport has been established (or re-established).
 func (d *RTCDataChannel) OnOpen(f func()) {
-	d.Lock()
-	defer d.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.onOpenHandler = f
 }
 
 func (d *RTCDataChannel) onOpen() (done chan struct{}) {
-	d.RLock()
+	d.mu.RLock()
 	hdlr := d.onOpenHandler
-	d.RUnlock()
+	d.mu.RUnlock()
 
 	done = make(chan struct{})
 	if hdlr == nil {
@@ -205,15 +205,15 @@ func (d *RTCDataChannel) onOpen() (done chan struct{}) {
 // OnMessage sets an event handler which is invoked on a message
 // arrival over the sctp transport from a remote peer.
 func (d *RTCDataChannel) OnMessage(f func(p sugar.Payload)) {
-	d.Lock()
-	defer d.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.onMessageHandler = f
 }
 
 func (d *RTCDataChannel) onMessage(p sugar.Payload) {
-	d.RLock()
+	d.mu.RLock()
 	hdlr := d.onMessageHandler
-	d.RUnlock()
+	d.mu.RUnlock()
 
 	if hdlr == nil || p == nil {
 		return
@@ -230,14 +230,14 @@ func (d *RTCDataChannel) Onmessage(f func(p sugar.Payload)) {
 }
 
 func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
-	d.Lock()
+	d.mu.Lock()
 	d.dataChannel = dc
-	d.Unlock()
+	d.mu.Unlock()
 
 	d.onOpen()
 
-	d.Lock()
-	defer d.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	if !defaultSettingEngine.Detach.DataChannels {
 		go d.readLoop()
@@ -294,8 +294,8 @@ func (d *RTCDataChannel) Send(payload sugar.Payload) error {
 // pions/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	if !defaultSettingEngine.Detach.DataChannels {
 		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
