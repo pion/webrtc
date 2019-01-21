@@ -73,6 +73,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements, G.722 support, Bugfixes*
 * [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification*
 * [Yutaka Takeda](https://github.com/enobufs) *Fix ICE connection timeout*
+* [Hugo Arregui](https://github.com/hugoArregui) *Fix connection timeout*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
