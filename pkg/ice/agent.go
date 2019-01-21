@@ -684,7 +684,7 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 	return nil
 }
 
-// handleInbound processes traffic from a remote candidate
+// handleInbound processes STUN traffic from a remote candidate
 func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
 	iceLog.Tracef("inbound STUN from %s to %s", remote.String(), local.String())
 	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
@@ -708,6 +708,14 @@ func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr
 		a.handleInboundControlling(m, local, remoteCandidate)
 	} else {
 		a.handleInboundControlled(m, local, remoteCandidate)
+	}
+}
+
+// noSTUNSeen processes non STUN traffic from a remote candidate
+func (a *Agent) noSTUNSeen(local *Candidate, remote net.Addr) {
+	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
+	if remoteCandidate != nil {
+		remoteCandidate.seen(false)
 	}
 }
 

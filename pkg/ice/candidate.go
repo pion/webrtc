@@ -118,6 +118,13 @@ func (c *Candidate) recvLoop() {
 			}
 
 			continue
+		} else {
+			err := c.agent.run(func(agent *Agent) {
+				agent.noSTUNSeen(c, srcAddr)
+			})
+			if err != nil {
+				iceLog.Warnf("Failed to handle message: %v", err)
+			}
 		}
 
 		select {
