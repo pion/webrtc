@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/pions/sdp"
-	"github.com/pions/webrtc/internal/network"
+	"github.com/pions/webrtc/internal/mux"
+	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/media"
@@ -25,13 +26,17 @@ import (
 
 var pcLog = logging.NewScopedLogger("pc")
 
-// Unknown defines default public constant to use for "enum" like struct
-// comparisons when no value was defined.
-const Unknown = iota
+const (
+	// Unknown defines default public constant to use for "enum" like struct
+	// comparisons when no value was defined.
+	Unknown    = iota
+	unknownStr = "unknown"
 
-const unknownStr = "unknown"
+	receiveMTU = 8192
 
-const receiveMTU = 8192
+	srtpMasterKeyLen     = 16
+	srtpMasterKeySaltLen = 14
+)
 
 // RTCPeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another RTCPeerConnection instance in a
@@ -110,13 +115,16 @@ type RTCPeerConnection struct {
 	onTrackHandler                    func(*RTCTrack)
 	onDataChannelHandler              func(*RTCDataChannel)
 
-	// Deprecated: Internal mechanism which will be removed.
-	networkManager *network.Manager
-
 	iceGatherer   *RTCIceGatherer
 	iceTransport  *RTCIceTransport
 	dtlsTransport *RTCDtlsTransport
 	sctpTransport *RTCSctpTransport
+
+	srtpSession  *srtp.SessionSRTP
+	srtpEndpoint *mux.Endpoint
+
+	srtcpSession  *srtp.SessionSRTCP
+	srtcpEndpoint *mux.Endpoint
 }
 
 // New creates a new RTCPeerConfiguration with the provided configuration
@@ -144,15 +152,14 @@ func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 		ConnectionState:    RTCPeerConnectionStateNew,
 		mediaEngine:        DefaultMediaEngine,
 		dataChannels:       make(map[uint16]*RTCDataChannel),
+		srtpSession:        srtp.CreateSessionSRTP(),
+		srtcpSession:       srtp.CreateSessionSRTCP(),
 	}
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}
-
-	// TODO: Phase out
-	pc.networkManager = network.NewManager()
 
 	// For now we eagerly allocate and start the gatherer
 	gatherer, err := pc.createIceGatherer()
@@ -833,16 +840,18 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 			return
 		}
 
-		err = pc.networkManager.Start(pc.iceTransport.mux, pc.dtlsTransport.conn, weOffer)
+		pc.srtpEndpoint = pc.iceTransport.mux.NewEndpoint(mux.MatchSRTP)
+		pc.srtcpEndpoint = pc.iceTransport.mux.NewEndpoint(mux.MatchSRTCP)
+
+		err = pc.startSRTP(weOffer)
 		if err != nil {
 			// TODO: Handle error
-			pcLog.Warnf("Failed to start manager: %s", err)
+			pcLog.Warnf("Failed to start RTP: %s", err)
 			return
 		}
 
-		// Temporary SRTP glue
 		go pc.acceptSRTP()
-		go pc.acceptSRTCP()
+		go pc.drainSRTCP()
 
 		// Start sctp
 		err = pc.sctpTransport.Start(RTCSctpCapabilities{
@@ -850,7 +859,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		})
 		if err != nil {
 			// TODO: Handle error
-			pcLog.Warnf("Failed to start manager: %s", err)
+			pcLog.Warnf("Failed to start SCTP: %s", err)
 			return
 		}
 
@@ -872,10 +881,65 @@ func (pc *RTCPeerConnection) openDataChannels() {
 	}
 }
 
-// TODO: Move to RTCRTpSender?
-func (pc *RTCPeerConnection) acceptSRTCP() {
+// startSRTP initializes all the cryptographic context needed for encrypted RTP
+func (pc *RTCPeerConnection) startSRTP(isOffer bool) error {
+	keyingMaterial, err := pc.dtlsTransport.conn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
+	if err != nil {
+		return err
+	}
+
+	offset := 0
+	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	serverWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	clientWriteKey = append(clientWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+	offset += srtpMasterKeySaltLen
+
+	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+
+	if isOffer {
+		err = pc.srtpSession.Start(
+			serverWriteKey[0:16], serverWriteKey[16:],
+			clientWriteKey[0:16], clientWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, pc.srtpEndpoint,
+		)
+
+		if err == nil {
+			err = pc.srtcpSession.Start(
+				serverWriteKey[0:16], serverWriteKey[16:],
+				clientWriteKey[0:16], clientWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, pc.srtcpEndpoint,
+			)
+		}
+	} else {
+		err = pc.srtpSession.Start(
+			clientWriteKey[0:16], clientWriteKey[16:],
+			serverWriteKey[0:16], serverWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, pc.srtpEndpoint,
+		)
+
+		if err == nil {
+			err = pc.srtcpSession.Start(
+				clientWriteKey[0:16], clientWriteKey[16:],
+				serverWriteKey[0:16], serverWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, pc.srtcpEndpoint,
+			)
+		}
+	}
+
+	return err
+}
+
+// drainSRTCP pulls and discards RTCP packets that don't match any SRTP
+// These could be sent to the user, but right now we don't provide an API
+// to distribute orphaned RTCP messages. This is needed to make sure we don't block
+// and provides useful debugging messages
+func (pc *RTCPeerConnection) drainSRTCP() {
 	for {
-		r, ssrc, err := pc.networkManager.SrtcpSession.AcceptStream()
+		r, ssrc, err := pc.srtcpSession.AcceptStream()
 		if err != nil {
 			pcLog.Warnf("Failed to accept RTCP %v \n", err)
 			return
@@ -907,7 +971,7 @@ func (pc *RTCPeerConnection) acceptSRTCP() {
 // TODO: Move to RTCRTpSender?
 func (pc *RTCPeerConnection) acceptSRTP() {
 	for {
-		r, ssrc, err := pc.networkManager.SrtpSession.AcceptStream()
+		r, ssrc, err := pc.srtpSession.AcceptStream()
 		if err != nil {
 			return
 		}
@@ -943,7 +1007,7 @@ func (pc *RTCPeerConnection) acceptSRTP() {
 
 		// RTCP
 		go func() {
-			readStream, err := pc.networkManager.SrtcpSession.OpenReadStream(ssrc)
+			readStream, err := pc.srtcpSession.OpenReadStream(ssrc)
 			if err != nil {
 				pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, ssrc)
 				return
@@ -1267,7 +1331,7 @@ func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
 		return err
 	}
 
-	writeStream, err := pc.networkManager.SrtcpSession.OpenWriteStream()
+	writeStream, err := pc.srtcpSession.OpenWriteStream()
 	if err != nil {
 		return fmt.Errorf("SendRTCP failed to open WriteStream: %v", err)
 	}
@@ -1317,10 +1381,12 @@ func (pc *RTCPeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	if pc.networkManager != nil {
-		if err := pc.networkManager.Close(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+	if err := pc.srtpSession.Close(); err != nil {
+		closeErrs = append(closeErrs, err)
+	}
+
+	if err := pc.srtcpSession.Close(); err != nil {
+		closeErrs = append(closeErrs, err)
 	}
 
 	if pc.sctpTransport != nil {
@@ -1503,7 +1569,7 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 
 // TODO RTCRtpSender
 func (pc *RTCPeerConnection) sendRTP(packet *rtp.Packet) {
-	writeStream, err := pc.networkManager.SrtpSession.OpenWriteStream()
+	writeStream, err := pc.srtpSession.OpenWriteStream()
 	if err != nil {
 		pcLog.Warnf("SendRTP failed to open WriteStream: %v", err)
 		return
@@ -1589,7 +1655,7 @@ func (pc *RTCPeerConnection) newRTCTrack(payloadType uint8, ssrc uint32, id, lab
 
 	// Inbound RTCP
 	go func() {
-		readStream, err := pc.networkManager.SrtcpSession.OpenReadStream(ssrc)
+		readStream, err := pc.srtcpSession.OpenReadStream(ssrc)
 		if err != nil {
 			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, ssrc)
 			return
