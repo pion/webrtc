@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/pkg/stun"
+	"github.com/pions/stun"
 	"github.com/pions/webrtc/internal/util"
 	"github.com/pkg/errors"
 )
@@ -327,7 +327,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 	// request.
 
 	if a.isControlling {
-		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionID(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
@@ -338,7 +338,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 			&stun.Fingerprint{},
 		)
 	} else {
-		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionId(),
+		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionID(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
 			&stun.Priority{Priority: uint32(local.Priority(CandidateTypeHost.Preference(), 1))},

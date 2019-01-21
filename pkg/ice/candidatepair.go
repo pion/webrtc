@@ -1,7 +1,7 @@
 package ice
 
 import (
-	"github.com/pions/pkg/stun"
+	"github.com/pions/stun"
 )
 
 func newCandidatePair(local, remote *Candidate) *candidatePair {
@@ -23,7 +23,7 @@ func (p *candidatePair) Write(b []byte) (int, error) {
 
 // keepaliveCandidate sends a STUN Binding Indication to the remote candidate
 func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
-	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionId(),
+	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionID(),
 		&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 		&stun.MessageIntegrity{
 			Key: []byte(a.remotePwd),

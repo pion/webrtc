@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/pkg/stun"
+	"github.com/pions/stun"
 )
 
 const receiveMTU = 8192
