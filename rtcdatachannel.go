@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
+
 // RTCDataChannel represents a WebRTC DataChannel
 // The RTCDataChannel interface represents a network channel
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
@@ -244,6 +246,10 @@ func (d *RTCDataChannel) onClose() (done chan struct{}) {
 
 // OnMessage sets an event handler which is invoked on a message
 // arrival over the sctp transport from a remote peer.
+// OnMessage can currently receive messages up to 16384 bytes
+// in size. Check out the detach API if you want to use larger
+// message sizes. Note that browser support for larger messages
+// is also limited.
 func (d *RTCDataChannel) OnMessage(f func(p sugar.Payload)) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -286,8 +292,12 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 
 func (d *RTCDataChannel) readLoop() {
 	for {
-		buffer := make([]byte, receiveMTU)
+		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
+		if err == io.ErrShortBuffer {
+			pcLog.Warnf("Failed to read from data channel: The message is larger than %d bytes.\n", dataChannelBufferSize)
+			continue
+		}
 		if err != nil {
 			d.mu.Lock()
 			d.ReadyState = RTCDataChannelStateClosed
