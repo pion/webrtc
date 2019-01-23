@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
@@ -203,7 +204,7 @@ func (a *Agent) gatherCandidatesLocal() {
 			}
 
 			port := conn.LocalAddr().(*net.UDPAddr).Port
-			c, err := NewCandidateHost(network, ip, port)
+			c, err := NewCandidateHost(network, ip, port, ComponentRTP)
 			if err != nil {
 				iceLog.Warnf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
 				continue
@@ -239,7 +240,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				port := xoraddr.Port
 				relIP := laddr.IP.String()
 				relPort := laddr.Port
-				c, err := NewCandidateServerReflexive(network, ip, port, relIP, relPort)
+				c, err := NewCandidateServerReflexive(network, ip, port, ComponentRTP, relIP, relPort)
 				if err != nil {
 					iceLog.Warnf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
 					continue
@@ -331,7 +332,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.UseCandidate{},
 			&stun.IceControlling{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.Priority(CandidateTypeHost.Preference(), 1))},
+			&stun.Priority{Priority: uint32(local.Priority())},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -341,7 +342,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 		msg, err = stun.Build(stun.ClassRequest, stun.MethodBinding, stun.GenerateTransactionID(),
 			&stun.Username{Username: a.remoteUfrag + ":" + a.localUfrag},
 			&stun.IceControlled{TieBreaker: a.tieBreaker},
-			&stun.Priority{Priority: uint32(local.Priority(CandidateTypeHost.Preference(), 1))},
+			&stun.Priority{Priority: uint32(local.Priority())},
 			&stun.MessageIntegrity{
 				Key: []byte(a.remotePwd),
 			},
@@ -370,10 +371,22 @@ func (a *Agent) updateConnectionState(newState ConnectionState) {
 	}
 }
 
-func (a *Agent) setValidPair(local, remote *Candidate, selected bool) {
+type candidatePairs []*candidatePair
+
+func (cp candidatePairs) Len() int      { return len(cp) }
+func (cp candidatePairs) Swap(i, j int) { cp[i], cp[j] = cp[j], cp[i] }
+
+type byPairPriority struct{ candidatePairs }
+
+// NB: Reverse sort so our candidates start at highest priority
+func (bp byPairPriority) Less(i, j int) bool {
+	return bp.candidatePairs[i].Priority() > bp.candidatePairs[j].Priority()
+}
+
+func (a *Agent) setValidPair(local, remote *Candidate, selected, controlling bool) {
 	// TODO: avoid duplicates
-	p := newCandidatePair(local, remote)
-	iceLog.Tracef("Found valid candidate pair: %s <-> %s (selected? %t)", local, remote, selected)
+	p := newCandidatePair(local, remote, controlling)
+	iceLog.Tracef("Found valid candidate pair: %s (selected? %t)", p, selected)
 
 	if selected {
 		a.selectedPair = p
@@ -385,6 +398,8 @@ func (a *Agent) setValidPair(local, remote *Candidate, selected bool) {
 		// can be used for communication until the final pair is selected:
 		// https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-12
 		a.validPairs = append(a.validPairs, p)
+		// Sort the candidate pairs by priority of the remotes
+		sort.Sort(byPairPriority{a.validPairs})
 	}
 
 	// Signal connected
@@ -619,7 +634,7 @@ func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteC
 	_, usepair := m.GetOneAttribute(stun.AttrUseCandidate)
 	iceLog.Tracef("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
 	// Remember the working pair and select it when marked with usepair
-	a.setValidPair(localCandidate, remoteCandidate, usepair)
+	a.setValidPair(localCandidate, remoteCandidate, usepair, false)
 
 	if !successResponse {
 		// Send success response
@@ -639,7 +654,7 @@ func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remote
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	// Remember the working pair and select it when receiving a success response
-	a.setValidPair(localCandidate, remoteCandidate, successResponse)
+	a.setValidPair(localCandidate, remoteCandidate, successResponse, true)
 
 	if !successResponse {
 		// Send success response
@@ -671,6 +686,7 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 		local.NetworkType.String(), // assume, same as that of local
 		ip,
 		port,
+		local.Component,
 		"", // unknown at this moment. TODO: need a review
 		0,  // unknown at this moment. TODO: need a review
 	)

@@ -4,7 +4,7 @@ require (
 	github.com/pions/datachannel v1.2.0
 	github.com/pions/dtls v1.1.0
 	github.com/pions/sctp v1.3.0
-	github.com/pions/sdp v1.1.0
+	github.com/pions/sdp v1.3.0
 	github.com/pions/stun v0.1.0
 	github.com/pions/transport v0.1.0
 	github.com/pkg/errors v0.8.1
