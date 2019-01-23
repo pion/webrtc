@@ -19,7 +19,7 @@ type RTCIceGatherer struct {
 
 	agent *ice.Agent
 
-	settingEngine *settingEngine
+	api *API
 }
 
 // NewRTCIceGatherer creates a new NewRTCIceGatherer.
@@ -40,7 +40,7 @@ func (api *API) NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, er
 	return &RTCIceGatherer{
 		state:            RTCIceGathererStateNew,
 		validatedServers: validatedServers,
-		settingEngine:    &api.settingEngine,
+		api:              api,
 	}, nil
 }
 
@@ -63,10 +63,10 @@ func (g *RTCIceGatherer) Gather() error {
 
 	config := &ice.AgentConfig{
 		Urls:              g.validatedServers,
-		PortMin:           g.settingEngine.EphemeralUDP.PortMin,
-		PortMax:           g.settingEngine.EphemeralUDP.PortMax,
-		ConnectionTimeout: g.settingEngine.Timeout.ICEConnection,
-		KeepaliveInterval: g.settingEngine.Timeout.ICEKeepalive,
+		PortMin:           g.api.settingEngine.EphemeralUDP.PortMin,
+		PortMax:           g.api.settingEngine.EphemeralUDP.PortMax,
+		ConnectionTimeout: g.api.settingEngine.Timeout.ICEConnection,
+		KeepaliveInterval: g.api.settingEngine.Timeout.ICEKeepalive,
 	}
 
 	agent, err := ice.NewAgent(config)

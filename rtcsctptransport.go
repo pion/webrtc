@@ -36,7 +36,7 @@ type RTCSctpTransport struct {
 	association          *sctp.Association
 	onDataChannelHandler func(*RTCDataChannel)
 
-	settingEngine *settingEngine
+	api *API
 }
 
 // NewRTCSctpTransport creates a new RTCSctpTransport.
@@ -47,7 +47,7 @@ func (api *API) NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
 		dtlsTransport: dtls,
 		State:         RTCSctpTransportStateConnecting,
 		port:          5000, // TODO
-		settingEngine: &api.settingEngine,
+		api:           api,
 	}
 
 	res.updateMessageSize()
@@ -142,10 +142,10 @@ func (r *RTCSctpTransport) acceptDataChannels() {
 
 		sid := dc.StreamIdentifier()
 		rtcDC := &RTCDataChannel{
-			ID:            &sid,
-			Label:         dc.Config.Label,
-			ReadyState:    RTCDataChannelStateOpen,
-			settingEngine: r.settingEngine,
+			ID:         &sid,
+			Label:      dc.Config.Label,
+			ReadyState: RTCDataChannelStateOpen,
+			api:        r.api,
 		}
 
 		<-r.onDataChannel(rtcDC)
