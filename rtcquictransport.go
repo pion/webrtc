@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/dtls"
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/quic"
 	"github.com/pions/webrtc/pkg/rtcerr"
