@@ -17,6 +17,7 @@ type RTCIceCandidate struct {
 	Protocol       RTCIceProtocol      `json:"protocol"`
 	Port           uint16              `json:"port"`
 	Typ            RTCIceCandidateType `json:"type"`
+	Component      uint16              `json:"component"`
 	RelatedAddress string              `json:"relatedAddress"`
 	RelatedPort    uint16              `json:"relatedPort"`
 }
@@ -38,6 +39,7 @@ func newRTCIceCandidateFromSDP(c sdp.ICECandidate) (RTCIceCandidate, error) {
 		IP:             c.IP,
 		Protocol:       protocol,
 		Port:           c.Port,
+		Component:      c.Component,
 		Typ:            typ,
 		RelatedAddress: c.RelatedAddress,
 		RelatedPort:    c.RelatedPort,
@@ -51,6 +53,7 @@ func (c RTCIceCandidate) toSDP() sdp.ICECandidate {
 		IP:             c.IP,
 		Protocol:       c.Protocol.String(),
 		Port:           c.Port,
+		Component:      c.Component,
 		Typ:            c.Typ.String(),
 		RelatedAddress: c.RelatedAddress,
 		RelatedPort:    c.RelatedPort,
@@ -85,10 +88,11 @@ func newRTCIceCandidateFromICE(i *ice.Candidate) (RTCIceCandidate, error) {
 
 	c := RTCIceCandidate{
 		Foundation: "foundation",
-		Priority:   uint32(i.Priority(i.Type.Preference(), uint16(1))),
+		Priority:   uint32(i.Priority()),
 		IP:         i.IP.String(),
 		Protocol:   protocol,
 		Port:       uint16(i.Port),
+		Component:  i.Component,
 		Typ:        typ,
 	}
 
@@ -108,14 +112,15 @@ func (c RTCIceCandidate) toICE() (*ice.Candidate, error) {
 
 	switch c.Typ {
 	case RTCIceCandidateTypeHost:
-		return ice.NewCandidateHost(c.Protocol.String(), ip, int(c.Port))
-
+		return ice.NewCandidateHost(c.Protocol.String(), ip, int(c.Port), c.Component)
 	case RTCIceCandidateTypeSrflx:
-		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port),
+		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
-
 	case RTCIceCandidateTypePrflx:
-		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port),
+		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
+			c.RelatedAddress, int(c.RelatedPort))
+	case RTCIceCandidateTypeRelay:
+		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	default:
 		return nil, fmt.Errorf("Unknown candidate type: %s", c.Typ)
@@ -130,8 +135,8 @@ func convertTypeFromICE(t ice.CandidateType) (RTCIceCandidateType, error) {
 		return RTCIceCandidateTypeSrflx, nil
 	case ice.CandidateTypePeerReflexive:
 		return RTCIceCandidateTypePrflx, nil
-		// case ice.CandidateTypeRelay:
-		// 	return RTCIceCandidateTypeRelay, nil
+	case ice.CandidateTypeRelay:
+		return RTCIceCandidateTypeRelay, nil
 	default:
 		return RTCIceCandidateType(t), fmt.Errorf("Unknown ICE candidate type: %s", t)
 	}

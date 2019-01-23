@@ -2,7 +2,6 @@ package ice
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -10,16 +9,26 @@ import (
 	"github.com/pions/stun"
 )
 
-const receiveMTU = 8192
+const (
+	receiveMTU             = 8192
+	defaultLocalPreference = 65535
+
+	// ComponentRTP indicates that the candidate is used for RTP
+	ComponentRTP uint16 = 1
+	// ComponentRTCP indicates that the candidate is used for RTCP
+	ComponentRTCP
+)
 
 // Candidate represents an ICE candidate
 type Candidate struct {
 	NetworkType
 
-	Type           CandidateType
-	IP             net.IP
-	Port           int
-	RelatedAddress *CandidateRelatedAddress
+	Type            CandidateType
+	LocalPreference uint16
+	Component       uint16
+	IP              net.IP
+	Port            int
+	RelatedAddress  *CandidateRelatedAddress
 
 	lock         sync.RWMutex
 	lastSent     time.Time
@@ -32,31 +41,35 @@ type Candidate struct {
 }
 
 // NewCandidateHost creates a new host candidate
-func NewCandidateHost(network string, ip net.IP, port int) (*Candidate, error) {
+func NewCandidateHost(network string, ip net.IP, port int, component uint16) (*Candidate, error) {
 	networkType, err := determineNetworkType(network, ip)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Candidate{
-		Type:        CandidateTypeHost,
-		NetworkType: networkType,
-		IP:          ip,
-		Port:        port,
+		Type:            CandidateTypeHost,
+		NetworkType:     networkType,
+		IP:              ip,
+		Port:            port,
+		LocalPreference: defaultLocalPreference,
+		Component:       component,
 	}, nil
 }
 
 // NewCandidateServerReflexive creates a new server reflective candidate
-func NewCandidateServerReflexive(network string, ip net.IP, port int, relAddr string, relPort int) (*Candidate, error) {
+func NewCandidateServerReflexive(network string, ip net.IP, port int, component uint16, relAddr string, relPort int) (*Candidate, error) {
 	networkType, err := determineNetworkType(network, ip)
 	if err != nil {
 		return nil, err
 	}
 	return &Candidate{
-		Type:        CandidateTypeServerReflexive,
-		NetworkType: networkType,
-		IP:          ip,
-		Port:        port,
+		Type:            CandidateTypeServerReflexive,
+		NetworkType:     networkType,
+		IP:              ip,
+		Port:            port,
+		LocalPreference: defaultLocalPreference,
+		Component:       component,
 		RelatedAddress: &CandidateRelatedAddress{
 			Address: relAddr,
 			Port:    relPort,
@@ -65,16 +78,38 @@ func NewCandidateServerReflexive(network string, ip net.IP, port int, relAddr st
 }
 
 // NewCandidatePeerReflexive creates a new peer reflective candidate
-func NewCandidatePeerReflexive(network string, ip net.IP, port int, relAddr string, relPort int) (*Candidate, error) {
+func NewCandidatePeerReflexive(network string, ip net.IP, port int, component uint16, relAddr string, relPort int) (*Candidate, error) {
 	networkType, err := determineNetworkType(network, ip)
 	if err != nil {
 		return nil, err
 	}
 	return &Candidate{
-		Type:        CandidateTypePeerReflexive,
-		NetworkType: networkType,
-		IP:          ip,
-		Port:        port,
+		Type:            CandidateTypePeerReflexive,
+		NetworkType:     networkType,
+		IP:              ip,
+		Port:            port,
+		LocalPreference: defaultLocalPreference,
+		Component:       component,
+		RelatedAddress: &CandidateRelatedAddress{
+			Address: relAddr,
+			Port:    relPort,
+		},
+	}, nil
+}
+
+// NewCandidateRelay creates a new relay candidate
+func NewCandidateRelay(network string, ip net.IP, port int, component uint16, relAddr string, relPort int) (*Candidate, error) {
+	networkType, err := determineNetworkType(network, ip)
+	if err != nil {
+		return nil, err
+	}
+	return &Candidate{
+		Type:            CandidateTypeRelay,
+		NetworkType:     networkType,
+		IP:              ip,
+		Port:            port,
+		LocalPreference: defaultLocalPreference,
+		Component:       component,
 		RelatedAddress: &CandidateRelatedAddress{
 			Address: relAddr,
 			Port:    relPort,
@@ -167,11 +202,16 @@ func (c *Candidate) writeTo(raw []byte, dst *Candidate) (int, error) {
 }
 
 // Priority computes the priority for this ICE Candidate
-func (c *Candidate) Priority(typePreference uint16, component uint16) uint16 {
-	localPreference := uint16(rand.New(rand.NewSource(time.Now().UnixNano())).Uint32() / 2)
-	return (2^24)*typePreference +
-		(2^8)*localPreference +
-		(2^0)*(256-component)
+func (c *Candidate) Priority() uint16 {
+	// The local preference MUST be an integer from 0 (lowest preference) to
+	// 65535 (highest preference) inclusive.  When there is only a single IP
+	// address, this value SHOULD be set to 65535.  If there are multiple
+	// candidates for a particular component for a particular data stream
+	// that have the same type, the local preference MUST be unique for each
+	// one.
+	return (2^24)*c.Type.Preference() +
+		(2^8)*c.LocalPreference +
+		(2^0)*(256-c.Component)
 }
 
 // Equal is used to compare two CandidateBases

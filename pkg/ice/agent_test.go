@@ -41,6 +41,79 @@ func TestPairSearch(t *testing.T) {
 	}
 }
 
+func TestPairPriority(t *testing.T) {
+	// avoid deadlocks?
+	defer test.TimeOut(1 * time.Second).Stop()
+
+	a, err := NewAgent(&AgentConfig{})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %s", err)
+	}
+
+	hostLocal, err := NewCandidateHost(
+		"udp",
+		net.ParseIP("192.168.1.1"), 19216,
+		1,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct local host candidate: %s", err)
+	}
+
+	relayRemote, err := NewCandidateRelay(
+		"udp",
+		net.ParseIP("1.2.3.4"), 12340,
+		1,
+		"4.3.2.1", 43210,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct remote relay candidate: %s", err)
+	}
+
+	srflxRemote, err := NewCandidateServerReflexive(
+		"udp",
+		net.ParseIP("10.10.10.2"), 19218,
+		1,
+		"4.3.2.1", 43212,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct remote srflx candidate: %s", err)
+	}
+
+	prflxRemote, err := NewCandidatePeerReflexive(
+		"udp",
+		net.ParseIP("10.10.10.2"), 19217,
+		1,
+		"4.3.2.1", 43211,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct remote prflx candidate: %s", err)
+	}
+
+	hostRemote, err := NewCandidateHost(
+		"udp",
+		net.ParseIP("1.2.3.5"), 12350,
+		1,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct remote host candidate: %s", err)
+	}
+
+	for _, remote := range []*Candidate{relayRemote, srflxRemote, prflxRemote, hostRemote} {
+		a.setValidPair(hostLocal, remote, false, false)
+		bestPair, err := a.getBestPair()
+		if err != nil {
+			t.Fatalf("Failed to get best candidate pair: %s", err)
+		}
+		if bestPair.String() != (&candidatePair{remote: remote, local: hostLocal}).String() {
+			t.Fatalf("Unexpected bestPair %s (expected remote: %s)", bestPair, remote)
+		}
+	}
+
+	if err := a.Close(); err != nil {
+		t.Fatalf("Error on agent.Close(): %s", err)
+	}
+}
+
 type BadAddr struct{}
 
 func (ba *BadAddr) Network() string {
@@ -64,7 +137,7 @@ func TestHandlePeerReflexive(t *testing.T) {
 		}
 
 		ip := net.ParseIP("192.168.0.2")
-		local, err := NewCandidateHost("udp", ip, 777)
+		local, err := NewCandidateHost("udp", ip, 777, 1)
 		if err != nil {
 			t.Fatalf("failed to create a new candidate: %v", err)
 		}
@@ -113,7 +186,7 @@ func TestHandlePeerReflexive(t *testing.T) {
 		}
 
 		ip := net.ParseIP("192.168.0.2")
-		local, err := NewCandidateHost("tcp", ip, 777)
+		local, err := NewCandidateHost("tcp", ip, 777, 1)
 		if err != nil {
 			t.Fatalf("failed to create a new candidate: %v", err)
 		}
@@ -141,7 +214,7 @@ func TestHandlePeerReflexive(t *testing.T) {
 		}
 
 		ip := net.ParseIP("192.168.0.2")
-		local, err := NewCandidateHost("tcp", ip, 777)
+		local, err := NewCandidateHost("tcp", ip, 777, 1)
 		if err != nil {
 			t.Fatalf("failed to create a new candidate: %v", err)
 		}
