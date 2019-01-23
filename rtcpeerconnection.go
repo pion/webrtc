@@ -1063,6 +1063,10 @@ func (pc *RTCPeerConnection) RemoteDescription() *RTCSessionDescription {
 // to the existing set of candidates
 func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
 	// TODO: AddIceCandidate should take RTCIceCandidateInit
+	if pc.CurrentRemoteDescription != nil {
+		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
+	}
+
 	s = strings.TrimPrefix(s, "candidate:")
 
 	attribute := sdp.NewAttribute("candidate", s)

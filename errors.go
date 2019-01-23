@@ -71,4 +71,8 @@ var (
 
 	// ErrCodecNotFound is returned when a codec search to the Media Engine fails
 	ErrCodecNotFound = errors.New("Codec not found")
+
+	// ErrNoRemoteDescription indicates that an operation was rejected because
+	// the remote description is not set
+	ErrNoRemoteDescription = errors.New("remote description is not set")
 )
