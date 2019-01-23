@@ -15,7 +15,7 @@ func TestSettingEngine(t *testing.T) {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
+	dc := &RTCDataChannel{api: api}
 	_, err := dc.Detach()
 
 	if err == nil {
@@ -41,7 +41,7 @@ func TestSettingEngine(t *testing.T) {
 
 	api.settingEngine.DetachDataChannels()
 
-	dc = &RTCDataChannel{settingEngine: &api.settingEngine}
+	dc = &RTCDataChannel{api: api}
 	_, err = dc.Detach()
 
 	if err == nil {

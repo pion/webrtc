@@ -94,8 +94,8 @@ type RTCDataChannel struct {
 	sctpTransport *RTCSctpTransport
 	dataChannel   *datachannel.DataChannel
 
-	// A reference to the associated setting engine used by this datachannel
-	settingEngine *settingEngine
+	// A reference to the associated api object used by this datachannel
+	api *API
 }
 
 // NewRTCDataChannel creates a new RTCDataChannel.
@@ -131,10 +131,10 @@ func (api *API) newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataCha
 	}
 
 	d := &RTCDataChannel{
-		Label:         params.Label,
-		ID:            &params.ID,
-		ReadyState:    RTCDataChannelStateConnecting,
-		settingEngine: &api.settingEngine,
+		Label:      params.Label,
+		ID:         &params.ID,
+		ReadyState: RTCDataChannelStateConnecting,
+		api:        api,
 	}
 
 	return d, nil
@@ -250,7 +250,7 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.settingEngine.Detach.DataChannels {
+	if !d.api.settingEngine.Detach.DataChannels {
 		go d.readLoop()
 	}
 }
@@ -308,7 +308,7 @@ func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.settingEngine.Detach.DataChannels {
+	if !d.api.settingEngine.Detach.DataChannels {
 		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	}
 

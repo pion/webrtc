@@ -109,7 +109,7 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 	defer report()
 
 	api := NewAPI()
-	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
+	dc := &RTCDataChannel{api: api}
 
 	onOpenCalled := make(chan bool)
 	onMessageCalled := make(chan bool)
@@ -155,7 +155,7 @@ func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
 	defer report()
 
 	api := NewAPI()
-	dc := &RTCDataChannel{settingEngine: &api.settingEngine}
+	dc := &RTCDataChannel{api: api}
 
 	max := 512
 	out := make(chan int)
