@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/pions/dtls/pkg/dtls"
+	"github.com/pions/dtls"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
