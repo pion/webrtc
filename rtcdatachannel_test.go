@@ -105,6 +105,9 @@ func TestRTCDataChannel_Send(t *testing.T) {
 }
 
 func TestRTCDataChannel_EventHandlers(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
 	report := test.CheckRoutines(t)
 	defer report()
 
