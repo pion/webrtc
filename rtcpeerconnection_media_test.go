@@ -18,7 +18,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api.RegisterDefaultCodecs()
+	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)

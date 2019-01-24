@@ -49,7 +49,7 @@ type RTCIceTransport struct {
 // NewRTCIceTransport creates a new NewRTCIceTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCIceTransport(gatherer *RTCIceGatherer) *RTCIceTransport {
+func (api *API) NewRTCIceTransport(gatherer *RTCIceGatherer) *RTCIceTransport {
 	return &RTCIceTransport{gatherer: gatherer}
 }
 

@@ -19,12 +19,12 @@ import (
 )
 
 func (api *API) newPair() (pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection, err error) {
-	pca, err := api.New(RTCConfiguration{})
+	pca, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := api.New(RTCConfiguration{})
+	pcb, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -65,7 +65,7 @@ func TestNew(t *testing.T) {
 		certificate, err := GenerateCertificate(secretKey)
 		assert.Nil(t, err)
 
-		pc, err := api.New(RTCConfiguration{
+		pc, err := api.NewRTCPeerConnection(RTCConfiguration{
 			IceServers: []RTCIceServer{
 				{
 					URLs: []string{
@@ -107,12 +107,12 @@ func TestNew(t *testing.T) {
 				})
 				assert.Nil(t, err)
 
-				return api.New(RTCConfiguration{
+				return api.NewRTCPeerConnection(RTCConfiguration{
 					Certificates: []RTCCertificate{*certificate},
 				})
 			}, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{
+				return api.NewRTCPeerConnection(RTCConfiguration{
 					IceServers: []RTCIceServer{
 						{
 							URLs: []string{
@@ -144,7 +144,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 		certificate, err := GenerateCertificate(secretKey)
 		assert.Nil(t, err)
 
-		pc, err := api.New(RTCConfiguration{
+		pc, err := api.NewRTCPeerConnection(RTCConfiguration{
 			PeerIdentity:         "unittest",
 			Certificates:         []RTCCertificate{*certificate},
 			IceCandidatePoolSize: 5,
@@ -182,7 +182,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 			expectedErr    error
 		}{
 			{func() (*RTCPeerConnection, error) {
-				pc, err := api.New(RTCConfiguration{})
+				pc, err := api.NewRTCPeerConnection(RTCConfiguration{})
 				assert.Nil(t, err)
 
 				err = pc.Close()
@@ -192,14 +192,14 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				return RTCConfiguration{}
 			}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					PeerIdentity: "unittest",
 				}
 			}, &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				secretKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				assert.Nil(t, err)
@@ -218,7 +218,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				}
 			}, &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				assert.Nil(t, err)
@@ -231,14 +231,14 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 				}
 			}, &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					BundlePolicy: RTCBundlePolicyMaxCompat,
 				}
 			}, &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy}},
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					RtcpMuxPolicy: RTCRtcpMuxPolicyNegotiate,
@@ -246,7 +246,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 			}, &rtcerr.InvalidModificationError{Err: ErrModifyingRtcpMuxPolicy}},
 			// TODO Unittest for IceCandidatePoolSize cannot be done now needs pc.LocalDescription()
 			{func() (*RTCPeerConnection, error) {
-				return api.New(RTCConfiguration{})
+				return api.NewRTCPeerConnection(RTCConfiguration{})
 			}, func() RTCConfiguration {
 				return RTCConfiguration{
 					IceServers: []RTCIceServer{
@@ -276,7 +276,7 @@ func TestRTCPeerConnection_SetConfiguration(t *testing.T) {
 
 func TestRTCPeerConnection_GetConfiguration(t *testing.T) {
 	api := NewAPI()
-	pc, err := api.New(RTCConfiguration{})
+	pc, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	assert.Nil(t, err)
 
 	expected := RTCConfiguration{
@@ -335,7 +335,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		peerConn, err := api.New(RTCConfiguration{})
+		peerConn, err := api.NewRTCPeerConnection(RTCConfiguration{})
 		if err != nil {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
@@ -348,7 +348,7 @@ func TestSetRemoteDescription(t *testing.T) {
 
 func TestCreateOfferAnswer(t *testing.T) {
 	api := NewAPI()
-	offerPeerConn, err := api.New(RTCConfiguration{})
+	offerPeerConn, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	if err != nil {
 		t.Errorf("New RTCPeerConnection: got error: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Create Offer: got error: %v", err)
 	}
-	answerPeerConn, err := api.New(RTCConfiguration{})
+	answerPeerConn, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	if err != nil {
 		t.Errorf("New RTCPeerConnection: got error: %v", err)
 	}
@@ -376,9 +376,9 @@ func TestCreateOfferAnswer(t *testing.T) {
 
 func TestRTCPeerConnection_NewRawRTPTrack(t *testing.T) {
 	api := NewAPI()
-	api.RegisterDefaultCodecs()
+	api.mediaEngine.RegisterDefaultCodecs()
 
-	pc, err := api.New(RTCConfiguration{})
+	pc, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	assert.Nil(t, err)
 
 	_, err = pc.NewRawRTPTrack(DefaultPayloadTypeH264, 0, "trackId", "trackLabel")
@@ -399,9 +399,9 @@ func TestRTCPeerConnection_NewRawRTPTrack(t *testing.T) {
 
 func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 	api := NewAPI()
-	api.RegisterDefaultCodecs()
+	api.mediaEngine.RegisterDefaultCodecs()
 
-	pc, err := api.New(RTCConfiguration{})
+	pc, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	assert.Nil(t, err)
 
 	track, err := pc.NewRTCSampleTrack(DefaultPayloadTypeH264, "trackId", "trackLabel")
@@ -419,7 +419,7 @@ func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 
 func TestRTCPeerConnection_EventHandlers(t *testing.T) {
 	api := NewAPI()
-	pc, err := api.New(RTCConfiguration{})
+	pc, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	assert.Nil(t, err)
 
 	onTrackCalled := make(chan bool)

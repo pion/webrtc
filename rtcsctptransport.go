@@ -56,11 +56,6 @@ func (api *API) NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
 	return res
 }
 
-// NewRTCSctpTransport does the same as above, except with the default API object
-func NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
-	return defaultAPI.NewRTCSctpTransport(dtls)
-}
-
 // Transport returns the RTCDtlsTransport instance the RTCSctpTransport is sending over.
 func (r *RTCSctpTransport) Transport() *RTCDtlsTransport {
 	r.lock.RLock()

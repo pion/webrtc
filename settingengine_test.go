@@ -5,55 +5,57 @@ import (
 	"time"
 )
 
-func TestSettingEngine(t *testing.T) {
-	api := NewAPI()
+func TestSetEphemeralUDPPortRange(t *testing.T) {
+	s := SettingEngine{}
 
-	if (api.settingEngine.EphemeralUDP.PortMin != 0) ||
-		(api.settingEngine.EphemeralUDP.PortMax != 0) ||
-		(api.settingEngine.Timeout.ICEConnection != nil) ||
-		(api.settingEngine.Timeout.ICEKeepalive != nil) {
+	if s.ephemeralUDP.PortMin != 0 ||
+		s.ephemeralUDP.PortMax != 0 {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	dc := &RTCDataChannel{api: api}
-	_, err := dc.Detach()
-
-	if err == nil {
-		t.Fatalf("Should not be able to detach data channels before calling DetachDataChannels()")
-	}
-
-	//set bad ephemeral ports
-	err = api.settingEngine.SetEphemeralUDPPortRange(3000, 2999)
-	if err == nil {
+	// set bad ephemeral ports
+	if err := s.SetEphemeralUDPPortRange(3000, 2999); err == nil {
 		t.Fatalf("Setting engine should fail bad ephemeral ports.")
 	}
 
-	err = api.settingEngine.SetEphemeralUDPPortRange(3000, 4000)
-
-	if err != nil {
+	if err := s.SetEphemeralUDPPortRange(3000, 4000); err != nil {
 		t.Fatalf("Setting engine failed valid port range: %s", err)
 	}
 
-	if (api.settingEngine.EphemeralUDP.PortMin != 3000) ||
-		(api.settingEngine.EphemeralUDP.PortMax != 4000) {
+	if s.ephemeralUDP.PortMin != 3000 ||
+		s.ephemeralUDP.PortMax != 4000 {
 		t.Fatalf("Setting engine ports do not reflect expected range")
 	}
+}
 
-	api.settingEngine.DetachDataChannels()
+func TestSetConnectionTimeout(t *testing.T) {
+	s := SettingEngine{}
 
-	dc = &RTCDataChannel{api: api}
-	_, err = dc.Detach()
-
-	if err == nil {
-		t.Fatalf("Cannot detach data channels after calling DetachDataChannels()")
+	if s.timeout.ICEConnection != nil ||
+		s.timeout.ICEKeepalive != nil {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	api.settingEngine.SetConnectionTimeout(5*time.Second, 1*time.Second)
+	s.SetConnectionTimeout(5*time.Second, 1*time.Second)
 
-	if (api.settingEngine.Timeout.ICEConnection == nil) ||
-		(*api.settingEngine.Timeout.ICEConnection != 5*time.Second) ||
-		(api.settingEngine.Timeout.ICEKeepalive == nil) ||
-		(*api.settingEngine.Timeout.ICEKeepalive != 1*time.Second) {
+	if s.timeout.ICEConnection == nil ||
+		*s.timeout.ICEConnection != 5*time.Second ||
+		s.timeout.ICEKeepalive == nil ||
+		*s.timeout.ICEKeepalive != 1*time.Second {
 		t.Fatalf("ICE Timeouts do not reflect requested values.")
+	}
+}
+
+func TestDetachDataChannels(t *testing.T) {
+	s := SettingEngine{}
+
+	if s.detach.DataChannels {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
+	}
+
+	s.DetachDataChannels()
+
+	if !s.detach.DataChannels {
+		t.Fatalf("Failed to enable detached data channels.")
 	}
 }

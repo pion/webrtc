@@ -21,16 +21,16 @@ func TestGenerateDataChannelID(t *testing.T) {
 		c      *RTCPeerConnection
 		result uint16
 	}{
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 0},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 0},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 2},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 2: nil}, api: api}, 4},
-		{true, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 4: nil}, api: api}, 2},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 1},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 1},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 3},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 3: nil}, api: api}, 5},
-		{false, &RTCPeerConnection{sctpTransport: NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 5: nil}, api: api}, 3},
+		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 0},
+		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 0},
+		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 2},
+		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 2: nil}, api: api}, 4},
+		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 4: nil}, api: api}, 2},
+		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 1},
+		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 1},
+		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 3},
+		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 3: nil}, api: api}, 5},
+		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 5: nil}, api: api}, 3},
 	}
 
 	for _, testCase := range testCases {
