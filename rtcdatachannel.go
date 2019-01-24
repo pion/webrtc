@@ -105,13 +105,6 @@ type RTCDataChannel struct {
 // NewRTCDataChannel creates a new RTCDataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
-	return defaultAPI.NewRTCDataChannel(transport, params)
-}
-
-// NewRTCDataChannel creates a new RTCDataChannel.
-// This constructor is part of the ORTC API. It is not
-// meant to be used together with the basic WebRTC API.
 func (api *API) NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
 	d, err := api.newRTCDataChannel(params)
 	if err != nil {
@@ -285,7 +278,7 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.api.settingEngine.Detach.DataChannels {
+	if !d.api.settingEngine.detach.DataChannels {
 		go d.readLoop()
 	}
 }
@@ -367,7 +360,7 @@ func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.api.settingEngine.Detach.DataChannels {
+	if !d.api.settingEngine.detach.DataChannels {
 		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	}
 

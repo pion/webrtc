@@ -44,11 +44,6 @@ func (api *API) NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, er
 	}, nil
 }
 
-// NewRTCIceGatherer does the same as above, except with the default API object
-func NewRTCIceGatherer(opts RTCIceGatherOptions) (*RTCIceGatherer, error) {
-	return defaultAPI.NewRTCIceGatherer(opts)
-}
-
 // State indicates the current state of the ICE gatherer.
 func (g *RTCIceGatherer) State() RTCIceGathererState {
 	g.lock.RLock()
@@ -63,10 +58,10 @@ func (g *RTCIceGatherer) Gather() error {
 
 	config := &ice.AgentConfig{
 		Urls:              g.validatedServers,
-		PortMin:           g.api.settingEngine.EphemeralUDP.PortMin,
-		PortMax:           g.api.settingEngine.EphemeralUDP.PortMax,
-		ConnectionTimeout: g.api.settingEngine.Timeout.ICEConnection,
-		KeepaliveInterval: g.api.settingEngine.Timeout.ICEKeepalive,
+		PortMin:           g.api.settingEngine.ephemeralUDP.PortMin,
+		PortMax:           g.api.settingEngine.ephemeralUDP.PortMax,
+		ConnectionTimeout: g.api.settingEngine.timeout.ICEConnection,
+		KeepaliveInterval: g.api.settingEngine.timeout.ICEKeepalive,
 	}
 
 	agent, err := ice.NewAgent(config)

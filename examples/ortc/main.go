@@ -23,19 +23,22 @@ func main() {
 		},
 	}
 
+	// Create an API object
+	api := webrtc.NewAPI()
+
 	// Create the ICE gatherer
-	gatherer, err := webrtc.NewRTCIceGatherer(iceOptions)
+	gatherer, err := api.NewRTCIceGatherer(iceOptions)
 	util.Check(err)
 
 	// Construct the ICE transport
-	ice := webrtc.NewRTCIceTransport(gatherer)
+	ice := api.NewRTCIceTransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := webrtc.NewRTCDtlsTransport(ice, nil)
+	dtls, err := api.NewRTCDtlsTransport(ice, nil)
 	util.Check(err)
 
 	// Construct the SCTP transport
-	sctp := webrtc.NewRTCSctpTransport(dtls)
+	sctp := api.NewRTCSctpTransport(dtls)
 
 	// Handle incoming data channels
 	sctp.OnDataChannel(func(channel *webrtc.RTCDataChannel) {
@@ -99,7 +102,7 @@ func main() {
 			ID:    1,
 		}
 		var channel *webrtc.RTCDataChannel
-		channel, err = webrtc.NewRTCDataChannel(sctp, dcParams)
+		channel, err = api.NewRTCDataChannel(sctp, dcParams)
 		util.Check(err)
 
 		// Register the handlers

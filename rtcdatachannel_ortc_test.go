@@ -45,7 +45,7 @@ func TestRTCDataChannel_ORTCE2E(t *testing.T) {
 		Label: "Foo",
 		ID:    1,
 	}
-	channelA, err := NewRTCDataChannel(stackA.sctp, dcParams)
+	channelA, err := stackA.api.NewRTCDataChannel(stackA.sctp, dcParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +75,7 @@ func TestRTCDataChannel_ORTCE2E(t *testing.T) {
 }
 
 type testORTCStack struct {
+	api      *API
 	gatherer *RTCIceGatherer
 	ice      *RTCIceTransport
 	dtls     *RTCDtlsTransport
@@ -178,25 +179,29 @@ func newORTCPair() (stackA *testORTCStack, stackB *testORTCStack, err error) {
 }
 
 func newORTCStack() (*testORTCStack, error) {
+	// Create an API object
+	api := NewAPI()
+
 	// Create the ICE gatherer
-	gatherer, err := NewRTCIceGatherer(RTCIceGatherOptions{})
+	gatherer, err := api.NewRTCIceGatherer(RTCIceGatherOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the ICE transport
-	ice := NewRTCIceTransport(gatherer)
+	ice := api.NewRTCIceTransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := NewRTCDtlsTransport(ice, nil)
+	dtls, err := api.NewRTCDtlsTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the SCTP transport
-	sctp := NewRTCSctpTransport(dtls)
+	sctp := api.NewRTCSctpTransport(dtls)
 
 	return &testORTCStack{
+		api:      api,
 		gatherer: gatherer,
 		ice:      ice,
 		dtls:     dtls,

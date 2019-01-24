@@ -34,7 +34,7 @@ type RTCQuicTransport struct {
 // Note that the Quic transport is a draft and therefore
 // highly experimental. It is currently not supported by
 // any browsers yet.
-func NewRTCQuicTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCQuicTransport, error) {
+func (api *API) NewRTCQuicTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCQuicTransport, error) {
 	t := &RTCQuicTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {

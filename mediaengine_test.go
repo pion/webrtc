@@ -11,7 +11,7 @@ func TestCodecRegistration(t *testing.T) {
 	api := NewAPI()
 	const invalidPT = 255
 
-	api.RegisterDefaultCodecs()
+	api.mediaEngine.RegisterDefaultCodecs()
 
 	testCases := []struct {
 		c uint8

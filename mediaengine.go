@@ -8,13 +8,6 @@ import (
 	"github.com/pions/webrtc/pkg/rtp/codecs"
 )
 
-// RegisterCodec is used to register a codec with the DefaultMediaEngine
-func RegisterCodec(codec *RTCRtpCodec) {
-	defaultAPI.mediaEngine.RegisterCodec(codec)
-}
-
-// TODO: Phase out DefaultPayloadTypes in favor or dynamic assignment in 96-127 range
-
 // PayloadTypes for the default codecs
 const (
 	DefaultPayloadTypeG722 = 9
@@ -23,25 +16,6 @@ const (
 	DefaultPayloadTypeVP9  = 98
 	DefaultPayloadTypeH264 = 100
 )
-
-// RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
-func (api *API) RegisterDefaultCodecs() {
-	api.mediaEngine.RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
-	api.mediaEngine.RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
-	api.mediaEngine.RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
-	api.mediaEngine.RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
-	api.mediaEngine.RegisterCodec(NewRTCRtpVP9Codec(DefaultPayloadTypeVP9, 90000))
-}
-
-// RegisterDefaultCodecs calls the above on the default api object.
-func RegisterDefaultCodecs() {
-	defaultAPI.RegisterDefaultCodecs()
-}
-
-// InitMediaEngine initializes an empty media engine object.
-func InitMediaEngine(m *MediaEngine) {
-	*m = MediaEngine{}
-}
 
 // MediaEngine defines the codecs supported by a RTCPeerConnection
 type MediaEngine struct {
@@ -53,6 +27,15 @@ func (m *MediaEngine) RegisterCodec(codec *RTCRtpCodec) uint8 {
 	// TODO: generate PayloadType if not set
 	m.codecs = append(m.codecs, codec)
 	return codec.PayloadType
+}
+
+// RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
+func (m *MediaEngine) RegisterDefaultCodecs() {
+	m.RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
+	m.RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
+	m.RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
+	m.RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
+	m.RegisterCodec(NewRTCRtpVP9Codec(DefaultPayloadTypeVP9, 90000))
 }
 
 func (m *MediaEngine) getCodec(payloadType uint8) (*RTCRtpCodec, error) {

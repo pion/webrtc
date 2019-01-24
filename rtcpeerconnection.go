@@ -128,8 +128,8 @@ type RTCPeerConnection struct {
 	api *API
 }
 
-// New creates a new RTCPeerConfiguration with the provided configuration against the received API object
-func (api *API) New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+// NewRTCPeerConnection creates a new RTCPeerConnection with the provided configuration against the received API object
+func (api *API) NewRTCPeerConnection(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -178,11 +178,6 @@ func (api *API) New(configuration RTCConfiguration) (*RTCPeerConnection, error) 
 	}
 
 	return &pc, nil
-}
-
-// New creates a new RTCPeerConfiguration with the provided configuration
-func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
-	return defaultAPI.New(configuration)
 }
 
 // initConfiguration defines validation of the specified RTCConfiguration and
@@ -476,7 +471,7 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 }
 
 func (pc *RTCPeerConnection) createIceGatherer() (*RTCIceGatherer, error) {
-	g, err := NewRTCIceGatherer(RTCIceGatherOptions{
+	g, err := pc.api.NewRTCIceGatherer(RTCIceGatherOptions{
 		ICEServers: pc.configuration.IceServers,
 		// TODO: GatherPolicy
 	})
@@ -492,7 +487,7 @@ func (pc *RTCPeerConnection) gather() error {
 }
 
 func (pc *RTCPeerConnection) createICETransport() *RTCIceTransport {
-	t := NewRTCIceTransport(pc.iceGatherer)
+	t := pc.api.NewRTCIceTransport(pc.iceGatherer)
 
 	t.OnConnectionStateChange(func(state RTCIceTransportState) {
 		// We convert the state back to the ICE state to not brake the
@@ -505,7 +500,7 @@ func (pc *RTCPeerConnection) createICETransport() *RTCIceTransport {
 }
 
 func (pc *RTCPeerConnection) createDTLSTransport() (*RTCDtlsTransport, error) {
-	dtlsTransport, err := NewRTCDtlsTransport(pc.iceTransport, pc.configuration.Certificates)
+	dtlsTransport, err := pc.api.NewRTCDtlsTransport(pc.iceTransport, pc.configuration.Certificates)
 	return dtlsTransport, err
 }
 
@@ -800,7 +795,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 	fingerprintHash = parts[0]
 
 	// Create the SCTP transport
-	sctp := NewRTCSctpTransport(pc.dtlsTransport)
+	sctp := pc.api.NewRTCSctpTransport(pc.dtlsTransport)
 	pc.sctpTransport = sctp
 
 	// Wire up the on datachannel handler

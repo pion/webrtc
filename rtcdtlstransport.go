@@ -36,7 +36,7 @@ type RTCDtlsTransport struct {
 // NewRTCDtlsTransport creates a new RTCDtlsTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func NewRTCDtlsTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCDtlsTransport, error) {
+func (api *API) NewRTCDtlsTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCDtlsTransport, error) {
 	t := &RTCDtlsTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {

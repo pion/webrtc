@@ -19,7 +19,9 @@ func TestNewRTCIceGatherer_Success(t *testing.T) {
 		ICEServers: []RTCIceServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	gatherer, err := NewRTCIceGatherer(opts)
+	api := NewAPI()
+
+	gatherer, err := api.NewRTCIceGatherer(opts)
 	if err != nil {
 		t.Error(err)
 	}
