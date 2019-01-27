@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pions/webrtc/pkg/ice"
-
 	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtp"
 
@@ -387,6 +386,9 @@ func TestRTCPeerConnection_NewRawRTPTrack(t *testing.T) {
 	track, err := pc.NewRawRTPTrack(DefaultPayloadTypeH264, 123456, "trackId", "trackLabel")
 	assert.Nil(t, err)
 
+	_, err = pc.AddTrack(track)
+	assert.Nil(t, err)
+
 	// This channel should not be set up for a RawRTP track
 	assert.Panics(t, func() {
 		track.Samples <- media.RTCSample{}
@@ -405,6 +407,9 @@ func TestRTCPeerConnection_NewRTCSampleTrack(t *testing.T) {
 	assert.Nil(t, err)
 
 	track, err := pc.NewRTCSampleTrack(DefaultPayloadTypeH264, "trackId", "trackLabel")
+	assert.Nil(t, err)
+
+	_, err = pc.AddTrack(track)
 	assert.Nil(t, err)
 
 	// This channel should not be set up for a RTCSample track

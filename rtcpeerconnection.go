@@ -940,6 +940,8 @@ func (pc *RTCPeerConnection) drainSRTP() {
 
 			go func() {
 				rtpBuf := make([]byte, receiveMTU)
+				rtpPacket := &rtp.Packet{}
+
 				for {
 					i, err := r.Read(rtpBuf)
 					if err != nil {
@@ -947,7 +949,6 @@ func (pc *RTCPeerConnection) drainSRTP() {
 						return
 					}
 
-					var rtpPacket *rtp.Packet
 					if err := rtpPacket.Unmarshal(rtpBuf[:i]); err != nil {
 						pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
 						continue
@@ -1295,16 +1296,6 @@ func (pc *RTCPeerConnection) Close() error {
 		return nil
 	}
 
-	for _, t := range pc.rtpTransceivers {
-		if track := t.Sender.Track; track != nil {
-			if track.isRawRTP {
-				close(track.RawRTP)
-			} else {
-				close(track.Samples)
-			}
-		}
-	}
-
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.isClosed = true
 
@@ -1327,13 +1318,19 @@ func (pc *RTCPeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	// if err := pc.srtpSession.Close(); err != nil {
-	// 	closeErrs = append(closeErrs, err)
-	// }
+	if err := pc.dtlsTransport.srtpSession.Close(); err != nil {
+		closeErrs = append(closeErrs, err)
+	}
 
-	// if err := pc.srtcpSession.Close(); err != nil {
-	// 	closeErrs = append(closeErrs, err)
-	// }
+	if err := pc.dtlsTransport.srtcpSession.Close(); err != nil {
+		closeErrs = append(closeErrs, err)
+	}
+
+	for _, t := range pc.rtpTransceivers {
+		if err := t.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
 
 	if pc.sctpTransport != nil {
 		if err := pc.sctpTransport.Stop(); err != nil {

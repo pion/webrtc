@@ -44,6 +44,17 @@ func (r *RTCRtpSender) Send(parameters RTCRtpSendParameters) {
 	go r.handleRTCP(r.transport, rtcpInput)
 }
 
+// Stop irreversibly stops the RTCRtpSender
+func (r *RTCRtpSender) Stop() {
+	if r.Track.isRawRTP {
+		close(r.Track.RawRTP)
+	} else {
+		close(r.Track.Samples)
+	}
+
+	// TODO properly tear down all loops (and test that)
+}
+
 func (r *RTCRtpSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
 	for {
 		p, ok := <-rtpPackets
