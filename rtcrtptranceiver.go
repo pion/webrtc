@@ -32,5 +32,11 @@ func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) error {
 
 // Stop irreversibly stops the RTCRtpTransceiver
 func (t *RTCRtpTransceiver) Stop() error {
-	return errors.Errorf("TODO")
+	if t.Sender != nil {
+		t.Sender.Stop()
+	}
+	if t.Receiver != nil {
+		t.Receiver.Stop()
+	}
+	return nil
 }

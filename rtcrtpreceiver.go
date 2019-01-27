@@ -111,3 +111,8 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 
 	return r.hasRecv
 }
+
+// Stop irreversibly stops the RTCRtpReceiver
+func (r *RTCRtpReceiver) Stop() {
+	// TODO properly tear down all loops (and test that)
+}

@@ -121,7 +121,7 @@ func (t *RTCIceTransport) Stop() error {
 	if t.mux != nil {
 		return t.mux.Close()
 	}
-	return errors.New("No Mux configured for transport; nothing to close")
+	return nil
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
