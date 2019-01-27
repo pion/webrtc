@@ -13,7 +13,13 @@ import (
 
 	"github.com/pions/dtls"
 	"github.com/pions/webrtc/internal/mux"
+	"github.com/pions/webrtc/internal/srtp"
 	"github.com/pions/webrtc/pkg/rtcerr"
+)
+
+const (
+	srtpMasterKeyLen     = 16
+	srtpMasterKeySaltLen = 14
 )
 
 // RTCDtlsTransport allows an application access to information about the DTLS
@@ -31,13 +37,23 @@ type RTCDtlsTransport struct {
 	// OnError       func()
 
 	conn *dtls.Conn
+
+	srtpSession  *srtp.SessionSRTP
+	srtpEndpoint *mux.Endpoint
+
+	srtcpSession  *srtp.SessionSRTCP
+	srtcpEndpoint *mux.Endpoint
 }
 
 // NewRTCDtlsTransport creates a new RTCDtlsTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewRTCDtlsTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCDtlsTransport, error) {
-	t := &RTCDtlsTransport{iceTransport: transport}
+	t := &RTCDtlsTransport{
+		iceTransport: transport,
+		srtpSession:  srtp.CreateSessionSRTP(),
+		srtcpSession: srtp.CreateSessionSRTCP(),
+	}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -132,7 +148,64 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 		fmt.Println("Warning: Certificate not checked")
 	}
 
-	return nil
+	return t.startSRTP(isClient)
+}
+
+// Start SRTP transport
+// RTCDtlsTransport needs to own SRTP state to satisfy ORTC interfaces
+func (t *RTCDtlsTransport) startSRTP(isClient bool) error {
+	keyingMaterial, err := t.conn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
+	if err != nil {
+		return err
+	}
+
+	t.srtpEndpoint = t.iceTransport.mux.NewEndpoint(mux.MatchSRTP)
+	t.srtcpEndpoint = t.iceTransport.mux.NewEndpoint(mux.MatchSRTCP)
+
+	offset := 0
+	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	serverWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
+	offset += srtpMasterKeyLen
+
+	clientWriteKey = append(clientWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+	offset += srtpMasterKeySaltLen
+
+	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
+
+	if !isClient {
+		err = t.srtpSession.Start(
+			serverWriteKey[0:16], serverWriteKey[16:],
+			clientWriteKey[0:16], clientWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtpEndpoint,
+		)
+
+		if err == nil {
+			err = t.srtcpSession.Start(
+				serverWriteKey[0:16], serverWriteKey[16:],
+				clientWriteKey[0:16], clientWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtcpEndpoint,
+			)
+		}
+	} else {
+		err = t.srtpSession.Start(
+			clientWriteKey[0:16], clientWriteKey[16:],
+			serverWriteKey[0:16], serverWriteKey[16:],
+			srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtpEndpoint,
+		)
+
+		if err == nil {
+			err = t.srtcpSession.Start(
+				clientWriteKey[0:16], clientWriteKey[16:],
+				serverWriteKey[0:16], serverWriteKey[16:],
+				srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtcpEndpoint,
+			)
+		}
+	}
+
+	return err
+
 }
 
 func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameters, remoteCert *x509.Certificate) error {
