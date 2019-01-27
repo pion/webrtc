@@ -35,16 +35,16 @@ func (r *RTCRtpSender) Send(parameters RTCRtpSendParameters) {
 
 	if r.Track.isRawRTP {
 		close(r.Track.Samples)
-		go r.handleRawRTP(r.transport, rawInput)
+		go r.handleRawRTP(rawInput)
 	} else {
 		close(r.Track.RawRTP)
-		go r.handleSampleRTP(r.transport, sampleInput)
+		go r.handleSampleRTP(sampleInput)
 	}
 
 	go r.handleRTCP(r.transport, rtcpInput)
 }
 
-func (r *RTCRtpSender) handleRawRTP(transport *RTCDtlsTransport, rtpPackets chan *rtp.Packet) {
+func (r *RTCRtpSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
 	for {
 		p, ok := <-rtpPackets
 		if !ok {
@@ -56,7 +56,7 @@ func (r *RTCRtpSender) handleRawRTP(transport *RTCDtlsTransport, rtpPackets chan
 
 }
 
-func (r *RTCRtpSender) handleSampleRTP(transport *RTCDtlsTransport, rtpPackets chan media.RTCSample) {
+func (r *RTCRtpSender) handleSampleRTP(rtpPackets chan media.RTCSample) {
 	packetizer := rtp.NewPacketizer(
 		rtpOutboundMTU,
 		r.Track.PayloadType,

@@ -19,4 +19,5 @@ require (
 	github.com/marten-seemann/qtls v0.0.0-20190110111248-7a090b30c3ab // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
+	github.com/pions/srtp v1.0.0
 )
