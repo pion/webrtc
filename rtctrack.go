@@ -32,7 +32,7 @@ type RTCTrack struct {
 //
 // NB: If the source RTP stream is being broadcast to multiple tracks, each track
 // must receive its own copies of the source packets in order to avoid packet corruption.
-func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
+func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTCRtpCodec) (*RTCTrack, error) {
 	if ssrc == 0 {
 		return nil, errors.New("SSRC supplied to NewRawRTPTrack() must be non-zero")
 	}
@@ -42,8 +42,10 @@ func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack
 
 		ID:          id,
 		PayloadType: payloadType,
+		Kind:        codec.Type,
 		Label:       label,
 		Ssrc:        ssrc,
+		Codec:       codec,
 	}, nil
 }
 

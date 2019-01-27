@@ -64,7 +64,6 @@ func (r *RTCRtpSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
 
 		r.sendRTP(p)
 	}
-
 }
 
 func (r *RTCRtpSender) handleSampleRTP(rtpPackets chan media.RTCSample) {
@@ -91,7 +90,13 @@ func (r *RTCRtpSender) handleSampleRTP(rtpPackets chan media.RTCSample) {
 }
 
 func (r *RTCRtpSender) handleRTCP(transport *RTCDtlsTransport, rtcpPackets chan rtcp.Packet) {
-	readStream, err := transport.srtcpSession.OpenReadStream(r.Track.Ssrc)
+	srtcpSession, err := transport.getSRTCPSession()
+	if err != nil {
+		pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, r.Track.Ssrc)
+		return
+	}
+
+	readStream, err := srtcpSession.OpenReadStream(r.Track.Ssrc)
 	if err != nil {
 		pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, r.Track.Ssrc)
 		return
@@ -121,7 +126,13 @@ func (r *RTCRtpSender) handleRTCP(transport *RTCDtlsTransport, rtcpPackets chan 
 }
 
 func (r *RTCRtpSender) sendRTP(packet *rtp.Packet) {
-	writeStream, err := r.transport.srtpSession.OpenWriteStream()
+	srtpSession, err := r.transport.getSRTPSession()
+	if err != nil {
+		pcLog.Warnf("SendRTP failed to open SrtpSession: %v", err)
+		return
+	}
+
+	writeStream, err := srtpSession.OpenWriteStream()
 	if err != nil {
 		pcLog.Warnf("SendRTP failed to open WriteStream: %v", err)
 		return
