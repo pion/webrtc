@@ -17,6 +17,7 @@ import (
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pions/webrtc/pkg/rtcp"
+	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 
@@ -833,6 +834,7 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		} else {
 			pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
 		}
+		go pc.drainSRTP()
 
 		// Start sctp
 		err = pc.sctpTransport.Start(RTCSctpCapabilities{
@@ -923,11 +925,39 @@ func (pc *RTCPeerConnection) openSRTP() {
 
 }
 
-// drainSRTCP pulls and discards RTCP packets that don't match any SRTP
+// drainSRTP pulls and discards RTP/RTCP packets that don't match any SRTP
 // These could be sent to the user, but right now we don't provide an API
 // to distribute orphaned RTCP messages. This is needed to make sure we don't block
 // and provides useful debugging messages
-func (pc *RTCPeerConnection) drainSRTCP() {
+func (pc *RTCPeerConnection) drainSRTP() {
+	go func() {
+		for {
+			r, ssrc, err := pc.dtlsTransport.srtpSession.AcceptStream()
+			if err != nil {
+				pcLog.Warnf("Failed to accept RTP %v \n", err)
+				return
+			}
+
+			go func() {
+				rtpBuf := make([]byte, receiveMTU)
+				for {
+					i, err := r.Read(rtpBuf)
+					if err != nil {
+						pcLog.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
+						return
+					}
+
+					var rtpPacket *rtp.Packet
+					if err := rtpPacket.Unmarshal(rtpBuf[:i]); err != nil {
+						pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
+						continue
+					}
+					pcLog.Debugf("got RTP: %+v", rtpPacket)
+				}
+			}()
+		}
+	}()
+
 	for {
 		r, ssrc, err := pc.dtlsTransport.srtcpSession.AcceptStream()
 		if err != nil {
@@ -952,7 +982,6 @@ func (pc *RTCPeerConnection) drainSRTCP() {
 				pcLog.Debugf("got RTCP: %+v", rtcpPacket)
 			}
 		}()
-
 	}
 }
 
