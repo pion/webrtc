@@ -1,7 +1,5 @@
 package webrtc
 
-// TODO: figure out how to avoid leaking
-/*
 import (
 	"testing"
 	"time"
@@ -79,6 +77,7 @@ type testQuicStack struct {
 	gatherer *RTCIceGatherer
 	ice      *RTCIceTransport
 	quic     *RTCQuicTransport
+	api      *API
 }
 
 func (s *testQuicStack) setSignal(sig *testQuicSignal, isOffer bool) error {
@@ -168,22 +167,24 @@ func newQuicPair() (stackA *testQuicStack, stackB *testQuicStack, err error) {
 }
 
 func newQuicStack() (*testQuicStack, error) {
+	api := NewAPI()
 	// Create the ICE gatherer
-	gatherer, err := NewRTCIceGatherer(RTCIceGatherOptions{})
+	gatherer, err := api.NewRTCIceGatherer(RTCIceGatherOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the ICE transport
-	ice := NewRTCIceTransport(gatherer)
+	ice := api.NewRTCIceTransport(gatherer)
 
 	// Construct the Quic transport
-	qt, err := NewRTCQuicTransport(ice, nil)
+	qt, err := api.NewRTCQuicTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &testQuicStack{
+		api:      api,
 		gatherer: gatherer,
 		ice:      ice,
 		quic:     qt,
@@ -218,5 +219,3 @@ func signalQuicPair(stackA *testQuicStack, stackB *testQuicStack) error {
 
 	return flattenErrs(closeErrs)
 }
-
-*/
