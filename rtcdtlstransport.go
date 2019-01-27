@@ -29,8 +29,9 @@ const (
 type RTCDtlsTransport struct {
 	lock sync.RWMutex
 
-	iceTransport *RTCIceTransport
-	certificates []RTCCertificate
+	iceTransport     *RTCIceTransport
+	certificates     []RTCCertificate
+	remoteParameters RTCDtlsParameters
 	// State     RTCDtlsTransportState
 
 	// OnStateChange func()
@@ -38,10 +39,10 @@ type RTCDtlsTransport struct {
 
 	conn *dtls.Conn
 
-	srtpSession  *srtp.SessionSRTP
-	srtpEndpoint *mux.Endpoint
-
+	srtpHasKeyed  bool
+	srtpSession   *srtp.SessionSRTP
 	srtcpSession  *srtp.SessionSRTCP
+	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
 }
 
@@ -49,11 +50,7 @@ type RTCDtlsTransport struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewRTCDtlsTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCDtlsTransport, error) {
-	t := &RTCDtlsTransport{
-		iceTransport: transport,
-		srtpSession:  srtp.CreateSessionSRTP(),
-		srtcpSession: srtp.CreateSessionSRTCP(),
-	}
+	t := &RTCDtlsTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -93,74 +90,25 @@ func (t *RTCDtlsTransport) GetLocalParameters() RTCDtlsParameters {
 	}
 }
 
-// Start DTLS transport negotiation with the parameters of the remote DTLS transport
-func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
+func (t *RTCDtlsTransport) startSRTP() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if err := t.ensureICEConn(); err != nil {
-		return err
+	if t.srtpSession == nil {
+		t.srtpSession = srtp.CreateSessionSRTP()
 	}
-
-	mx := t.iceTransport.mux
-	dtlsEndpoint := mx.NewEndpoint(mux.MatchDTLS)
-
-	// TODO: handle multiple certs
-	cert := t.certificates[0]
-
-	isClient := true
-	switch remoteParameters.Role {
-	case RTCDtlsRoleClient:
-		isClient = true
-	case RTCDtlsRoleServer:
-		isClient = false
-	default:
-		if t.iceTransport.Role() == RTCIceRoleControlling {
-			isClient = false
-		}
+	if t.srtcpSession == nil {
+		t.srtcpSession = srtp.CreateSessionSRTCP()
 	}
-
-	dtlsCofig := &dtls.Config{Certificate: cert.x509Cert, PrivateKey: cert.privateKey}
-	if isClient {
-		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsCofig)
-		if err != nil {
-			return err
-		}
-		t.conn = dtlsConn
-	} else {
-		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err := dtls.Server(dtlsEndpoint, dtlsCofig)
-		if err != nil {
-			return err
-		}
-		t.conn = dtlsConn
+	if t.conn == nil || t.srtpHasKeyed {
+		return nil
 	}
+	t.srtpHasKeyed = true
 
-	// Check the fingerprint if a certificate was exchanged
-	remoteCert := t.conn.RemoteCertificate()
-	if remoteCert != nil {
-		err := t.validateFingerPrint(remoteParameters, remoteCert)
-		if err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("Warning: Certificate not checked")
-	}
-
-	return t.startSRTP(isClient)
-}
-
-// Start SRTP transport
-// RTCDtlsTransport needs to own SRTP state to satisfy ORTC interfaces
-func (t *RTCDtlsTransport) startSRTP(isClient bool) error {
 	keyingMaterial, err := t.conn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
 	if err != nil {
 		return err
 	}
-
-	t.srtpEndpoint = t.iceTransport.mux.NewEndpoint(mux.MatchSRTP)
-	t.srtcpEndpoint = t.iceTransport.mux.NewEndpoint(mux.MatchSRTCP)
 
 	offset := 0
 	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
@@ -174,7 +122,7 @@ func (t *RTCDtlsTransport) startSRTP(isClient bool) error {
 
 	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
 
-	if !isClient {
+	if !t.isClient() {
 		err = t.srtpSession.Start(
 			serverWriteKey[0:16], serverWriteKey[16:],
 			clientWriteKey[0:16], clientWriteKey[16:],
@@ -206,6 +154,100 @@ func (t *RTCDtlsTransport) startSRTP(isClient bool) error {
 
 	return err
 
+}
+
+func (t *RTCDtlsTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
+	t.lock.RLock()
+	if t.srtpSession != nil && t.srtpHasKeyed {
+		t.lock.RUnlock()
+		return t.srtpSession, nil
+	}
+	t.lock.RUnlock()
+
+	if err := t.startSRTP(); err != nil {
+		return nil, err
+	}
+
+	return t.srtpSession, nil
+}
+
+func (t *RTCDtlsTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
+	t.lock.RLock()
+	if t.srtcpSession != nil && t.srtpHasKeyed {
+		t.lock.RUnlock()
+		return t.srtcpSession, nil
+	}
+	t.lock.RUnlock()
+
+	if err := t.startSRTP(); err != nil {
+		return nil, err
+	}
+
+	return t.srtcpSession, nil
+}
+
+func (t *RTCDtlsTransport) isClient() bool {
+	isClient := true
+	switch t.remoteParameters.Role {
+	case RTCDtlsRoleClient:
+		isClient = true
+	case RTCDtlsRoleServer:
+		isClient = false
+	default:
+		if t.iceTransport.Role() == RTCIceRoleControlling {
+			isClient = false
+		}
+	}
+
+	return isClient
+}
+
+// Start DTLS transport negotiation with the parameters of the remote DTLS transport
+func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if err := t.ensureICEConn(); err != nil {
+		return err
+	}
+
+	mx := t.iceTransport.mux
+	dtlsEndpoint := mx.NewEndpoint(mux.MatchDTLS)
+	t.srtpEndpoint = mx.NewEndpoint(mux.MatchSRTP)
+	t.srtcpEndpoint = mx.NewEndpoint(mux.MatchSRTCP)
+
+	// TODO: handle multiple certs
+	cert := t.certificates[0]
+
+	dtlsCofig := &dtls.Config{Certificate: cert.x509Cert, PrivateKey: cert.privateKey}
+	if t.isClient() {
+		// Assumes the peer offered to be passive and we accepted.
+		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsCofig)
+		if err != nil {
+			return err
+		}
+		t.conn = dtlsConn
+	} else {
+		// Assumes we offer to be passive and this is accepted.
+		dtlsConn, err := dtls.Server(dtlsEndpoint, dtlsCofig)
+		if err != nil {
+			return err
+		}
+		t.conn = dtlsConn
+	}
+
+	// Check the fingerprint if a certificate was exchanged
+	remoteCert := t.conn.RemoteCertificate()
+	if remoteCert != nil {
+		err := t.validateFingerPrint(remoteParameters, remoteCert)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Warning: Certificate not checked")
+	}
+
+	return nil
 }
 
 func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameters, remoteCert *x509.Certificate) error {

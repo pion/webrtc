@@ -932,7 +932,13 @@ func (pc *RTCPeerConnection) openSRTP() {
 func (pc *RTCPeerConnection) drainSRTP() {
 	go func() {
 		for {
-			r, ssrc, err := pc.dtlsTransport.srtpSession.AcceptStream()
+			srtpSession, err := pc.dtlsTransport.getSRTPSession()
+			if err != nil {
+				pcLog.Warnf("drainSRTP failed to open SrtpSession: %v", err)
+				return
+			}
+
+			r, ssrc, err := srtpSession.AcceptStream()
 			if err != nil {
 				pcLog.Warnf("Failed to accept RTP %v \n", err)
 				return
@@ -960,7 +966,13 @@ func (pc *RTCPeerConnection) drainSRTP() {
 	}()
 
 	for {
-		r, ssrc, err := pc.dtlsTransport.srtcpSession.AcceptStream()
+		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+		if err != nil {
+			pcLog.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
+			return
+		}
+
+		r, ssrc, err := srtcpSession.AcceptStream()
 		if err != nil {
 			pcLog.Warnf("Failed to accept RTCP %v \n", err)
 			return
@@ -1278,7 +1290,12 @@ func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
 		return err
 	}
 
-	writeStream, err := pc.dtlsTransport.srtcpSession.OpenWriteStream()
+	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+	if err != nil {
+		return fmt.Errorf("SendRTCP failed to open SRTCPSession: %v", err)
+	}
+
+	writeStream, err := srtcpSession.OpenWriteStream()
 	if err != nil {
 		return fmt.Errorf("SendRTCP failed to open WriteStream: %v", err)
 	}
@@ -1318,12 +1335,16 @@ func (pc *RTCPeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	if err := pc.dtlsTransport.srtpSession.Close(); err != nil {
-		closeErrs = append(closeErrs, err)
+	if pc.dtlsTransport.srtpSession != nil {
+		if err := pc.dtlsTransport.srtpSession.Close(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
 	}
 
-	if err := pc.dtlsTransport.srtcpSession.Close(); err != nil {
-		closeErrs = append(closeErrs, err)
+	if pc.dtlsTransport.srtcpSession != nil {
+		if err := pc.dtlsTransport.srtcpSession.Close(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
 	}
 
 	for _, t := range pc.rtpTransceivers {
@@ -1476,7 +1497,14 @@ func (pc *RTCPeerConnection) addDataMediaSection(d *sdp.SessionDescription, midV
 //
 // See NewRTCSampleTrack for documentation
 func (pc *RTCPeerConnection) NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*RTCTrack, error) {
-	return NewRawRTPTrack(payloadType, ssrc, id, label)
+	codec, err := pc.api.mediaEngine.getCodec(payloadType)
+	if err != nil {
+		return nil, err
+	} else if codec.Payloader == nil {
+		return nil, errors.New("codec payloader not set")
+	}
+
+	return NewRawRTPTrack(payloadType, ssrc, id, label, codec)
 }
 
 // NewRTCSampleTrack Creates a new RTCTrack

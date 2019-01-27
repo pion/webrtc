@@ -48,7 +48,13 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			}
 		}()
 
-		readStream, err := r.transport.srtpSession.OpenReadStream(parameters.encodings.SSRC)
+		srtpSession, err := r.transport.getSRTPSession()
+		if err != nil {
+			pcLog.Warnf("Failed to open SRTPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			return
+		}
+
+		readStream, err := srtpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
 			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
@@ -83,7 +89,13 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 
 	// RTCP ReadLoop
 	go func() {
-		readStream, err := r.transport.srtcpSession.OpenReadStream(parameters.encodings.SSRC)
+		srtcpSession, err := r.transport.getSRTCPSession()
+		if err != nil {
+			pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			return
+		}
+
+		readStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
 			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
