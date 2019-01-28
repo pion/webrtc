@@ -26,6 +26,16 @@ func (p *candidatePair) String() string {
 		p.Priority(), p.local.Priority(), p.local, p.remote, p.remote.Priority())
 }
 
+func (p *candidatePair) Equal(other *candidatePair) bool {
+	if p == nil && other == nil {
+		return true
+	}
+	if p == nil || other == nil {
+		return false
+	}
+	return p.local.Equal(other.local) && p.remote.Equal(other.remote)
+}
+
 // RFC 5245 - 5.7.2.  Computing Pair Priority and Ordering Pairs
 // Let G be the priority for the candidate provided by the controlling
 // agent.  Let D be the priority for the candidate provided by the

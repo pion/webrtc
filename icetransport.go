@@ -19,7 +19,8 @@ type ICETransport struct {
 	// State ICETransportState
 	// gatheringState ICEGathererState
 
-	onConnectionStateChangeHdlr func(ICETransportState)
+	onConnectionStateChangeHdlr       func(ICETransportState)
+	onSelectedCandidatePairChangeHdlr func(*ICECandidatePair)
 
 	gatherer *ICEGatherer
 	conn     *ice.Conn
@@ -67,10 +68,19 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 
 	agent := t.gatherer.agent
-	err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
+	if err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
 		t.onConnectionStateChange(newICETransportStateFromICE(iceState))
-	})
-	if err != nil {
+	}); err != nil {
+		return err
+	}
+	if err := agent.OnSelectedCandidatePairChange(func(local, remote *ice.Candidate) {
+		candidates, err := newICECandidatesFromICE([]*ice.Candidate{local, remote})
+		if err != nil {
+			pcLog.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
+			return
+		}
+		t.onSelectedCandidatePairChange(NewICECandidatePair(&candidates[0], &candidates[1]))
+	}); err != nil {
 		return err
 	}
 
@@ -85,6 +95,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	t.lock.Unlock()
 
 	var iceConn *ice.Conn
+	var err error
 	switch *role {
 	case ICERoleControlling:
 		iceConn, err = agent.Dial(context.TODO(),
@@ -122,6 +133,23 @@ func (t *ICETransport) Stop() error {
 		return t.mux.Close()
 	}
 	return nil
+}
+
+// OnSelectedCandidatePairChange sets a handler that is invoked when a new
+// ICE candidate pair is selected
+func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.onSelectedCandidatePairChangeHdlr = f
+}
+
+func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
+	t.lock.RLock()
+	hdlr := t.onSelectedCandidatePairChangeHdlr
+	t.lock.RUnlock()
+	if hdlr != nil {
+		hdlr(pair)
+	}
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
