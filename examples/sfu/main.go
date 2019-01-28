@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 var peerConnectionConfig = webrtc.RTCConfiguration{

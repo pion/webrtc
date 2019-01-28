@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pions/webrtc/pkg/rtp"
-	"github.com/pions/webrtc/pkg/rtp/codecs"
+	"github.com/pions/rtp"
+	"github.com/pions/rtp/codecs"
 )
 
 // IVFWriter is used to take RTP packets and write them to an IVF on disk

@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 	"github.com/pions/sdp"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
-	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 

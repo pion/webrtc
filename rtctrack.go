@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp"
 	"github.com/pkg/errors"
 )
 

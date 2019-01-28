@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/rtcp"
 	"github.com/pions/transport/test"
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/rtcp"
 )
 
 func TestRTCPeerConnection_Media_Sample(t *testing.T) {

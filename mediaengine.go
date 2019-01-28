@@ -3,9 +3,9 @@ package webrtc
 import (
 	"strconv"
 
+	"github.com/pions/rtp"
+	"github.com/pions/rtp/codecs"
 	"github.com/pions/sdp"
-	"github.com/pions/webrtc/pkg/rtp"
-	"github.com/pions/webrtc/pkg/rtp/codecs"
 )
 
 // PayloadTypes for the default codecs

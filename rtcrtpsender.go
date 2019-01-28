@@ -1,9 +1,9 @@
 package webrtc
 
 import (
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 const rtpOutboundMTU = 1400
