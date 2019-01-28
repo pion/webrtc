@@ -1,8 +1,8 @@
 package samplebuilder
 
 import (
+	"github.com/pions/rtp"
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/rtp"
 )
 
 // SampleBuilder contains all packets

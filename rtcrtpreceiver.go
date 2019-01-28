@@ -1,8 +1,8 @@
 package webrtc
 
 import (
-	"github.com/pions/webrtc/pkg/rtcp"
-	"github.com/pions/webrtc/pkg/rtp"
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack

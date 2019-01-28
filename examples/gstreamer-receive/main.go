@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pions/rtcp"
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
 	gst "github.com/pions/webrtc/examples/util/gstreamer-sink"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/rtcp"
 )
 
 func main() {
