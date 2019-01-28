@@ -38,6 +38,14 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 	}, nil
 }
 
+// Transport returns the currently-configured *DTLSTransport or nil
+// if one has not yet been configured
+func (r *RTPReceiver) Transport() *DTLSTransport {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.transport
+}
+
 // Track returns the RTCRtpTransceiver track
 func (r *RTPReceiver) Track() *Track {
 	r.mu.RLock()

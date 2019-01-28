@@ -69,6 +69,14 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 	return t, nil
 }
 
+// ICETransport returns the currently-configured *ICETransport or nil
+// if one has not been configured
+func (t *DTLSTransport) ICETransport() *ICETransport {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.iceTransport
+}
+
 // GetLocalParameters returns the DTLS parameters of the local DTLSTransport upon construction.
 func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
 	fingerprints := []DTLSFingerprint{}

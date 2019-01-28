@@ -141,3 +141,11 @@ func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 		return ICECandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
 	}
 }
+
+func (c ICECandidate) String() string {
+	ic, err := c.toICE()
+	if err != nil {
+		return fmt.Sprintf("%#v failed to convert to ICE: %s", c, err)
+	}
+	return ic.String()
+}
