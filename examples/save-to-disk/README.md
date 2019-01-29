@@ -6,6 +6,11 @@ save-to-disk is a simple application that shows how to record your webcam using 
 ```
 go get github.com/pions/webrtc/examples/save-to-disk
 ```
+### Build 
+```
+cd $GOPATH/src/github.com/pions/webrtc/examples/save-to-disk
+go build
+```
 
 ### Open save-to-disk example page
 [jsfiddle.net](https://jsfiddle.net/dyj8qpek/19/) you should see your Webcam, two text-areas and a 'Start Session' button
