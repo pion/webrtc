@@ -1,11 +1,8 @@
 package webrtc
 
 import (
-	"strconv"
-
 	"github.com/pions/rtp"
 	"github.com/pions/rtp/codecs"
-	"github.com/pions/sdp/v2"
 )
 
 // PayloadTypes for the default codecs
@@ -47,15 +44,22 @@ func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
 	return nil, ErrCodecNotFound
 }
 
-func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
+func (m *MediaEngine) getCodecSDP(codecParams RTPCodecParameters) (*RTPCodec, error) {
 	for _, codec := range m.codecs {
-		if codec.Name == sdpCodec.Name &&
-			codec.ClockRate == sdpCodec.ClockRate &&
-			(sdpCodec.EncodingParameters == "" ||
-				strconv.Itoa(int(codec.Channels)) == sdpCodec.EncodingParameters) &&
-			codec.SDPFmtpLine == sdpCodec.Fmtp { // TODO: Protocol specific matching?
+		if codec.Name == codecParams.Name &&
+			codec.ClockRate == codecParams.ClockRate &&
+			codec.Channels == codecParams.Channels {
+			ok, err := codecParams.equalFMTP(codec.SDPFmtpLine) // TODO: Protocol specific matching?
+			if err != nil {
+				pcLog.Warnf("failed compare FMTP: %v", err)
+				continue
+			}
+			if !ok {
+				continue
+			}
 			return codec, nil
 		}
+
 	}
 	return nil, ErrCodecNotFound
 }
@@ -92,7 +96,7 @@ func NewRTPG722Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 }
 
 // NewRTPOpusCodec is a helper to create an Opus codec
-func NewRTPOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *RTPCodec {
+func NewRTPOpusCodec(payloadType uint8, clockrate uint32, channels uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeAudio,
 		Opus,
 		clockrate,
@@ -176,7 +180,7 @@ func NewRTPCodec(
 	codecType RTPCodecType,
 	name string,
 	clockrate uint32,
-	channels uint16,
+	channels uint32,
 	fmtp string,
 	payloadType uint8,
 	payloader rtp.Payloader,
@@ -199,7 +203,7 @@ func NewRTPCodec(
 type RTPCodecCapability struct {
 	MimeType    string
 	ClockRate   uint32
-	Channels    uint16
+	Channels    uint32 // uint32 as specified in ORTC
 	SDPFmtpLine string
 }
 

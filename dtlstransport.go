@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/pions/dtls"
+	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 	"github.com/pions/srtp"
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/rtcerr"
@@ -84,20 +86,11 @@ func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
 	}
 }
 
+// Note: the caller should hold the datachannel lock.
 func (t *DTLSTransport) startSRTP() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if t.srtpSession != nil && t.srtcpSession != nil {
-		return nil
-	} else if t.conn == nil {
-		return fmt.Errorf("the DTLS transport has not started yet")
-	}
-
 	srtpConfig := &srtp.Config{
 		Profile: srtp.ProtectionProfileAes128CmHmacSha1_80,
 	}
-
 	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.isClient())
 	if err != nil {
 		return fmt.Errorf("failed to extract sctp session keys: %v", err)
@@ -110,42 +103,109 @@ func (t *DTLSTransport) startSRTP() error {
 
 	srtcpSession, err := srtp.NewSessionSRTCP(t.srtcpEndpoint, srtpConfig)
 	if err != nil {
-		return fmt.Errorf("failed to start srtp: %v", err)
+		return fmt.Errorf("failed to start srtcp: %v", err)
 	}
 
+	t.lock.Lock()
 	t.srtpSession = srtpSession
 	t.srtcpSession = srtcpSession
+	t.lock.Unlock()
+
 	return nil
 }
 
-func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
+func (t *DTLSTransport) getSrtpSession() (*srtp.SessionSRTP, error) {
 	t.lock.RLock()
-	if t.srtpSession != nil {
-		t.lock.RUnlock()
-		return t.srtpSession, nil
-	}
-	t.lock.RUnlock()
+	defer t.lock.RUnlock()
 
-	if err := t.startSRTP(); err != nil {
-		return nil, err
+	if t.srtpSession == nil {
+		return nil, errors.New("the SRTP session is not started")
 	}
 
 	return t.srtpSession, nil
 }
 
-func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
+func (t *DTLSTransport) getSrtcpSession() (*srtp.SessionSRTCP, error) {
 	t.lock.RLock()
-	if t.srtcpSession != nil {
-		t.lock.RUnlock()
-		return t.srtcpSession, nil
-	}
-	t.lock.RUnlock()
+	defer t.lock.RUnlock()
 
-	if err := t.startSRTP(); err != nil {
-		return nil, err
+	if t.srtcpSession == nil {
+		return nil, errors.New("the SRTCP session is not started")
 	}
 
 	return t.srtcpSession, nil
+}
+
+// drainSRTP pulls and discards RTP/RTCP packets that don't match any SRTP
+// These could be sent to the user, but right now we don't provide an API
+// to distribute orphaned RTCP messages. This is needed to make sure we don't block
+// and provides useful debugging messages
+func (t *DTLSTransport) drainSRTP() {
+	go t.drainRTPSessions()
+	go t.drainRTCPSessions()
+}
+
+func (t *DTLSTransport) drainRTPSessions() {
+	srtpSession := t.srtpSession
+	for {
+		s, ssrc, err := srtpSession.AcceptStream()
+		if err != nil {
+			pcLog.Warnf("Failed to accept RTP %v \n", err)
+			return
+		}
+
+		go t.drainRTPStream(s, ssrc)
+	}
+}
+
+func (t *DTLSTransport) drainRTPStream(stream *srtp.ReadStreamSRTP, ssrc uint32) {
+	rtpBuf := make([]byte, receiveMTU)
+	rtpPacket := &rtp.Packet{}
+
+	for {
+		i, err := stream.Read(rtpBuf)
+		if err != nil {
+			pcLog.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
+			return
+		}
+
+		if err := rtpPacket.Unmarshal(rtpBuf[:i]); err != nil {
+			pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
+			continue
+		}
+		pcLog.Debugf("got RTP: %+v", rtpPacket)
+	}
+}
+
+func (t *DTLSTransport) drainRTCPSessions() {
+	srtcpSession := t.srtcpSession
+	for {
+		s, ssrc, err := srtcpSession.AcceptStream()
+		if err != nil {
+			pcLog.Warnf("Failed to accept RTCP %v \n", err)
+			return
+		}
+
+		go t.drainRTCPStream(s, ssrc)
+	}
+}
+
+func (t *DTLSTransport) drainRTCPStream(stream *srtp.ReadStreamSRTCP, ssrc uint32) {
+	rtcpBuf := make([]byte, receiveMTU)
+	for {
+		i, err := stream.Read(rtcpBuf)
+		if err != nil {
+			pcLog.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
+			return
+		}
+
+		rtcpPacket, _, err := rtcp.Unmarshal(rtcpBuf[:i])
+		if err != nil {
+			pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
+			continue
+		}
+		pcLog.Debugf("got RTCP: %+v", rtcpPacket)
+	}
 }
 
 func (t *DTLSTransport) isClient() bool {
@@ -237,6 +297,7 @@ func (t *DTLSTransport) Stop() error {
 			closeErrs = append(closeErrs, err)
 		}
 	}
+
 	return flattenErrs(closeErrs)
 }
 

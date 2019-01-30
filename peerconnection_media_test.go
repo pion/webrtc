@@ -79,11 +79,15 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
 			vp8Track.Samples <- media.Sample{Data: []byte{0x00}, Samples: 1}
-
 			select {
 			case <-awaitRTPRecv:
 				close(awaitRTPSend)
@@ -113,11 +117,6 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		<-vp8Track.RTCPPackets
 		close(awaitRTCPSenderRecv)
 	}()
-
-	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	<-awaitRTPRecv
 	<-awaitRTPSend

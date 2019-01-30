@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
+	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pkg/errors"
 )
@@ -106,10 +106,11 @@ type PeerConnection struct {
 	onTrackHandler                    func(*Track)
 	onDataChannelHandler              func(*DataChannel)
 
-	iceGatherer   *ICEGatherer
-	iceTransport  *ICETransport
-	dtlsTransport *DTLSTransport
-	sctpTransport *SCTPTransport
+	iceGatherer        *ICEGatherer
+	iceTransport       *ICETransport
+	dtlsTransport      *DTLSTransport
+	sctpTransport      *SCTPTransport
+	hasBundleTransport bool
 
 	// A reference to the associated API state used by this connection
 	api *API
@@ -159,17 +160,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the ice transport
-	iceTransport := pc.createICETransport()
-	pc.iceTransport = iceTransport
-
-	// Create the DTLS transport
-	dtlsTransport, err := pc.createDTLSTransport()
-	if err != nil {
-		return nil, err
-	}
-	pc.dtlsTransport = dtlsTransport
 
 	return pc, nil
 }
@@ -510,6 +500,25 @@ func (pc *PeerConnection) createDTLSTransport() (*DTLSTransport, error) {
 	return dtlsTransport, err
 }
 
+func (pc *PeerConnection) createICEAndDTLSTransports() (*DTLSTransport, error) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	if pc.hasBundleTransport {
+		return pc.dtlsTransport, nil
+	}
+
+	pc.iceTransport = pc.createICETransport()
+
+	dtlsTransport, err := pc.createDTLSTransport()
+	if err != nil {
+		return nil, err
+	}
+	pc.dtlsTransport = dtlsTransport
+	pc.hasBundleTransport = true
+
+	return dtlsTransport, nil
+}
+
 // CreateAnswer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
@@ -747,6 +756,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		weOffer = false
 	}
 
+	// Create the ICE & DTLS transport
+	_, err := pc.createICEAndDTLSTransports()
+	if err != nil {
+		return err
+	}
+
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
 			switch {
@@ -787,7 +802,33 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprint = parts[1]
 	fingerprintHash = parts[0]
 
+	// Initialize RtcSenders
+	for _, t := range pc.rtpTransceivers {
+		if t.Sender != nil &&
+			t.Sender.Track != nil {
+			track := t.Sender.Track
+
+			if track.isRawRTP {
+				track.rawInput = make(chan *rtp.Packet, 15) // Is the buffering needed?
+				track.RawRTP = track.rawInput
+			} else {
+				track.sampleInput = make(chan media.Sample, 15) // Is the buffering needed?
+				track.Samples = track.sampleInput
+
+			}
+			track.rtcpInput = make(chan rtcp.Packet, 15) // Is the buffering needed?
+			track.RTCPPackets = track.rtcpInput
+		}
+	}
+
+	// Create RTPReceivers
+	err = pc.createRTPReceivers()
+	if err != nil {
+		return fmt.Errorf("failed to create receivers: %v", err)
+	}
+
 	// Create the SCTP transport
+	// TODO: Don't start SCTP if there are no data channels
 	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
 	pc.sctpTransport = sctp
 
@@ -802,7 +843,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	})
 
 	go func() {
-		// Star the networking in a new routine since it will block until
+		// Start the networking in a new routine since it will block until
 		// the connection is actually established.
 
 		// Start the ice transport
@@ -837,22 +878,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			return
 		}
 
-		if pc.onTrackHandler != nil {
-			pc.openSRTP()
-		} else {
-			pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
-		}
-
-		for _, tranceiver := range pc.rtpTransceivers {
-			if tranceiver.Sender != nil {
-				tranceiver.Sender.Send(RTPSendParameters{
-					encodings: RTPEncodingParameters{
-						RTPCodingParameters{SSRC: tranceiver.Sender.Track.SSRC, PayloadType: tranceiver.Sender.Track.PayloadType},
-					}})
+		// Start srtp
+		if len(pc.rtpTransceivers) > 0 {
+			err := pc.transceive()
+			if err != nil {
+				pcLog.Warnf("failed to transceive: %v", err)
 			}
 		}
-
-		go pc.drainSRTP()
 
 		// Start sctp
 		err = pc.sctpTransport.Start(SCTPCapabilities{
@@ -870,6 +902,26 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	return nil
 }
+func (pc *PeerConnection) transceive() error {
+	// Start SRTP
+	err := pc.dtlsTransport.startSRTP()
+	if err != nil {
+		return fmt.Errorf("failed to start SRTP: %v", err)
+	}
+
+	// Start the transceivers
+	for _, transceiver := range pc.rtpTransceivers {
+		err := transceiver.start()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Drain any incoming SRTP packets not configured
+	go pc.dtlsTransport.drainSRTP()
+
+	return nil
+}
 
 // openDataChannels opens the existing data channels
 func (pc *PeerConnection) openDataChannels() {
@@ -882,139 +934,50 @@ func (pc *PeerConnection) openDataChannels() {
 	}
 }
 
-// openSRTP opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) openSRTP() {
-	incomingSSRCes := map[uint32]RTPCodecType{}
-
-	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
-		for _, attr := range media.Attributes {
-			var codecType RTPCodecType
-			switch media.MediaName.Media {
-			case "audio":
-				codecType = RTPCodecTypeAudio
-			case "video":
-				codecType = RTPCodecTypeVideo
-			default:
-				continue
-			}
-
-			if attr.Key == sdp.AttrKeySSRC {
-				ssrc, err := strconv.ParseUint(strings.Split(attr.Value, " ")[0], 10, 32)
-				if err != nil {
-					pcLog.Warnf("Failed to parse SSRC: %v", err)
-					continue
-				}
-
-				incomingSSRCes[uint32(ssrc)] = codecType
-			}
+// createRtpReceivers creates RTCRtpReceiver based on the RemoteDescription
+func (pc *PeerConnection) createRTPReceivers() error {
+	for _, mediaSection := range pc.RemoteDescription().parsed.MediaDescriptions {
+		if _, err := sdpFindAttributePrefix(mediaSection, "recvonly", ""); err == nil {
+			// Don't create a receiver for a recvonly media section
+			continue
 		}
-	}
 
-	for i := range incomingSSRCes {
-		go func(ssrc uint32, codecType RTPCodecType) {
-			receiver := NewRTPReceiver(codecType, pc.dtlsTransport)
-			<-receiver.Receive(RTPReceiveParameters{
-				encodings: RTPDecodingParameters{
-					RTPCodingParameters{SSRC: ssrc},
-				}})
-
-			sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track.PayloadType)
-			if err != nil {
-				pcLog.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track.PayloadType)
-				return
-			}
-
-			codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
-			if err != nil {
-				pcLog.Warnf("codec %s in not registered", sdpCodec)
-				return
-			}
-
-			receiver.Track.Kind = codec.Type
-			receiver.Track.Codec = codec
-			pc.newRTPTransceiver(
-				receiver,
-				nil,
-				RTPTransceiverDirectionRecvonly,
-			)
-
-			pc.onTrack(receiver.Track)
-		}(i, incomingSSRCes[i])
-	}
-
-}
-
-// drainSRTP pulls and discards RTP/RTCP packets that don't match any SRTP
-// These could be sent to the user, but right now we don't provide an API
-// to distribute orphaned RTCP messages. This is needed to make sure we don't block
-// and provides useful debugging messages
-func (pc *PeerConnection) drainSRTP() {
-	go func() {
-		for {
-			srtpSession, err := pc.dtlsTransport.getSRTPSession()
-			if err != nil {
-				pcLog.Warnf("drainSRTP failed to open SrtpSession: %v", err)
-				return
-			}
-
-			r, ssrc, err := srtpSession.AcceptStream()
-			if err != nil {
-				pcLog.Warnf("Failed to accept RTP %v \n", err)
-				return
-			}
-
-			go func() {
-				rtpBuf := make([]byte, receiveMTU)
-				rtpPacket := &rtp.Packet{}
-
-				for {
-					i, err := r.Read(rtpBuf)
-					if err != nil {
-						pcLog.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
-						return
-					}
-
-					if err := rtpPacket.Unmarshal(rtpBuf[:i]); err != nil {
-						pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
-						continue
-					}
-					pcLog.Debugf("got RTP: %+v", rtpPacket)
-				}
-			}()
+		var codecType RTPCodecType
+		switch mediaSection.MediaName.Media {
+		case "audio":
+			codecType = RTPCodecTypeAudio
+		case "video":
+			codecType = RTPCodecTypeVideo
+		default:
+			// Skip data channels
+			continue
 		}
-	}()
 
-	for {
-		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+		remoteCapabilities, err := sdpParseRTPParameters(mediaSection)
 		if err != nil {
-			pcLog.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
-			return
+			return fmt.Errorf("failed to parse remote capabilities: %v", err)
 		}
 
-		r, ssrc, err := srtcpSession.AcceptStream()
+		recvDecodingParameters, err := sdpParseRTPDecodingParameters(mediaSection)
 		if err != nil {
-			pcLog.Warnf("Failed to accept RTCP %v \n", err)
-			return
+			pcLog.Warnf("failed to parse decoding parameters for media secion %s: %v", mediaSection.MediaName.Media, err)
+			continue
+			// return fmt.Errorf("failed to parse decoding parameters: %v", err)
 		}
 
-		go func() {
-			rtcpBuf := make([]byte, receiveMTU)
-			for {
-				i, err := r.Read(rtcpBuf)
-				if err != nil {
-					pcLog.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
-					return
-				}
+		receiver := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
+		// TODO: Check if trancevier exists?
+		transceiver := pc.newRTPTransceiver(
+			receiver,
+			nil,
+			RTPTransceiverDirectionRecvonly,
+		)
 
-				rtcpPacket, _, err := rtcp.Unmarshal(rtcpBuf[:i])
-				if err != nil {
-					pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
-					continue
-				}
-				pcLog.Debugf("got RTCP: %+v", rtcpPacket)
-			}
-		}()
+		transceiver.recvDecodingParameters = recvDecodingParameters
+		transceiver.remoteCapabilities = remoteCapabilities
 	}
+
+	return nil
 }
 
 // RemoteDescription returns PendingRemoteDescription if it is not null and
@@ -1077,7 +1040,7 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 	return result
 }
 
-// GetReceivers returns the RTPReceivers that are currently attached to this RTCPeerConnection
+// GetReceivers returns the RTPReceivers that are currently attached to this PeerConnection
 func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
@@ -1092,7 +1055,7 @@ func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 	return result
 }
 
-// GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
+// GetTransceivers returns the RTPTransceiver that are currently attached to this PeerConnection
 func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
@@ -1129,7 +1092,11 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			return nil, err
 		}
 	} else {
-		sender := NewRTPSender(track, pc.dtlsTransport)
+		dtlsTransport, err := pc.createICEAndDTLSTransports()
+		if err != nil {
+			return nil, err
+		}
+		sender := pc.api.NewRTPSender(track, dtlsTransport)
 		transceiver = pc.newRTPTransceiver(
 			nil,
 			sender,
@@ -1264,9 +1231,15 @@ func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
 		return err
 	}
 
-	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+	dtls := pc.dtlsTransport
+	if dtls == nil {
+		return errors.New("the DTLS transport is not started")
+	}
+
+	srtcpSession, err := dtls.getSrtcpSession()
 	if err != nil {
 		return nil // TODO SendRTCP before would gracefully discard packets until ready
+		// return err
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
@@ -1309,8 +1282,11 @@ func (pc *PeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	if err := pc.dtlsTransport.Stop(); err != nil {
-		closeErrs = append(closeErrs, err)
+	// TODO: Move before stopping ICE?
+	if pc.dtlsTransport != nil {
+		if err := pc.dtlsTransport.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
 	}
 
 	for _, t := range pc.rtpTransceivers {
@@ -1324,8 +1300,6 @@ func (pc *PeerConnection) Close() error {
 			closeErrs = append(closeErrs, err)
 		}
 	}
-
-	// TODO: Close DTLS?
 
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
@@ -1396,7 +1370,7 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
 
 	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
-		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
+		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, uint16(codec.Channels), codec.SDPFmtpLine)
 	}
 
 	weSend := false
@@ -1502,9 +1476,10 @@ func (pc *PeerConnection) newRTPTransceiver(
 ) *RTPTransceiver {
 
 	t := &RTPTransceiver{
-		Receiver:  receiver,
-		Sender:    sender,
-		Direction: direction,
+		Receiver:       receiver,
+		Sender:         sender,
+		Direction:      direction,
+		peerConnection: pc,
 	}
 	pc.mu.Lock()
 	defer pc.mu.Unlock()

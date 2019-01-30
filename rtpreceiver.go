@@ -14,8 +14,6 @@ type RTPReceiver struct {
 	kind      RTPCodecType
 	transport *DTLSTransport
 
-	hasRecv chan bool
-
 	Track *Track
 
 	closed bool
@@ -23,70 +21,95 @@ type RTPReceiver struct {
 
 	rtpOut        chan *rtp.Packet
 	rtpReadStream *srtp.ReadStreamSRTP
-	rtpOutDone    chan bool
+	rtpOutDone    chan struct{}
 
 	rtcpOut        chan rtcp.Packet
 	rtcpReadStream *srtp.ReadStreamSRTCP
-	rtcpOutDone    chan bool
+	rtcpOutDone    chan struct{}
+
+	// A reference to the associated api object
+	api *API
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
-func NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) *RTPReceiver {
+func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) *RTPReceiver {
 	return &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 
 		rtpOut:     make(chan *rtp.Packet, 15),
-		rtpOutDone: make(chan bool),
+		rtpOutDone: make(chan struct{}),
 
 		rtcpOut:     make(chan rtcp.Packet, 15),
-		rtcpOutDone: make(chan bool),
+		rtcpOutDone: make(chan struct{}),
 
-		hasRecv: make(chan bool),
+		api: api,
 	}
 }
 
-// Receive blocks until the Track is available
-func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) chan bool {
+// Receive blocks until the RTCTrack is available
+func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	// TODO atomic only allow this to fire once
+	ssrc := parameters.Encodings[0].SSRC
+
+	srtpSession := r.transport.srtpSession
+	readStreamRTP, err := srtpSession.OpenReadStream(ssrc)
+	if err != nil {
+		return fmt.Errorf("failed to open RTP ReadStream %d: %v", ssrc, err)
+	}
+
+	srtcpSession := r.transport.srtcpSession
+	readStreamRTCP, err := srtcpSession.OpenReadStream(ssrc)
+	if err != nil {
+		return fmt.Errorf("failed to open RTCP ReadStream %d: %v", ssrc, err)
+	}
+
+	// Start readloops
+	recvLoopRTP, payloadTypeCh := r.createRecvLoopRTP()
+
+	go recvLoopRTP(readStreamRTP, ssrc)
+	go r.recvLoopRTCP(readStreamRTCP, ssrc)
+
+	payloadType := <-payloadTypeCh
+	codecParams, err := parameters.getCodecParameters(payloadType)
+	if err != nil {
+		return fmt.Errorf("failed to find codec parameters: %v", err)
+	}
+
+	codec, err := r.api.mediaEngine.getCodecSDP(codecParams)
+	if err != nil {
+		return fmt.Errorf("codec %s is not registered", codecParams)
+	}
+
+	// Set the receiver track
 	r.Track = &Track{
-		Kind:        r.kind,
-		SSRC:        parameters.encodings.SSRC,
+		PayloadType: payloadType,
+		Kind:        codec.Type,
+		Codec:       codec,
+		SSRC:        ssrc,
 		Packets:     r.rtpOut,
 		RTCPPackets: r.rtcpOut,
 	}
 
-	// RTP ReadLoop
-	go func() {
-		payloadSet := false
+	return nil
+}
+
+func (r *RTPReceiver) createRecvLoopRTP() (func(stream *srtp.ReadStreamSRTP, ssrc uint32), chan uint8) {
+	payloadTypeCh := make(chan uint8)
+	return func(stream *srtp.ReadStreamSRTP, ssrc uint32) {
+		r.mu.Lock()
+		r.rtpReadStream = stream
+		r.mu.Unlock()
+
 		defer func() {
-			if !payloadSet {
-				close(r.hasRecv)
-			}
 			close(r.rtpOut)
 			close(r.rtpOutDone)
 		}()
-
-		srtpSession, err := r.transport.getSRTPSession()
-		if err != nil {
-			pcLog.Warnf("Failed to open SRTPSession, Track done for: %v %d \n", err, parameters.encodings.SSRC)
-			return
-		}
-
-		readStream, err := srtpSession.OpenReadStream(parameters.encodings.SSRC)
-		if err != nil {
-			pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, parameters.encodings.SSRC)
-			return
-		}
-		r.mu.Lock()
-		r.rtpReadStream = readStream
-		r.mu.Unlock()
-
 		readBuf := make([]byte, receiveMTU)
 		for {
-			rtpLen, err := readStream.Read(readBuf)
+			rtpLen, err := stream.Read(readBuf)
 			if err != nil {
-				pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, parameters.encodings.SSRC)
+				pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, ssrc)
 				return
 			}
 
@@ -96,62 +119,44 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) chan bool {
 				continue
 			}
 
-			if !payloadSet {
-				r.Track.PayloadType = rtpPacket.PayloadType
-				payloadSet = true
-				close(r.hasRecv)
-			}
-
 			select {
+			case payloadTypeCh <- rtpPacket.PayloadType:
+				payloadTypeCh = nil
 			case r.rtpOut <- &rtpPacket:
 			default:
 			}
 		}
+	}, payloadTypeCh
+}
+
+func (r *RTPReceiver) recvLoopRTCP(stream *srtp.ReadStreamSRTCP, ssrc uint32) {
+	r.mu.Lock()
+	r.rtcpReadStream = stream
+	r.mu.Unlock()
+
+	defer func() {
+		close(r.rtcpOut)
+		close(r.rtcpOutDone)
 	}()
-
-	// RTCP ReadLoop
-	go func() {
-		defer func() {
-			close(r.rtcpOut)
-			close(r.rtcpOutDone)
-		}()
-
-		srtcpSession, err := r.transport.getSRTCPSession()
+	readBuf := make([]byte, receiveMTU)
+	for {
+		rtcpLen, err := stream.Read(readBuf)
 		if err != nil {
-			pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, parameters.encodings.SSRC)
+			pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, ssrc)
 			return
 		}
 
-		readStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
+		rtcpPacket, _, err := rtcp.Unmarshal(append([]byte{}, readBuf[:rtcpLen]...))
 		if err != nil {
-			pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, parameters.encodings.SSRC)
-			return
+			pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
+			continue
 		}
-		r.mu.Lock()
-		r.rtcpReadStream = readStream
-		r.mu.Unlock()
 
-		readBuf := make([]byte, receiveMTU)
-		for {
-			rtcpLen, err := readStream.Read(readBuf)
-			if err != nil {
-				pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, parameters.encodings.SSRC)
-				return
-			}
-
-			rtcpPacket, _, err := rtcp.Unmarshal(append([]byte{}, readBuf[:rtcpLen]...))
-			if err != nil {
-				pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
-				continue
-			}
-			select {
-			case r.rtcpOut <- rtcpPacket:
-			default:
-			}
+		select {
+		case r.rtcpOut <- rtcpPacket:
+		default:
 		}
-	}()
-
-	return r.hasRecv
+	}
 }
 
 // Stop irreversibly stops the RTPReceiver
@@ -163,12 +168,7 @@ func (r *RTPReceiver) Stop() error {
 		return fmt.Errorf("RTPReceiver has already been closed")
 	}
 
-	select {
-	case <-r.hasRecv:
-	default:
-		return fmt.Errorf("RTPReceiver has not been started")
-	}
-
+	fmt.Println("Closing receiver")
 	if err := r.rtcpReadStream.Close(); err != nil {
 		return err
 	}
