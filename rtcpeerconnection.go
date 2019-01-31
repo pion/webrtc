@@ -1539,6 +1539,8 @@ func (pc *RTCPeerConnection) newRTCRtpTransceiver(
 		Sender:    sender,
 		Direction: direction,
 	}
+	pc.Lock()
+	defer pc.Unlock()
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
 	return t
 }

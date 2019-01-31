@@ -17,11 +17,6 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-const (
-	srtpMasterKeyLen     = 16
-	srtpMasterKeySaltLen = 14
-)
-
 // RTCDtlsTransport allows an application access to information about the DTLS
 // transport over which RTP and RTCP packets are sent and received by
 // RTCRtpSender and RTCRtpReceiver, as well other data such as SCTP packets sent
@@ -39,7 +34,6 @@ type RTCDtlsTransport struct {
 
 	conn *dtls.Conn
 
-	srtpHasKeyed  bool
 	srtpSession   *srtp.SessionSRTP
 	srtcpSession  *srtp.SessionSRTCP
 	srtpEndpoint  *mux.Endpoint
@@ -94,71 +88,39 @@ func (t *RTCDtlsTransport) startSRTP() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if t.srtpSession == nil {
-		t.srtpSession = srtp.CreateSessionSRTP()
-	}
-	if t.srtcpSession == nil {
-		t.srtcpSession = srtp.CreateSessionSRTCP()
-	}
-	if t.conn == nil || t.srtpHasKeyed {
+	if t.srtpSession != nil && t.srtcpSession != nil {
 		return nil
+	} else if t.conn == nil {
+		return fmt.Errorf("the DTLS transport has not started yet")
 	}
-	t.srtpHasKeyed = true
 
-	keyingMaterial, err := t.conn.ExportKeyingMaterial([]byte("EXTRACTOR-dtls_srtp"), nil, (srtpMasterKeyLen*2)+(srtpMasterKeySaltLen*2))
+	srtpConfig := &srtp.Config{
+		Profile: srtp.ProtectionProfileAes128CmHmacSha1_80,
+	}
+
+	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.isClient())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to extract sctp session keys: %v", err)
 	}
 
-	offset := 0
-	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
-	offset += srtpMasterKeyLen
-
-	serverWriteKey := append([]byte{}, keyingMaterial[offset:offset+srtpMasterKeyLen]...)
-	offset += srtpMasterKeyLen
-
-	clientWriteKey = append(clientWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
-	offset += srtpMasterKeySaltLen
-
-	serverWriteKey = append(serverWriteKey, keyingMaterial[offset:offset+srtpMasterKeySaltLen]...)
-
-	if !t.isClient() {
-		err = t.srtpSession.Start(
-			serverWriteKey[0:16], serverWriteKey[16:],
-			clientWriteKey[0:16], clientWriteKey[16:],
-			srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtpEndpoint,
-		)
-
-		if err == nil {
-			err = t.srtcpSession.Start(
-				serverWriteKey[0:16], serverWriteKey[16:],
-				clientWriteKey[0:16], clientWriteKey[16:],
-				srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtcpEndpoint,
-			)
-		}
-	} else {
-		err = t.srtpSession.Start(
-			clientWriteKey[0:16], clientWriteKey[16:],
-			serverWriteKey[0:16], serverWriteKey[16:],
-			srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtpEndpoint,
-		)
-
-		if err == nil {
-			err = t.srtcpSession.Start(
-				clientWriteKey[0:16], clientWriteKey[16:],
-				serverWriteKey[0:16], serverWriteKey[16:],
-				srtp.ProtectionProfileAes128CmHmacSha1_80, t.srtcpEndpoint,
-			)
-		}
+	srtpSession, err := srtp.NewSessionSRTP(t.srtpEndpoint, srtpConfig)
+	if err != nil {
+		return fmt.Errorf("failed to start srtp: %v", err)
 	}
 
-	return err
+	srtcpSession, err := srtp.NewSessionSRTCP(t.srtcpEndpoint, srtpConfig)
+	if err != nil {
+		return fmt.Errorf("failed to start srtp: %v", err)
+	}
 
+	t.srtpSession = srtpSession
+	t.srtcpSession = srtcpSession
+	return nil
 }
 
 func (t *RTCDtlsTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
 	t.lock.RLock()
-	if t.srtpSession != nil && t.srtpHasKeyed {
+	if t.srtpSession != nil {
 		t.lock.RUnlock()
 		return t.srtpSession, nil
 	}
@@ -173,7 +135,7 @@ func (t *RTCDtlsTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
 
 func (t *RTCDtlsTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
 	t.lock.RLock()
-	if t.srtcpSession != nil && t.srtpHasKeyed {
+	if t.srtcpSession != nil {
 		t.lock.RUnlock()
 		return t.srtcpSession, nil
 	}
