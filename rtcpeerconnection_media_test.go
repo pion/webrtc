@@ -37,13 +37,13 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: track.Ssrc, MediaSSRC: track.Ssrc}); routineErr != nil {
+				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.Ssrc, MediaSSRC: track.Ssrc}); routineErr != nil {
 					awaitRTCPRecieverSend <- routineErr
 					return
 				}
 
 				select {
-				case <-awaitRTCPRecieverRecv:
+				case <-awaitRTCPSenderRecv:
 					close(awaitRTCPRecieverSend)
 					return
 				default:

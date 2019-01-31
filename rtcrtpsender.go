@@ -17,31 +17,37 @@ type RTCRtpSender struct {
 
 // NewRTCRtpSender constructs a new RTCRtpSender
 func NewRTCRtpSender(track *RTCTrack, transport *RTCDtlsTransport) *RTCRtpSender {
-	return &RTCRtpSender{
+	r := &RTCRtpSender{
 		Track:     track,
 		transport: transport,
 	}
+
+	r.Track.sampleInput = make(chan media.RTCSample, 15) // Is the buffering needed?
+	r.Track.rawInput = make(chan *rtp.Packet, 15)        // Is the buffering needed?
+	r.Track.rtcpInput = make(chan rtcp.Packet, 15)       // Is the buffering needed?
+
+	r.Track.Samples = r.Track.sampleInput
+	r.Track.RawRTP = r.Track.rawInput
+	r.Track.RTCPPackets = r.Track.rtcpInput
+
+	if r.Track.isRawRTP {
+		close(r.Track.Samples)
+	} else {
+		close(r.Track.RawRTP)
+	}
+
+	return r
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
 func (r *RTCRtpSender) Send(parameters RTCRtpSendParameters) {
-	sampleInput := make(chan media.RTCSample, 15) // Is the buffering needed?
-	rawInput := make(chan *rtp.Packet, 15)        // Is the buffering needed?
-	rtcpInput := make(chan rtcp.Packet, 15)       // Is the buffering needed?
-
-	r.Track.Samples = sampleInput
-	r.Track.RawRTP = rawInput
-	r.Track.RTCPPackets = rtcpInput
-
 	if r.Track.isRawRTP {
-		close(r.Track.Samples)
-		go r.handleRawRTP(rawInput)
+		go r.handleRawRTP(r.Track.rawInput)
 	} else {
-		close(r.Track.RawRTP)
-		go r.handleSampleRTP(sampleInput)
+		go r.handleSampleRTP(r.Track.sampleInput)
 	}
 
-	go r.handleRTCP(r.transport, rtcpInput)
+	go r.handleRTCP(r.transport, r.Track.rtcpInput)
 }
 
 // Stop irreversibly stops the RTCRtpSender

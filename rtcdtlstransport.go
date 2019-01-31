@@ -212,6 +212,31 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 	return nil
 }
 
+// Stop stops and closes the RTCDtlsTransport object.
+func (t *RTCDtlsTransport) Stop() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	// Try closing everything and collect the errors
+	var closeErrs []error
+
+	if t.srtpSession != nil {
+		if err := t.srtpSession.Close(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	if t.srtcpSession != nil {
+		if err := t.srtcpSession.Close(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	// TODO: Close DTLS itself? Currently closed by ICE
+
+	return flattenErrs(closeErrs)
+}
+
 func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameters, remoteCert *x509.Certificate) error {
 	for _, fp := range remoteParameters.Fingerprints {
 		hashAlgo, err := dtls.HashAlgorithmString(fp.Algorithm)

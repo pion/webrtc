@@ -834,6 +834,16 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 		} else {
 			pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
 		}
+
+		for _, tranceiver := range pc.rtpTransceivers {
+			if tranceiver.Sender != nil {
+				tranceiver.Sender.Send(RTCRtpSendParameters{
+					encodings: RTCRtpEncodingParameters{
+						RTCRtpCodingParameters{SSRC: tranceiver.Sender.Track.Ssrc, PayloadType: tranceiver.Sender.Track.PayloadType},
+					}})
+			}
+		}
+
 		go pc.drainSRTP()
 
 		// Start sctp
@@ -1099,10 +1109,6 @@ func (pc *RTCPeerConnection) AddTrack(track *RTCTrack) (*RTCRtpSender, error) {
 			sender,
 			RTCRtpTransceiverDirectionSendonly,
 		)
-		sender.Send(RTCRtpSendParameters{
-			encodings: RTCRtpEncodingParameters{
-				RTCRtpCodingParameters{SSRC: track.Ssrc, PayloadType: track.PayloadType},
-			}})
 	}
 
 	transceiver.Mid = track.Kind.String() // TODO: Mid generation
@@ -1292,7 +1298,7 @@ func (pc *RTCPeerConnection) SendRTCP(pkt rtcp.Packet) error {
 
 	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 	if err != nil {
-		return fmt.Errorf("SendRTCP failed to open SRTCPSession: %v", err)
+		return nil // TODO SendRTCP before would gracefully discard packets until ready
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
@@ -1335,16 +1341,8 @@ func (pc *RTCPeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	if pc.dtlsTransport.srtpSession != nil {
-		if err := pc.dtlsTransport.srtpSession.Close(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
-	}
-
-	if pc.dtlsTransport.srtcpSession != nil {
-		if err := pc.dtlsTransport.srtcpSession.Close(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+	if err := pc.dtlsTransport.Stop(); err != nil {
+		closeErrs = append(closeErrs, err)
 	}
 
 	for _, t := range pc.rtpTransceivers {

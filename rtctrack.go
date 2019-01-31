@@ -12,7 +12,10 @@ import (
 
 // RTCTrack represents a track that is communicated
 type RTCTrack struct {
-	isRawRTP bool
+	isRawRTP    bool
+	sampleInput chan media.RTCSample
+	rawInput    chan *rtp.Packet
+	rtcpInput   chan rtcp.Packet
 
 	ID          string
 	PayloadType uint8
