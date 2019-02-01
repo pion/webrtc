@@ -1,0 +1,13 @@
+<video id="video1" width="160" height="120" autoplay muted></video> <br />
+
+
+<button class="createSessionButton" onclick="window.createSession(true)"> Publish a Broadcast </button>
+<button class="createSessionButton" onclick="window.createSession(false)"> Join a Broadcast </button>
+
+<div id="signalingContainer" style="display: none">
+  Browser base64 Session Description <textarea id="localSessionDescription" readonly="true"></textarea> <br />
+  Golang base64 Session Description: <textarea id="remoteSessionDescription"></textarea> <br/>
+  <button onclick="window.startSession()"> Start Session </button>
+</div>
+
+<div id="logs"></div>
