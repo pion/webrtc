@@ -7,7 +7,7 @@ require (
 	github.com/pions/rtp v1.0.0
 	github.com/pions/sctp v1.3.0
 	github.com/pions/sdp v1.3.0
-	github.com/pions/srtp v1.0.2
+	github.com/pions/srtp v1.0.3
 	github.com/pions/stun v0.2.0
 	github.com/pions/transport v0.1.0
 	github.com/pkg/errors v0.8.1

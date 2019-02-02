@@ -36,7 +36,9 @@ func (t *RTCRtpTransceiver) Stop() error {
 		t.Sender.Stop()
 	}
 	if t.Receiver != nil {
-		t.Receiver.Stop()
+		if err := t.Receiver.Stop(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -1048,30 +1048,40 @@ func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
 // ------------------------------------------------------------------------
 
 // GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
-func (pc *RTCPeerConnection) GetSenders() []RTCRtpSender {
-	result := make([]RTCRtpSender, len(pc.rtpTransceivers))
+func (pc *RTCPeerConnection) GetSenders() []*RTCRtpSender {
+	pc.Lock()
+	defer pc.Unlock()
+
+	result := make([]*RTCRtpSender, len(pc.rtpTransceivers))
 	for i, tranceiver := range pc.rtpTransceivers {
-		result[i] = *tranceiver.Sender
+		if tranceiver.Sender != nil {
+			result[i] = tranceiver.Sender
+		}
 	}
 	return result
 }
 
 // GetReceivers returns the RTCRtpReceivers that are currently attached to this RTCPeerConnection
-func (pc *RTCPeerConnection) GetReceivers() []RTCRtpReceiver {
-	result := make([]RTCRtpReceiver, len(pc.rtpTransceivers))
+func (pc *RTCPeerConnection) GetReceivers() []*RTCRtpReceiver {
+	pc.Lock()
+	defer pc.Unlock()
+
+	result := make([]*RTCRtpReceiver, len(pc.rtpTransceivers))
 	for i, tranceiver := range pc.rtpTransceivers {
-		result[i] = *tranceiver.Receiver
+		if tranceiver.Receiver != nil {
+			result[i] = tranceiver.Receiver
+
+		}
 	}
 	return result
 }
 
 // GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
-func (pc *RTCPeerConnection) GetTransceivers() []RTCRtpTransceiver {
-	result := make([]RTCRtpTransceiver, len(pc.rtpTransceivers))
-	for i, tranceiver := range pc.rtpTransceivers {
-		result[i] = *tranceiver
-	}
-	return result
+func (pc *RTCPeerConnection) GetTransceivers() []*RTCRtpTransceiver {
+	pc.Lock()
+	defer pc.Unlock()
+
+	return pc.rtpTransceivers
 }
 
 // AddTrack adds a RTCTrack to the RTCPeerConnection

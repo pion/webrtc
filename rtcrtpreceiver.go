@@ -1,8 +1,12 @@
 package webrtc
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/pions/rtcp"
 	"github.com/pions/rtp"
+	"github.com/pions/srtp"
 )
 
 // RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack
@@ -14,8 +18,16 @@ type RTCRtpReceiver struct {
 
 	Track *RTCTrack
 
-	rtpOut  chan *rtp.Packet
-	rtcpOut chan rtcp.Packet
+	closed bool
+	mu     sync.Mutex
+
+	rtpOut        chan *rtp.Packet
+	rtpReadStream *srtp.ReadStreamSRTP
+	rtpOutDone    chan bool
+
+	rtcpOut        chan rtcp.Packet
+	rtcpReadStream *srtp.ReadStreamSRTCP
+	rtcpOutDone    chan bool
 }
 
 // NewRTCRtpReceiver constructs a new RTCRtpReceiver
@@ -23,9 +35,14 @@ func NewRTCRtpReceiver(kind RTCRtpCodecType, transport *RTCDtlsTransport) *RTCRt
 	return &RTCRtpReceiver{
 		kind:      kind,
 		transport: transport,
-		hasRecv:   make(chan bool),
-		rtpOut:    make(chan *rtp.Packet, 15),
-		rtcpOut:   make(chan rtcp.Packet, 15),
+
+		rtpOut:     make(chan *rtp.Packet, 15),
+		rtpOutDone: make(chan bool),
+
+		rtcpOut:     make(chan rtcp.Packet, 15),
+		rtcpOutDone: make(chan bool),
+
+		hasRecv: make(chan bool),
 	}
 }
 
@@ -46,6 +63,8 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			if !payloadSet {
 				close(r.hasRecv)
 			}
+			close(r.rtpOut)
+			close(r.rtpOutDone)
 		}()
 
 		srtpSession, err := r.transport.getSRTPSession()
@@ -59,6 +78,9 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
+		r.mu.Lock()
+		r.rtpReadStream = readStream
+		r.mu.Unlock()
 
 		readBuf := make([]byte, receiveMTU)
 		for {
@@ -89,6 +111,11 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 
 	// RTCP ReadLoop
 	go func() {
+		defer func() {
+			close(r.rtcpOut)
+			close(r.rtcpOutDone)
+		}()
+
 		srtcpSession, err := r.transport.getSRTCPSession()
 		if err != nil {
 			pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
@@ -100,6 +127,9 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
+		r.mu.Lock()
+		r.rtcpReadStream = readStream
+		r.mu.Unlock()
 
 		readBuf := make([]byte, receiveMTU)
 		for {
@@ -125,6 +155,30 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 }
 
 // Stop irreversibly stops the RTCRtpReceiver
-func (r *RTCRtpReceiver) Stop() {
-	// TODO properly tear down all loops (and test that)
+func (r *RTCRtpReceiver) Stop() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		return fmt.Errorf("RTCRtpReceiver has already been closed")
+	}
+
+	select {
+	case <-r.hasRecv:
+	default:
+		return fmt.Errorf("RTCRtpReceiver has not been started")
+	}
+
+	if err := r.rtcpReadStream.Close(); err != nil {
+		return err
+	}
+	if err := r.rtpReadStream.Close(); err != nil {
+		return err
+	}
+
+	<-r.rtcpOutDone
+	<-r.rtpOutDone
+
+	r.closed = true
+	return nil
 }
