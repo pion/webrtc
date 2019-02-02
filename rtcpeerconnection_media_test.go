@@ -2,11 +2,13 @@ package webrtc
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pions/rtcp"
 	"github.com/pions/transport/test"
+	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media"
 )
 
@@ -25,6 +27,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	}
 
 	awaitRTPRecv := make(chan bool)
+	awaitRTPRecvClosed := make(chan bool)
 	awaitRTPSend := make(chan bool)
 
 	awaitRTCPSenderRecv := make(chan bool)
@@ -56,11 +59,15 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 			close(awaitRTCPRecieverRecv)
 		}()
 
+		haveClosedAwaitRTPRecv := false
 		for {
-			p := <-track.Packets
-			if bytes.Equal(p.Payload, []byte{0x10, 0x00}) {
-				close(awaitRTPRecv)
+			p, ok := <-track.Packets
+			if !ok {
+				close(awaitRTPRecvClosed)
 				return
+			} else if bytes.Equal(p.Payload, []byte{0x10, 0x00}) && !haveClosedAwaitRTPRecv {
+				haveClosedAwaitRTPRecv = true
+				close(awaitRTPRecv)
 			}
 		}
 	})
@@ -137,4 +144,88 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	<-awaitRTPRecvClosed
+}
+
+/*
+RTCPeerConnection should be able to be torn down at anytime
+This test adds an input track and asserts
+
+* OnTrack doesn't fire since no video packets will arrive
+* No goroutine leaks
+* No deadlocks on shutdown
+*/
+func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
+	iceComplete := make(chan bool)
+
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opusTrack, err := pcOffer.NewRTCSampleTrack(DefaultPayloadTypeOpus, "audio", "pion1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vp8Track, err := pcOffer.NewRTCSampleTrack(DefaultPayloadTypeVP8, "video", "pion2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = pcOffer.AddTrack(opusTrack); err != nil {
+		t.Fatal(err)
+	} else if _, err = pcOffer.AddTrack(vp8Track); err != nil {
+		t.Fatal(err)
+	}
+
+	var onTrackFiredLock sync.RWMutex
+	onTrackFired := false
+
+	pcAnswer.OnTrack(func(track *RTCTrack) {
+		onTrackFiredLock.Lock()
+		defer onTrackFiredLock.Unlock()
+		onTrackFired = true
+	})
+
+	pcAnswer.OnICEConnectionStateChange(func(iceState ice.ConnectionState) {
+		if iceState == ice.ConnectionStateConnected {
+			go func() {
+				time.Sleep(3 * time.Second) // TODO RTCPeerConnection.Close() doesn't block for all subsystems
+				close(iceComplete)
+			}()
+		}
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-iceComplete
+
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onTrackFiredLock.Lock()
+	if onTrackFired {
+		t.Fatalf("RTCPeerConnection OnTrack fired even though we got no packets")
+	}
+	onTrackFiredLock.Unlock()
+
 }
