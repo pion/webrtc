@@ -49,6 +49,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 		}()
 
 		srtpSession, err := r.transport.getSRTPSession()
+		defer srtpSession.Close()
 		if err != nil {
 			pcLog.Warnf("Failed to open SRTPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
@@ -83,6 +84,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			select {
 			case r.rtpOut <- &rtpPacket:
 			default:
+				break
 			}
 		}
 	}()
@@ -90,6 +92,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 	// RTCP ReadLoop
 	go func() {
 		srtcpSession, err := r.transport.getSRTCPSession()
+		defer srtcpSession.Close()
 		if err != nil {
 			pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
@@ -117,6 +120,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 			select {
 			case r.rtcpOut <- rtcpPacket:
 			default:
+				break
 			}
 		}
 	}()
@@ -127,4 +131,6 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 // Stop irreversibly stops the RTCRtpReceiver
 func (r *RTCRtpReceiver) Stop() {
 	// TODO properly tear down all loops (and test that)
+	close(r.rtpOut)
+	close(r.rtcpOut)
 }
