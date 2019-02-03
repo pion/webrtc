@@ -1,6 +1,8 @@
 package webrtc
 
 import (
+	"sync"
+
 	"github.com/pions/rtcp"
 	"github.com/pions/rtp"
 )
@@ -13,6 +15,9 @@ type RTCRtpReceiver struct {
 	hasRecv chan bool
 
 	Track *RTCTrack
+
+	closed bool
+	mu     sync.Mutex
 
 	rtpOut  chan *rtp.Packet
 	rtcpOut chan rtcp.Packet
@@ -49,11 +54,11 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 		}()
 
 		srtpSession, err := r.transport.getSRTPSession()
-		defer srtpSession.Close()
 		if err != nil {
 			pcLog.Warnf("Failed to open SRTPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
+		defer srtpSession.Close()
 
 		readStream, err := srtpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
@@ -92,11 +97,11 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 	// RTCP ReadLoop
 	go func() {
 		srtcpSession, err := r.transport.getSRTCPSession()
-		defer srtcpSession.Close()
 		if err != nil {
 			pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
+		defer srtcpSession.Close()
 
 		readStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
@@ -131,6 +136,13 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 // Stop irreversibly stops the RTCRtpReceiver
 func (r *RTCRtpReceiver) Stop() {
 	// TODO properly tear down all loops (and test that)
-	close(r.rtpOut)
-	close(r.rtcpOut)
+	r.mu.Lock()
+	closed := r.closed
+	r.closed = true
+	r.mu.Unlock()
+
+	if !closed {
+		close(r.rtpOut)
+		close(r.rtcpOut)
+	}
 }
