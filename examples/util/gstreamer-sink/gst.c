@@ -27,7 +27,6 @@ static gboolean gstreamer_receive_bus_call(GstBus *bus, GstMessage *msg, gpointe
     g_printerr("Error: %s\n", error->message);
     g_error_free(error);
     exit(1);
-    break;
   }
   default:
     break;

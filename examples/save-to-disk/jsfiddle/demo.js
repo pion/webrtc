@@ -11,7 +11,7 @@ var log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
-navigator.mediaDevices.getUserMedia({video: true, audio: true})
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
   .then(stream => pc.addStream(document.getElementById('video1').srcObject = stream))
   .catch(log)
 

@@ -19,7 +19,7 @@ window.createSession = isPublisher => {
   }
 
   if (isPublisher) {
-    navigator.mediaDevices.getUserMedia({video: true, audio: false})
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       .then(stream => pc.addStream(document.getElementById('video1').srcObject = stream))
       .catch(log)
     pc.onnegotiationneeded = e => {
@@ -28,7 +28,7 @@ window.createSession = isPublisher => {
         .catch(log)
     }
   } else {
-    pc.createOffer({offerToReceiveVideo: true})
+    pc.createOffer({ offerToReceiveVideo: true })
       .then(d => pc.setLocalDescription(d))
       .catch(log)
 
