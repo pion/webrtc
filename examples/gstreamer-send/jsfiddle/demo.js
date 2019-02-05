@@ -27,7 +27,7 @@ pc.onicecandidate = event => {
   }
 }
 
-pc.createOffer({offerToReceiveVideo: true, offerToReceiveAudio: true}).then(d => pc.setLocalDescription(d)).catch(log)
+pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true }).then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value

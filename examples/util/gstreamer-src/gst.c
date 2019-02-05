@@ -31,7 +31,6 @@ static gboolean gstreamer_send_bus_call(GstBus *bus, GstMessage *msg, gpointer d
     g_printerr("Error: %s\n", error->message);
     g_error_free(error);
     exit(1);
-    break;
   }
   default:
     break;
@@ -71,7 +70,7 @@ void gstreamer_send_start_pipeline(GstElement *pipeline, int pipelineId) {
   s->pipelineId = pipelineId;
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-  guint bus_watch_id = gst_bus_add_watch(bus, gstreamer_send_bus_call, NULL);
+  gst_bus_add_watch(bus, gstreamer_send_bus_call, NULL);
   gst_object_unref(bus);
 
   GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
