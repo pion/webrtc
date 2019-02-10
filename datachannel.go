@@ -127,14 +127,15 @@ func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, err
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
-	d := &DataChannel{
-		Label:      params.Label,
-		ID:         &params.ID,
-		ReadyState: DataChannelStateConnecting,
-		api:        api,
-	}
-
-	return d, nil
+	return &DataChannel{
+		Label:             params.Label,
+		ID:                &params.ID,
+		Ordered:           params.Ordered,
+		MaxPacketLifeTime: params.MaxPacketLifeTime,
+		MaxRetransmits:    params.MaxRetransmits,
+		ReadyState:        DataChannelStateConnecting,
+		api:               api,
+	}, nil
 }
 
 // open opens the datachannel over the sctp transport
@@ -147,10 +148,35 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		return err
 	}
 
+	var channelType datachannel.ChannelType
+	var reliabilityParameteer uint32
+
+	if d.MaxPacketLifeTime == nil && d.MaxRetransmits == nil {
+		if d.Ordered {
+			channelType = datachannel.ChannelTypeReliable
+		} else {
+			channelType = datachannel.ChannelTypeReliableUnordered
+		}
+	} else if d.MaxRetransmits != nil {
+		reliabilityParameteer = uint32(*d.MaxRetransmits)
+		if d.Ordered {
+			channelType = datachannel.ChannelTypePartialReliableRexmit
+		} else {
+			channelType = datachannel.ChannelTypePartialReliableRexmitUnordered
+		}
+	} else {
+		reliabilityParameteer = uint32(*d.MaxPacketLifeTime)
+		if d.Ordered {
+			channelType = datachannel.ChannelTypePartialReliableTimed
+		} else {
+			channelType = datachannel.ChannelTypePartialReliableTimedUnordered
+		}
+	}
+
 	cfg := &datachannel.Config{
-		ChannelType:          datachannel.ChannelTypeReliable,   // TODO: Wiring
+		ChannelType:          channelType,
 		Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
-		ReliabilityParameter: 0,                                 // TODO: Wiring
+		ReliabilityParameter: reliabilityParameteer,
 		Label:                d.Label,
 	}
 
