@@ -76,6 +76,7 @@ void gstreamer_send_start_pipeline(GstElement *pipeline, int pipelineId) {
   GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
   g_object_set(appsink, "emit-signals", TRUE, NULL);
   g_signal_connect(appsink, "new-sample", G_CALLBACK(gstreamer_send_new_sample_handler), s);
+  gst_object_unref(appsink);
 
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
 }

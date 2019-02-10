@@ -57,5 +57,6 @@ void gstreamer_receive_push_buffer(GstElement *pipeline, void *buffer, int len) 
     gpointer p = g_memdup(buffer, len);
     GstBuffer *buffer = gst_buffer_new_wrapped(p, len);
     gst_app_src_push_buffer(GST_APP_SRC(src), buffer);
+    gst_object_unref(src);
   }
 }
