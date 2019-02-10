@@ -16,3 +16,4 @@ vendor/
 *.ivf
 tags
 cover.out
+*.sw[poe]

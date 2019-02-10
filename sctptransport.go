@@ -135,12 +135,40 @@ func (r *SCTPTransport) acceptDataChannels() {
 			return
 		}
 
+		var ordered = true
+		var maxRetransmits *uint16
+		var maxPacketLifeTime *uint16
+		var val = uint16(dc.Config.ReliabilityParameter)
+
+		switch dc.Config.ChannelType {
+		case datachannel.ChannelTypeReliable:
+			ordered = true
+		case datachannel.ChannelTypeReliableUnordered:
+			ordered = false
+		case datachannel.ChannelTypePartialReliableRexmit:
+			ordered = true
+			maxRetransmits = &val
+		case datachannel.ChannelTypePartialReliableRexmitUnordered:
+			ordered = false
+			maxRetransmits = &val
+		case datachannel.ChannelTypePartialReliableTimed:
+			ordered = true
+			maxPacketLifeTime = &val
+		case datachannel.ChannelTypePartialReliableTimedUnordered:
+			ordered = false
+			maxPacketLifeTime = &val
+		default:
+		}
+
 		sid := dc.StreamIdentifier()
 		rtcDC := &DataChannel{
-			ID:         &sid,
-			Label:      dc.Config.Label,
-			ReadyState: DataChannelStateOpen,
-			api:        r.api,
+			ID:                &sid,
+			Label:             dc.Config.Label,
+			Ordered:           ordered,
+			MaxPacketLifeTime: maxPacketLifeTime,
+			MaxRetransmits:    maxRetransmits,
+			ReadyState:        DataChannelStateOpen,
+			api:               r.api,
 		}
 
 		<-r.onDataChannel(rtcDC)
