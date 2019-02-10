@@ -24,6 +24,9 @@ func init() {
 type Pipeline struct {
 	Pipeline  *C.GstElement
 	in        chan<- media.RTCSample
+	// stop acts as a signal that this pipeline is stopped
+	// any pending sends to Pipeline.in should be cancelled
+	stop      chan interface{}
 	id        int
 	codecName string
 }
@@ -68,11 +71,17 @@ func CreatePipeline(codecName string, in chan<- media.RTCSample, pipelineSrc str
 
 // Start starts the GStreamer Pipeline
 func (p *Pipeline) Start() {
+	// This will signal to goHandlePipelineBuffer
+	// and provide a method for cancelling sends.
+	p.stop = make(chan interface{})
 	C.gstreamer_send_start_pipeline(p.Pipeline, C.int(p.id))
 }
 
 // Stop stops the GStreamer Pipeline
 func (p *Pipeline) Stop() {
+	// To run gstreamer_send_stop_pipeline we need to make sure
+	// that appsink isn't being hung by any goHandlePipelineBuffers
+	close(p.stop)
 	C.gstreamer_send_stop_pipeline(p.Pipeline)
 }
 
@@ -93,7 +102,12 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 		} else {
 			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
 		}
-		pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}
+		// We need to be able to cancel this function even f pipeline.in isn't being serviced
+		// When pipeline.stop is closed the sending of data will be cancelled.
+		select {
+		case pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}:
+		case <-pipeline.stop:
+		}
 	} else {
 		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineID))
 	}
