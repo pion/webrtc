@@ -23,3 +23,5 @@ require (
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 )
+
+replace github.com/marten-seemann/qtls v0.0.0-20190110111248-7a090b30c3ab => github.com/sean-der/qtls-vendor-extracted v0.0.0-20190210024908-018998217c65
