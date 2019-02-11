@@ -232,8 +232,11 @@ func (t *RTCDtlsTransport) Stop() error {
 		}
 	}
 
-	// TODO: Close DTLS itself? Currently closed by ICE
-
+	if t.conn != nil {
+		if err := t.conn.Close(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
 	return flattenErrs(closeErrs)
 }
 
