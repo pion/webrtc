@@ -1,7 +1,7 @@
 package quic
 
 import (
-	quic "github.com/lucas-clemente/quic-go"
+	quic "github.com/pions/quic-go"
 	"github.com/pions/webrtc/pkg/quic/internal/wrapper"
 )
 
