@@ -5,7 +5,7 @@ require (
 	github.com/pions/dtls v1.1.1
 	github.com/pions/rtcp v1.0.0
 	github.com/pions/rtp v1.0.0
-	github.com/pions/sctp v1.3.0
+	github.com/pions/sctp v1.3.1
 	github.com/pions/sdp v1.3.0
 	github.com/pions/srtp v1.0.3
 	github.com/pions/stun v0.2.0
