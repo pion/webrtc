@@ -3,6 +3,7 @@ package webrtc
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"io"
 	"math/big"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func closePair(t *testing.T, pc1, pc2 *PeerConnection, done chan bool) {
+func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
 	var err error
 	select {
 	case <-time.After(10 * time.Second):
@@ -220,18 +221,36 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	assert.EqualValues(t, expected, values)
 }
 
-func TestRTCDataChannelParamters(t *testing.T) {
+func setUpReliabilityParamTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
+	api := NewAPI()
+	offerPC, answerPC, err := api.newPair()
+	if err != nil {
+		t.Fatalf("Failed to create a PC pair for testing")
+	}
+	done := make(chan bool)
+
+	dc, err := offerPC.CreateDataChannel("data", options)
+	if err != nil {
+		t.Fatalf("Failed to create a PC pair for testing")
+	}
+
+	return offerPC, answerPC, dc, done
+}
+
+func closeReliabilityParamTest(t *testing.T, pc1, pc2 *PeerConnection, done chan bool) {
+	err := signalPair(pc1, pc2)
+	if err != nil {
+		t.Fatalf("Failed to signal our PC pair for testing")
+	}
+
+	closePair(t, pc1, pc2, done)
+}
+
+func TestDataChannelParamters(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
 	t.Run("MaxPacketLifeTime exchange", func(t *testing.T) {
-		api := NewAPI()
-		offerPC, answerPC, err := api.newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
-		done := make(chan bool)
-
 		var ordered = true
 		var maxPacketLifeTime uint16 = 3
 		options := &DataChannelInit{
@@ -239,23 +258,13 @@ func TestRTCDataChannelParamters(t *testing.T) {
 			MaxPacketLifeTime: &maxPacketLifeTime,
 		}
 
-		dc, err := offerPC.CreateDataChannel("data", options)
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
 
 		// Check if parameters are correctly set
 		assert.True(t, dc.Ordered, "Ordered should be set to true")
 		if assert.NotNil(t, dc.MaxPacketLifeTime, "should not be nil") {
 			assert.Equal(t, maxPacketLifeTime, *dc.MaxPacketLifeTime, "should match")
 		}
-
-		dc.OnOpen(func() {
-			e := dc.Send(sugar.PayloadString{Data: []byte("Ping")})
-			if e != nil {
-				t.Fatalf("Failed to send string on data channel")
-			}
-		})
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			// Check if parameters are correctly set
@@ -266,23 +275,10 @@ func TestRTCDataChannelParamters(t *testing.T) {
 			done <- true
 		})
 
-		err = signalPair(offerPC, answerPC)
-
-		if err != nil {
-			t.Fatalf("Failed to signal our PC pair for testing")
-		}
-
-		closePair(t, offerPC, answerPC, done)
+		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
 
 	t.Run("MaxRetransmits exchange", func(t *testing.T) {
-		api := NewAPI()
-		offerPC, answerPC, err := api.newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
-		done := make(chan bool)
-
 		var ordered = false
 		var maxRetransmits uint16 = 3000
 		options := &DataChannelInit{
@@ -290,23 +286,13 @@ func TestRTCDataChannelParamters(t *testing.T) {
 			MaxRetransmits: &maxRetransmits,
 		}
 
-		dc, err := offerPC.CreateDataChannel("data", options)
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
 
 		// Check if parameters are correctly set
 		assert.False(t, dc.Ordered, "Ordered should be set to false")
 		if assert.NotNil(t, dc.MaxRetransmits, "should not be nil") {
 			assert.Equal(t, maxRetransmits, *dc.MaxRetransmits, "should match")
 		}
-
-		dc.OnOpen(func() {
-			e := dc.Send(sugar.PayloadString{Data: []byte("Ping")})
-			if e != nil {
-				t.Fatalf("Failed to send string on data channel")
-			}
-		})
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			// Check if parameters are correctly set
@@ -317,12 +303,6 @@ func TestRTCDataChannelParamters(t *testing.T) {
 			done <- true
 		})
 
-		err = signalPair(offerPC, answerPC)
-
-		if err != nil {
-			t.Fatalf("Failed to signal our PC pair for testing")
-		}
-
-		closePair(t, offerPC, answerPC, done)
+		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
 }
