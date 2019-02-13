@@ -22,8 +22,8 @@ func init() {
 
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
-	Pipeline  *C.GstElement
-	in        chan<- media.RTCSample
+	Pipeline *C.GstElement
+	in       chan<- media.RTCSample
 	// stop acts as a signal that this pipeline is stopped
 	// any pending sends to Pipeline.in should be cancelled
 	stop      chan interface{}
@@ -93,9 +93,10 @@ const (
 //export goHandlePipelineBuffer
 func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineID C.int) {
 	pipelinesLock.Lock()
-	defer pipelinesLock.Unlock()
+	pipeline, ok := pipelines[int(pipelineID)]
+	pipelinesLock.Unlock()
 
-	if pipeline, ok := pipelines[int(pipelineID)]; ok {
+	if ok {
 		var samples uint32
 		if pipeline.codecName == webrtc.Opus {
 			samples = uint32(audioClockRate * (float32(duration) / 1000000000))
