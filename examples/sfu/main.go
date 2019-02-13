@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
-	"os"
+	"io/ioutil"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -29,15 +32,32 @@ func mustReadStdin(reader *bufio.Reader) string {
 	return rawSd
 }
 
+func mustReadHttp(sdp chan string) string {
+	ret := <-sdp
+	return ret
+}
+
 const (
 	rtcpPLIInterval = time.Second * 3
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
+	port := flag.Int("port", 8080, "http server port")
+	flag.Parse()
+
+	sdp := make(chan string)
+	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := ioutil.ReadAll(r.Body)
+		fmt.Fprintf(w, "done")
+		sdp <- string(body)
+	})
+
+	go func() {
+		http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+	}()
 
 	offer := webrtc.RTCSessionDescription{}
-	util.Decode(mustReadStdin(reader), &offer)
+	util.Decode(mustReadHttp(sdp), &offer)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
@@ -101,10 +121,10 @@ func main() {
 	outboundPayloadType := <-inboundPayloadType
 	for {
 		fmt.Println("")
-		fmt.Println("Paste an base64 SDP to start sendonly peer connection")
+		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.RTCSessionDescription{}
-		util.Decode(mustReadStdin(reader), &recvOnlyOffer)
+		util.Decode(mustReadHttp(sdp), &recvOnlyOffer)
 
 		// Create a new RTCPeerConnection
 		peerConnection, err := webrtc.New(peerConnectionConfig)
