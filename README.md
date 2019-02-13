@@ -75,6 +75,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Yutaka Takeda](https://github.com/enobufs) *Fix ICE connection timeout*
 * [Hugo Arregui](https://github.com/hugoArregui) *Fix connection timeout*
 * [Rob Deutsch](https://github.com/rob-deutsch) *RTCRtpReceiver graceful shutdown*
+* [Jin Lei](https://github.com/jinleileiking) - *SFU example use http*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
