@@ -181,7 +181,7 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 	// TODO: handle multiple certs
 	cert := t.certificates[0]
 
-	dtlsCofig := &dtls.Config{Certificate: cert.x509Cert, PrivateKey: cert.privateKey}
+	dtlsCofig := &dtls.Config{Certificate: cert.x509Cert, PrivateKey: cert.privateKey, SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80}}
 	if t.isClient() {
 		// Assumes the peer offered to be passive and we accepted.
 		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsCofig)
