@@ -53,7 +53,8 @@ func main() {
 	})
 
 	go func() {
-		http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+		err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+		util.Check(err)
 	}()
 
 	offer := webrtc.RTCSessionDescription{}
