@@ -9,10 +9,10 @@ import (
 )
 
 type sampleBuilderTest struct {
-	message    string
-	packets    []*rtp.Packet
-	samples    []*media.RTCSample
-	bufferSize uint16
+	message string
+	packets []*rtp.Packet
+	samples []*media.RTCSample
+	maxLate uint16
 }
 
 type fakeDepacketizer struct {
@@ -28,8 +28,8 @@ var testCases = []sampleBuilderTest{
 		packets: []*rtp.Packet{
 			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
 		},
-		samples:    []*media.RTCSample{},
-		bufferSize: 50,
+		samples: []*media.RTCSample{},
+		maxLate: 50,
 	},
 	{
 		message: "SampleBuilder should emit one packet, we had three packets with unique timestamps",
@@ -41,7 +41,7 @@ var testCases = []sampleBuilderTest{
 		samples: []*media.RTCSample{
 			{Data: []byte{0x02}, Samples: 1},
 		},
-		bufferSize: 50,
+		maxLate: 50,
 	},
 	{
 		message: "SampleBuilder should emit one packet, we had two packets but two with duplicate timestamps",
@@ -54,7 +54,7 @@ var testCases = []sampleBuilderTest{
 		samples: []*media.RTCSample{
 			{Data: []byte{0x02, 0x03}, Samples: 1},
 		},
-		bufferSize: 50,
+		maxLate: 50,
 	},
 	{
 		message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one",
@@ -63,8 +63,8 @@ var testCases = []sampleBuilderTest{
 			{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
 			{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
 		},
-		samples:    []*media.RTCSample{},
-		bufferSize: 50,
+		samples: []*media.RTCSample{},
+		maxLate: 50,
 	},
 	{
 		message: "SampleBuilder should emit multiple valid packets",
@@ -82,7 +82,7 @@ var testCases = []sampleBuilderTest{
 			{Data: []byte{0x04}, Samples: 1},
 			{Data: []byte{0x05}, Samples: 1},
 		},
-		bufferSize: 50,
+		maxLate: 50,
 	},
 }
 
@@ -90,7 +90,7 @@ func TestSampleBuilder(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, t := range testCases {
-		s := New(t.bufferSize, &fakeDepacketizer{})
+		s := New(t.maxLate, &fakeDepacketizer{})
 		samples := []*media.RTCSample{}
 
 		for _, p := range t.packets {
@@ -102,4 +102,20 @@ func TestSampleBuilder(t *testing.T) {
 
 		assert.Equal(samples, t.samples, t.message)
 	}
+}
+
+// SampleBuilder should respect maxLate if we popped successfully but then have a gap larger then maxLate
+func TestSampleBuilderMaxLate(t *testing.T) {
+	assert := assert.New(t)
+	s := New(50, &fakeDepacketizer{})
+
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 0, Timestamp: 1}, Payload: []byte{0x01}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 2}, Payload: []byte{0x01}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 3}, Payload: []byte{0x01}})
+	assert.Equal(s.Pop(), &media.RTCSample{Data: []byte{0x01}, Samples: 1}, "Failed to build samples before gap")
+
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 500}, Payload: []byte{0x02}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 501}, Payload: []byte{0x02}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 502}, Payload: []byte{0x02}})
+	assert.Equal(s.Pop(), &media.RTCSample{Data: []byte{0x02}, Samples: 1}, "Failed to build samples after large gap")
 }
