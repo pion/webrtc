@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	// Create a datachannel with label 'data'
@@ -70,6 +70,10 @@ func main() {
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)
+	util.Check(err)
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(offer)
 	util.Check(err)
 
 	// Exchange the offer for the answer

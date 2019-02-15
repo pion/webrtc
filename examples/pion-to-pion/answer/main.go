@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	// Set the handler for ICE connection state
@@ -77,8 +77,12 @@ func main() {
 	err = peerConnection.SetRemoteDescription(offer)
 	util.Check(err)
 
-	// Sets the LocalDescription, and starts our UDP listeners
+	// Create answer
 	answer, err := peerConnection.CreateAnswer(nil)
+	util.Check(err)
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(answer)
 	util.Check(err)
 
 	// Send the answer

@@ -37,6 +37,10 @@ func signalPair(pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection) error {
 		return err
 	}
 
+	if err = pcOffer.SetLocalDescription(offer); err != nil {
+		return err
+	}
+
 	err = pcAnswer.SetRemoteDescription(offer)
 	if err != nil {
 		return err
@@ -44,6 +48,10 @@ func signalPair(pcOffer *RTCPeerConnection, pcAnswer *RTCPeerConnection) error {
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	if err != nil {
+		return err
+	}
+
+	if err = pcAnswer.SetLocalDescription(answer); err != nil {
 		return err
 	}
 
@@ -355,6 +363,9 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Create Offer: got error: %v", err)
 	}
+	if err = offerPeerConn.SetLocalDescription(offer); err != nil {
+		t.Errorf("SetLocalDescription: got error: %v", err)
+	}
 	answerPeerConn, err := api.NewRTCPeerConnection(RTCConfiguration{})
 	if err != nil {
 		t.Errorf("New RTCPeerConnection: got error: %v", err)
@@ -366,6 +377,9 @@ func TestCreateOfferAnswer(t *testing.T) {
 	answer, err := answerPeerConn.CreateAnswer(nil)
 	if err != nil {
 		t.Errorf("Create Answer: got error: %v", err)
+	}
+	if err = answerPeerConn.SetLocalDescription(answer); err != nil {
+		t.Errorf("SetLocalDescription: got error: %v", err)
 	}
 	err = offerPeerConn.SetRemoteDescription(answer)
 	if err != nil {
