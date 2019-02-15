@@ -17,13 +17,13 @@ const (
 	DefaultPayloadTypeH264 = 100
 )
 
-// MediaEngine defines the codecs supported by a RTCPeerConnection
+// MediaEngine defines the codecs supported by a PeerConnection
 type MediaEngine struct {
-	codecs []*RTCRtpCodec
+	codecs []*RTPCodec
 }
 
 // RegisterCodec registers a codec to a media engine
-func (m *MediaEngine) RegisterCodec(codec *RTCRtpCodec) uint8 {
+func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 	// TODO: generate PayloadType if not set
 	m.codecs = append(m.codecs, codec)
 	return codec.PayloadType
@@ -31,14 +31,14 @@ func (m *MediaEngine) RegisterCodec(codec *RTCRtpCodec) uint8 {
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
 func (m *MediaEngine) RegisterDefaultCodecs() {
-	m.RegisterCodec(NewRTCRtpOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
-	m.RegisterCodec(NewRTCRtpG722Codec(DefaultPayloadTypeG722, 8000))
-	m.RegisterCodec(NewRTCRtpVP8Codec(DefaultPayloadTypeVP8, 90000))
-	m.RegisterCodec(NewRTCRtpH264Codec(DefaultPayloadTypeH264, 90000))
-	m.RegisterCodec(NewRTCRtpVP9Codec(DefaultPayloadTypeVP9, 90000))
+	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
+	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
+	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
+	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
+	m.RegisterCodec(NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000))
 }
 
-func (m *MediaEngine) getCodec(payloadType uint8) (*RTCRtpCodec, error) {
+func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
 	for _, codec := range m.codecs {
 		if codec.PayloadType == payloadType {
 			return codec, nil
@@ -47,7 +47,7 @@ func (m *MediaEngine) getCodec(payloadType uint8) (*RTCRtpCodec, error) {
 	return nil, ErrCodecNotFound
 }
 
-func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTCRtpCodec, error) {
+func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
 	for _, codec := range m.codecs {
 		if codec.Name == sdpCodec.Name &&
 			codec.ClockRate == sdpCodec.ClockRate &&
@@ -60,8 +60,8 @@ func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTCRtpCodec, error) {
 	return nil, ErrCodecNotFound
 }
 
-func (m *MediaEngine) getCodecsByKind(kind RTCRtpCodecType) []*RTCRtpCodec {
-	var codecs []*RTCRtpCodec
+func (m *MediaEngine) getCodecsByKind(kind RTPCodecType) []*RTPCodec {
+	var codecs []*RTPCodec
 	for _, codec := range m.codecs {
 		if codec.Type == kind {
 			codecs = append(codecs, codec)
@@ -79,9 +79,9 @@ const (
 	H264 = "H264"
 )
 
-// NewRTCRtpG722Codec is a helper to create a G722 codec
-func NewRTCRtpG722Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
-	c := NewRTCRtpCodec(RTCRtpCodecTypeAudio,
+// NewRTPG722Codec is a helper to create a G722 codec
+func NewRTPG722Codec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeAudio,
 		G722,
 		clockrate,
 		0,
@@ -91,9 +91,9 @@ func NewRTCRtpG722Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
 	return c
 }
 
-// NewRTCRtpOpusCodec is a helper to create an Opus codec
-func NewRTCRtpOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *RTCRtpCodec {
-	c := NewRTCRtpCodec(RTCRtpCodecTypeAudio,
+// NewRTPOpusCodec is a helper to create an Opus codec
+func NewRTPOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeAudio,
 		Opus,
 		clockrate,
 		channels,
@@ -103,9 +103,9 @@ func NewRTCRtpOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *R
 	return c
 }
 
-// NewRTCRtpVP8Codec is a helper to create an VP8 codec
-func NewRTCRtpVP8Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
-	c := NewRTCRtpCodec(RTCRtpCodecTypeVideo,
+// NewRTPVP8Codec is a helper to create an VP8 codec
+func NewRTPVP8Codec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
 		VP8,
 		clockrate,
 		0,
@@ -115,9 +115,9 @@ func NewRTCRtpVP8Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
 	return c
 }
 
-// NewRTCRtpVP9Codec is a helper to create an VP9 codec
-func NewRTCRtpVP9Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
-	c := NewRTCRtpCodec(RTCRtpCodecTypeVideo,
+// NewRTPVP9Codec is a helper to create an VP9 codec
+func NewRTPVP9Codec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
 		VP9,
 		clockrate,
 		0,
@@ -127,9 +127,9 @@ func NewRTCRtpVP9Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
 	return c
 }
 
-// NewRTCRtpH264Codec is a helper to create an H264 codec
-func NewRTCRtpH264Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
-	c := NewRTCRtpCodec(RTCRtpCodecTypeVideo,
+// NewRTPH264Codec is a helper to create an H264 codec
+func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeVideo,
 		H264,
 		clockrate,
 		0,
@@ -139,50 +139,50 @@ func NewRTCRtpH264Codec(payloadType uint8, clockrate uint32) *RTCRtpCodec {
 	return c
 }
 
-// RTCRtpCodecType determines the type of a codec
-type RTCRtpCodecType int
+// RTPCodecType determines the type of a codec
+type RTPCodecType int
 
 const (
 
-	// RTCRtpCodecTypeAudio indicates this is an audio codec
-	RTCRtpCodecTypeAudio RTCRtpCodecType = iota + 1
+	// RTPCodecTypeAudio indicates this is an audio codec
+	RTPCodecTypeAudio RTPCodecType = iota + 1
 
-	// RTCRtpCodecTypeVideo indicates this is a video codec
-	RTCRtpCodecTypeVideo
+	// RTPCodecTypeVideo indicates this is a video codec
+	RTPCodecTypeVideo
 )
 
-func (t RTCRtpCodecType) String() string {
+func (t RTPCodecType) String() string {
 	switch t {
-	case RTCRtpCodecTypeAudio:
+	case RTPCodecTypeAudio:
 		return "audio"
-	case RTCRtpCodecTypeVideo:
+	case RTPCodecTypeVideo:
 		return "video"
 	default:
 		return ErrUnknownType.Error()
 	}
 }
 
-// RTCRtpCodec represents a codec supported by the PeerConnection
-type RTCRtpCodec struct {
-	RTCRtpCodecCapability
-	Type        RTCRtpCodecType
+// RTPCodec represents a codec supported by the PeerConnection
+type RTPCodec struct {
+	RTPCodecCapability
+	Type        RTPCodecType
 	Name        string
 	PayloadType uint8
 	Payloader   rtp.Payloader
 }
 
-// NewRTCRtpCodec is used to define a new codec
-func NewRTCRtpCodec(
-	codecType RTCRtpCodecType,
+// NewRTPCodec is used to define a new codec
+func NewRTPCodec(
+	codecType RTPCodecType,
 	name string,
 	clockrate uint32,
 	channels uint16,
 	fmtp string,
 	payloadType uint8,
 	payloader rtp.Payloader,
-) *RTCRtpCodec {
-	return &RTCRtpCodec{
-		RTCRtpCodecCapability: RTCRtpCodecCapability{
+) *RTPCodec {
+	return &RTPCodec{
+		RTPCodecCapability: RTPCodecCapability{
 			MimeType:    codecType.String() + "/" + name,
 			ClockRate:   clockrate,
 			Channels:    channels,
@@ -195,21 +195,21 @@ func NewRTCRtpCodec(
 	}
 }
 
-// RTCRtpCodecCapability provides information about codec capabilities.
-type RTCRtpCodecCapability struct {
+// RTPCodecCapability provides information about codec capabilities.
+type RTPCodecCapability struct {
 	MimeType    string
 	ClockRate   uint32
 	Channels    uint16
 	SdpFmtpLine string
 }
 
-// RTCRtpHeaderExtensionCapability is used to define a RFC5285 RTP header extension supported by the codec.
-type RTCRtpHeaderExtensionCapability struct {
+// RTPHeaderExtensionCapability is used to define a RFC5285 RTP header extension supported by the codec.
+type RTPHeaderExtensionCapability struct {
 	URI string
 }
 
-// RTCRtpCapabilities represents the capabilities of a transceiver
-type RTCRtpCapabilities struct {
-	Codecs           []RTCRtpCodecCapability
-	HeaderExtensions []RTCRtpHeaderExtensionCapability
+// RTPCapabilities represents the capabilities of a transceiver
+type RTPCapabilities struct {
+	Codecs           []RTPCodecCapability
+	HeaderExtensions []RTPHeaderExtensionCapability
 }

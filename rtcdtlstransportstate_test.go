@@ -6,39 +6,39 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCDtlsTransportState(t *testing.T) {
+func TestNewDTLSTransportState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState RTCDtlsTransportState
+		expectedState DTLSTransportState
 	}{
-		{unknownStr, RTCDtlsTransportState(Unknown)},
-		{"new", RTCDtlsTransportStateNew},
-		{"connecting", RTCDtlsTransportStateConnecting},
-		{"connected", RTCDtlsTransportStateConnected},
-		{"closed", RTCDtlsTransportStateClosed},
-		{"failed", RTCDtlsTransportStateFailed},
+		{unknownStr, DTLSTransportState(Unknown)},
+		{"new", DTLSTransportStateNew},
+		{"connecting", DTLSTransportStateConnecting},
+		{"connected", DTLSTransportStateConnected},
+		{"closed", DTLSTransportStateClosed},
+		{"failed", DTLSTransportStateFailed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newRTCDtlsTransportState(testCase.stateString),
+			newDTLSTransportState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCDtlsTransportState_String(t *testing.T) {
+func TestDTLSTransportState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCDtlsTransportState
+		state          DTLSTransportState
 		expectedString string
 	}{
-		{RTCDtlsTransportState(Unknown), unknownStr},
-		{RTCDtlsTransportStateNew, "new"},
-		{RTCDtlsTransportStateConnecting, "connecting"},
-		{RTCDtlsTransportStateConnected, "connected"},
-		{RTCDtlsTransportStateClosed, "closed"},
-		{RTCDtlsTransportStateFailed, "failed"},
+		{DTLSTransportState(Unknown), unknownStr},
+		{DTLSTransportStateNew, "new"},
+		{DTLSTransportStateConnecting, "connecting"},
+		{DTLSTransportStateConnected, "connected"},
+		{DTLSTransportStateClosed, "closed"},
+		{DTLSTransportStateFailed, "failed"},
 	}
 
 	for i, testCase := range testCases {

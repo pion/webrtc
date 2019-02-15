@@ -9,14 +9,14 @@ import (
 	"github.com/pions/srtp"
 )
 
-// RTCRtpReceiver allows an application to inspect the receipt of a RTCTrack
-type RTCRtpReceiver struct {
-	kind      RTCRtpCodecType
-	transport *RTCDtlsTransport
+// RTPReceiver allows an application to inspect the receipt of a Track
+type RTPReceiver struct {
+	kind      RTPCodecType
+	transport *DTLSTransport
 
 	hasRecv chan bool
 
-	Track *RTCTrack
+	Track *Track
 
 	closed bool
 	mu     sync.Mutex
@@ -30,9 +30,9 @@ type RTCRtpReceiver struct {
 	rtcpOutDone    chan bool
 }
 
-// NewRTCRtpReceiver constructs a new RTCRtpReceiver
-func NewRTCRtpReceiver(kind RTCRtpCodecType, transport *RTCDtlsTransport) *RTCRtpReceiver {
-	return &RTCRtpReceiver{
+// NewRTPReceiver constructs a new RTPReceiver
+func NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) *RTPReceiver {
+	return &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 
@@ -46,10 +46,10 @@ func NewRTCRtpReceiver(kind RTCRtpCodecType, transport *RTCDtlsTransport) *RTCRt
 	}
 }
 
-// Receive blocks until the RTCTrack is available
-func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
+// Receive blocks until the Track is available
+func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) chan bool {
 	// TODO atomic only allow this to fire once
-	r.Track = &RTCTrack{
+	r.Track = &Track{
 		Kind:        r.kind,
 		Ssrc:        parameters.encodings.SSRC,
 		Packets:     r.rtpOut,
@@ -69,13 +69,13 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 
 		srtpSession, err := r.transport.getSRTPSession()
 		if err != nil {
-			pcLog.Warnf("Failed to open SRTPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			pcLog.Warnf("Failed to open SRTPSession, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
 
 		readStream, err := srtpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
-			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
 		r.mu.Lock()
@@ -86,7 +86,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 		for {
 			rtpLen, err := readStream.Read(readBuf)
 			if err != nil {
-				pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+				pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 				return
 			}
 
@@ -118,13 +118,13 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 
 		srtcpSession, err := r.transport.getSRTCPSession()
 		if err != nil {
-			pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
 
 		readStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
 		if err != nil {
-			pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+			pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 			return
 		}
 		r.mu.Lock()
@@ -135,7 +135,7 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 		for {
 			rtcpLen, err := readStream.Read(readBuf)
 			if err != nil {
-				pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, parameters.encodings.SSRC)
+				pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, parameters.encodings.SSRC)
 				return
 			}
 
@@ -154,19 +154,19 @@ func (r *RTCRtpReceiver) Receive(parameters RTCRtpReceiveParameters) chan bool {
 	return r.hasRecv
 }
 
-// Stop irreversibly stops the RTCRtpReceiver
-func (r *RTCRtpReceiver) Stop() error {
+// Stop irreversibly stops the RTPReceiver
+func (r *RTPReceiver) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.closed {
-		return fmt.Errorf("RTCRtpReceiver has already been closed")
+		return fmt.Errorf("RTPReceiver has already been closed")
 	}
 
 	select {
 	case <-r.hasRecv:
 	default:
-		return fmt.Errorf("RTCRtpReceiver has not been started")
+		return fmt.Errorf("RTPReceiver has not been started")
 	}
 
 	if err := r.rtcpReadStream.Close(); err != nil {

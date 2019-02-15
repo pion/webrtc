@@ -17,25 +17,25 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-// RTCQuicTransport is a specialization of QuicTransportBase focused on
+// QUICTransport is a specialization of QuicTransportBase focused on
 // peer-to-peer use cases and includes information relating to use of a
 // QUIC transport with an ICE transport.
-type RTCQuicTransport struct {
+type QUICTransport struct {
 	lock sync.RWMutex
 	quic.TransportBase
 
-	iceTransport *RTCIceTransport
-	certificates []RTCCertificate
+	iceTransport *ICETransport
+	certificates []Certificate
 }
 
-// NewRTCQuicTransport creates a new RTCQuicTransport.
+// NewQUICTransport creates a new QUICTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 // Note that the Quic transport is a draft and therefore
 // highly experimental. It is currently not supported by
 // any browsers yet.
-func (api *API) NewRTCQuicTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCQuicTransport, error) {
-	t := &RTCQuicTransport{iceTransport: transport}
+func (api *API) NewQUICTransport(transport *ICETransport, certificates []Certificate) (*QUICTransport, error) {
+	t := &QUICTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -54,29 +54,29 @@ func (api *API) NewRTCQuicTransport(transport *RTCIceTransport, certificates []R
 		if err != nil {
 			return nil, err
 		}
-		t.certificates = []RTCCertificate{*certificate}
+		t.certificates = []Certificate{*certificate}
 	}
 
 	return t, nil
 }
 
-// GetLocalParameters returns the Quic parameters of the local RTCQuicParameters upon construction.
-func (t *RTCQuicTransport) GetLocalParameters() RTCQuicParameters {
-	fingerprints := []RTCDtlsFingerprint{}
+// GetLocalParameters returns the Quic parameters of the local QUICParameters upon construction.
+func (t *QUICTransport) GetLocalParameters() QUICParameters {
+	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
 		prints := c.GetFingerprints() // TODO: Should be only one?
 		fingerprints = append(fingerprints, prints...)
 	}
 
-	return RTCQuicParameters{
-		Role:         RTCQuicRoleAuto, // always returns the default role
+	return QUICParameters{
+		Role:         QUICRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
 	}
 }
 
 // Start Quic transport with the parameters of the remote
-func (t *RTCQuicTransport) Start(remoteParameters RTCQuicParameters) error {
+func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -89,12 +89,12 @@ func (t *RTCQuicTransport) Start(remoteParameters RTCQuicParameters) error {
 
 	isClient := true
 	switch remoteParameters.Role {
-	case RTCQuicRoleClient:
+	case QUICRoleClient:
 		isClient = true
-	case RTCQuicRoleServer:
+	case QUICRoleServer:
 		isClient = false
 	default:
-		if t.iceTransport.Role() == RTCIceRoleControlling {
+		if t.iceTransport.Role() == ICERoleControlling {
 			isClient = false
 		}
 	}
@@ -125,7 +125,7 @@ func (t *RTCQuicTransport) Start(remoteParameters RTCQuicParameters) error {
 	return nil
 }
 
-func (t *RTCQuicTransport) validateFingerPrint(remoteParameters RTCQuicParameters, remoteCert *x509.Certificate) error {
+func (t *QUICTransport) validateFingerPrint(remoteParameters QUICParameters, remoteCert *x509.Certificate) error {
 	for _, fp := range remoteParameters.Fingerprints {
 		hashAlgo, err := dtls.HashAlgorithmString(fp.Algorithm)
 		if err != nil {
@@ -145,7 +145,7 @@ func (t *RTCQuicTransport) validateFingerPrint(remoteParameters RTCQuicParameter
 	return errors.New("No matching fingerprint")
 }
 
-func (t *RTCQuicTransport) ensureICEConn() error {
+func (t *QUICTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
 		t.iceTransport.conn == nil ||
 		t.iceTransport.mux == nil {

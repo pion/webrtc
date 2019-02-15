@@ -1,92 +1,92 @@
 package webrtc
 
-// RTCIceConnectionState indicates signaling state of the Ice Connection.
-type RTCIceConnectionState int
+// ICEConnectionState indicates signaling state of the ICE Connection.
+type ICEConnectionState int
 
 const (
-	// RTCIceConnectionStateNew indicates that any of the RTCIceTransports are
+	// ICEConnectionStateNew indicates that any of the ICETransports are
 	// in the "new" state and none of them are in the "checking", "disconnected"
-	// or "failed" state, or all RTCIceTransports are in the "closed" state, or
+	// or "failed" state, or all ICETransports are in the "closed" state, or
 	// there are no transports.
-	RTCIceConnectionStateNew RTCIceConnectionState = iota + 1
+	ICEConnectionStateNew ICEConnectionState = iota + 1
 
-	// RTCIceConnectionStateChecking indicates that any of the RTCIceTransports
+	// ICEConnectionStateChecking indicates that any of the ICETransports
 	// are in the "checking" state and none of them are in the "disconnected"
 	// or "failed" state.
-	RTCIceConnectionStateChecking
+	ICEConnectionStateChecking
 
-	// RTCIceConnectionStateConnected indicates that all RTCIceTransports are
+	// ICEConnectionStateConnected indicates that all ICETransports are
 	// in the "connected", "completed" or "closed" state and at least one of
 	// them is in the "connected" state.
-	RTCIceConnectionStateConnected
+	ICEConnectionStateConnected
 
-	// RTCIceConnectionStateCompleted indicates that all RTCIceTransports are
+	// ICEConnectionStateCompleted indicates that all ICETransports are
 	// in the "completed" or "closed" state and at least one of them is in the
 	// "completed" state.
-	RTCIceConnectionStateCompleted
+	ICEConnectionStateCompleted
 
-	// RTCIceConnectionStateDisconnected indicates that any of the
-	// RTCIceTransports are in the "disconnected" state and none of them are
+	// ICEConnectionStateDisconnected indicates that any of the
+	// ICETransports are in the "disconnected" state and none of them are
 	// in the "failed" state.
-	RTCIceConnectionStateDisconnected
+	ICEConnectionStateDisconnected
 
-	// RTCIceConnectionStateFailed indicates that any of the RTCIceTransports
+	// ICEConnectionStateFailed indicates that any of the ICETransports
 	// are in the "failed" state.
-	RTCIceConnectionStateFailed
+	ICEConnectionStateFailed
 
-	// RTCIceConnectionStateClosed indicates that the RTCPeerConnection's
+	// ICEConnectionStateClosed indicates that the PeerConnection's
 	// isClosed is true.
-	RTCIceConnectionStateClosed
+	ICEConnectionStateClosed
 )
 
 // This is done this way because of a linter.
 const (
-	rtcIceConnectionStateNewStr          = "new"
-	rtcIceConnectionStateCheckingStr     = "checking"
-	rtcIceConnectionStateConnectedStr    = "connected"
-	rtcIceConnectionStateCompletedStr    = "completed"
-	rtcIceConnectionStateDisconnectedStr = "disconnected"
-	rtcIceConnectionStateFailedStr       = "failed"
-	rtcIceConnectionStateClosedStr       = "closed"
+	iceConnectionStateNewStr          = "new"
+	iceConnectionStateCheckingStr     = "checking"
+	iceConnectionStateConnectedStr    = "connected"
+	iceConnectionStateCompletedStr    = "completed"
+	iceConnectionStateDisconnectedStr = "disconnected"
+	iceConnectionStateFailedStr       = "failed"
+	iceConnectionStateClosedStr       = "closed"
 )
 
-func newRTCIceConnectionState(raw string) RTCIceConnectionState {
+func newICEConnectionState(raw string) ICEConnectionState {
 	switch raw {
-	case rtcIceConnectionStateNewStr:
-		return RTCIceConnectionStateNew
-	case rtcIceConnectionStateCheckingStr:
-		return RTCIceConnectionStateChecking
-	case rtcIceConnectionStateConnectedStr:
-		return RTCIceConnectionStateConnected
-	case rtcIceConnectionStateCompletedStr:
-		return RTCIceConnectionStateCompleted
-	case rtcIceConnectionStateDisconnectedStr:
-		return RTCIceConnectionStateDisconnected
-	case rtcIceConnectionStateFailedStr:
-		return RTCIceConnectionStateFailed
-	case rtcIceConnectionStateClosedStr:
-		return RTCIceConnectionStateClosed
+	case iceConnectionStateNewStr:
+		return ICEConnectionStateNew
+	case iceConnectionStateCheckingStr:
+		return ICEConnectionStateChecking
+	case iceConnectionStateConnectedStr:
+		return ICEConnectionStateConnected
+	case iceConnectionStateCompletedStr:
+		return ICEConnectionStateCompleted
+	case iceConnectionStateDisconnectedStr:
+		return ICEConnectionStateDisconnected
+	case iceConnectionStateFailedStr:
+		return ICEConnectionStateFailed
+	case iceConnectionStateClosedStr:
+		return ICEConnectionStateClosed
 	default:
-		return RTCIceConnectionState(Unknown)
+		return ICEConnectionState(Unknown)
 	}
 }
 
-func (c RTCIceConnectionState) String() string {
+func (c ICEConnectionState) String() string {
 	switch c {
-	case RTCIceConnectionStateNew:
-		return rtcIceConnectionStateNewStr
-	case RTCIceConnectionStateChecking:
-		return rtcIceConnectionStateCheckingStr
-	case RTCIceConnectionStateConnected:
-		return rtcIceConnectionStateConnectedStr
-	case RTCIceConnectionStateCompleted:
-		return rtcIceConnectionStateCompletedStr
-	case RTCIceConnectionStateDisconnected:
-		return rtcIceConnectionStateDisconnectedStr
-	case RTCIceConnectionStateFailed:
-		return rtcIceConnectionStateFailedStr
-	case RTCIceConnectionStateClosed:
-		return rtcIceConnectionStateClosedStr
+	case ICEConnectionStateNew:
+		return iceConnectionStateNewStr
+	case ICEConnectionStateChecking:
+		return iceConnectionStateCheckingStr
+	case ICEConnectionStateConnected:
+		return iceConnectionStateConnectedStr
+	case ICEConnectionStateCompleted:
+		return iceConnectionStateCompletedStr
+	case ICEConnectionStateDisconnected:
+		return iceConnectionStateDisconnectedStr
+	case ICEConnectionStateFailed:
+		return iceConnectionStateFailedStr
+	case ICEConnectionStateClosed:
+		return iceConnectionStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}

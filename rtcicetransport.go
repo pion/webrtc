@@ -9,52 +9,52 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 )
 
-// RTCIceTransport allows an application access to information about the ICE
+// ICETransport allows an application access to information about the ICE
 // transport over which packets are sent and received.
-type RTCIceTransport struct {
+type ICETransport struct {
 	lock sync.RWMutex
 
-	role RTCIceRole
-	// Component RTCIceComponent
-	// State RTCIceTransportState
-	// gatheringState RTCIceGathererState
+	role ICERole
+	// Component ICEComponent
+	// State ICETransportState
+	// gatheringState ICEGathererState
 
-	onConnectionStateChangeHdlr func(RTCIceTransportState)
+	onConnectionStateChangeHdlr func(ICETransportState)
 
-	gatherer *RTCIceGatherer
+	gatherer *ICEGatherer
 	conn     *ice.Conn
 	mux      *mux.Mux
 }
 
-// func (t *RTCIceTransport) GetLocalCandidates() []RTCIceCandidate {
+// func (t *ICETransport) GetLocalCandidates() []ICECandidate {
 //
 // }
 //
-// func (t *RTCIceTransport) GetRemoteCandidates() []RTCIceCandidate {
+// func (t *ICETransport) GetRemoteCandidates() []ICECandidate {
 //
 // }
 //
-// func (t *RTCIceTransport) GetSelectedCandidatePair() RTCIceCandidatePair {
+// func (t *ICETransport) GetSelectedCandidatePair() ICECandidatePair {
 //
 // }
 //
-// func (t *RTCIceTransport) GetLocalParameters() RTCIceParameters {
+// func (t *ICETransport) GetLocalParameters() ICEParameters {
 //
 // }
 //
-// func (t *RTCIceTransport) GetRemoteParameters() RTCIceParameters {
+// func (t *ICETransport) GetRemoteParameters() ICEParameters {
 //
 // }
 
-// NewRTCIceTransport creates a new NewRTCIceTransport.
+// NewICETransport creates a new NewICETransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewRTCIceTransport(gatherer *RTCIceGatherer) *RTCIceTransport {
-	return &RTCIceTransport{gatherer: gatherer}
+func (api *API) NewICETransport(gatherer *ICEGatherer) *ICETransport {
+	return &ICETransport{gatherer: gatherer}
 }
 
 // Start incoming connectivity checks based on its configured role.
-func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameters, role *RTCIceRole) error {
+func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -68,14 +68,14 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 
 	agent := t.gatherer.agent
 	err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
-		t.onConnectionStateChange(newRTCIceTransportStateFromICE(iceState))
+		t.onConnectionStateChange(newICETransportStateFromICE(iceState))
 	})
 	if err != nil {
 		return err
 	}
 
 	if role == nil {
-		controlled := RTCIceRoleControlled
+		controlled := ICERoleControlled
 		role = &controlled
 	}
 	t.role = *role
@@ -86,12 +86,12 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 
 	var iceConn *ice.Conn
 	switch *role {
-	case RTCIceRoleControlling:
+	case ICERoleControlling:
 		iceConn, err = agent.Dial(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
 
-	case RTCIceRoleControlled:
+	case ICERoleControlled:
 		iceConn, err = agent.Accept(context.TODO(),
 			params.UsernameFragment,
 			params.Password)
@@ -112,8 +112,8 @@ func (t *RTCIceTransport) Start(gatherer *RTCIceGatherer, params RTCIceParameter
 	return nil
 }
 
-// Stop irreversibly stops the RTCIceTransport.
-func (t *RTCIceTransport) Stop() error {
+// Stop irreversibly stops the ICETransport.
+func (t *ICETransport) Stop() error {
 	// Close the Mux. This closes the Mux and the underlying ICE conn.
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -126,13 +126,13 @@ func (t *RTCIceTransport) Stop() error {
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
 // connection state changes.
-func (t *RTCIceTransport) OnConnectionStateChange(f func(RTCIceTransportState)) {
+func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.onConnectionStateChangeHdlr = f
 }
 
-func (t *RTCIceTransport) onConnectionStateChange(state RTCIceTransportState) {
+func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
 	t.lock.RLock()
 	hdlr := t.onConnectionStateChangeHdlr
 	t.lock.RUnlock()
@@ -142,15 +142,15 @@ func (t *RTCIceTransport) onConnectionStateChange(state RTCIceTransportState) {
 }
 
 // Role indicates the current role of the ICE transport.
-func (t *RTCIceTransport) Role() RTCIceRole {
+func (t *ICETransport) Role() ICERole {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	return t.role
 }
 
-// SetRemoteCandidates sets the sequence of candidates associated with the remote RTCIceTransport.
-func (t *RTCIceTransport) SetRemoteCandidates(remoteCandidates []RTCIceCandidate) error {
+// SetRemoteCandidates sets the sequence of candidates associated with the remote ICETransport.
+func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -172,8 +172,8 @@ func (t *RTCIceTransport) SetRemoteCandidates(remoteCandidates []RTCIceCandidate
 	return nil
 }
 
-// AddRemoteCandidate adds a candidate associated with the remote RTCIceTransport.
-func (t *RTCIceTransport) AddRemoteCandidate(remoteCandidate RTCIceCandidate) error {
+// AddRemoteCandidate adds a candidate associated with the remote ICETransport.
+func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -193,7 +193,7 @@ func (t *RTCIceTransport) AddRemoteCandidate(remoteCandidate RTCIceCandidate) er
 	return nil
 }
 
-func (t *RTCIceTransport) ensureGatherer() error {
+func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil ||
 		t.gatherer.agent == nil {
 		return errors.New("Gatherer not started")

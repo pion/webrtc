@@ -7,17 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCSessionDescription_JSON(t *testing.T) {
+func TestSessionDescription_JSON(t *testing.T) {
 	testCases := []struct {
-		desc           RTCSessionDescription
+		desc           SessionDescription
 		expectedString string
 		unmarshalErr   error
 	}{
-		{RTCSessionDescription{Type: RTCSdpTypeOffer, Sdp: "sdp"}, `{"type":"offer","sdp":"sdp"}`, nil},
-		{RTCSessionDescription{Type: RTCSdpTypePranswer, Sdp: "sdp"}, `{"type":"pranswer","sdp":"sdp"}`, nil},
-		{RTCSessionDescription{Type: RTCSdpTypeAnswer, Sdp: "sdp"}, `{"type":"answer","sdp":"sdp"}`, nil},
-		{RTCSessionDescription{Type: RTCSdpTypeRollback, Sdp: "sdp"}, `{"type":"rollback","sdp":"sdp"}`, nil},
-		{RTCSessionDescription{Type: RTCSdpType(Unknown), Sdp: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
+		{SessionDescription{Type: SDPTypeOffer, Sdp: "sdp"}, `{"type":"offer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypePranswer, Sdp: "sdp"}, `{"type":"pranswer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypeAnswer, Sdp: "sdp"}, `{"type":"answer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypeRollback, Sdp: "sdp"}, `{"type":"rollback","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPType(Unknown), Sdp: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
 	}
 
 	for i, testCase := range testCases {
@@ -33,7 +33,7 @@ func TestRTCSessionDescription_JSON(t *testing.T) {
 			"testCase: %d %v", i, testCase,
 		)
 
-		var desc RTCSessionDescription
+		var desc SessionDescription
 		err = json.Unmarshal(descData, &desc)
 
 		if testCase.unmarshalErr != nil {

@@ -21,8 +21,8 @@ func main() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Create a datachannel with label 'data'
@@ -88,7 +88,7 @@ func main() {
 }
 
 // mustSignalViaHTTP exchange the SDP offer and answer using an HTTP Post request.
-func mustSignalViaHTTP(offer webrtc.RTCSessionDescription, address string) webrtc.RTCSessionDescription {
+func mustSignalViaHTTP(offer webrtc.SessionDescription, address string) webrtc.SessionDescription {
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(offer)
 	util.Check(err)
@@ -97,7 +97,7 @@ func mustSignalViaHTTP(offer webrtc.RTCSessionDescription, address string) webrt
 	util.Check(err)
 	defer resp.Body.Close()
 
-	var answer webrtc.RTCSessionDescription
+	var answer webrtc.SessionDescription
 	err = json.NewDecoder(resp.Body).Decode(&answer)
 	util.Check(err)
 

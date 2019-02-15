@@ -6,33 +6,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCIceRole(t *testing.T) {
+func TestNewICERole(t *testing.T) {
 	testCases := []struct {
 		roleString   string
-		expectedRole RTCIceRole
+		expectedRole ICERole
 	}{
-		{unknownStr, RTCIceRole(Unknown)},
-		{"controlling", RTCIceRoleControlling},
-		{"controlled", RTCIceRoleControlled},
+		{unknownStr, ICERole(Unknown)},
+		{"controlling", ICERoleControlling},
+		{"controlled", ICERoleControlled},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedRole,
-			newRTCIceRole(testCase.roleString),
+			newICERole(testCase.roleString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCIceRole_String(t *testing.T) {
+func TestICERole_String(t *testing.T) {
 	testCases := []struct {
-		proto          RTCIceRole
+		proto          ICERole
 		expectedString string
 	}{
-		{RTCIceRole(Unknown), unknownStr},
-		{RTCIceRoleControlling, "controlling"},
-		{RTCIceRoleControlled, "controlled"},
+		{ICERole(Unknown), unknownStr},
+		{ICERoleControlling, "controlling"},
+		{ICERoleControlled, "controlled"},
 	}
 
 	for i, testCase := range testCases {

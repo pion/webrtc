@@ -6,37 +6,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCSdpType(t *testing.T) {
+func TestNewSDPType(t *testing.T) {
 	testCases := []struct {
 		sdpTypeString   string
-		expectedSdpType RTCSdpType
+		expectedSdpType SDPType
 	}{
-		{unknownStr, RTCSdpType(Unknown)},
-		{"offer", RTCSdpTypeOffer},
-		{"pranswer", RTCSdpTypePranswer},
-		{"answer", RTCSdpTypeAnswer},
-		{"rollback", RTCSdpTypeRollback},
+		{unknownStr, SDPType(Unknown)},
+		{"offer", SDPTypeOffer},
+		{"pranswer", SDPTypePranswer},
+		{"answer", SDPTypeAnswer},
+		{"rollback", SDPTypeRollback},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedSdpType,
-			newRTCSdpType(testCase.sdpTypeString),
+			newSDPType(testCase.sdpTypeString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCSdpType_String(t *testing.T) {
+func TestSDPType_String(t *testing.T) {
 	testCases := []struct {
-		sdpType        RTCSdpType
+		sdpType        SDPType
 		expectedString string
 	}{
-		{RTCSdpType(Unknown), unknownStr},
-		{RTCSdpTypeOffer, "offer"},
-		{RTCSdpTypePranswer, "pranswer"},
-		{RTCSdpTypeAnswer, "answer"},
-		{RTCSdpTypeRollback, "rollback"},
+		{SDPType(Unknown), unknownStr},
+		{SDPTypeOffer, "offer"},
+		{SDPTypePranswer, "pranswer"},
+		{SDPTypeAnswer, "answer"},
+		{SDPTypeRollback, "rollback"},
 	}
 
 	for i, testCase := range testCases {

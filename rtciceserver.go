@@ -5,20 +5,20 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-// RTCIceServer describes a single STUN and TURN server that can be used by
-// the IceAgent to establish a connection with a peer.
-type RTCIceServer struct {
+// ICEServer describes a single STUN and TURN server that can be used by
+// the ICEAgent to establish a connection with a peer.
+type ICEServer struct {
 	URLs           []string
 	Username       string
 	Credential     interface{}
-	CredentialType RTCIceCredentialType
+	CredentialType ICECredentialType
 }
 
-func (s RTCIceServer) parseURL(i int) (*ice.URL, error) {
+func (s ICEServer) parseURL(i int) (*ice.URL, error) {
 	return ice.ParseURL(s.URLs[i])
 }
 
-func (s RTCIceServer) validate() ([]*ice.URL, error) {
+func (s ICEServer) validate() ([]*ice.URL, error) {
 	urls := []*ice.URL{}
 
 	for i := range s.URLs {
@@ -34,15 +34,15 @@ func (s RTCIceServer) validate() ([]*ice.URL, error) {
 			}
 
 			switch s.CredentialType {
-			case RTCIceCredentialTypePassword:
+			case ICECredentialTypePassword:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 				if _, ok := s.Credential.(string); !ok {
 					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
 				}
 
-			case RTCIceCredentialTypeOauth:
+			case ICECredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
-				if _, ok := s.Credential.(RTCOAuthCredential); !ok {
+				if _, ok := s.Credential.(OAuthCredential); !ok {
 					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
 				}
 

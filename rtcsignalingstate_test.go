@@ -8,41 +8,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCSignalingState(t *testing.T) {
+func TestNewSignalingState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState RTCSignalingState
+		expectedState SignalingState
 	}{
-		{unknownStr, RTCSignalingState(Unknown)},
-		{"stable", RTCSignalingStateStable},
-		{"have-local-offer", RTCSignalingStateHaveLocalOffer},
-		{"have-remote-offer", RTCSignalingStateHaveRemoteOffer},
-		{"have-local-pranswer", RTCSignalingStateHaveLocalPranswer},
-		{"have-remote-pranswer", RTCSignalingStateHaveRemotePranswer},
-		{"closed", RTCSignalingStateClosed},
+		{unknownStr, SignalingState(Unknown)},
+		{"stable", SignalingStateStable},
+		{"have-local-offer", SignalingStateHaveLocalOffer},
+		{"have-remote-offer", SignalingStateHaveRemoteOffer},
+		{"have-local-pranswer", SignalingStateHaveLocalPranswer},
+		{"have-remote-pranswer", SignalingStateHaveRemotePranswer},
+		{"closed", SignalingStateClosed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newRTCSignalingState(testCase.stateString),
+			newSignalingState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCSignalingState_String(t *testing.T) {
+func TestSignalingState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCSignalingState
+		state          SignalingState
 		expectedString string
 	}{
-		{RTCSignalingState(Unknown), unknownStr},
-		{RTCSignalingStateStable, "stable"},
-		{RTCSignalingStateHaveLocalOffer, "have-local-offer"},
-		{RTCSignalingStateHaveRemoteOffer, "have-remote-offer"},
-		{RTCSignalingStateHaveLocalPranswer, "have-local-pranswer"},
-		{RTCSignalingStateHaveRemotePranswer, "have-remote-pranswer"},
-		{RTCSignalingStateClosed, "closed"},
+		{SignalingState(Unknown), unknownStr},
+		{SignalingStateStable, "stable"},
+		{SignalingStateHaveLocalOffer, "have-local-offer"},
+		{SignalingStateHaveRemoteOffer, "have-remote-offer"},
+		{SignalingStateHaveLocalPranswer, "have-local-pranswer"},
+		{SignalingStateHaveRemotePranswer, "have-remote-pranswer"},
+		{SignalingStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {
@@ -54,93 +54,93 @@ func TestRTCSignalingState_String(t *testing.T) {
 	}
 }
 
-func TestRTCSignalingState_Transitions(t *testing.T) {
+func TestSignalingState_Transitions(t *testing.T) {
 	testCases := []struct {
 		desc        string
-		current     RTCSignalingState
-		next        RTCSignalingState
-		op          rtcStateChangeOp
-		sdpType     RTCSdpType
+		current     SignalingState
+		next        SignalingState
+		op          stateChangeOp
+		sdpType     SDPType
 		expectedErr error
 	}{
 		{
 			"stable->SetLocal(offer)->have-local-offer",
-			RTCSignalingStateStable,
-			RTCSignalingStateHaveLocalOffer,
-			rtcStateChangeOpSetLocal,
-			RTCSdpTypeOffer,
+			SignalingStateStable,
+			SignalingStateHaveLocalOffer,
+			stateChangeOpSetLocal,
+			SDPTypeOffer,
 			nil,
 		},
 		{
 			"stable->SetRemote(offer)->have-remote-offer",
-			RTCSignalingStateStable,
-			RTCSignalingStateHaveRemoteOffer,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypeOffer,
+			SignalingStateStable,
+			SignalingStateHaveRemoteOffer,
+			stateChangeOpSetRemote,
+			SDPTypeOffer,
 			nil,
 		},
 		{
 			"have-local-offer->SetRemote(answer)->stable",
-			RTCSignalingStateHaveLocalOffer,
-			RTCSignalingStateStable,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypeAnswer,
+			SignalingStateHaveLocalOffer,
+			SignalingStateStable,
+			stateChangeOpSetRemote,
+			SDPTypeAnswer,
 			nil,
 		},
 		{
 			"have-local-offer->SetRemote(pranswer)->have-remote-pranswer",
-			RTCSignalingStateHaveLocalOffer,
-			RTCSignalingStateHaveRemotePranswer,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypePranswer,
+			SignalingStateHaveLocalOffer,
+			SignalingStateHaveRemotePranswer,
+			stateChangeOpSetRemote,
+			SDPTypePranswer,
 			nil,
 		},
 		{
 			"have-remote-pranswer->SetRemote(answer)->stable",
-			RTCSignalingStateHaveRemotePranswer,
-			RTCSignalingStateStable,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypeAnswer,
+			SignalingStateHaveRemotePranswer,
+			SignalingStateStable,
+			stateChangeOpSetRemote,
+			SDPTypeAnswer,
 			nil,
 		},
 		{
 			"have-remote-offer->SetLocal(answer)->stable",
-			RTCSignalingStateHaveRemoteOffer,
-			RTCSignalingStateStable,
-			rtcStateChangeOpSetLocal,
-			RTCSdpTypeAnswer,
+			SignalingStateHaveRemoteOffer,
+			SignalingStateStable,
+			stateChangeOpSetLocal,
+			SDPTypeAnswer,
 			nil,
 		},
 		{
 			"have-remote-offer->SetLocal(pranswer)->have-local-pranswer",
-			RTCSignalingStateHaveRemoteOffer,
-			RTCSignalingStateHaveLocalPranswer,
-			rtcStateChangeOpSetLocal,
-			RTCSdpTypePranswer,
+			SignalingStateHaveRemoteOffer,
+			SignalingStateHaveLocalPranswer,
+			stateChangeOpSetLocal,
+			SDPTypePranswer,
 			nil,
 		},
 		{
 			"have-local-pranswer->SetLocal(answer)->stable",
-			RTCSignalingStateHaveLocalPranswer,
-			RTCSignalingStateStable,
-			rtcStateChangeOpSetLocal,
-			RTCSdpTypeAnswer,
+			SignalingStateHaveLocalPranswer,
+			SignalingStateStable,
+			stateChangeOpSetLocal,
+			SDPTypeAnswer,
 			nil,
 		},
 		{
 			"(invalid) stable->SetRemote(pranswer)->have-remote-pranswer",
-			RTCSignalingStateStable,
-			RTCSignalingStateHaveRemotePranswer,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypePranswer,
+			SignalingStateStable,
+			SignalingStateHaveRemotePranswer,
+			stateChangeOpSetRemote,
+			SDPTypePranswer,
 			&rtcerr.InvalidModificationError{},
 		},
 		{
 			"(invalid) stable->SetRemote(rollback)->have-local-offer",
-			RTCSignalingStateStable,
-			RTCSignalingStateHaveLocalOffer,
-			rtcStateChangeOpSetRemote,
-			RTCSdpTypeRollback,
+			SignalingStateStable,
+			SignalingStateHaveLocalOffer,
+			stateChangeOpSetRemote,
+			SDPTypeRollback,
 			&rtcerr.InvalidModificationError{},
 		},
 	}

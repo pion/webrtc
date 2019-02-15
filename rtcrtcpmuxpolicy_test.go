@@ -6,33 +6,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCRtcpMuxPolicy(t *testing.T) {
+func TestNewRTCPMuxPolicy(t *testing.T) {
 	testCases := []struct {
 		policyString   string
-		expectedPolicy RTCRtcpMuxPolicy
+		expectedPolicy RTCPMuxPolicy
 	}{
-		{unknownStr, RTCRtcpMuxPolicy(Unknown)},
-		{"negotiate", RTCRtcpMuxPolicyNegotiate},
-		{"require", RTCRtcpMuxPolicyRequire},
+		{unknownStr, RTCPMuxPolicy(Unknown)},
+		{"negotiate", RTCPMuxPolicyNegotiate},
+		{"require", RTCPMuxPolicyRequire},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedPolicy,
-			newRTCRtcpMuxPolicy(testCase.policyString),
+			newRTCPMuxPolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCRtcpMuxPolicy_String(t *testing.T) {
+func TestRTCPMuxPolicy_String(t *testing.T) {
 	testCases := []struct {
-		policy         RTCRtcpMuxPolicy
+		policy         RTCPMuxPolicy
 		expectedString string
 	}{
-		{RTCRtcpMuxPolicy(Unknown), unknownStr},
-		{RTCRtcpMuxPolicyNegotiate, "negotiate"},
-		{RTCRtcpMuxPolicyRequire, "require"},
+		{RTCPMuxPolicy(Unknown), unknownStr},
+		{RTCPMuxPolicyNegotiate, "negotiate"},
+		{RTCPMuxPolicyRequire, "require"},
 	}
 
 	for i, testCase := range testCases {

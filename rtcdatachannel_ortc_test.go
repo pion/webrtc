@@ -8,7 +8,7 @@ import (
 	"github.com/pions/webrtc/pkg/datachannel"
 )
 
-func TestRTCDataChannel_ORTCE2E(t *testing.T) {
+func TestDataChannel_ORTCE2E(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -24,7 +24,7 @@ func TestRTCDataChannel_ORTCE2E(t *testing.T) {
 	awaitSetup := make(chan struct{})
 	awaitString := make(chan struct{})
 	awaitBinary := make(chan struct{})
-	stackB.sctp.OnDataChannel(func(d *RTCDataChannel) {
+	stackB.sctp.OnDataChannel(func(d *DataChannel) {
 		close(awaitSetup)
 		d.OnMessage(func(payload datachannel.Payload) {
 			switch payload.(type) {
@@ -41,11 +41,11 @@ func TestRTCDataChannel_ORTCE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dcParams := &RTCDataChannelParameters{
+	dcParams := &DataChannelParameters{
 		Label: "Foo",
 		ID:    1,
 	}
-	channelA, err := stackA.api.NewRTCDataChannel(stackA.sctp, dcParams)
+	channelA, err := stackA.api.NewDataChannel(stackA.sctp, dcParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,16 +76,16 @@ func TestRTCDataChannel_ORTCE2E(t *testing.T) {
 
 type testORTCStack struct {
 	api      *API
-	gatherer *RTCIceGatherer
-	ice      *RTCIceTransport
-	dtls     *RTCDtlsTransport
-	sctp     *RTCSctpTransport
+	gatherer *ICEGatherer
+	ice      *ICETransport
+	dtls     *DTLSTransport
+	sctp     *SCTPTransport
 }
 
 func (s *testORTCStack) setSignal(sig *testORTCSignal, isOffer bool) error {
-	iceRole := RTCIceRoleControlled
+	iceRole := ICERoleControlled
 	if isOffer {
-		iceRole = RTCIceRoleControlling
+		iceRole = ICERoleControlling
 	}
 
 	err := s.ice.SetRemoteCandidates(sig.ICECandidates)
@@ -100,7 +100,7 @@ func (s *testORTCStack) setSignal(sig *testORTCSignal, isOffer bool) error {
 	}
 
 	// Start the DTLS transport
-	err = s.dtls.Start(sig.DtlsParameters)
+	err = s.dtls.Start(sig.DTLSParameters)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (s *testORTCStack) getSignal() (*testORTCSignal, error) {
 	return &testORTCSignal{
 		ICECandidates:    iceCandidates,
 		ICEParameters:    iceParams,
-		DtlsParameters:   dtlsParams,
+		DTLSParameters:   dtlsParams,
 		SCTPCapabilities: sctpCapabilities,
 	}, nil
 }
@@ -158,10 +158,10 @@ func (s *testORTCStack) close() error {
 }
 
 type testORTCSignal struct {
-	ICECandidates    []RTCIceCandidate   `json:"iceCandidates"`
-	ICEParameters    RTCIceParameters    `json:"iceParameters"`
-	DtlsParameters   RTCDtlsParameters   `json:"dtlsParameters"`
-	SCTPCapabilities RTCSctpCapabilities `json:"sctpCapabilities"`
+	ICECandidates    []ICECandidate   `json:"iceCandidates"`
+	ICEParameters    ICEParameters    `json:"iceParameters"`
+	DTLSParameters   DTLSParameters   `json:"dtlsParameters"`
+	SCTPCapabilities SCTPCapabilities `json:"sctpCapabilities"`
 }
 
 func newORTCPair() (stackA *testORTCStack, stackB *testORTCStack, err error) {
@@ -183,22 +183,22 @@ func newORTCStack() (*testORTCStack, error) {
 	api := NewAPI()
 
 	// Create the ICE gatherer
-	gatherer, err := api.NewRTCIceGatherer(RTCIceGatherOptions{})
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the ICE transport
-	ice := api.NewRTCIceTransport(gatherer)
+	ice := api.NewICETransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := api.NewRTCDtlsTransport(ice, nil)
+	dtls, err := api.NewDTLSTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the SCTP transport
-	sctp := api.NewRTCSctpTransport(dtls)
+	sctp := api.NewSCTPTransport(dtls)
 
 	return &testORTCStack{
 		api:      api,

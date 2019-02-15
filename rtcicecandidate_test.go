@@ -9,20 +9,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCIceCandidate_Convert(t *testing.T) {
+func TestICECandidate_Convert(t *testing.T) {
 	testCases := []struct {
-		native RTCIceCandidate
+		native ICECandidate
 		ice    *ice.Candidate
 		sdp    sdp.ICECandidate
 	}{
 		{
-			RTCIceCandidate{
+			ICECandidate{
 				Foundation: "foundation",
 				Priority:   128,
 				IP:         "1.0.0.1",
-				Protocol:   RTCIceProtocolUDP,
+				Protocol:   ICEProtocolUDP,
 				Port:       1234,
-				Typ:        RTCIceCandidateTypeHost,
+				Typ:        ICECandidateTypeHost,
 				Component:  1,
 			}, &ice.Candidate{
 				IP:              net.ParseIP("1.0.0.1"),
@@ -43,13 +43,13 @@ func TestRTCIceCandidate_Convert(t *testing.T) {
 			},
 		},
 		{
-			RTCIceCandidate{
+			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
 				IP:             "::1",
-				Protocol:       RTCIceProtocolUDP,
+				Protocol:       ICEProtocolUDP,
 				Port:           1234,
-				Typ:            RTCIceCandidateTypeSrflx,
+				Typ:            ICECandidateTypeSrflx,
 				Component:      1,
 				RelatedAddress: "1.0.0.1",
 				RelatedPort:    4321,
@@ -78,13 +78,13 @@ func TestRTCIceCandidate_Convert(t *testing.T) {
 			},
 		},
 		{
-			RTCIceCandidate{
+			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
 				IP:             "::1",
-				Protocol:       RTCIceProtocolUDP,
+				Protocol:       ICEProtocolUDP,
 				Port:           1234,
-				Typ:            RTCIceCandidateTypePrflx,
+				Typ:            ICECandidateTypePrflx,
 				Component:      1,
 				RelatedAddress: "1.0.0.1",
 				RelatedPort:    4321,
@@ -137,8 +137,8 @@ func TestConvertTypeFromICE(t *testing.T) {
 		if err != nil {
 			t.Fatal("failed coverting ice.CandidateTypeHost")
 		}
-		if ct != RTCIceCandidateTypeHost {
-			t.Fatal("should be coverted to RTCIceCandidateTypeHost")
+		if ct != ICECandidateTypeHost {
+			t.Fatal("should be coverted to ICECandidateTypeHost")
 		}
 	})
 	t.Run("srflx", func(t *testing.T) {
@@ -146,8 +146,8 @@ func TestConvertTypeFromICE(t *testing.T) {
 		if err != nil {
 			t.Fatal("failed coverting ice.CandidateTypeServerReflexive")
 		}
-		if ct != RTCIceCandidateTypeSrflx {
-			t.Fatal("should be coverted to RTCIceCandidateTypeSrflx")
+		if ct != ICECandidateTypeSrflx {
+			t.Fatal("should be coverted to ICECandidateTypeSrflx")
 		}
 	})
 	t.Run("prflx", func(t *testing.T) {
@@ -155,8 +155,8 @@ func TestConvertTypeFromICE(t *testing.T) {
 		if err != nil {
 			t.Fatal("failed coverting ice.CandidateTypePeerReflexive")
 		}
-		if ct != RTCIceCandidateTypePrflx {
-			t.Fatal("should be coverted to RTCIceCandidateTypePrflx")
+		if ct != ICECandidateTypePrflx {
+			t.Fatal("should be coverted to ICECandidateTypePrflx")
 		}
 	})
 }

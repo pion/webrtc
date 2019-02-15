@@ -12,40 +12,40 @@ import (
 
 const sctpMaxChannels = uint16(65535)
 
-// RTCSctpTransport provides details about the SCTP transport.
-type RTCSctpTransport struct {
+// SCTPTransport provides details about the SCTP transport.
+type SCTPTransport struct {
 	lock sync.RWMutex
 
-	dtlsTransport *RTCDtlsTransport
+	dtlsTransport *DTLSTransport
 
 	// State represents the current state of the SCTP transport.
-	State RTCSctpTransportState
+	State SCTPTransportState
 
 	port uint16
 
 	// MaxMessageSize represents the maximum size of data that can be passed to
-	// RTCDataChannel's send() method.
+	// DataChannel's send() method.
 	MaxMessageSize float64
 
-	// MaxChannels represents the maximum amount of RTCDataChannel's that can
+	// MaxChannels represents the maximum amount of DataChannel's that can
 	// be used simultaneously.
 	MaxChannels *uint16
 
 	// OnStateChange  func()
 
 	association          *sctp.Association
-	onDataChannelHandler func(*RTCDataChannel)
+	onDataChannelHandler func(*DataChannel)
 
 	api *API
 }
 
-// NewRTCSctpTransport creates a new RTCSctpTransport.
+// NewSCTPTransport creates a new SCTPTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
-	res := &RTCSctpTransport{
+func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
+	res := &SCTPTransport{
 		dtlsTransport: dtls,
-		State:         RTCSctpTransportStateConnecting,
+		State:         SCTPTransportStateConnecting,
 		port:          5000, // TODO
 		api:           api,
 	}
@@ -56,25 +56,25 @@ func (api *API) NewRTCSctpTransport(dtls *RTCDtlsTransport) *RTCSctpTransport {
 	return res
 }
 
-// Transport returns the RTCDtlsTransport instance the RTCSctpTransport is sending over.
-func (r *RTCSctpTransport) Transport() *RTCDtlsTransport {
+// Transport returns the DTLSTransport instance the SCTPTransport is sending over.
+func (r *SCTPTransport) Transport() *DTLSTransport {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	return r.dtlsTransport
 }
 
-// GetCapabilities returns the RTCSctpCapabilities of the RTCSctpTransport.
-func (r *RTCSctpTransport) GetCapabilities() RTCSctpCapabilities {
-	return RTCSctpCapabilities{
+// GetCapabilities returns the SCTPCapabilities of the SCTPTransport.
+func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
+	return SCTPCapabilities{
 		MaxMessageSize: 0,
 	}
 }
 
-// Start the RTCSctpTransport. Since both local and remote parties must mutually
-// create an RTCSctpTransport, SCTP SO (Simultaneous Open) is used to establish
+// Start the SCTPTransport. Since both local and remote parties must mutually
+// create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *RTCSctpTransport) Start(remoteCaps RTCSctpCapabilities) error {
+func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -96,8 +96,8 @@ func (r *RTCSctpTransport) Start(remoteCaps RTCSctpCapabilities) error {
 	return nil
 }
 
-// Stop stops the RTCSctpTransport
-func (r *RTCSctpTransport) Stop() error {
+// Stop stops the SCTPTransport
+func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if r.association == nil {
@@ -109,12 +109,12 @@ func (r *RTCSctpTransport) Stop() error {
 	}
 
 	r.association = nil
-	r.State = RTCSctpTransportStateClosed
+	r.State = SCTPTransportStateClosed
 
 	return nil
 }
 
-func (r *RTCSctpTransport) ensureDTLS() error {
+func (r *SCTPTransport) ensureDTLS() error {
 	if r.dtlsTransport == nil ||
 		r.dtlsTransport.conn == nil {
 		return errors.New("DTLS not establisched")
@@ -123,7 +123,7 @@ func (r *RTCSctpTransport) ensureDTLS() error {
 	return nil
 }
 
-func (r *RTCSctpTransport) acceptDataChannels() {
+func (r *SCTPTransport) acceptDataChannels() {
 	r.lock.RLock()
 	a := r.association
 	r.lock.RUnlock()
@@ -136,10 +136,10 @@ func (r *RTCSctpTransport) acceptDataChannels() {
 		}
 
 		sid := dc.StreamIdentifier()
-		rtcDC := &RTCDataChannel{
+		rtcDC := &DataChannel{
 			ID:         &sid,
 			Label:      dc.Config.Label,
-			ReadyState: RTCDataChannelStateOpen,
+			ReadyState: DataChannelStateOpen,
 			api:        r.api,
 		}
 
@@ -150,13 +150,13 @@ func (r *RTCSctpTransport) acceptDataChannels() {
 
 // OnDataChannel sets an event handler which is invoked when a data
 // channel message arrives from a remote peer.
-func (r *RTCSctpTransport) OnDataChannel(f func(*RTCDataChannel)) {
+func (r *SCTPTransport) OnDataChannel(f func(*DataChannel)) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.onDataChannelHandler = f
 }
 
-func (r *RTCSctpTransport) onDataChannel(dc *RTCDataChannel) (done chan struct{}) {
+func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.lock.Lock()
 	hdlr := r.onDataChannelHandler
 	r.lock.Unlock()
@@ -177,14 +177,14 @@ func (r *RTCSctpTransport) onDataChannel(dc *RTCDataChannel) (done chan struct{}
 	return
 }
 
-func (r *RTCSctpTransport) updateMessageSize() {
+func (r *SCTPTransport) updateMessageSize() {
 	var remoteMaxMessageSize float64 = 65536 // TODO: get from SDP
 	var canSendSize float64 = 65536          // TODO: Get from SCTP implementation
 
 	r.MaxMessageSize = r.calcMessageSize(remoteMaxMessageSize, canSendSize)
 }
 
-func (r *RTCSctpTransport) calcMessageSize(remoteMaxMessageSize, canSendSize float64) float64 {
+func (r *SCTPTransport) calcMessageSize(remoteMaxMessageSize, canSendSize float64) float64 {
 	switch {
 	case remoteMaxMessageSize == 0 &&
 		canSendSize == 0:
@@ -204,7 +204,7 @@ func (r *RTCSctpTransport) calcMessageSize(remoteMaxMessageSize, canSendSize flo
 	}
 }
 
-func (r *RTCSctpTransport) updateMaxChannels() {
+func (r *SCTPTransport) updateMaxChannels() {
 	val := sctpMaxChannels
 	r.MaxChannels = &val
 }

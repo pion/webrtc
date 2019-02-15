@@ -6,15 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCDtlsRole_String(t *testing.T) {
+func TestDTLSRole_String(t *testing.T) {
 	testCases := []struct {
-		role           RTCDtlsRole
+		role           DTLSRole
 		expectedString string
 	}{
-		{RTCDtlsRole(Unknown), unknownStr},
-		{RTCDtlsRoleAuto, "auto"},
-		{RTCDtlsRoleClient, "client"},
-		{RTCDtlsRoleServer, "server"},
+		{DTLSRole(Unknown), unknownStr},
+		{DTLSRoleAuto, "auto"},
+		{DTLSRoleClient, "client"},
+		{DTLSRoleServer, "server"},
 	}
 
 	for i, testCase := range testCases {

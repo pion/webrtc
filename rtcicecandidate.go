@@ -9,31 +9,31 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 )
 
-// RTCIceCandidate represents a ice candidate
-type RTCIceCandidate struct {
-	Foundation     string              `json:"foundation"`
-	Priority       uint32              `json:"priority"`
-	IP             string              `json:"ip"`
-	Protocol       RTCIceProtocol      `json:"protocol"`
-	Port           uint16              `json:"port"`
-	Typ            RTCIceCandidateType `json:"type"`
-	Component      uint16              `json:"component"`
-	RelatedAddress string              `json:"relatedAddress"`
-	RelatedPort    uint16              `json:"relatedPort"`
+// ICECandidate represents a ice candidate
+type ICECandidate struct {
+	Foundation     string           `json:"foundation"`
+	Priority       uint32           `json:"priority"`
+	IP             string           `json:"ip"`
+	Protocol       ICEProtocol      `json:"protocol"`
+	Port           uint16           `json:"port"`
+	Typ            ICECandidateType `json:"type"`
+	Component      uint16           `json:"component"`
+	RelatedAddress string           `json:"relatedAddress"`
+	RelatedPort    uint16           `json:"relatedPort"`
 }
 
 // Conversion for package sdp
 
-func newRTCIceCandidateFromSDP(c sdp.ICECandidate) (RTCIceCandidate, error) {
-	typ, err := newRTCIceCandidateType(c.Typ)
+func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
+	typ, err := newICECandidateType(c.Typ)
 	if err != nil {
-		return RTCIceCandidate{}, err
+		return ICECandidate{}, err
 	}
-	protocol, err := newRTCIceProtocol(c.Protocol)
+	protocol, err := newICEProtocol(c.Protocol)
 	if err != nil {
-		return RTCIceCandidate{}, err
+		return ICECandidate{}, err
 	}
-	return RTCIceCandidate{
+	return ICECandidate{
 		Foundation:     c.Foundation,
 		Priority:       c.Priority,
 		IP:             c.IP,
@@ -46,7 +46,7 @@ func newRTCIceCandidateFromSDP(c sdp.ICECandidate) (RTCIceCandidate, error) {
 	}, nil
 }
 
-func (c RTCIceCandidate) toSDP() sdp.ICECandidate {
+func (c ICECandidate) toSDP() sdp.ICECandidate {
 	return sdp.ICECandidate{
 		Foundation:     c.Foundation,
 		Priority:       c.Priority,
@@ -62,11 +62,11 @@ func (c RTCIceCandidate) toSDP() sdp.ICECandidate {
 
 // Conversion for package ice
 
-func newRTCIceCandidatesFromICE(iceCandidates []*ice.Candidate) ([]RTCIceCandidate, error) {
-	candidates := []RTCIceCandidate{}
+func newICECandidatesFromICE(iceCandidates []*ice.Candidate) ([]ICECandidate, error) {
+	candidates := []ICECandidate{}
 
 	for _, i := range iceCandidates {
-		c, err := newRTCIceCandidateFromICE(i)
+		c, err := newICECandidateFromICE(i)
 		if err != nil {
 			return nil, err
 		}
@@ -76,17 +76,17 @@ func newRTCIceCandidatesFromICE(iceCandidates []*ice.Candidate) ([]RTCIceCandida
 	return candidates, nil
 }
 
-func newRTCIceCandidateFromICE(i *ice.Candidate) (RTCIceCandidate, error) {
+func newICECandidateFromICE(i *ice.Candidate) (ICECandidate, error) {
 	typ, err := convertTypeFromICE(i.Type)
 	if err != nil {
-		return RTCIceCandidate{}, err
+		return ICECandidate{}, err
 	}
-	protocol, err := newRTCIceProtocol(i.NetworkType.NetworkShort())
+	protocol, err := newICEProtocol(i.NetworkType.NetworkShort())
 	if err != nil {
-		return RTCIceCandidate{}, err
+		return ICECandidate{}, err
 	}
 
-	c := RTCIceCandidate{
+	c := ICECandidate{
 		Foundation: "foundation",
 		Priority:   uint32(i.Priority()),
 		IP:         i.IP.String(),
@@ -104,22 +104,22 @@ func newRTCIceCandidateFromICE(i *ice.Candidate) (RTCIceCandidate, error) {
 	return c, nil
 }
 
-func (c RTCIceCandidate) toICE() (*ice.Candidate, error) {
+func (c ICECandidate) toICE() (*ice.Candidate, error) {
 	ip := net.ParseIP(c.IP)
 	if ip == nil {
 		return nil, errors.New("Failed to parse IP address")
 	}
 
 	switch c.Typ {
-	case RTCIceCandidateTypeHost:
+	case ICECandidateTypeHost:
 		return ice.NewCandidateHost(c.Protocol.String(), ip, int(c.Port), c.Component)
-	case RTCIceCandidateTypeSrflx:
+	case ICECandidateTypeSrflx:
 		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
-	case RTCIceCandidateTypePrflx:
+	case ICECandidateTypePrflx:
 		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
-	case RTCIceCandidateTypeRelay:
+	case ICECandidateTypeRelay:
 		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	default:
@@ -127,17 +127,17 @@ func (c RTCIceCandidate) toICE() (*ice.Candidate, error) {
 	}
 }
 
-func convertTypeFromICE(t ice.CandidateType) (RTCIceCandidateType, error) {
+func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 	switch t {
 	case ice.CandidateTypeHost:
-		return RTCIceCandidateTypeHost, nil
+		return ICECandidateTypeHost, nil
 	case ice.CandidateTypeServerReflexive:
-		return RTCIceCandidateTypeSrflx, nil
+		return ICECandidateTypeSrflx, nil
 	case ice.CandidateTypePeerReflexive:
-		return RTCIceCandidateTypePrflx, nil
+		return ICECandidateTypePrflx, nil
 	case ice.CandidateTypeRelay:
-		return RTCIceCandidateTypeRelay, nil
+		return ICECandidateTypeRelay, nil
 	default:
-		return RTCIceCandidateType(t), fmt.Errorf("Unknown ICE candidate type: %s", t)
+		return ICECandidateType(t), fmt.Errorf("Unknown ICE candidate type: %s", t)
 	}
 }

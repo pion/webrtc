@@ -1,70 +1,70 @@
 package webrtc
 
-// RTCPriorityType determines the priority type of a data channel.
-type RTCPriorityType int
+// PriorityType determines the priority type of a data channel.
+type PriorityType int
 
 const (
-	// RTCPriorityTypeVeryLow corresponds to "below normal".
-	RTCPriorityTypeVeryLow RTCPriorityType = iota + 1
+	// PriorityTypeVeryLow corresponds to "below normal".
+	PriorityTypeVeryLow PriorityType = iota + 1
 
-	// RTCPriorityTypeLow corresponds to "normal".
-	RTCPriorityTypeLow
+	// PriorityTypeLow corresponds to "normal".
+	PriorityTypeLow
 
-	// RTCPriorityTypeMedium corresponds to "high".
-	RTCPriorityTypeMedium
+	// PriorityTypeMedium corresponds to "high".
+	PriorityTypeMedium
 
-	// RTCPriorityTypeHigh corresponds to "extra high".
-	RTCPriorityTypeHigh
+	// PriorityTypeHigh corresponds to "extra high".
+	PriorityTypeHigh
 )
 
 // This is done this way because of a linter.
 const (
-	rtcPriorityTypeVeryLowStr = "very-low"
-	rtcPriorityTypeLowStr     = "low"
-	rtcPriorityTypeMediumStr  = "medium"
-	rtcPriorityTypeHighStr    = "high"
+	priorityTypeVeryLowStr = "very-low"
+	priorityTypeLowStr     = "low"
+	priorityTypeMediumStr  = "medium"
+	priorityTypeHighStr    = "high"
 )
 
-func newRTCPriorityTypeFromString(raw string) RTCPriorityType {
+func newPriorityTypeFromString(raw string) PriorityType {
 	switch raw {
-	case rtcPriorityTypeVeryLowStr:
-		return RTCPriorityTypeVeryLow
-	case rtcPriorityTypeLowStr:
-		return RTCPriorityTypeLow
-	case rtcPriorityTypeMediumStr:
-		return RTCPriorityTypeMedium
-	case rtcPriorityTypeHighStr:
-		return RTCPriorityTypeHigh
+	case priorityTypeVeryLowStr:
+		return PriorityTypeVeryLow
+	case priorityTypeLowStr:
+		return PriorityTypeLow
+	case priorityTypeMediumStr:
+		return PriorityTypeMedium
+	case priorityTypeHighStr:
+		return PriorityTypeHigh
 	default:
-		return RTCPriorityType(Unknown)
+		return PriorityType(Unknown)
 	}
 }
 
-func newRTCPriorityTypeFromUint16(raw uint16) RTCPriorityType {
+func newPriorityTypeFromUint16(raw uint16) PriorityType {
 	switch {
 	case raw <= 128:
-		return RTCPriorityTypeVeryLow
+		return PriorityTypeVeryLow
 	case 129 <= raw && raw <= 256:
-		return RTCPriorityTypeLow
+		return PriorityTypeLow
 	case 257 <= raw && raw <= 512:
-		return RTCPriorityTypeMedium
+		return PriorityTypeMedium
 	case 513 <= raw:
-		return RTCPriorityTypeHigh
+		return PriorityTypeHigh
 	default:
-		return RTCPriorityType(Unknown)
+		return PriorityType(Unknown)
 	}
 }
 
-func (p RTCPriorityType) String() string {
+func (p PriorityType) String() string {
 	switch p {
-	case RTCPriorityTypeVeryLow:
-		return rtcPriorityTypeVeryLowStr
-	case RTCPriorityTypeLow:
-		return rtcPriorityTypeLowStr
-	case RTCPriorityTypeMedium:
-		return rtcPriorityTypeMediumStr
-	case RTCPriorityTypeHigh:
-		return rtcPriorityTypeHighStr
+	case PriorityTypeVeryLow:
+		return priorityTypeVeryLowStr
+	case PriorityTypeLow:
+		return priorityTypeLowStr
+	case PriorityTypeMedium:
+		return priorityTypeMediumStr
+	case PriorityTypeHigh:
+		return priorityTypeHighStr
 	default:
 		return ErrUnknownType.Error()
 	}

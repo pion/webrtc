@@ -13,18 +13,18 @@ import (
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
 
-// RTCDataChannel represents a WebRTC DataChannel
-// The RTCDataChannel interface represents a network channel
+// DataChannel represents a WebRTC DataChannel
+// The DataChannel interface represents a network channel
 // which can be used for bidirectional peer-to-peer transfers of arbitrary data
-type RTCDataChannel struct {
+type DataChannel struct {
 	mu sync.RWMutex
 
 	// Label represents a label that can be used to distinguish this
-	// RTCDataChannel object from other RTCDataChannel objects. Scripts are
-	// allowed to create multiple RTCDataChannel objects with the same label.
+	// DataChannel object from other DataChannel objects. Scripts are
+	// allowed to create multiple DataChannel objects with the same label.
 	Label string
 
-	// Ordered represents if the RTCDataChannel is ordered, and false if
+	// Ordered represents if the DataChannel is ordered, and false if
 	// out-of-order delivery is allowed.
 	Ordered bool
 
@@ -37,14 +37,14 @@ type RTCDataChannel struct {
 	MaxRetransmits *uint16
 
 	// Protocol represents the name of the sub-protocol used with this
-	// RTCDataChannel.
+	// DataChannel.
 	Protocol string
 
-	// Negotiated represents whether this RTCDataChannel was negotiated by the
+	// Negotiated represents whether this DataChannel was negotiated by the
 	// application (true), or not (false).
 	Negotiated bool
 
-	// ID represents the ID for this RTCDataChannel. The value is initially
+	// ID represents the ID for this DataChannel. The value is initially
 	// null, which is what will be returned if the ID was not provided at
 	// channel creation time, and the DTLS role of the SCTP transport has not
 	// yet been negotiated. Otherwise, it will return the ID that was either
@@ -52,12 +52,12 @@ type RTCDataChannel struct {
 	// value, it will not change.
 	ID *uint16
 
-	// Priority represents the priority for this RTCDataChannel. The priority is
+	// Priority represents the priority for this DataChannel. The priority is
 	// assigned at channel creation time.
-	Priority RTCPriorityType
+	Priority PriorityType
 
-	// ReadyState represents the state of the RTCDataChannel object.
-	ReadyState RTCDataChannelState
+	// ReadyState represents the state of the DataChannel object.
+	ReadyState DataChannelState
 
 	// BufferedAmount represents the number of bytes of application data
 	// (UTF-8 text and binary data) that have been queued using send(). Even
@@ -75,13 +75,13 @@ type RTCDataChannel struct {
 	// bufferedAmount is considered to be low. When the bufferedAmount decreases
 	// from above this threshold to equal or below it, the bufferedamountlow
 	// event fires. BufferedAmountLowThreshold is initially zero on each new
-	// RTCDataChannel, but the application may change its value at any time.
+	// DataChannel, but the application may change its value at any time.
 	BufferedAmountLowThreshold uint64
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
 	// "blob" or the string "arraybuffer", then set the IDL attribute to this
-	// new value. Otherwise, throw a SyntaxError. When an RTCDataChannel object
+	// new value. Otherwise, throw a SyntaxError. When an DataChannel object
 	// is created, the binaryType attribute MUST be initialized to the string
 	// "blob". This attribute controls how binary data is exposed to scripts.
 	// binaryType                 string
@@ -95,18 +95,18 @@ type RTCDataChannel struct {
 	onOpenHandler    func()
 	onCloseHandler   func()
 
-	sctpTransport *RTCSctpTransport
+	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
 
 	// A reference to the associated api object used by this datachannel
 	api *API
 }
 
-// NewRTCDataChannel creates a new RTCDataChannel.
+// NewDataChannel creates a new DataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataChannelParameters) (*RTCDataChannel, error) {
-	d, err := api.newRTCDataChannel(params)
+func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelParameters) (*DataChannel, error) {
+	d, err := api.newDataChannel(params)
 	if err != nil {
 		return nil, err
 	}
@@ -119,18 +119,18 @@ func (api *API) NewRTCDataChannel(transport *RTCSctpTransport, params *RTCDataCh
 	return d, nil
 }
 
-// newRTCDataChannel is an internal constructor for the data channel used to
-// create the RTCDataChannel object before the networking is set up.
-func (api *API) newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataChannel, error) {
+// newDataChannel is an internal constructor for the data channel used to
+// create the DataChannel object before the networking is set up.
+func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
-	d := &RTCDataChannel{
+	d := &DataChannel{
 		Label:      params.Label,
 		ID:         &params.ID,
-		ReadyState: RTCDataChannelStateConnecting,
+		ReadyState: DataChannelStateConnecting,
 		api:        api,
 	}
 
@@ -138,7 +138,7 @@ func (api *API) newRTCDataChannel(params *RTCDataChannelParameters) (*RTCDataCha
 }
 
 // open opens the datachannel over the sctp transport
-func (d *RTCDataChannel) open(sctpTransport *RTCSctpTransport) error {
+func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	d.mu.RLock()
 	d.sctpTransport = sctpTransport
 
@@ -160,14 +160,14 @@ func (d *RTCDataChannel) open(sctpTransport *RTCSctpTransport) error {
 		return err
 	}
 
-	d.ReadyState = RTCDataChannelStateOpen
+	d.ReadyState = DataChannelStateOpen
 	d.mu.RUnlock()
 
 	d.handleOpen(dc)
 	return nil
 }
 
-func (d *RTCDataChannel) ensureSCTP() error {
+func (d *DataChannel) ensureSCTP() error {
 	if d.sctpTransport == nil ||
 		d.sctpTransport.association == nil {
 		return errors.New("SCTP not establisched")
@@ -175,8 +175,8 @@ func (d *RTCDataChannel) ensureSCTP() error {
 	return nil
 }
 
-// Transport returns the RTCSctpTransport instance the RTCDataChannel is sending over.
-func (d *RTCDataChannel) Transport() *RTCSctpTransport {
+// Transport returns the SCTPTransport instance the DataChannel is sending over.
+func (d *DataChannel) Transport() *SCTPTransport {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -185,13 +185,13 @@ func (d *RTCDataChannel) Transport() *RTCSctpTransport {
 
 // OnOpen sets an event handler which is invoked when
 // the underlying data transport has been established (or re-established).
-func (d *RTCDataChannel) OnOpen(f func()) {
+func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onOpenHandler = f
 }
 
-func (d *RTCDataChannel) onOpen() (done chan struct{}) {
+func (d *DataChannel) onOpen() (done chan struct{}) {
 	d.mu.RLock()
 	hdlr := d.onOpenHandler
 	d.mu.RUnlock()
@@ -212,13 +212,13 @@ func (d *RTCDataChannel) onOpen() (done chan struct{}) {
 
 // OnClose sets an event handler which is invoked when
 // the underlying data transport has been closed.
-func (d *RTCDataChannel) OnClose(f func()) {
+func (d *DataChannel) OnClose(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onCloseHandler = f
 }
 
-func (d *RTCDataChannel) onClose() (done chan struct{}) {
+func (d *DataChannel) onClose() (done chan struct{}) {
 	d.mu.RLock()
 	hdlr := d.onCloseHandler
 	d.mu.RUnlock()
@@ -243,13 +243,13 @@ func (d *RTCDataChannel) onClose() (done chan struct{}) {
 // in size. Check out the detach API if you want to use larger
 // message sizes. Note that browser support for larger messages
 // is also limited.
-func (d *RTCDataChannel) OnMessage(f func(p sugar.Payload)) {
+func (d *DataChannel) OnMessage(f func(p sugar.Payload)) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onMessageHandler = f
 }
 
-func (d *RTCDataChannel) onMessage(p sugar.Payload) {
+func (d *DataChannel) onMessage(p sugar.Payload) {
 	d.mu.RLock()
 	hdlr := d.onMessageHandler
 	d.mu.RUnlock()
@@ -264,11 +264,11 @@ func (d *RTCDataChannel) onMessage(p sugar.Payload) {
 // arrival over the sctp transport from a remote peer.
 //
 // Deprecated: use OnMessage instead.
-func (d *RTCDataChannel) Onmessage(f func(p sugar.Payload)) {
+func (d *DataChannel) Onmessage(f func(p sugar.Payload)) {
 	d.OnMessage(f)
 }
 
-func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
+func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
 	d.dataChannel = dc
 	d.mu.Unlock()
@@ -283,7 +283,7 @@ func (d *RTCDataChannel) handleOpen(dc *datachannel.DataChannel) {
 	}
 }
 
-func (d *RTCDataChannel) readLoop() {
+func (d *DataChannel) readLoop() {
 	for {
 		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
@@ -293,7 +293,7 @@ func (d *RTCDataChannel) readLoop() {
 		}
 		if err != nil {
 			d.mu.Lock()
-			d.ReadyState = RTCDataChannelStateClosed
+			d.ReadyState = DataChannelStateClosed
 			d.mu.Unlock()
 			if err != io.EOF {
 				// TODO: Throw OnError
@@ -312,7 +312,7 @@ func (d *RTCDataChannel) readLoop() {
 }
 
 // Send sends the passed message to the DataChannel peer
-func (d *RTCDataChannel) Send(payload sugar.Payload) error {
+func (d *DataChannel) Send(payload sugar.Payload) error {
 	err := d.ensureOpen()
 	if err != nil {
 		return err
@@ -339,10 +339,10 @@ func (d *RTCDataChannel) Send(payload sugar.Payload) error {
 	return err
 }
 
-func (d *RTCDataChannel) ensureOpen() error {
+func (d *DataChannel) ensureOpen() error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	if d.ReadyState != RTCDataChannelStateOpen {
+	if d.ReadyState != DataChannelStateOpen {
 		return &rtcerr.InvalidStateError{Err: ErrDataChannelNotOpen}
 	}
 	return nil
@@ -356,7 +356,7 @@ func (d *RTCDataChannel) ensureOpen() error {
 // Please reffer to the data-channels-detach example and the
 // pions/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
-func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
+func (d *DataChannel) Detach() (*datachannel.DataChannel, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -371,18 +371,18 @@ func (d *RTCDataChannel) Detach() (*datachannel.DataChannel, error) {
 	return d.dataChannel, nil
 }
 
-// Close Closes the RTCDataChannel. It may be called regardless of whether
-// the RTCDataChannel object was created by this peer or the remote peer.
-func (d *RTCDataChannel) Close() error {
+// Close Closes the DataChannel. It may be called regardless of whether
+// the DataChannel object was created by this peer or the remote peer.
+func (d *DataChannel) Close() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if d.ReadyState == RTCDataChannelStateClosing ||
-		d.ReadyState == RTCDataChannelStateClosed {
+	if d.ReadyState == DataChannelStateClosing ||
+		d.ReadyState == DataChannelStateClosed {
 		return nil
 	}
 
-	d.ReadyState = RTCDataChannelStateClosing
+	d.ReadyState = DataChannelStateClosing
 
 	return d.dataChannel.Close()
 }

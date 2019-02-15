@@ -1,10 +1,10 @@
 package webrtc
 
-// RTCOAuthCredential represents OAuth credential information which is used by
+// OAuthCredential represents OAuth credential information which is used by
 // the STUN/TURN client to connect to an ICE server as defined in
 // https://tools.ietf.org/html/rfc7635. Note that the kid parameter is not
-// located in RTCOAuthCredential, but in RTCIceServer's username member.
-type RTCOAuthCredential struct {
+// located in OAuthCredential, but in ICEServer's username member.
+type OAuthCredential struct {
 	// MacKey is a base64-url encoded format. It is used in STUN message
 	// integrity hash calculation.
 	MacKey string

@@ -25,7 +25,7 @@ type SettingEngine struct {
 
 // DetachDataChannels enables detaching data channels. When enabled
 // data channels have to be detached in the OnOpen callback using the
-// RTCDataChannel.Detach method.
+// DataChannel.Detach method.
 func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }

@@ -1,28 +1,28 @@
 package webrtc
 
-// RTCQuicRole indicates the role of the Quic transport.
-type RTCQuicRole byte
+// QUICRole indicates the role of the Quic transport.
+type QUICRole byte
 
 const (
-	// RTCQuicRoleAuto defines the Quic role is determined based on
+	// QUICRoleAuto defines the Quic role is determined based on
 	// the resolved ICE role: the ICE controlled role acts as the Quic
 	// client and the ICE controlling role acts as the Quic server.
-	RTCQuicRoleAuto RTCQuicRole = iota + 1
+	QUICRoleAuto QUICRole = iota + 1
 
-	// RTCQuicRoleClient defines the Quic client role.
-	RTCQuicRoleClient
+	// QUICRoleClient defines the Quic client role.
+	QUICRoleClient
 
-	// RTCQuicRoleServer defines the Quic server role.
-	RTCQuicRoleServer
+	// QUICRoleServer defines the Quic server role.
+	QUICRoleServer
 )
 
-func (r RTCQuicRole) String() string {
+func (r QUICRole) String() string {
 	switch r {
-	case RTCQuicRoleAuto:
+	case QUICRoleAuto:
 		return "auto"
-	case RTCQuicRoleClient:
+	case QUICRoleClient:
 		return "client"
-	case RTCQuicRoleServer:
+	case QUICRoleServer:
 		return "server"
 	default:
 		return unknownStr

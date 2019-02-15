@@ -77,7 +77,7 @@ func SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
 
 // RegisterCodec on the default API.
 // See MediaEngine for details.
-func RegisterCodec(codec *RTCRtpCodec) {
+func RegisterCodec(codec *RTPCodec) {
 	defaultAPI.mediaEngine.RegisterCodec(codec)
 }
 
@@ -89,8 +89,8 @@ func RegisterDefaultCodecs() {
 
 // PeerConnection API
 
-// NewRTCPeerConnection using the default API.
+// NewPeerConnection using the default API.
 // See API.NewRTCPeerConnection for details.
-func NewRTCPeerConnection(configuration RTCConfiguration) (*RTCPeerConnection, error) {
-	return defaultAPI.NewRTCPeerConnection(configuration)
+func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+	return defaultAPI.NewPeerConnection(configuration)
 }

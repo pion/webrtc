@@ -1,34 +1,34 @@
 package webrtc
 
-// RTCIceGathererState represents the current state of the ICE gatherer.
-type RTCIceGathererState byte
+// ICEGathererState represents the current state of the ICE gatherer.
+type ICEGathererState byte
 
 const (
-	// RTCIceGathererStateNew indicates object has been created but
+	// ICEGathererStateNew indicates object has been created but
 	// gather() has not been called.
-	RTCIceGathererStateNew RTCIceGathererState = iota + 1
+	ICEGathererStateNew ICEGathererState = iota + 1
 
-	// RTCIceGathererStateGathering indicates gather() has been called,
-	// and the RTCIceGatherer is in the process of gathering candidates.
-	RTCIceGathererStateGathering
+	// ICEGathererStateGathering indicates gather() has been called,
+	// and the ICEGatherer is in the process of gathering candidates.
+	ICEGathererStateGathering
 
-	// RTCIceGathererStateComplete indicates the RTCIceGatherer has completed gathering.
-	RTCIceGathererStateComplete
+	// ICEGathererStateComplete indicates the ICEGatherer has completed gathering.
+	ICEGathererStateComplete
 
-	// RTCIceGathererStateClosed indicates the closed state can only be entered
-	// when the RTCIceGatherer has been closed intentionally by calling close().
-	RTCIceGathererStateClosed
+	// ICEGathererStateClosed indicates the closed state can only be entered
+	// when the ICEGatherer has been closed intentionally by calling close().
+	ICEGathererStateClosed
 )
 
-func (s RTCIceGathererState) String() string {
+func (s ICEGathererState) String() string {
 	switch s {
-	case RTCIceGathererStateNew:
+	case ICEGathererStateNew:
 		return "new"
-	case RTCIceGathererStateGathering:
+	case ICEGathererStateGathering:
 		return "gathering"
-	case RTCIceGathererStateComplete:
+	case ICEGathererStateComplete:
 		return "complete"
-	case RTCIceGathererStateClosed:
+	case ICEGathererStateClosed:
 		return "closed"
 	default:
 		return unknownStr

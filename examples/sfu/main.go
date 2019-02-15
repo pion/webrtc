@@ -16,8 +16,8 @@ import (
 	"github.com/pions/webrtc/examples/util"
 )
 
-var peerConnectionConfig = webrtc.RTCConfiguration{
-	IceServers: []webrtc.RTCIceServer{
+var peerConnectionConfig = webrtc.Configuration{
+	ICEServers: []webrtc.ICEServer{
 		{
 			URLs: []string{"stun:stun.l.google.com:19302"},
 		},
@@ -57,17 +57,17 @@ func main() {
 		util.Check(err)
 	}()
 
-	offer := webrtc.RTCSessionDescription{}
+	offer := webrtc.SessionDescription{}
 	util.Decode(mustReadHTTP(sdp), &offer)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
 
 	// Only support VP8, this makes our proxying code simpler
-	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	webrtc.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(peerConnectionConfig)
+	peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfig)
 	util.Check(err)
 
 	inboundSSRC := make(chan uint32)
@@ -77,7 +77,7 @@ func main() {
 	var outboundRTPLock sync.RWMutex
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
-	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.Track) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 		go func() {
@@ -128,11 +128,11 @@ func main() {
 		fmt.Println("")
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
-		recvOnlyOffer := webrtc.RTCSessionDescription{}
+		recvOnlyOffer := webrtc.SessionDescription{}
 		util.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
 
-		// Create a new RTCPeerConnection
-		peerConnection, err := webrtc.NewRTCPeerConnection(peerConnectionConfig)
+		// Create a new PeerConnection
+		peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfig)
 		util.Check(err)
 
 		// Create a single VP8 Track to send videa

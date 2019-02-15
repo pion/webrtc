@@ -17,17 +17,17 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-// RTCDtlsTransport allows an application access to information about the DTLS
+// DTLSTransport allows an application access to information about the DTLS
 // transport over which RTP and RTCP packets are sent and received by
-// RTCRtpSender and RTCRtpReceiver, as well other data such as SCTP packets sent
+// RTPSender and RTPReceiver, as well other data such as SCTP packets sent
 // and received by data channels.
-type RTCDtlsTransport struct {
+type DTLSTransport struct {
 	lock sync.RWMutex
 
-	iceTransport     *RTCIceTransport
-	certificates     []RTCCertificate
-	remoteParameters RTCDtlsParameters
-	// State     RTCDtlsTransportState
+	iceTransport     *ICETransport
+	certificates     []Certificate
+	remoteParameters DTLSParameters
+	// State     DTLSTransportState
 
 	// OnStateChange func()
 	// OnError       func()
@@ -40,11 +40,11 @@ type RTCDtlsTransport struct {
 	srtcpEndpoint *mux.Endpoint
 }
 
-// NewRTCDtlsTransport creates a new RTCDtlsTransport.
+// NewDTLSTransport creates a new DTLSTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewRTCDtlsTransport(transport *RTCIceTransport, certificates []RTCCertificate) (*RTCDtlsTransport, error) {
-	t := &RTCDtlsTransport{iceTransport: transport}
+func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
+	t := &DTLSTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -63,28 +63,28 @@ func (api *API) NewRTCDtlsTransport(transport *RTCIceTransport, certificates []R
 		if err != nil {
 			return nil, err
 		}
-		t.certificates = []RTCCertificate{*certificate}
+		t.certificates = []Certificate{*certificate}
 	}
 
 	return t, nil
 }
 
-// GetLocalParameters returns the DTLS parameters of the local RTCDtlsTransport upon construction.
-func (t *RTCDtlsTransport) GetLocalParameters() RTCDtlsParameters {
-	fingerprints := []RTCDtlsFingerprint{}
+// GetLocalParameters returns the DTLS parameters of the local DTLSTransport upon construction.
+func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
+	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
 		prints := c.GetFingerprints() // TODO: Should be only one?
 		fingerprints = append(fingerprints, prints...)
 	}
 
-	return RTCDtlsParameters{
-		Role:         RTCDtlsRoleAuto, // always returns the default role
+	return DTLSParameters{
+		Role:         DTLSRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
 	}
 }
 
-func (t *RTCDtlsTransport) startSRTP() error {
+func (t *DTLSTransport) startSRTP() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -118,7 +118,7 @@ func (t *RTCDtlsTransport) startSRTP() error {
 	return nil
 }
 
-func (t *RTCDtlsTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
+func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
 	t.lock.RLock()
 	if t.srtpSession != nil {
 		t.lock.RUnlock()
@@ -133,7 +133,7 @@ func (t *RTCDtlsTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
 	return t.srtpSession, nil
 }
 
-func (t *RTCDtlsTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
+func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
 	t.lock.RLock()
 	if t.srtcpSession != nil {
 		t.lock.RUnlock()
@@ -148,15 +148,15 @@ func (t *RTCDtlsTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
 	return t.srtcpSession, nil
 }
 
-func (t *RTCDtlsTransport) isClient() bool {
+func (t *DTLSTransport) isClient() bool {
 	isClient := true
 	switch t.remoteParameters.Role {
-	case RTCDtlsRoleClient:
+	case DTLSRoleClient:
 		isClient = true
-	case RTCDtlsRoleServer:
+	case DTLSRoleServer:
 		isClient = false
 	default:
-		if t.iceTransport.Role() == RTCIceRoleControlling {
+		if t.iceTransport.Role() == ICERoleControlling {
 			isClient = false
 		}
 	}
@@ -165,7 +165,7 @@ func (t *RTCDtlsTransport) isClient() bool {
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
-func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
+func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -212,8 +212,8 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 	return t.validateFingerPrint(remoteParameters, remoteCert)
 }
 
-// Stop stops and closes the RTCDtlsTransport object.
-func (t *RTCDtlsTransport) Stop() error {
+// Stop stops and closes the DTLSTransport object.
+func (t *DTLSTransport) Stop() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -240,7 +240,7 @@ func (t *RTCDtlsTransport) Stop() error {
 	return flattenErrs(closeErrs)
 }
 
-func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameters, remoteCert *x509.Certificate) error {
+func (t *DTLSTransport) validateFingerPrint(remoteParameters DTLSParameters, remoteCert *x509.Certificate) error {
 	for _, fp := range remoteParameters.Fingerprints {
 		hashAlgo, err := dtls.HashAlgorithmString(fp.Algorithm)
 		if err != nil {
@@ -260,7 +260,7 @@ func (t *RTCDtlsTransport) validateFingerPrint(remoteParameters RTCDtlsParameter
 	return errors.New("No matching fingerprint")
 }
 
-func (t *RTCDtlsTransport) ensureICEConn() error {
+func (t *DTLSTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
 		t.iceTransport.conn == nil ||
 		t.iceTransport.mux == nil {

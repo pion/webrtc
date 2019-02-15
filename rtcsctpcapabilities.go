@@ -1,6 +1,6 @@
 package webrtc
 
-// RTCSctpCapabilities indicates the capabilities of the RTCSctpTransport.
-type RTCSctpCapabilities struct {
+// SCTPCapabilities indicates the capabilities of the SCTPTransport.
+type SCTPCapabilities struct {
 	MaxMessageSize uint32 `json:"maxMessageSize"`
 }

@@ -1,7 +1,7 @@
 package webrtc
 
-// RTCDtlsParameters holds information relating to DTLS configuration.
-type RTCDtlsParameters struct {
-	Role         RTCDtlsRole          `json:"role"`
-	Fingerprints []RTCDtlsFingerprint `json:"fingerprints"`
+// DTLSParameters holds information relating to DTLS configuration.
+type DTLSParameters struct {
+	Role         DTLSRole          `json:"role"`
+	Fingerprints []DTLSFingerprint `json:"fingerprints"`
 }

@@ -17,8 +17,8 @@ func main() {
 	// Everything below is the pion-WebRTC (ORTC) API! Thanks for using it ❤️.
 
 	// Prepare ICE gathering options
-	iceOptions := webrtc.RTCIceGatherOptions{
-		ICEServers: []webrtc.RTCIceServer{
+	iceOptions := webrtc.ICEGatherOptions{
+		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
 	}
@@ -27,21 +27,21 @@ func main() {
 	api := webrtc.NewAPI()
 
 	// Create the ICE gatherer
-	gatherer, err := api.NewRTCIceGatherer(iceOptions)
+	gatherer, err := api.NewICEGatherer(iceOptions)
 	util.Check(err)
 
 	// Construct the ICE transport
-	ice := api.NewRTCIceTransport(gatherer)
+	ice := api.NewICETransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := api.NewRTCDtlsTransport(ice, nil)
+	dtls, err := api.NewDTLSTransport(ice, nil)
 	util.Check(err)
 
 	// Construct the SCTP transport
-	sctp := api.NewRTCSctpTransport(dtls)
+	sctp := api.NewSCTPTransport(dtls)
 
 	// Handle incoming data channels
-	sctp.OnDataChannel(func(channel *webrtc.RTCDataChannel) {
+	sctp.OnDataChannel(func(channel *webrtc.DataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", channel.Label, channel.ID)
 
 		// Register the handlers
@@ -66,7 +66,7 @@ func main() {
 	signal := Signal{
 		ICECandidates:    iceCandidates,
 		ICEParameters:    iceParams,
-		DtlsParameters:   dtlsParams,
+		DTLSParameters:   dtlsParams,
 		SCTPCapabilities: sctpCapabilities,
 	}
 
@@ -75,9 +75,9 @@ func main() {
 	remoteSignal := Signal{}
 	util.Decode(util.MustReadStdin(), &remoteSignal)
 
-	iceRole := webrtc.RTCIceRoleControlled
+	iceRole := webrtc.ICERoleControlled
 	if *isOffer {
-		iceRole = webrtc.RTCIceRoleControlling
+		iceRole = webrtc.ICERoleControlling
 	}
 
 	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
@@ -88,7 +88,7 @@ func main() {
 	util.Check(err)
 
 	// Start the DTLS transport
-	err = dtls.Start(remoteSignal.DtlsParameters)
+	err = dtls.Start(remoteSignal.DTLSParameters)
 	util.Check(err)
 
 	// Start the SCTP transport
@@ -97,12 +97,12 @@ func main() {
 
 	// Construct the data channel as the offerer
 	if *isOffer {
-		dcParams := &webrtc.RTCDataChannelParameters{
+		dcParams := &webrtc.DataChannelParameters{
 			Label: "Foo",
 			ID:    1,
 		}
-		var channel *webrtc.RTCDataChannel
-		channel, err = api.NewRTCDataChannel(sctp, dcParams)
+		var channel *webrtc.DataChannel
+		channel, err = api.NewDataChannel(sctp, dcParams)
 		util.Check(err)
 
 		// Register the handlers
@@ -118,13 +118,13 @@ func main() {
 // This is not part of the ORTC spec. You are free
 // to exchange this information any way you want.
 type Signal struct {
-	ICECandidates    []webrtc.RTCIceCandidate   `json:"iceCandidates"`
-	ICEParameters    webrtc.RTCIceParameters    `json:"iceParameters"`
-	DtlsParameters   webrtc.RTCDtlsParameters   `json:"dtlsParameters"`
-	SCTPCapabilities webrtc.RTCSctpCapabilities `json:"sctpCapabilities"`
+	ICECandidates    []webrtc.ICECandidate   `json:"iceCandidates"`
+	ICEParameters    webrtc.ICEParameters    `json:"iceParameters"`
+	DTLSParameters   webrtc.DTLSParameters   `json:"dtlsParameters"`
+	SCTPCapabilities webrtc.SCTPCapabilities `json:"sctpCapabilities"`
 }
 
-func handleOnOpen(channel *webrtc.RTCDataChannel) func() {
+func handleOnOpen(channel *webrtc.DataChannel) func() {
 	return func() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label, channel.ID)
 
@@ -138,7 +138,7 @@ func handleOnOpen(channel *webrtc.RTCDataChannel) func() {
 	}
 }
 
-func handleMessage(channel *webrtc.RTCDataChannel) func(datachannel.Payload) {
+func handleMessage(channel *webrtc.DataChannel) func(datachannel.Payload) {
 	return func(payload datachannel.Payload) {
 		switch p := payload.(type) {
 		case *datachannel.PayloadString:

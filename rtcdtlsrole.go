@@ -1,28 +1,28 @@
 package webrtc
 
-// RTCDtlsRole indicates the role of the DTLS transport.
-type RTCDtlsRole byte
+// DTLSRole indicates the role of the DTLS transport.
+type DTLSRole byte
 
 const (
-	// RTCDtlsRoleAuto defines the DLTS role is determined based on
+	// DTLSRoleAuto defines the DLTS role is determined based on
 	// the resolved ICE role: the ICE controlled role acts as the DTLS
 	// client and the ICE controlling role acts as the DTLS server.
-	RTCDtlsRoleAuto RTCDtlsRole = iota + 1
+	DTLSRoleAuto DTLSRole = iota + 1
 
-	// RTCDtlsRoleClient defines the DTLS client role.
-	RTCDtlsRoleClient
+	// DTLSRoleClient defines the DTLS client role.
+	DTLSRoleClient
 
-	// RTCDtlsRoleServer defines the DTLS server role.
-	RTCDtlsRoleServer
+	// DTLSRoleServer defines the DTLS server role.
+	DTLSRoleServer
 )
 
-func (r RTCDtlsRole) String() string {
+func (r DTLSRole) String() string {
 	switch r {
-	case RTCDtlsRoleAuto:
+	case DTLSRoleAuto:
 		return "auto"
-	case RTCDtlsRoleClient:
+	case DTLSRoleClient:
 		return "client"
-	case RTCDtlsRoleServer:
+	case DTLSRoleServer:
 		return "server"
 	default:
 		return unknownStr

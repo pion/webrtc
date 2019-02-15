@@ -1,60 +1,60 @@
 package webrtc
 
-// RTCDataChannelState indicates the state of a data channel.
-type RTCDataChannelState int
+// DataChannelState indicates the state of a data channel.
+type DataChannelState int
 
 const (
-	// RTCDataChannelStateConnecting indicates that the data channel is being
-	// established. This is the initial state of RTCDataChannel, whether created
-	// with CreateDataChannel, or dispatched as a part of an RTCDataChannelEvent.
-	RTCDataChannelStateConnecting RTCDataChannelState = iota + 1
+	// DataChannelStateConnecting indicates that the data channel is being
+	// established. This is the initial state of DataChannel, whether created
+	// with CreateDataChannel, or dispatched as a part of an DataChannelEvent.
+	DataChannelStateConnecting DataChannelState = iota + 1
 
-	// RTCDataChannelStateOpen indicates that the underlying data transport is
+	// DataChannelStateOpen indicates that the underlying data transport is
 	// established and communication is possible.
-	RTCDataChannelStateOpen
+	DataChannelStateOpen
 
-	// RTCDataChannelStateClosing indicates that the procedure to close down the
+	// DataChannelStateClosing indicates that the procedure to close down the
 	// underlying data transport has started.
-	RTCDataChannelStateClosing
+	DataChannelStateClosing
 
-	// RTCDataChannelStateClosed indicates that the underlying data transport
+	// DataChannelStateClosed indicates that the underlying data transport
 	// has been closed or could not be established.
-	RTCDataChannelStateClosed
+	DataChannelStateClosed
 )
 
 // This is done this way because of a linter.
 const (
-	rtcDataChannelStateConnectingStr = "connecting"
-	rtcDataChannelStateOpenStr       = "open"
-	rtcDataChannelStateClosingStr    = "closing"
-	rtcDataChannelStateClosedStr     = "closed"
+	dataChannelStateConnectingStr = "connecting"
+	dataChannelStateOpenStr       = "open"
+	dataChannelStateClosingStr    = "closing"
+	dataChannelStateClosedStr     = "closed"
 )
 
-func newRTCDataChannelState(raw string) RTCDataChannelState {
+func newDataChannelState(raw string) DataChannelState {
 	switch raw {
-	case rtcDataChannelStateConnectingStr:
-		return RTCDataChannelStateConnecting
-	case rtcDataChannelStateOpenStr:
-		return RTCDataChannelStateOpen
-	case rtcDataChannelStateClosingStr:
-		return RTCDataChannelStateClosing
-	case rtcDataChannelStateClosedStr:
-		return RTCDataChannelStateClosed
+	case dataChannelStateConnectingStr:
+		return DataChannelStateConnecting
+	case dataChannelStateOpenStr:
+		return DataChannelStateOpen
+	case dataChannelStateClosingStr:
+		return DataChannelStateClosing
+	case dataChannelStateClosedStr:
+		return DataChannelStateClosed
 	default:
-		return RTCDataChannelState(Unknown)
+		return DataChannelState(Unknown)
 	}
 }
 
-func (t RTCDataChannelState) String() string {
+func (t DataChannelState) String() string {
 	switch t {
-	case RTCDataChannelStateConnecting:
-		return rtcDataChannelStateConnectingStr
-	case RTCDataChannelStateOpen:
-		return rtcDataChannelStateOpenStr
-	case RTCDataChannelStateClosing:
-		return rtcDataChannelStateClosingStr
-	case RTCDataChannelStateClosed:
-		return rtcDataChannelStateClosedStr
+	case DataChannelStateConnecting:
+		return dataChannelStateConnectingStr
+	case DataChannelStateOpen:
+		return dataChannelStateOpenStr
+	case DataChannelStateClosing:
+		return dataChannelStateClosingStr
+	case DataChannelStateClosed:
+		return dataChannelStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}

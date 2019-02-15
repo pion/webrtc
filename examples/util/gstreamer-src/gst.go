@@ -23,7 +23,7 @@ func init() {
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline *C.GstElement
-	in       chan<- media.RTCSample
+	in       chan<- media.Sample
 	// stop acts as a signal that this pipeline is stopped
 	// any pending sends to Pipeline.in should be cancelled
 	stop      chan interface{}
@@ -35,7 +35,7 @@ var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(codecName string, in chan<- media.RTCSample, pipelineSrc string) *Pipeline {
+func CreatePipeline(codecName string, in chan<- media.Sample, pipelineSrc string) *Pipeline {
 	pipelineStr := "appsink name=appsink"
 	switch codecName {
 	case webrtc.VP8:
@@ -106,7 +106,7 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 		// We need to be able to cancel this function even f pipeline.in isn't being serviced
 		// When pipeline.stop is closed the sending of data will be cancelled.
 		select {
-		case pipeline.in <- media.RTCSample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}:
+		case pipeline.in <- media.Sample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}:
 		case <-pipeline.stop:
 		}
 	} else {

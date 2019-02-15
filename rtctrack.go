@@ -10,37 +10,37 @@ import (
 	"github.com/pkg/errors"
 )
 
-// RTCTrack represents a track that is communicated
-type RTCTrack struct {
+// Track represents a track that is communicated
+type Track struct {
 	isRawRTP    bool
-	sampleInput chan media.RTCSample
+	sampleInput chan media.Sample
 	rawInput    chan *rtp.Packet
 	rtcpInput   chan rtcp.Packet
 
 	ID          string
 	PayloadType uint8
-	Kind        RTCRtpCodecType
+	Kind        RTPCodecType
 	Label       string
 	Ssrc        uint32
-	Codec       *RTCRtpCodec
+	Codec       *RTPCodec
 
 	Packets     <-chan *rtp.Packet
 	RTCPPackets <-chan rtcp.Packet
 
-	Samples chan<- media.RTCSample
+	Samples chan<- media.Sample
 	RawRTP  chan<- *rtp.Packet
 }
 
-// NewRawRTPTrack initializes a new *RTCTrack configured to accept raw *rtp.Packet
+// NewRawRTPTrack initializes a new *Track configured to accept raw *rtp.Packet
 //
 // NB: If the source RTP stream is being broadcast to multiple tracks, each track
 // must receive its own copies of the source packets in order to avoid packet corruption.
-func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTCRtpCodec) (*RTCTrack, error) {
+func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec) (*Track, error) {
 	if ssrc == 0 {
 		return nil, errors.New("SSRC supplied to NewRawRTPTrack() must be non-zero")
 	}
 
-	return &RTCTrack{
+	return &Track{
 		isRawRTP: true,
 
 		ID:          id,
@@ -52,10 +52,10 @@ func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTC
 	}, nil
 }
 
-// NewRTCSampleTrack initializes a new *RTCTrack configured to accept media.RTCSample
-func NewRTCSampleTrack(payloadType uint8, id, label string, codec *RTCRtpCodec) (*RTCTrack, error) {
+// NewSampleTrack initializes a new *Track configured to accept media.Sample
+func NewSampleTrack(payloadType uint8, id, label string, codec *RTPCodec) (*Track, error) {
 	if codec == nil {
-		return nil, errors.New("codec supplied to NewRTCSampleTrack() must not be nil")
+		return nil, errors.New("codec supplied to NewSampleTrack() must not be nil")
 	}
 
 	buf := make([]byte, 4)
@@ -63,7 +63,7 @@ func NewRTCSampleTrack(payloadType uint8, id, label string, codec *RTCRtpCodec) 
 		return nil, errors.New("failed to generate random value")
 	}
 
-	return &RTCTrack{
+	return &Track{
 		isRawRTP: false,
 
 		ID:          id,

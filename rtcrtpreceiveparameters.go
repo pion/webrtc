@@ -1,6 +1,6 @@
 package webrtc
 
-// RTCRtpReceiveParameters contains the RTP stack settings used by receivers
-type RTCRtpReceiveParameters struct {
-	encodings RTCRtpDecodingParameters
+// RTPReceiveParameters contains the RTP stack settings used by receivers
+type RTPReceiveParameters struct {
+	encodings RTPDecodingParameters
 }

@@ -6,35 +6,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCSctpTransportState(t *testing.T) {
+func TestNewSCTPTransportState(t *testing.T) {
 	testCases := []struct {
 		transportStateString   string
-		expectedTransportState RTCSctpTransportState
+		expectedTransportState SCTPTransportState
 	}{
-		{unknownStr, RTCSctpTransportState(Unknown)},
-		{"connecting", RTCSctpTransportStateConnecting},
-		{"connected", RTCSctpTransportStateConnected},
-		{"closed", RTCSctpTransportStateClosed},
+		{unknownStr, SCTPTransportState(Unknown)},
+		{"connecting", SCTPTransportStateConnecting},
+		{"connected", SCTPTransportStateConnected},
+		{"closed", SCTPTransportStateClosed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedTransportState,
-			newRTCSctpTransportState(testCase.transportStateString),
+			newSCTPTransportState(testCase.transportStateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCSctpTransportState_String(t *testing.T) {
+func TestSCTPTransportState_String(t *testing.T) {
 	testCases := []struct {
-		transportState RTCSctpTransportState
+		transportState SCTPTransportState
 		expectedString string
 	}{
-		{RTCSctpTransportState(Unknown), unknownStr},
-		{RTCSctpTransportStateConnecting, "connecting"},
-		{RTCSctpTransportStateConnected, "connected"},
-		{RTCSctpTransportStateClosed, "closed"},
+		{SCTPTransportState(Unknown), unknownStr},
+		{SCTPTransportStateConnecting, "connecting"},
+		{SCTPTransportStateConnected, "connected"},
+		{SCTPTransportStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {
