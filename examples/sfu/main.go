@@ -32,7 +32,7 @@ func mustReadStdin(reader *bufio.Reader) string {
 	return rawSd
 }
 
-func mustReadHttp(sdp chan string) string {
+func mustReadHTTP(sdp chan string) string {
 	ret := <-sdp
 	return ret
 }
@@ -58,7 +58,7 @@ func main() {
 	}()
 
 	offer := webrtc.RTCSessionDescription{}
-	util.Decode(mustReadHttp(sdp), &offer)
+	util.Decode(mustReadHTTP(sdp), &offer)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
@@ -67,7 +67,7 @@ func main() {
 	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(peerConnectionConfig)
+	peerConnection, err := webrtc.NewRTCPeerConnection(peerConnectionConfig)
 	util.Check(err)
 
 	inboundSSRC := make(chan uint32)
@@ -111,8 +111,12 @@ func main() {
 	// Set the remote SessionDescription
 	util.Check(peerConnection.SetRemoteDescription(offer))
 
-	// Sets the LocalDescription, and starts our UDP listeners
+	// Create answer
 	answer, err := peerConnection.CreateAnswer(nil)
+	util.Check(err)
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(answer)
 	util.Check(err)
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
@@ -125,10 +129,10 @@ func main() {
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.RTCSessionDescription{}
-		util.Decode(mustReadHttp(sdp), &recvOnlyOffer)
+		util.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
 
 		// Create a new RTCPeerConnection
-		peerConnection, err := webrtc.New(peerConnectionConfig)
+		peerConnection, err := webrtc.NewRTCPeerConnection(peerConnectionConfig)
 		util.Check(err)
 
 		// Create a single VP8 Track to send videa
@@ -146,8 +150,12 @@ func main() {
 		err = peerConnection.SetRemoteDescription(recvOnlyOffer)
 		util.Check(err)
 
-		// Sets the LocalDescription, and starts our UDP listeners
+		// Create answer
 		answer, err := peerConnection.CreateAnswer(nil)
+		util.Check(err)
+
+		// Sets the LocalDescription, and starts our UDP listeners
+		err = peerConnection.SetLocalDescription(answer)
 		util.Check(err)
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser

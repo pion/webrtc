@@ -89,8 +89,8 @@ func RegisterDefaultCodecs() {
 
 // PeerConnection API
 
-// New using the default API.
+// NewRTCPeerConnection using the default API.
 // See API.NewRTCPeerConnection for details.
-func New(configuration RTCConfiguration) (*RTCPeerConnection, error) {
+func NewRTCPeerConnection(configuration RTCConfiguration) (*RTCPeerConnection, error) {
 	return defaultAPI.NewRTCPeerConnection(configuration)
 }

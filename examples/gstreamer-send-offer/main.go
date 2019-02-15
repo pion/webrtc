@@ -26,7 +26,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	// Set the handler for ICE connection state
@@ -49,6 +49,10 @@ func main() {
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)
+	util.Check(err)
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(offer)
 	util.Check(err)
 
 	// Output the offer in base64 so we can paste it in browser

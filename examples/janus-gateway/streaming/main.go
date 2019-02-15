@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
@@ -105,6 +105,9 @@ func main() {
 		util.Check(err)
 
 		answer, err := peerConnection.CreateAnswer(nil)
+		util.Check(err)
+
+		err = peerConnection.SetLocalDescription(answer)
 		util.Check(err)
 
 		// now we start

@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
@@ -70,8 +70,12 @@ func main() {
 	err = peerConnection.SetRemoteDescription(offer)
 	util.Check(err)
 
-	// Sets the LocalDescription, and starts our UDP listeners
+	// Create an answer
 	answer, err := peerConnection.CreateAnswer(nil)
+	util.Check(err)
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(answer)
 	util.Check(err)
 
 	// Output the answer in base64 so we can paste it in browser

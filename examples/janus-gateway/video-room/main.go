@@ -7,7 +7,7 @@ import (
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/examples/util/gstreamer-src"
+	gst "github.com/pions/webrtc/examples/util/gstreamer-src"
 	"github.com/pions/webrtc/pkg/ice"
 )
 
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.New(config)
+	peerConnection, err := webrtc.NewRTCPeerConnection(config)
 	util.Check(err)
 
 	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
@@ -69,6 +69,9 @@ func main() {
 	util.Check(err)
 
 	offer, err := peerConnection.CreateOffer(nil)
+	util.Check(err)
+
+	err = peerConnection.SetLocalDescription(offer)
 	util.Check(err)
 
 	gateway, err := janus.Connect("ws://localhost:8188/janus")

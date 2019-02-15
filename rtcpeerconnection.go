@@ -457,12 +457,6 @@ func (pc *RTCPeerConnection) CreateOffer(options *RTCOfferOptions) (RTCSessionDe
 		parsed: d,
 	}
 	pc.lastOffer = desc.Sdp
-
-	// FIXME: This doesn't follow the JS API spec, but removing it
-	// would mean our examples and existing code have to change
-	if err := pc.SetLocalDescription(desc); err != nil {
-		return RTCSessionDescription{}, err
-	}
 	return desc, nil
 }
 
@@ -567,12 +561,6 @@ func (pc *RTCPeerConnection) CreateAnswer(options *RTCAnswerOptions) (RTCSession
 		parsed: d,
 	}
 	pc.lastAnswer = desc.Sdp
-
-	// FIXME: This doesn't follow the JS API spec, but removing it
-	// would mean our examples and existing code have to change
-	if err := pc.SetLocalDescription(desc); err != nil {
-		return RTCSessionDescription{}, err
-	}
 	return desc, nil
 }
 
