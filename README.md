@@ -74,7 +74,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification*
 * [Yutaka Takeda](https://github.com/enobufs) *Fix ICE connection timeout*
 * [Hugo Arregui](https://github.com/hugoArregui) *Fix connection timeout*
-* [Rob Deutsch](https://github.com/rob-deutsch) *RTCRtpReceiver graceful shutdown*
+* [Rob Deutsch](https://github.com/rob-deutsch) *RTPReceiver graceful shutdown*
 * [Jin Lei](https://github.com/jinleileiking) - *SFU example use http*
 
 ### License

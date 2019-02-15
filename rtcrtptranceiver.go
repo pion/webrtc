@@ -4,34 +4,34 @@ import (
 	"github.com/pkg/errors"
 )
 
-// RTCRtpTransceiver represents a combination of an RTCRtpSender and an RTCRtpReceiver that share a common mid.
-type RTCRtpTransceiver struct {
+// RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
+type RTPTransceiver struct {
 	Mid       string
-	Sender    *RTCRtpSender
-	Receiver  *RTCRtpReceiver
-	Direction RTCRtpTransceiverDirection
-	// currentDirection RTCRtpTransceiverDirection
-	// firedDirection   RTCRtpTransceiverDirection
+	Sender    *RTPSender
+	Receiver  *RTPReceiver
+	Direction RTPTransceiverDirection
+	// currentDirection RTPTransceiverDirection
+	// firedDirection   RTPTransceiverDirection
 	// receptive bool
 	stopped bool
 }
 
-func (t *RTCRtpTransceiver) setSendingTrack(track *RTCTrack) error {
+func (t *RTPTransceiver) setSendingTrack(track *Track) error {
 	t.Sender.Track = track
 
 	switch t.Direction {
-	case RTCRtpTransceiverDirectionRecvonly:
-		t.Direction = RTCRtpTransceiverDirectionSendrecv
-	case RTCRtpTransceiverDirectionInactive:
-		t.Direction = RTCRtpTransceiverDirectionSendonly
+	case RTPTransceiverDirectionRecvonly:
+		t.Direction = RTPTransceiverDirectionSendrecv
+	case RTPTransceiverDirectionInactive:
+		t.Direction = RTPTransceiverDirectionSendonly
 	default:
-		return errors.Errorf("Invalid state change in RTCRtpTransceiver.setSending")
+		return errors.Errorf("Invalid state change in RTPTransceiver.setSending")
 	}
 	return nil
 }
 
-// Stop irreversibly stops the RTCRtpTransceiver
-func (t *RTCRtpTransceiver) Stop() error {
+// Stop irreversibly stops the RTPTransceiver
+func (t *RTPTransceiver) Stop() error {
 	if t.Sender != nil {
 		t.Sender.Stop()
 	}

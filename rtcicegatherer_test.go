@@ -7,7 +7,7 @@ import (
 	"github.com/pions/transport/test"
 )
 
-func TestNewRTCIceGatherer_Success(t *testing.T) {
+func TestNewICEGatherer_Success(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -15,18 +15,18 @@ func TestNewRTCIceGatherer_Success(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	opts := RTCIceGatherOptions{
-		ICEServers: []RTCIceServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
+	opts := ICEGatherOptions{
+		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
 	api := NewAPI()
 
-	gatherer, err := api.NewRTCIceGatherer(opts)
+	gatherer, err := api.NewICEGatherer(opts)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if gatherer.State() != RTCIceGathererStateNew {
+	if gatherer.State() != ICEGathererStateNew {
 		t.Fatalf("Expected gathering state new")
 	}
 

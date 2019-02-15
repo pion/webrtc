@@ -1,41 +1,41 @@
 package webrtc
 
-// RTCIceTransportPolicy defines the ICE candidate policy surface the
+// ICETransportPolicy defines the ICE candidate policy surface the
 // permitted candidates. Only these candidates are used for connectivity checks.
-type RTCIceTransportPolicy int
+type ICETransportPolicy int
 
 const (
-	// RTCIceTransportPolicyRelay indicates only media relay candidates such
+	// ICETransportPolicyRelay indicates only media relay candidates such
 	// as candidates passing through a TURN server are used.
-	RTCIceTransportPolicyRelay RTCIceTransportPolicy = iota + 1
+	ICETransportPolicyRelay ICETransportPolicy = iota + 1
 
-	// RTCIceTransportPolicyAll indicates any type of candidate is used.
-	RTCIceTransportPolicyAll
+	// ICETransportPolicyAll indicates any type of candidate is used.
+	ICETransportPolicyAll
 )
 
 // This is done this way because of a linter.
 const (
-	rtcIceTransportPolicyRelayStr = "relay"
-	rtcIceTransportPolicyAllStr   = "all"
+	iceTransportPolicyRelayStr = "relay"
+	iceTransportPolicyAllStr   = "all"
 )
 
-func newRTCIceTransportPolicy(raw string) RTCIceTransportPolicy {
+func newICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
-	case rtcIceTransportPolicyRelayStr:
-		return RTCIceTransportPolicyRelay
-	case rtcIceTransportPolicyAllStr:
-		return RTCIceTransportPolicyAll
+	case iceTransportPolicyRelayStr:
+		return ICETransportPolicyRelay
+	case iceTransportPolicyAllStr:
+		return ICETransportPolicyAll
 	default:
-		return RTCIceTransportPolicy(Unknown)
+		return ICETransportPolicy(Unknown)
 	}
 }
 
-func (t RTCIceTransportPolicy) String() string {
+func (t ICETransportPolicy) String() string {
 	switch t {
-	case RTCIceTransportPolicyRelay:
-		return rtcIceTransportPolicyRelayStr
-	case RTCIceTransportPolicyAll:
-		return rtcIceTransportPolicyAllStr
+	case ICETransportPolicyRelay:
+		return iceTransportPolicyRelayStr
+	case ICETransportPolicyAll:
+		return iceTransportPolicyAllStr
 	default:
 		return ErrUnknownType.Error()
 	}

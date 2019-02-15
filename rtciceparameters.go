@@ -1,9 +1,9 @@
 package webrtc
 
-// RTCIceParameters includes the ICE username fragment
+// ICEParameters includes the ICE username fragment
 // and password and other ICE-related parameters.
-type RTCIceParameters struct {
+type ICEParameters struct {
 	UsernameFragment string `json:"usernameFragment"`
 	Password         string `json:"password"`
-	IceLite          bool   `json:"iceLite"`
+	ICELite          bool   `json:"iceLite"`
 }

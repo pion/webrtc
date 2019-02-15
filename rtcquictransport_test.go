@@ -8,7 +8,7 @@ import (
 	"github.com/pions/webrtc/pkg/quic"
 )
 
-func TestRTCQuicTransport_E2E(t *testing.T) {
+func TestQUICTransport_E2E(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -74,16 +74,16 @@ func quicReadLoop(s *quic.BidirectionalStream) {
 }
 
 type testQuicStack struct {
-	gatherer *RTCIceGatherer
-	ice      *RTCIceTransport
-	quic     *RTCQuicTransport
+	gatherer *ICEGatherer
+	ice      *ICETransport
+	quic     *QUICTransport
 	api      *API
 }
 
 func (s *testQuicStack) setSignal(sig *testQuicSignal, isOffer bool) error {
-	iceRole := RTCIceRoleControlled
+	iceRole := ICERoleControlled
 	if isOffer {
-		iceRole = RTCIceRoleControlling
+		iceRole = ICERoleControlling
 	}
 
 	err := s.ice.SetRemoteCandidates(sig.ICECandidates)
@@ -147,9 +147,9 @@ func (s *testQuicStack) close() error {
 }
 
 type testQuicSignal struct {
-	ICECandidates  []RTCIceCandidate `json:"iceCandidates"`
-	ICEParameters  RTCIceParameters  `json:"iceParameters"`
-	QuicParameters RTCQuicParameters `json:"quicParameters"`
+	ICECandidates  []ICECandidate `json:"iceCandidates"`
+	ICEParameters  ICEParameters  `json:"iceParameters"`
+	QuicParameters QUICParameters `json:"quicParameters"`
 }
 
 func newQuicPair() (stackA *testQuicStack, stackB *testQuicStack, err error) {
@@ -169,16 +169,16 @@ func newQuicPair() (stackA *testQuicStack, stackB *testQuicStack, err error) {
 func newQuicStack() (*testQuicStack, error) {
 	api := NewAPI()
 	// Create the ICE gatherer
-	gatherer, err := api.NewRTCIceGatherer(RTCIceGatherOptions{})
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct the ICE transport
-	ice := api.NewRTCIceTransport(gatherer)
+	ice := api.NewICETransport(gatherer)
 
 	// Construct the Quic transport
-	qt, err := api.NewRTCQuicTransport(ice, nil)
+	qt, err := api.NewQUICTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}

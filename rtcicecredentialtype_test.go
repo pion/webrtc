@@ -6,33 +6,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCIceCredentialType(t *testing.T) {
+func TestNewICECredentialType(t *testing.T) {
 	testCases := []struct {
 		credentialTypeString   string
-		expectedCredentialType RTCIceCredentialType
+		expectedCredentialType ICECredentialType
 	}{
-		{unknownStr, RTCIceCredentialType(Unknown)},
-		{"password", RTCIceCredentialTypePassword},
-		{"oauth", RTCIceCredentialTypeOauth},
+		{unknownStr, ICECredentialType(Unknown)},
+		{"password", ICECredentialTypePassword},
+		{"oauth", ICECredentialTypeOauth},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedCredentialType,
-			newRTCIceCredentialType(testCase.credentialTypeString),
+			newICECredentialType(testCase.credentialTypeString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCIceCredentialType_String(t *testing.T) {
+func TestICECredentialType_String(t *testing.T) {
 	testCases := []struct {
-		credentialType RTCIceCredentialType
+		credentialType ICECredentialType
 		expectedString string
 	}{
-		{RTCIceCredentialType(Unknown), unknownStr},
-		{RTCIceCredentialTypePassword, "password"},
-		{RTCIceCredentialTypeOauth, "oauth"},
+		{ICECredentialType(Unknown), unknownStr},
+		{ICECredentialTypePassword, "password"},
+		{ICECredentialTypeOauth, "oauth"},
 	}
 
 	for i, testCase := range testCases {

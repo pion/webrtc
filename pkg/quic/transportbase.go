@@ -29,7 +29,7 @@ type Config struct {
 
 // StartBase is used to start the TransportBase. Most implementations
 // should instead use the methods on quic.Transport or
-// webrtc.RTCQuicTransport to setup a Quic connection.
+// webrtc.QUICTransport to setup a Quic connection.
 func (b *TransportBase) StartBase(conn net.Conn, config *Config) error {
 	cfg := config.clone()
 	cfg.SkipVerify = true // Using self signed certificates; WebRTC will check the fingerprint

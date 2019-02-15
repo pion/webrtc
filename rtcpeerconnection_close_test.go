@@ -7,10 +7,10 @@ import (
 	"github.com/pions/transport/test"
 )
 
-// TestRTCPeerConnection_Close is moved to it's on file because the tests
+// TestPeerConnection_Close is moved to it's on file because the tests
 // in rtcpeerconnection_test.go are leaky, making the goroutine report useless.
 
-func TestRTCPeerConnection_Close(t *testing.T) {
+func TestPeerConnection_Close(t *testing.T) {
 	api := NewAPI()
 
 	// Limit runtime in case of deadlocks
@@ -26,7 +26,7 @@ func TestRTCPeerConnection_Close(t *testing.T) {
 	}
 
 	awaitSetup := make(chan struct{})
-	pcAnswer.OnDataChannel(func(d *RTCDataChannel) {
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
 		close(awaitSetup)
 	})
 

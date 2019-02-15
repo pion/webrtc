@@ -7,19 +7,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCIceTransportState_String(t *testing.T) {
+func TestICETransportState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCIceTransportState
+		state          ICETransportState
 		expectedString string
 	}{
-		{RTCIceTransportState(Unknown), unknownStr},
-		{RTCIceTransportStateNew, "new"},
-		{RTCIceTransportStateChecking, "checking"},
-		{RTCIceTransportStateConnected, "connected"},
-		{RTCIceTransportStateCompleted, "completed"},
-		{RTCIceTransportStateFailed, "failed"},
-		{RTCIceTransportStateDisconnected, "disconnected"},
-		{RTCIceTransportStateClosed, "closed"},
+		{ICETransportState(Unknown), unknownStr},
+		{ICETransportStateNew, "new"},
+		{ICETransportStateChecking, "checking"},
+		{ICETransportStateConnected, "connected"},
+		{ICETransportStateCompleted, "completed"},
+		{ICETransportStateFailed, "failed"},
+		{ICETransportStateDisconnected, "disconnected"},
+		{ICETransportStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {
@@ -31,19 +31,19 @@ func TestRTCIceTransportState_String(t *testing.T) {
 	}
 }
 
-func TestRTCIceTransportState_Convert(t *testing.T) {
+func TestICETransportState_Convert(t *testing.T) {
 	testCases := []struct {
-		native RTCIceTransportState
+		native ICETransportState
 		ice    ice.ConnectionState
 	}{
-		{RTCIceTransportState(Unknown), ice.ConnectionState(Unknown)},
-		{RTCIceTransportStateNew, ice.ConnectionStateNew},
-		{RTCIceTransportStateChecking, ice.ConnectionStateChecking},
-		{RTCIceTransportStateConnected, ice.ConnectionStateConnected},
-		{RTCIceTransportStateCompleted, ice.ConnectionStateCompleted},
-		{RTCIceTransportStateFailed, ice.ConnectionStateFailed},
-		{RTCIceTransportStateDisconnected, ice.ConnectionStateDisconnected},
-		{RTCIceTransportStateClosed, ice.ConnectionStateClosed},
+		{ICETransportState(Unknown), ice.ConnectionState(Unknown)},
+		{ICETransportStateNew, ice.ConnectionStateNew},
+		{ICETransportStateChecking, ice.ConnectionStateChecking},
+		{ICETransportStateConnected, ice.ConnectionStateConnected},
+		{ICETransportStateCompleted, ice.ConnectionStateCompleted},
+		{ICETransportStateFailed, ice.ConnectionStateFailed},
+		{ICETransportStateDisconnected, ice.ConnectionStateDisconnected},
+		{ICETransportStateClosed, ice.ConnectionStateClosed},
 	}
 
 	for i, testCase := range testCases {
@@ -54,7 +54,7 @@ func TestRTCIceTransportState_Convert(t *testing.T) {
 		)
 		assert.Equal(t,
 			testCase.native,
-			newRTCIceTransportStateFromICE(testCase.ice),
+			newICETransportStateFromICE(testCase.ice),
 			"testCase: %d %v", i, testCase,
 		)
 	}

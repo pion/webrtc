@@ -1,82 +1,82 @@
 package webrtc
 
-// RTCPeerConnectionState indicates the state of the RTCPeerConnection.
-type RTCPeerConnectionState int
+// PeerConnectionState indicates the state of the PeerConnection.
+type PeerConnectionState int
 
 const (
-	// RTCPeerConnectionStateNew indicates that any of the RTCIceTransports or
-	// RTCDtlsTransports are in the "new" state and none of the transports are
+	// PeerConnectionStateNew indicates that any of the ICETransports or
+	// DTLSTransports are in the "new" state and none of the transports are
 	// in the "connecting", "checking", "failed" or "disconnected" state, or
 	// all transports are in the "closed" state, or there are no transports.
-	RTCPeerConnectionStateNew RTCPeerConnectionState = iota + 1
+	PeerConnectionStateNew PeerConnectionState = iota + 1
 
-	// RTCPeerConnectionStateConnecting indicates that any of the
-	// RTCIceTransports or RTCDtlsTransports are in the "connecting" or
+	// PeerConnectionStateConnecting indicates that any of the
+	// ICETransports or DTLSTransports are in the "connecting" or
 	// "checking" state and none of them is in the "failed" state.
-	RTCPeerConnectionStateConnecting
+	PeerConnectionStateConnecting
 
-	// RTCPeerConnectionStateConnected indicates that all RTCIceTransports and
-	// RTCDtlsTransports are in the "connected", "completed" or "closed" state
+	// PeerConnectionStateConnected indicates that all ICETransports and
+	// DTLSTransports are in the "connected", "completed" or "closed" state
 	// and at least one of them is in the "connected" or "completed" state.
-	RTCPeerConnectionStateConnected
+	PeerConnectionStateConnected
 
-	// RTCPeerConnectionStateDisconnected indicates that any of the
-	// RTCIceTransports or RTCDtlsTransports are in the "disconnected" state
+	// PeerConnectionStateDisconnected indicates that any of the
+	// ICETransports or DTLSTransports are in the "disconnected" state
 	// and none of them are in the "failed" or "connecting" or "checking" state.
-	RTCPeerConnectionStateDisconnected
+	PeerConnectionStateDisconnected
 
-	// RTCPeerConnectionStateFailed indicates that any of the RTCIceTransports
-	// or RTCDtlsTransports are in a "failed" state.
-	RTCPeerConnectionStateFailed
+	// PeerConnectionStateFailed indicates that any of the ICETransports
+	// or DTLSTransports are in a "failed" state.
+	PeerConnectionStateFailed
 
-	// RTCPeerConnectionStateClosed indicates the peer connection is closed
-	// and the isClosed member variable of RTCPeerConnection is true.
-	RTCPeerConnectionStateClosed
+	// PeerConnectionStateClosed indicates the peer connection is closed
+	// and the isClosed member variable of PeerConnection is true.
+	PeerConnectionStateClosed
 )
 
 // This is done this way because of a linter.
 const (
-	rtcPeerConnectionStateNewStr          = "new"
-	rtcPeerConnectionStateConnectingStr   = "connecting"
-	rtcPeerConnectionStateConnectedStr    = "connected"
-	rtcPeerConnectionStateDisconnectedStr = "disconnected"
-	rtcPeerConnectionStateFailedStr       = "failed"
-	rtcPeerConnectionStateClosedStr       = "closed"
+	peerConnectionStateNewStr          = "new"
+	peerConnectionStateConnectingStr   = "connecting"
+	peerConnectionStateConnectedStr    = "connected"
+	peerConnectionStateDisconnectedStr = "disconnected"
+	peerConnectionStateFailedStr       = "failed"
+	peerConnectionStateClosedStr       = "closed"
 )
 
-func newRTCPeerConnectionState(raw string) RTCPeerConnectionState {
+func newPeerConnectionState(raw string) PeerConnectionState {
 	switch raw {
-	case rtcPeerConnectionStateNewStr:
-		return RTCPeerConnectionStateNew
-	case rtcPeerConnectionStateConnectingStr:
-		return RTCPeerConnectionStateConnecting
-	case rtcPeerConnectionStateConnectedStr:
-		return RTCPeerConnectionStateConnected
-	case rtcPeerConnectionStateDisconnectedStr:
-		return RTCPeerConnectionStateDisconnected
-	case rtcPeerConnectionStateFailedStr:
-		return RTCPeerConnectionStateFailed
-	case rtcPeerConnectionStateClosedStr:
-		return RTCPeerConnectionStateClosed
+	case peerConnectionStateNewStr:
+		return PeerConnectionStateNew
+	case peerConnectionStateConnectingStr:
+		return PeerConnectionStateConnecting
+	case peerConnectionStateConnectedStr:
+		return PeerConnectionStateConnected
+	case peerConnectionStateDisconnectedStr:
+		return PeerConnectionStateDisconnected
+	case peerConnectionStateFailedStr:
+		return PeerConnectionStateFailed
+	case peerConnectionStateClosedStr:
+		return PeerConnectionStateClosed
 	default:
-		return RTCPeerConnectionState(Unknown)
+		return PeerConnectionState(Unknown)
 	}
 }
 
-func (t RTCPeerConnectionState) String() string {
+func (t PeerConnectionState) String() string {
 	switch t {
-	case RTCPeerConnectionStateNew:
-		return rtcPeerConnectionStateNewStr
-	case RTCPeerConnectionStateConnecting:
-		return rtcPeerConnectionStateConnectingStr
-	case RTCPeerConnectionStateConnected:
-		return rtcPeerConnectionStateConnectedStr
-	case RTCPeerConnectionStateDisconnected:
-		return rtcPeerConnectionStateDisconnectedStr
-	case RTCPeerConnectionStateFailed:
-		return rtcPeerConnectionStateFailedStr
-	case RTCPeerConnectionStateClosed:
-		return rtcPeerConnectionStateClosedStr
+	case PeerConnectionStateNew:
+		return peerConnectionStateNewStr
+	case PeerConnectionStateConnecting:
+		return peerConnectionStateConnectingStr
+	case PeerConnectionStateConnected:
+		return peerConnectionStateConnectedStr
+	case PeerConnectionStateDisconnected:
+		return peerConnectionStateDisconnectedStr
+	case PeerConnectionStateFailed:
+		return peerConnectionStateFailedStr
+	case PeerConnectionStateClosed:
+		return peerConnectionStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}

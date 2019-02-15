@@ -6,21 +6,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCIceCandidateType(t *testing.T) {
+func TestICECandidateType(t *testing.T) {
 	testCases := []struct {
 		typeString   string
 		shouldFail   bool
-		expectedType RTCIceCandidateType
+		expectedType ICECandidateType
 	}{
-		{unknownStr, true, RTCIceCandidateType(Unknown)},
-		{"host", false, RTCIceCandidateTypeHost},
-		{"srflx", false, RTCIceCandidateTypeSrflx},
-		{"prflx", false, RTCIceCandidateTypePrflx},
-		{"relay", false, RTCIceCandidateTypeRelay},
+		{unknownStr, true, ICECandidateType(Unknown)},
+		{"host", false, ICECandidateTypeHost},
+		{"srflx", false, ICECandidateTypeSrflx},
+		{"prflx", false, ICECandidateTypePrflx},
+		{"relay", false, ICECandidateTypeRelay},
 	}
 
 	for i, testCase := range testCases {
-		actual, err := newRTCIceCandidateType(testCase.typeString)
+		actual, err := newICECandidateType(testCase.typeString)
 		if (err != nil) != testCase.shouldFail {
 			t.Error(err)
 		}
@@ -32,16 +32,16 @@ func TestRTCIceCandidateType(t *testing.T) {
 	}
 }
 
-func TestRTCIceCandidateType_String(t *testing.T) {
+func TestICECandidateType_String(t *testing.T) {
 	testCases := []struct {
-		cType          RTCIceCandidateType
+		cType          ICECandidateType
 		expectedString string
 	}{
-		{RTCIceCandidateType(Unknown), unknownStr},
-		{RTCIceCandidateTypeHost, "host"},
-		{RTCIceCandidateTypeSrflx, "srflx"},
-		{RTCIceCandidateTypePrflx, "prflx"},
-		{RTCIceCandidateTypeRelay, "relay"},
+		{ICECandidateType(Unknown), unknownStr},
+		{ICECandidateTypeHost, "host"},
+		{ICECandidateTypeSrflx, "srflx"},
+		{ICECandidateTypePrflx, "prflx"},
+		{ICECandidateTypeRelay, "relay"},
 	}
 
 	for i, testCase := range testCases {

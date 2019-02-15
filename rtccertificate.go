@@ -16,17 +16,17 @@ import (
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
-// RTCCertificate represents a x509Cert used to authenticate WebRTC communications.
-type RTCCertificate struct {
+// Certificate represents a x509Cert used to authenticate WebRTC communications.
+type Certificate struct {
 	privateKey crypto.PrivateKey
 	x509Cert   *x509.Certificate
 }
 
-// NewRTCCertificate generates a new x509 compliant RTCCertificate to be used
+// NewCertificate generates a new x509 compliant Certificate to be used
 // by DTLS for encrypting data sent over the wire. This method differs from
 // GenerateCertificate by allowing to specify a template x509.Certificate to
 // be used in order to define certificate parameters.
-func NewRTCCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*RTCCertificate, error) {
+func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, error) {
 	var err error
 	var certDER []byte
 	switch sk := key.(type) {
@@ -53,12 +53,12 @@ func NewRTCCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*RTCCertifi
 		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
-	return &RTCCertificate{privateKey: key, x509Cert: cert}, nil
+	return &Certificate{privateKey: key, x509Cert: cert}, nil
 }
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
-func (c RTCCertificate) Equals(o RTCCertificate) bool {
+func (c Certificate) Equals(o Certificate) bool {
 	switch cSK := c.privateKey.(type) {
 	case *rsa.PrivateKey:
 		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
@@ -82,7 +82,7 @@ func (c RTCCertificate) Equals(o RTCCertificate) bool {
 }
 
 // Expires returns the timestamp after which this certificate is no longer valid.
-func (c RTCCertificate) Expires() time.Time {
+func (c Certificate) Expires() time.Time {
 	if c.x509Cert == nil {
 		return time.Time{}
 	}
@@ -93,8 +93,8 @@ var fingerprintAlgorithms = []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
 
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
-func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
-	res := make([]RTCDtlsFingerprint, len(fingerprintAlgorithms))
+func (c Certificate) GetFingerprints() []DTLSFingerprint {
+	res := make([]DTLSFingerprint, len(fingerprintAlgorithms))
 
 	i := 0
 	for _, algo := range fingerprintAlgorithms {
@@ -103,7 +103,7 @@ func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
 			fmt.Printf("Failed to create fingerprint: %v\n", err)
 			continue
 		}
-		res[i] = RTCDtlsFingerprint{
+		res[i] = DTLSFingerprint{
 			Algorithm: algo.String(),
 			Value:     value,
 		}
@@ -114,7 +114,7 @@ func (c RTCCertificate) GetFingerprints() []RTCDtlsFingerprint {
 
 // GenerateCertificate causes the creation of an X.509 certificate and
 // corresponding private key.
-func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
+func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 	origin := make([]byte, 16)
 	/* #nosec */
 	if _, err := rand.Read(origin); err != nil {
@@ -131,7 +131,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*RTCCertificate, error) {
 		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
-	return NewRTCCertificate(secretKey, x509.Certificate{
+	return NewCertificate(secretKey, x509.Certificate{
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 			x509.ExtKeyUsageServerAuth,

@@ -21,8 +21,8 @@ func main() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Create a datachannel with label 'data'
@@ -70,7 +70,7 @@ func main() {
 	fmt.Println(util.Encode(offer))
 
 	// Wait for the answer to be pasted
-	answer := webrtc.RTCSessionDescription{}
+	answer := webrtc.SessionDescription{}
 	util.Decode(util.MustReadStdin(), answer)
 
 	// Apply the answer as the remote description

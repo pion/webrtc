@@ -6,7 +6,7 @@ import (
 )
 
 // SampleBuilder contains all packets
-// maxLate determines how long we should wait until we get a valid RTCSample
+// maxLate determines how long we should wait until we get a valid Sample
 // The larger the value the less packet loss you will see, but higher latency
 type SampleBuilder struct {
 	maxLate uint16
@@ -41,7 +41,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
+func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.Sample {
 	data := []byte{}
 
 	for i := firstBuffer; s.buffer[i] != nil; i++ {
@@ -59,7 +59,7 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.RTCSample {
 			for j := firstBuffer; j < i; j++ {
 				s.buffer[j] = nil
 			}
-			return &media.RTCSample{Data: data, Samples: samples}
+			return &media.Sample{Data: data, Samples: samples}
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i])
@@ -82,7 +82,7 @@ func seqnumDistance(x, y uint16) uint16 {
 }
 
 // Pop scans buffer for valid samples, returns nil when no valid samples have been found
-func (s *SampleBuilder) Pop() *media.RTCSample {
+func (s *SampleBuilder) Pop() *media.Sample {
 	var i uint16
 	if !s.isContiguous {
 		i = s.lastPush - s.maxLate

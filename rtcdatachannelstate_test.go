@@ -6,37 +6,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCDataChannelState(t *testing.T) {
+func TestNewDataChannelState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState RTCDataChannelState
+		expectedState DataChannelState
 	}{
-		{unknownStr, RTCDataChannelState(Unknown)},
-		{"connecting", RTCDataChannelStateConnecting},
-		{"open", RTCDataChannelStateOpen},
-		{"closing", RTCDataChannelStateClosing},
-		{"closed", RTCDataChannelStateClosed},
+		{unknownStr, DataChannelState(Unknown)},
+		{"connecting", DataChannelStateConnecting},
+		{"open", DataChannelStateOpen},
+		{"closing", DataChannelStateClosing},
+		{"closed", DataChannelStateClosed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newRTCDataChannelState(testCase.stateString),
+			newDataChannelState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCDataChannelState_String(t *testing.T) {
+func TestDataChannelState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCDataChannelState
+		state          DataChannelState
 		expectedString string
 	}{
-		{RTCDataChannelState(Unknown), unknownStr},
-		{RTCDataChannelStateConnecting, "connecting"},
-		{RTCDataChannelStateOpen, "open"},
-		{RTCDataChannelStateClosing, "closing"},
-		{RTCDataChannelStateClosed, "closed"},
+		{DataChannelState(Unknown), unknownStr},
+		{DataChannelStateConnecting, "connecting"},
+		{DataChannelStateOpen, "open"},
+		{DataChannelStateClosing, "closing"},
+		{DataChannelStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {

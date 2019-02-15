@@ -6,37 +6,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCRtpTransceiverDirection(t *testing.T) {
+func TestNewRTPTransceiverDirection(t *testing.T) {
 	testCases := []struct {
 		priorityString   string
-		expectedPriority RTCRtpTransceiverDirection
+		expectedPriority RTPTransceiverDirection
 	}{
-		{unknownStr, RTCRtpTransceiverDirection(Unknown)},
-		{"sendrecv", RTCRtpTransceiverDirectionSendrecv},
-		{"sendonly", RTCRtpTransceiverDirectionSendonly},
-		{"recvonly", RTCRtpTransceiverDirectionRecvonly},
-		{"inactive", RTCRtpTransceiverDirectionInactive},
+		{unknownStr, RTPTransceiverDirection(Unknown)},
+		{"sendrecv", RTPTransceiverDirectionSendrecv},
+		{"sendonly", RTPTransceiverDirectionSendonly},
+		{"recvonly", RTPTransceiverDirectionRecvonly},
+		{"inactive", RTPTransceiverDirectionInactive},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTCRtpTransceiverDirection(testCase.priorityString),
+			NewRTPTransceiverDirection(testCase.priorityString),
 			testCase.expectedPriority,
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCRtpTransceiverDirection_String(t *testing.T) {
+func TestRTPTransceiverDirection_String(t *testing.T) {
 	testCases := []struct {
-		priority       RTCRtpTransceiverDirection
+		priority       RTPTransceiverDirection
 		expectedString string
 	}{
-		{RTCRtpTransceiverDirection(Unknown), unknownStr},
-		{RTCRtpTransceiverDirectionSendrecv, "sendrecv"},
-		{RTCRtpTransceiverDirectionSendonly, "sendonly"},
-		{RTCRtpTransceiverDirectionRecvonly, "recvonly"},
-		{RTCRtpTransceiverDirectionInactive, "inactive"},
+		{RTPTransceiverDirection(Unknown), unknownStr},
+		{RTPTransceiverDirectionSendrecv, "sendrecv"},
+		{RTPTransceiverDirectionSendonly, "sendonly"},
+		{RTPTransceiverDirectionRecvonly, "recvonly"},
+		{RTPTransceiverDirectionInactive, "inactive"},
 	}
 
 	for i, testCase := range testCases {

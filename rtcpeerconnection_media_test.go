@@ -12,7 +12,7 @@ import (
 	"github.com/pions/webrtc/pkg/media"
 )
 
-func TestRTCPeerConnection_Media_Sample(t *testing.T) {
+func TestPeerConnection_Media_Sample(t *testing.T) {
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -36,7 +36,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPRecieverRecv := make(chan bool)
 	awaitRTCPRecieverSend := make(chan error)
 
-	pcAnswer.OnTrack(func(track *RTCTrack) {
+	pcAnswer.OnTrack(func(track *Track) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
@@ -72,7 +72,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 		}
 	})
 
-	vp8Track, err := pcOffer.NewRTCSampleTrack(DefaultPayloadTypeVP8, "video", "pion")
+	vp8Track, err := pcOffer.NewSampleTrack(DefaultPayloadTypeVP8, "video", "pion")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			vp8Track.Samples <- media.RTCSample{Data: []byte{0x00}, Samples: 1}
+			vp8Track.Samples <- media.Sample{Data: []byte{0x00}, Samples: 1}
 
 			select {
 			case <-awaitRTPRecv:
@@ -149,14 +149,14 @@ func TestRTCPeerConnection_Media_Sample(t *testing.T) {
 }
 
 /*
-RTCPeerConnection should be able to be torn down at anytime
+PeerConnection should be able to be torn down at anytime
 This test adds an input track and asserts
 
 * OnTrack doesn't fire since no video packets will arrive
 * No goroutine leaks
 * No deadlocks on shutdown
 */
-func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
+func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	iceComplete := make(chan bool)
 
 	api := NewAPI()
@@ -172,11 +172,11 @@ func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := pcOffer.NewRTCSampleTrack(DefaultPayloadTypeOpus, "audio", "pion1")
+	opusTrack, err := pcOffer.NewSampleTrack(DefaultPayloadTypeOpus, "audio", "pion1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	vp8Track, err := pcOffer.NewRTCSampleTrack(DefaultPayloadTypeVP8, "video", "pion2")
+	vp8Track, err := pcOffer.NewSampleTrack(DefaultPayloadTypeVP8, "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
 	var onTrackFiredLock sync.RWMutex
 	onTrackFired := false
 
-	pcAnswer.OnTrack(func(track *RTCTrack) {
+	pcAnswer.OnTrack(func(track *Track) {
 		onTrackFiredLock.Lock()
 		defer onTrackFiredLock.Unlock()
 		onTrackFired = true
@@ -199,7 +199,7 @@ func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
 	pcAnswer.OnICEConnectionStateChange(func(iceState ice.ConnectionState) {
 		if iceState == ice.ConnectionStateConnected {
 			go func() {
-				time.Sleep(3 * time.Second) // TODO RTCPeerConnection.Close() doesn't block for all subsystems
+				time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
 				close(iceComplete)
 			}()
 		}
@@ -224,7 +224,7 @@ func TestRTCPeerConnection_Media_Shutdown(t *testing.T) {
 
 	onTrackFiredLock.Lock()
 	if onTrackFired {
-		t.Fatalf("RTCPeerConnection OnTrack fired even though we got no packets")
+		t.Fatalf("PeerConnection OnTrack fired even though we got no packets")
 	}
 	onTrackFiredLock.Unlock()
 

@@ -1,51 +1,51 @@
 package webrtc
 
-// RTCIceGatheringState describes the state of the candidate gathering process.
-type RTCIceGatheringState int
+// ICEGatheringState describes the state of the candidate gathering process.
+type ICEGatheringState int
 
 const (
-	// RTCIceGatheringStateNew indicates that any of the RTCIceTransports are
+	// ICEGatheringStateNew indicates that any of the ICETransports are
 	// in the "new" gathering state and none of the transports are in the
 	// "gathering" state, or there are no transports.
-	RTCIceGatheringStateNew RTCIceGatheringState = iota + 1
+	ICEGatheringStateNew ICEGatheringState = iota + 1
 
-	// RTCIceGatheringStateGathering indicates that any of the RTCIceTransports
+	// ICEGatheringStateGathering indicates that any of the ICETransports
 	// are in the "gathering" state.
-	RTCIceGatheringStateGathering
+	ICEGatheringStateGathering
 
-	// RTCIceGatheringStateComplete indicates that at least one RTCIceTransport
-	// exists, and all RTCIceTransports are in the "completed" gathering state.
-	RTCIceGatheringStateComplete
+	// ICEGatheringStateComplete indicates that at least one ICETransport
+	// exists, and all ICETransports are in the "completed" gathering state.
+	ICEGatheringStateComplete
 )
 
 // This is done this way because of a linter.
 const (
-	rtcIceGatheringStateNewStr       = "new"
-	rtcIceGatheringStateGatheringStr = "gathering"
-	rtcIceGatheringStateCompleteStr  = "complete"
+	iceGatheringStateNewStr       = "new"
+	iceGatheringStateGatheringStr = "gathering"
+	iceGatheringStateCompleteStr  = "complete"
 )
 
-func newRTCIceGatheringState(raw string) RTCIceGatheringState {
+func newICEGatheringState(raw string) ICEGatheringState {
 	switch raw {
-	case rtcIceGatheringStateNewStr:
-		return RTCIceGatheringStateNew
-	case rtcIceGatheringStateGatheringStr:
-		return RTCIceGatheringStateGathering
-	case rtcIceGatheringStateCompleteStr:
-		return RTCIceGatheringStateComplete
+	case iceGatheringStateNewStr:
+		return ICEGatheringStateNew
+	case iceGatheringStateGatheringStr:
+		return ICEGatheringStateGathering
+	case iceGatheringStateCompleteStr:
+		return ICEGatheringStateComplete
 	default:
-		return RTCIceGatheringState(Unknown)
+		return ICEGatheringState(Unknown)
 	}
 }
 
-func (t RTCIceGatheringState) String() string {
+func (t ICEGatheringState) String() string {
 	switch t {
-	case RTCIceGatheringStateNew:
-		return rtcIceGatheringStateNewStr
-	case RTCIceGatheringStateGathering:
-		return rtcIceGatheringStateGatheringStr
-	case RTCIceGatheringStateComplete:
-		return rtcIceGatheringStateCompleteStr
+	case ICEGatheringStateNew:
+		return iceGatheringStateNewStr
+	case ICEGatheringStateGathering:
+		return iceGatheringStateGatheringStr
+	case ICEGatheringStateComplete:
+		return iceGatheringStateCompleteStr
 	default:
 		return ErrUnknownType.Error()
 	}

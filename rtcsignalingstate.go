@@ -7,106 +7,106 @@ import (
 	"github.com/pkg/errors"
 )
 
-type rtcStateChangeOp int
+type stateChangeOp int
 
 const (
-	rtcStateChangeOpSetLocal rtcStateChangeOp = iota + 1
-	rtcStateChangeOpSetRemote
+	stateChangeOpSetLocal stateChangeOp = iota + 1
+	stateChangeOpSetRemote
 )
 
-func (op rtcStateChangeOp) String() string {
+func (op stateChangeOp) String() string {
 	switch op {
-	case rtcStateChangeOpSetLocal:
+	case stateChangeOpSetLocal:
 		return "SetLocal"
-	case rtcStateChangeOpSetRemote:
+	case stateChangeOpSetRemote:
 		return "SetRemote"
 	default:
 		return "Unknown State Change Operation"
 	}
 }
 
-// RTCSignalingState indicates the signaling state of the offer/answer process.
-type RTCSignalingState int
+// SignalingState indicates the signaling state of the offer/answer process.
+type SignalingState int
 
 const (
-	// RTCSignalingStateStable indicates there is no offer/answer exchange in
+	// SignalingStateStable indicates there is no offer/answer exchange in
 	// progress. This is also the initial state, in which case the local and
 	// remote descriptions are nil.
-	RTCSignalingStateStable RTCSignalingState = iota + 1
+	SignalingStateStable SignalingState = iota + 1
 
-	// RTCSignalingStateHaveLocalOffer indicates that a local description, of
+	// SignalingStateHaveLocalOffer indicates that a local description, of
 	// type "offer", has been successfully applied.
-	RTCSignalingStateHaveLocalOffer
+	SignalingStateHaveLocalOffer
 
-	// RTCSignalingStateHaveRemoteOffer indicates that a remote description, of
+	// SignalingStateHaveRemoteOffer indicates that a remote description, of
 	// type "offer", has been successfully applied.
-	RTCSignalingStateHaveRemoteOffer
+	SignalingStateHaveRemoteOffer
 
-	// RTCSignalingStateHaveLocalPranswer indicates that a remote description
+	// SignalingStateHaveLocalPranswer indicates that a remote description
 	// of type "offer" has been successfully applied and a local description
 	// of type "pranswer" has been successfully applied.
-	RTCSignalingStateHaveLocalPranswer
+	SignalingStateHaveLocalPranswer
 
-	// RTCSignalingStateHaveRemotePranswer indicates that a local description
+	// SignalingStateHaveRemotePranswer indicates that a local description
 	// of type "offer" has been successfully applied and a remote description
 	// of type "pranswer" has been successfully applied.
-	RTCSignalingStateHaveRemotePranswer
+	SignalingStateHaveRemotePranswer
 
-	// RTCSignalingStateClosed indicates The RTCPeerConnection has been closed.
-	RTCSignalingStateClosed
+	// SignalingStateClosed indicates The PeerConnection has been closed.
+	SignalingStateClosed
 )
 
 // This is done this way because of a linter.
 const (
-	rtcSignalingStateStableStr             = "stable"
-	rtcSignalingStateHaveLocalOfferStr     = "have-local-offer"
-	rtcSignalingStateHaveRemoteOfferStr    = "have-remote-offer"
-	rtcSignalingStateHaveLocalPranswerStr  = "have-local-pranswer"
-	rtcSignalingStateHaveRemotePranswerStr = "have-remote-pranswer"
-	rtcSignalingStateClosedStr             = "closed"
+	signalingStateStableStr             = "stable"
+	signalingStateHaveLocalOfferStr     = "have-local-offer"
+	signalingStateHaveRemoteOfferStr    = "have-remote-offer"
+	signalingStateHaveLocalPranswerStr  = "have-local-pranswer"
+	signalingStateHaveRemotePranswerStr = "have-remote-pranswer"
+	signalingStateClosedStr             = "closed"
 )
 
-func newRTCSignalingState(raw string) RTCSignalingState {
+func newSignalingState(raw string) SignalingState {
 	switch raw {
-	case rtcSignalingStateStableStr:
-		return RTCSignalingStateStable
-	case rtcSignalingStateHaveLocalOfferStr:
-		return RTCSignalingStateHaveLocalOffer
-	case rtcSignalingStateHaveRemoteOfferStr:
-		return RTCSignalingStateHaveRemoteOffer
-	case rtcSignalingStateHaveLocalPranswerStr:
-		return RTCSignalingStateHaveLocalPranswer
-	case rtcSignalingStateHaveRemotePranswerStr:
-		return RTCSignalingStateHaveRemotePranswer
-	case rtcSignalingStateClosedStr:
-		return RTCSignalingStateClosed
+	case signalingStateStableStr:
+		return SignalingStateStable
+	case signalingStateHaveLocalOfferStr:
+		return SignalingStateHaveLocalOffer
+	case signalingStateHaveRemoteOfferStr:
+		return SignalingStateHaveRemoteOffer
+	case signalingStateHaveLocalPranswerStr:
+		return SignalingStateHaveLocalPranswer
+	case signalingStateHaveRemotePranswerStr:
+		return SignalingStateHaveRemotePranswer
+	case signalingStateClosedStr:
+		return SignalingStateClosed
 	default:
-		return RTCSignalingState(Unknown)
+		return SignalingState(Unknown)
 	}
 }
 
-func (t RTCSignalingState) String() string {
+func (t SignalingState) String() string {
 	switch t {
-	case RTCSignalingStateStable:
-		return rtcSignalingStateStableStr
-	case RTCSignalingStateHaveLocalOffer:
-		return rtcSignalingStateHaveLocalOfferStr
-	case RTCSignalingStateHaveRemoteOffer:
-		return rtcSignalingStateHaveRemoteOfferStr
-	case RTCSignalingStateHaveLocalPranswer:
-		return rtcSignalingStateHaveLocalPranswerStr
-	case RTCSignalingStateHaveRemotePranswer:
-		return rtcSignalingStateHaveRemotePranswerStr
-	case RTCSignalingStateClosed:
-		return rtcSignalingStateClosedStr
+	case SignalingStateStable:
+		return signalingStateStableStr
+	case SignalingStateHaveLocalOffer:
+		return signalingStateHaveLocalOfferStr
+	case SignalingStateHaveRemoteOffer:
+		return signalingStateHaveRemoteOfferStr
+	case SignalingStateHaveLocalPranswer:
+		return signalingStateHaveLocalPranswerStr
+	case SignalingStateHaveRemotePranswer:
+		return signalingStateHaveRemotePranswerStr
+	case SignalingStateClosed:
+		return signalingStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}
 }
 
-func checkNextSignalingState(cur, next RTCSignalingState, op rtcStateChangeOp, sdpType RTCSdpType) (RTCSignalingState, error) {
+func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) {
 	// Special case for rollbacks
-	if sdpType == RTCSdpTypeRollback && cur == RTCSignalingStateStable {
+	if sdpType == SDPTypeRollback && cur == SignalingStateStable {
 		return cur, &rtcerr.InvalidModificationError{
 			Err: errors.New("Can't rollback from stable state"),
 		}
@@ -114,60 +114,60 @@ func checkNextSignalingState(cur, next RTCSignalingState, op rtcStateChangeOp, s
 
 	// 4.3.1 valid state transitions
 	switch cur {
-	case RTCSignalingStateStable:
+	case SignalingStateStable:
 		switch op {
-		case rtcStateChangeOpSetLocal:
+		case stateChangeOpSetLocal:
 			// stable->SetLocal(offer)->have-local-offer
-			if sdpType == RTCSdpTypeOffer && next == RTCSignalingStateHaveLocalOffer {
+			if sdpType == SDPTypeOffer && next == SignalingStateHaveLocalOffer {
 				return next, nil
 			}
-		case rtcStateChangeOpSetRemote:
+		case stateChangeOpSetRemote:
 			// stable->SetRemote(offer)->have-remote-offer
-			if sdpType == RTCSdpTypeOffer && next == RTCSignalingStateHaveRemoteOffer {
+			if sdpType == SDPTypeOffer && next == SignalingStateHaveRemoteOffer {
 				return next, nil
 			}
 		}
-	case RTCSignalingStateHaveLocalOffer:
-		if op == rtcStateChangeOpSetRemote {
+	case SignalingStateHaveLocalOffer:
+		if op == stateChangeOpSetRemote {
 			switch sdpType {
 			// have-local-offer->SetRemote(answer)->stable
-			case RTCSdpTypeAnswer:
-				if next == RTCSignalingStateStable {
+			case SDPTypeAnswer:
+				if next == SignalingStateStable {
 					return next, nil
 				}
 			// have-local-offer->SetRemote(pranswer)->have-remote-pranswer
-			case RTCSdpTypePranswer:
-				if next == RTCSignalingStateHaveRemotePranswer {
+			case SDPTypePranswer:
+				if next == SignalingStateHaveRemotePranswer {
 					return next, nil
 				}
 			}
 		}
-	case RTCSignalingStateHaveRemotePranswer:
-		if op == rtcStateChangeOpSetRemote && sdpType == RTCSdpTypeAnswer {
+	case SignalingStateHaveRemotePranswer:
+		if op == stateChangeOpSetRemote && sdpType == SDPTypeAnswer {
 			// have-remote-pranswer->SetRemote(answer)->stable
-			if next == RTCSignalingStateStable {
+			if next == SignalingStateStable {
 				return next, nil
 			}
 		}
-	case RTCSignalingStateHaveRemoteOffer:
-		if op == rtcStateChangeOpSetLocal {
+	case SignalingStateHaveRemoteOffer:
+		if op == stateChangeOpSetLocal {
 			switch sdpType {
 			// have-remote-offer->SetLocal(answer)->stable
-			case RTCSdpTypeAnswer:
-				if next == RTCSignalingStateStable {
+			case SDPTypeAnswer:
+				if next == SignalingStateStable {
 					return next, nil
 				}
 			// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
-			case RTCSdpTypePranswer:
-				if next == RTCSignalingStateHaveLocalPranswer {
+			case SDPTypePranswer:
+				if next == SignalingStateHaveLocalPranswer {
 					return next, nil
 				}
 			}
 		}
-	case RTCSignalingStateHaveLocalPranswer:
-		if op == rtcStateChangeOpSetLocal && sdpType == RTCSdpTypeAnswer {
+	case SignalingStateHaveLocalPranswer:
+		if op == stateChangeOpSetLocal && sdpType == SDPTypeAnswer {
 			// have-local-pranswer->SetLocal(answer)->stable
-			if next == RTCSignalingStateStable {
+			if next == SignalingStateStable {
 				return next, nil
 			}
 		}

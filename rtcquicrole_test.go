@@ -6,15 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRTCQuicRole_String(t *testing.T) {
+func TestQUICRole_String(t *testing.T) {
 	testCases := []struct {
-		role           RTCQuicRole
+		role           QUICRole
 		expectedString string
 	}{
-		{RTCQuicRole(Unknown), unknownStr},
-		{RTCQuicRoleAuto, "auto"},
-		{RTCQuicRoleClient, "client"},
-		{RTCQuicRoleServer, "server"},
+		{QUICRole(Unknown), unknownStr},
+		{QUICRoleAuto, "auto"},
+		{QUICRoleClient, "client"},
+		{QUICRoleServer, "server"},
 	}
 
 	for i, testCase := range testCases {

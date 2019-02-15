@@ -2,104 +2,104 @@ package webrtc
 
 import "github.com/pions/webrtc/pkg/ice"
 
-// RTCIceTransportState represents the current state of the ICE transport.
-type RTCIceTransportState int
+// ICETransportState represents the current state of the ICE transport.
+type ICETransportState int
 
 const (
-	// RTCIceTransportStateNew indicates the RTCIceTransport is waiting
+	// ICETransportStateNew indicates the ICETransport is waiting
 	// for remote candidates to be supplied.
-	RTCIceTransportStateNew = iota + 1
+	ICETransportStateNew = iota + 1
 
-	// RTCIceTransportStateChecking indicates the RTCIceTransport has
+	// ICETransportStateChecking indicates the ICETransport has
 	// received at least one remote candidate, and a local and remote
-	// RTCIceCandidateComplete dictionary was not added as the last candidate.
-	RTCIceTransportStateChecking
+	// ICECandidateComplete dictionary was not added as the last candidate.
+	ICETransportStateChecking
 
-	// RTCIceTransportStateConnected indicates the RTCIceTransport has
+	// ICETransportStateConnected indicates the ICETransport has
 	// received a response to an outgoing connectivity check, or has
 	// received incoming DTLS/media after a successful response to an
 	// incoming connectivity check, but is still checking other candidate
 	// pairs to see if there is a better connection.
-	RTCIceTransportStateConnected
+	ICETransportStateConnected
 
-	// RTCIceTransportStateCompleted indicates the RTCIceTransport tested
+	// ICETransportStateCompleted indicates the ICETransport tested
 	// all appropriate candidate pairs and at least one functioning
 	// candidate pair has been found.
-	RTCIceTransportStateCompleted
+	ICETransportStateCompleted
 
-	// RTCIceTransportStateFailed indicates the RTCIceTransport the last
+	// ICETransportStateFailed indicates the ICETransport the last
 	// candidate was added and all appropriate candidate pairs have either
 	// failed connectivity checks or have lost consent.
-	RTCIceTransportStateFailed
+	ICETransportStateFailed
 
-	// RTCIceTransportStateDisconnected indicates the RTCIceTransport has received
+	// ICETransportStateDisconnected indicates the ICETransport has received
 	// at least one local and remote candidate, but the final candidate was
 	// received yet and all appropriate candidate pairs thus far have been
 	// tested and failed.
-	RTCIceTransportStateDisconnected
+	ICETransportStateDisconnected
 
-	// RTCIceTransportStateClosed indicates the RTCIceTransport has shut down
+	// ICETransportStateClosed indicates the ICETransport has shut down
 	// and is no longer responding to STUN requests.
-	RTCIceTransportStateClosed
+	ICETransportStateClosed
 )
 
-func (c RTCIceTransportState) String() string {
+func (c ICETransportState) String() string {
 	switch c {
-	case RTCIceTransportStateNew:
+	case ICETransportStateNew:
 		return "new"
-	case RTCIceTransportStateChecking:
+	case ICETransportStateChecking:
 		return "checking"
-	case RTCIceTransportStateConnected:
+	case ICETransportStateConnected:
 		return "connected"
-	case RTCIceTransportStateCompleted:
+	case ICETransportStateCompleted:
 		return "completed"
-	case RTCIceTransportStateFailed:
+	case ICETransportStateFailed:
 		return "failed"
-	case RTCIceTransportStateDisconnected:
+	case ICETransportStateDisconnected:
 		return "disconnected"
-	case RTCIceTransportStateClosed:
+	case ICETransportStateClosed:
 		return "closed"
 	default:
 		return unknownStr
 	}
 }
 
-func newRTCIceTransportStateFromICE(i ice.ConnectionState) RTCIceTransportState {
+func newICETransportStateFromICE(i ice.ConnectionState) ICETransportState {
 	switch i {
 	case ice.ConnectionStateNew:
-		return RTCIceTransportStateNew
+		return ICETransportStateNew
 	case ice.ConnectionStateChecking:
-		return RTCIceTransportStateChecking
+		return ICETransportStateChecking
 	case ice.ConnectionStateConnected:
-		return RTCIceTransportStateConnected
+		return ICETransportStateConnected
 	case ice.ConnectionStateCompleted:
-		return RTCIceTransportStateCompleted
+		return ICETransportStateCompleted
 	case ice.ConnectionStateFailed:
-		return RTCIceTransportStateFailed
+		return ICETransportStateFailed
 	case ice.ConnectionStateDisconnected:
-		return RTCIceTransportStateDisconnected
+		return ICETransportStateDisconnected
 	case ice.ConnectionStateClosed:
-		return RTCIceTransportStateClosed
+		return ICETransportStateClosed
 	default:
-		return RTCIceTransportState(Unknown)
+		return ICETransportState(Unknown)
 	}
 }
 
-func (c RTCIceTransportState) toICE() ice.ConnectionState {
+func (c ICETransportState) toICE() ice.ConnectionState {
 	switch c {
-	case RTCIceTransportStateNew:
+	case ICETransportStateNew:
 		return ice.ConnectionStateNew
-	case RTCIceTransportStateChecking:
+	case ICETransportStateChecking:
 		return ice.ConnectionStateChecking
-	case RTCIceTransportStateConnected:
+	case ICETransportStateConnected:
 		return ice.ConnectionStateConnected
-	case RTCIceTransportStateCompleted:
+	case ICETransportStateCompleted:
 		return ice.ConnectionStateCompleted
-	case RTCIceTransportStateFailed:
+	case ICETransportStateFailed:
 		return ice.ConnectionStateFailed
-	case RTCIceTransportStateDisconnected:
+	case ICETransportStateDisconnected:
 		return ice.ConnectionStateDisconnected
-	case RTCIceTransportStateClosed:
+	case ICETransportStateClosed:
 		return ice.ConnectionStateClosed
 	default:
 		return ice.ConnectionState(Unknown)

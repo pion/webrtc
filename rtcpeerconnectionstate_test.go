@@ -6,41 +6,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCPeerConnectionState(t *testing.T) {
+func TestNewPeerConnectionState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState RTCPeerConnectionState
+		expectedState PeerConnectionState
 	}{
-		{unknownStr, RTCPeerConnectionState(Unknown)},
-		{"new", RTCPeerConnectionStateNew},
-		{"connecting", RTCPeerConnectionStateConnecting},
-		{"connected", RTCPeerConnectionStateConnected},
-		{"disconnected", RTCPeerConnectionStateDisconnected},
-		{"failed", RTCPeerConnectionStateFailed},
-		{"closed", RTCPeerConnectionStateClosed},
+		{unknownStr, PeerConnectionState(Unknown)},
+		{"new", PeerConnectionStateNew},
+		{"connecting", PeerConnectionStateConnecting},
+		{"connected", PeerConnectionStateConnected},
+		{"disconnected", PeerConnectionStateDisconnected},
+		{"failed", PeerConnectionStateFailed},
+		{"closed", PeerConnectionStateClosed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newRTCPeerConnectionState(testCase.stateString),
+			newPeerConnectionState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCPeerConnectionState_String(t *testing.T) {
+func TestPeerConnectionState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCPeerConnectionState
+		state          PeerConnectionState
 		expectedString string
 	}{
-		{RTCPeerConnectionState(Unknown), unknownStr},
-		{RTCPeerConnectionStateNew, "new"},
-		{RTCPeerConnectionStateConnecting, "connecting"},
-		{RTCPeerConnectionStateConnected, "connected"},
-		{RTCPeerConnectionStateDisconnected, "disconnected"},
-		{RTCPeerConnectionStateFailed, "failed"},
-		{RTCPeerConnectionStateClosed, "closed"},
+		{PeerConnectionState(Unknown), unknownStr},
+		{PeerConnectionStateNew, "new"},
+		{PeerConnectionStateConnecting, "connecting"},
+		{PeerConnectionStateConnected, "connected"},
+		{PeerConnectionStateDisconnected, "disconnected"},
+		{PeerConnectionStateFailed, "failed"},
+		{PeerConnectionStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {

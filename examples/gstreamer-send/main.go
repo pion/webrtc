@@ -22,8 +22,8 @@ func main() {
 	webrtc.RegisterDefaultCodecs()
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Set the handler for ICE connection state
@@ -41,19 +41,19 @@ func main() {
 	})
 
 	// Create a audio track
-	opusTrack, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
+	opusTrack, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
 	util.Check(err)
 	_, err = peerConnection.AddTrack(opusTrack)
 	util.Check(err)
 
 	// Create a video track
-	vp8Track, err := peerConnection.NewRTCSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+	vp8Track, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
 	util.Check(err)
 	_, err = peerConnection.AddTrack(vp8Track)
 	util.Check(err)
 
 	// Wait for the offer to be pasted
-	offer := webrtc.RTCSessionDescription{}
+	offer := webrtc.SessionDescription{}
 	util.Decode(util.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription

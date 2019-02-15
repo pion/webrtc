@@ -1,42 +1,42 @@
 package webrtc
 
-// RTCIceCredentialType indicates the type of credentials used to connect to
+// ICECredentialType indicates the type of credentials used to connect to
 // an ICE server.
-type RTCIceCredentialType int
+type ICECredentialType int
 
 const (
-	// RTCIceCredentialTypePassword describes username and pasword based
+	// ICECredentialTypePassword describes username and pasword based
 	// credentials as described in https://tools.ietf.org/html/rfc5389.
-	RTCIceCredentialTypePassword RTCIceCredentialType = iota + 1
+	ICECredentialTypePassword ICECredentialType = iota + 1
 
-	// RTCIceCredentialTypeOauth describes token based credential as described
+	// ICECredentialTypeOauth describes token based credential as described
 	// in https://tools.ietf.org/html/rfc7635.
-	RTCIceCredentialTypeOauth
+	ICECredentialTypeOauth
 )
 
 // This is done this way because of a linter.
 const (
-	rtcIceCredentialTypePasswordStr = "password"
-	rtcIceCredentialTypeOauthStr    = "oauth"
+	iceCredentialTypePasswordStr = "password"
+	iceCredentialTypeOauthStr    = "oauth"
 )
 
-func newRTCIceCredentialType(raw string) RTCIceCredentialType {
+func newICECredentialType(raw string) ICECredentialType {
 	switch raw {
-	case rtcIceCredentialTypePasswordStr:
-		return RTCIceCredentialTypePassword
-	case rtcIceCredentialTypeOauthStr:
-		return RTCIceCredentialTypeOauth
+	case iceCredentialTypePasswordStr:
+		return ICECredentialTypePassword
+	case iceCredentialTypeOauthStr:
+		return ICECredentialTypeOauth
 	default:
-		return RTCIceCredentialType(Unknown)
+		return ICECredentialType(Unknown)
 	}
 }
 
-func (t RTCIceCredentialType) String() string {
+func (t ICECredentialType) String() string {
 	switch t {
-	case RTCIceCredentialTypePassword:
-		return rtcIceCredentialTypePasswordStr
-	case RTCIceCredentialTypeOauth:
-		return rtcIceCredentialTypeOauthStr
+	case ICECredentialTypePassword:
+		return iceCredentialTypePasswordStr
+	case ICECredentialTypeOauth:
+		return iceCredentialTypeOauthStr
 	default:
 		return ErrUnknownType.Error()
 	}

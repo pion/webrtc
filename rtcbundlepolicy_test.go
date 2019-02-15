@@ -6,35 +6,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCBundlePolicy(t *testing.T) {
+func TestNewBundlePolicy(t *testing.T) {
 	testCases := []struct {
 		policyString   string
-		expectedPolicy RTCBundlePolicy
+		expectedPolicy BundlePolicy
 	}{
-		{unknownStr, RTCBundlePolicy(Unknown)},
-		{"balanced", RTCBundlePolicyBalanced},
-		{"max-compat", RTCBundlePolicyMaxCompat},
-		{"max-bundle", RTCBundlePolicyMaxBundle},
+		{unknownStr, BundlePolicy(Unknown)},
+		{"balanced", BundlePolicyBalanced},
+		{"max-compat", BundlePolicyMaxCompat},
+		{"max-bundle", BundlePolicyMaxBundle},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedPolicy,
-			newRTCBundlePolicy(testCase.policyString),
+			newBundlePolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCBundlePolicy_String(t *testing.T) {
+func TestBundlePolicy_String(t *testing.T) {
 	testCases := []struct {
-		policy         RTCBundlePolicy
+		policy         BundlePolicy
 		expectedString string
 	}{
-		{RTCBundlePolicy(Unknown), unknownStr},
-		{RTCBundlePolicyBalanced, "balanced"},
-		{RTCBundlePolicyMaxCompat, "max-compat"},
-		{RTCBundlePolicyMaxBundle, "max-bundle"},
+		{BundlePolicy(Unknown), unknownStr},
+		{BundlePolicyBalanced, "balanced"},
+		{BundlePolicyMaxCompat, "max-compat"},
+		{BundlePolicyMaxBundle, "max-bundle"},
 	}
 
 	for i, testCase := range testCases {

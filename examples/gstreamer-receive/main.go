@@ -22,8 +22,8 @@ func gstreamerReceiveMain() {
 	webrtc.RegisterDefaultCodecs()
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -31,12 +31,12 @@ func gstreamerReceiveMain() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
-	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.Track) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
 		go func() {
@@ -66,7 +66,7 @@ func gstreamerReceiveMain() {
 	})
 
 	// Wait for the offer to be pasted
-	offer := webrtc.RTCSessionDescription{}
+	offer := webrtc.SessionDescription{}
 	util.Decode(util.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription

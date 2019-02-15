@@ -16,12 +16,12 @@ func main() {
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 codec but you can also define your own
-	webrtc.RegisterCodec(webrtc.NewRTCRtpOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
-	webrtc.RegisterCodec(webrtc.NewRTCRtpVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	webrtc.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
+	webrtc.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -29,13 +29,13 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.OnTrack(func(track *webrtc.RTCTrack) {
+	peerConnection.OnTrack(func(track *webrtc.Track) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
 		go func() {
@@ -66,7 +66,7 @@ func main() {
 	})
 
 	// Wait for the offer to be pasted
-	offer := webrtc.RTCSessionDescription{}
+	offer := webrtc.SessionDescription{}
 	util.Decode(util.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription

@@ -25,21 +25,21 @@ func main() {
 	api := webrtc.NewAPI()
 
 	// Prepare ICE gathering options
-	iceOptions := webrtc.RTCIceGatherOptions{
-		ICEServers: []webrtc.RTCIceServer{
+	iceOptions := webrtc.ICEGatherOptions{
+		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
 	}
 
 	// Create the ICE gatherer
-	gatherer, err := api.NewRTCIceGatherer(iceOptions)
+	gatherer, err := api.NewICEGatherer(iceOptions)
 	util.Check(err)
 
 	// Construct the ICE transport
-	ice := api.NewRTCIceTransport(gatherer)
+	ice := api.NewICETransport(gatherer)
 
 	// Construct the Quic transport
-	qt, err := api.NewRTCQuicTransport(ice, nil)
+	qt, err := api.NewQUICTransport(ice, nil)
 	util.Check(err)
 
 	// Handle incoming streams
@@ -76,9 +76,9 @@ func main() {
 	remoteSignal := Signal{}
 	util.Decode(util.MustReadStdin(), &remoteSignal)
 
-	iceRole := webrtc.RTCIceRoleControlled
+	iceRole := webrtc.ICERoleControlled
 	if *isOffer {
-		iceRole = webrtc.RTCIceRoleControlling
+		iceRole = webrtc.ICERoleControlling
 	}
 
 	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
@@ -112,9 +112,9 @@ func main() {
 // This is not part of the ORTC spec. You are free
 // to exchange this information any way you want.
 type Signal struct {
-	ICECandidates  []webrtc.RTCIceCandidate `json:"iceCandidates"`
-	ICEParameters  webrtc.RTCIceParameters  `json:"iceParameters"`
-	QuicParameters webrtc.RTCQuicParameters `json:"quicParameters"`
+	ICECandidates  []webrtc.ICECandidate `json:"iceCandidates"`
+	ICEParameters  webrtc.ICEParameters  `json:"iceParameters"`
+	QuicParameters webrtc.QUICParameters `json:"quicParameters"`
 }
 
 // ReadLoop reads from the stream

@@ -35,24 +35,24 @@ var (
 	ErrPrivateKeyType = errors.New("private key type not supported")
 
 	// ErrModifyingPeerIdentity indicates that an attempt to modify
-	// PeerIdentity was made after RTCPeerConnection has been initialized.
+	// PeerIdentity was made after PeerConnection has been initialized.
 	ErrModifyingPeerIdentity = errors.New("peerIdentity cannot be modified")
 
 	// ErrModifyingCertificates indicates that an attempt to modify
-	// Certificates was made after RTCPeerConnection has been initialized.
+	// Certificates was made after PeerConnection has been initialized.
 	ErrModifyingCertificates = errors.New("certificates cannot be modified")
 
 	// ErrModifyingBundlePolicy indicates that an attempt to modify
-	// BundlePolicy was made after RTCPeerConnection has been initialized.
+	// BundlePolicy was made after PeerConnection has been initialized.
 	ErrModifyingBundlePolicy = errors.New("bundle policy cannot be modified")
 
-	// ErrModifyingRtcpMuxPolicy indicates that an attempt to modify
-	// RtcpMuxPolicy was made after RTCPeerConnection has been initialized.
-	ErrModifyingRtcpMuxPolicy = errors.New("rtcp mux policy cannot be modified")
+	// ErrModifyingRTCPMuxPolicy indicates that an attempt to modify
+	// RTCPMuxPolicy was made after PeerConnection has been initialized.
+	ErrModifyingRTCPMuxPolicy = errors.New("rtcp mux policy cannot be modified")
 
-	// ErrModifyingIceCandidatePoolSize indicates that an attempt to modify
-	// IceCandidatePoolSize was made after RTCPeerConnection has been initialized.
-	ErrModifyingIceCandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
+	// ErrModifyingICECandidatePoolSize indicates that an attempt to modify
+	// ICECandidatePoolSize was made after PeerConnection has been initialized.
+	ErrModifyingICECandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
 
 	// ErrStringSizeLimit indicates that the character size limit of string is
 	// exceeded. The limit is hardcoded to 65535 according to specifications.

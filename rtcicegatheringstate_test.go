@@ -6,35 +6,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRTCIceGatheringState(t *testing.T) {
+func TestNewICEGatheringState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState RTCIceGatheringState
+		expectedState ICEGatheringState
 	}{
-		{unknownStr, RTCIceGatheringState(Unknown)},
-		{"new", RTCIceGatheringStateNew},
-		{"gathering", RTCIceGatheringStateGathering},
-		{"complete", RTCIceGatheringStateComplete},
+		{unknownStr, ICEGatheringState(Unknown)},
+		{"new", ICEGatheringStateNew},
+		{"gathering", ICEGatheringStateGathering},
+		{"complete", ICEGatheringStateComplete},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newRTCIceGatheringState(testCase.stateString),
+			newICEGatheringState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestRTCIceGatheringState_String(t *testing.T) {
+func TestICEGatheringState_String(t *testing.T) {
 	testCases := []struct {
-		state          RTCIceGatheringState
+		state          ICEGatheringState
 		expectedString string
 	}{
-		{RTCIceGatheringState(Unknown), unknownStr},
-		{RTCIceGatheringStateNew, "new"},
-		{RTCIceGatheringStateGathering, "gathering"},
-		{RTCIceGatheringStateComplete, "complete"},
+		{ICEGatheringState(Unknown), unknownStr},
+		{ICEGatheringStateNew, "new"},
+		{ICEGatheringStateGathering, "gathering"},
+		{ICEGatheringStateComplete, "complete"},
 	}
 
 	for i, testCase := range testCases {

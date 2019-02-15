@@ -20,8 +20,8 @@ func main() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
-	config := webrtc.RTCConfiguration{
-		IceServers: []webrtc.RTCIceServer{
+	config := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewRTCPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	util.Check(err)
 
 	// Set the handler for ICE connection state
@@ -39,7 +39,7 @@ func main() {
 	})
 
 	// Register data channel creation handling
-	peerConnection.OnDataChannel(func(d *webrtc.RTCDataChannel) {
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
 
 		// Register channel opening handling
@@ -93,12 +93,12 @@ func main() {
 }
 
 // mustSignalViaHTTP exchange the SDP offer and answer using an HTTP server.
-func mustSignalViaHTTP(address string) (offerOut chan webrtc.RTCSessionDescription, answerIn chan webrtc.RTCSessionDescription) {
-	offerOut = make(chan webrtc.RTCSessionDescription)
-	answerIn = make(chan webrtc.RTCSessionDescription)
+func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription, answerIn chan webrtc.SessionDescription) {
+	offerOut = make(chan webrtc.SessionDescription)
+	answerIn = make(chan webrtc.SessionDescription)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		var offer webrtc.RTCSessionDescription
+		var offer webrtc.SessionDescription
 		err := json.NewDecoder(r.Body).Decode(&offer)
 		util.Check(err)
 

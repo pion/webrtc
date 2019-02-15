@@ -1,70 +1,70 @@
 package webrtc
 
-// RTCDtlsTransportState indicates the dtsl transport establishment state.
-type RTCDtlsTransportState int
+// DTLSTransportState indicates the dtsl transport establishment state.
+type DTLSTransportState int
 
 const (
-	// RTCDtlsTransportStateNew indicates that DTLS has not started negotiating
+	// DTLSTransportStateNew indicates that DTLS has not started negotiating
 	// yet.
-	RTCDtlsTransportStateNew RTCDtlsTransportState = iota + 1
+	DTLSTransportStateNew DTLSTransportState = iota + 1
 
-	// RTCDtlsTransportStateConnecting indicates that DTLS is in the process of
+	// DTLSTransportStateConnecting indicates that DTLS is in the process of
 	// negotiating a secure connection and verifying the remote fingerprint.
-	RTCDtlsTransportStateConnecting
+	DTLSTransportStateConnecting
 
-	// RTCDtlsTransportStateConnected indicates that DTLS has completed
+	// DTLSTransportStateConnected indicates that DTLS has completed
 	// negotiation of a secure connection and verified the remote fingerprint.
-	RTCDtlsTransportStateConnected
+	DTLSTransportStateConnected
 
-	// RTCDtlsTransportStateClosed indicates that the transport has been closed
+	// DTLSTransportStateClosed indicates that the transport has been closed
 	// intentionally as the result of receipt of a close_notify alert, or
 	// calling close().
-	RTCDtlsTransportStateClosed
+	DTLSTransportStateClosed
 
-	// RTCDtlsTransportStateFailed indicates that the transport has failed as
+	// DTLSTransportStateFailed indicates that the transport has failed as
 	// the result of an error (such as receipt of an error alert or failure to
 	// validate the remote fingerprint).
-	RTCDtlsTransportStateFailed
+	DTLSTransportStateFailed
 )
 
 // This is done this way because of a linter.
 const (
-	rtcDtlsTransportStateNewStr        = "new"
-	rtcDtlsTransportStateConnectingStr = "connecting"
-	rtcDtlsTransportStateConnectedStr  = "connected"
-	rtcDtlsTransportStateClosedStr     = "closed"
-	rtcDtlsTransportStateFailedStr     = "failed"
+	dtlsTransportStateNewStr        = "new"
+	dtlsTransportStateConnectingStr = "connecting"
+	dtlsTransportStateConnectedStr  = "connected"
+	dtlsTransportStateClosedStr     = "closed"
+	dtlsTransportStateFailedStr     = "failed"
 )
 
-func newRTCDtlsTransportState(raw string) RTCDtlsTransportState {
+func newDTLSTransportState(raw string) DTLSTransportState {
 	switch raw {
-	case rtcDtlsTransportStateNewStr:
-		return RTCDtlsTransportStateNew
-	case rtcDtlsTransportStateConnectingStr:
-		return RTCDtlsTransportStateConnecting
-	case rtcDtlsTransportStateConnectedStr:
-		return RTCDtlsTransportStateConnected
-	case rtcDtlsTransportStateClosedStr:
-		return RTCDtlsTransportStateClosed
-	case rtcDtlsTransportStateFailedStr:
-		return RTCDtlsTransportStateFailed
+	case dtlsTransportStateNewStr:
+		return DTLSTransportStateNew
+	case dtlsTransportStateConnectingStr:
+		return DTLSTransportStateConnecting
+	case dtlsTransportStateConnectedStr:
+		return DTLSTransportStateConnected
+	case dtlsTransportStateClosedStr:
+		return DTLSTransportStateClosed
+	case dtlsTransportStateFailedStr:
+		return DTLSTransportStateFailed
 	default:
-		return RTCDtlsTransportState(Unknown)
+		return DTLSTransportState(Unknown)
 	}
 }
 
-func (t RTCDtlsTransportState) String() string {
+func (t DTLSTransportState) String() string {
 	switch t {
-	case RTCDtlsTransportStateNew:
-		return rtcDtlsTransportStateNewStr
-	case RTCDtlsTransportStateConnecting:
-		return rtcDtlsTransportStateConnectingStr
-	case RTCDtlsTransportStateConnected:
-		return rtcDtlsTransportStateConnectedStr
-	case RTCDtlsTransportStateClosed:
-		return rtcDtlsTransportStateClosedStr
-	case RTCDtlsTransportStateFailed:
-		return rtcDtlsTransportStateFailedStr
+	case DTLSTransportStateNew:
+		return dtlsTransportStateNewStr
+	case DTLSTransportStateConnecting:
+		return dtlsTransportStateConnectingStr
+	case DTLSTransportStateConnected:
+		return dtlsTransportStateConnectedStr
+	case DTLSTransportStateClosed:
+		return dtlsTransportStateClosedStr
+	case DTLSTransportStateFailed:
+		return dtlsTransportStateFailedStr
 	default:
 		return ErrUnknownType.Error()
 	}

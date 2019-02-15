@@ -18,19 +18,19 @@ func TestGenerateDataChannelID(t *testing.T) {
 
 	testCases := []struct {
 		client bool
-		c      *RTCPeerConnection
+		c      *PeerConnection
 		result uint16
 	}{
-		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 0},
-		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 0},
-		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 2},
-		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 2: nil}, api: api}, 4},
-		{true, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil, 4: nil}, api: api}, 2},
-		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{}, api: api}, 1},
-		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{0: nil}, api: api}, 1},
-		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil}, api: api}, 3},
-		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 3: nil}, api: api}, 5},
-		{false, &RTCPeerConnection{sctpTransport: api.NewRTCSctpTransport(nil), dataChannels: map[uint16]*RTCDataChannel{1: nil, 5: nil}, api: api}, 3},
+		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 0},
+		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 0},
+		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 2},
+		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}, api: api}, 4},
+		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}, api: api}, 2},
+		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 1},
+		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 1},
+		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 3},
+		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}, api: api}, 5},
+		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}, api: api}, 3},
 	}
 
 	for _, testCase := range testCases {
@@ -45,7 +45,7 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
-func TestRTCDataChannel_Send(t *testing.T) {
+func TestDataChannel_Send(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -74,7 +74,7 @@ func TestRTCDataChannel_Send(t *testing.T) {
 		done <- true
 	})
 
-	answerPC.OnDataChannel(func(d *RTCDataChannel) {
+	answerPC.OnDataChannel(func(d *DataChannel) {
 		d.OnMessage(func(payload sugar.Payload) {
 			e := d.Send(sugar.PayloadBinary{Data: []byte("Pong")})
 			if e != nil {
@@ -104,7 +104,7 @@ func TestRTCDataChannel_Send(t *testing.T) {
 	}
 }
 
-func TestRTCDataChannel_EventHandlers(t *testing.T) {
+func TestDataChannel_EventHandlers(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()
 
@@ -112,7 +112,7 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 	defer report()
 
 	api := NewAPI()
-	dc := &RTCDataChannel{api: api}
+	dc := &DataChannel{api: api}
 
 	onOpenCalled := make(chan bool)
 	onMessageCalled := make(chan bool)
@@ -153,12 +153,12 @@ func TestRTCDataChannel_EventHandlers(t *testing.T) {
 	}))
 }
 
-func TestRTCDataChannel_MessagesAreOrdered(t *testing.T) {
+func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
 	api := NewAPI()
-	dc := &RTCDataChannel{api: api}
+	dc := &DataChannel{api: api}
 
 	max := 512
 	out := make(chan int)

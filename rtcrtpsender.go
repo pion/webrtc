@@ -8,23 +8,23 @@ import (
 
 const rtpOutboundMTU = 1400
 
-// RTCRtpSender allows an application to control how a given RTCTrack is encoded and transmitted to a remote peer
-type RTCRtpSender struct {
-	Track *RTCTrack
+// RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
+type RTPSender struct {
+	Track *Track
 
-	transport *RTCDtlsTransport
+	transport *DTLSTransport
 }
 
-// NewRTCRtpSender constructs a new RTCRtpSender
-func NewRTCRtpSender(track *RTCTrack, transport *RTCDtlsTransport) *RTCRtpSender {
-	r := &RTCRtpSender{
+// NewRTPSender constructs a new RTPSender
+func NewRTPSender(track *Track, transport *DTLSTransport) *RTPSender {
+	r := &RTPSender{
 		Track:     track,
 		transport: transport,
 	}
 
-	r.Track.sampleInput = make(chan media.RTCSample, 15) // Is the buffering needed?
-	r.Track.rawInput = make(chan *rtp.Packet, 15)        // Is the buffering needed?
-	r.Track.rtcpInput = make(chan rtcp.Packet, 15)       // Is the buffering needed?
+	r.Track.sampleInput = make(chan media.Sample, 15) // Is the buffering needed?
+	r.Track.rawInput = make(chan *rtp.Packet, 15)     // Is the buffering needed?
+	r.Track.rtcpInput = make(chan rtcp.Packet, 15)    // Is the buffering needed?
 
 	r.Track.Samples = r.Track.sampleInput
 	r.Track.RawRTP = r.Track.rawInput
@@ -40,7 +40,7 @@ func NewRTCRtpSender(track *RTCTrack, transport *RTCDtlsTransport) *RTCRtpSender
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
-func (r *RTCRtpSender) Send(parameters RTCRtpSendParameters) {
+func (r *RTPSender) Send(parameters RTPSendParameters) {
 	if r.Track.isRawRTP {
 		go r.handleRawRTP(r.Track.rawInput)
 	} else {
@@ -50,8 +50,8 @@ func (r *RTCRtpSender) Send(parameters RTCRtpSendParameters) {
 	go r.handleRTCP(r.transport, r.Track.rtcpInput)
 }
 
-// Stop irreversibly stops the RTCRtpSender
-func (r *RTCRtpSender) Stop() {
+// Stop irreversibly stops the RTPSender
+func (r *RTPSender) Stop() {
 	if r.Track.isRawRTP {
 		close(r.Track.RawRTP)
 	} else {
@@ -61,7 +61,7 @@ func (r *RTCRtpSender) Stop() {
 	// TODO properly tear down all loops (and test that)
 }
 
-func (r *RTCRtpSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
+func (r *RTPSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
 	for {
 		p, ok := <-rtpPackets
 		if !ok {
@@ -72,7 +72,7 @@ func (r *RTCRtpSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
 	}
 }
 
-func (r *RTCRtpSender) handleSampleRTP(rtpPackets chan media.RTCSample) {
+func (r *RTPSender) handleSampleRTP(rtpPackets chan media.Sample) {
 	packetizer := rtp.NewPacketizer(
 		rtpOutboundMTU,
 		r.Track.PayloadType,
@@ -95,16 +95,16 @@ func (r *RTCRtpSender) handleSampleRTP(rtpPackets chan media.RTCSample) {
 
 }
 
-func (r *RTCRtpSender) handleRTCP(transport *RTCDtlsTransport, rtcpPackets chan rtcp.Packet) {
+func (r *RTPSender) handleRTCP(transport *DTLSTransport, rtcpPackets chan rtcp.Packet) {
 	srtcpSession, err := transport.getSRTCPSession()
 	if err != nil {
-		pcLog.Warnf("Failed to open SRTCPSession, RTCTrack done for: %v %d \n", err, r.Track.Ssrc)
+		pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, r.Track.Ssrc)
 		return
 	}
 
 	readStream, err := srtcpSession.OpenReadStream(r.Track.Ssrc)
 	if err != nil {
-		pcLog.Warnf("Failed to open RTCP ReadStream, RTCTrack done for: %v %d \n", err, r.Track.Ssrc)
+		pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, r.Track.Ssrc)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (r *RTCRtpSender) handleRTCP(transport *RTCDtlsTransport, rtcpPackets chan 
 		rtcpBuf := make([]byte, receiveMTU)
 		i, err := readStream.Read(rtcpBuf)
 		if err != nil {
-			pcLog.Warnf("Failed to read, RTCTrack done for: %v %d \n", err, r.Track.Ssrc)
+			pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, r.Track.Ssrc)
 			return
 		}
 
@@ -131,7 +131,7 @@ func (r *RTCRtpSender) handleRTCP(transport *RTCDtlsTransport, rtcpPackets chan 
 
 }
 
-func (r *RTCRtpSender) sendRTP(packet *rtp.Packet) {
+func (r *RTPSender) sendRTP(packet *rtp.Packet) {
 	srtpSession, err := r.transport.getSRTPSession()
 	if err != nil {
 		pcLog.Warnf("SendRTP failed to open SrtpSession: %v", err)
