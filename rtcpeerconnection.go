@@ -36,7 +36,7 @@ const (
 // peer-to-peer communications with another RTCPeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
 type RTCPeerConnection struct {
-	sync.RWMutex
+	mu sync.RWMutex
 
 	configuration RTCConfiguration
 
@@ -237,15 +237,15 @@ func (pc *RTCPeerConnection) initConfiguration(configuration RTCConfiguration) e
 // OnSignalingStateChange sets an event handler which is invoked when the
 // peer connection's signaling state changes
 func (pc *RTCPeerConnection) OnSignalingStateChange(f func(RTCSignalingState)) {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 	pc.onSignalingStateChangeHandler = f
 }
 
 func (pc *RTCPeerConnection) onSignalingStateChange(newState RTCSignalingState) (done chan struct{}) {
-	pc.RLock()
+	pc.mu.RLock()
 	hdlr := pc.onSignalingStateChangeHandler
-	pc.RUnlock()
+	pc.mu.RUnlock()
 
 	pcLog.Infof("signaling state changed to %s", newState)
 	done = make(chan struct{})
@@ -265,23 +265,23 @@ func (pc *RTCPeerConnection) onSignalingStateChange(newState RTCSignalingState) 
 // OnDataChannel sets an event handler which is invoked when a data
 // channel message arrives from a remote peer.
 func (pc *RTCPeerConnection) OnDataChannel(f func(*RTCDataChannel)) {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 	pc.onDataChannelHandler = f
 }
 
 // OnTrack sets an event handler which is called when remote track
 // arrives from a remote peer.
 func (pc *RTCPeerConnection) OnTrack(f func(*RTCTrack)) {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 	pc.onTrackHandler = f
 }
 
 func (pc *RTCPeerConnection) onTrack(t *RTCTrack) (done chan struct{}) {
-	pc.RLock()
+	pc.mu.RLock()
 	hdlr := pc.onTrackHandler
-	pc.RUnlock()
+	pc.mu.RUnlock()
 
 	pcLog.Debugf("got new track: %+v", t)
 	done = make(chan struct{})
@@ -301,15 +301,15 @@ func (pc *RTCPeerConnection) onTrack(t *RTCTrack) (done chan struct{}) {
 // OnICEConnectionStateChange sets an event handler which is called
 // when an ICE connection state is changed.
 func (pc *RTCPeerConnection) OnICEConnectionStateChange(f func(ice.ConnectionState)) {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 	pc.onICEConnectionStateChangeHandler = f
 }
 
 func (pc *RTCPeerConnection) onICEConnectionStateChange(cs ice.ConnectionState) (done chan struct{}) {
-	pc.RLock()
+	pc.mu.RLock()
 	hdlr := pc.onICEConnectionStateChangeHandler
-	pc.RUnlock()
+	pc.mu.RUnlock()
 
 	pcLog.Infof("ICE connection state changed: %s", cs)
 	done = make(chan struct{})
@@ -773,9 +773,9 @@ func (pc *RTCPeerConnection) SetRemoteDescription(desc RTCSessionDescription) er
 
 	// Wire up the on datachannel handler
 	sctp.OnDataChannel(func(d *RTCDataChannel) {
-		pc.RLock()
+		pc.mu.RLock()
 		hdlr := pc.onDataChannelHandler
-		pc.RUnlock()
+		pc.mu.RUnlock()
 		if hdlr != nil {
 			hdlr(d)
 		}
@@ -1037,8 +1037,8 @@ func (pc *RTCPeerConnection) AddIceCandidate(s string) error {
 
 // GetSenders returns the RTCRtpSender that are currently attached to this RTCPeerConnection
 func (pc *RTCPeerConnection) GetSenders() []*RTCRtpSender {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 
 	result := make([]*RTCRtpSender, len(pc.rtpTransceivers))
 	for i, tranceiver := range pc.rtpTransceivers {
@@ -1051,8 +1051,8 @@ func (pc *RTCPeerConnection) GetSenders() []*RTCRtpSender {
 
 // GetReceivers returns the RTCRtpReceivers that are currently attached to this RTCPeerConnection
 func (pc *RTCPeerConnection) GetReceivers() []*RTCRtpReceiver {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 
 	result := make([]*RTCRtpReceiver, len(pc.rtpTransceivers))
 	for i, tranceiver := range pc.rtpTransceivers {
@@ -1066,8 +1066,8 @@ func (pc *RTCPeerConnection) GetReceivers() []*RTCRtpReceiver {
 
 // GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
 func (pc *RTCPeerConnection) GetTransceivers() []*RTCRtpTransceiver {
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 
 	return pc.rtpTransceivers
 }
@@ -1386,9 +1386,9 @@ func flattenErrs(errs []error) error {
 }
 
 func (pc *RTCPeerConnection) iceStateChange(newState ice.ConnectionState) {
-	pc.Lock()
+	pc.mu.Lock()
 	pc.IceConnectionState = newState
-	pc.Unlock()
+	pc.mu.Unlock()
 
 	pc.onICEConnectionStateChange(newState)
 }
@@ -1535,8 +1535,8 @@ func (pc *RTCPeerConnection) newRTCRtpTransceiver(
 		Sender:    sender,
 		Direction: direction,
 	}
-	pc.Lock()
-	defer pc.Unlock()
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
 	return t
 }
