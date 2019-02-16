@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/pions/rtcp"
@@ -11,7 +12,9 @@ import (
 	"github.com/pions/webrtc/pkg/ice"
 )
 
-func main() {
+// gstreamerReceiveMain is launched in a goroutine because the main thread is needed
+// for Glib's main loop (Gstreamer uses Glib)
+func gstreamerReceiveMain() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Setup the codecs you want to use.
@@ -83,4 +86,17 @@ func main() {
 
 	// Block forever
 	select {}
+}
+
+func init() {
+	// This example uses Gstreamer's autovideosink element to display the received video
+	// This element, along with some others, sometimes require that the process' main thread is used
+	runtime.LockOSThread()
+}
+
+func main() {
+	// Start a new thread to do the actual work for this application
+	go gstreamerReceiveMain()
+	// Use this goroutine (which has been runtime.LockOSThread'd to he the main thread) to run the Glib loop that Gstreamer requires
+	gst.StartMainLoop()
 }

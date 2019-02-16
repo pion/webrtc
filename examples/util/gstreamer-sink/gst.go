@@ -13,8 +13,12 @@ import (
 	"github.com/pions/webrtc"
 )
 
-func init() {
-	go C.gstreamer_receive_start_mainloop()
+// StartMainLoop starts GLib's main loop
+// It needs to be called from the process' main thread
+// Because many gstreamer plugins require access to the main thread
+// See: https://golang.org/pkg/runtime/#LockOSThread
+func StartMainLoop() {
+	C.gstreamer_receive_start_mainloop()
 }
 
 // Pipeline is a wrapper for a GStreamer Pipeline
