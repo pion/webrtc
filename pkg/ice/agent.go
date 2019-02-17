@@ -295,11 +295,12 @@ func allocateUDP(network string, url *URL) (*net.UDPAddr, *stun.XorAddress, erro
 }
 
 func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remotePwd string) error {
-	if a.haveStarted {
+	switch {
+	case a.haveStarted:
 		return errors.Errorf("Attempted to start agent twice")
-	} else if remoteUfrag == "" {
+	case remoteUfrag == "":
 		return errors.Errorf("remoteUfrag is empty")
-	} else if remotePwd == "" {
+	case remotePwd == "":
 		return errors.Errorf("remotePwd is empty")
 	}
 	iceLog.Debugf("Started agent: isControlling? %t, remoteUfrag: %q, remotePwd: %q", isControlling, remoteUfrag, remotePwd)
