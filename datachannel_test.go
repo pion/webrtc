@@ -162,7 +162,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 
 	max := 512
 	out := make(chan int)
-	inner := func(p sugar.Payload) {
+	inner := func(payload sugar.Payload) {
 		// randomly sleep
 		// NB: The big.Int/crypto.Rand is overkill but makes the linter happy
 		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
@@ -170,8 +170,8 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 			t.Fatalf("Failed to get random sleep duration: %s", err)
 		}
 		time.Sleep(time.Duration(randInt.Int64()) * time.Microsecond)
-		switch p := p.(type) {
-		case *sugar.PayloadBinary:
+		p, ok := payload.(*sugar.PayloadBinary)
+		if ok {
 			s, _ := binary.Varint(p.Data)
 			out <- int(s)
 		}

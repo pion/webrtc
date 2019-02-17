@@ -414,11 +414,12 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 // CreateOffer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
-	if options != nil {
+	switch {
+	case options != nil:
 		return SessionDescription{}, errors.Errorf("TODO handle options")
-	} else if useIdentity {
+	case useIdentity:
 		return SessionDescription{}, errors.Errorf("TODO handle identity provider")
-	} else if pc.isClosed {
+	case pc.isClosed:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -497,11 +498,12 @@ func (pc *PeerConnection) createDTLSTransport() (*DTLSTransport, error) {
 // CreateAnswer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
-	if options != nil {
+	switch {
+	case options != nil:
 		return SessionDescription{}, errors.Errorf("TODO handle options")
-	} else if useIdentity {
+	case useIdentity:
 		return SessionDescription{}, errors.Errorf("TODO handle identity provider")
-	} else if pc.isClosed {
+	case pc.isClosed:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -524,13 +526,14 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		var peerDirection RTPTransceiverDirection
 		midValue := ""
 		for _, a := range remoteMedia.Attributes {
-			if strings.HasPrefix(*a.String(), "mid") {
+			switch {
+			case strings.HasPrefix(*a.String(), "mid"):
 				midValue = (*a.String())[len("mid:"):]
-			} else if strings.HasPrefix(*a.String(), "sendrecv") {
+			case strings.HasPrefix(*a.String(), "sendrecv"):
 				peerDirection = RTPTransceiverDirectionSendrecv
-			} else if strings.HasPrefix(*a.String(), "sendonly") {
+			case strings.HasPrefix(*a.String(), "sendonly"):
 				peerDirection = RTPTransceiverDirectionSendonly
-			} else if strings.HasPrefix(*a.String(), "recvonly") {
+			case strings.HasPrefix(*a.String(), "recvonly"):
 				peerDirection = RTPTransceiverDirectionRecvonly
 			}
 		}
@@ -539,15 +542,16 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 			bundleValue += " " + midValue
 		}
 
-		if strings.HasPrefix(*remoteMedia.MediaName.String(), "audio") {
+		switch {
+		case strings.HasPrefix(*remoteMedia.MediaName.String(), "audio"):
 			if pc.addRTPMediaSection(d, RTPCodecTypeAudio, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
 				appendBundle()
 			}
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "video") {
+		case strings.HasPrefix(*remoteMedia.MediaName.String(), "video"):
 			if pc.addRTPMediaSection(d, RTPCodecTypeVideo, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
 				appendBundle()
 			}
-		} else if strings.HasPrefix(*remoteMedia.MediaName.String(), "application") {
+		case strings.HasPrefix(*remoteMedia.MediaName.String(), "application"):
 			pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
 			appendBundle()
 		}
@@ -730,7 +734,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, a := range m.Attributes {
-			if a.IsICECandidate() {
+			switch {
+			case a.IsICECandidate():
 				sdpCandidate, err := a.ToICECandidate()
 				if err != nil {
 					return err
@@ -744,9 +749,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				if err = pc.iceTransport.AddRemoteCandidate(candidate); err != nil {
 					return err
 				}
-			} else if strings.HasPrefix(*a.String(), "ice-ufrag") {
+			case strings.HasPrefix(*a.String(), "ice-ufrag"):
 				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
-			} else if strings.HasPrefix(*a.String(), "ice-pwd") {
+			case strings.HasPrefix(*a.String(), "ice-pwd"):
 				remotePwd = (*a.String())[len("ice-pwd:"):]
 			}
 		}
@@ -869,11 +874,12 @@ func (pc *PeerConnection) openSRTP() {
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, attr := range media.Attributes {
 			var codecType RTPCodecType
-			if media.MediaName.Media == "audio" {
+			switch media.MediaName.Media {
+			case "audio":
 				codecType = RTPCodecTypeAudio
-			} else if media.MediaName.Media == "video" {
+			case "video":
 				codecType = RTPCodecTypeVideo
-			} else {
+			default:
 				continue
 			}
 
@@ -1395,11 +1401,12 @@ func (pc *PeerConnection) iceStateChange(newState ice.ConnectionState) {
 
 func localDirection(weSend bool, peerDirection RTPTransceiverDirection) RTPTransceiverDirection {
 	theySend := (peerDirection == RTPTransceiverDirectionSendrecv || peerDirection == RTPTransceiverDirectionSendonly)
-	if weSend && theySend {
+	switch {
+	case weSend && theySend:
 		return RTPTransceiverDirectionSendrecv
-	} else if weSend && !theySend {
+	case weSend && !theySend:
 		return RTPTransceiverDirectionSendonly
-	} else if !weSend && theySend {
+	case !weSend && theySend:
 		return RTPTransceiverDirectionRecvonly
 	}
 
