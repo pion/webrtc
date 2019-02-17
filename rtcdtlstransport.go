@@ -181,7 +181,12 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 	// TODO: handle multiple certs
 	cert := t.certificates[0]
 
-	dtlsCofig := &dtls.Config{Certificate: cert.x509Cert, PrivateKey: cert.privateKey, SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80}}
+	dtlsCofig := &dtls.Config{
+		Certificate:            cert.x509Cert,
+		PrivateKey:             cert.privateKey,
+		SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
+		ClientAuth:             dtls.RequireAnyClientCert,
+	}
 	if t.isClient() {
 		// Assumes the peer offered to be passive and we accepted.
 		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsCofig)
@@ -200,16 +205,11 @@ func (t *RTCDtlsTransport) Start(remoteParameters RTCDtlsParameters) error {
 
 	// Check the fingerprint if a certificate was exchanged
 	remoteCert := t.conn.RemoteCertificate()
-	if remoteCert != nil {
-		err := t.validateFingerPrint(remoteParameters, remoteCert)
-		if err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("Warning: Certificate not checked")
+	if remoteCert == nil {
+		return fmt.Errorf("Peer didn't provide certificate via DTLS")
 	}
 
-	return nil
+	return t.validateFingerPrint(remoteParameters, remoteCert)
 }
 
 // Stop stops and closes the RTCDtlsTransport object.

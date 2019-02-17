@@ -2,7 +2,7 @@ module github.com/pions/webrtc
 
 require (
 	github.com/pions/datachannel v1.2.0
-	github.com/pions/dtls v1.2.0
+	github.com/pions/dtls v1.2.1
 	github.com/pions/rtcp v1.0.0
 	github.com/pions/rtp v1.0.0
 	github.com/pions/sctp v1.3.1
