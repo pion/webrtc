@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -144,118 +145,38 @@ func TestNew(t *testing.T) {
 
 func TestPeerConnection_SetConfiguration(t *testing.T) {
 	api := NewAPI()
-	t.Run("Success", func(t *testing.T) {
-		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		assert.Nil(t, err)
 
-		certificate, err := GenerateCertificate(secretKey)
-		assert.Nil(t, err)
+	secretKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
 
-		pc, err := api.NewPeerConnection(Configuration{
-			PeerIdentity:         "unittest",
-			Certificates:         []Certificate{*certificate},
-			ICECandidatePoolSize: 5,
-		})
-		assert.Nil(t, err)
+	certificate1, err := GenerateCertificate(secretKey1)
+	assert.Nil(t, err)
 
-		err = pc.SetConfiguration(Configuration{
-			ICEServers: []ICEServer{
-				{
-					URLs: []string{
-						"stun:stun.l.google.com:19302",
-						"turns:google.de?transport=tcp",
-					},
-					Username: "unittest",
-					Credential: OAuthCredential{
-						MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
-						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
-					},
-					CredentialType: ICECredentialTypeOauth,
-				},
-			},
-			ICETransportPolicy:   ICETransportPolicyAll,
-			BundlePolicy:         BundlePolicyBalanced,
-			RTCPMuxPolicy:        RTCPMuxPolicyRequire,
-			PeerIdentity:         "unittest",
-			Certificates:         []Certificate{*certificate},
-			ICECandidatePoolSize: 5,
-		})
-		assert.Nil(t, err)
-	})
-	t.Run("Failure", func(t *testing.T) {
-		testCases := []struct {
-			initialize     func() (*PeerConnection, error)
-			updatingConfig func() Configuration
-			expectedErr    error
-		}{
-			{func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{})
-				assert.Nil(t, err)
+	secretKey2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
 
-				err = pc.Close()
-				assert.Nil(t, err)
-				return pc, err
-			}, func() Configuration {
-				return Configuration{}
-			}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				return Configuration{
-					PeerIdentity: "unittest",
+	certificate2, err := GenerateCertificate(secretKey2)
+	assert.Nil(t, err)
+
+	for _, test := range []struct {
+		name    string
+		init    func() (*PeerConnection, error)
+		config  Configuration
+		wantErr error
+	}{
+		{
+			name: "valid",
+			init: func() (*PeerConnection, error) {
+				pc, err := api.NewPeerConnection(Configuration{
+					PeerIdentity:         "unittest",
+					Certificates:         []Certificate{*certificate1},
+					ICECandidatePoolSize: 5,
+				})
+				if err != nil {
+					return pc, err
 				}
-			}, &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				secretKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				assert.Nil(t, err)
 
-				certificate1, err := GenerateCertificate(secretKey1)
-				assert.Nil(t, err)
-
-				secretKey2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				assert.Nil(t, err)
-
-				certificate2, err := GenerateCertificate(secretKey2)
-				assert.Nil(t, err)
-
-				return Configuration{
-					Certificates: []Certificate{*certificate1, *certificate2},
-				}
-			}, &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				assert.Nil(t, err)
-
-				certificate, err := GenerateCertificate(secretKey)
-				assert.Nil(t, err)
-
-				return Configuration{
-					Certificates: []Certificate{*certificate},
-				}
-			}, &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				return Configuration{
-					BundlePolicy: BundlePolicyMaxCompat,
-				}
-			}, &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				return Configuration{
-					RTCPMuxPolicy: RTCPMuxPolicyNegotiate,
-				}
-			}, &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy}},
-			// TODO Unittest for ICECandidatePoolSize cannot be done now needs pc.LocalDescription()
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			}, func() Configuration {
-				return Configuration{
+				err = pc.SetConfiguration(Configuration{
 					ICEServers: []ICEServer{
 						{
 							URLs: []string{
@@ -263,22 +184,145 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 								"turns:google.de?transport=tcp",
 							},
 							Username: "unittest",
+							Credential: OAuthCredential{
+								MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+								AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
+							},
+							CredentialType: ICECredentialTypeOauth,
 						},
 					},
+					ICETransportPolicy:   ICETransportPolicyAll,
+					BundlePolicy:         BundlePolicyBalanced,
+					RTCPMuxPolicy:        RTCPMuxPolicyRequire,
+					PeerIdentity:         "unittest",
+					Certificates:         []Certificate{*certificate1},
+					ICECandidatePoolSize: 5,
+				})
+				if err != nil {
+					return pc, err
 				}
-			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}},
+
+				return pc, nil
+			},
+			config:  Configuration{},
+			wantErr: nil,
+		},
+		{
+			name: "closed connection",
+			init: func() (*PeerConnection, error) {
+				pc, err := api.NewPeerConnection(Configuration{})
+				assert.Nil(t, err)
+
+				err = pc.Close()
+				assert.Nil(t, err)
+				return pc, err
+			},
+			config:  Configuration{},
+			wantErr: &rtcerr.InvalidStateError{Err: ErrConnectionClosed},
+		},
+		{
+			name: "update PeerIdentity",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				PeerIdentity: "unittest",
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity},
+		},
+		{
+			name: "update multiple certificates",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				Certificates: []Certificate{*certificate1, *certificate2},
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates},
+		},
+		{
+			name: "update certificate",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				Certificates: []Certificate{*certificate1},
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates},
+		},
+		{
+			name: "update BundlePolicy",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				BundlePolicy: BundlePolicyMaxCompat,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy},
+		},
+		{
+			name: "update RTCPMuxPolicy",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				RTCPMuxPolicy: RTCPMuxPolicyNegotiate,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy},
+		},
+		{
+			name: "update ICECandidatePoolSize",
+			init: func() (*PeerConnection, error) {
+				pc, err := api.NewPeerConnection(Configuration{
+					ICECandidatePoolSize: 0,
+				})
+				if err != nil {
+					return pc, err
+				}
+				offer, err := pc.CreateOffer(nil)
+				if err != nil {
+					return pc, err
+				}
+				err = pc.SetLocalDescription(offer)
+				if err != nil {
+					return pc, err
+				}
+				return pc, nil
+			},
+			config: Configuration{
+				ICECandidatePoolSize: 1,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize},
+		},
+		{
+			name: "update ICEServers, no TURN credentials",
+			init: func() (*PeerConnection, error) {
+				return api.NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				ICEServers: []ICEServer{
+					{
+						URLs: []string{
+							"stun:stun.l.google.com:19302",
+							"turns:google.de?transport=tcp",
+						},
+						Username: "unittest",
+					},
+				},
+			},
+			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials},
+		},
+	} {
+		pc, err := test.init()
+		if err != nil {
+			t.Fatalf("SetConfiguration %q: init failed: %v", test.name, err)
 		}
 
-		for i, testCase := range testCases {
-			pc, err := testCase.initialize()
-			assert.Nil(t, err)
-
-			err = pc.SetConfiguration(testCase.updatingConfig())
-			assert.EqualError(t, err, testCase.expectedErr.Error(),
-				"testCase: %d %v", i, testCase,
-			)
+		err = pc.SetConfiguration(test.config)
+		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
+			t.Fatalf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
-	})
+	}
 }
 
 func TestPeerConnection_GetConfiguration(t *testing.T) {
