@@ -219,13 +219,13 @@ func pipe() (*Conn, *Conn) {
 	return aConn, bConn
 }
 
-func pipeWithTimeout(ICETimeout time.Duration, ICEKeepalive time.Duration) (*Conn, *Conn) {
+func pipeWithTimeout(iceTimeout time.Duration, iceKeepalive time.Duration) (*Conn, *Conn) {
 	var urls []*URL
 
 	aNotifier, aConnected := onConnected()
 	bNotifier, bConnected := onConnected()
 
-	aAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &ICETimeout, KeepaliveInterval: &ICEKeepalive})
+	aAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &iceTimeout, KeepaliveInterval: &iceKeepalive})
 	if err != nil {
 		panic(err)
 	}
@@ -234,7 +234,7 @@ func pipeWithTimeout(ICETimeout time.Duration, ICEKeepalive time.Duration) (*Con
 		panic(err)
 	}
 
-	bAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &ICETimeout, KeepaliveInterval: &ICEKeepalive})
+	bAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &iceTimeout, KeepaliveInterval: &iceKeepalive})
 	if err != nil {
 		panic(err)
 	}
