@@ -137,12 +137,12 @@ func (t *QUICTransport) validateFingerPrint(remoteParameters QUICParameters, rem
 			return err
 		}
 
-		if strings.ToLower(remoteValue) == strings.ToLower(fp.Value) {
+		if strings.EqualFold(remoteValue, fp.Value) {
 			return nil
 		}
 	}
 
-	return errors.New("No matching fingerprint")
+	return errors.New("no matching fingerprint")
 }
 
 func (t *QUICTransport) ensureICEConn() error {

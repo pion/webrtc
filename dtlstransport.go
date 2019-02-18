@@ -206,7 +206,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Check the fingerprint if a certificate was exchanged
 	remoteCert := t.conn.RemoteCertificate()
 	if remoteCert == nil {
-		return fmt.Errorf("Peer didn't provide certificate via DTLS")
+		return fmt.Errorf("peer didn't provide certificate via DTLS")
 	}
 
 	return t.validateFingerPrint(remoteParameters, remoteCert)
@@ -252,12 +252,12 @@ func (t *DTLSTransport) validateFingerPrint(remoteParameters DTLSParameters, rem
 			return err
 		}
 
-		if strings.ToLower(remoteValue) == strings.ToLower(fp.Value) {
+		if strings.EqualFold(remoteValue, fp.Value) {
 			return nil
 		}
 	}
 
-	return errors.New("No matching fingerprint")
+	return errors.New("no matching fingerprint")
 }
 
 func (t *DTLSTransport) ensureICEConn() error {

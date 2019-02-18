@@ -98,7 +98,7 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	if g.agent == nil {
-		return ICEParameters{}, errors.New("Gatherer not started")
+		return ICEParameters{}, errors.New("gatherer not started")
 	}
 
 	frag, pwd := g.agent.GetLocalUserCredentials()
@@ -116,7 +116,7 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 	defer g.lock.RUnlock()
 
 	if g.agent == nil {
-		return nil, errors.New("Gatherer not started")
+		return nil, errors.New("gatherer not started")
 	}
 
 	iceCandidates, err := g.agent.GetLocalCandidates()

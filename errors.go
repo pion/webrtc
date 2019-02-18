@@ -74,7 +74,7 @@ var (
 	ErrRetransmitsOrPacketLifeTime = errors.New("both MaxPacketLifeTime and MaxRetransmits was set")
 
 	// ErrCodecNotFound is returned when a codec search to the Media Engine fails
-	ErrCodecNotFound = errors.New("Codec not found")
+	ErrCodecNotFound = errors.New("codec not found")
 
 	// ErrNoRemoteDescription indicates that an operation was rejected because
 	// the remote description is not set

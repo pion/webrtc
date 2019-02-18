@@ -622,7 +622,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				pc.PendingLocalDescription = sd
 			}
 		default:
-			return &rtcerr.OperationError{Err: fmt.Errorf("Invalid state change op: %s(%s)", op, sd.Type)}
+			return &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
 		}
 	case setRemote:
 		switch sd.Type {
@@ -654,10 +654,10 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				pc.PendingRemoteDescription = sd
 			}
 		default:
-			return &rtcerr.OperationError{Err: fmt.Errorf("Invalid state change op: %s(%s)", op, sd.Type)}
+			return &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
 		}
 	default:
-		return &rtcerr.OperationError{Err: fmt.Errorf("Unhandled state change op: %q", op)}
+		return &rtcerr.OperationError{Err: fmt.Errorf("unhandled state change op: %q", op)}
 	}
 
 	if err == nil {
@@ -682,7 +682,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 			desc.Sdp = pc.lastOffer
 		default:
 			return &rtcerr.InvalidModificationError{
-				Err: fmt.Errorf("Invalid SDP type supplied to SetLocalDescription(): %s", desc.Type),
+				Err: fmt.Errorf("invalid SDP type supplied to SetLocalDescription(): %s", desc.Type),
 			}
 		}
 	}
