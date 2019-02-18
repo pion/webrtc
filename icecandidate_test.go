@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/pions/sdp"
+	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/stretchr/testify/assert"
 )

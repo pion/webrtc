@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	"github.com/pions/sdp"
+	"github.com/pions/sdp/v2"
 )
 
 // SessionDescription is used to expose local and remote session descriptions.
