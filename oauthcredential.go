@@ -5,9 +5,9 @@ package webrtc
 // https://tools.ietf.org/html/rfc7635. Note that the kid parameter is not
 // located in OAuthCredential, but in ICEServer's username member.
 type OAuthCredential struct {
-	// MacKey is a base64-url encoded format. It is used in STUN message
+	// MACKey is a base64-url encoded format. It is used in STUN message
 	// integrity hash calculation.
-	MacKey string
+	MACKey string
 
 	// AccessToken is a base64-encoded format. This is an encrypted
 	// self-contained token that is opaque to the application.

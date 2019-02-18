@@ -82,7 +82,7 @@ func TestNew(t *testing.T) {
 					},
 					Username: "unittest",
 					Credential: OAuthCredential{
-						MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+						MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 					},
 					CredentialType: ICECredentialTypeOauth,
@@ -185,7 +185,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 							},
 							Username: "unittest",
 							Credential: OAuthCredential{
-								MacKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+								MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 								AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 							},
 							CredentialType: ICECredentialTypeOauth,
