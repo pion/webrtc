@@ -13,11 +13,11 @@ func TestSessionDescription_JSON(t *testing.T) {
 		expectedString string
 		unmarshalErr   error
 	}{
-		{SessionDescription{Type: SDPTypeOffer, Sdp: "sdp"}, `{"type":"offer","sdp":"sdp"}`, nil},
-		{SessionDescription{Type: SDPTypePranswer, Sdp: "sdp"}, `{"type":"pranswer","sdp":"sdp"}`, nil},
-		{SessionDescription{Type: SDPTypeAnswer, Sdp: "sdp"}, `{"type":"answer","sdp":"sdp"}`, nil},
-		{SessionDescription{Type: SDPTypeRollback, Sdp: "sdp"}, `{"type":"rollback","sdp":"sdp"}`, nil},
-		{SessionDescription{Type: SDPType(Unknown), Sdp: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
+		{SessionDescription{Type: SDPTypeOffer, SDP: "sdp"}, `{"type":"offer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypePranswer, SDP: "sdp"}, `{"type":"pranswer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypeAnswer, SDP: "sdp"}, `{"type":"answer","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPTypeRollback, SDP: "sdp"}, `{"type":"rollback","sdp":"sdp"}`, nil},
+		{SessionDescription{Type: SDPType(Unknown), SDP: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
 	}
 
 	for i, testCase := range testCases {

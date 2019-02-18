@@ -100,7 +100,7 @@ func main() {
 		"data":    false,
 	}, map[string]interface{}{
 		"type":    "offer",
-		"sdp":     offer.Sdp,
+		"sdp":     offer.SDP,
 		"trickle": false,
 	})
 	util.Check(err)
@@ -108,7 +108,7 @@ func main() {
 	if msg.Jsep != nil {
 		err = peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 			Type: webrtc.SDPTypeAnswer,
-			Sdp:  msg.Jsep["sdp"].(string),
+			SDP:  msg.Jsep["sdp"].(string),
 		})
 		util.Check(err)
 

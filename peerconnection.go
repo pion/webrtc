@@ -454,10 +454,10 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 	desc := SessionDescription{
 		Type:   SDPTypeOffer,
-		Sdp:    d.Marshal(),
+		SDP:    d.Marshal(),
 		parsed: d,
 	}
-	pc.lastOffer = desc.Sdp
+	pc.lastOffer = desc.SDP
 	return desc, nil
 }
 
@@ -561,10 +561,10 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	desc := SessionDescription{
 		Type:   SDPTypeAnswer,
-		Sdp:    d.Marshal(),
+		SDP:    d.Marshal(),
 		parsed: d,
 	}
-	pc.lastAnswer = desc.Sdp
+	pc.lastAnswer = desc.SDP
 	return desc, nil
 }
 
@@ -577,8 +577,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	cur := pc.SignalingState
 	setLocal := stateChangeOpSetLocal
 	setRemote := stateChangeOpSetRemote
-	newSdpDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous offer")}
-	newSdpDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous answer")}
+	newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous offer")}
+	newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous answer")}
 
 	var nextState SignalingState
 	var err error
@@ -587,8 +587,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		switch sd.Type {
 		// stable->SetLocal(offer)->have-local-offer
 		case SDPTypeOffer:
-			if sd.Sdp != pc.lastOffer {
-				return newSdpDoesNotMatchOffer
+			if sd.SDP != pc.lastOffer {
+				return newSDPDoesNotMatchOffer
 			}
 			nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalOffer, setLocal, sd.Type)
 			if err == nil {
@@ -597,8 +597,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		// have-remote-offer->SetLocal(answer)->stable
 		// have-local-pranswer->SetLocal(answer)->stable
 		case SDPTypeAnswer:
-			if sd.Sdp != pc.lastAnswer {
-				return newSdpDoesNotMatchAnswer
+			if sd.SDP != pc.lastAnswer {
+				return newSDPDoesNotMatchAnswer
 			}
 			nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
 			if err == nil {
@@ -614,8 +614,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			}
 		// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
 		case SDPTypePranswer:
-			if sd.Sdp != pc.lastAnswer {
-				return newSdpDoesNotMatchAnswer
+			if sd.SDP != pc.lastAnswer {
+				return newSDPDoesNotMatchAnswer
 			}
 			nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalPranswer, setLocal, sd.Type)
 			if err == nil {
@@ -674,12 +674,12 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	// JSEP 5.4
-	if desc.Sdp == "" {
+	if desc.SDP == "" {
 		switch desc.Type {
 		case SDPTypeAnswer, SDPTypePranswer:
-			desc.Sdp = pc.lastAnswer
+			desc.SDP = pc.lastAnswer
 		case SDPTypeOffer:
-			desc.Sdp = pc.lastOffer
+			desc.SDP = pc.lastOffer
 		default:
 			return &rtcerr.InvalidModificationError{
 				Err: fmt.Errorf("invalid SDP type supplied to SetLocalDescription(): %s", desc.Type),
@@ -690,7 +690,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	// TODO: Initiate ICE candidate gathering?
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal(desc.Sdp); err != nil {
+	if err := desc.parsed.Unmarshal(desc.SDP); err != nil {
 		return err
 	}
 	return pc.setDescription(&desc, stateChangeOpSetLocal)
@@ -718,7 +718,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal(desc.Sdp); err != nil {
+	if err := desc.parsed.Unmarshal(desc.SDP); err != nil {
 		return err
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
@@ -1432,7 +1432,7 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
 
 	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
-		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SdpFmtpLine)
+		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 	}
 
 	weSend := false

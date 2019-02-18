@@ -382,7 +382,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	testCases := []struct {
 		desc SessionDescription
 	}{
-		{SessionDescription{Type: SDPTypeOffer, Sdp: minimalOffer}},
+		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}},
 	}
 
 	for i, testCase := range testCases {

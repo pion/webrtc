@@ -53,7 +53,7 @@ func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
 			codec.ClockRate == sdpCodec.ClockRate &&
 			(sdpCodec.EncodingParameters == "" ||
 				strconv.Itoa(int(codec.Channels)) == sdpCodec.EncodingParameters) &&
-			codec.SdpFmtpLine == sdpCodec.Fmtp { // TODO: Protocol specific matching?
+			codec.SDPFmtpLine == sdpCodec.Fmtp { // TODO: Protocol specific matching?
 			return codec, nil
 		}
 	}
@@ -186,7 +186,7 @@ func NewRTPCodec(
 			MimeType:    codecType.String() + "/" + name,
 			ClockRate:   clockrate,
 			Channels:    channels,
-			SdpFmtpLine: fmtp,
+			SDPFmtpLine: fmtp,
 		},
 		PayloadType: payloadType,
 		Payloader:   payloader,
@@ -200,7 +200,7 @@ type RTPCodecCapability struct {
 	MimeType    string
 	ClockRate   uint32
 	Channels    uint16
-	SdpFmtpLine string
+	SDPFmtpLine string
 }
 
 // RTPHeaderExtensionCapability is used to define a RFC5285 RTP header extension supported by the codec.
