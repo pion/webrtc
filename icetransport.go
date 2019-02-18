@@ -97,7 +97,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 			params.Password)
 
 	default:
-		err = errors.New("Unknown ICE Role")
+		err = errors.New("unknown ICE Role")
 	}
 
 	// Reacquire the lock to set the connection/mux
@@ -196,7 +196,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil ||
 		t.gatherer.agent == nil {
-		return errors.New("Gatherer not started")
+		return errors.New("gatherer not started")
 	}
 
 	return nil

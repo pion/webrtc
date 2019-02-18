@@ -15,7 +15,7 @@ before_install:
   - sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
 before_script:
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.12.5
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.14.0
   - go get github.com/mattn/goveralls
 
 script:

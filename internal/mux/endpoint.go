@@ -43,7 +43,7 @@ func (e *Endpoint) Read(p []byte) (int, error) {
 		default:
 			close(e.readCh)
 		}
-		return 0, errors.New("Endpoint closed")
+		return 0, errors.New("endpoint closed")
 	}
 }
 

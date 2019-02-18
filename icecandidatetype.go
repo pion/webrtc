@@ -52,7 +52,7 @@ func newICECandidateType(raw string) (ICECandidateType, error) {
 	case iceCandidateTypeRelayStr:
 		return ICECandidateTypeRelay, nil
 	default:
-		return ICECandidateType(Unknown), fmt.Errorf("Unknown ICE candidate type: %s", raw)
+		return ICECandidateType(Unknown), fmt.Errorf("unknown ICE candidate type: %s", raw)
 	}
 }
 

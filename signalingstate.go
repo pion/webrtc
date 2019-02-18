@@ -174,6 +174,6 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 	}
 
 	return cur, &rtcerr.InvalidModificationError{
-		Err: fmt.Errorf("Invalid proposed signaling state transition %s->%s(%s)->%s", cur, op, sdpType, next),
+		Err: fmt.Errorf("invalid proposed signaling state transition %s->%s(%s)->%s", cur, op, sdpType, next),
 	}
 }

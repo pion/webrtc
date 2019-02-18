@@ -107,7 +107,7 @@ func newICECandidateFromICE(i *ice.Candidate) (ICECandidate, error) {
 func (c ICECandidate) toICE() (*ice.Candidate, error) {
 	ip := net.ParseIP(c.IP)
 	if ip == nil {
-		return nil, errors.New("Failed to parse IP address")
+		return nil, errors.New("failed to parse IP address")
 	}
 
 	switch c.Typ {
@@ -123,7 +123,7 @@ func (c ICECandidate) toICE() (*ice.Candidate, error) {
 		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	default:
-		return nil, fmt.Errorf("Unknown candidate type: %s", c.Typ)
+		return nil, fmt.Errorf("unknown candidate type: %s", c.Typ)
 	}
 }
 
@@ -138,6 +138,6 @@ func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 	case ice.CandidateTypeRelay:
 		return ICECandidateTypeRelay, nil
 	default:
-		return ICECandidateType(t), fmt.Errorf("Unknown ICE candidate type: %s", t)
+		return ICECandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
 	}
 }

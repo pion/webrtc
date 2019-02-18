@@ -80,7 +80,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 	}
 
 	if stun.IsSTUN(p) {
-		return 0, errors.New("The ICE conn can't write STUN messages")
+		return 0, errors.New("the ICE conn can't write STUN messages")
 	}
 
 	pair, err := c.agent.getBestPair()
