@@ -1128,10 +1128,6 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 // 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
-// ------------------------------------------------------------------------
-// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api
-// ------------------------------------------------------------------------
-
 // CreateDataChannel creates a new DataChannel object with the given label
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
@@ -1182,94 +1178,12 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
-	// TODO: Re-enable validation of the parameters once they are implemented.
-	/*
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #3)
-		// Some variables defined explicitly despite their implicit zero values to
-		// allow better readability to understand what is happening. Additionally,
-		// some members are set to a non zero value default due to the default
-		// definitions in https://w3c.github.io/webrtc-pc/#dom-rtcdatachannelinit
-		// which are later overwriten by the options if any were specified.
-		channel := DataChannel{
-			rtcPeerConnection: pc,
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #4)
-			Label:             label,
-			Ordered:           true,
-			MaxPacketLifeTime: nil,
-			MaxRetransmits:    nil,
-			Protocol:          "",
-			Negotiated:        false,
-			ID:                nil,
-			Priority:          PriorityTypeLow,
-			// https://w3c.github.io/webrtc-pc/#dfn-create-an-rtcdatachannel (Step #3)
-			BufferedAmount: 0,
-		}
-
-		if options != nil {
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #7)
-			if options.MaxPacketLifeTime != nil {
-				channel.MaxPacketLifeTime = options.MaxPacketLifeTime
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #8)
-			if options.MaxRetransmits != nil {
-				channel.MaxRetransmits = options.MaxRetransmits
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
-			if options.Ordered != nil {
-				channel.Ordered = *options.Ordered
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #10)
-			if options.Protocol != nil {
-				channel.Protocol = *options.Protocol
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-da	ta-api (Step #12)
-			if options.Negotiated != nil {
-				channel.Negotiated = *options.Negotiated
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #13)
-			if options.ID != nil && channel.Negotiated {
-				channel.ID = options.ID
-			}
-
-			// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #15)
-			if options.Priority != nil {
-				channel.Priority = *options.Priority
-			}
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
-		if len(channel.Protocol) > 65535 {
-			return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #14)
-		if channel.Negotiated && channel.ID == nil {
-			return nil, &rtcerr.TypeError{Err: ErrNegotiatedWithoutID}
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
-		if channel.MaxPacketLifeTime != nil && channel.MaxRetransmits != nil {
-			return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
-		}
-
-		// FIXME https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createdatachannel (Step #17)
-
-
-		// // https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #18)
-		if *channel.ID > 65534 {
-			return nil, &rtcerr.TypeError{Err: ErrMaxDataChannelID}
-		}
-
-		if pc.sctpTransport.State == SCTPTransportStateConnected &&
-			*channel.ID >= *pc.sctpTransport.MaxChannels {
-			return nil, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
-		}
-	*/
+	// TODO: Enable validation of other parameters once they are implemented.
+	// - Protocol
+	// - Negotiated
+	// - Priority:
+	//
+	// See https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api for details
 
 	d, err := pc.api.newDataChannel(params)
 	if err != nil {
