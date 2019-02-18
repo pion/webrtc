@@ -6,9 +6,10 @@ require (
 	github.com/pions/rtcp v1.0.0
 	github.com/pions/rtp v1.0.0
 	github.com/pions/sdp/v2 v2.0.0
+	github.com/pions/sctp v1.4.0
 	github.com/pions/srtp v1.0.3
 	github.com/pions/stun v0.2.0
-	github.com/pions/transport v0.1.1-0.20190213080349-17f3c4b39c85
+	github.com/pions/transport v0.2.0
 	github.com/pkg/errors v0.8.1
 )
 

@@ -151,20 +151,22 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	var channelType datachannel.ChannelType
 	var reliabilityParameteer uint32
 
-	if d.MaxPacketLifeTime == nil && d.MaxRetransmits == nil {
+	switch {
+	case d.MaxPacketLifeTime == nil && d.MaxRetransmits == nil:
 		if d.Ordered {
 			channelType = datachannel.ChannelTypeReliable
 		} else {
 			channelType = datachannel.ChannelTypeReliableUnordered
 		}
-	} else if d.MaxRetransmits != nil {
+
+	case d.MaxRetransmits != nil:
 		reliabilityParameteer = uint32(*d.MaxRetransmits)
 		if d.Ordered {
 			channelType = datachannel.ChannelTypePartialReliableRexmit
 		} else {
 			channelType = datachannel.ChannelTypePartialReliableRexmitUnordered
 		}
-	} else {
+	default:
 		reliabilityParameteer = uint32(*d.MaxPacketLifeTime)
 		if d.Ordered {
 			channelType = datachannel.ChannelTypePartialReliableTimed
