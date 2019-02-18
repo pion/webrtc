@@ -40,7 +40,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.Ssrc, MediaSSRC: track.Ssrc}); routineErr != nil {
+				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC, MediaSSRC: track.SSRC}); routineErr != nil {
 					awaitRTCPRecieverSend <- routineErr
 					return
 				}
@@ -97,7 +97,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.Ssrc, MediaSSRC: vp8Track.Ssrc}); routineErr != nil {
+			if routineErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC, MediaSSRC: vp8Track.SSRC}); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 

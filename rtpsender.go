@@ -76,7 +76,7 @@ func (r *RTPSender) handleSampleRTP(rtpPackets chan media.Sample) {
 	packetizer := rtp.NewPacketizer(
 		rtpOutboundMTU,
 		r.Track.PayloadType,
-		r.Track.Ssrc,
+		r.Track.SSRC,
 		r.Track.Codec.Payloader,
 		rtp.NewRandomSequencer(),
 		r.Track.Codec.ClockRate,
@@ -98,13 +98,13 @@ func (r *RTPSender) handleSampleRTP(rtpPackets chan media.Sample) {
 func (r *RTPSender) handleRTCP(transport *DTLSTransport, rtcpPackets chan rtcp.Packet) {
 	srtcpSession, err := transport.getSRTCPSession()
 	if err != nil {
-		pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, r.Track.Ssrc)
+		pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, r.Track.SSRC)
 		return
 	}
 
-	readStream, err := srtcpSession.OpenReadStream(r.Track.Ssrc)
+	readStream, err := srtcpSession.OpenReadStream(r.Track.SSRC)
 	if err != nil {
-		pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, r.Track.Ssrc)
+		pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, r.Track.SSRC)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (r *RTPSender) handleRTCP(transport *DTLSTransport, rtcpPackets chan rtcp.P
 		rtcpBuf := make([]byte, receiveMTU)
 		i, err := readStream.Read(rtcpBuf)
 		if err != nil {
-			pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, r.Track.Ssrc)
+			pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, r.Track.SSRC)
 			return
 		}
 

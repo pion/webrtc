@@ -42,7 +42,7 @@ func gstreamerReceiveMain() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.Ssrc})
+				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC})
 				if err != nil {
 					fmt.Println(err)
 				}

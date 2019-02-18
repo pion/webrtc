@@ -83,13 +83,13 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
-				if err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.Ssrc}); err != nil {
+				if err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC}); err != nil {
 					fmt.Println(err)
 				}
 			}
 		}()
 
-		inboundSSRC <- track.Ssrc
+		inboundSSRC <- track.SSRC
 		inboundPayloadType <- track.PayloadType
 
 		for {
@@ -122,7 +122,7 @@ func main() {
 	// Get the LocalDescription and take it to base64 so we can paste in browser
 	fmt.Println(util.Encode(answer))
 
-	outboundSsrc := <-inboundSSRC
+	outboundSSRC := <-inboundSSRC
 	outboundPayloadType := <-inboundPayloadType
 	for {
 		fmt.Println("")
@@ -136,7 +136,7 @@ func main() {
 		util.Check(err)
 
 		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRawRTPTrack(outboundPayloadType, outboundSsrc, "video", "pion")
+		vp8Track, err := peerConnection.NewRawRTPTrack(outboundPayloadType, outboundSSRC, "video", "pion")
 		util.Check(err)
 
 		_, err = peerConnection.AddTrack(vp8Track)

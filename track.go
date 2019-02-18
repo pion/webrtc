@@ -21,7 +21,7 @@ type Track struct {
 	PayloadType uint8
 	Kind        RTPCodecType
 	Label       string
-	Ssrc        uint32
+	SSRC        uint32
 	Codec       *RTPCodec
 
 	Packets     <-chan *rtp.Packet
@@ -47,7 +47,7 @@ func NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTP
 		PayloadType: payloadType,
 		Kind:        codec.Type,
 		Label:       label,
-		Ssrc:        ssrc,
+		SSRC:        ssrc,
 		Codec:       codec,
 	}, nil
 }
@@ -70,7 +70,7 @@ func NewSampleTrack(payloadType uint8, id, label string, codec *RTPCodec) (*Trac
 		PayloadType: payloadType,
 		Kind:        codec.Type,
 		Label:       label,
-		Ssrc:        binary.LittleEndian.Uint32(buf),
+		SSRC:        binary.LittleEndian.Uint32(buf),
 		Codec:       codec,
 	}, nil
 }
