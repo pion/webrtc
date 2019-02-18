@@ -9,7 +9,7 @@ import (
 func TestNewSDPType(t *testing.T) {
 	testCases := []struct {
 		sdpTypeString   string
-		expectedSdpType SDPType
+		expectedSDPType SDPType
 	}{
 		{unknownStr, SDPType(Unknown)},
 		{"offer", SDPTypeOffer},
@@ -20,7 +20,7 @@ func TestNewSDPType(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.expectedSdpType,
+			testCase.expectedSDPType,
 			newSDPType(testCase.sdpTypeString),
 			"testCase: %d %v", i, testCase,
 		)
