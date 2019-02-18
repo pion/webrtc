@@ -832,7 +832,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if tranceiver.Sender != nil {
 				tranceiver.Sender.Send(RTPSendParameters{
 					encodings: RTPEncodingParameters{
-						RTPCodingParameters{SSRC: tranceiver.Sender.Track.Ssrc, PayloadType: tranceiver.Sender.Track.PayloadType},
+						RTPCodingParameters{SSRC: tranceiver.Sender.Track.SSRC, PayloadType: tranceiver.Sender.Track.PayloadType},
 					}})
 			}
 		}
@@ -883,7 +883,7 @@ func (pc *PeerConnection) openSRTP() {
 				continue
 			}
 
-			if attr.Key == sdp.AttrKeySsrc {
+			if attr.Key == sdp.AttrKeySSRC {
 				ssrc, err := strconv.ParseUint(strings.Split(attr.Value, " ")[0], 10, 32)
 				if err != nil {
 					pcLog.Warnf("Failed to parse SSRC: %v", err)
@@ -1444,7 +1444,7 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		}
 		weSend = true
 		track := transceiver.Sender.Track
-		media = media.WithMediaSource(track.Ssrc, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
+		media = media.WithMediaSource(track.SSRC, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
 	}
 	media = media.WithPropertyAttribute(localDirection(weSend, peerDirection).String())
 

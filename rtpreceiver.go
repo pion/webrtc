@@ -51,7 +51,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) chan bool {
 	// TODO atomic only allow this to fire once
 	r.Track = &Track{
 		Kind:        r.kind,
-		Ssrc:        parameters.encodings.SSRC,
+		SSRC:        parameters.encodings.SSRC,
 		Packets:     r.rtpOut,
 		RTCPPackets: r.rtcpOut,
 	}
