@@ -5,7 +5,7 @@ import (
 
 	"github.com/pions/rtp"
 	"github.com/pions/rtp/codecs"
-	"github.com/pions/sdp"
+	"github.com/pions/sdp/v2"
 )
 
 // PayloadTypes for the default codecs

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pions/sdp"
+	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/pkg/ice"
 )
 

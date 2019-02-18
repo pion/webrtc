@@ -14,7 +14,7 @@ import (
 
 	"github.com/pions/rtcp"
 	"github.com/pions/rtp"
-	"github.com/pions/sdp"
+	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
@@ -1428,8 +1428,8 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
-		WithPropertyAttribute(sdp.AttrKeyRtcpMux).  // TODO: support RTCP fallback
-		WithPropertyAttribute(sdp.AttrKeyRtcpRsize) // TODO: Support Reduced-Size RTCP?
+		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
+		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
 
 	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
