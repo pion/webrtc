@@ -22,6 +22,14 @@
 
 See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
 
+### Breaking Changes
+
+Pion WebRTC v2.0.0 is coming soon! HEAD will be unstable for the next few weeks as we prepare for the new release. See the [release notes](https://github.com/pions/webrtc/wiki/v2.0.0-Release-Notes) to learn about the new features breaking changes.
+
+Have any questions? Join [the Slack channel](https://gophers.slack.com/messages/pion) to follow development and speak with the maintainers.
+
+Use the tag [v1.2.0](https://github.com/pions/webrtc/tree/v1.2.0) if you'd like to continue using the v1.0 API in the meantime. After v2.0 is released v1.0 will be deprecated and unmaintained.
+
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
 
