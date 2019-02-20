@@ -1030,26 +1030,24 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates
-func (pc *PeerConnection) AddICECandidate(s string) error {
-	// TODO: AddICECandidate should take ICECandidateInit
+func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	if pc.RemoteDescription() == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
-	s = strings.TrimPrefix(s, "candidate:")
-
-	attribute := sdp.NewAttribute("candidate", s)
+	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+	attribute := sdp.NewAttribute("candidate", candidateValue)
 	sdpCandidate, err := attribute.ToICECandidate()
 	if err != nil {
 		return err
 	}
 
-	candidate, err := newICECandidateFromSDP(sdpCandidate)
+	iceCandidate, err := newICECandidateFromSDP(sdpCandidate)
 	if err != nil {
 		return err
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(candidate)
+	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
 }
 
 // ICEConnectionState returns the ICE connection state of the
