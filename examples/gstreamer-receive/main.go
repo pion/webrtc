@@ -9,7 +9,6 @@ import (
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
 	gst "github.com/pions/webrtc/examples/util/gstreamer-sink"
-	"github.com/pions/webrtc/pkg/ice"
 )
 
 // gstreamerReceiveMain is launched in a goroutine because the main thread is needed
@@ -61,7 +60,7 @@ func gstreamerReceiveMain() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 

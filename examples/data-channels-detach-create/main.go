@@ -7,7 +7,6 @@ import (
 	"github.com/pions/datachannel"
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/pkg/ice"
 )
 
 const messageSize = 15
@@ -39,7 +38,7 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
 	})
 

@@ -7,7 +7,6 @@ import (
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/examples/util"
 	gst "github.com/pions/webrtc/examples/util/gstreamer-src"
-	"github.com/pions/webrtc/pkg/ice"
 )
 
 func main() {
@@ -36,7 +35,7 @@ func main() {
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState ice.ConnectionState) {
+	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 

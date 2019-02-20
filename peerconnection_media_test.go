@@ -8,7 +8,6 @@ import (
 
 	"github.com/pions/rtcp"
 	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/media"
 )
 
@@ -196,8 +195,8 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		onTrackFired = true
 	})
 
-	pcAnswer.OnICEConnectionStateChange(func(iceState ice.ConnectionState) {
-		if iceState == ice.ConnectionStateConnected {
+	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
 			go func() {
 				time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
 				close(iceComplete)
