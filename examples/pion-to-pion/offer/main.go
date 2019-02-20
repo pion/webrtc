@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/pkg/datachannel"
+	sugar "github.com/pions/webrtc/pkg/datachannel"
+
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -30,11 +31,15 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create a datachannel with label 'data'
 	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -47,20 +52,22 @@ func main() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label, dataChannel.ID)
 
 		for range time.NewTicker(5 * time.Second).C {
-			message := util.RandSeq(15)
+			message := signal.RandSeq(15)
 			fmt.Printf("Sending %s \n", message)
 
-			err := dataChannel.Send(datachannel.PayloadString{Data: []byte(message)})
-			util.Check(err)
+			err := dataChannel.Send(sugar.PayloadString{Data: []byte(message)})
+			if err != nil {
+				panic(err)
+			}
 		}
 	})
 
 	// Register the OnMessage to handle incoming messages
-	dataChannel.OnMessage(func(payload datachannel.Payload) {
+	dataChannel.OnMessage(func(payload sugar.Payload) {
 		switch p := payload.(type) {
-		case *datachannel.PayloadString:
+		case *sugar.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), dataChannel.Label, string(p.Data))
-		case *datachannel.PayloadBinary:
+		case *sugar.PayloadBinary:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), dataChannel.Label, p.Data)
 		default:
 			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), dataChannel.Label)
@@ -69,18 +76,24 @@ func main() {
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Exchange the offer for the answer
 	answer := mustSignalViaHTTP(offer, *addr)
 
 	// Apply the answer as the remote description
 	err = peerConnection.SetRemoteDescription(answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Block forever
 	select {}
@@ -90,15 +103,21 @@ func main() {
 func mustSignalViaHTTP(offer webrtc.SessionDescription, address string) webrtc.SessionDescription {
 	b := new(bytes.Buffer)
 	err := json.NewEncoder(b).Encode(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	resp, err := http.Post("http://"+address, "application/json; charset=utf-8", b)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	defer resp.Body.Close()
 
 	var answer webrtc.SessionDescription
 	err = json.NewDecoder(resp.Body).Decode(&answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	return answer
 }

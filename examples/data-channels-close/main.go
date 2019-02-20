@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/datachannel"
+
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -27,7 +28,9 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -52,18 +55,22 @@ func main() {
 
 			cnt := *closeAfter
 			for range ticker.C {
-				message := util.RandSeq(15)
+				message := signal.RandSeq(15)
 				fmt.Printf("Sending %s \n", message)
 
 				err := d.Send(datachannel.PayloadString{Data: []byte(message)})
-				util.Check(err)
+				if err != nil {
+					panic(err)
+				}
 
 				cnt--
 				if cnt < 0 {
 					fmt.Printf("Sent %d times. Closing data channel '%s'-'%d'.\n", *closeAfter, d.Label, d.ID)
 					ticker.Stop()
 					err = d.Close()
-					util.Check(err)
+					if err != nil {
+						panic(err)
+					}
 				}
 			}
 		})
@@ -83,22 +90,28 @@ func main() {
 
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
-	util.Decode(util.MustReadStdin(), &offer)
+	signal.Decode(signal.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create answer
 	answer, err := peerConnection.CreateAnswer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(util.Encode(answer))
+	fmt.Println(signal.Encode(answer))
 
 	// Block forever
 	select {}

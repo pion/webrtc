@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/quic"
 
-	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 const messageSize = 15
@@ -33,14 +33,18 @@ func main() {
 
 	// Create the ICE gatherer
 	gatherer, err := api.NewICEGatherer(iceOptions)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Construct the ICE transport
 	ice := api.NewICETransport(gatherer)
 
 	// Construct the Quic transport
 	qt, err := api.NewQUICTransport(ice, nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Handle incoming streams
 	qt.OnBidirectionalStream(func(stream *quic.BidirectionalStream) {
@@ -55,26 +59,32 @@ func main() {
 
 	// Gather candidates
 	err = gatherer.Gather()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	iceParams, err := gatherer.GetLocalParameters()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	quicParams := qt.GetLocalParameters()
 
-	signal := Signal{
+	s := Signal{
 		ICECandidates:  iceCandidates,
 		ICEParameters:  iceParams,
 		QuicParameters: quicParams,
 	}
 
 	// Exchange the information
-	fmt.Println(util.Encode(signal))
+	fmt.Println(signal.Encode(s))
 	remoteSignal := Signal{}
-	util.Decode(util.MustReadStdin(), &remoteSignal)
+	signal.Decode(signal.MustReadStdin(), &remoteSignal)
 
 	iceRole := webrtc.ICERoleControlled
 	if *isOffer {
@@ -82,21 +92,29 @@ func main() {
 	}
 
 	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the ICE transport
 	err = ice.Start(nil, remoteSignal.ICEParameters, &iceRole)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the Quic transport
 	err = qt.Start(remoteSignal.QuicParameters)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Construct the stream as the offerer
 	if *isOffer {
 		var stream *quic.BidirectionalStream
 		stream, err = qt.CreateBidirectionalStream()
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Handle reading from the stream
 		go ReadLoop(stream)
@@ -122,7 +140,9 @@ func ReadLoop(s *quic.BidirectionalStream) {
 	for {
 		buffer := make([]byte, messageSize)
 		params, err := s.ReadInto(buffer)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		fmt.Printf("Message from stream '%d': %s\n", s.StreamID(), string(buffer[:params.Amount]))
 	}
@@ -131,13 +151,15 @@ func ReadLoop(s *quic.BidirectionalStream) {
 // WriteLoop writes to the stream
 func WriteLoop(s *quic.BidirectionalStream) {
 	for range time.NewTicker(5 * time.Second).C {
-		message := util.RandSeq(messageSize)
+		message := signal.RandSeq(messageSize)
 		fmt.Printf("Sending %s \n", message)
 
 		data := quic.StreamWriteParameters{
 			Data: []byte(message),
 		}
 		err := s.Write(data)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
