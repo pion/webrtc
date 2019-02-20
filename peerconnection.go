@@ -75,8 +75,7 @@ type PeerConnection struct {
 
 	// ICEConnectionState attribute returns the ICE connection state of the
 	// PeerConnection instance.
-	// ICEConnectionState ICEConnectionState  // FIXME SWAP-FOR-THIS
-	ICEConnectionState ice.ConnectionState // FIXME REMOVE
+	iceConnectionState ICEConnectionState
 
 	// ConnectionState attribute returns the connection state of the
 	// PeerConnection instance.
@@ -103,7 +102,7 @@ type PeerConnection struct {
 	// OnConnectionStateChange    func() // FIXME NOT-USED
 
 	onSignalingStateChangeHandler     func(SignalingState)
-	onICEConnectionStateChangeHandler func(ice.ConnectionState)
+	onICEConnectionStateChangeHandler func(ICEConnectionState)
 	onTrackHandler                    func(*Track)
 	onDataChannelHandler              func(*DataChannel)
 
@@ -130,13 +129,12 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		isClosed:          false,
-		negotiationNeeded: false,
-		lastOffer:         "",
-		lastAnswer:        "",
-		SignalingState:    SignalingStateStable,
-		// ICEConnectionState: ICEConnectionStateNew, // FIXME SWAP-FOR-THIS
-		ICEConnectionState: ice.ConnectionStateNew, // FIXME REMOVE
+		isClosed:           false,
+		negotiationNeeded:  false,
+		lastOffer:          "",
+		lastAnswer:         "",
+		SignalingState:     SignalingStateStable,
+		iceConnectionState: ICEConnectionStateNew,
 		ICEGatheringState:  ICEGatheringStateNew,
 		ConnectionState:    PeerConnectionStateNew,
 		dataChannels:       make(map[uint16]*DataChannel),
@@ -300,13 +298,13 @@ func (pc *PeerConnection) onTrack(t *Track) (done chan struct{}) {
 
 // OnICEConnectionStateChange sets an event handler which is called
 // when an ICE connection state is changed.
-func (pc *PeerConnection) OnICEConnectionStateChange(f func(ice.ConnectionState)) {
+func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState)) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	pc.onICEConnectionStateChangeHandler = f
 }
 
-func (pc *PeerConnection) onICEConnectionStateChange(cs ice.ConnectionState) (done chan struct{}) {
+func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) (done chan struct{}) {
 	pc.mu.RLock()
 	hdlr := pc.onICEConnectionStateChangeHandler
 	pc.mu.RUnlock()
@@ -481,10 +479,27 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 	t := pc.api.NewICETransport(pc.iceGatherer)
 
 	t.OnConnectionStateChange(func(state ICETransportState) {
-		// We convert the state back to the ICE state to not brake the
-		// existing public API at this point.
-		iceState := state.toICE()
-		pc.iceStateChange(iceState)
+		cs := ICEConnectionStateNew
+		switch state {
+		case ICETransportStateNew:
+			cs = ICEConnectionStateNew
+		case ICETransportStateChecking:
+			cs = ICEConnectionStateChecking
+		case ICETransportStateConnected:
+			cs = ICEConnectionStateConnected
+		case ICETransportStateCompleted:
+			cs = ICEConnectionStateCompleted
+		case ICETransportStateFailed:
+			cs = ICEConnectionStateFailed
+		case ICETransportStateDisconnected:
+			cs = ICEConnectionStateDisconnected
+		case ICETransportStateClosed:
+			cs = ICEConnectionStateClosed
+		default:
+			pcLog.Warnf("OnConnectionStateChange: unhandled ICE state: %s", state)
+			return
+		}
+		pc.iceStateChange(cs)
 	})
 
 	return t
@@ -1037,6 +1052,15 @@ func (pc *PeerConnection) AddICECandidate(s string) error {
 	return pc.iceTransport.AddRemoteCandidate(candidate)
 }
 
+// ICEConnectionState returns the ICE connection state of the
+// PeerConnection instance.
+func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	return pc.iceConnectionState
+}
+
 // ------------------------------------------------------------------------
 // --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#rtp-media-api
 // ------------------------------------------------------------------------
@@ -1333,9 +1357,9 @@ func flattenErrs(errs []error) error {
 	return fmt.Errorf(strings.Join(errstrings, "\n"))
 }
 
-func (pc *PeerConnection) iceStateChange(newState ice.ConnectionState) {
+func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
 	pc.mu.Lock()
-	pc.ICEConnectionState = newState
+	pc.iceConnectionState = newState
 	pc.mu.Unlock()
 
 	pc.onICEConnectionStateChange(newState)

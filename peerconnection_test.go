@@ -497,7 +497,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		onTrackCalled <- true
 	})
 
-	pc.OnICEConnectionStateChange(func(cs ice.ConnectionState) {
+	pc.OnICEConnectionStateChange(func(cs ICEConnectionState) {
 		onICEConnectionStateChangeCalled <- true
 	})
 
