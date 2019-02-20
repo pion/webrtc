@@ -1,4 +1,6 @@
-package util
+// Package signal contains helpers to exchange the SDP session
+// description between examples.
+package signal
 
 import (
 	"bufio"
@@ -9,22 +11,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strings"
-	"time"
 )
 
 // Allows compressing offer/answer to bypass terminal input limits.
 const compress = false
-
-// Check is used to panic in an error occurs.
-// Don't do this! We're only using it to make the examples shorter.
-func Check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 // MustReadStdin blocks until input is received from stdin
 func MustReadStdin() string {
@@ -35,7 +27,9 @@ func MustReadStdin() string {
 		var err error
 		in, err = r.ReadString('\n')
 		if err != io.EOF {
-			Check(err)
+			if err != nil {
+				panic(err)
+			}
 		}
 		in = strings.TrimSpace(in)
 		if len(in) > 0 {
@@ -52,7 +46,9 @@ func MustReadStdin() string {
 // It can optionally zip the input before encoding
 func Encode(obj interface{}) string {
 	b, err := json.Marshal(obj)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	if compress {
 		b = zip(b)
@@ -65,46 +61,51 @@ func Encode(obj interface{}) string {
 // It can optionally unzip the input after decoding
 func Decode(in string, obj interface{}) {
 	b, err := base64.StdEncoding.DecodeString(in)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	if compress {
 		b = unzip(b)
 	}
 
 	err = json.Unmarshal(b, obj)
-	Check(err)
-}
-
-// RandSeq generates a random string to serve as dummy data
-func RandSeq(n int) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[r.Intn(len(letters))]
+	if err != nil {
+		panic(err)
 	}
-	return string(b)
 }
 
 func zip(in []byte) []byte {
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
 	_, err := gz.Write(in)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	err = gz.Flush()
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	err = gz.Close()
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	return b.Bytes()
 }
 
 func unzip(in []byte) []byte {
 	var b bytes.Buffer
 	_, err := b.Write(in)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	r, err := gzip.NewReader(&b)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	res, err := ioutil.ReadAll(r)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 	return res
 }

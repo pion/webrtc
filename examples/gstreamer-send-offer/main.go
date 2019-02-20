@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
-	gst "github.com/pions/webrtc/examples/util/gstreamer-src"
+
+	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -26,7 +27,9 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -36,34 +39,48 @@ func main() {
 
 	// Create a audio track
 	opusTrack, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	_, err = peerConnection.AddTrack(opusTrack)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create a video track
 	vp8Track, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	_, err = peerConnection.AddTrack(vp8Track)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create an offer to send to the browser
 	offer, err := peerConnection.CreateOffer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Output the offer in base64 so we can paste it in browser
-	fmt.Println(util.Encode(offer))
+	fmt.Println(signal.Encode(offer))
 
 	// Wait for the answer to be pasted
 	answer := webrtc.SessionDescription{}
-	util.Decode(util.MustReadStdin(), &answer)
+	signal.Decode(signal.MustReadStdin(), &answer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start pushing buffers on these tracks
 	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples, "audiotestsrc").Start()

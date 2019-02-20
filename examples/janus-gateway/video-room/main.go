@@ -6,8 +6,8 @@ import (
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
-	gst "github.com/pions/webrtc/examples/util/gstreamer-src"
+
+	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
 )
 
 func watchHandle(handle *janus.Handle) {
@@ -49,7 +49,9 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
@@ -57,30 +59,48 @@ func main() {
 
 	// Create a audio track
 	opusTrack, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	_, err = peerConnection.AddTrack(opusTrack)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create a video track
 	vp8Track, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	_, err = peerConnection.AddTrack(vp8Track)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	offer, err := peerConnection.CreateOffer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	err = peerConnection.SetLocalDescription(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	gateway, err := janus.Connect("ws://localhost:8188/janus")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	session, err := gateway.Create()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	handle, err := session.Attach("janus.plugin.videoroom")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	go watchHandle(handle)
 
@@ -90,7 +110,9 @@ func main() {
 		"room":    1234,
 		"id":      1,
 	}, nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	msg, err := handle.Message(map[string]interface{}{
 		"request": "publish",
@@ -102,14 +124,18 @@ func main() {
 		"sdp":     offer.SDP,
 		"trickle": false,
 	})
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	if msg.Jsep != nil {
 		err = peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 			Type: webrtc.SDPTypeAnswer,
 			SDP:  msg.Jsep["sdp"].(string),
 		})
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Start pushing buffers on these tracks
 		gst.CreatePipeline(webrtc.Opus, opusTrack.Samples, "audiotestsrc").Start()

@@ -13,7 +13,8 @@ import (
 	"github.com/pions/rtcp"
 	"github.com/pions/rtp"
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
+
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 var peerConnectionConfig = webrtc.Configuration{
@@ -26,7 +27,9 @@ var peerConnectionConfig = webrtc.Configuration{
 
 func mustReadStdin(reader *bufio.Reader) string {
 	rawSd, err := reader.ReadString('\n')
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("")
 
 	return rawSd
@@ -54,11 +57,13 @@ func main() {
 
 	go func() {
 		err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 	}()
 
 	offer := webrtc.SessionDescription{}
-	util.Decode(mustReadHTTP(sdp), &offer)
+	signal.Decode(mustReadHTTP(sdp), &offer)
 	fmt.Println("")
 
 	/* Everything below is the pion-WebRTC API, thanks for using it! */
@@ -68,7 +73,9 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfig)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	inboundSSRC := make(chan uint32)
 	inboundPayloadType := make(chan uint8)
@@ -109,18 +116,25 @@ func main() {
 	})
 
 	// Set the remote SessionDescription
-	util.Check(peerConnection.SetRemoteDescription(offer))
+	err = peerConnection.SetRemoteDescription(offer)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create answer
 	answer, err := peerConnection.CreateAnswer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(util.Encode(answer))
+	fmt.Println(signal.Encode(answer))
 
 	outboundSSRC := <-inboundSSRC
 	outboundPayloadType := <-inboundPayloadType
@@ -129,18 +143,24 @@ func main() {
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.SessionDescription{}
-		util.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
+		signal.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
 
 		// Create a new PeerConnection
 		peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfig)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Create a single VP8 Track to send videa
 		vp8Track, err := peerConnection.NewRawRTPTrack(outboundPayloadType, outboundSSRC, "video", "pion")
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		_, err = peerConnection.AddTrack(vp8Track)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		outboundRTPLock.Lock()
 		outboundRTP = append(outboundRTP, vp8Track.RawRTP)
@@ -148,17 +168,23 @@ func main() {
 
 		// Set the remote SessionDescription
 		err = peerConnection.SetRemoteDescription(recvOnlyOffer)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Create answer
 		answer, err := peerConnection.CreateAnswer(nil)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerConnection.SetLocalDescription(answer)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser
-		fmt.Println(util.Encode(answer))
+		fmt.Println(signal.Encode(answer))
 	}
 }

@@ -7,8 +7,9 @@ import (
 
 	"github.com/pions/rtcp"
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
-	gst "github.com/pions/webrtc/examples/util/gstreamer-sink"
+
+	gst "github.com/pions/webrtc/examples/internal/gstreamer-sink"
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 // gstreamerReceiveMain is launched in a goroutine because the main thread is needed
@@ -31,7 +32,9 @@ func gstreamerReceiveMain() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
@@ -66,22 +69,28 @@ func gstreamerReceiveMain() {
 
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
-	util.Decode(util.MustReadStdin(), &offer)
+	signal.Decode(signal.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create an answer
 	answer, err := peerConnection.CreateAnswer(nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(util.Encode(answer))
+	fmt.Println(signal.Encode(answer))
 
 	// Block forever
 	select {}

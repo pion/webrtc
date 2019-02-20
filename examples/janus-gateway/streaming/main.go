@@ -6,7 +6,6 @@ import (
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
 	"github.com/pions/webrtc/pkg/media/ivfwriter"
 )
 
@@ -49,7 +48,9 @@ func main() {
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
@@ -62,24 +63,34 @@ func main() {
 
 		fmt.Println("Got VP8 track, saving to disk as output.ivf")
 		i, err := ivfwriter.New("output.ivf")
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 		for {
 			err = i.AddPacket(<-track.Packets)
-			util.Check(err)
+			if err != nil {
+				panic(err)
+			}
 		}
 	})
 
 	// Janus
 	gateway, err := janus.Connect("ws://localhost:8188/")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create session
 	session, err := gateway.Create()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create handle
 	handle, err := session.Attach("janus.plugin.streaming")
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	go watchHandle(handle)
 
@@ -87,27 +98,37 @@ func main() {
 	_, err = handle.Request(map[string]interface{}{
 		"request": "list",
 	})
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Watch the second stream
 	msg, err := handle.Message(map[string]interface{}{
 		"request": "watch",
 		"id":      1,
 	}, nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	if msg.Jsep != nil {
 		err = peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 			Type: webrtc.SDPTypeOffer,
 			SDP:  msg.Jsep["sdp"].(string),
 		})
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		answer, err := peerConnection.CreateAnswer(nil)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		err = peerConnection.SetLocalDescription(answer)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// now we start
 		_, err = handle.Message(map[string]interface{}{
@@ -117,11 +138,15 @@ func main() {
 			"sdp":     answer.SDP,
 			"trickle": false,
 		})
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 	}
 	for {
 		_, err = session.KeepAlive()
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		time.Sleep(5 * time.Second)
 	}

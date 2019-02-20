@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/examples/util"
-	"github.com/pions/webrtc/pkg/datachannel"
+	sugar "github.com/pions/webrtc/pkg/datachannel"
+
+	"github.com/pions/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -28,14 +29,18 @@ func main() {
 
 	// Create the ICE gatherer
 	gatherer, err := api.NewICEGatherer(iceOptions)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Construct the ICE transport
 	ice := api.NewICETransport(gatherer)
 
 	// Construct the DTLS transport
 	dtls, err := api.NewDTLSTransport(ice, nil)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Construct the SCTP transport
 	sctp := api.NewSCTPTransport(dtls)
@@ -51,19 +56,25 @@ func main() {
 
 	// Gather candidates
 	err = gatherer.Gather()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	iceParams, err := gatherer.GetLocalParameters()
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	dtlsParams := dtls.GetLocalParameters()
 
 	sctpCapabilities := sctp.GetCapabilities()
 
-	signal := Signal{
+	s := Signal{
 		ICECandidates:    iceCandidates,
 		ICEParameters:    iceParams,
 		DTLSParameters:   dtlsParams,
@@ -71,9 +82,9 @@ func main() {
 	}
 
 	// Exchange the information
-	fmt.Println(util.Encode(signal))
+	fmt.Println(signal.Encode(s))
 	remoteSignal := Signal{}
-	util.Decode(util.MustReadStdin(), &remoteSignal)
+	signal.Decode(signal.MustReadStdin(), &remoteSignal)
 
 	iceRole := webrtc.ICERoleControlled
 	if *isOffer {
@@ -81,19 +92,27 @@ func main() {
 	}
 
 	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the ICE transport
 	err = ice.Start(nil, remoteSignal.ICEParameters, &iceRole)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the DTLS transport
 	err = dtls.Start(remoteSignal.DTLSParameters)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start the SCTP transport
 	err = sctp.Start(remoteSignal.SCTPCapabilities)
-	util.Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Construct the data channel as the offerer
 	if *isOffer {
@@ -103,7 +122,9 @@ func main() {
 		}
 		var channel *webrtc.DataChannel
 		channel, err = api.NewDataChannel(sctp, dcParams)
-		util.Check(err)
+		if err != nil {
+			panic(err)
+		}
 
 		// Register the handlers
 		// channel.OnOpen(handleOnOpen(channel)) // TODO: OnOpen on handle ChannelAck
@@ -129,21 +150,23 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label, channel.ID)
 
 		for range time.NewTicker(5 * time.Second).C {
-			message := util.RandSeq(15)
+			message := signal.RandSeq(15)
 			fmt.Printf("Sending %s \n", message)
 
-			err := channel.Send(datachannel.PayloadString{Data: []byte(message)})
-			util.Check(err)
+			err := channel.Send(sugar.PayloadString{Data: []byte(message)})
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
 
-func handleMessage(channel *webrtc.DataChannel) func(datachannel.Payload) {
-	return func(payload datachannel.Payload) {
+func handleMessage(channel *webrtc.DataChannel) func(sugar.Payload) {
+	return func(payload sugar.Payload) {
 		switch p := payload.(type) {
-		case *datachannel.PayloadString:
+		case *sugar.PayloadString:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), channel.Label, string(p.Data))
-		case *datachannel.PayloadBinary:
+		case *sugar.PayloadBinary:
 			fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), channel.Label, p.Data)
 		default:
 			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), channel.Label)
