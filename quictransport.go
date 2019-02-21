@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/pions/dtls"
+	"github.com/pions/quic"
 	"github.com/pions/webrtc/internal/mux"
-	"github.com/pions/webrtc/pkg/quic"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
