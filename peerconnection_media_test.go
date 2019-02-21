@@ -2,6 +2,8 @@ package webrtc
 
 import (
 	"bytes"
+	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -32,14 +34,14 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPSenderRecv := make(chan bool)
 	awaitRTCPSenderSend := make(chan error)
 
-	awaitRTCPRecieverRecv := make(chan bool)
+	awaitRTCPRecieverRecv := make(chan error)
 	awaitRTCPRecieverSend := make(chan error)
 
-	pcAnswer.OnTrack(func(track *Track) {
+	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC, MediaSSRC: track.SSRC}); routineErr != nil {
+				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}); routineErr != nil {
 					awaitRTCPRecieverSend <- routineErr
 					return
 				}
@@ -54,14 +56,18 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}()
 
 		go func() {
-			<-track.RTCPPackets
-			close(awaitRTCPRecieverRecv)
+			_, routineErr := receiver.Read(make([]byte, 1400))
+			if routineErr != nil {
+				awaitRTCPRecieverRecv <- routineErr
+			} else {
+				close(awaitRTCPRecieverRecv)
+			}
 		}()
 
 		haveClosedAwaitRTPRecv := false
 		for {
-			p, ok := <-track.Packets
-			if !ok {
+			p, routineErr := track.ReadRTP()
+			if routineErr != nil {
 				close(awaitRTPRecvClosed)
 				return
 			} else if bytes.Equal(p.Payload, []byte{0x10, 0x00}) && !haveClosedAwaitRTPRecv {
@@ -71,18 +77,21 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}
 	})
 
-	vp8Track, err := pcOffer.NewSampleTrack(DefaultPayloadTypeVP8, "video", "pion")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pcOffer.AddTrack(vp8Track); err != nil {
+	rtpReceiver, err := pcOffer.AddTrack(vp8Track)
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			vp8Track.Samples <- media.Sample{Data: []byte{0x00}, Samples: 1}
+			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); routineErr != nil {
+				fmt.Println(routineErr)
+			}
 
 			select {
 			case <-awaitRTPRecv:
@@ -96,7 +105,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC, MediaSSRC: vp8Track.SSRC}); routineErr != nil {
+			if routineErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC(), MediaSSRC: vp8Track.SSRC()}); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 
@@ -110,8 +119,9 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
-		<-vp8Track.RTCPPackets
-		close(awaitRTCPSenderRecv)
+		if _, routineErr := rtpReceiver.Read(make([]byte, 1400)); routineErr == nil {
+			close(awaitRTCPSenderRecv)
+		}
 	}()
 
 	err = signalPair(pcOffer, pcAnswer)
@@ -158,38 +168,41 @@ This test adds an input track and asserts
 func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	iceComplete := make(chan bool)
 
-	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := pcOffer.NewSampleTrack(DefaultPayloadTypeOpus, "audio", "pion1")
+	pcAnswer, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	vp8Track, err := pcOffer.NewSampleTrack(DefaultPayloadTypeVP8, "video", "pion2")
+
+	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err = pcOffer.AddTrack(opusTrack); err != nil {
 		t.Fatal(err)
-	} else if _, err = pcOffer.AddTrack(vp8Track); err != nil {
+	} else if _, err = pcAnswer.AddTrack(vp8Track); err != nil {
 		t.Fatal(err)
 	}
 
 	var onTrackFiredLock sync.RWMutex
 	onTrackFired := false
 
-	pcAnswer.OnTrack(func(track *Track) {
+	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
 		onTrackFiredLock.Lock()
 		defer onTrackFiredLock.Unlock()
 		onTrackFired = true
@@ -208,8 +221,25 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	<-iceComplete
+
+	// Each PeerConnection should have one sender, one receiver and two transceivers
+	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
+		senders := pc.GetSenders()
+		if len(senders) != 1 {
+			t.Errorf("Each PeerConnection should have one RTPSender, we have %d", len(senders))
+		}
+
+		receivers := pc.GetReceivers()
+		if len(receivers) != 1 {
+			t.Errorf("Each PeerConnection should have one RTPReceiver, we have %d", len(receivers))
+		}
+
+		transceivers := pc.GetTransceivers()
+		if len(transceivers) != 2 {
+			t.Errorf("Each PeerConnection should have two RTPTransceivers, we have %d", len(transceivers))
+		}
+	}
 
 	err = pcOffer.Close()
 	if err != nil {
@@ -226,5 +256,4 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatalf("PeerConnection OnTrack fired even though we got no packets")
 	}
 	onTrackFiredLock.Unlock()
-
 }

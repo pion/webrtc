@@ -34,26 +34,31 @@ func gstreamerReceiveMain() {
 
 	// Set a handler for when a new remote track starts, this handler creates a gstreamer pipeline
 	// for the given codec
-	peerConnection.OnTrack(func(track *webrtc.Track) {
+	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This is a temporary fix until we implement incoming RTCP events, then we would push a PLI only when a viewer requests it
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC})
+				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
 				if err != nil {
 					fmt.Println(err)
 				}
 			}
 		}()
 
-		codec := track.Codec
-		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType, codec.Name)
+		codec := track.Codec()
+		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), codec.Name)
 		pipeline := gst.CreatePipeline(codec.Name)
 		pipeline.Start()
+		buf := make([]byte, 1400)
 		for {
-			p := <-track.Packets
-			pipeline.Push(p.Raw)
+			i, err := track.Read(buf)
+			if err != nil {
+				panic(err)
+			}
+
+			pipeline.Push(buf[:i])
 		}
 	})
 

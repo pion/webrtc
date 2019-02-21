@@ -17,7 +17,7 @@ type RTPTransceiver struct {
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {
-	t.Sender.Track = track
+	t.Sender.track = track
 
 	switch t.Direction {
 	case RTPTransceiverDirectionRecvonly:
@@ -33,7 +33,9 @@ func (t *RTPTransceiver) setSendingTrack(track *Track) error {
 // Stop irreversibly stops the RTPTransceiver
 func (t *RTPTransceiver) Stop() error {
 	if t.Sender != nil {
-		t.Sender.Stop()
+		if err := t.Sender.Stop(); err != nil {
+			return err
+		}
 	}
 	if t.Receiver != nil {
 		if err := t.Receiver.Stop(); err != nil {

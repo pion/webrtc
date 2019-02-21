@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 
 	"github.com/pions/webrtc"
 
@@ -39,7 +40,7 @@ func main() {
 	})
 
 	// Create a audio track
-	opusTrack, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeOpus, "audio", "pion1")
+	opusTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// Create a video track
-	vp8Track, err := peerConnection.NewSampleTrack(webrtc.DefaultPayloadTypeVP8, "video", "pion2")
+	vp8Track, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
 		panic(err)
 	}
@@ -84,8 +85,8 @@ func main() {
 	fmt.Println(signal.Encode(answer))
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack.Samples, *audioSrc).Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track.Samples, *videoSrc).Start()
+	gst.CreatePipeline(webrtc.Opus, opusTrack, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, vp8Track, *videoSrc).Start()
 
 	// Block forever
 	select {}
