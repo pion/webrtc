@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pions/quic"
 	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/pkg/quic"
 
 	"github.com/pions/webrtc/examples/internal/signal"
 )

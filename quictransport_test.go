@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/quic"
 	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/pkg/quic"
 )
 
 func TestQUICTransport_E2E(t *testing.T) {
