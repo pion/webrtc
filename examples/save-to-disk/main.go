@@ -12,12 +12,19 @@ import (
 )
 
 func main() {
-	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
+
+	// Create a MediaEngine object to configure the supported codec
+	m := webrtc.MediaEngine{}
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 codec but you can also define your own
-	webrtc.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
-	webrtc.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	m.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
+	m.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+
+	// Create the API object with the MediaEngine
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+
+	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -29,7 +36,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
