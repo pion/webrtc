@@ -6,7 +6,7 @@ require (
 	github.com/pions/quic v0.0.1
 	github.com/pions/rtcp v1.0.0
 	github.com/pions/rtp v1.0.0
-	github.com/pions/sctp v1.4.0
+	github.com/pions/sctp v1.4.1
 	github.com/pions/sdp/v2 v2.0.0
 	github.com/pions/srtp v1.0.3
 	github.com/pions/stun v0.2.0
