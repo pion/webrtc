@@ -7,11 +7,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/pions/rtcp"
-	"github.com/pions/rtp"
 	"github.com/pions/webrtc"
 
 	"github.com/pions/webrtc/examples/internal/signal"
@@ -84,41 +82,38 @@ func main() {
 		panic(err)
 	}
 
-	inboundSSRC := make(chan uint32)
-	inboundPayloadType := make(chan uint8)
-
-	outboundRTP := []chan<- *rtp.Packet{}
-	var outboundRTPLock sync.RWMutex
+	localTrackChan := make(chan *webrtc.Track)
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
-	peerConnection.OnTrack(func(track *webrtc.Track) {
+	peerConnection.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
 		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
 		// This can be less wasteful by processing incoming RTCP events, then we would emit a NACK/PLI when a viewer requests it
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
-				if err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC}); err != nil {
+				if err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}); err != nil {
 					fmt.Println(err)
 				}
 			}
 		}()
 
-		inboundSSRC <- track.SSRC
-		inboundPayloadType <- track.PayloadType
+		// Create a local track, all our SFU clients will be fed via this track
+		localTrack, err := peerConnection.NewTrack(remoteTrack.PayloadType(), remoteTrack.SSRC(), "video", "pion")
+		if err != nil {
+			panic(err)
+		}
+		localTrackChan <- localTrack
 
+		rtpBuf := make([]byte, 1400)
 		for {
-			rtpPacket := <-track.Packets
-
-			outboundRTPLock.RLock()
-			for _, outChan := range outboundRTP {
-				outPacket := rtpPacket
-				outPacket.Payload = append([]byte{}, outPacket.Payload...)
-				select {
-				case outChan <- outPacket:
-				default:
-				}
+			i, err := remoteTrack.Read(rtpBuf)
+			if err != nil {
+				panic(err)
 			}
-			outboundRTPLock.RUnlock()
+
+			if _, err = localTrack.Write(rtpBuf[:i]); err != nil {
+				panic(err)
+			}
 		}
 	})
 
@@ -143,8 +138,7 @@ func main() {
 	// Get the LocalDescription and take it to base64 so we can paste in browser
 	fmt.Println(signal.Encode(answer))
 
-	outboundSSRC := <-inboundSSRC
-	outboundPayloadType := <-inboundPayloadType
+	localTrack := <-localTrackChan
 	for {
 		fmt.Println("")
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
@@ -158,20 +152,10 @@ func main() {
 			panic(err)
 		}
 
-		// Create a single VP8 Track to send videa
-		vp8Track, err := peerConnection.NewRawRTPTrack(outboundPayloadType, outboundSSRC, "video", "pion")
+		_, err = peerConnection.AddTrack(localTrack)
 		if err != nil {
 			panic(err)
 		}
-
-		_, err = peerConnection.AddTrack(vp8Track)
-		if err != nil {
-			panic(err)
-		}
-
-		outboundRTPLock.Lock()
-		outboundRTP = append(outboundRTP, vp8Track.RawRTP)
-		outboundRTPLock.Unlock()
 
 		// Set the remote SessionDescription
 		err = peerConnection.SetRemoteDescription(recvOnlyOffer)

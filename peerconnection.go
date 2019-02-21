@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/pions/rtcp"
-	"github.com/pions/rtp"
 	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/pkg/ice"
 	"github.com/pions/webrtc/pkg/logging"
@@ -103,7 +102,7 @@ type PeerConnection struct {
 
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
-	onTrackHandler                    func(*Track)
+	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
 
 	iceGatherer   *ICEGatherer
@@ -279,13 +278,13 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 
 // OnTrack sets an event handler which is called when remote track
 // arrives from a remote peer.
-func (pc *PeerConnection) OnTrack(f func(*Track)) {
+func (pc *PeerConnection) OnTrack(f func(*Track, *RTPReceiver)) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	pc.onTrackHandler = f
 }
 
-func (pc *PeerConnection) onTrack(t *Track) (done chan struct{}) {
+func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) (done chan struct{}) {
 	pc.mu.RLock()
 	hdlr := pc.onTrackHandler
 	pc.mu.RUnlock()
@@ -298,7 +297,7 @@ func (pc *PeerConnection) onTrack(t *Track) (done chan struct{}) {
 	}
 
 	go func() {
-		hdlr(t)
+		hdlr(t, r)
 		close(done)
 	}()
 
@@ -856,18 +855,21 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			return
 		}
 
-		if pc.onTrackHandler != nil {
-			pc.openSRTP()
-		} else {
-			pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
-		}
+		pc.openSRTP()
 
 		for _, tranceiver := range pc.rtpTransceivers {
 			if tranceiver.Sender != nil {
-				tranceiver.Sender.Send(RTPSendParameters{
+				err = tranceiver.Sender.Send(RTPSendParameters{
 					encodings: RTPEncodingParameters{
-						RTPCodingParameters{SSRC: tranceiver.Sender.Track.SSRC, PayloadType: tranceiver.Sender.Track.PayloadType},
+						RTPCodingParameters{
+							SSRC:        tranceiver.Sender.track.SSRC(),
+							PayloadType: tranceiver.Sender.track.PayloadType(),
+						},
 					}})
+
+				if err != nil {
+					pcLog.Warnf("Failed to start Sender: %s", err)
+				}
 			}
 		}
 
@@ -931,15 +933,37 @@ func (pc *PeerConnection) openSRTP() {
 
 	for i := range incomingSSRCes {
 		go func(ssrc uint32, codecType RTPCodecType) {
-			receiver := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
-			<-receiver.Receive(RTPReceiveParameters{
+			receiver, err := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
+			if err != nil {
+				pcLog.Warnf("Could not create RTPReceiver %s", err)
+				return
+			}
+
+			if err = receiver.Receive(RTPReceiveParameters{
 				encodings: RTPDecodingParameters{
 					RTPCodingParameters{SSRC: ssrc},
-				}})
+				}}); err != nil {
+				pcLog.Warnf("RTPReceiver Receive failed %s", err)
+				return
+			}
 
-			sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track.PayloadType)
+			pc.newRTPTransceiver(
+				receiver,
+				nil,
+				RTPTransceiverDirectionRecvonly,
+			)
+
+			if err = receiver.Track().determinePayloadType(); err != nil {
+				pcLog.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+				return
+			}
+
+			pc.mu.RLock()
+			defer pc.mu.RUnlock()
+
+			sdpCodec, err := pc.CurrentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
 			if err != nil {
-				pcLog.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track.PayloadType)
+				pcLog.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
 				return
 			}
 
@@ -949,18 +973,18 @@ func (pc *PeerConnection) openSRTP() {
 				return
 			}
 
-			receiver.Track.Kind = codec.Type
-			receiver.Track.Codec = codec
-			pc.newRTPTransceiver(
-				receiver,
-				nil,
-				RTPTransceiverDirectionRecvonly,
-			)
+			receiver.Track().mu.Lock()
+			receiver.Track().kind = codec.Type
+			receiver.Track().codec = codec
+			receiver.Track().mu.Unlock()
 
-			pc.onTrack(receiver.Track)
+			if pc.onTrackHandler != nil {
+				pc.onTrack(receiver.Track(), receiver)
+			} else {
+				pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
+			}
 		}(i, incomingSSRCes[i])
 	}
-
 }
 
 // drainSRTP pulls and discards RTP/RTCP packets that don't match any SRTP
@@ -984,20 +1008,14 @@ func (pc *PeerConnection) drainSRTP() {
 
 			go func() {
 				rtpBuf := make([]byte, receiveMTU)
-				rtpPacket := &rtp.Packet{}
-
 				for {
-					i, err := r.Read(rtpBuf)
+					_, rtpHeader, err := r.ReadRTP(rtpBuf)
 					if err != nil {
 						pcLog.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
 						return
 					}
 
-					if err := rtpPacket.Unmarshal(rtpBuf[:i]); err != nil {
-						pcLog.Warnf("Failed to unmarshal RTP packet, discarding: %v \n", err)
-						continue
-					}
-					pcLog.Debugf("got RTP: %+v", rtpPacket)
+					pcLog.Debugf("got RTP: %+v", rtpHeader)
 				}
 			}()
 		}
@@ -1019,18 +1037,12 @@ func (pc *PeerConnection) drainSRTP() {
 		go func() {
 			rtcpBuf := make([]byte, receiveMTU)
 			for {
-				i, err := r.Read(rtcpBuf)
+				_, header, err := r.ReadRTCP(rtcpBuf)
 				if err != nil {
 					pcLog.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
 					return
 				}
-
-				rtcpPacket, _, err := rtcp.Unmarshal(rtcpBuf[:i])
-				if err != nil {
-					pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
-					continue
-				}
-				pcLog.Debugf("got RTCP: %+v", rtcpPacket)
+				pcLog.Debugf("got RTCP: %+v", header)
 			}
 		}()
 	}
@@ -1087,10 +1099,10 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	result := make([]*RTPSender, len(pc.rtpTransceivers))
-	for i, tranceiver := range pc.rtpTransceivers {
+	result := []*RTPSender{}
+	for _, tranceiver := range pc.rtpTransceivers {
 		if tranceiver.Sender != nil {
-			result[i] = tranceiver.Sender
+			result = append(result, tranceiver.Sender)
 		}
 	}
 	return result
@@ -1101,11 +1113,10 @@ func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	result := make([]*RTPReceiver, len(pc.rtpTransceivers))
-	for i, tranceiver := range pc.rtpTransceivers {
+	result := []*RTPReceiver{}
+	for _, tranceiver := range pc.rtpTransceivers {
 		if tranceiver.Receiver != nil {
-			result[i] = tranceiver.Receiver
-
+			result = append(result, tranceiver.Receiver)
 		}
 	}
 	return result
@@ -1125,10 +1136,10 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 	for _, transceiver := range pc.rtpTransceivers {
-		if transceiver.Sender.Track == nil {
+		if transceiver.Sender.track == nil {
 			continue
 		}
-		if track.ID == transceiver.Sender.Track.ID {
+		if track.ID() == transceiver.Sender.track.ID() {
 			return nil, &rtcerr.InvalidAccessError{Err: ErrExistingTrack}
 		}
 	}
@@ -1136,9 +1147,9 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	for _, t := range pc.rtpTransceivers {
 		if !t.stopped &&
 			// t.Sender == nil && // TODO: check that the sender has never sent
-			t.Sender.Track == nil &&
-			t.Receiver.Track != nil &&
-			t.Receiver.Track.Kind == track.Kind {
+			t.Sender.track == nil &&
+			t.Receiver.Track() != nil &&
+			t.Receiver.Track().Kind() == track.Kind() {
 			transceiver = t
 			break
 		}
@@ -1148,7 +1159,10 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			return nil, err
 		}
 	} else {
-		sender := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
 		transceiver = pc.newRTPTransceiver(
 			nil,
 			sender,
@@ -1156,7 +1170,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		)
 	}
 
-	transceiver.Mid = track.Kind.String() // TODO: Mid generation
+	transceiver.Mid = track.Kind().String() // TODO: Mid generation
 
 	return transceiver.Sender, nil
 }
@@ -1328,14 +1342,14 @@ func (pc *PeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	if err := pc.dtlsTransport.Stop(); err != nil {
-		closeErrs = append(closeErrs, err)
-	}
-
 	for _, t := range pc.rtpTransceivers {
 		if err := t.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
+	}
+
+	if err := pc.dtlsTransport.Stop(); err != nil {
+		closeErrs = append(closeErrs, err)
 	}
 
 	if pc.sctpTransport != nil {
@@ -1421,13 +1435,13 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 	weSend := false
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Sender == nil ||
-			transceiver.Sender.Track == nil ||
-			transceiver.Sender.Track.Kind != codecType {
+			transceiver.Sender.track == nil ||
+			transceiver.Sender.track.Kind() != codecType {
 			continue
 		}
 		weSend = true
-		track := transceiver.Sender.Track
-		media = media.WithMediaSource(track.SSRC, track.Label /* cname */, track.Label /* streamLabel */, track.Label)
+		track := transceiver.Sender.track
+		media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.Label())
 	}
 	media = media.WithPropertyAttribute(localDirection(weSend, peerDirection).String())
 
@@ -1479,10 +1493,8 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 	d.WithMedia(media)
 }
 
-// NewRawRTPTrack Creates a new Track
-//
-// See NewSampleTrack for documentation
-func (pc *PeerConnection) NewRawRTPTrack(payloadType uint8, ssrc uint32, id, label string) (*Track, error) {
+// NewTrack Creates a new Track
+func (pc *PeerConnection) NewTrack(payloadType uint8, ssrc uint32, id, label string) (*Track, error) {
 	codec, err := pc.api.mediaEngine.getCodec(payloadType)
 	if err != nil {
 		return nil, err
@@ -1490,28 +1502,7 @@ func (pc *PeerConnection) NewRawRTPTrack(payloadType uint8, ssrc uint32, id, lab
 		return nil, errors.New("codec payloader not set")
 	}
 
-	return NewRawRTPTrack(payloadType, ssrc, id, label, codec)
-}
-
-// NewSampleTrack Creates a new Track
-//
-// See NewSampleTrack for documentation
-func (pc *PeerConnection) NewSampleTrack(payloadType uint8, id, label string) (*Track, error) {
-	codec, err := pc.api.mediaEngine.getCodec(payloadType)
-	if err != nil {
-		return nil, err
-	} else if codec.Payloader == nil {
-		return nil, errors.New("codec payloader not set")
-	}
-
-	return NewSampleTrack(payloadType, id, label, codec)
-}
-
-// NewTrack is used to create a new Track
-//
-// Deprecated: Use NewSampleTrack() instead
-func (pc *PeerConnection) NewTrack(payloadType uint8, id, label string) (*Track, error) {
-	return pc.NewSampleTrack(payloadType, id, label)
+	return NewTrack(payloadType, ssrc, id, label, codec)
 }
 
 func (pc *PeerConnection) newRTPTransceiver(
