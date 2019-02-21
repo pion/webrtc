@@ -115,6 +115,15 @@ type PeerConnection struct {
 	api *API
 }
 
+// NewPeerConnection creates a peerconnection with the default
+// codecs. See API.NewRTCPeerConnection for details.
+func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+	m := MediaEngine{}
+	m.RegisterDefaultCodecs()
+	api := NewAPI(WithMediaEngine(m))
+	return api.NewPeerConnection(configuration)
+}
+
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
 func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)

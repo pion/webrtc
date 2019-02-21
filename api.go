@@ -43,30 +43,3 @@ func WithSettingEngine(s SettingEngine) func(a *API) {
 		a.settingEngine = &s
 	}
 }
-
-// defaultAPI is used to support the legacy global API.
-// This global API should not be extended and may be phased out
-// in the future.
-var defaultAPI = NewAPI()
-
-// Media Engine API
-
-// RegisterCodec on the default API.
-// See MediaEngine for details.
-func RegisterCodec(codec *RTPCodec) {
-	defaultAPI.mediaEngine.RegisterCodec(codec)
-}
-
-// RegisterDefaultCodecs on the default API.
-// See MediaEngine for details.
-func RegisterDefaultCodecs() {
-	defaultAPI.mediaEngine.RegisterDefaultCodecs()
-}
-
-// PeerConnection API
-
-// NewPeerConnection using the default API.
-// See API.NewRTCPeerConnection for details.
-func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
-	return defaultAPI.NewPeerConnection(configuration)
-}

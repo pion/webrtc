@@ -34,10 +34,6 @@ func watchHandle(handle *janus.Handle) {
 func main() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
-	// Setup the codecs you want to use.
-	// We'll use the default ones but you can also define your own
-	webrtc.RegisterDefaultCodecs()
-
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
