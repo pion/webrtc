@@ -921,7 +921,7 @@ func (pc *PeerConnection) openSRTP() {
 
 	for i := range incomingSSRCes {
 		go func(ssrc uint32, codecType RTPCodecType) {
-			receiver := NewRTPReceiver(codecType, pc.dtlsTransport)
+			receiver := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
 			<-receiver.Receive(RTPReceiveParameters{
 				encodings: RTPDecodingParameters{
 					RTPCodingParameters{SSRC: ssrc},
@@ -1138,7 +1138,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			return nil, err
 		}
 	} else {
-		sender := NewRTPSender(track, pc.dtlsTransport)
+		sender := pc.api.NewRTPSender(track, pc.dtlsTransport)
 		transceiver = pc.newRTPTransceiver(
 			nil,
 			sender,

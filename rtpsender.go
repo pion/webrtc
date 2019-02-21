@@ -13,13 +13,17 @@ type RTPSender struct {
 	Track *Track
 
 	transport *DTLSTransport
+
+	// A reference to the associated api object
+	api *API
 }
 
 // NewRTPSender constructs a new RTPSender
-func NewRTPSender(track *Track, transport *DTLSTransport) *RTPSender {
+func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) *RTPSender {
 	r := &RTPSender{
 		Track:     track,
 		transport: transport,
+		api:       api,
 	}
 
 	r.Track.sampleInput = make(chan media.Sample, 15) // Is the buffering needed?

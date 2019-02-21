@@ -23,26 +23,31 @@ type RTPReceiver struct {
 
 	rtpOut        chan *rtp.Packet
 	rtpReadStream *srtp.ReadStreamSRTP
-	rtpOutDone    chan bool
+	rtpOutDone    chan struct{}
 
 	rtcpOut        chan rtcp.Packet
 	rtcpReadStream *srtp.ReadStreamSRTCP
-	rtcpOutDone    chan bool
+	rtcpOutDone    chan struct{}
+
+	// A reference to the associated api object
+	api *API
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
-func NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) *RTPReceiver {
+func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) *RTPReceiver {
 	return &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 
 		rtpOut:     make(chan *rtp.Packet, 15),
-		rtpOutDone: make(chan bool),
+		rtpOutDone: make(chan struct{}),
 
 		rtcpOut:     make(chan rtcp.Packet, 15),
-		rtcpOutDone: make(chan bool),
+		rtcpOutDone: make(chan struct{}),
 
 		hasRecv: make(chan bool),
+
+		api: api,
 	}
 }
 
