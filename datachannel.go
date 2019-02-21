@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/pions/datachannel"
-	sugar "github.com/pions/webrtc/pkg/datachannel"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/pkg/errors"
 )
@@ -86,12 +85,10 @@ type DataChannel struct {
 	// "blob". This attribute controls how binary data is exposed to scripts.
 	// binaryType                 string
 
-	// OnOpen              func()
 	// OnBufferedAmountLow func()
 	// OnError             func()
-	// OnClose             func()
 
-	onMessageHandler func(sugar.Payload)
+	onMessageHandler func(DataChannelMessage)
 	onOpenHandler    func()
 	onCloseHandler   func()
 
@@ -265,35 +262,36 @@ func (d *DataChannel) onClose() (done chan struct{}) {
 	return
 }
 
-// OnMessage sets an event handler which is invoked on a message
-// arrival over the sctp transport from a remote peer.
+// DataChannelMessage represents a message received from the
+// data channel. IsString will be set to true if the incoming
+// message is of the string type. Otherwise the message is of
+// a binary type.
+type DataChannelMessage struct {
+	IsString bool
+	Data     []byte
+}
+
+// OnMessage sets an event handler which is invoked on a binary
+// message arrival over the sctp transport from a remote peer.
 // OnMessage can currently receive messages up to 16384 bytes
 // in size. Check out the detach API if you want to use larger
 // message sizes. Note that browser support for larger messages
 // is also limited.
-func (d *DataChannel) OnMessage(f func(p sugar.Payload)) {
+func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onMessageHandler = f
 }
 
-func (d *DataChannel) onMessage(p sugar.Payload) {
+func (d *DataChannel) onMessage(msg DataChannelMessage) {
 	d.mu.RLock()
 	hdlr := d.onMessageHandler
 	d.mu.RUnlock()
 
-	if hdlr == nil || p == nil {
+	if hdlr == nil {
 		return
 	}
-	hdlr(p)
-}
-
-// Onmessage sets an event handler which is invoked on a message
-// arrival over the sctp transport from a remote peer.
-//
-// Deprecated: use OnMessage instead.
-func (d *DataChannel) Onmessage(f func(p sugar.Payload)) {
-	d.OnMessage(f)
+	hdlr(msg)
 }
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
@@ -331,39 +329,38 @@ func (d *DataChannel) readLoop() {
 			return
 		}
 
-		if isString {
-			d.onMessage(&sugar.PayloadString{Data: buffer[:n]})
-			continue
-		}
-		d.onMessage(&sugar.PayloadBinary{Data: buffer[:n]})
+		d.onMessage(DataChannelMessage{Data: buffer[:n], IsString: isString})
 	}
 }
 
-// Send sends the passed message to the DataChannel peer
-func (d *DataChannel) Send(payload sugar.Payload) error {
+// Send sends the binary message to the DataChannel peer
+func (d *DataChannel) Send(data []byte) error {
 	err := d.ensureOpen()
 	if err != nil {
 		return err
-	}
-
-	var data []byte
-	isString := false
-
-	switch p := payload.(type) {
-	case sugar.PayloadString:
-		data = p.Data
-		isString = true
-	case sugar.PayloadBinary:
-		data = p.Data
-	default:
-		return errors.Errorf("unknown DataChannel Payload (%s)", payload.PayloadType())
 	}
 
 	if len(data) == 0 {
 		data = []byte{0}
 	}
 
-	_, err = d.dataChannel.WriteDataChannel(data, isString)
+	_, err = d.dataChannel.WriteDataChannel(data, false)
+	return err
+}
+
+// SendText sends the text message to the DataChannel peer
+func (d *DataChannel) SendText(s string) error {
+	err := d.ensureOpen()
+	if err != nil {
+		return err
+	}
+
+	data := []byte(s)
+	if len(data) == 0 {
+		data = []byte{0}
+	}
+
+	_, err = d.dataChannel.WriteDataChannel(data, true)
 	return err
 }
 

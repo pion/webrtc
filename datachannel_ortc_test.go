@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/pkg/datachannel"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {
@@ -26,11 +25,11 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 	awaitBinary := make(chan struct{})
 	stackB.sctp.OnDataChannel(func(d *DataChannel) {
 		close(awaitSetup)
-		d.OnMessage(func(payload datachannel.Payload) {
-			switch payload.(type) {
-			case *datachannel.PayloadString:
+
+		d.OnMessage(func(msg DataChannelMessage) {
+			if msg.IsString {
 				close(awaitString)
-			case *datachannel.PayloadBinary:
+			} else {
 				close(awaitBinary)
 			}
 		})
@@ -52,11 +51,11 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 
 	<-awaitSetup
 
-	err = channelA.Send(datachannel.PayloadString{Data: []byte("ABC")})
+	err = channelA.SendText("ABC")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = channelA.Send(datachannel.PayloadBinary{Data: []byte("ABC")})
+	err = channelA.Send([]byte("ABC"))
 	if err != nil {
 		t.Fatal(err)
 	}

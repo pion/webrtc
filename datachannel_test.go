@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	sugar "github.com/pions/webrtc/pkg/datachannel"
-
 	"github.com/pions/transport/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -85,20 +83,20 @@ func TestDataChannel_Send(t *testing.T) {
 	assert.True(t, dc.Ordered, "Ordered should be set to true")
 
 	dc.OnOpen(func() {
-		e := dc.Send(sugar.PayloadString{Data: []byte("Ping")})
+		e := dc.SendText("Ping")
 		if e != nil {
 			t.Fatalf("Failed to send string on data channel")
 		}
 	})
-	dc.OnMessage(func(payload sugar.Payload) {
+	dc.OnMessage(func(msg DataChannelMessage) {
 		done <- true
 	})
 
 	answerPC.OnDataChannel(func(d *DataChannel) {
 		assert.True(t, d.Ordered, "Ordered should be set to true")
 
-		d.OnMessage(func(payload sugar.Payload) {
-			e := d.Send(sugar.PayloadBinary{Data: []byte("Pong")})
+		d.OnMessage(func(msg DataChannelMessage) {
+			e := d.Send([]byte("Pong"))
 			if e != nil {
 				t.Fatalf("Failed to send string on data channel")
 			}
@@ -124,43 +122,27 @@ func TestDataChannel_EventHandlers(t *testing.T) {
 	api := NewAPI()
 	dc := &DataChannel{api: api}
 
-	onOpenCalled := make(chan bool)
-	onMessageCalled := make(chan bool)
+	onOpenCalled := make(chan struct{})
+	onMessageCalled := make(chan struct{})
 
 	// Verify that the noop case works
 	assert.NotPanics(t, func() { dc.onOpen() })
-	assert.NotPanics(t, func() { dc.onMessage(nil) })
 
 	dc.OnOpen(func() {
-		onOpenCalled <- true
+		close(onOpenCalled)
 	})
 
-	dc.OnMessage(func(p sugar.Payload) {
-		go func() {
-			onMessageCalled <- true
-		}()
+	dc.OnMessage(func(p DataChannelMessage) {
+		close(onMessageCalled)
 	})
-
-	// Verify that the handlers deal with nil inputs
-	assert.NotPanics(t, func() { dc.onMessage(nil) })
 
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { dc.onOpen() })
-	assert.NotPanics(t, func() { dc.onMessage(&sugar.PayloadString{Data: []byte("o hai")}) })
+	assert.NotPanics(t, func() { dc.onMessage(DataChannelMessage{Data: []byte("o hai")}) })
 
-	allTrue := func(vals []bool) bool {
-		for _, val := range vals {
-			if !val {
-				return false
-			}
-		}
-		return true
-	}
-
-	assert.True(t, allTrue([]bool{
-		<-onOpenCalled,
-		<-onMessageCalled,
-	}))
+	// Wait for all handlers to be called
+	<-onOpenCalled
+	<-onMessageCalled
 }
 
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
@@ -172,7 +154,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 
 	max := 512
 	out := make(chan int)
-	inner := func(payload sugar.Payload) {
+	inner := func(msg DataChannelMessage) {
 		// randomly sleep
 		// NB: The big.Int/crypto.Rand is overkill but makes the linter happy
 		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
@@ -180,13 +162,10 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 			t.Fatalf("Failed to get random sleep duration: %s", err)
 		}
 		time.Sleep(time.Duration(randInt.Int64()) * time.Microsecond)
-		p, ok := payload.(*sugar.PayloadBinary)
-		if ok {
-			s, _ := binary.Varint(p.Data)
-			out <- int(s)
-		}
+		s, _ := binary.Varint(msg.Data)
+		out <- int(s)
 	}
-	dc.OnMessage(func(p sugar.Payload) {
+	dc.OnMessage(func(p DataChannelMessage) {
 		inner(p)
 	})
 
@@ -194,12 +173,12 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 		for i := 1; i <= max; i++ {
 			buf := make([]byte, 8)
 			binary.PutVarint(buf, int64(i))
-			dc.onMessage(&sugar.PayloadBinary{Data: buf})
+			dc.onMessage(DataChannelMessage{Data: buf})
 			// Change the registered handler a couple of times to make sure
 			// that everything continues to work, we don't lose messages, etc.
 			if i%2 == 0 {
-				hdlr := func(p sugar.Payload) {
-					inner(p)
+				hdlr := func(msg DataChannelMessage) {
+					inner(msg)
 				}
 				dc.OnMessage(hdlr)
 			}
