@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	sugar "github.com/pions/webrtc/pkg/datachannel"
 
 	"github.com/pions/webrtc/examples/internal/signal"
 )
@@ -51,7 +50,9 @@ func main() {
 
 		// Register the handlers
 		channel.OnOpen(handleOnOpen(channel))
-		channel.OnMessage(handleMessage(channel))
+		channel.OnMessage(func(msg webrtc.DataChannelMessage) {
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label, string(msg.Data))
+		})
 	})
 
 	// Gather candidates
@@ -129,7 +130,9 @@ func main() {
 		// Register the handlers
 		// channel.OnOpen(handleOnOpen(channel)) // TODO: OnOpen on handle ChannelAck
 		go handleOnOpen(channel)() // Temporary alternative
-		channel.OnMessage(handleMessage(channel))
+		channel.OnMessage(func(msg webrtc.DataChannelMessage) {
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label, string(msg.Data))
+		})
 	}
 
 	select {}
@@ -151,25 +154,12 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 
 		for range time.NewTicker(5 * time.Second).C {
 			message := signal.RandSeq(15)
-			fmt.Printf("Sending %s \n", message)
+			fmt.Printf("Sending '%s' \n", message)
 
-			err := channel.Send(sugar.PayloadString{Data: []byte(message)})
+			err := channel.SendText(message)
 			if err != nil {
 				panic(err)
 			}
-		}
-	}
-}
-
-func handleMessage(channel *webrtc.DataChannel) func(sugar.Payload) {
-	return func(payload sugar.Payload) {
-		switch p := payload.(type) {
-		case *sugar.PayloadString:
-			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), channel.Label, string(p.Data))
-		case *sugar.PayloadBinary:
-			fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), channel.Label, p.Data)
-		default:
-			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), channel.Label)
 		}
 	}
 }

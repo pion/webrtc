@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-	sugar "github.com/pions/webrtc/pkg/datachannel"
 
 	"github.com/pions/webrtc/examples/internal/signal"
 )
@@ -53,25 +52,19 @@ func main() {
 
 		for range time.NewTicker(5 * time.Second).C {
 			message := signal.RandSeq(15)
-			fmt.Printf("Sending %s \n", message)
+			fmt.Printf("Sending '%s'\n", message)
 
-			err := dataChannel.Send(sugar.PayloadString{Data: []byte(message)})
+			// Send the message as text
+			err := dataChannel.SendText(message)
 			if err != nil {
 				panic(err)
 			}
 		}
 	})
 
-	// Register the OnMessage to handle incoming messages
-	dataChannel.OnMessage(func(payload sugar.Payload) {
-		switch p := payload.(type) {
-		case *sugar.PayloadString:
-			fmt.Printf("Message '%s' from DataChannel '%s' payload '%s'\n", p.PayloadType().String(), dataChannel.Label, string(p.Data))
-		case *sugar.PayloadBinary:
-			fmt.Printf("Message '%s' from DataChannel '%s' payload '% 02x'\n", p.PayloadType().String(), dataChannel.Label, p.Data)
-		default:
-			fmt.Printf("Message '%s' from DataChannel '%s' no payload \n", p.PayloadType().String(), dataChannel.Label)
-		}
+	// Register text message handling
+	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
+		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label, string(msg.Data))
 	})
 
 	// Create an offer to send to the browser
