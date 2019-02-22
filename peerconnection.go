@@ -459,9 +459,14 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		m.WithPropertyAttribute("setup:actpass")
 	}
 
+	sdp, err := d.Marshal()
+	if err != nil {
+		return SessionDescription{}, err
+	}
+
 	desc := SessionDescription{
 		Type:   SDPTypeOffer,
-		SDP:    d.Marshal(),
+		SDP:    string(sdp),
 		parsed: d,
 	}
 	pc.lastOffer = desc.SDP
@@ -583,9 +588,14 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
+	sdp, err := d.Marshal()
+	if err != nil {
+		return SessionDescription{}, err
+	}
+
 	desc := SessionDescription{
 		Type:   SDPTypeAnswer,
-		SDP:    d.Marshal(),
+		SDP:    string(sdp),
 		parsed: d,
 	}
 	pc.lastAnswer = desc.SDP
@@ -714,7 +724,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	// TODO: Initiate ICE candidate gathering?
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal(desc.SDP); err != nil {
+	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
 		return err
 	}
 	return pc.setDescription(&desc, stateChangeOpSetLocal)
@@ -742,7 +752,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal(desc.SDP); err != nil {
+	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
 		return err
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
