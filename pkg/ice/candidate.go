@@ -136,6 +136,7 @@ func (c *Candidate) recvLoop() {
 	for {
 		n, srcAddr, err := c.conn.ReadFrom(buffer)
 		if err != nil {
+			iceLog.Warnf("Failed to read from %s: %v", c.addr(), err)
 			return
 		}
 
