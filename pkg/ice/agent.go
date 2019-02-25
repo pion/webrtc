@@ -234,6 +234,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 				conn, err := net.ListenUDP(network, laddr)
 				if err != nil {
 					iceLog.Warnf("could not listen %s %s: %v\n", network, laddr, err)
+					continue
 				}
 
 				ip := xoraddr.IP
