@@ -156,7 +156,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	}
 
 	// Initialize local candidates
-	a.gatherCandidatesLocal()
+	//a.gatherCandidatesLocal() //TODO just testing
 	a.gatherCandidatesReflective(config.Urls)
 
 	go a.taskLoop()
@@ -254,6 +254,28 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 
 				c.start(a, conn)
 
+				{
+					addr := &net.UDPAddr{Port: 0}
+					conn, err := net.ListenUDP(network, addr)
+					if err != nil {
+						iceLog.Warnf("could not listen peer reflexive %v %v\n", addr, err)
+						continue
+					}
+
+					port := conn.LocalAddr().(*net.UDPAddr).Port
+					c, err := NewCandidatePeerReflexive(network, ip, port, ComponentRTP, "", 0)
+					if err != nil {
+						iceLog.Warnf("Failed to create peer reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
+						continue
+					}
+
+					networkType := c.NetworkType
+					set := a.localCandidates[networkType]
+					set = append(set, c)
+					a.localCandidates[networkType] = set
+
+					c.start(a, conn)
+				}
 			default:
 				iceLog.Warnf("scheme %s is not implemented\n", url.Scheme)
 				continue
