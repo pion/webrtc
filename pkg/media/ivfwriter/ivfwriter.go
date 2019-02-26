@@ -3,6 +3,7 @@ package ivfwriter
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/pions/rtp"
@@ -11,6 +12,7 @@ import (
 
 // IVFWriter is used to take RTP packets and write them to an IVF on disk
 type IVFWriter struct {
+	stream       io.Writer
 	fd           *os.File
 	count        uint64
 	currentFrame []byte
@@ -22,7 +24,30 @@ func New(fileName string) (*IVFWriter, error) {
 	if err != nil {
 		return nil, err
 	}
+	writer, err := NewWith(f)
+	if err != nil {
+		return nil, err
+	}
+	writer.fd = f
+	return writer, nil
+}
 
+// NewWith initialize a new IVF writer with an io.Writer output
+func NewWith(out io.Writer) (*IVFWriter, error) {
+	if out == nil {
+		return nil, fmt.Errorf("file not opened")
+	}
+
+	writer := &IVFWriter{
+		stream: out,
+	}
+	if err := writer.writeHeader(); err != nil {
+		return nil, err
+	}
+	return writer, nil
+}
+
+func (i *IVFWriter) writeHeader() error {
 	header := make([]byte, 32)
 	copy(header[0:], []byte("DKIF"))                // DKIF
 	binary.LittleEndian.PutUint16(header[4:], 0)    // Version
@@ -35,15 +60,15 @@ func New(fileName string) (*IVFWriter, error) {
 	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count
 	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
-	if _, err := f.Write(header); err != nil {
-		return nil, err
-	}
-
-	return &IVFWriter{fd: f}, nil
+	_, err := i.stream.Write(header)
+	return err
 }
 
 // AddPacket adds a new packet and writes the appropriate headers for it
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
+	if i.stream == nil {
+		return fmt.Errorf("file not opened")
+	}
 
 	vp8Packet := codecs.VP8Packet{}
 	_, err := vp8Packet.Unmarshal(packet)
@@ -56,7 +81,6 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 	if !packet.Marker {
 		return nil
 	} else if len(i.currentFrame) == 0 {
-		fmt.Println("skipping")
 		return nil
 	}
 
@@ -66,12 +90,27 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 
 	i.count++
 
-	if _, err := i.fd.Write(frameHeader); err != nil {
+	if _, err := i.stream.Write(frameHeader); err != nil {
 		return err
-	} else if _, err := i.fd.Write(i.currentFrame); err != nil {
+	} else if _, err := i.stream.Write(i.currentFrame); err != nil {
 		return err
 	}
 
 	i.currentFrame = nil
 	return nil
+}
+
+// Close stops the recording
+func (i *IVFWriter) Close() error {
+	defer func() {
+		i.fd = nil
+		i.stream = nil
+	}()
+
+	if i.fd == nil {
+		// Returns no error has it may be convenient to call
+		// Close() multiple times
+		return nil
+	}
+	return i.fd.Close()
 }
