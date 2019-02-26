@@ -860,7 +860,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		for _, tranceiver := range pc.rtpTransceivers {
 			if tranceiver.Sender != nil {
 				err = tranceiver.Sender.Send(RTPSendParameters{
-					encodings: RTPEncodingParameters{
+					Encodings: RTPEncodingParameters{
 						RTPCodingParameters{
 							SSRC:        tranceiver.Sender.track.SSRC(),
 							PayloadType: tranceiver.Sender.track.PayloadType(),
@@ -940,7 +940,7 @@ func (pc *PeerConnection) openSRTP() {
 			}
 
 			if err = receiver.Receive(RTPReceiveParameters{
-				encodings: RTPDecodingParameters{
+				Encodings: RTPDecodingParameters{
 					RTPCodingParameters{SSRC: ssrc},
 				}}); err != nil {
 				pcLog.Warnf("RTPReceiver Receive failed %s", err)

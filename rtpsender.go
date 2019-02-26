@@ -58,7 +58,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	if err != nil {
 		return err
 	}
-	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
+	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
 	}
