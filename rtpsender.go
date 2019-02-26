@@ -1,154 +1,146 @@
 package webrtc
 
 import (
-	"github.com/pions/rtcp"
-	"github.com/pions/rtp"
-	"github.com/pions/webrtc/pkg/media"
-)
+	"fmt"
+	"sync"
 
-const rtpOutboundMTU = 1400
+	"github.com/pions/rtcp"
+)
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
 type RTPSender struct {
-	Track *Track
+	track          *Track
+	rtcpReadStream *lossyReadCloser
 
 	transport *DTLSTransport
 
 	// A reference to the associated api object
 	api *API
+
+	mu                     sync.RWMutex
+	sendCalled, stopCalled chan interface{}
 }
 
 // NewRTPSender constructs a new RTPSender
-func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) *RTPSender {
-	r := &RTPSender{
-		Track:     track,
-		transport: transport,
-		api:       api,
+func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender, error) {
+	if track == nil {
+		return nil, fmt.Errorf("Track must not be nil")
+	} else if transport == nil {
+		return nil, fmt.Errorf("DTLSTransport must not be nil")
 	}
 
-	r.Track.sampleInput = make(chan media.Sample, 15) // Is the buffering needed?
-	r.Track.rawInput = make(chan *rtp.Packet, 15)     // Is the buffering needed?
-	r.Track.rtcpInput = make(chan rtcp.Packet, 15)    // Is the buffering needed?
-
-	r.Track.Samples = r.Track.sampleInput
-	r.Track.RawRTP = r.Track.rawInput
-	r.Track.RTCPPackets = r.Track.rtcpInput
-
-	if r.Track.isRawRTP {
-		close(r.Track.Samples)
-	} else {
-		close(r.Track.RawRTP)
+	track.mu.RLock()
+	defer track.mu.RUnlock()
+	if track.receiver != nil {
+		return nil, fmt.Errorf("RTPSender can not be constructed with remote track")
 	}
 
-	return r
+	return &RTPSender{
+		track:      track,
+		transport:  transport,
+		api:        api,
+		sendCalled: make(chan interface{}),
+		stopCalled: make(chan interface{}),
+	}, nil
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
-func (r *RTPSender) Send(parameters RTPSendParameters) {
-	if r.Track.isRawRTP {
-		go r.handleRawRTP(r.Track.rawInput)
-	} else {
-		go r.handleSampleRTP(r.Track.sampleInput)
+func (r *RTPSender) Send(parameters RTPSendParameters) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	select {
+	case <-r.sendCalled:
+		return fmt.Errorf("Send has already been called")
+	default:
 	}
 
-	go r.handleRTCP(r.transport, r.Track.rtcpInput)
+	srtcpSession, err := r.transport.getSRTCPSession()
+	if err != nil {
+		return err
+	}
+	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
+	if err != nil {
+		return err
+	}
+	r.rtcpReadStream = newLossyReadCloser(srtcpReadStream)
+
+	r.track.mu.Lock()
+	r.track.senders = append(r.track.senders, r)
+	r.track.mu.Unlock()
+
+	close(r.sendCalled)
+	return nil
 }
 
 // Stop irreversibly stops the RTPSender
-func (r *RTPSender) Stop() {
-	if r.Track.isRawRTP {
-		close(r.Track.RawRTP)
-	} else {
-		close(r.Track.Samples)
+func (r *RTPSender) Stop() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	select {
+	case <-r.stopCalled:
+		return nil
+	default:
 	}
 
-	// TODO properly tear down all loops (and test that)
+	r.track.mu.Lock()
+	defer r.track.mu.Unlock()
+	filtered := []*RTPSender{}
+	for _, s := range r.track.senders {
+		if s != r {
+			filtered = append(filtered, s)
+		}
+	}
+	r.track.senders = filtered
+
+	select {
+	case <-r.sendCalled:
+		return r.rtcpReadStream.Close()
+	default:
+	}
+
+	close(r.stopCalled)
+	return nil
 }
 
-func (r *RTPSender) handleRawRTP(rtpPackets chan *rtp.Packet) {
-	for {
-		p, ok := <-rtpPackets
-		if !ok {
-			return
-		}
-
-		r.sendRTP(p)
+// Read reads incoming RTCP for this RTPReceiver
+func (r *RTPSender) Read(b []byte) (n int, err error) {
+	select {
+	case <-r.stopCalled:
+		return 0, fmt.Errorf("RTPSender has been stopped")
+	case <-r.sendCalled:
+		return r.rtcpReadStream.Read(b)
 	}
 }
 
-func (r *RTPSender) handleSampleRTP(rtpPackets chan media.Sample) {
-	packetizer := rtp.NewPacketizer(
-		rtpOutboundMTU,
-		r.Track.PayloadType,
-		r.Track.SSRC,
-		r.Track.Codec.Payloader,
-		rtp.NewRandomSequencer(),
-		r.Track.Codec.ClockRate,
-	)
-
-	for {
-		in, ok := <-rtpPackets
-		if !ok {
-			return
-		}
-		packets := packetizer.Packetize(in.Data, in.Samples)
-		for _, p := range packets {
-			r.sendRTP(p)
-		}
-	}
-
-}
-
-func (r *RTPSender) handleRTCP(transport *DTLSTransport, rtcpPackets chan rtcp.Packet) {
-	srtcpSession, err := transport.getSRTCPSession()
+// ReadRTCP is a convenience method that wraps Read and unmarshals for you
+func (r *RTPSender) ReadRTCP() (rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.Read(b)
 	if err != nil {
-		pcLog.Warnf("Failed to open SRTCPSession, Track done for: %v %d \n", err, r.Track.SSRC)
-		return
+		return nil, err
 	}
 
-	readStream, err := srtcpSession.OpenReadStream(r.Track.SSRC)
-	if err != nil {
-		pcLog.Warnf("Failed to open RTCP ReadStream, Track done for: %v %d \n", err, r.Track.SSRC)
-		return
-	}
+	pkt, _, err := rtcp.Unmarshal(b[:i])
+	return pkt, err
+}
 
-	var rtcpPacket rtcp.Packet
-	for {
-		rtcpBuf := make([]byte, receiveMTU)
-		i, err := readStream.Read(rtcpBuf)
+// sendRTP should only be called by a track, this only exists so we can keep state in one place
+func (r *RTPSender) sendRTP(b []byte) (int, error) {
+	select {
+	case <-r.stopCalled:
+		return 0, fmt.Errorf("RTPSender has been stopped")
+	case <-r.sendCalled:
+		srtpSession, err := r.transport.getSRTPSession()
 		if err != nil {
-			pcLog.Warnf("Failed to read, Track done for: %v %d \n", err, r.Track.SSRC)
-			return
+			return 0, err
 		}
 
-		rtcpPacket, _, err = rtcp.Unmarshal(rtcpBuf[:i])
+		writeStream, err := srtpSession.OpenWriteStream()
 		if err != nil {
-			pcLog.Warnf("Failed to unmarshal RTCP packet, discarding: %v \n", err)
-			continue
+			return 0, err
 		}
 
-		select {
-		case rtcpPackets <- rtcpPacket:
-		default:
-		}
-	}
-
-}
-
-func (r *RTPSender) sendRTP(packet *rtp.Packet) {
-	srtpSession, err := r.transport.getSRTPSession()
-	if err != nil {
-		pcLog.Warnf("SendRTP failed to open SrtpSession: %v", err)
-		return
-	}
-
-	writeStream, err := srtpSession.OpenWriteStream()
-	if err != nil {
-		pcLog.Warnf("SendRTP failed to open WriteStream: %v", err)
-		return
-	}
-
-	if _, err := writeStream.WriteRTP(&packet.Header, packet.Payload); err != nil {
-		pcLog.Warnf("SendRTP failed to write: %v", err)
+		return writeStream.Write(b)
 	}
 }

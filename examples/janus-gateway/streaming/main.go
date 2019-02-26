@@ -52,8 +52,8 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 
-	peerConnection.OnTrack(func(track *webrtc.Track) {
-		if track.Codec.Name == webrtc.Opus {
+	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
+		if track.Codec().Name == webrtc.Opus {
 			return
 		}
 
@@ -62,8 +62,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
 		for {
-			err = i.AddPacket(<-track.Packets)
+			packet, err := track.ReadRTP()
+			if err != nil {
+				panic(err)
+			}
+
+			err = i.AddPacket(packet)
 			if err != nil {
 				panic(err)
 			}

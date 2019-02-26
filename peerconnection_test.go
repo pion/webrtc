@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/rtp"
 	"github.com/pions/webrtc/pkg/ice"
-	"github.com/pions/webrtc/pkg/media"
 
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -431,55 +429,6 @@ func TestCreateOfferAnswer(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_NewRawRTPTrack(t *testing.T) {
-	api := NewAPI()
-	api.mediaEngine.RegisterDefaultCodecs()
-
-	pc, err := api.NewPeerConnection(Configuration{})
-	assert.Nil(t, err)
-
-	_, err = pc.NewRawRTPTrack(DefaultPayloadTypeH264, 0, "trackId", "trackLabel")
-	assert.NotNil(t, err)
-
-	track, err := pc.NewRawRTPTrack(DefaultPayloadTypeH264, 123456, "trackId", "trackLabel")
-	assert.Nil(t, err)
-
-	_, err = pc.AddTrack(track)
-	assert.Nil(t, err)
-
-	// This channel should not be set up for a RawRTP track
-	assert.Panics(t, func() {
-		track.Samples <- media.Sample{}
-	})
-
-	assert.NotPanics(t, func() {
-		track.RawRTP <- &rtp.Packet{}
-	})
-}
-
-func TestPeerConnection_NewSampleTrack(t *testing.T) {
-	api := NewAPI()
-	api.mediaEngine.RegisterDefaultCodecs()
-
-	pc, err := api.NewPeerConnection(Configuration{})
-	assert.Nil(t, err)
-
-	track, err := pc.NewSampleTrack(DefaultPayloadTypeH264, "trackId", "trackLabel")
-	assert.Nil(t, err)
-
-	_, err = pc.AddTrack(track)
-	assert.Nil(t, err)
-
-	// This channel should not be set up for a Sample track
-	assert.Panics(t, func() {
-		track.RawRTP <- &rtp.Packet{}
-	})
-
-	assert.NotPanics(t, func() {
-		track.Samples <- media.Sample{}
-	})
-}
-
 func TestPeerConnection_EventHandlers(t *testing.T) {
 	api := NewAPI()
 	pc, err := api.NewPeerConnection(Configuration{})
@@ -490,10 +439,10 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	onDataChannelCalled := make(chan bool)
 
 	// Verify that the noop case works
-	assert.NotPanics(t, func() { pc.onTrack(nil) })
+	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
 
-	pc.OnTrack(func(t *Track) {
+	pc.OnTrack(func(t *Track, r *RTPReceiver) {
 		onTrackCalled <- true
 	})
 
@@ -506,11 +455,11 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	})
 
 	// Verify that the handlers deal with nil inputs
-	assert.NotPanics(t, func() { pc.onTrack(nil) })
+	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
 	assert.NotPanics(t, func() { go pc.onDataChannelHandler(nil) })
 
 	// Verify that the set handlers are called
-	assert.NotPanics(t, func() { pc.onTrack(&Track{}) })
+	assert.NotPanics(t, func() { pc.onTrack(&Track{}, &RTPReceiver{}) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
 	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
 
