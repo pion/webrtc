@@ -85,6 +85,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Rob Deutsch](https://github.com/rob-deutsch) *RTPReceiver graceful shutdown*
 * [Jin Lei](https://github.com/jinleileiking) - *SFU example use http*
 * [Will Watson](https://github.com/wwatson) - *Enable gocritic*
+* [Luke Curley](https://github.com/kixelated)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -58,7 +58,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 
 	r.track = &Track{
 		kind:     r.kind,
-		ssrc:     parameters.encodings.SSRC,
+		ssrc:     parameters.Encodings.SSRC,
 		receiver: r,
 	}
 
@@ -67,7 +67,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return err
 	}
 
-	srtpReadStream, err := srtpSession.OpenReadStream(parameters.encodings.SSRC)
+	srtpReadStream, err := srtpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return err
 	}
 
-	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.encodings.SSRC)
+	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
 	}
