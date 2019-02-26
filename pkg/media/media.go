@@ -19,5 +19,5 @@ type Writer interface {
 	Close() error
 
 	// Creates the file and assigns the file descriptor
-	open(fileName string) error
+	open(fileName string) error //nolint:unused
 }

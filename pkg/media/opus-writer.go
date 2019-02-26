@@ -101,7 +101,7 @@ func NewOpusWriter(fileName string, sampleRate uint32, channelCount uint16) (*Op
 
 func (i *OpusWriter) open(fileName string) error {
 	if i.fd != nil {
-		return fmt.Errorf("File already opened")
+		return fmt.Errorf("file already opened")
 	}
 
 	f, err := os.Create(fileName)
@@ -161,7 +161,7 @@ func (i *OpusWriter) createPage(payload []uint8, headerType uint8, granulePos ui
 // AddPacket adds a new packet and writes the appropriate headers for it
 func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
 	if i.fd == nil {
-		return fmt.Errorf("File not opened")
+		return fmt.Errorf("file not opened")
 	}
 	opusPacket := codecs.OpusPacket{}
 	_, err := opusPacket.Unmarshal(packet)
@@ -188,7 +188,7 @@ func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
 // Close stops the recording
 func (i *OpusWriter) Close() error {
 	if i.fd == nil {
-		return fmt.Errorf("File not opened")
+		return fmt.Errorf("file not opened")
 	}
 
 	// RFC specifies that the last page should have a Header Type set to 4 (EndOfStream)
@@ -196,7 +196,7 @@ func (i *OpusWriter) Close() error {
 	data := i.createPage(make([]uint8, 0), 4, 0xFFFFFFFFFFFFFFFF)
 	if _, err := i.fd.Write(data); err != nil {
 		if e2 := i.fd.Close(); e2 != nil {
-			return fmt.Errorf("Error writing file (%v); error deleting file (%v)", err, e2)
+			return fmt.Errorf("error writing file (%v); error deleting file (%v)", err, e2)
 		}
 		return err
 	}

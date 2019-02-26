@@ -44,7 +44,7 @@ func NewIVFWriter(fileName string) (*IVFWriter, error) {
 
 func (i *IVFWriter) open(fileName string) error {
 	if i.fd != nil {
-		return fmt.Errorf("File already opened")
+		return fmt.Errorf("file already opened")
 	}
 
 	f, err := os.Create(fileName)
@@ -58,7 +58,7 @@ func (i *IVFWriter) open(fileName string) error {
 // AddPacket adds a new packet and writes the appropriate headers for it
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 	if i.fd == nil {
-		return fmt.Errorf("File not opened")
+		return fmt.Errorf("file not opened")
 	}
 
 	vp8Packet := codecs.VP8Packet{}
@@ -95,7 +95,7 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 // Close stops the recording
 func (i *IVFWriter) Close() error {
 	if i.fd == nil {
-		return fmt.Errorf("File not opened")
+		return fmt.Errorf("file not opened")
 	}
 	return i.fd.Close()
 }

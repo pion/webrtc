@@ -12,7 +12,12 @@ import (
 )
 
 func saveToDisk(i media.Writer, track *webrtc.Track) {
-	defer i.Close()
+	defer func() {
+		if err := i.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
 	for {
 		packet, err := track.ReadRTP()
 		if err != nil {
@@ -25,8 +30,26 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 	}
 }
 
-func main() {
+func handleTrack(track *webrtc.Track) {
+	codec := track.Codec()
+	if codec.Name == webrtc.Opus {
+		fmt.Println("Got Opus track, saving to disk as output.opus")
+		i, err := media.NewOpusWriter("output.opus", codec.ClockRate, codec.Channels)
+		if err != nil {
+			panic(err)
+		}
+		saveToDisk(i, track)
+	} else if codec.Name == webrtc.VP8 {
+		fmt.Println("Got VP8 track, saving to disk as output.ivf")
+		i, err := media.NewIVFWriter("output.ivf")
+		if err != nil {
+			panic(err)
+		}
+		saveToDisk(i, track)
+	}
+}
 
+func main() {
 	// Create a MediaEngine object to configure the supported codec
 	m := webrtc.MediaEngine{}
 
@@ -63,29 +86,13 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
-				if err != nil {
-					fmt.Println(err)
+				errSend := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
+				if errSend != nil {
+					fmt.Println(errSend)
 				}
 			}
 		}()
-
-		codec := track.Codec()
-		if codec.Name == webrtc.Opus {
-			fmt.Println("Got Opus track, saving to disk as output.opus")
-			i, err := media.NewOpusWriter("output.opus", codec.ClockRate, codec.Channels)
-			if err != nil {
-				panic(err)
-			}
-			saveToDisk(i, track)
-		} else if codec.Name == webrtc.VP8 {
-			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := media.NewIVFWriter("output.ivf")
-			if err != nil {
-				panic(err)
-			}
-			saveToDisk(i, track)
-		}
+		handleTrack(track)
 	})
 
 	// Set the handler for ICE connection state
