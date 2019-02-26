@@ -75,3 +75,8 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 	i.currentFrame = nil
 	return nil
 }
+
+// Close stops the recording
+func (i *IVFWriter) Close() error {
+	return i.fd.Close()
+}

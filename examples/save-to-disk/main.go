@@ -6,10 +6,26 @@ import (
 
 	"github.com/pions/rtcp"
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/media/ivfwriter"
+	"github.com/pions/webrtc/pkg/media/opuswriter"
 
 	"github.com/pions/webrtc/examples/internal/signal"
 )
+
+func saveToDisk(i media.Writer, track *webrtc.Track) {
+	defer i.Close()
+	for {
+		packet, err := track.ReadRTP()
+		if err != nil {
+			panic(err)
+		}
+
+		if err := i.AddPacket(packet); err != nil {
+			panic(err)
+		}
+	}
+}
 
 func main() {
 
@@ -56,23 +72,22 @@ func main() {
 			}
 		}()
 
-		if track.Codec().Name == webrtc.VP8 {
-			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := ivfwriter.New("output.ivf")
+		codec := track.Codec()
+		if codec.Name == webrtc.Opus {
+			fmt.Println("Got Opus track, saving to disk as output.opus")
+			i, err := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
 			if err != nil {
 				panic(err)
 			}
-
-			for {
-				packet, err := track.ReadRTP()
+			go saveToDisk(i, track)
+		} else if codec.Name == webrtc.VP8 {
+			if codec.Name == webrtc.VP8 {
+				fmt.Println("Got VP8 track, saving to disk as output.ivf")
+				i, err := ivfwriter.New("output.ivf")
 				if err != nil {
 					panic(err)
 				}
-
-				err = i.AddPacket(packet)
-				if err != nil {
-					panic(err)
-				}
+				go saveToDisk(i, track)
 			}
 		}
 	})
