@@ -1,7 +1,8 @@
-package opuswriter
+package media
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"math/rand"
 	"os"
@@ -11,8 +12,8 @@ import (
 	"github.com/pions/rtp/codecs"
 )
 
-// Writer is used to take RTP packets and write them to an OGG on disk
-type Writer struct {
+// OpusWriter is used to take RTP packets and write them to an OGG on disk
+type OpusWriter struct {
 	fd                      *os.File
 	sampleRate              uint32
 	channelCount            uint16
@@ -46,23 +47,21 @@ type Writer struct {
    Figure 1: Example Packet Organization for a Logical Ogg Opus Stream
 */
 
-// New builds a new OGG Opus writer
-func New(fileName string, sampleRate uint32, channelCount uint16) (*Writer, error) {
-	f, err := os.Create(fileName)
-	if err != nil {
-		return nil, err
-	}
+// NewOpusWriter builds a new OGG Opus writer
+func NewOpusWriter(fileName string, sampleRate uint32, channelCount uint16) (*OpusWriter, error) {
 	// Since the seed and the creation date of the
 	// file will be really close, is this an issue ?
 	r := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(r)
 	serial := uint32(math.Ceil(r1.Float64() * math.Pow(2, 32)))
-	writer := &Writer{
-		fd:            f,
+	writer := &OpusWriter{
 		sampleRate:    sampleRate,
 		channelCount:  channelCount,
 		serial:        serial,
 		checksumTable: make([]int, 256),
+	}
+	if err := writer.open(fileName); err != nil {
+		return nil, err
 	}
 	writer.initChecksum()
 
@@ -80,7 +79,7 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*Writer, erro
 	// Reference: https://tools.ietf.org/html/rfc7845.html#page-6
 	// RFC specifies that the ID Header page should have a granule position of 0 and a Header Type set to 2 (StartOfStream)
 	data := writer.createPage(oggIDHeader, 2, 0)
-	if _, err := f.Write(data); err != nil {
+	if _, err := writer.fd.Write(data); err != nil {
 		return nil, err
 	}
 
@@ -93,15 +92,28 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*Writer, erro
 
 	// RFC specifies that the page where the CommentHeader completes should have a granule position of 0
 	data = writer.createPage(oggCommentHeader, 0, 0)
-	if _, err := f.Write(data); err != nil {
+	if _, err := writer.fd.Write(data); err != nil {
 		return nil, err
 	}
 
 	return writer, nil
 }
 
+func (i *OpusWriter) open(fileName string) error {
+	if i.fd != nil {
+		return fmt.Errorf("File already opened")
+	}
+
+	f, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	i.fd = f
+	return nil
+}
+
 // CRC32
-func (i *Writer) initChecksum() {
+func (i *OpusWriter) initChecksum() {
 	for ndx := range i.checksumTable {
 		r := ndx << 24
 		for i := 0; i < 8; i++ {
@@ -115,7 +127,7 @@ func (i *Writer) initChecksum() {
 	}
 }
 
-func (i *Writer) getChecksum(payload []uint8) uint32 {
+func (i *OpusWriter) getChecksum(payload []uint8) uint32 {
 	var checksum uint32
 	for ndx := range payload {
 		tableNdx := uint8(((checksum >> 24) & 0xff)) ^ payload[ndx]
@@ -128,7 +140,7 @@ const (
 	pageHeaderSize = 27
 )
 
-func (i *Writer) createPage(payload []uint8, headerType uint8, granulePos uint64) []byte {
+func (i *OpusWriter) createPage(payload []uint8, headerType uint8, granulePos uint64) []byte {
 	payloadLen := len(payload)
 	page := make([]byte, pageHeaderSize+1+payloadLen)
 
@@ -147,7 +159,10 @@ func (i *Writer) createPage(payload []uint8, headerType uint8, granulePos uint64
 }
 
 // AddPacket adds a new packet and writes the appropriate headers for it
-func (i *Writer) AddPacket(packet *rtp.Packet) error {
+func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
+	if i.fd == nil {
+		return fmt.Errorf("File not opened")
+	}
 	opusPacket := codecs.OpusPacket{}
 	_, err := opusPacket.Unmarshal(packet)
 	if err != nil {
@@ -165,25 +180,25 @@ func (i *Writer) AddPacket(packet *rtp.Packet) error {
 	i.previousTimestamp = packet.Timestamp
 
 	data := i.createPage(payload, 0, i.previousGranulePosition)
+
 	_, err = i.fd.Write(data)
 	return err
 }
 
 // Close stops the recording
-func (i *Writer) Close() error {
-	var err error
-	// I'm doing this to make the linter happy,
-	// but it will silent 'Write' error in case of failure...
-	defer func() { err = i.fd.Close() }()
+func (i *OpusWriter) Close() error {
+	if i.fd == nil {
+		return fmt.Errorf("File not opened")
+	}
 
 	// RFC specifies that the last page should have a Header Type set to 4 (EndOfStream)
 	// The granule position here is the magic value '-1'
 	data := i.createPage(make([]uint8, 0), 4, 0xFFFFFFFFFFFFFFFF)
-	_, err = i.fd.Write(data)
-	if err != nil {
+	if _, err := i.fd.Write(data); err != nil {
+		if e2 := i.fd.Close(); e2 != nil {
+			return fmt.Errorf("Error writing file (%v); error deleting file (%v)", err, e2)
+		}
 		return err
 	}
-
-	err = i.fd.Close()
-	return err
+	return i.fd.Close()
 }

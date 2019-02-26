@@ -1,6 +1,8 @@
 package media
 
-import "github.com/pions/rtp"
+import (
+	"github.com/pions/rtp"
+)
 
 // Sample contains media, and the amount of samples in it
 type Sample struct {
@@ -15,4 +17,7 @@ type Writer interface {
 	AddPacket(packet *rtp.Packet) error
 	// Close the media
 	Close() error
+
+	// Creates the file and assigns the file descriptor
+	open(fileName string) error
 }

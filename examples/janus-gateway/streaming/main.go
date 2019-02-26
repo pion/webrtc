@@ -7,8 +7,6 @@ import (
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
 	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/media/ivfwriter"
-	"github.com/pions/webrtc/pkg/media/opuswriter"
 )
 
 func saveToDisk(i media.Writer, track *webrtc.Track) {
@@ -72,14 +70,14 @@ func main() {
 		codec := track.Codec()
 		if codec.Name == webrtc.Opus {
 			fmt.Println("Got Opus track, saving to disk as output.opus")
-			i, err := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
+			i, err := media.NewOpusWriter("output.opus", codec.ClockRate, codec.Channels)
 			if err != nil {
 				panic(err)
 			}
 			saveToDisk(i, track)
 		} else if codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := ivfwriter.New("output.ivf")
+			i, err := media.NewIVFWriter("output.ivf")
 			if err != nil {
 				panic(err)
 			}

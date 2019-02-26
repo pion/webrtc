@@ -1,4 +1,4 @@
-package ivfwriter
+package media
 
 import (
 	"encoding/binary"
@@ -16,10 +16,10 @@ type IVFWriter struct {
 	currentFrame []byte
 }
 
-// New builds a new IVF writer
-func New(fileName string) (*IVFWriter, error) {
-	f, err := os.Create(fileName)
-	if err != nil {
+// NewIVFWriter builds a new IVF writer
+func NewIVFWriter(fileName string) (*IVFWriter, error) {
+	writer := &IVFWriter{}
+	if err := writer.open(fileName); err != nil {
 		return nil, err
 	}
 
@@ -35,15 +35,31 @@ func New(fileName string) (*IVFWriter, error) {
 	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count
 	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
-	if _, err := f.Write(header); err != nil {
+	if _, err := writer.fd.Write(header); err != nil {
 		return nil, err
 	}
 
-	return &IVFWriter{fd: f}, nil
+	return writer, nil
+}
+
+func (i *IVFWriter) open(fileName string) error {
+	if i.fd != nil {
+		return fmt.Errorf("File already opened")
+	}
+
+	f, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	i.fd = f
+	return nil
 }
 
 // AddPacket adds a new packet and writes the appropriate headers for it
 func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
+	if i.fd == nil {
+		return fmt.Errorf("File not opened")
+	}
 
 	vp8Packet := codecs.VP8Packet{}
 	_, err := vp8Packet.Unmarshal(packet)
@@ -78,5 +94,8 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 
 // Close stops the recording
 func (i *IVFWriter) Close() error {
+	if i.fd == nil {
+		return fmt.Errorf("File not opened")
+	}
 	return i.fd.Close()
 }
