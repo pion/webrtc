@@ -77,6 +77,7 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*Writer, erro
 	binary.LittleEndian.PutUint16(oggIDHeader[16:], 0)          // output gain
 	oggIDHeader[18] = 0                                         // channel map 0 = one stream: mono or stereo
 
+	// Reference: https://tools.ietf.org/html/rfc7845.html#page-6
 	// RFC specifies that the ID Header page should have a granule position of 0 and a Header Type set to 2 (StartOfStream)
 	data := writer.createPage(oggIDHeader, 2, 0)
 	if _, err := f.Write(data); err != nil {
@@ -164,10 +165,8 @@ func (i *Writer) AddPacket(packet *rtp.Packet) error {
 	i.previousTimestamp = packet.Timestamp
 
 	data := i.createPage(payload, 0, i.previousGranulePosition)
-	if _, err := i.fd.Write(data); err != nil {
-		return err
-	}
-	return nil
+	_, err = i.fd.Write(data)
+	return err
 }
 
 // Close stops the recording

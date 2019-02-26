@@ -79,16 +79,14 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			go saveToDisk(i, track)
+			saveToDisk(i, track)
 		} else if codec.Name == webrtc.VP8 {
-			if codec.Name == webrtc.VP8 {
-				fmt.Println("Got VP8 track, saving to disk as output.ivf")
-				i, err := ivfwriter.New("output.ivf")
-				if err != nil {
-					panic(err)
-				}
-				go saveToDisk(i, track)
+			fmt.Println("Got VP8 track, saving to disk as output.ivf")
+			i, err := ivfwriter.New("output.ivf")
+			if err != nil {
+				panic(err)
 			}
+			saveToDisk(i, track)
 		}
 	})
 
