@@ -188,7 +188,9 @@ func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
 // Close stops the recording
 func (i *OpusWriter) Close() error {
 	if i.fd == nil {
-		return fmt.Errorf("file not opened")
+		// Returns no error has it may be convenient to call
+		// Close() multiple times
+		return nil
 	}
 
 	// RFC specifies that the last page should have a Header Type set to 4 (EndOfStream)

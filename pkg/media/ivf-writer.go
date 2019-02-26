@@ -72,7 +72,6 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 	if !packet.Marker {
 		return nil
 	} else if len(i.currentFrame) == 0 {
-		fmt.Println("skipping")
 		return nil
 	}
 
@@ -95,7 +94,9 @@ func (i *IVFWriter) AddPacket(packet *rtp.Packet) error {
 // Close stops the recording
 func (i *IVFWriter) Close() error {
 	if i.fd == nil {
-		return fmt.Errorf("file not opened")
+		// Returns no error has it may be convenient to call
+		// Close() multiple times
+		return nil
 	}
 	return i.fd.Close()
 }
