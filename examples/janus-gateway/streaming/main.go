@@ -6,8 +6,29 @@ import (
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
+	"github.com/pions/webrtc/pkg/media"
 	"github.com/pions/webrtc/pkg/media/ivfwriter"
+	"github.com/pions/webrtc/pkg/media/opuswriter"
 )
+
+func saveToDisk(i media.Writer, track *webrtc.Track) {
+	defer func() {
+		if err := i.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	for {
+		packet, err := track.ReadRTP()
+		if err != nil {
+			panic(err)
+		}
+
+		if err := i.AddPacket(packet); err != nil {
+			panic(err)
+		}
+	}
+}
 
 func watchHandle(handle *janus.Handle) {
 	// wait for event
@@ -27,7 +48,6 @@ func watchHandle(handle *janus.Handle) {
 		}
 
 	}
-
 }
 
 func main() {
@@ -53,26 +73,21 @@ func main() {
 	})
 
 	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
-		if track.Codec().Name == webrtc.Opus {
-			return
-		}
-
-		fmt.Println("Got VP8 track, saving to disk as output.ivf")
-		i, err := ivfwriter.New("output.ivf")
-		if err != nil {
-			panic(err)
-		}
-
-		for {
-			packet, err := track.ReadRTP()
+		codec := track.Codec()
+		if codec.Name == webrtc.Opus {
+			fmt.Println("Got Opus track, saving to disk as output.opus")
+			i, err := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
 			if err != nil {
 				panic(err)
 			}
-
-			err = i.AddPacket(packet)
+			saveToDisk(i, track)
+		} else if codec.Name == webrtc.VP8 {
+			fmt.Println("Got VP8 track, saving to disk as output.ivf")
+			i, err := ivfwriter.New("output.ivf")
 			if err != nil {
 				panic(err)
 			}
+			saveToDisk(i, track)
 		}
 	})
 
