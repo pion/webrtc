@@ -36,7 +36,7 @@ func main() {
 	ice := webrtc.NewICETransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := api.NewDTLSTransport(ice, nil)
+	dtls, err := webrtc.NewDTLSTransport(ice, nil)
 	if err != nil {
 		panic(err)
 	}

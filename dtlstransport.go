@@ -43,7 +43,7 @@ type DTLSTransport struct {
 // NewDTLSTransport creates a new DTLSTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
+func NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
 	t := &DTLSTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {

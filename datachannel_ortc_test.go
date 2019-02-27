@@ -191,7 +191,7 @@ func newORTCStack() (*testORTCStack, error) {
 	ice := NewICETransport(gatherer)
 
 	// Construct the DTLS transport
-	dtls, err := api.NewDTLSTransport(ice, nil)
+	dtls, err := NewDTLSTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}

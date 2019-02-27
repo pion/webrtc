@@ -533,7 +533,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 }
 
 func (pc *PeerConnection) createDTLSTransport() (*DTLSTransport, error) {
-	dtlsTransport, err := pc.api.NewDTLSTransport(pc.iceTransport, pc.configuration.Certificates)
+	dtlsTransport, err := NewDTLSTransport(pc.iceTransport, pc.configuration.Certificates)
 	return dtlsTransport, err
 }
 
