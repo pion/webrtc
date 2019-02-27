@@ -37,16 +37,16 @@ func TestGenerateDataChannelID(t *testing.T) {
 		c      *PeerConnection
 		result uint16
 	}{
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 2},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}, api: api}, 4},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}, api: api}, 2},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 3},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}, api: api}, 5},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}, api: api}, 3},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 0},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 0},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 2},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}, api: api}, 4},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}, api: api}, 2},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 1},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 1},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 3},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}, api: api}, 5},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}, api: api}, 3},
 	}
 
 	for _, testCase := range testCases {

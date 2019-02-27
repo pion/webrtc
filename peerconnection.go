@@ -820,7 +820,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprintHash = parts[0]
 
 	// Create the SCTP transport
-	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
+	sctp := NewSCTPTransport(pc.dtlsTransport, &DataChannelOptions{
+		Detach: pc.api.settingEngine.detach.DataChannels,
+	})
 	pc.sctpTransport = sctp
 
 	// Wire up the on datachannel handler

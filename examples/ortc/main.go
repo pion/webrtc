@@ -23,9 +23,6 @@ func main() {
 		},
 	}
 
-	// Create an API object
-	api := webrtc.NewAPI()
-
 	// Create the ICE gatherer
 	gatherer, err := webrtc.NewICEGatherer(iceOptions, nil)
 	if err != nil {
@@ -42,7 +39,7 @@ func main() {
 	}
 
 	// Construct the SCTP transport
-	sctp := api.NewSCTPTransport(dtls)
+	sctp := webrtc.NewSCTPTransport(dtls, nil)
 
 	// Handle incoming data channels
 	sctp.OnDataChannel(func(channel *webrtc.DataChannel) {

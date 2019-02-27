@@ -36,18 +36,22 @@ type SCTPTransport struct {
 	association          *sctp.Association
 	onDataChannelHandler func(*DataChannel)
 
-	api *API
+	options DataChannelOptions
 }
 
 // NewSCTPTransport creates a new SCTPTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
+func NewSCTPTransport(dtls *DTLSTransport, opts *DataChannelOptions) *SCTPTransport {
+	if opts == nil {
+		opts = &DataChannelOptions{}
+	}
+
 	res := &SCTPTransport{
 		dtlsTransport: dtls,
 		State:         SCTPTransportStateConnecting,
 		port:          5000, // TODO
-		api:           api,
+		options:       *opts,
 	}
 
 	res.updateMessageSize()
@@ -168,9 +172,7 @@ func (r *SCTPTransport) acceptDataChannels() {
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
 			ReadyState:        DataChannelStateOpen,
-			options: DataChannelOptions{
-				Detach: r.api.settingEngine.detach.DataChannels,
-			},
+			options:           r.options,
 		}
 
 		<-r.onDataChannel(rtcDC)

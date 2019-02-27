@@ -197,7 +197,7 @@ func newORTCStack() (*testORTCStack, error) {
 	}
 
 	// Construct the SCTP transport
-	sctp := api.NewSCTPTransport(dtls)
+	sctp := NewSCTPTransport(dtls, nil)
 
 	return &testORTCStack{
 		api:      api,
