@@ -14,15 +14,12 @@ type RTPSender struct {
 
 	transport *DTLSTransport
 
-	// A reference to the associated api object
-	api *API
-
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan interface{}
 }
 
 // NewRTPSender constructs a new RTPSender
-func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender, error) {
+func NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender, error) {
 	if track == nil {
 		return nil, fmt.Errorf("Track must not be nil")
 	} else if transport == nil {
@@ -38,7 +35,6 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 	return &RTPSender{
 		track:      track,
 		transport:  transport,
-		api:        api,
 		sendCalled: make(chan interface{}),
 		stopCalled: make(chan interface{}),
 	}, nil

@@ -1167,7 +1167,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			return nil, err
 		}
 	} else {
-		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		sender, err := NewRTPSender(track, pc.dtlsTransport)
 		if err != nil {
 			return nil, err
 		}
