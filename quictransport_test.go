@@ -175,7 +175,7 @@ func newQuicStack() (*testQuicStack, error) {
 	}
 
 	// Construct the ICE transport
-	ice := api.NewICETransport(gatherer)
+	ice := NewICETransport(gatherer)
 
 	// Construct the Quic transport
 	qt, err := api.NewQUICTransport(ice, nil)

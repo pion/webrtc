@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// Construct the ICE transport
-	ice := api.NewICETransport(gatherer)
+	ice := webrtc.NewICETransport(gatherer)
 
 	// Construct the DTLS transport
 	dtls, err := api.NewDTLSTransport(ice, nil)

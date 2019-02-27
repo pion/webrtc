@@ -503,7 +503,7 @@ func (pc *PeerConnection) gather() error {
 }
 
 func (pc *PeerConnection) createICETransport() *ICETransport {
-	t := pc.api.NewICETransport(pc.iceGatherer)
+	t := NewICETransport(pc.iceGatherer)
 
 	t.OnConnectionStateChange(func(state ICETransportState) {
 		cs := ICEConnectionStateNew
