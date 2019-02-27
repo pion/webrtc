@@ -86,6 +86,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Jin Lei](https://github.com/jinleileiking) - *SFU example use http*
 * [Will Watson](https://github.com/wwatson) - *Enable gocritic*
 * [Luke Curley](https://github.com/kixelated)
+* [Antoine Baché](https://github.com/Antonito) - *OGG Opus export*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
