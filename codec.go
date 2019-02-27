@@ -17,29 +17,22 @@ const (
 	DefaultPayloadTypeH264 = 100
 )
 
-// MediaEngine defines the codecs supported by a PeerConnection
-type MediaEngine struct {
-	codecs []*RTPCodec
+type CodecList []*RTPCodec
+
+var DefaultCodecs CodecList = []*RTPCodec{
+	NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000, 2),
+	NewRTPG722Codec(DefaultPayloadTypeG722, 8000),
+	NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000),
+	NewRTPH264Codec(DefaultPayloadTypeH264, 90000),
+	NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000),
 }
 
-// RegisterCodec registers a codec to a media engine
-func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
-	// TODO: generate PayloadType if not set
-	m.codecs = append(m.codecs, codec)
-	return codec.PayloadType
-}
+func (c CodecList) getCodec(payloadType uint8) (*RTPCodec, error) {
+	if c == nil {
+		c = DefaultCodecs
+	}
 
-// RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
-func (m *MediaEngine) RegisterDefaultCodecs() {
-	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
-	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
-	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
-	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
-	m.RegisterCodec(NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000))
-}
-
-func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
-	for _, codec := range m.codecs {
+	for _, codec := range c {
 		if codec.PayloadType == payloadType {
 			return codec, nil
 		}
@@ -47,8 +40,12 @@ func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
 	return nil, ErrCodecNotFound
 }
 
-func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
-	for _, codec := range m.codecs {
+func (c CodecList) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
+	if c == nil {
+		c = DefaultCodecs
+	}
+
+	for _, codec := range c {
 		if codec.Name == sdpCodec.Name &&
 			codec.ClockRate == sdpCodec.ClockRate &&
 			(sdpCodec.EncodingParameters == "" ||
@@ -60,9 +57,13 @@ func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
 	return nil, ErrCodecNotFound
 }
 
-func (m *MediaEngine) getCodecsByKind(kind RTPCodecType) []*RTPCodec {
+func (c CodecList) getCodecsByKind(kind RTPCodecType) []*RTPCodec {
+	if c == nil {
+		c = DefaultCodecs
+	}
+
 	var codecs []*RTPCodec
-	for _, codec := range m.codecs {
+	for _, codec := range c {
 		if codec.Type == kind {
 			codecs = append(codecs, codec)
 		}

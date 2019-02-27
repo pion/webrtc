@@ -33,17 +33,6 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 }
 
 func main() {
-	// Create a MediaEngine object to configure the supported codec
-	m := webrtc.MediaEngine{}
-
-	// Setup the codecs you want to use.
-	// We'll use a VP8 codec but you can also define your own
-	m.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
-	m.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
-
-	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
-
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -56,7 +45,14 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := api.NewPeerConnection(config, nil)
+	peerConnection, err := webrtc.NewPeerConnection(config, &webrtc.PeerConnectionOptions{
+		// Setup the codecs you want to use.
+		// We'll use a VP8 codec but you can also define your own
+		Codecs: webrtc.CodecList{
+			webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2),
+			webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000),
+		},
+	})
 	if err != nil {
 		panic(err)
 	}

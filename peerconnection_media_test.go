@@ -14,15 +14,13 @@ import (
 )
 
 func TestPeerConnection_Media_Sample(t *testing.T) {
-	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := newPair(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

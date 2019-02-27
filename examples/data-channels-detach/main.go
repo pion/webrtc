@@ -17,9 +17,6 @@ func main() {
 	// enabled using a settings engine. Mixing both detached and the
 	// OnMessage DataChannel API is not supported.
 
-	// Create an API object with the engine
-	api := webrtc.NewAPI()
-
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -32,7 +29,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection using the API object
-	peerConnection, err := api.NewPeerConnection(config, nil)
+	peerConnection, err := webrtc.NewPeerConnection(config, nil)
 	if err != nil {
 		panic(err)
 	}

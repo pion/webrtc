@@ -74,7 +74,6 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 }
 
 type testORTCStack struct {
-	api      *API
 	gatherer *ICEGatherer
 	ice      *ICETransport
 	dtls     *DTLSTransport
@@ -178,9 +177,6 @@ func newORTCPair() (stackA *testORTCStack, stackB *testORTCStack, err error) {
 }
 
 func newORTCStack() (*testORTCStack, error) {
-	// Create an API object
-	api := NewAPI()
-
 	// Create the ICE gatherer
 	gatherer, err := NewICEGatherer(ICEGatherOptions{}, nil)
 	if err != nil {
@@ -200,7 +196,6 @@ func newORTCStack() (*testORTCStack, error) {
 	sctp := NewSCTPTransport(dtls, nil)
 
 	return &testORTCStack{
-		api:      api,
 		gatherer: gatherer,
 		ice:      ice,
 		dtls:     dtls,

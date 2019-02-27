@@ -110,8 +110,6 @@ type PeerConnection struct {
 	dtlsTransport *DTLSTransport
 	sctpTransport *SCTPTransport
 
-	// A reference to the associated API state used by this connection
-	api     *API
 	options PeerConnectionOptions
 }
 
@@ -120,19 +118,12 @@ type PeerConnection struct {
 type PeerConnectionOptions struct {
 	DataChannelOptions
 	ICEAgentOptions
-}
 
-// NewPeerConnection creates a peerconnection with the default
-// codecs. See API.NewRTCPeerConnection for details.
-func NewPeerConnection(configuration Configuration, opts *PeerConnectionOptions) (*PeerConnection, error) {
-	m := MediaEngine{}
-	m.RegisterDefaultCodecs()
-	api := NewAPI(WithMediaEngine(m))
-	return api.NewPeerConnection(configuration, opts)
+	Codecs CodecList
 }
 
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
-func (api *API) NewPeerConnection(configuration Configuration, opts *PeerConnectionOptions) (*PeerConnection, error) {
+func NewPeerConnection(configuration Configuration, opts *PeerConnectionOptions) (*PeerConnection, error) {
 	if opts == nil {
 		opts = &PeerConnectionOptions{}
 	}
@@ -159,7 +150,6 @@ func (api *API) NewPeerConnection(configuration Configuration, opts *PeerConnect
 		ConnectionState:    PeerConnectionStateNew,
 		dataChannels:       make(map[uint16]*DataChannel),
 
-		api:     api,
 		options: *opts,
 	}
 
@@ -980,7 +970,7 @@ func (pc *PeerConnection) openSRTP() {
 				return
 			}
 
-			codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
+			codec, err := pc.options.Codecs.getCodecSDP(sdpCodec)
 			if err != nil {
 				pcLog.Warnf("codec %s in not registered", sdpCodec)
 				return
@@ -1423,7 +1413,7 @@ func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) {
 }
 
 func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTPCodecType, midValue string, iceParams ICEParameters, peerDirection RTPTransceiverDirection, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) bool {
-	if codecs := pc.api.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
+	if codecs := pc.options.Codecs.getCodecsByKind(codecType); len(codecs) == 0 {
 		d.WithMedia(&sdp.MediaDescription{
 			MediaName: sdp.MediaName{
 				Media:   codecType.String(),
@@ -1441,7 +1431,7 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
 
-	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
+	for _, codec := range pc.options.Codecs.getCodecsByKind(codecType) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 	}
 
@@ -1508,7 +1498,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 
 // NewTrack Creates a new Track
 func (pc *PeerConnection) NewTrack(payloadType uint8, ssrc uint32, id, label string) (*Track, error) {
-	codec, err := pc.api.mediaEngine.getCodec(payloadType)
+	codec, err := pc.options.Codecs.getCodec(payloadType)
 	if err != nil {
 		return nil, err
 	} else if codec.Payloader == nil {

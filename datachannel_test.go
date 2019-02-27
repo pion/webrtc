@@ -30,23 +30,21 @@ func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
 }
 
 func TestGenerateDataChannelID(t *testing.T) {
-	api := NewAPI()
-
 	testCases := []struct {
 		client bool
 		c      *PeerConnection
 		result uint16
 	}{
-		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 2},
-		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}, api: api}, 4},
-		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}, api: api}, 2},
-		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 3},
-		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}, api: api}, 5},
-		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}, api: api}, 3},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}}, 0},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}}, 0},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}}, 2},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}}, 4},
+		{true, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}}, 2},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{}}, 1},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{0: nil}}, 1},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil}}, 3},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}}, 5},
+		{false, &PeerConnection{sctpTransport: NewSCTPTransport(nil, nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}}, 3},
 	}
 
 	for _, testCase := range testCases {
@@ -65,8 +63,7 @@ func TestDataChannel_Send(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := newPair(nil)
 
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
@@ -201,8 +198,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 }
 
 func setUpReliabilityParamTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
-	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := newPair(nil)
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
 	}
