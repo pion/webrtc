@@ -48,25 +48,6 @@ func watchHandle(handle *janus.Handle) {
 	}
 }
 
-func handleTrack(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
-	codec := track.Codec()
-	if codec.Name == webrtc.Opus {
-		fmt.Println("Got Opus track, saving to disk as output.opus")
-		i, err := media.NewOpusWriter("output.opus", codec.ClockRate, codec.Channels)
-		if err != nil {
-			panic(err)
-		}
-		saveToDisk(i, track)
-	} else if codec.Name == webrtc.VP8 {
-		fmt.Println("Got VP8 track, saving to disk as output.ivf")
-		i, err := media.NewIVFWriter("output.ivf")
-		if err != nil {
-			panic(err)
-		}
-		saveToDisk(i, track)
-	}
-}
-
 func main() {
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
@@ -89,7 +70,24 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 
-	peerConnection.OnTrack(handleTrack)
+	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
+		codec := track.Codec()
+		if codec.Name == webrtc.Opus {
+			fmt.Println("Got Opus track, saving to disk as output.opus")
+			i, err := media.NewOpusWriter("output.opus", codec.ClockRate, codec.Channels)
+			if err != nil {
+				panic(err)
+			}
+			saveToDisk(i, track)
+		} else if codec.Name == webrtc.VP8 {
+			fmt.Println("Got VP8 track, saving to disk as output.ivf")
+			i, err := media.NewIVFWriter("output.ivf")
+			if err != nil {
+				panic(err)
+			}
+			saveToDisk(i, track)
+		}
+	})
 
 	// Janus
 	gateway, err := janus.Connect("ws://localhost:8188/")

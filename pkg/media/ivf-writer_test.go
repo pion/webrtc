@@ -56,7 +56,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			message:      "IVFWriter shouldn't be able to write something else than an IVF packet",
 			messageClose: "IVFWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          fmt.Errorf("Empty payload"),
+			err:          fmt.Errorf("Payload is not large enough to container header"),
 			closeErr:     nil,
 		},
 		{
