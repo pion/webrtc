@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := api.NewPeerConnection(config)
+	peerConnection, err := api.NewPeerConnection(config, nil)
 	if err != nil {
 		panic(err)
 	}

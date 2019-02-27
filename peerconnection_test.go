@@ -17,12 +17,12 @@ import (
 )
 
 func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
-	pca, err := api.NewPeerConnection(Configuration{})
+	pca, err := api.NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := api.NewPeerConnection(Configuration{})
+	pcb, err := api.NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -92,7 +92,7 @@ func TestNew(t *testing.T) {
 			PeerIdentity:         "unittest",
 			Certificates:         []Certificate{*certificate},
 			ICECandidatePoolSize: 5,
-		})
+		}, nil)
 		assert.Nil(t, err)
 		assert.NotNil(t, pc)
 	})
@@ -115,7 +115,7 @@ func TestNew(t *testing.T) {
 
 				return api.NewPeerConnection(Configuration{
 					Certificates: []Certificate{*certificate},
-				})
+				}, nil)
 			}, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}},
 			{func() (*PeerConnection, error) {
 				return api.NewPeerConnection(Configuration{
@@ -128,7 +128,7 @@ func TestNew(t *testing.T) {
 							Username: "unittest",
 						},
 					},
-				})
+				}, nil)
 			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}},
 		}
 
@@ -169,7 +169,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 					PeerIdentity:         "unittest",
 					Certificates:         []Certificate{*certificate1},
 					ICECandidatePoolSize: 5,
-				})
+				}, nil)
 				if err != nil {
 					return pc, err
 				}
@@ -208,7 +208,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "closed connection",
 			init: func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{})
+				pc, err := api.NewPeerConnection(Configuration{}, nil)
 				assert.Nil(t, err)
 
 				err = pc.Close()
@@ -221,7 +221,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update PeerIdentity",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				PeerIdentity: "unittest",
@@ -231,7 +231,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update multiple certificates",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				Certificates: []Certificate{*certificate1, *certificate2},
@@ -241,7 +241,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update certificate",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				Certificates: []Certificate{*certificate1},
@@ -251,7 +251,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update BundlePolicy",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				BundlePolicy: BundlePolicyMaxCompat,
@@ -261,7 +261,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update RTCPMuxPolicy",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				RTCPMuxPolicy: RTCPMuxPolicyNegotiate,
@@ -273,7 +273,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			init: func() (*PeerConnection, error) {
 				pc, err := api.NewPeerConnection(Configuration{
 					ICECandidatePoolSize: 0,
-				})
+				}, nil)
 				if err != nil {
 					return pc, err
 				}
@@ -295,7 +295,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update ICEServers, no TURN credentials",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return api.NewPeerConnection(Configuration{}, nil)
 			},
 			config: Configuration{
 				ICEServers: []ICEServer{
@@ -325,7 +325,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 
 func TestPeerConnection_GetConfiguration(t *testing.T) {
 	api := NewAPI()
-	pc, err := api.NewPeerConnection(Configuration{})
+	pc, err := api.NewPeerConnection(Configuration{}, nil)
 	assert.Nil(t, err)
 
 	expected := Configuration{
@@ -384,7 +384,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		peerConn, err := api.NewPeerConnection(Configuration{})
+		peerConn, err := api.NewPeerConnection(Configuration{}, nil)
 		if err != nil {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
@@ -397,7 +397,7 @@ func TestSetRemoteDescription(t *testing.T) {
 
 func TestCreateOfferAnswer(t *testing.T) {
 	api := NewAPI()
-	offerPeerConn, err := api.NewPeerConnection(Configuration{})
+	offerPeerConn, err := api.NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err = offerPeerConn.SetLocalDescription(offer); err != nil {
 		t.Errorf("SetLocalDescription: got error: %v", err)
 	}
-	answerPeerConn, err := api.NewPeerConnection(Configuration{})
+	answerPeerConn, err := api.NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
 	api := NewAPI()
-	pc, err := api.NewPeerConnection(Configuration{})
+	pc, err := api.NewPeerConnection(Configuration{}, nil)
 	assert.Nil(t, err)
 
 	onTrackCalled := make(chan bool)

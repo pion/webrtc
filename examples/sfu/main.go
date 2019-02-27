@@ -77,7 +77,7 @@ func main() {
 	// Everything below is the pion-WebRTC API, thanks for using it ❤️.
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := api.NewPeerConnection(peerConnectionConfig)
+	peerConnection, err := api.NewPeerConnection(peerConnectionConfig, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -147,7 +147,7 @@ func main() {
 		signal.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
 
 		// Create a new PeerConnection
-		peerConnection, err := api.NewPeerConnection(peerConnectionConfig)
+		peerConnection, err := api.NewPeerConnection(peerConnectionConfig, nil)
 		if err != nil {
 			panic(err)
 		}

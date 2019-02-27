@@ -27,7 +27,7 @@ func gstreamerReceiveMain() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config, nil)
 	if err != nil {
 		panic(err)
 	}

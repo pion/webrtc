@@ -111,20 +111,32 @@ type PeerConnection struct {
 	sctpTransport *SCTPTransport
 
 	// A reference to the associated API state used by this connection
-	api *API
+	api     *API
+	options PeerConnectionOptions
+}
+
+// PeerConnectionOptions contains non-standard options that can be passed to NewPeerConnection
+// to change the behavior of the PeerConnection or access lower-level features.
+type PeerConnectionOptions struct {
+	DataChannelOptions
+	ICEAgentOptions
 }
 
 // NewPeerConnection creates a peerconnection with the default
 // codecs. See API.NewRTCPeerConnection for details.
-func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+func NewPeerConnection(configuration Configuration, opts *PeerConnectionOptions) (*PeerConnection, error) {
 	m := MediaEngine{}
 	m.RegisterDefaultCodecs()
 	api := NewAPI(WithMediaEngine(m))
-	return api.NewPeerConnection(configuration)
+	return api.NewPeerConnection(configuration, opts)
 }
 
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
-func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+func (api *API) NewPeerConnection(configuration Configuration, opts *PeerConnectionOptions) (*PeerConnection, error) {
+	if opts == nil {
+		opts = &PeerConnectionOptions{}
+	}
+
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -147,7 +159,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		ConnectionState:    PeerConnectionStateNew,
 		dataChannels:       make(map[uint16]*DataChannel),
 
-		api: api,
+		api:     api,
+		options: *opts,
 	}
 
 	var err error
@@ -473,24 +486,10 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 }
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
-	var connTimeout time.Duration
-	if c := pc.api.settingEngine.timeout.ICEConnection; c != nil {
-		connTimeout = *c
-	}
-	var keepaliveInterval time.Duration
-	if k := pc.api.settingEngine.timeout.ICEKeepalive; k != nil {
-		keepaliveInterval = *k
-	}
-
 	g, err := NewICEGatherer(ICEGatherOptions{
 		ICEServers: pc.configuration.ICEServers,
 		// TODO: GatherPolicy
-	}, &ICEAgentOptions{
-		PortMin:           pc.api.settingEngine.ephemeralUDP.PortMin,
-		PortMax:           pc.api.settingEngine.ephemeralUDP.PortMax,
-		ConnectionTimeout: connTimeout,
-		KeepaliveInterval: keepaliveInterval,
-	})
+	}, &pc.options.ICEAgentOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -820,9 +819,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprintHash = parts[0]
 
 	// Create the SCTP transport
-	sctp := NewSCTPTransport(pc.dtlsTransport, &DataChannelOptions{
-		Detach: pc.api.settingEngine.detach.DataChannels,
-	})
+	sctp := NewSCTPTransport(pc.dtlsTransport, &pc.options.DataChannelOptions)
 	pc.sctpTransport = sctp
 
 	// Wire up the on datachannel handler

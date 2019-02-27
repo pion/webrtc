@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection using the API object
-	peerConnection, err := api.NewPeerConnection(config)
+	peerConnection, err := api.NewPeerConnection(config, nil)
 	if err != nil {
 		panic(err)
 	}

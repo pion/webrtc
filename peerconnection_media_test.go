@@ -174,12 +174,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, err := NewPeerConnection(Configuration{})
+	pcOffer, err := NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pcAnswer, err := NewPeerConnection(Configuration{})
+	pcAnswer, err := NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
