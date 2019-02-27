@@ -1135,14 +1135,6 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	if pc.isClosed {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
-	for _, transceiver := range pc.rtpTransceivers {
-		if transceiver.Sender.track == nil {
-			continue
-		}
-		if track.ID() == transceiver.Sender.track.ID() {
-			return nil, &rtcerr.InvalidAccessError{Err: ErrExistingTrack}
-		}
-	}
 	var transceiver *RTPTransceiver
 	for _, t := range pc.rtpTransceivers {
 		if !t.stopped &&
