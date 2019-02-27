@@ -1411,6 +1411,14 @@ func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) {
 
 func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTPCodecType, midValue string, iceParams ICEParameters, peerDirection RTPTransceiverDirection, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) bool {
 	if codecs := pc.api.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
+		d.WithMedia(&sdp.MediaDescription{
+			MediaName: sdp.MediaName{
+				Media:   codecType.String(),
+				Port:    sdp.RangedPort{Value: 0},
+				Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
+				Formats: []string{"0"},
+			},
+		})
 		return false
 	}
 	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
