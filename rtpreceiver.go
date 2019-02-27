@@ -18,13 +18,10 @@ type RTPReceiver struct {
 	mu               sync.RWMutex
 
 	rtpReadStream, rtcpReadStream *lossyReadCloser
-
-	// A reference to the associated api object
-	api *API
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
-func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RTPReceiver, error) {
+func NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RTPReceiver, error) {
 	if transport == nil {
 		return nil, fmt.Errorf("DTLSTransport must not be nil")
 	}
@@ -32,7 +29,6 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 	return &RTPReceiver{
 		kind:      kind,
 		transport: transport,
-		api:       api,
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
 	}, nil

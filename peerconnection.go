@@ -949,7 +949,7 @@ func (pc *PeerConnection) openSRTP() {
 
 	for i := range incomingSSRCes {
 		go func(ssrc uint32, codecType RTPCodecType) {
-			receiver, err := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
+			receiver, err := NewRTPReceiver(codecType, pc.dtlsTransport)
 			if err != nil {
 				pcLog.Warnf("Could not create RTPReceiver %s", err)
 				return
