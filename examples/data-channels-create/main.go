@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Create a datachannel with label 'data'
-	dataChannel, err := peerConnection.CreateDataChannel("data", nil, nil)
+	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
 	if err != nil {
 		panic(err)
 	}

@@ -29,15 +29,17 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection using the API object
-	peerConnection, err := webrtc.NewPeerConnection(config, nil)
+	peerConnection, err := webrtc.NewPeerConnection(config, &webrtc.PeerConnectionOptions{
+		DataChannelOptions: webrtc.DataChannelOptions{
+			Detach: true,
+		},
+	})
 	if err != nil {
 		panic(err)
 	}
 
 	// Create a datachannel with label 'data'
-	dataChannel, err := peerConnection.CreateDataChannel("data", nil, &webrtc.DataChannelOptions{
-		Detach: true,
-	})
+	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
 	if err != nil {
 		panic(err)
 	}

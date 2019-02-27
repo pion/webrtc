@@ -1181,7 +1181,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 // CreateDataChannel creates a new DataChannel object with the given label
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
-func (pc *PeerConnection) CreateDataChannel(label string, init *DataChannelInit, opts *DataChannelOptions) (*DataChannel, error) {
+func (pc *PeerConnection) CreateDataChannel(label string, init *DataChannelInit) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
 	if pc.isClosed {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -1235,7 +1235,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, init *DataChannelInit,
 	//
 	// See https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api for details
 
-	d, err := newDataChannel(params, opts)
+	d, err := newDataChannel(params, &pc.options.DataChannelOptions)
 	if err != nil {
 		return nil, err
 	}
