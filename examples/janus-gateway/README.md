@@ -30,12 +30,22 @@ OSX
 ```sh 
 brew install pkg-config
 https://gstreamer.freedesktop.org/data/pkg/osx/
+
+export PKG_CONFIG_PATH=/Library/Frameworks/GStreamer.framework/Versions/Current/lib/pkgconfig
 ```
 Ubuntu
 ```sh
 apt install pkg-config
 apt install libgstreamer*
 ```
+
+Build
+```sh
+cd example/janus-gateway/video-room
+go build
+```
+
+
 
 If this worked you should see a test video in video-room `1234`
 
