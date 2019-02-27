@@ -461,7 +461,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&Track{}, &RTPReceiver{}) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
+	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{}) })
 
 	allTrue := func(vals []bool) bool {
 		for _, val := range vals {

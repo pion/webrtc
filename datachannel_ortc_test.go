@@ -44,7 +44,7 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 		Label: "Foo",
 		ID:    1,
 	}
-	channelA, err := stackA.api.NewDataChannel(stackA.sctp, dcParams)
+	channelA, err := NewDataChannel(stackA.sctp, dcParams, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

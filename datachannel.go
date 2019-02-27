@@ -95,15 +95,20 @@ type DataChannel struct {
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
 
-	// A reference to the associated api object used by this datachannel
-	api *API
+	options DataChannelOptions
+}
+
+// DataChannelOptions contains non-standard options that can be passed to NewDataChannel
+// to change the behavior of the DataChannels or access lower-level features.
+type DataChannelOptions struct {
+	Detach bool
 }
 
 // NewDataChannel creates a new DataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelParameters) (*DataChannel, error) {
-	d, err := api.newDataChannel(params)
+func NewDataChannel(transport *SCTPTransport, params *DataChannelParameters, opts *DataChannelOptions) (*DataChannel, error) {
+	d, err := newDataChannel(params, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +123,11 @@ func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelPara
 
 // newDataChannel is an internal constructor for the data channel used to
 // create the DataChannel object before the networking is set up.
-func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, error) {
+func newDataChannel(params *DataChannelParameters, opts *DataChannelOptions) (*DataChannel, error) {
+	if opts == nil {
+		opts = &DataChannelOptions{}
+	}
+
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
@@ -131,7 +140,7 @@ func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, err
 		MaxPacketLifeTime: params.MaxPacketLifeTime,
 		MaxRetransmits:    params.MaxRetransmits,
 		ReadyState:        DataChannelStateConnecting,
-		api:               api,
+		options:           *opts,
 	}, nil
 }
 
@@ -304,7 +313,7 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.api.settingEngine.detach.DataChannels {
+	if !d.options.Detach {
 		go d.readLoop()
 	}
 }
@@ -385,7 +394,7 @@ func (d *DataChannel) Detach() (*datachannel.DataChannel, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if !d.api.settingEngine.detach.DataChannels {
+	if !d.options.Detach {
 		return nil, errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	}
 

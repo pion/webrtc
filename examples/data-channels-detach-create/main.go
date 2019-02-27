@@ -17,12 +17,8 @@ func main() {
 	// enabled using a settings engine. Mixing both detached and the
 	// OnMessage DataChannel API is not supported.
 
-	// Create a SettingEngine and enable Detach
-	s := webrtc.SettingEngine{}
-	s.DetachDataChannels()
-
-	// Create an API object with the engine
-	api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+	// Create an API object
+	api := webrtc.NewAPI()
 
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
@@ -42,7 +38,9 @@ func main() {
 	}
 
 	// Create a datachannel with label 'data'
-	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
+	dataChannel, err := peerConnection.CreateDataChannel("data", nil, &webrtc.DataChannelOptions{
+		Detach: true,
+	})
 	if err != nil {
 		panic(err)
 	}

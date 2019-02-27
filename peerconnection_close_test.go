@@ -30,7 +30,7 @@ func TestPeerConnection_Close(t *testing.T) {
 		close(awaitSetup)
 	})
 
-	_, err = pcOffer.CreateDataChannel("data", nil)
+	_, err = pcOffer.CreateDataChannel("data", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

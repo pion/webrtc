@@ -168,7 +168,9 @@ func (r *SCTPTransport) acceptDataChannels() {
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
 			ReadyState:        DataChannelStateOpen,
-			api:               r.api,
+			options: DataChannelOptions{
+				Detach: r.api.settingEngine.detach.DataChannels,
+			},
 		}
 
 		<-r.onDataChannel(rtcDC)

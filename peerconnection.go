@@ -1192,7 +1192,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 // CreateDataChannel creates a new DataChannel object with the given label
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
-func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelInit) (*DataChannel, error) {
+func (pc *PeerConnection) CreateDataChannel(label string, init *DataChannelInit, opts *DataChannelOptions) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
 	if pc.isClosed {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -1207,35 +1207,35 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
-	if options == nil || options.ID == nil {
+	if init == nil || init.ID == nil {
 		var err error
 		if params.ID, err = pc.generateDataChannelID(true); err != nil {
 			return nil, err
 		}
 	} else {
-		params.ID = *options.ID
+		params.ID = *init.ID
 	}
 
-	if options != nil {
+	if init != nil {
 		// Ordered indicates if data is allowed to be delivered out of order. The
 		// default value of true, guarantees that data will be delivered in order.
-		if options.Ordered != nil {
-			params.Ordered = *options.Ordered
+		if init.Ordered != nil {
+			params.Ordered = *init.Ordered
 		}
 
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #7)
-		if options.MaxPacketLifeTime != nil {
-			params.MaxPacketLifeTime = options.MaxPacketLifeTime
+		if init.MaxPacketLifeTime != nil {
+			params.MaxPacketLifeTime = init.MaxPacketLifeTime
 		}
 
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #8)
-		if options.MaxRetransmits != nil {
-			params.MaxRetransmits = options.MaxRetransmits
+		if init.MaxRetransmits != nil {
+			params.MaxRetransmits = init.MaxRetransmits
 		}
 
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
-		if options.Ordered != nil {
-			params.Ordered = *options.Ordered
+		if init.Ordered != nil {
+			params.Ordered = *init.Ordered
 		}
 	}
 
@@ -1246,7 +1246,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	//
 	// See https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api for details
 
-	d, err := pc.api.newDataChannel(params)
+	d, err := newDataChannel(params, opts)
 	if err != nil {
 		return nil, err
 	}

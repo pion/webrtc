@@ -74,7 +74,7 @@ func TestDataChannel_Send(t *testing.T) {
 
 	done := make(chan bool)
 
-	dc, err := offerPC.CreateDataChannel("data", nil)
+	dc, err := offerPC.CreateDataChannel("data", nil, nil)
 
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
@@ -119,8 +119,7 @@ func TestDataChannel_EventHandlers(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api := NewAPI()
-	dc := &DataChannel{api: api}
+	dc := &DataChannel{}
 
 	onOpenCalled := make(chan struct{})
 	onMessageCalled := make(chan struct{})
@@ -149,8 +148,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	api := NewAPI()
-	dc := &DataChannel{api: api}
+	dc := &DataChannel{}
 
 	max := 512
 	out := make(chan int)
@@ -210,7 +208,7 @@ func setUpReliabilityParamTest(t *testing.T, options *DataChannelInit) (*PeerCon
 	}
 	done := make(chan bool)
 
-	dc, err := offerPC.CreateDataChannel("data", options)
+	dc, err := offerPC.CreateDataChannel("data", options, nil)
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
 	}

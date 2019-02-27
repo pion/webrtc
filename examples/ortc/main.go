@@ -122,7 +122,7 @@ func main() {
 			ID:    1,
 		}
 		var channel *webrtc.DataChannel
-		channel, err = api.NewDataChannel(sctp, dcParams)
+		channel, err = webrtc.NewDataChannel(sctp, dcParams, nil)
 		if err != nil {
 			panic(err)
 		}
