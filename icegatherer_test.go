@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/webrtc/pkg/ice"
+
 	"github.com/pions/transport/test"
 )
 
@@ -55,5 +57,22 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	err = gatherer.Close()
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestNewICEGatherer_BadPort(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	_, err := NewICEGatherer(ICEGatherOptions{}, &ICEAgentOptions{
+		PortMin: 3000,
+		PortMax: 2000,
+	})
+	if got, want := err, ice.ErrPort; got != want {
+		t.Fatalf("NewICEGatherer with invalid port spec: err=%v, want %v", got, want)
 	}
 }

@@ -29,6 +29,9 @@ func NewICEGatherer(opts ICEGatherOptions, agentOpts *ICEAgentOptions) (*ICEGath
 	if agentOpts == nil {
 		agentOpts = &ICEAgentOptions{}
 	}
+	if err := agentOpts.Validate(); err != nil {
+		return nil, err
+	}
 
 	validatedServers := []*ice.URL{}
 	if len(opts.ICEServers) > 0 {

@@ -1,6 +1,10 @@
 package webrtc
 
-import "time"
+import (
+	"time"
+
+	"github.com/pions/webrtc/pkg/ice"
+)
 
 // ICEGatherOptions provides options relating to the gathering of ICE candidates.
 type ICEGatherOptions struct {
@@ -14,4 +18,11 @@ type ICEAgentOptions struct {
 	PortMax           uint16
 	ConnectionTimeout time.Duration
 	KeepaliveInterval time.Duration
+}
+
+func (i *ICEAgentOptions) Validate() error {
+	if i.PortMax < i.PortMin {
+		return ice.ErrPort
+	}
+	return nil
 }
