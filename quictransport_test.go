@@ -77,7 +77,6 @@ type testQuicStack struct {
 	gatherer *ICEGatherer
 	ice      *ICETransport
 	quic     *QUICTransport
-	api      *API
 }
 
 func (s *testQuicStack) setSignal(sig *testQuicSignal, isOffer bool) error {
@@ -167,7 +166,6 @@ func newQuicPair() (stackA *testQuicStack, stackB *testQuicStack, err error) {
 }
 
 func newQuicStack() (*testQuicStack, error) {
-	api := NewAPI()
 	// Create the ICE gatherer
 	gatherer, err := NewICEGatherer(ICEGatherOptions{}, nil)
 	if err != nil {
@@ -178,13 +176,12 @@ func newQuicStack() (*testQuicStack, error) {
 	ice := NewICETransport(gatherer)
 
 	// Construct the Quic transport
-	qt, err := api.NewQUICTransport(ice, nil)
+	qt, err := NewQUICTransport(ice, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &testQuicStack{
-		api:      api,
 		gatherer: gatherer,
 		ice:      ice,
 		quic:     qt,

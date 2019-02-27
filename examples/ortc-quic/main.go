@@ -21,9 +21,6 @@ func main() {
 
 	// Everything below is the pion-WebRTC (ORTC) API! Thanks for using it ❤️.
 
-	// Create an API object
-	api := webrtc.NewAPI()
-
 	// Prepare ICE gathering options
 	iceOptions := webrtc.ICEGatherOptions{
 		ICEServers: []webrtc.ICEServer{
@@ -41,7 +38,7 @@ func main() {
 	ice := webrtc.NewICETransport(gatherer)
 
 	// Construct the Quic transport
-	qt, err := api.NewQUICTransport(ice, nil)
+	qt, err := webrtc.NewQUICTransport(ice, nil)
 	if err != nil {
 		panic(err)
 	}

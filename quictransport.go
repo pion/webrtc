@@ -34,7 +34,7 @@ type QUICTransport struct {
 // Note that the Quic transport is a draft and therefore
 // highly experimental. It is currently not supported by
 // any browsers yet.
-func (api *API) NewQUICTransport(transport *ICETransport, certificates []Certificate) (*QUICTransport, error) {
+func NewQUICTransport(transport *ICETransport, certificates []Certificate) (*QUICTransport, error) {
 	t := &QUICTransport{iceTransport: transport}
 
 	if len(certificates) > 0 {
