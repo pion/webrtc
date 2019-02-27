@@ -19,9 +19,7 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	api := NewAPI()
-
-	gatherer, err := api.NewICEGatherer(opts)
+	gatherer, err := NewICEGatherer(opts, nil)
 	if err != nil {
 		t.Error(err)
 	}

@@ -473,9 +473,23 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 }
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
-	g, err := pc.api.NewICEGatherer(ICEGatherOptions{
+	var connTimeout time.Duration
+	if c := pc.api.settingEngine.timeout.ICEConnection; c != nil {
+		connTimeout = *c
+	}
+	var keepaliveInterval time.Duration
+	if k := pc.api.settingEngine.timeout.ICEKeepalive; k != nil {
+		keepaliveInterval = *k
+	}
+
+	g, err := NewICEGatherer(ICEGatherOptions{
 		ICEServers: pc.configuration.ICEServers,
 		// TODO: GatherPolicy
+	}, &ICEAgentOptions{
+		PortMin:           pc.api.settingEngine.ephemeralUDP.PortMin,
+		PortMax:           pc.api.settingEngine.ephemeralUDP.PortMax,
+		ConnectionTimeout: connTimeout,
+		KeepaliveInterval: keepaliveInterval,
 	})
 	if err != nil {
 		return nil, err

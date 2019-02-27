@@ -27,7 +27,7 @@ func main() {
 	api := webrtc.NewAPI()
 
 	// Create the ICE gatherer
-	gatherer, err := api.NewICEGatherer(iceOptions)
+	gatherer, err := webrtc.NewICEGatherer(iceOptions, nil)
 	if err != nil {
 		panic(err)
 	}

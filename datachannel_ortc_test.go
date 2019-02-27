@@ -182,7 +182,7 @@ func newORTCStack() (*testORTCStack, error) {
 	api := NewAPI()
 
 	// Create the ICE gatherer
-	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	gatherer, err := NewICEGatherer(ICEGatherOptions{}, nil)
 	if err != nil {
 		return nil, err
 	}

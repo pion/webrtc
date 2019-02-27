@@ -169,7 +169,7 @@ func newQuicPair() (stackA *testQuicStack, stackB *testQuicStack, err error) {
 func newQuicStack() (*testQuicStack, error) {
 	api := NewAPI()
 	// Create the ICE gatherer
-	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	gatherer, err := NewICEGatherer(ICEGatherOptions{}, nil)
 	if err != nil {
 		return nil, err
 	}

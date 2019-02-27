@@ -19,13 +19,17 @@ type ICEGatherer struct {
 
 	agent *ice.Agent
 
-	api *API
+	agentOpts ICEAgentOptions
 }
 
 // NewICEGatherer creates a new NewICEGatherer.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
-func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
+func NewICEGatherer(opts ICEGatherOptions, agentOpts *ICEAgentOptions) (*ICEGatherer, error) {
+	if agentOpts == nil {
+		agentOpts = &ICEAgentOptions{}
+	}
+
 	validatedServers := []*ice.URL{}
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
@@ -40,7 +44,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 	return &ICEGatherer{
 		state:            ICEGathererStateNew,
 		validatedServers: validatedServers,
-		api:              api,
+		agentOpts:        *agentOpts,
 	}, nil
 }
 
@@ -57,11 +61,15 @@ func (g *ICEGatherer) Gather() error {
 	defer g.lock.Unlock()
 
 	config := &ice.AgentConfig{
-		Urls:              g.validatedServers,
-		PortMin:           g.api.settingEngine.ephemeralUDP.PortMin,
-		PortMax:           g.api.settingEngine.ephemeralUDP.PortMax,
-		ConnectionTimeout: g.api.settingEngine.timeout.ICEConnection,
-		KeepaliveInterval: g.api.settingEngine.timeout.ICEKeepalive,
+		Urls:    g.validatedServers,
+		PortMin: g.agentOpts.PortMin,
+		PortMax: g.agentOpts.PortMax,
+	}
+	if c := g.agentOpts.ConnectionTimeout; c > 0 {
+		config.ConnectionTimeout = &c
+	}
+	if k := g.agentOpts.KeepaliveInterval; k > 0 {
+		config.KeepaliveInterval = &k
 	}
 
 	agent, err := ice.NewAgent(config)
