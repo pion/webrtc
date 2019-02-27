@@ -87,6 +87,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Will Watson](https://github.com/wwatson) - *Enable gocritic*
 * [Luke Curley](https://github.com/kixelated)
 * [Antoine Baché](https://github.com/Antonito) - *OGG Opus export*
+* [frank](https://github.com/feixiao) - *Building examples on OSX*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
