@@ -26,3 +26,4 @@ script:
   - bash .github/assert-contributors.sh
   - bash .github/lint-disallowed-functions-in-library.sh
   - bash .github/lint-commit-message.sh
+  - bash .github/lint-filename.sh
