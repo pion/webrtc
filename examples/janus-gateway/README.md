@@ -5,6 +5,7 @@ These examples require that you build+enable websockets with Janus
 
 ## streaming
 This example demonstrates how to download a video from a Janus streaming room. Before you run this example, you need to run `plugins/streams/test_gstreamer_1.sh` from Janus.
+The example records audio+video in a `.ipf` file (VP8 codec) and audio in a `.opus` file (OGG Opus codec)
 
 You should confirm that you can successfully watch `Opus/VP8 live stream coming from gstreamer (live)` in the stream demo web UI
 

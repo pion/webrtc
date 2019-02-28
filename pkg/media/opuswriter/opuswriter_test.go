@@ -62,7 +62,7 @@ func TestOpusWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OpusWriter shouldn't be able to write an empty packet",
 			messageClose: "OpusWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          nil, // TODO: Update pions/rpt Opus unmarshal, so it returns an error, and update expected value
+			err:          fmt.Errorf("Payload is not large enough"),
 			closeErr:     nil,
 		},
 		{

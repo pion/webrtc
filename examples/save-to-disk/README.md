@@ -1,5 +1,6 @@
 # save-to-disk
 save-to-disk is a simple application that shows how to record your webcam using pion-WebRTC and save to disk.
+The example records audio+video in a `.ivf` file (VP8 codec) and audio in a `.opus` file (OGG Opus codec)
 
 ## Instructions
 ### Download save-to-disk

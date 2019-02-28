@@ -14,6 +14,7 @@ vendor/
 ### Files ###
 #############
 *.ivf
+*.opus
 tags
 cover.out
 *.sw[poe]
