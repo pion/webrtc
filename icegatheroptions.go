@@ -20,6 +20,8 @@ type ICEAgentOptions struct {
 	KeepaliveInterval time.Duration
 }
 
+// Validate returns an error if the IceAgentOptions are invalid and cannot be used,
+// or nil otherwise.
 func (i *ICEAgentOptions) Validate() error {
 	if i.PortMax < i.PortMin {
 		return ice.ErrPort

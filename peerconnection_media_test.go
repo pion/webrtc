@@ -20,7 +20,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, pcAnswer, err := newPair(nil)
+	pcOffer, pcAnswer, err := newPair()
 	if err != nil {
 		t.Fatal(err)
 	}

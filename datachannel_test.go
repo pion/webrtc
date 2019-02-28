@@ -63,7 +63,7 @@ func TestDataChannel_Send(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	offerPC, answerPC, err := newPair(nil)
+	offerPC, answerPC, err := newPair()
 
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
@@ -198,7 +198,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 }
 
 func setUpReliabilityParamTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
-	offerPC, answerPC, err := newPair(nil)
+	offerPC, answerPC, err := newPair()
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
 	}

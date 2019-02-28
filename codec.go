@@ -17,8 +17,14 @@ const (
 	DefaultPayloadTypeH264 = 100
 )
 
+// A CodecList is a list of supported RTPCodecs for a PeerConnection.
+//
+// An empty CodecList is equivalent to DefaultCodecs, which contains RTP codecs
+// commonly used with WebRTC.
 type CodecList []*RTPCodec
 
+// DefaultCodecs is a CodecList containing codecs commonly used with WebRTC
+// and useful for most applications, including: Opus, G.722, VP8, H265, and VP9.
 var DefaultCodecs CodecList = []*RTPCodec{
 	NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000, 2),
 	NewRTPG722Codec(DefaultPayloadTypeG722, 8000),

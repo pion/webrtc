@@ -16,13 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newPair(opts *PeerConnectionOptions) (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
-	pca, err := NewPeerConnection(Configuration{}, opts)
+func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
+	pca, err := NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := NewPeerConnection(Configuration{}, opts)
+	pcb, err := NewPeerConnection(Configuration{}, nil)
 	if err != nil {
 		return nil, nil, err
 	}
