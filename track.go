@@ -96,7 +96,7 @@ func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	return r, nil
 }
 
-// Write writes data to the track. If this is a remote track this will error
+// Write writes serialized RTP to the track. If this is a remote track this will error
 func (t *Track) Write(b []byte) (n int, err error) {
 	t.mu.RLock()
 	if t.receiver != nil {
@@ -107,7 +107,7 @@ func (t *Track) Write(b []byte) (n int, err error) {
 	t.mu.RUnlock()
 
 	for _, s := range senders {
-		if _, err := s.sendRTP(b); err != nil {
+		if _, err := s.write(b); err != nil {
 			return 0, err
 		}
 	}
@@ -117,28 +117,30 @@ func (t *Track) Write(b []byte) (n int, err error) {
 
 // WriteSample packetizes and writes to the track
 func (t *Track) WriteSample(s media.Sample) error {
+	// Convert the sample to multiple packets.
 	packets := t.packetizer.Packetize(s.Data, s.Samples)
-	for _, p := range packets {
-		buf, err := p.Marshal()
+
+	// Write all of the packets at once.
+	return t.WriteRTP(packets...)
+}
+
+// WriteRTP writes RTP packets any configured senders for the track
+func (t *Track) WriteRTP(ps ...*rtp.Packet) (err error) {
+	t.mu.RLock()
+	senders := t.senders
+	receiver := t.receiver
+	t.mu.RUnlock()
+
+	if receiver != nil {
+		return fmt.Errorf("this is a remote track and must not be written to")
+	}
+
+	// Loop over each sender and give them the packets.
+	for _, s := range senders {
+		err := s.writeRTP(ps...)
 		if err != nil {
 			return err
 		}
-		if _, err := t.Write(buf); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// WriteRTP writes RTP packets to the track
-func (t *Track) WriteRTP(p *rtp.Packet) error {
-	buf, err := p.Marshal()
-	if err != nil {
-		return err
-	}
-	if _, err := t.Write(buf); err != nil {
-		return err
 	}
 
 	return nil

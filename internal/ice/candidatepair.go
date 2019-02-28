@@ -80,6 +80,10 @@ func (p *candidatePair) Write(b []byte) (int, error) {
 	return p.local.writeTo(b, p.remote)
 }
 
+func (p *candidatePair) WriteBatch(packets [][]byte) (int, error) {
+	return p.local.writeBatchTo(packets, p.remote)
+}
+
 // keepaliveCandidate sends a STUN Binding Indication to the remote candidate
 func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 	msg, err := stun.Build(stun.ClassIndication, stun.MethodBinding, stun.GenerateTransactionID(),

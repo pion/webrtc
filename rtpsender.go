@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/pions/rtcp"
+	"github.com/pions/rtp"
 )
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
@@ -133,8 +134,8 @@ func (r *RTPSender) ReadRTCP() (rtcp.Packet, error) {
 	return pkt, err
 }
 
-// sendRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPSender) sendRTP(b []byte) (int, error) {
+// write should only be called by a track, this only exists so we can keep state in one place
+func (r *RTPSender) write(b []byte) (int, error) {
 	select {
 	case <-r.stopCalled:
 		return 0, fmt.Errorf("RTPSender has been stopped")
@@ -150,5 +151,24 @@ func (r *RTPSender) sendRTP(b []byte) (int, error) {
 		}
 
 		return writeStream.Write(b)
+	}
+}
+
+func (r *RTPSender) writeRTP(ps ...*rtp.Packet) error {
+	select {
+	case <-r.stopCalled:
+		return fmt.Errorf("RTPSender has been stopped")
+	case <-r.sendCalled:
+		srtpSession, err := r.transport.getSRTPSession()
+		if err != nil {
+			return err
+		}
+
+		writeStream, err := srtpSession.OpenWriteStream()
+		if err != nil {
+			return err
+		}
+
+		return writeStream.WriteRTP(ps...)
 	}
 }

@@ -72,22 +72,39 @@ func (c *Conn) Read(p []byte) (int, error) {
 	}
 }
 
+func (c *Conn) ReadBatch(packets [][]byte) (n int, err error) {
+	return 0, errors.New("unimplemented")
+}
+
 // Write implements the Conn Write method.
 func (c *Conn) Write(p []byte) (int, error) {
-	err := c.agent.ok()
+	_, err := c.WriteBatch([][]byte{p})
 	if err != nil {
 		return 0, err
 	}
 
-	if stun.IsSTUN(p) {
-		return 0, errors.New("the ICE conn can't write STUN messages")
+	return len(p), nil
+}
+
+// WriteBatch efficiently writes multiple packets at once, returning the number written.
+func (c *Conn) WriteBatch(packets [][]byte) (n int, err error) {
+	err = c.agent.ok()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, p := range packets {
+		if stun.IsSTUN(p) {
+			return 0, errors.New("the ICE conn can't write STUN messages")
+		}
 	}
 
 	pair, err := c.agent.getBestPair()
 	if err != nil {
 		return 0, err
 	}
-	return pair.Write(p)
+
+	return pair.WriteBatch(packets)
 }
 
 // Close implements the Conn Close method. It is used to close

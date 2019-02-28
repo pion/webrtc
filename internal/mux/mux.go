@@ -9,7 +9,7 @@ import (
 // Mux allows multiplexing
 type Mux struct {
 	lock       sync.RWMutex
-	nextConn   net.Conn
+	nextConn   connection
 	endpoints  map[*Endpoint]MatchFunc
 	bufferSize int
 	closedCh   chan struct{}
@@ -18,7 +18,7 @@ type Mux struct {
 // NewMux creates a new Mux
 func NewMux(conn net.Conn, bufferSize int) *Mux {
 	m := &Mux{
-		nextConn:   conn,
+		nextConn:   newConnection(conn),
 		endpoints:  make(map[*Endpoint]MatchFunc),
 		bufferSize: bufferSize,
 		closedCh:   make(chan struct{}),

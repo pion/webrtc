@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pions/stun"
+	"golang.org/x/net/ipv4"
 )
 
 const (
@@ -198,6 +199,29 @@ func (c *Candidate) writeTo(raw []byte, dst *Candidate) (int, error) {
 		return n, fmt.Errorf("failed to send packet: %v", err)
 	}
 	c.seen(true)
+	return n, nil
+}
+
+func (c *Candidate) writeBatchTo(packets [][]byte, dst *Candidate) (int, error) {
+	batcher := ipv4.NewPacketConn(c.conn)
+
+	messages := make([]ipv4.Message, len(packets))
+	for i, packet := range packets {
+		messages[i] = ipv4.Message{
+			Buffers: [][]byte{packet},
+			Addr:    dst.addr(),
+		}
+	}
+
+	// Note that this may not write all of the messages.
+	// On non-linux platforms, it will only write one message.
+	n, err := batcher.WriteBatch(messages, 0)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send packets: %v", err)
+	}
+
+	c.seen(true)
+
 	return n, nil
 }
 

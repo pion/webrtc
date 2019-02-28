@@ -47,9 +47,18 @@ func (e *Endpoint) Read(p []byte) (int, error) {
 	}
 }
 
+func (e *Endpoint) ReadBatch(packets [][]byte) (n int, err error) {
+	return 0, errors.New("unimplemented")
+}
+
 // Write writes len(p) bytes to the underlying conn
 func (e *Endpoint) Write(p []byte) (n int, err error) {
 	return e.mux.nextConn.Write(p)
+}
+
+// WriteBatch writes multiple packets to the underlying conn
+func (e *Endpoint) WriteBatch(packets [][]byte) (n int, err error) {
+	return e.mux.nextConn.WriteBatch(packets)
 }
 
 // LocalAddr is a stub
