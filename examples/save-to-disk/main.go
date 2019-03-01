@@ -38,7 +38,7 @@ func main() {
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 codec but you can also define your own
-	m.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000, 2))
+	m.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
 
 	// Create the API object with the MediaEngine
