@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 

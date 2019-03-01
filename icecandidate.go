@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/pions/sdp/v2"
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/internal/ice"
 )
 
 // ICECandidate represents a ice candidate
