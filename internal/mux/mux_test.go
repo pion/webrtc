@@ -74,7 +74,10 @@ func TestNoEndpoints(t *testing.T) {
 		panic("Failed to close network pipe")
 	}
 	m := NewMux(ca, 8192)
-	m.dispatch(make([]byte, 1))
+	err = m.dispatch(make([]byte, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = m.Close()
 	if err != nil {
 		t.Fatalf("Failed to close empty mux")

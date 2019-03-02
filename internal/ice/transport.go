@@ -61,15 +61,7 @@ func (c *Conn) Read(p []byte) (int, error) {
 		return 0, err
 	}
 
-	resN := make(chan int)
-
-	select {
-	case c.agent.rcvCh <- &bufIn{p, resN}:
-		n := <-resN
-		return n, nil
-	case <-c.agent.done:
-		return 0, c.agent.getErr()
-	}
+	return c.agent.buffer.Read(p)
 }
 
 // Write implements the Conn Write method.
@@ -87,6 +79,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return pair.Write(p)
 }
 

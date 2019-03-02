@@ -1,50 +1,37 @@
 package mux
 
 import (
-	"errors"
 	"net"
 	"time"
+
+	"github.com/pions/transport/packetio"
 )
 
 // Endpoint implements net.Conn. It is used to read muxed packets.
 type Endpoint struct {
-	mux     *Mux
-	readCh  chan []byte
-	wroteCh chan int
-	doneCh  chan struct{}
+	mux    *Mux
+	buffer *packetio.Buffer
 }
 
 // Close unregisters the endpoint from the Mux
-func (e *Endpoint) Close() error {
-	e.close()
+func (e *Endpoint) Close() (err error) {
+	err = e.close()
+	if err != nil {
+		return err
+	}
+
 	e.mux.RemoveEndpoint(e)
 	return nil
 }
 
-func (e *Endpoint) close() {
-	select {
-	case <-e.doneCh:
-	default:
-		close(e.doneCh)
-	}
+func (e *Endpoint) close() error {
+	return e.buffer.Close()
 }
 
 // Read reads a packet of len(p) bytes from the underlying conn
 // that are matched by the associated MuxFunc
 func (e *Endpoint) Read(p []byte) (int, error) {
-	select {
-	case e.readCh <- p:
-		n := <-e.wroteCh
-		return n, nil
-	case <-e.doneCh:
-		// Unblock Mux.dispatch
-		select {
-		case <-e.readCh:
-		default:
-			close(e.readCh)
-		}
-		return 0, errors.New("endpoint closed")
-	}
+	return e.buffer.Read(p)
 }
 
 // Write writes len(p) bytes to the underlying conn
