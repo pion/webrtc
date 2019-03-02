@@ -140,7 +140,8 @@ func (c *Candidate) recvLoop() {
 		}
 
 		if stun.IsSTUN(buffer[:n]) {
-			m, err := stun.NewMessage(buffer[:n])
+			var m *stun.Message
+			m, err = stun.NewMessage(buffer[:n])
 			if err != nil {
 				iceLog.Warnf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
 				continue
@@ -154,7 +155,7 @@ func (c *Candidate) recvLoop() {
 
 			continue
 		} else {
-			err := c.agent.run(func(agent *Agent) {
+			err = c.agent.run(func(agent *Agent) {
 				agent.noSTUNSeen(c, srcAddr)
 			})
 			if err != nil {
@@ -162,12 +163,10 @@ func (c *Candidate) recvLoop() {
 			}
 		}
 
-		select {
-		case bufin := <-c.agent.rcvCh:
-			copy(bufin.buf, buffer[:n]) // TODO: avoid copy in common case?
-			bufin.size <- n
-		case <-c.closeCh:
-			return
+		// NOTE This will return packetio.ErrFull if the buffer ever manages to fill up.
+		_, err = c.agent.buffer.Write(buffer[:n])
+		if err != nil {
+			iceLog.Warnf("failed to write packet")
 		}
 	}
 }

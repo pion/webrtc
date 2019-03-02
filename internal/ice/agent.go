@@ -13,6 +13,7 @@ import (
 	"errors"
 
 	"github.com/pions/stun"
+	"github.com/pions/transport/packetio"
 	"github.com/pions/webrtc/internal/util"
 )
 
@@ -25,6 +26,9 @@ const (
 
 	// defaultConnectionTimeout used to declare a connection dead
 	defaultConnectionTimeout = 30 * time.Second
+
+	// the number of bytes that can be buffered before we start to error
+	maxBufferSize = 1000 * 1000 // 1MB
 )
 
 // Agent represents the ICE agent
@@ -72,17 +76,11 @@ type Agent struct {
 	selectedPair *candidatePair
 	validPairs   []*candidatePair
 
-	// Channel for reading
-	rcvCh chan *bufIn
+	buffer *packetio.Buffer
 
 	// State for closing
 	done chan struct{}
 	err  atomicError
-}
-
-type bufIn struct {
-	buf  []byte
-	size chan int
 }
 
 func (a *Agent) ok() error {
@@ -142,11 +140,16 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		localPwd:    util.RandSeq(32),
 		taskChan:    make(chan task),
 		onConnected: make(chan struct{}),
-		rcvCh:       make(chan *bufIn),
+		buffer:      packetio.NewBuffer(),
 		done:        make(chan struct{}),
 		portmin:     config.PortMin,
 		portmax:     config.PortMax,
 	}
+
+	// Make sure the buffer doesn't grow indefinitely.
+	// NOTE: We actually won't get anywhere close to this limit.
+	// SRTP will constantly read from the endpoint and drop packets if it's full.
+	a.buffer.SetLimitSize(maxBufferSize)
 
 	// connectionTimeout used to declare a connection dead
 	if config.ConnectionTimeout == nil {
@@ -594,6 +597,11 @@ func (a *Agent) Close() error {
 				}
 			}
 			delete(agent.remoteCandidates, net)
+		}
+
+		err := a.buffer.Close()
+		if err != nil {
+			iceLog.Warnf("failed to close buffer: %v", err)
 		}
 	})
 	if err != nil {

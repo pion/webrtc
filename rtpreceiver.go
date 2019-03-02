@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/pions/rtcp"
+	"github.com/pions/srtp"
 )
 
 // RTPReceiver allows an application to inspect the receipt of a Track
@@ -19,7 +20,8 @@ type RTPReceiver struct {
 	closed, received chan interface{}
 	mu               sync.RWMutex
 
-	rtpReadStream, rtcpReadStream *lossyReadCloser
+	rtpReadStream  *srtp.ReadStreamSRTP
+	rtcpReadStream *srtp.ReadStreamSRTCP
 
 	// A reference to the associated api object
 	api *API
@@ -77,7 +79,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return err
 	}
 
-	srtpReadStream, err := srtpSession.OpenReadStream(parameters.Encodings.SSRC)
+	r.rtpReadStream, err = srtpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
 	}
@@ -87,13 +89,11 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		return err
 	}
 
-	srtcpReadStream, err := srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
+	r.rtcpReadStream, err = srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
 	}
 
-	r.rtpReadStream = newLossyReadCloser(srtpReadStream)
-	r.rtcpReadStream = newLossyReadCloser(srtcpReadStream)
 	return nil
 }
 

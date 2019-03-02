@@ -62,7 +62,7 @@ func TestOpusWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OpusWriter shouldn't be able to write an empty packet",
 			messageClose: "OpusWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          nil, // TODO: Update pions/rpt Opus unmarshal, so it returns an error, and update expected value
+			err:          fmt.Errorf("Payload is not large enough"),
 			closeErr:     nil,
 		},
 		{
@@ -113,14 +113,14 @@ func TestOpusWriter_AddPacketAndClose(t *testing.T) {
 	for _, t := range addPacketTestCase {
 		if t.writer != nil {
 			res := t.writer.AddPacket(t.packet)
-			assert.Equal(res, t.err, t.message)
+			assert.Equal(t.err, res, t.message)
 		}
 	}
 
 	for _, t := range addPacketTestCase {
 		if t.writer != nil {
 			res := t.writer.Close()
-			assert.Equal(res, t.closeErr, t.messageClose)
+			assert.Equal(t.closeErr, res, t.messageClose)
 		}
 	}
 }
