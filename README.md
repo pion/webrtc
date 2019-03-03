@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion webrtc"></a>
   <a href="https://sourcegraph.com/github.com/pions/webrtc?badge"><img src="https://sourcegraph.com/github.com/pions/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
+<a href="https://app.fossa.io/projects/git%2Bgithub.com%2Fpions%2Fwebrtc?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpions%2Fwebrtc.svg?type=shield"/></a>
   <a href="http://gophers.slack.com/messages/pion"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a>
   <a href="https://waffle.io/pions/webrtc"><img src="https://img.shields.io/badge/pm-waffle-gray.svg?longCache=true&colorB=brightgreen" alt="Waffle board"></a>
   <br>
@@ -21,6 +22,9 @@
 <br>
 
 See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpions%2Fwebrtc.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpions%2Fwebrtc?ref=badge_large)
 
 ### Breaking Changes
 
