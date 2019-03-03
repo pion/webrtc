@@ -30,13 +30,13 @@ const (
 	// NetworkTypeUDP4 indicates UDP over IPv4.
 	NetworkTypeUDP4 NetworkType = iota + 1
 
-	// NetworkTypeUDP6 indicates UDP over IPv4.
+	// NetworkTypeUDP6 indicates UDP over IPv6.
 	NetworkTypeUDP6
 
 	// NetworkTypeTCP4 indicates TCP over IPv4.
 	NetworkTypeTCP4
 
-	// NetworkTypeTCP6 indicates TCP over IPv4.
+	// NetworkTypeTCP6 indicates TCP over IPv6.
 	NetworkTypeTCP6
 )
 
@@ -73,6 +73,28 @@ func (t NetworkType) IsReliable() bool {
 	case NetworkTypeUDP4, NetworkTypeUDP6:
 		return false
 	case NetworkTypeTCP4, NetworkTypeTCP6:
+		return true
+	}
+	return false
+}
+
+// IsIPv4 returns whether the network type is IPv4 or not.
+func (t NetworkType) IsIPv4() bool {
+	switch t {
+	case NetworkTypeUDP4, NetworkTypeTCP4:
+		return true
+	case NetworkTypeUDP6, NetworkTypeTCP6:
+		return false
+	}
+	return false
+}
+
+// IsIPv6 returns whether the network type is IPv6 or not.
+func (t NetworkType) IsIPv6() bool {
+	switch t {
+	case NetworkTypeUDP4, NetworkTypeTCP4:
+		return false
+	case NetworkTypeUDP6, NetworkTypeTCP6:
 		return true
 	}
 	return false
