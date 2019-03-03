@@ -119,6 +119,10 @@ type AgentConfig struct {
 	// when this is nil, it defaults to 10 seconds.
 	// A keepalive interval of 0 means we never send keepalive packets
 	KeepaliveInterval *time.Duration
+
+	// NetworkTypes is an optional configuration for disabling or enablding
+	// support for specific network types.
+	NetworkTypes []NetworkType
 }
 
 // NewAgent creates a new Agent
@@ -158,8 +162,8 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	}
 
 	// Initialize local candidates
-	a.gatherCandidatesLocal()
-	a.gatherCandidatesReflective(config.Urls)
+	a.gatherCandidatesLocal(config.NetworkTypes)
+	a.gatherCandidatesReflective(config.Urls, config.NetworkTypes)
 
 	go a.taskLoop()
 	return a, nil
@@ -211,8 +215,8 @@ func (a *Agent) listenUDP(network string, laddr *net.UDPAddr) (*net.UDPConn, err
 	return nil, ErrPort
 }
 
-func (a *Agent) gatherCandidatesLocal() {
-	localIPs := localInterfaces()
+func (a *Agent) gatherCandidatesLocal(networkTypes []NetworkType) {
+	localIPs := localInterfaces(networkTypes)
 	for _, ip := range localIPs {
 		for _, network := range supportedNetworks {
 			conn, err := a.listenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
@@ -238,8 +242,8 @@ func (a *Agent) gatherCandidatesLocal() {
 	}
 }
 
-func (a *Agent) gatherCandidatesReflective(urls []*URL) {
-	for _, networkType := range supportedNetworkTypes {
+func (a *Agent) gatherCandidatesReflective(urls []*URL, networkTypes []NetworkType) {
+	for _, networkType := range networkTypes {
 		network := networkType.String()
 		for _, url := range urls {
 			switch url.Scheme {

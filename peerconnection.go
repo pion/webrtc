@@ -230,6 +230,7 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 		}
 		pc.configuration.ICEServers = configuration.ICEServers
 	}
+
 	return nil
 }
 
@@ -468,7 +469,6 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	g, err := pc.api.NewICEGatherer(ICEGatherOptions{
 		ICEServers: pc.configuration.ICEServers,
-		// TODO: GatherPolicy
 	})
 	if err != nil {
 		return nil, err

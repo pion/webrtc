@@ -33,7 +33,7 @@ func testTimeout(t *testing.T, c *Conn, timeout time.Duration) {
 		})
 
 		if err != nil {
-			//we should never get here.
+			// we should never get here.
 			panic(err)
 		}
 
@@ -59,7 +59,7 @@ func TestTimeout(t *testing.T) {
 	err := cb.Close()
 
 	if err != nil {
-		//we should never get here.
+		// we should never get here.
 		panic(err)
 	}
 
@@ -69,7 +69,7 @@ func TestTimeout(t *testing.T) {
 	err = cb.Close()
 
 	if err != nil {
-		//we should never get here.
+		// we should never get here.
 		panic(err)
 	}
 
@@ -81,13 +81,13 @@ func TestReadClosed(t *testing.T) {
 
 	err := ca.Close()
 	if err != nil {
-		//we should never get here.
+		// we should never get here.
 		panic(err)
 	}
 
 	err = cb.Close()
 	if err != nil {
-		//we should never get here.
+		// we should never get here.
 		panic(err)
 	}
 
@@ -191,7 +191,10 @@ func pipe() (*Conn, *Conn) {
 	aNotifier, aConnected := onConnected()
 	bNotifier, bConnected := onConnected()
 
-	aAgent, err := NewAgent(&AgentConfig{Urls: urls})
+	aAgent, err := NewAgent(&AgentConfig{
+		Urls:         urls,
+		NetworkTypes: supportedNetworkTypes,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -200,7 +203,10 @@ func pipe() (*Conn, *Conn) {
 		panic(err)
 	}
 
-	bAgent, err := NewAgent(&AgentConfig{Urls: urls})
+	bAgent, err := NewAgent(&AgentConfig{
+		Urls:         urls,
+		NetworkTypes: supportedNetworkTypes,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -225,7 +231,12 @@ func pipeWithTimeout(iceTimeout time.Duration, iceKeepalive time.Duration) (*Con
 	aNotifier, aConnected := onConnected()
 	bNotifier, bConnected := onConnected()
 
-	aAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &iceTimeout, KeepaliveInterval: &iceKeepalive})
+	aAgent, err := NewAgent(&AgentConfig{
+		Urls:              urls,
+		ConnectionTimeout: &iceTimeout,
+		KeepaliveInterval: &iceKeepalive,
+		NetworkTypes:      supportedNetworkTypes,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -234,7 +245,12 @@ func pipeWithTimeout(iceTimeout time.Duration, iceKeepalive time.Duration) (*Con
 		panic(err)
 	}
 
-	bAgent, err := NewAgent(&AgentConfig{Urls: urls, ConnectionTimeout: &iceTimeout, KeepaliveInterval: &iceKeepalive})
+	bAgent, err := NewAgent(&AgentConfig{
+		Urls:              urls,
+		ConnectionTimeout: &iceTimeout,
+		KeepaliveInterval: &iceKeepalive,
+		NetworkTypes:      supportedNetworkTypes,
+	})
 	if err != nil {
 		panic(err)
 	}

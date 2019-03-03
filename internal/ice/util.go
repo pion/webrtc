@@ -5,10 +5,21 @@ import (
 	"sync/atomic"
 )
 
-func localInterfaces() (ips []net.IP) {
+func localInterfaces(networkTypes []NetworkType) (ips []net.IP) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return ips
+	}
+
+	var IPv4Requested, IPv6Requested bool
+	for _, typ := range networkTypes {
+		if typ.IsIPv4() {
+			IPv4Requested = true
+		}
+
+		if typ.IsIPv6() {
+			IPv6Requested = true
+		}
 	}
 
 	for _, iface := range ifaces {
@@ -33,17 +44,18 @@ func localInterfaces() (ips []net.IP) {
 				ip = addr.IP
 
 			}
-
 			if ip == nil || ip.IsLoopback() {
 				continue
 			}
 
-			// The conditions of invalidation written below are defined in
-			// https://tools.ietf.org/html/rfc8445#section-5.1.1.1
 			if ipv4 := ip.To4(); ipv4 == nil {
-				if !isSupportedIPv6(ip) {
+				if !IPv6Requested {
+					continue
+				} else if !isSupportedIPv6(ip) {
 					continue
 				}
+			} else if !IPv4Requested {
+				continue
 			}
 
 			ips = append(ips, ip)
@@ -62,6 +74,8 @@ func (a *atomicError) Load() error {
 	return err.error
 }
 
+// The conditions of invalidation written below are defined in
+// https://tools.ietf.org/html/rfc8445#section-5.1.1.1
 func isSupportedIPv6(ip net.IP) bool {
 	if len(ip) != net.IPv6len ||
 		!isZeros(ip[0:12]) || // !(IPv4-compatible IPv6)
