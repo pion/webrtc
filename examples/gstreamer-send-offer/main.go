@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 
@@ -11,6 +12,10 @@ import (
 )
 
 func main() {
+	audioSrc := flag.String("audio-src", "audiotestsrc", "GStreamer audio src")
+	videoSrc := flag.String("video-src", "videotestsrc", "GStreamer video src")
+	sdpChan := signal.HTTPSDPServer()
+
 	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
@@ -69,9 +74,9 @@ func main() {
 	// Output the offer in base64 so we can paste it in browser
 	fmt.Println(signal.Encode(offer))
 
-	// Wait for the answer to be pasted
+	// Wait for the answer to be submitted via HTTP
 	answer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &answer)
+	signal.Decode(<-sdpChan, &answer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(answer)
@@ -80,8 +85,8 @@ func main() {
 	}
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack, "audiotestsrc").Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track, "videotestsrc").Start()
+	gst.CreatePipeline(webrtc.Opus, opusTrack, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, vp8Track, *videoSrc).Start()
 
 	// Block forever
 	select {}
