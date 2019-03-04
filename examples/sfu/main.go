@@ -1,12 +1,7 @@
 package main
 
 import (
-	"bufio"
-	"flag"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/pions/rtcp"
@@ -23,26 +18,14 @@ var peerConnectionConfig = webrtc.Configuration{
 	},
 }
 
-func mustReadStdin(reader *bufio.Reader) string {
-	rawSd, err := reader.ReadString('\n')
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("")
-
-	return rawSd
-}
-
-func mustReadHTTP(sdp chan string) string {
-	ret := <-sdp
-	return ret
-}
-
 const (
 	rtcpPLIInterval = time.Second * 3
 )
 
 func main() {
+	sdpChan := signal.HTTPSDPServer()
+
+	// Everything below is the pion-WebRTC API, thanks for using it ❤️.
 	// Create a MediaEngine object to configure the supported codec
 	m := webrtc.MediaEngine{}
 
@@ -53,28 +36,9 @@ func main() {
 	// Create the API object with the MediaEngine
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
 
-	port := flag.Int("port", 8080, "http server port")
-	flag.Parse()
-
-	sdp := make(chan string)
-	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := ioutil.ReadAll(r.Body)
-		fmt.Fprintf(w, "done")
-		sdp <- string(body)
-	})
-
-	go func() {
-		err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
 	offer := webrtc.SessionDescription{}
-	signal.Decode(mustReadHTTP(sdp), &offer)
+	signal.Decode(<-sdpChan, &offer)
 	fmt.Println("")
-
-	// Everything below is the pion-WebRTC API, thanks for using it ❤️.
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := api.NewPeerConnection(peerConnectionConfig)
@@ -144,7 +108,7 @@ func main() {
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.SessionDescription{}
-		signal.Decode(mustReadHTTP(sdp), &recvOnlyOffer)
+		signal.Decode(<-sdpChan, &recvOnlyOffer)
 
 		// Create a new PeerConnection
 		peerConnection, err := api.NewPeerConnection(peerConnectionConfig)
