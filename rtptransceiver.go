@@ -1,6 +1,8 @@
 package webrtc
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 )
 
@@ -17,6 +19,10 @@ type RTPTransceiver struct {
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {
+	if track == nil {
+		return fmt.Errorf("Track must not be nil")
+	}
+
 	t.Sender.track = track
 
 	switch t.Direction {
