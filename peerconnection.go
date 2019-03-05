@@ -1138,8 +1138,8 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	var transceiver *RTPTransceiver
 	for _, t := range pc.rtpTransceivers {
 		if !t.stopped &&
-			t.Sender != nil && // TODO: check that the sender has never sent
-			t.Sender.track == nil &&
+			t.Sender != nil &&
+			!t.Sender.hasSent() &&
 			t.Receiver.Track() != nil &&
 			t.Receiver.Track().Kind() == track.Kind() {
 			transceiver = t
