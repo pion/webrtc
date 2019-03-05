@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
@@ -98,6 +99,22 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Janus Session need keep alive 
+	go func() {
+		ticker := time.NewTicker(time.Second * 30)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				_,err := session.KeepAlive()
+				if err != nil {
+					log.Println("ping:", err)
+					return
+				}
+			}
+		}
+	}()
 
 	go watchHandle(handle)
 
