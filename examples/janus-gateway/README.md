@@ -27,7 +27,7 @@ This example demonstrates how to stream to a Janus video-room using pion-WebRTC
 run `main.go` in `github.com/pions/webrtc/examples/janus-gateway/video-room`
 
 OSX
-```sh 
+```sh
 brew install pkg-config
 https://gstreamer.freedesktop.org/data/pkg/osx/
 
