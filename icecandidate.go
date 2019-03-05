@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/pions/sdp/v2"
-	"github.com/pions/webrtc/pkg/ice"
+	"github.com/pions/webrtc/internal/ice"
 )
 
 // ICECandidate represents a ice candidate
@@ -140,4 +140,12 @@ func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 	default:
 		return ICECandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
 	}
+}
+
+func (c ICECandidate) String() string {
+	ic, err := c.toICE()
+	if err != nil {
+		return fmt.Sprintf("%#v failed to convert to ICE: %s", c, err)
+	}
+	return ic.String()
 }

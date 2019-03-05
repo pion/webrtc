@@ -28,7 +28,8 @@ const (
 
 // Agent represents the ICE agent
 type Agent struct {
-	onConnectionStateChangeHdlr func(ConnectionState)
+	onConnectionStateChangeHdlr       func(ConnectionState)
+	onSelectedCandidatePairChangeHdlr func(*Candidate, *Candidate)
 
 	// Used to block double Dial/Accept
 	opened bool
@@ -168,6 +169,22 @@ func (a *Agent) OnConnectionStateChange(f func(ConnectionState)) error {
 	return a.run(func(agent *Agent) {
 		agent.onConnectionStateChangeHdlr = f
 	})
+}
+
+// OnSelectedCandidatePairChange sets a handler that is fired when the final candidate
+// pair is selected
+func (a *Agent) OnSelectedCandidatePairChange(f func(*Candidate, *Candidate)) error {
+	return a.run(func(agent *Agent) {
+		agent.onSelectedCandidatePairChangeHdlr = f
+	})
+}
+
+func (a *Agent) onSelectedCandidatePairChange(p *candidatePair) {
+	if p != nil {
+		if a.onSelectedCandidatePairChangeHdlr != nil {
+			a.onSelectedCandidatePairChangeHdlr(p.local, p.remote)
+		}
+	}
 }
 
 func (a *Agent) listenUDP(network string, laddr *net.UDPAddr) (*net.UDPConn, error) {
@@ -362,6 +379,7 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	if a.connectionState != newState {
+		iceLog.Infof("Setting new connection state: %s", newState)
 		a.connectionState = newState
 		hdlr := a.onConnectionStateChangeHdlr
 		if hdlr != nil {
@@ -390,6 +408,10 @@ func (a *Agent) setValidPair(local, remote *Candidate, selected, controlling boo
 	iceLog.Tracef("Found valid candidate pair: %s (selected? %t)", p, selected)
 
 	if selected {
+		// Notify when the selected pair changes
+		if !a.selectedPair.Equal(p) {
+			a.onSelectedCandidatePairChange(p)
+		}
 		a.selectedPair = p
 		a.validPairs = nil
 		// TODO: only set state to connected on selecting final pair?

@@ -31,7 +31,7 @@ func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
 func (m *MediaEngine) RegisterDefaultCodecs() {
-	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000, 2))
+	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
 	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
 	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
@@ -92,11 +92,11 @@ func NewRTPG722Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 }
 
 // NewRTPOpusCodec is a helper to create an Opus codec
-func NewRTPOpusCodec(payloadType uint8, clockrate uint32, channels uint16) *RTPCodec {
+func NewRTPOpusCodec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeAudio,
 		Opus,
 		clockrate,
-		channels,
+		2, //According to RFC7587, Opus RTP streams must have exactly 2 channels.
 		"minptime=10;useinbandfec=1",
 		payloadType,
 		&codecs.OpusPayloader{})

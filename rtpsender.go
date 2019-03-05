@@ -44,6 +44,14 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 	}, nil
 }
 
+// Transport returns the currently-configured *DTLSTransport or nil
+// if one has not yet been configured
+func (r *RTPSender) Transport() *DTLSTransport {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.transport
+}
+
 // Send Attempts to set the parameters controlling the sending of media.
 func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.mu.Lock()

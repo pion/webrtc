@@ -114,6 +114,61 @@ func TestPairPriority(t *testing.T) {
 	}
 }
 
+func TestOnSelectedCandidatePairChange(t *testing.T) {
+	// avoid deadlocks?
+	defer test.TimeOut(1 * time.Second).Stop()
+
+	a, err := NewAgent(&AgentConfig{})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %s", err)
+	}
+	callbackCalled := make(chan struct{}, 1)
+	if err = a.OnSelectedCandidatePairChange(func(local, remote *Candidate) {
+		close(callbackCalled)
+	}); err != nil {
+		t.Fatalf("Failed to set agent OnCandidatePairChange callback: %s", err)
+	}
+
+	hostLocal, err := NewCandidateHost(
+		"udp",
+		net.ParseIP("192.168.1.1"), 19216,
+		1,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct local host candidate: %s", err)
+	}
+
+	relayRemote, err := NewCandidateRelay(
+		"udp",
+		net.ParseIP("1.2.3.4"), 12340,
+		1,
+		"4.3.2.1", 43210,
+	)
+	if err != nil {
+		t.Fatalf("Failed to construct remote relay candidate: %s", err)
+	}
+
+	// select the pair
+	if err = a.run(func(agent *Agent) {
+		agent.setValidPair(hostLocal, relayRemote, true, false)
+	}); err != nil {
+		t.Fatalf("Failed to setValidPair(): %s", err)
+	}
+	// ensure that the callback fired on setting the pair
+	<-callbackCalled
+	// set the same pair; this should not invoke the callback
+	// if the callback is invoked now it will panic due
+	// to second close of the channel
+	if err = a.run(func(agent *Agent) {
+		agent.setValidPair(hostLocal, relayRemote, true, false)
+	}); err != nil {
+		t.Fatalf("Failed to setValidPair(): %s", err)
+	}
+	if err := a.Close(); err != nil {
+		t.Fatalf("Error on agent.Close(): %s", err)
+	}
+}
+
 type BadAddr struct{}
 
 func (ba *BadAddr) Network() string {
