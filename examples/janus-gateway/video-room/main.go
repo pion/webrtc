@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	janus "github.com/notedit/janus-go"
 	"github.com/pions/webrtc"
@@ -98,6 +99,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	go func() {
+		for {
+			if _, keepAliveErr := session.KeepAlive(); err != nil {
+				panic(keepAliveErr)
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
 
 	go watchHandle(handle)
 
