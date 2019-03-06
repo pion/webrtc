@@ -82,6 +82,12 @@ func NewWith(out io.Writer, sampleRate uint32, channelCount uint16) (*OpusWriter
    Figure 1: Example Packet Organization for a Logical Ogg Opus Stream
 */
 
+const (
+	continuationOfStream = 0
+	beginningOfStream    = 2
+	endOfStream          = 4
+)
+
 func (i *OpusWriter) writeHeaders() error {
 	// ID Header
 	oggIDHeader := make([]byte, 19)
@@ -89,14 +95,14 @@ func (i *OpusWriter) writeHeaders() error {
 	copy(oggIDHeader[0:], []byte("OpusHead"))                     // Magic Signature 'OpusHead'
 	oggIDHeader[8] = 1                                            // Version
 	oggIDHeader[9] = uint8(i.channelCount)                        // Channel count
-	binary.LittleEndian.PutUint16(oggIDHeader[10:], 0)            // pre-skip, don't need to skip any value
+	binary.LittleEndian.PutUint16(oggIDHeader[10:], 3840)         // pre-skip, 3840 recommanded in the RFC
 	binary.LittleEndian.PutUint32(oggIDHeader[12:], i.sampleRate) // original sample rate, any valid sample e.g 48000
 	binary.LittleEndian.PutUint16(oggIDHeader[16:], 0)            // output gain
 	oggIDHeader[18] = 0                                           // channel map 0 = one stream: mono or stereo
 
 	// Reference: https://tools.ietf.org/html/rfc7845.html#page-6
 	// RFC specifies that the ID Header page should have a granule position of 0 and a Header Type set to 2 (StartOfStream)
-	data := i.createPage(oggIDHeader, 2, 0)
+	data := i.createPage(oggIDHeader, beginningOfStream, 0)
 	if _, err := i.stream.Write(data); err != nil {
 		return err
 	}
@@ -125,6 +131,7 @@ func (i *OpusWriter) createPage(payload []uint8, headerType uint8, granulePos ui
 	payloadLen := len(payload)
 	page := make([]byte, pageHeaderSize+1+payloadLen)
 
+	// https://www.xiph.org/ogg/doc/framing.html
 	copy(page[0:], []byte("OggS"))                        // page headers starts with 'OggS'
 	page[4] = 0                                           // Version
 	page[5] = headerType                                  // 1 = continuation, 2 = beginning of stream, 4 = end of stream
@@ -161,7 +168,7 @@ func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
 	}
 	i.previousTimestamp = packet.Timestamp
 
-	data := i.createPage(payload, 0, i.previousGranulePosition)
+	data := i.createPage(payload, continuationOfStream, i.previousGranulePosition)
 
 	_, err = i.stream.Write(data)
 	return err
@@ -182,15 +189,17 @@ func (i *OpusWriter) Close() error {
 
 	// RFC specifies that the last page should have a Header Type set to 4 (EndOfStream)
 	// The granule position here is the magic value '-1'
-	data := i.createPage(make([]uint8, 0), 4, 0xFFFFFFFFFFFFFFFF)
-	if _, err := i.stream.Write(data); err != nil {
-		if i.fd != nil {
-			if e2 := i.fd.Close(); e2 != nil {
-				err = fmt.Errorf("error writing file (%v); error deleting file (%v)", err, e2)
+	/*
+		data := i.createPage(make([]uint8, 0), endOfStream, i.previousGranulePosition+960)
+		if _, err := i.stream.Write(data); err != nil {
+			if i.fd != nil {
+				if e2 := i.fd.Close(); e2 != nil {
+					err = fmt.Errorf("error writing file (%v); error deleting file (%v)", err, e2)
+				}
 			}
+			return err
 		}
-		return err
-	}
+	*/
 
 	if i.fd != nil {
 		return i.fd.Close()
