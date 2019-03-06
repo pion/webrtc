@@ -14,6 +14,7 @@ import (
 	"github.com/pions/dtls"
 	"github.com/pions/srtp"
 	"github.com/pions/webrtc/internal/mux"
+	"github.com/pions/webrtc/internal/util"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
@@ -245,7 +246,7 @@ func (t *DTLSTransport) Stop() error {
 			closeErrs = append(closeErrs, err)
 		}
 	}
-	return flattenErrs(closeErrs)
+	return util.FlattenErrs(closeErrs)
 }
 
 func (t *DTLSTransport) validateFingerPrint(remoteParameters DTLSParameters, remoteCert *x509.Certificate) error {

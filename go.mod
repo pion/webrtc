@@ -11,6 +11,5 @@ require (
 	github.com/pions/srtp v1.0.4
 	github.com/pions/stun v0.2.0
 	github.com/pions/transport v0.2.0
-	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.3.0
 )

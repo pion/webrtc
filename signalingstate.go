@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/pions/webrtc/pkg/rtcerr"
-	"github.com/pkg/errors"
 )
 
 type stateChangeOp int
@@ -108,7 +107,7 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 	// Special case for rollbacks
 	if sdpType == SDPTypeRollback && cur == SignalingStateStable {
 		return cur, &rtcerr.InvalidModificationError{
-			Err: errors.New("Can't rollback from stable state"),
+			Err: fmt.Errorf("can't rollback from stable state"),
 		}
 	}
 

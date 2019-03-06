@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pions/transport/test"
+	"github.com/pions/webrtc/internal/util"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {
@@ -153,7 +154,7 @@ func (s *testORTCStack) close() error {
 		closeErrs = append(closeErrs, err)
 	}
 
-	return flattenErrs(closeErrs)
+	return util.FlattenErrs(closeErrs)
 }
 
 type testORTCSignal struct {
@@ -234,5 +235,5 @@ func signalORTCPair(stackA *testORTCStack, stackB *testORTCStack) error {
 
 	closeErrs := []error{errA, errB}
 
-	return flattenErrs(closeErrs)
+	return util.FlattenErrs(closeErrs)
 }

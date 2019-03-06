@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"errors"
+
 	"github.com/pions/stun"
 	"github.com/pions/webrtc/internal/util"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -282,30 +283,30 @@ func allocateUDP(network string, url *URL) (*net.UDPAddr, *stun.XorAddress, erro
 	// TODO Do we want the timeout to be configurable?
 	client, err := stun.NewClient(network, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Failed to create STUN client")
+		return nil, nil, util.FlattenErrs([]error{errors.New("failed to create STUN client"), err})
 	}
 	localAddr, ok := client.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		return nil, nil, errors.Errorf("Failed to cast STUN client to UDPAddr")
+		return nil, nil, fmt.Errorf("failed to cast STUN client to UDPAddr")
 	}
 
 	resp, err := client.Request()
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Failed to make STUN request")
+		return nil, nil, util.FlattenErrs([]error{errors.New("failed to make STUN request"), err})
 	}
 
 	if err = client.Close(); err != nil {
-		return nil, nil, errors.Wrapf(err, "Failed to close STUN client")
+		return nil, nil, util.FlattenErrs([]error{errors.New("failed to close STUN client"), err})
 	}
 
 	attr, ok := resp.GetOneAttribute(stun.AttrXORMappedAddress)
 	if !ok {
-		return nil, nil, errors.Errorf("Got respond from STUN server that did not contain XORAddress")
+		return nil, nil, fmt.Errorf("got response from STUN server that did not contain XORAddress")
 	}
 
 	var addr stun.XorAddress
 	if err = addr.Unpack(resp, attr); err != nil {
-		return nil, nil, errors.Wrapf(err, "Failed to unpack STUN XorAddress response")
+		return nil, nil, util.FlattenErrs([]error{errors.New("failed to unpack STUN XorAddress response"), err})
 	}
 
 	return localAddr, &addr, nil
@@ -314,11 +315,11 @@ func allocateUDP(network string, url *URL) (*net.UDPAddr, *stun.XorAddress, erro
 func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remotePwd string) error {
 	switch {
 	case a.haveStarted:
-		return errors.Errorf("Attempted to start agent twice")
+		return fmt.Errorf("attempted to start agent twice")
 	case remoteUfrag == "":
-		return errors.Errorf("remoteUfrag is empty")
+		return fmt.Errorf("remoteUfrag is empty")
 	case remotePwd == "":
-		return errors.Errorf("remotePwd is empty")
+		return fmt.Errorf("remotePwd is empty")
 	}
 	iceLog.Debugf("Started agent: isControlling? %t, remoteUfrag: %q, remotePwd: %q", isControlling, remoteUfrag, remotePwd)
 
@@ -702,7 +703,7 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 		ip = addr.IP
 		port = addr.Port
 	default:
-		return errors.Errorf("unsupported address type %T", addr)
+		return fmt.Errorf("unsupported address type %T", addr)
 	}
 
 	pflxCandidate, err := NewCandidatePeerReflexive(
@@ -715,7 +716,7 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 	)
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to create peer-reflexive candidate: %v", remote)
+		return util.FlattenErrs([]error{fmt.Errorf("failed to create peer-reflexive candidate: %v", remote), err})
 	}
 
 	// Add pflxCandidate to the remote candidate list
@@ -780,7 +781,7 @@ func (a *Agent) getBestPair() (*candidatePair, error) {
 	out := <-res
 
 	if out == nil {
-		return nil, errors.New("No Valid Candidate Pairs Available")
+		return nil, errors.New("no Valid Candidate Pairs Available")
 	}
 
 	return out, nil
