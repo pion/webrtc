@@ -1,10 +1,10 @@
 package ice
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/pions/webrtc/pkg/rtcerr"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 

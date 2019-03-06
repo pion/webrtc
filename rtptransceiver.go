@@ -1,10 +1,6 @@
 package webrtc
 
-import (
-	"fmt"
-
-	"github.com/pkg/errors"
-)
+import "fmt"
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
@@ -20,7 +16,7 @@ type RTPTransceiver struct {
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {
 	if track == nil {
-		return fmt.Errorf("Track must not be nil")
+		return fmt.Errorf("track must not be nil")
 	}
 
 	t.Sender.track = track
@@ -31,7 +27,7 @@ func (t *RTPTransceiver) setSendingTrack(track *Track) error {
 	case RTPTransceiverDirectionInactive:
 		t.Direction = RTPTransceiverDirectionSendonly
 	default:
-		return errors.Errorf("Invalid state change in RTPTransceiver.setSending")
+		return fmt.Errorf("invalid state change in RTPTransceiver.setSending")
 	}
 	return nil
 }

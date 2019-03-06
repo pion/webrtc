@@ -15,9 +15,9 @@ import (
 	"github.com/pions/rtcp"
 	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/internal/ice"
+	"github.com/pions/webrtc/internal/util"
 	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
-	"github.com/pkg/errors"
 )
 
 var pcLog = logging.NewScopedLogger("pc")
@@ -422,9 +422,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	useIdentity := pc.idpLoginURL != nil
 	switch {
 	case options != nil:
-		return SessionDescription{}, errors.Errorf("TODO handle options")
+		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case useIdentity:
-		return SessionDescription{}, errors.Errorf("TODO handle identity provider")
+		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -528,9 +528,9 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	useIdentity := pc.idpLoginURL != nil
 	switch {
 	case options != nil:
-		return SessionDescription{}, errors.Errorf("TODO handle options")
+		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case useIdentity:
-		return SessionDescription{}, errors.Errorf("TODO handle identity provider")
+		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -610,8 +610,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	cur := pc.SignalingState
 	setLocal := stateChangeOpSetLocal
 	setRemote := stateChangeOpSetRemote
-	newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous offer")}
-	newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errors.New("New sdp does not match previous answer")}
+	newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous offer")}
+	newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous answer")}
 
 	var nextState SignalingState
 	var err error
@@ -744,7 +744,7 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	// FIXME: Remove this when renegotiation is supported
 	if pc.CurrentRemoteDescription != nil {
-		return errors.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
+		return fmt.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
 	if pc.isClosed {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -794,13 +794,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if !ok {
 		fingerprint, ok = desc.parsed.MediaDescriptions[0].Attribute("fingerprint")
 		if !ok {
-			return errors.New("could not find fingerprint")
+			return fmt.Errorf("could not find fingerprint")
 		}
 	}
 	var fingerprintHash string
 	parts := strings.Split(fingerprint, " ")
 	if len(parts) != 2 {
-		return errors.New("invalid fingerprint")
+		return fmt.Errorf("invalid fingerprint")
 	}
 	fingerprint = parts[1]
 	fingerprintHash = parts[0]
@@ -1278,7 +1278,7 @@ func (pc *PeerConnection) generateDataChannelID(client bool) (uint16, error) {
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
 func (pc *PeerConnection) SetIdentityProvider(provider string) error {
-	return errors.Errorf("TODO SetIdentityProvider")
+	return fmt.Errorf("TODO SetIdentityProvider")
 }
 
 // SendRTCP sends a user provided RTCP packet to the connected peer
@@ -1360,24 +1360,7 @@ func (pc *PeerConnection) Close() error {
 
 	// TODO: Figure out stopping ICE transport & Gatherer independently.
 	// pc.iceGatherer()
-
-	return flattenErrs(closeErrs)
-}
-
-func flattenErrs(errs []error) error {
-	var errstrings []string
-
-	for _, err := range errs {
-		if err != nil {
-			errstrings = append(errstrings, err.Error())
-		}
-	}
-
-	if len(errstrings) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(strings.Join(errstrings, "\n"))
+	return util.FlattenErrs(closeErrs)
 }
 
 func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
@@ -1499,7 +1482,7 @@ func (pc *PeerConnection) NewTrack(payloadType uint8, ssrc uint32, id, label str
 	if err != nil {
 		return nil, err
 	} else if codec.Payloader == nil {
-		return nil, errors.New("codec payloader not set")
+		return nil, fmt.Errorf("codec payloader not set")
 	}
 
 	return NewTrack(payloadType, ssrc, id, label, codec)

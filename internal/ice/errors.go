@@ -1,8 +1,6 @@
 package ice
 
-import (
-	"github.com/pkg/errors"
-)
+import "errors"
 
 var (
 	// ErrUnknownType indicates an error with Unknown info.

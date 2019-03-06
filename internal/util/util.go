@@ -1,7 +1,9 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -14,4 +16,21 @@ func RandSeq(n int) string {
 		b[i] = letters[r.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+// FlattenErrs flattens multiple errors into one
+func FlattenErrs(errs []error) error {
+	var errstrings []string
+
+	for _, err := range errs {
+		if err != nil {
+			errstrings = append(errstrings, err.Error())
+		}
+	}
+
+	if len(errstrings) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(strings.Join(errstrings, "\n"))
 }
