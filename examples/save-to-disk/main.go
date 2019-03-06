@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pions/rtcp"
@@ -21,12 +22,11 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 	}()
 
 	for {
-		packet, err := track.ReadRTP()
+		rtpPacket, err := track.ReadRTP()
 		if err != nil {
 			panic(err)
 		}
-
-		if err := i.AddPacket(packet); err != nil {
+		if err := i.AddPacket(rtpPacket); err != nil {
 			panic(err)
 		}
 	}
@@ -61,6 +61,15 @@ func main() {
 		panic(err)
 	}
 
+	opusFile, err := opuswriter.New("output.opus", 48000, 2)
+	if err != nil {
+		panic(err)
+	}
+	ivfFile, err := ivfwriter.New("output.ivf")
+	if err != nil {
+		panic(err)
+	}
+
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
@@ -78,19 +87,11 @@ func main() {
 
 		codec := track.Codec()
 		if codec.Name == webrtc.Opus {
-			fmt.Println("Got Opus track, saving to disk as output.opus")
-			i, err := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
-			if err != nil {
-				panic(err)
-			}
-			saveToDisk(i, track)
+			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")
+			saveToDisk(opusFile, track)
 		} else if codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := ivfwriter.New("output.ivf")
-			if err != nil {
-				panic(err)
-			}
-			saveToDisk(i, track)
+			saveToDisk(ivfFile, track)
 		}
 	})
 
@@ -98,6 +99,16 @@ func main() {
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+
+		if connectionState == webrtc.ICEConnectionStateConnected {
+			fmt.Println("Ctrl+C the remote client to stop the demo")
+		} else if connectionState == webrtc.ICEConnectionStateFailed ||
+			connectionState == webrtc.ICEConnectionStateDisconnected {
+			opusFile.Close()
+			ivfFile.Close()
+			fmt.Println("Done writing media files")
+			os.Exit(0)
+		}
 	})
 
 	// Wait for the offer to be pasted

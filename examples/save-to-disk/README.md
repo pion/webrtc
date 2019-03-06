@@ -21,7 +21,8 @@ Run `echo $BROWSER_SDP | save-to-disk`
 ### Input save-to-disk's SessionDescription into your browser
 Copy the text that `save-to-disk` just emitted and copy into second text area
 
-### Hit 'Start Session' in jsfiddle, enjoy your video!
+### Hit 'Start Session' in jsfiddle, wait, close jsfiddle, enjoy your video!
 In the folder you ran `save-to-disk` you should now have a file `output-1.ivf` play with your video player of choice!
+> Note: In order to correctly create the files, the remote client (JSFiddle) should be closed. The Go example will automatically close itself.
 
 Congrats, you have used pion-WebRTC! Now start building something cool
