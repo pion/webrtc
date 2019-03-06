@@ -57,7 +57,7 @@ func (i *IVFWriter) writeHeader() error {
 	binary.LittleEndian.PutUint16(header[14:], 480) // Header Size
 	binary.LittleEndian.PutUint32(header[16:], 30)  // Framerate numerator
 	binary.LittleEndian.PutUint32(header[20:], 1)   // Framerate Denominator
-	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count
+	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count, will be updated on first Close() call
 	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
 	_, err := i.stream.Write(header)
@@ -108,9 +108,19 @@ func (i *IVFWriter) Close() error {
 	}()
 
 	if i.fd == nil {
-		// Returns no error has it may be convenient to call
+		// Returns no error as it may be convenient to call
 		// Close() multiple times
 		return nil
 	}
+	// Update the framecount
+	if _, err := i.fd.Seek(24, 0); err != nil {
+		return err
+	}
+	buff := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buff, uint32(i.count))
+	if _, err := i.fd.Write(buff); err != nil {
+		return err
+	}
+
 	return i.fd.Close()
 }
