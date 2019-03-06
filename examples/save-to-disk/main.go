@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pions/rtcp"
@@ -33,6 +34,14 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 }
 
 func main() {
+
+	if len(os.Args) < 2 {
+		fmt.Println("Missing Browser Session Description - Usage: go run main.go PASTE_BROWSER_SESSION_DESCRIPTION_HERE")
+		os.Exit(1)
+	}
+
+	browserSessionDescription := os.Args[1]
+
 	// Create a MediaEngine object to configure the supported codec
 	m := webrtc.MediaEngine{}
 
@@ -100,9 +109,9 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 
-	// Wait for the offer to be pasted
+	// Decode browserSessionDescription
 	offer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &offer)
+	signal.Decode(browserSessionDescription, &offer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
@@ -123,7 +132,7 @@ func main() {
 	}
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(answer))
+	fmt.Printf("\nPaste this in 'Golang base64 Session Description' input field in the browser \n%s\n", signal.Encode(answer))
 
 	// Block forever
 	select {}
