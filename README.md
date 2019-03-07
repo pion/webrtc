@@ -89,6 +89,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Antoine Baché](https://github.com/Antonito) - *OGG Opus export*
 * [frank](https://github.com/feixiao) - *Building examples on OSX*
 * [mxmCherry](https://github.com/mxmCherry)
+* [Alex Browne](https://github.com/albrow) - *JavaScript/WASM bindings*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
