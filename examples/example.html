@@ -1,11 +1,32 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>{{ .Title }}</title>
+		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,500,700" rel="stylesheet">
+		<title>{{ .Title }} | Pion</title>
+		<style>
+			body {
+				font-family: "Quicksand", sans-serif;
+				font-weight: 400;
+				margin: 4em 10%;
+			}
+		</style>
 		<link rel="stylesheet" type="text/css" href="demo.css">
+		{{ if .JS }}
 		<script src="demo.js"></script>
+		{{ else }}
+		<script src="/wasm_exec.js"></script>
+		<script>
+			const go = new Go();
+			WebAssembly.instantiateStreaming(fetch("demo.wasm"), go.importObject).then((result) => {
+				go.run(result.instance);
+			});
+		</script>
+		{{ end }}
 	</head>
 	<body>
+		<h1>{{ .Title }}</h1>
+		<p><a href="/">< Home</a></p> 
+
 		<div>
 		{{ template "demo.html" }}
 		</div>

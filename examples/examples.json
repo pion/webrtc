@@ -1,50 +1,50 @@
 [
 	{
-		"title": "Data channels",
+		"title": "Data Channels",
 		"link": "data-channels",
-		"description": "data-channels is a pion-WebRTC application that shows how you can send/recv DataChannel messages from a web browser.",
+		"description": "The data-channels example shows how you can send/recv DataChannel messages from a web browser.",
 		"type": "browser"
 	},
 	{
-		"title": "Data channels create",
+		"title": "Data Channels Create",
 		"link": "data-channels-create",
-		"description": "data-channels-create is a pion-WebRTC application that shows how you can send/recv DataChannel messages from a web browser. The difference with the data-channels example is that the datachannel is initialized from the pion side in this example.",
+		"description": "Example data-channels-create shows how you can send/recv DataChannel messages from a web browser. The difference with the data-channels example is that the data channel is initialized from the server side in this example.",
 		"type": "browser"
 	},
 	{
-		"title": "Data channels close",
+		"title": "Data Channels Close",
 		"link": "data-channels-close",
-		"description": "data-channels-close is a variant of data-channels that allow playing with the life cycle of data channels.",
+		"description": "Example data-channels-close is a variant of data-channels that allow playing with the life cycle of data channels.",
 		"type": "browser"
 	},
 	{
-		"title": "Gstreamer receive",
+		"title": "Gstreamer Receive",
 		"link": "gstreamer-receive",
-		"description": "gstreamer-receive is a simple application that shows how to receive media using pion-WebRTC and play live using GStreamer.",
+		"description": "The gstreamer-receive example shows how to receive media from the browser and play it live. This example uses GStreamer for rendering.",
 		"type": "browser"
 	},
 	{
-		"title": "Gstreamer send",
+		"title": "Gstreamer Send",
 		"link": "gstreamer-send",
-		"description": "gstreamer-send is a simple application that shows how to send video to your browser using pion-WebRTC and GStreamer.",
+		"description": "Example gstreamer-send shows how to send video to your browser. This example uses GStreamer to process the video.",
 		"type": "browser"
 	},
 	{
-		"title": "Pion to pion",
+		"title": "Pion to Pion",
 		"link": "#",
-		"description": "pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.",
+		"description": "Example pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.",
 		"type": "browser"
 	},
 	{
-		"title": "Save-to-disk",
+		"title": "Save to Disk",
 		"link": "save-to-disk",
-		"description": "save-to-disk is a simple application that shows how to record your webcam using pion-WebRTC and save to disk.",
+		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
 		"type": "browser"
 	},
 	{
 		"title": "SFU",
 		"link": "sfu",
-		"description": "sfu is a pion-WebRTC application that demonstrates how to broadcast a video to many peers, while only requiring the broadcaster to upload once.",
+		"description": "The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
 		"type": "browser"
 	}
 ]

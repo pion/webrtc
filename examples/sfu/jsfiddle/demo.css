@@ -1,1 +1,4 @@
-
+textarea {
+    width: 500px;
+    min-height: 75px;
+}

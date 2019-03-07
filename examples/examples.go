@@ -13,7 +13,7 @@ import (
 )
 
 // Examples represents the examples loaded from examples.json.
-type Examples []Example
+type Examples []*Example
 
 // Example represents an example loaded from examples.json.
 type Example struct {
@@ -21,6 +21,8 @@ type Example struct {
 	Link        string `json:"link"`
 	Description string `json:"description"`
 	Type        string `json:"type"`
+	IsJS        bool
+	IsWASM      bool
 }
 
 func main() {
@@ -47,17 +49,30 @@ func serve(addr string) error {
 	// Serve the required pages
 	// DIY 'mux' to avoid additional dependencies
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		parts := strings.Split(r.URL.Path, "/")
-		if len(parts) > 3 && // 1 / example:2 / link:3 / [ static: 4 ]
+		url := r.URL.Path
+		if url == "/wasm_exec.js" {
+			http.FileServer(http.Dir("./vendor-wasm/golang.org/misc/wasm/")).ServeHTTP(w, r)
+			return
+		}
+
+		// Split up the URL. Expected parts:
+		// 1: Base url
+		// 2: "example"
+		// 3: Example type: js or wasm
+		// 4: Example folder, e.g.: data-channels
+		// 5: Static file as part of the example
+		parts := strings.Split(url, "/")
+		if len(parts) > 4 &&
 			parts[1] == "example" {
-			exampleLink := parts[2]
+			exampleType := parts[2]
+			exampleLink := parts[3]
 			for _, example := range *examples {
 				if example.Link != exampleLink {
 					continue
 				}
 				fiddle := filepath.Join(exampleLink, "jsfiddle")
-				if len(parts[3]) != 0 {
-					http.StripPrefix("/example/"+exampleLink+"/", http.FileServer(http.Dir(fiddle))).ServeHTTP(w, r)
+				if len(parts[4]) != 0 {
+					http.StripPrefix("/example/"+exampleType+"/"+exampleLink+"/", http.FileServer(http.Dir(fiddle))).ServeHTTP(w, r)
 					return
 				}
 
@@ -67,7 +82,15 @@ func serve(addr string) error {
 					panic(err)
 				}
 
-				temp.Execute(w, example)
+				data := struct {
+					*Example
+					JS bool
+				}{
+					example,
+					exampleType == "js",
+				}
+
+				temp.Execute(w, data)
 				return
 			}
 		}
@@ -92,6 +115,18 @@ func getExamples() (*Examples, error) {
 	err = json.NewDecoder(file).Decode(&examples)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse examples: %v", err)
+	}
+
+	for _, example := range examples {
+		fiddle := filepath.Join(example.Link, "jsfiddle")
+		js := filepath.Join(fiddle, "demo.js")
+		if _, err := os.Stat(js); !os.IsNotExist(err) {
+			example.IsJS = true
+		}
+		wasm := filepath.Join(fiddle, "demo.wasm")
+		if _, err := os.Stat(wasm); !os.IsNotExist(err) {
+			example.IsWASM = true
+		}
 	}
 
 	return &examples, nil
