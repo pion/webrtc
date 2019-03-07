@@ -17,3 +17,4 @@ vendor/
 tags
 cover.out
 *.sw[poe]
+*.wasm

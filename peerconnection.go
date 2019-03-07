@@ -1,3 +1,5 @@
+// +build !js
+
 // Package webrtc implements the WebRTC 1.0 as defined in W3C WebRTC specification document.
 package webrtc
 
@@ -21,15 +23,6 @@ import (
 )
 
 var pcLog = logging.NewScopedLogger("pc")
-
-const (
-	// Unknown defines default public constant to use for "enum" like struct
-	// comparisons when no value was defined.
-	Unknown    = iota
-	unknownStr = "unknown"
-
-	receiveMTU = 8192
-)
 
 // PeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another PeerConnection instance in a
