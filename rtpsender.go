@@ -126,8 +126,7 @@ func (r *RTPSender) ReadRTCP() (rtcp.Packet, error) {
 		return nil, err
 	}
 
-	pkt, _, err := rtcp.Unmarshal(b[:i])
-	return pkt, err
+	return rtcp.Unmarshal(b[:i])
 }
 
 // sendRTP should only be called by a track, this only exists so we can keep state in one place
