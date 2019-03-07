@@ -1,16 +1,21 @@
-<h3>Signaling</h3>
-Browser base64 Session Description <textarea id="localSessionDescription" readonly="true"></textarea> <br />
-Golang base64 Session Description: <textarea id="remoteSessionDescription"></textarea> <br/>
+Browser base64 Session Description<br />
+<textarea id="localSessionDescription" readonly="true"></textarea> <br />
+Golang base64 Session Description<br />
+<textarea id="remoteSessionDescription"></textarea> <br/>
 <button onclick="window.startSession()"> Start Session </button> <br />
 
-<h3>New channels</h3>
-<button onclick="window.createDataChannel('other')"> Create Data Channel</button> <br />
+<br />
 
-<h3>Message</h3>
+Message<br />
 <textarea id="message">This is my DataChannel message!</textarea> <br/>
 
-<h3>Open channels</h3>
-<ul id="ul-open"></ul>
+<br />
 
-<h3>Log</h3>
+Open channels<br />
+<ul id="ul-open"></ul>
+<button onclick="window.createDataChannel('other')"> Create Data Channel</button> <br />
+
+<br />
+
+Logs<br />
 <div id="logs"></div>

@@ -1,15 +1,66 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>pions/webrtc examples!</title>
+		<link href="https://fonts.googleapis.com/css?family=Quicksand:400,500,700" rel="stylesheet">
+		<title>WebRTC examples! | Pion</title>
 	</head>
+	<style>
+	body {
+		font-family: "Quicksand", sans-serif;
+		font-weight: 400;
+		margin: 4em 10%;
+	}
+	
+	.container {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	
+	.card {
+		box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+		transition: 0.3s;
+		margin: 20px auto;
+		flex-grow: 1;
+		max-width: 500px;
+	}
+	
+	.card:hover {
+		box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+	}
+		
+	.content {
+		line-height: 1.2em;
+		padding: 0 16px;
+	}
+	
+	.header {
+		color:#ffffff;
+		background-image: linear-gradient(225deg, #eb6562 0%, #E53935 100%);
+		padding: 6px 16px 3px 16px;
+	}
+
+	h3 {
+		margin: 0;
+	}
+	</style>
 	<body>
-		<ol>
+		<h1>Pion WebRTC examples</h1>
+		<div class="container"> 
 			{{range .}}
-				<li><a href="/example/{{ .Link }}/">{{ .Title }}</a>: {{ .Description }}</li>
+			<div class="card">
+				<div class="header">
+					<h3>{{ .Title }}</h3> 
+				</div>
+				<div class="content">
+					<p>{{ .Description }}</p>
+					{{ if .IsJS}}<p><a href="/example/js/{{ .Link }}/">Run JavaScript</a></p>{{ end }}
+					{{ if .IsWASM}}<p><a href="/example/wasm/{{ .Link }}/">Run WASM</a></p>{{ end }}
+				</div>
+			</div>
 			{{else}}
 				<li><strong>No examples found!</strong></li>
 			{{end}}
-		</ol>
+		</div>
 	</body>
 </html>
