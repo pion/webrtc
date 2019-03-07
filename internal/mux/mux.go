@@ -1,10 +1,13 @@
 package mux
 
 import (
-	"fmt"
 	"net"
 	"sync"
+
+	"github.com/pions/webrtc/pkg/logging"
 )
+
+var muxLog = logging.NewScopedLogger("mux")
 
 // Mux allows multiplexing
 type Mux struct {
@@ -100,7 +103,7 @@ func (m *Mux) dispatch(buf []byte) {
 	m.lock.Unlock()
 
 	if endpoint == nil {
-		fmt.Printf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+		muxLog.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
 		return
 	}
 

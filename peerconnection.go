@@ -1334,8 +1334,8 @@ func (pc *PeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 
-	for _, t := range pc.rtpTransceivers {
-		if err := t.Stop(); err != nil {
+	if pc.iceTransport != nil {
+		if err := pc.iceTransport.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
@@ -1350,10 +1350,8 @@ func (pc *PeerConnection) Close() error {
 		}
 	}
 
-	// TODO: Close DTLS?
-
-	if pc.iceTransport != nil {
-		if err := pc.iceTransport.Stop(); err != nil {
+	for _, t := range pc.rtpTransceivers {
+		if err := t.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
