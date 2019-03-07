@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/transport/test"
 	"github.com/pions/webrtc/internal/ice"
+	"github.com/pions/webrtc/internal/mux"
 
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -477,4 +479,51 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		<-onICEConnectionStateChangeCalled,
 		<-onDataChannelCalled,
 	}))
+}
+
+// This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
+// We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost
+func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
+	dtlsMatchFunc := mux.MatchDTLS
+	defer func() {
+		mux.MatchDTLS = dtlsMatchFunc
+	}()
+
+	// Drop all incoming DTLS traffic
+	mux.MatchDTLS = func([]byte) bool {
+		return false
+	}
+
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	api := NewAPI()
+	offerPC, answerPC, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = signalPair(offerPC, answerPC); err != nil {
+		t.Fatal(err)
+	}
+
+	iceComplete := make(chan interface{})
+	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			time.Sleep(time.Second) // Give time for DTLS to start
+
+			select {
+			case <-iceComplete:
+			default:
+				close(iceComplete)
+			}
+		}
+	})
+
+	<-iceComplete
+	if err = offerPC.Close(); err != nil {
+		t.Fatal(err)
+	} else if err = answerPC.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

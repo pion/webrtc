@@ -289,10 +289,8 @@ func TestPeerConnection_Media_Sender_Transports_OnSelectedCandidatePairChange(t 
 
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
-			go func() {
-				time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
-				close(iceComplete)
-			}()
+			time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
+			close(iceComplete)
 		}
 	})
 
