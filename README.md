@@ -42,6 +42,9 @@ Now go forth and build some awesome apps! Here are some **ideas** to get your cr
 * Record your webcam and do special effects server side.
 * Build a conferencing application that processes audio/video and make decisions off of it.
 
+### WebAssembly
+Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In this case the library will act as a wrapper around the JavaScript WebRTC API. This allows you to use WebRTC from Go in both server and browser side code with little to no changes. Check out the **[example applications](examples/README.md#webassembly)** for instructions on how to compile and run the WebAssembly examples.
+
 ### Roadmap
 The library is in active development, please refer to the [roadmap](https://github.com/pions/webrtc/issues/9) to track our major milestones.
 
@@ -55,7 +58,6 @@ If you need commercial support or don't want to use public methods you can conta
 ### Related projects
 * [pions/turn](https://github.com/pions/turn): A simple extendable Golang TURN server
 * [WIP] [pions/media-server](https://github.com/pions/media-server): A Pion WebRTC powered media server, providing the building blocks for anything RTC.
-* [WIP] [pions/dcnet](https://github.com/pions/dcnet): A package providing Golang [net](https://godoc.org/net) interfaces around Pion WebRTC data channels.
 
 ### Contributing
 Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
