@@ -1,6 +1,7 @@
 module github.com/pions/webrtc
 
 require (
+	github.com/gorilla/websocket v1.4.0
 	github.com/pions/datachannel v1.2.0
 	github.com/pions/dtls v1.2.1
 	github.com/pions/quic v0.0.1

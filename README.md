@@ -92,6 +92,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [frank](https://github.com/feixiao) - *Building examples on OSX*
 * [mxmCherry](https://github.com/mxmCherry)
 * [Alex Browne](https://github.com/albrow) - *JavaScript/WASM bindings*
+* [adwpc](https://github.com/adwpc) - *SFU example with websocket*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
