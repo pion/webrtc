@@ -138,11 +138,11 @@ func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, err
 
 // open opens the datachannel over the sctp transport
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
-	d.mu.RLock()
+	d.mu.Lock()
 	d.sctpTransport = sctpTransport
 
 	if err := d.ensureSCTP(); err != nil {
-		d.mu.RUnlock()
+		d.mu.Unlock()
 		return err
 	}
 
@@ -182,12 +182,12 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.ID, cfg)
 	if err != nil {
-		d.mu.RUnlock()
+		d.mu.Unlock()
 		return err
 	}
 
 	d.ReadyState = DataChannelStateOpen
-	d.mu.RUnlock()
+	d.mu.Unlock()
 
 	d.handleOpen(dc)
 	return nil
