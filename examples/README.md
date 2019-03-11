@@ -11,7 +11,8 @@ We've build an extensive collection of examples covering common use-cases. You c
 * [Gstreamer Send Offer](gstreamer-send-offer): Example gstreamer-send-offer is a variant of gstreamer-send that initiates the WebRTC connection by sending an offer.
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [Janus Gateway](janus-gateway): Example janus-gateway is a collection of examples showing how to use Pion WebRTC with [janus-gateway](https://github.com/meetecho/janus-gateway).
-* [SFU](sfu): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
+* [SFU Minimal](sfu-minimal): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
+* [SFU Websocket](sfu-websocket): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
 
 #### Data Channel API
 * [Data Channels](data-channels): The data-channels example shows how you can send/recv DataChannel messages from a web browser.
@@ -26,7 +27,7 @@ We've build an extensive collection of examples covering common use-cases. You c
 
 
 ### Usage
-We've made it easy to run the browser based examples on your local machine. 
+We've made it easy to run the browser based examples on your local machine.
 
 1. Build and run the example server:
     ``` sh
@@ -34,7 +35,7 @@ We've made it easy to run the browser based examples on your local machine.
     cd $GOPATH/src/github.com/pions/webrtc/examples
     go run examples.go
     ```
-    
+
 2. Browse to [localhost](http://localhost) to browse through the examples.
 
 Note that you can change the port of the server using the ``--address`` flag.
