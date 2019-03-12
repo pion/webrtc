@@ -85,8 +85,8 @@ func main() {
 	fmt.Println(signal.Encode(answer))
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack, *audioSrc).Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track, *videoSrc).Start()
+	gst.CreatePipeline(webrtc.Opus, []*webrtc.Track{opusTrack}, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, []*webrtc.Track{vp8Track}, *videoSrc).Start()
 
 	// Block forever
 	select {}

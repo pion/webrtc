@@ -23,7 +23,7 @@ func init() {
 // Pipeline is a wrapper for a GStreamer Pipeline
 type Pipeline struct {
 	Pipeline  *C.GstElement
-	track     *webrtc.Track
+	tracks    []*webrtc.Track
 	id        int
 	codecName string
 }
@@ -32,7 +32,7 @@ var pipelines = make(map[int]*Pipeline)
 var pipelinesLock sync.Mutex
 
 // CreatePipeline creates a GStreamer Pipeline
-func CreatePipeline(codecName string, track *webrtc.Track, pipelineSrc string) *Pipeline {
+func CreatePipeline(codecName string, tracks []*webrtc.Track, pipelineSrc string) *Pipeline {
 	pipelineStr := "appsink name=appsink"
 	switch codecName {
 	case webrtc.VP8:
@@ -57,7 +57,7 @@ func CreatePipeline(codecName string, track *webrtc.Track, pipelineSrc string) *
 
 	pipeline := &Pipeline{
 		Pipeline:  C.gstreamer_send_create_pipeline(pipelineStrUnsafe),
-		track:     track,
+		tracks:    tracks,
 		id:        len(pipelines),
 		codecName: codecName,
 	}
@@ -94,8 +94,10 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 		} else {
 			samples = uint32(videoClockRate * (float32(duration) / 1000000000))
 		}
-		if err := pipeline.track.WriteSample(media.Sample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}); err != nil {
-			panic(err)
+		for _, t := range pipeline.tracks {
+			if err := t.WriteSample(media.Sample{Data: C.GoBytes(buffer, bufferLen), Samples: samples}); err != nil {
+				panic(err)
+			}
 		}
 	} else {
 		fmt.Printf("discarding buffer, no pipeline with id %d", int(pipelineID))
