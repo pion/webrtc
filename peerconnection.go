@@ -8,6 +8,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -1330,7 +1331,10 @@ func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
 	if _, err := writeStream.Write(raw); err != nil {
 		if err == ice.ErrNoCandidatePairs {
 			return nil
+		} else if err == ice.ErrClosed {
+			return io.ErrClosedPipe
 		}
+
 		return fmt.Errorf("WriteRTCP failed to write: %v", err)
 	}
 	return nil

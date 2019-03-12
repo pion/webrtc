@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/pions/rtp"
@@ -24,8 +25,10 @@ type Track struct {
 	codec       *RTPCodec
 
 	packetizer rtp.Packetizer
-	receiver   *RTPReceiver
-	senders    []*RTPSender
+
+	receiver         *RTPReceiver
+	activeSenders    []*RTPSender
+	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
 }
 
 // ID gets the ID of the track
@@ -73,7 +76,7 @@ func (t *Track) Codec() *RTPCodec {
 // Read reads data from the track. If this is a local track this will error
 func (t *Track) Read(b []byte) (n int, err error) {
 	t.mu.RLock()
-	if len(t.senders) != 0 {
+	if len(t.activeSenders) != 0 {
 		t.mu.RUnlock()
 		return 0, fmt.Errorf("this is a local track and must not be read from")
 	}
@@ -134,8 +137,13 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 		t.mu.RUnlock()
 		return fmt.Errorf("this is a remote track and must not be written to")
 	}
-	senders := t.senders
+	senders := t.activeSenders
+	totalSenderCount := t.totalSenderCount
 	t.mu.RUnlock()
+
+	if totalSenderCount == 0 {
+		return io.ErrClosedPipe
+	}
 
 	for _, s := range senders {
 		_, err := s.sendRTP(&p.Header, p.Payload)
