@@ -5,6 +5,7 @@ package webrtc
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math/rand"
 	"sync"
 	"testing"
@@ -268,7 +269,6 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 Integration test for behavior around media and disconnected peers
 
 * Sending RTP and RTCP to a disconnected Peer shouldn't return an error
-
 */
 func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -342,6 +342,92 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	}
 
 	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+/*
+Integration test for behavior around media and closing
+
+* Writing and Reading from tracks should return io.EOF when the PeerConnection is closed
+*/
+func TestPeerConnection_Media_Closed(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = pcOffer.AddTrack(vp8Writer); err != nil {
+		t.Fatal(err)
+	}
+
+	answerChan := make(chan *Track)
+	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
+		answerChan <- t
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Reader := func() *Track {
+		for {
+			if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(time.Millisecond * 25)
+
+			select {
+			case t := <-answerChan:
+				return t
+			default:
+				continue
+			}
+		}
+	}()
+
+	closeChan := make(chan error)
+	go func() {
+		time.Sleep(time.Second)
+		closeChan <- pcAnswer.Close()
+	}()
+	if _, err = vp8Reader.Read(make([]byte, 1)); err != io.EOF {
+		t.Fatal("Reading from closed Track did not return io.EOF")
+	} else if err = <-closeChan; err != nil {
+		t.Fatal(err)
+	}
+
+	if err = pcOffer.Close(); err != nil {
+		t.Fatal(err)
+	} else if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != io.ErrClosedPipe {
+		t.Fatal("Write to Track with no RTPSenders did not return io.ErrClosedPipe")
+	}
+
+	if err = pcAnswer.WriteRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}); err != io.ErrClosedPipe {
+		t.Fatal("WriteRTCP to closed PeerConnection did not return io.ErrClosedPipe")
+	}
+
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

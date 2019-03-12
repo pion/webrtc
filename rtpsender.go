@@ -39,6 +39,7 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 	if track.receiver != nil {
 		return nil, fmt.Errorf("RTPSender can not be constructed with remote track")
 	}
+	track.totalSenderCount++
 
 	return &RTPSender{
 		track:      track,
@@ -77,7 +78,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	}
 
 	r.track.mu.Lock()
-	r.track.senders = append(r.track.senders, r)
+	r.track.activeSenders = append(r.track.activeSenders, r)
 	r.track.mu.Unlock()
 
 	close(r.sendCalled)
@@ -98,29 +99,27 @@ func (r *RTPSender) Stop() error {
 	r.track.mu.Lock()
 	defer r.track.mu.Unlock()
 	filtered := []*RTPSender{}
-	for _, s := range r.track.senders {
+	for _, s := range r.track.activeSenders {
 		if s != r {
 			filtered = append(filtered, s)
+		} else {
+			r.track.totalSenderCount--
 		}
 	}
-	r.track.senders = filtered
+	r.track.activeSenders = filtered
+	close(r.stopCalled)
 
 	if r.hasSent() {
 		return r.rtcpReadStream.Close()
 	}
 
-	close(r.stopCalled)
 	return nil
 }
 
 // Read reads incoming RTCP for this RTPReceiver
 func (r *RTPSender) Read(b []byte) (n int, err error) {
-	select {
-	case <-r.stopCalled:
-		return 0, fmt.Errorf("RTPSender has been stopped")
-	case <-r.sendCalled:
-		return r.rtcpReadStream.Read(b)
-	}
+	<-r.sendCalled
+	return r.rtcpReadStream.Read(b)
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you

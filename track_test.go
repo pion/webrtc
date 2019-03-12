@@ -98,6 +98,13 @@ func TestNewTracksWrite(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to new audio track")
 	}
+
+	if _, err = peer.AddTrack(audioTrack); err != nil {
+		t.Fatal(err)
+	} else if _, err = peer.AddTrack(videoTrack); err != nil {
+		t.Fatal(err)
+	}
+
 	rtpBuf := make([]byte, 1400)
 	_, err = videoTrack.Write(rtpBuf)
 	if err != nil {
