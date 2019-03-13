@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pions/rtcp"
@@ -46,6 +47,11 @@ func main() {
 		panic(err)
 	}
 
+	// Allow us to receive 1 video track
+	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	}
+
 	localTrackChan := make(chan *webrtc.Track)
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
@@ -75,7 +81,8 @@ func main() {
 				panic(readErr)
 			}
 
-			if _, err = localTrack.Write(rtpBuf[:i]); err != nil {
+			// ErrClosedPipe means we don't have any subscribers, this is ok if no peers have connected yet
+			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && err != io.ErrClosedPipe {
 				panic(err)
 			}
 		}

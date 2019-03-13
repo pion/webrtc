@@ -68,6 +68,13 @@ func main() {
 		panic(err)
 	}
 
+	// Allow us to receive 1 audio track, and 1 video track
+	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	}
+
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})

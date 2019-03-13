@@ -4,12 +4,14 @@ Browser base64 Session Description<br />
 
 Golang base64 Session Description<br />
 <textarea id="remoteSessionDescription"></textarea> <br/>
-<button onclick="window.startSession()"> Start Session </button><br />
+<button onclick="window.startSession()"> Start Session </button>
+<button onclick="window.addDisplayCapture()" id="displayCapture"> Display Capture </button><br />
 
 <br />
 
 Video<br />
-<video id="video1" width="160" height="120" autoplay muted></video> <br />
+<div id="localVideos"></div> <br />
+
 
 Logs<br />
 <div id="logs"></div>

@@ -61,6 +61,13 @@ func main() {
 		panic(err)
 	}
 
+	// Allow us to receive 1 audio track, and 1 video track
+	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	}
+
 	opusFile, err := opuswriter.New("output.opus", 48000, 2)
 	if err != nil {
 		panic(err)

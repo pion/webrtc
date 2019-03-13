@@ -11,7 +11,11 @@ import (
 	"github.com/pions/webrtc/pkg/media"
 )
 
-const rtpOutboundMTU = 1400
+const (
+	rtpOutboundMTU          = 1400
+	trackDefaultIDLength    = 16
+	trackDefaultLabelLength = 16
+)
 
 // Track represents a single media track
 type Track struct {

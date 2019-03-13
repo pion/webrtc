@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/pions/rtp"
 	"github.com/pions/rtp/codecs"
@@ -161,6 +162,18 @@ func (t RTPCodecType) String() string {
 		return "video"
 	default:
 		return ErrUnknownType.Error()
+	}
+}
+
+// NewRTPCodecType creates a RTPCodecType from a string
+func NewRTPCodecType(r string) RTPCodecType {
+	switch {
+	case strings.EqualFold(r, "audio"):
+		return RTPCodecTypeAudio
+	case strings.EqualFold(r, "video"):
+		return RTPCodecTypeVideo
+	default:
+		return RTPCodecType(0)
 	}
 }
 

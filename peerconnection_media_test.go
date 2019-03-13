@@ -37,6 +37,11 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	awaitRTPRecv := make(chan bool)
 	awaitRTPRecvClosed := make(chan bool)
 	awaitRTPSend := make(chan bool)
@@ -187,6 +192,16 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcOffer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,6 +377,11 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,21 +40,31 @@ func main() {
 	})
 
 	// Create a audio track
-	opusTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
+	audioTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
 	if err != nil {
 		panic(err)
 	}
-	_, err = peerConnection.AddTrack(opusTrack)
+	_, err = peerConnection.AddTrack(audioTrack)
 	if err != nil {
 		panic(err)
 	}
 
 	// Create a video track
-	vp8Track, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	firstVideoTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
 		panic(err)
 	}
-	_, err = peerConnection.AddTrack(vp8Track)
+	_, err = peerConnection.AddTrack(firstVideoTrack)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a second video track
+	secondVideoTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
+	if err != nil {
+		panic(err)
+	}
+	_, err = peerConnection.AddTrack(secondVideoTrack)
 	if err != nil {
 		panic(err)
 	}
@@ -85,8 +95,8 @@ func main() {
 	fmt.Println(signal.Encode(answer))
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, []*webrtc.Track{opusTrack}, *audioSrc).Start()
-	gst.CreatePipeline(webrtc.VP8, []*webrtc.Track{vp8Track}, *videoSrc).Start()
+	gst.CreatePipeline(webrtc.Opus, []*webrtc.Track{audioTrack}, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, []*webrtc.Track{firstVideoTrack, secondVideoTrack}, *videoSrc).Start()
 
 	// Block forever
 	select {}

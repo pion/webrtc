@@ -66,7 +66,7 @@ window.sendMessage = element => {
             return alert('Message must not be empty')
         }
         dataChannel.send(message)
-        element.value = '' 
+        element.value = ''
     }
 }
 
@@ -103,7 +103,10 @@ window.createSession = isPublisher => {
         document.getElementById('msginput').style = 'display: none'
         dataChannel = pc.createDataChannel('data')
         dataChannel.onmessage = e => log(`receive data from '${dataChannel.label}' payload '${e.data}'`)
-        pc.createOffer({ offerToReceiveVideo: true , offerToReceiveAudio: true})
+        pc.addTransceiver('audio', {'direction': 'recvonly'})
+        pc.addTransceiver('video', {'direction': 'recvonly'})
+
+        pc.createOffer()
             .then(d => pc.setLocalDescription(d))
             .catch(log)
 
