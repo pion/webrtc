@@ -2,7 +2,9 @@
 
 package webrtc
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
@@ -14,6 +16,7 @@ type RTPTransceiver struct {
 	// firedDirection   RTPTransceiverDirection
 	// receptive bool
 	stopped bool
+	kind    RTPCodecType
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {

@@ -27,7 +27,11 @@ pc.onicecandidate = event => {
   }
 }
 
-pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true }).then(d => pc.setLocalDescription(d)).catch(log)
+// Offer to receive 1 audio, and 2 video tracks
+pc.addTransceiver('audio', {'direction': 'recvonly'})
+pc.addTransceiver('video', {'direction': 'recvonly'})
+pc.addTransceiver('video', {'direction': 'recvonly'})
+pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value

@@ -7,13 +7,24 @@ let pc = new RTCPeerConnection({
     }
   ]
 })
-var log = msg => {
+let log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
+}
+let displayVideo = video => {
+  var el = document.createElement('video')
+  el.srcObject = video
+  el.autoplay = true
+  el.muted = true
+  el.width = 160
+  el.height = 120
+
+  document.getElementById('localVideos').appendChild(el)
+  return video
 }
 
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
   .then(stream => {
-    pc.addStream(document.getElementById('video1').srcObject = stream)
+    pc.addStream(displayVideo(stream))
     pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
   }).catch(log)
 
@@ -35,4 +46,12 @@ window.startSession = () => {
   } catch (e) {
     alert(e)
   }
+}
+
+window.addDisplayCapture = () => {
+  navigator.mediaDevices.getDisplayMedia().then(stream => {
+    document.getElementById('displayCapture').disabled = true
+    pc.addStream(displayVideo(stream))
+    pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+  })
 }

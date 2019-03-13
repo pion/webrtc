@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"sync"
 
@@ -69,6 +70,12 @@ func room(w http.ResponseWriter, r *http.Request) {
 		pubReceiver, err = api.NewPeerConnection(peerConnectionConfig)
 		checkError(err)
 
+		_, err = pubReceiver.AddTransceiver(webrtc.RTPCodecTypeAudio)
+		checkError(err)
+
+		_, err = pubReceiver.AddTransceiver(webrtc.RTPCodecTypeVideo)
+		checkError(err)
+
 		pubReceiver.OnTrack(func(remoteTrack *webrtc.Track, receiver *webrtc.RTPReceiver) {
 			if remoteTrack.PayloadType() == webrtc.DefaultPayloadTypeVP8 || remoteTrack.PayloadType() == webrtc.DefaultPayloadTypeVP9 || remoteTrack.PayloadType() == webrtc.DefaultPayloadTypeH264 {
 
@@ -94,7 +101,10 @@ func room(w http.ResponseWriter, r *http.Request) {
 					videoTrackLock.RLock()
 					_, err = videoTrack.Write(rtpBuf[:i])
 					videoTrackLock.RUnlock()
-					checkError(err)
+
+					if err != io.ErrClosedPipe {
+						checkError(err)
+					}
 				}
 
 			} else {
@@ -113,7 +123,9 @@ func room(w http.ResponseWriter, r *http.Request) {
 					audioTrackLock.RLock()
 					_, err = audioTrack.Write(rtpBuf[:i])
 					audioTrackLock.RUnlock()
-					checkError(err)
+					if err != io.ErrClosedPipe {
+						checkError(err)
+					}
 				}
 			}
 		})
