@@ -1,3 +1,5 @@
+// +build !js
+
 package webrtc
 
 import (
@@ -7,12 +9,10 @@ import (
 	"github.com/pions/transport/test"
 )
 
-// TestPeerConnection_Close is moved to it's on file because the tests
+// TestPeerConnection_Close is moved to it's own file because the tests
 // in rtcpeerconnection_test.go are leaky, making the goroutine report useless.
 
 func TestPeerConnection_Close(t *testing.T) {
-	api := NewAPI()
-
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -20,7 +20,7 @@ func TestPeerConnection_Close(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := newPair()
 	if err != nil {
 		t.Fatal(err)
 	}
