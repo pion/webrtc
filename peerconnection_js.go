@@ -5,6 +5,8 @@ package webrtc
 
 import (
 	"syscall/js"
+
+	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
 // PeerConnection represents a WebRTC connection that establishes a
@@ -69,13 +71,13 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 		// fix by keeping a mutex-protected list of all DataChannel references as a
 		// property of this PeerConnection, but at the cost of additional overhead.
 		dataChannel := &DataChannel{
-			underlying: args[0],
+			underlying: args[0].Get("channel"),
 		}
 		go f(dataChannel)
 		return js.Undefined()
 	})
 	pc.onDataChannelHandler = &onDataChannelHandler
-	pc.underlying.Set("onsignalingstatechange", onDataChannelHandler)
+	pc.underlying.Set("ondatachannel", onDataChannelHandler)
 }
 
 // OnTrack sets an event handler which is called when remote track
@@ -99,6 +101,69 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 	pc.underlying.Set("oniceconnectionstatechange", onICEConectionStateChangeHandler)
 }
 
+func (pc *PeerConnection) checkConfiguration(configuration Configuration) error {
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
+	if pc.ConnectionState() == PeerConnectionStateClosed {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	existingConfig := pc.GetConfiguration()
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #3)
+	if configuration.PeerIdentity != "" {
+		if configuration.PeerIdentity != existingConfig.PeerIdentity {
+			return &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity}
+		}
+	}
+
+	// TODO: Enable these checks once Certificates are supported.
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4)
+	// if len(configuration.Certificates) > 0 {
+	// 	if len(configuration.Certificates) != len(existingConfiguration.Certificates) {
+	// 		return &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}
+	// 	}
+
+	// 	for i, certificate := range configuration.Certificates {
+	// 		if !pc.configuration.Certificates[i].Equals(certificate) {
+	// 			return &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates}
+	// 		}
+	// 	}
+	// 	pc.configuration.Certificates = configuration.Certificates
+	// }
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #5)
+	if configuration.BundlePolicy != BundlePolicy(Unknown) {
+		if configuration.BundlePolicy != existingConfig.BundlePolicy {
+			return &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy}
+		}
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #6)
+	if configuration.RTCPMuxPolicy != RTCPMuxPolicy(Unknown) {
+		if configuration.RTCPMuxPolicy != existingConfig.RTCPMuxPolicy {
+			return &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy}
+		}
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #7)
+	if configuration.ICECandidatePoolSize != 0 {
+		if configuration.ICECandidatePoolSize != existingConfig.ICECandidatePoolSize &&
+			pc.LocalDescription() != nil {
+			return &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize}
+		}
+	}
+
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11)
+	if len(configuration.ICEServers) > 0 {
+		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
+		for _, server := range configuration.ICEServers {
+			if _, err := server.validate(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // SetConfiguration updates the configuration of this PeerConnection object.
 func (pc *PeerConnection) SetConfiguration(configuration Configuration) (err error) {
 	defer func() {
@@ -106,6 +171,9 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) (err err
 			err = recoveryToError(e)
 		}
 	}()
+	if err := pc.checkConfiguration(configuration); err != nil {
+		return err
+	}
 	configMap := configurationToValue(configuration)
 	pc.underlying.Call("setConfiguration", configMap)
 	return nil
@@ -421,9 +489,10 @@ func iceServersToValue(iceServers []ICEServer) js.Value {
 
 func iceServerToValue(server ICEServer) js.Value {
 	return js.ValueOf(map[string]interface{}{
-		"urls":           stringsToValue(server.URLs), // required
-		"username":       stringToValueOrUndefined(server.Username),
-		"credential":     interfaceToValueOrUndefined(server.Credential),
+		"urls":     stringsToValue(server.URLs), // required
+		"username": stringToValueOrUndefined(server.Username),
+		// TODO(albrow): credential is not currently supported.
+		// "credential":     interfaceToValueOrUndefined(server.Credential),
 		"credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
 	})
 }
@@ -436,7 +505,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 		ICEServers:           valueToICEServers(configValue.Get("iceServers")),
 		ICETransportPolicy:   newICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
 		BundlePolicy:         newBundlePolicy(valueToStringOrZero(configValue.Get("bundlePolicy"))),
-		RTCPMuxPolicy:        newRTCPMuxPolicy(valueToStringOrZero(configValue.Get("bundlePolicy"))),
+		RTCPMuxPolicy:        newRTCPMuxPolicy(valueToStringOrZero(configValue.Get("rtcpMuxPolicy"))),
 		PeerIdentity:         valueToStringOrZero(configValue.Get("peerIdentity")),
 		ICECandidatePoolSize: valueToUint8OrZero(configValue.Get("iceCandidatePoolSize")),
 
@@ -521,9 +590,13 @@ func dataChannelInitToValue(options *DataChannelInit) js.Value {
 		return js.Undefined()
 	}
 
+	maxPacketLifeTime := uint16PointerToValue(options.MaxPacketLifeTime)
 	return js.ValueOf(map[string]interface{}{
 		"ordered":           boolPointerToValue(options.Ordered),
-		"maxPacketLifeTime": uint16PointerToValue(options.MaxPacketLifeTime),
+		"maxPacketLifeTime": maxPacketLifeTime,
+		// See https://bugs.chromium.org/p/chromium/issues/detail?id=696681
+		// Chrome calls this "maxRetransmitTime"
+		"maxRetransmitTime": maxPacketLifeTime,
 		"maxRetransmits":    uint16PointerToValue(options.MaxRetransmits),
 		"protocol":          stringPointerToValue(options.Protocol),
 		"negotiated":        boolPointerToValue(options.Negotiated),

@@ -1,30 +1,24 @@
 package webrtc
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"math/big"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
-
-	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/internal/ice"
-	"github.com/pions/webrtc/internal/mux"
 
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
-func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
-	pca, err := api.NewPeerConnection(Configuration{})
+// newPair creates two new peer connections (an offerer and an answerer)
+// *without* using an api (i.e. using the default settings).
+func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
+	pca, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := api.NewPeerConnection(Configuration{})
+	pcb, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -32,131 +26,30 @@ func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, er
 	return pca, pcb, nil
 }
 
-func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	offer, err := pcOffer.CreateOffer(nil)
-	if err != nil {
-		return err
-	}
-
-	if err = pcOffer.SetLocalDescription(offer); err != nil {
-		return err
-	}
-
-	err = pcAnswer.SetRemoteDescription(offer)
-	if err != nil {
-		return err
-	}
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	if err != nil {
-		return err
-	}
-
-	if err = pcAnswer.SetLocalDescription(answer); err != nil {
-		return err
-	}
-
-	err = pcOffer.SetRemoteDescription(answer)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func TestNew(t *testing.T) {
-	api := NewAPI()
-	t.Run("Success", func(t *testing.T) {
-		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		assert.Nil(t, err)
-
-		certificate, err := GenerateCertificate(secretKey)
-		assert.Nil(t, err)
-
-		pc, err := api.NewPeerConnection(Configuration{
-			ICEServers: []ICEServer{
-				{
-					URLs: []string{
-						"stun:stun.l.google.com:19302",
-						"turns:google.de?transport=tcp",
-					},
-					Username: "unittest",
-					Credential: OAuthCredential{
-						MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
-						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
-					},
-					CredentialType: ICECredentialTypeOauth,
+	pc, err := NewPeerConnection(Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs: []string{
+					"stun:stun.l.google.com:19302",
 				},
+				Username: "unittest",
 			},
-			ICETransportPolicy:   ICETransportPolicyRelay,
-			BundlePolicy:         BundlePolicyMaxCompat,
-			RTCPMuxPolicy:        RTCPMuxPolicyNegotiate,
-			PeerIdentity:         "unittest",
-			Certificates:         []Certificate{*certificate},
-			ICECandidatePoolSize: 5,
-		})
-		assert.Nil(t, err)
-		assert.NotNil(t, pc)
+		},
+		ICETransportPolicy:   ICETransportPolicyRelay,
+		BundlePolicy:         BundlePolicyMaxCompat,
+		RTCPMuxPolicy:        RTCPMuxPolicyNegotiate,
+		PeerIdentity:         "unittest",
+		ICECandidatePoolSize: 5,
 	})
-	t.Run("Failure", func(t *testing.T) {
-		testCases := []struct {
-			initialize  func() (*PeerConnection, error)
-			expectedErr error
-		}{
-			{func() (*PeerConnection, error) {
-				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				assert.Nil(t, err)
-
-				certificate, err := NewCertificate(secretKey, x509.Certificate{
-					Version:      2,
-					SerialNumber: big.NewInt(1653),
-					NotBefore:    time.Now().AddDate(0, -2, 0),
-					NotAfter:     time.Now().AddDate(0, -1, 0),
-				})
-				assert.Nil(t, err)
-
-				return api.NewPeerConnection(Configuration{
-					Certificates: []Certificate{*certificate},
-				})
-			}, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}},
-			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{
-					ICEServers: []ICEServer{
-						{
-							URLs: []string{
-								"stun:stun.l.google.com:19302",
-								"turns:google.de?transport=tcp",
-							},
-							Username: "unittest",
-						},
-					},
-				})
-			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}},
-		}
-
-		for i, testCase := range testCases {
-			_, err := testCase.initialize()
-			assert.EqualError(t, err, testCase.expectedErr.Error(),
-				"testCase: %d %v", i, testCase,
-			)
-		}
-	})
+	assert.NoError(t, err)
+	assert.NotNil(t, pc)
 }
 
 func TestPeerConnection_SetConfiguration(t *testing.T) {
-	api := NewAPI()
-
-	secretKey1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	assert.Nil(t, err)
-
-	certificate1, err := GenerateCertificate(secretKey1)
-	assert.Nil(t, err)
-
-	secretKey2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	assert.Nil(t, err)
-
-	certificate2, err := GenerateCertificate(secretKey2)
-	assert.Nil(t, err)
+	// Note: These tests don't include ICEServer.Credential,
+	// ICEServer.CredentialType, or Certificates because those are not supported
+	// in the WASM bindings.
 
 	for _, test := range []struct {
 		name    string
@@ -167,9 +60,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "valid",
 			init: func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{
-					PeerIdentity:         "unittest",
-					Certificates:         []Certificate{*certificate1},
+				pc, err := NewPeerConnection(Configuration{
 					ICECandidatePoolSize: 5,
 				})
 				if err != nil {
@@ -181,21 +72,13 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 						{
 							URLs: []string{
 								"stun:stun.l.google.com:19302",
-								"turns:google.de?transport=tcp",
 							},
 							Username: "unittest",
-							Credential: OAuthCredential{
-								MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
-								AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
-							},
-							CredentialType: ICECredentialTypeOauth,
 						},
 					},
 					ICETransportPolicy:   ICETransportPolicyAll,
 					BundlePolicy:         BundlePolicyBalanced,
 					RTCPMuxPolicy:        RTCPMuxPolicyRequire,
-					PeerIdentity:         "unittest",
-					Certificates:         []Certificate{*certificate1},
 					ICECandidatePoolSize: 5,
 				})
 				if err != nil {
@@ -210,7 +93,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "closed connection",
 			init: func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{})
+				pc, err := NewPeerConnection(Configuration{})
 				assert.Nil(t, err)
 
 				err = pc.Close()
@@ -223,7 +106,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update PeerIdentity",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return NewPeerConnection(Configuration{})
 			},
 			config: Configuration{
 				PeerIdentity: "unittest",
@@ -231,29 +114,9 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity},
 		},
 		{
-			name: "update multiple certificates",
-			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			},
-			config: Configuration{
-				Certificates: []Certificate{*certificate1, *certificate2},
-			},
-			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates},
-		},
-		{
-			name: "update certificate",
-			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
-			},
-			config: Configuration{
-				Certificates: []Certificate{*certificate1},
-			},
-			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates},
-		},
-		{
 			name: "update BundlePolicy",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return NewPeerConnection(Configuration{})
 			},
 			config: Configuration{
 				BundlePolicy: BundlePolicyMaxCompat,
@@ -263,7 +126,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update RTCPMuxPolicy",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return NewPeerConnection(Configuration{})
 			},
 			config: Configuration{
 				RTCPMuxPolicy: RTCPMuxPolicyNegotiate,
@@ -273,7 +136,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update ICECandidatePoolSize",
 			init: func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{
+				pc, err := NewPeerConnection(Configuration{
 					ICECandidatePoolSize: 0,
 				})
 				if err != nil {
@@ -297,7 +160,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update ICEServers, no TURN credentials",
 			init: func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{})
+				return NewPeerConnection(Configuration{})
 			},
 			config: Configuration{
 				ICEServers: []ICEServer{
@@ -315,20 +178,19 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 	} {
 		pc, err := test.init()
 		if err != nil {
-			t.Fatalf("SetConfiguration %q: init failed: %v", test.name, err)
+			t.Errorf("SetConfiguration %q: init failed: %v", test.name, err)
 		}
 
 		err = pc.SetConfiguration(test.config)
 		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
-			t.Fatalf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
+			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
 	}
 }
 
 func TestPeerConnection_GetConfiguration(t *testing.T) {
-	api := NewAPI()
-	pc, err := api.NewPeerConnection(Configuration{})
-	assert.Nil(t, err)
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
 
 	expected := Configuration{
 		ICEServers:           []ICEServer{},
@@ -344,41 +206,33 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.ICETransportPolicy, actual.ICETransportPolicy)
 	assert.Equal(t, expected.BundlePolicy, actual.BundlePolicy)
 	assert.Equal(t, expected.RTCPMuxPolicy, actual.RTCPMuxPolicy)
-	assert.NotEqual(t, len(expected.Certificates), len(actual.Certificates))
+	// TODO(albrow): Uncomment this after #513 is fixed.
+	// See: https://github.com/pions/webrtc/issues/513.
+	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
 }
 
-// TODO - This unittest needs to be completed when CreateDataChannel is complete
-// func TestPeerConnection_CreateDataChannel(t *testing.T) {
-// 	pc, err := New(Configuration{})
-// 	assert.Nil(t, err)
-//
-// 	_, err = pc.CreateDataChannel("data", &DataChannelInit{
-//
-// 	})
-// 	assert.Nil(t, err)
-// }
-
-// TODO Fix this test
 const minimalOffer = `v=0
-o=- 7193157174393298413 2 IN IP4 127.0.0.1
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
-a=group:BUNDLE video
-m=video 43858 UDP/TLS/RTP/SAVPF 96
-c=IN IP4 172.17.0.1
-a=candidate:3885250869 1 udp 1 127.0.0.1 1 typ host
-a=ice-ufrag:OgYk
-a=ice-pwd:G0ka4ts7hRhMLNljuuXzqnOF
-a=fingerprint:sha-256 D7:06:10:DE:69:66:B1:53:0E:02:33:45:63:F8:AF:78:B2:C7:CE:AF:8E:FD:E5:13:20:50:74:93:CD:B5:C8:69
-a=setup:active
-a=mid:video
-a=sendrecv
-a=rtpmap:96 VP8/90000
+a=msid-semantic: WMS
+m=application 47299 DTLS/SCTP 5000
+c=IN IP4 192.168.20.129
+a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=candidate:211962667 1 udp 2122194687 10.0.3.1 40864 typ host generation 0
+a=candidate:1002017894 1 tcp 1518280447 192.168.20.129 0 typ host tcptype active generation 0
+a=candidate:1109506011 1 tcp 1518214911 10.0.3.1 0 typ host tcptype active generation 0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:data
+a=sctpmap:5000 webrtc-datachannel 1024
 `
 
 func TestSetRemoteDescription(t *testing.T) {
-	api := NewAPI()
 	testCases := []struct {
 		desc SessionDescription
 	}{
@@ -386,7 +240,7 @@ func TestSetRemoteDescription(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		peerConn, err := api.NewPeerConnection(Configuration{})
+		peerConn, err := NewPeerConnection(Configuration{})
 		if err != nil {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
@@ -398,8 +252,7 @@ func TestSetRemoteDescription(t *testing.T) {
 }
 
 func TestCreateOfferAnswer(t *testing.T) {
-	api := NewAPI()
-	offerPeerConn, err := api.NewPeerConnection(Configuration{})
+	offerPeerConn, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
@@ -410,7 +263,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err = offerPeerConn.SetLocalDescription(offer); err != nil {
 		t.Errorf("SetLocalDescription: got error: %v", err)
 	}
-	answerPeerConn, err := api.NewPeerConnection(Configuration{})
+	answerPeerConn, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
@@ -432,98 +285,75 @@ func TestCreateOfferAnswer(t *testing.T) {
 }
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
-	api := NewAPI()
-	pc, err := api.NewPeerConnection(Configuration{})
-	assert.Nil(t, err)
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
 
-	onTrackCalled := make(chan bool)
-	onICEConnectionStateChangeCalled := make(chan bool)
-	onDataChannelCalled := make(chan bool)
+	// wasCalled is a list of event handlers that were called.
+	wasCalled := []string{}
+	wasCalledMut := &sync.Mutex{}
+	// wg is used to wait for all event handlers to be called.
+	wg := &sync.WaitGroup{}
+	wg.Add(4)
 
-	// Verify that the noop case works
-	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	// Each sync.Once is used to ensure that we call wg.Done once for each event
+	// handler and don't add multiple entries to wasCalled. The event handlers can
+	// be called more than once in some cases.
+	onceOffererOnICEConnectionStateChange := &sync.Once{}
+	onceOffererOnSignalingStateChange := &sync.Once{}
+	onceAnswererOnICEConnectionStateChange := &sync.Once{}
+	onceAnswererOnSignalingStateChange := &sync.Once{}
 
-	pc.OnTrack(func(t *Track, r *RTPReceiver) {
-		onTrackCalled <- true
+	// Register all the event handlers.
+	pcOffer.OnICEConnectionStateChange(func(ICEConnectionState) {
+		onceOffererOnICEConnectionStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "offerer OnICEConnectionStateChange")
+			wg.Done()
+		})
+	})
+	pcOffer.OnSignalingStateChange(func(SignalingState) {
+		onceOffererOnSignalingStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "offerer OnSignalingStateChange")
+			wg.Done()
+		})
+	})
+	pcAnswer.OnICEConnectionStateChange(func(ICEConnectionState) {
+		onceAnswererOnICEConnectionStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "answerer OnICEConnectionStateChange")
+			wg.Done()
+		})
+	})
+	pcAnswer.OnSignalingStateChange(func(SignalingState) {
+		onceAnswererOnSignalingStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "answerer OnSignalingStateChange")
+			wg.Done()
+		})
 	})
 
-	pc.OnICEConnectionStateChange(func(cs ICEConnectionState) {
-		onICEConnectionStateChangeCalled <- true
-	})
+	// Use signalPair to establish a connection between pcOffer and pcAnswer. This
+	// process should trigger the above event handlers.
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	pc.OnDataChannel(func(dc *DataChannel) {
-		onDataChannelCalled <- true
-	})
-
-	// Verify that the handlers deal with nil inputs
-	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
-	assert.NotPanics(t, func() { go pc.onDataChannelHandler(nil) })
-
-	// Verify that the set handlers are called
-	assert.NotPanics(t, func() { pc.onTrack(&Track{}, &RTPReceiver{}) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
-	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
-
-	allTrue := func(vals []bool) bool {
-		for _, val := range vals {
-			if !val {
-				return false
-			}
-		}
-		return true
-	}
-
-	assert.True(t, allTrue([]bool{
-		<-onTrackCalled,
-		<-onICEConnectionStateChangeCalled,
-		<-onDataChannelCalled,
-	}))
-}
-
-// This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
-// We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost
-func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
-	dtlsMatchFunc := mux.MatchDTLS
-	defer func() {
-		mux.MatchDTLS = dtlsMatchFunc
+	// Wait for all of the event handlers to be triggered.
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		done <- struct{}{}
 	}()
-
-	// Drop all incoming DTLS traffic
-	mux.MatchDTLS = func([]byte) bool {
-		return false
-	}
-
-	lim := test.TimeOut(time.Second * 10)
-	defer lim.Stop()
-
-	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = signalPair(offerPC, answerPC); err != nil {
-		t.Fatal(err)
-	}
-
-	iceComplete := make(chan interface{})
-	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
-		if iceState == ICEConnectionStateConnected {
-			time.Sleep(time.Second) // Give time for DTLS to start
-
-			select {
-			case <-iceComplete:
-			default:
-				close(iceComplete)
-			}
-		}
-	})
-
-	<-iceComplete
-	if err = offerPC.Close(); err != nil {
-		t.Fatal(err)
-	} else if err = answerPC.Close(); err != nil {
-		t.Fatal(err)
+	timeout := time.After(5 * time.Second)
+	select {
+	case <-done:
+		break
+	case <-timeout:
+		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
 }
