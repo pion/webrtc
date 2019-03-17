@@ -123,7 +123,7 @@ func (r *RTPSender) Read(b []byte) (n int, err error) {
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
-func (r *RTPSender) ReadRTCP() (rtcp.Packet, error) {
+func (r *RTPSender) ReadRTCP() (rtcp.CompoundPacket, error) {
 	b := make([]byte, receiveMTU)
 	i, err := r.Read(b)
 	if err != nil {
