@@ -1232,7 +1232,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
-	if d.MaxPacketLifeTime != nil && d.MaxRetransmits != nil {
+	if d.maxPacketLifeTime != nil && d.maxRetransmits != nil {
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
