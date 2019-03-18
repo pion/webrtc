@@ -164,12 +164,12 @@ func (r *SCTPTransport) acceptDataChannels() {
 
 		sid := dc.StreamIdentifier()
 		rtcDC := &DataChannel{
-			ID:                &sid,
-			Label:             dc.Config.Label,
-			Ordered:           ordered,
-			MaxPacketLifeTime: maxPacketLifeTime,
-			MaxRetransmits:    maxRetransmits,
-			ReadyState:        DataChannelStateOpen,
+			id:                &sid,
+			label:             dc.Config.Label,
+			ordered:           ordered,
+			maxPacketLifeTime: maxPacketLifeTime,
+			maxRetransmits:    maxRetransmits,
+			readyState:        DataChannelStateOpen,
 			api:               r.api,
 		}
 

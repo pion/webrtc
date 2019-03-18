@@ -64,7 +64,7 @@ func TestDataChannel_Send(t *testing.T) {
 		t.Fatalf("Failed to create a PC pair for testing")
 	}
 
-	assert.True(t, dc.Ordered, "Ordered should be set to true")
+	assert.True(t, dc.ordered, "Ordered should be set to true")
 
 	dc.OnOpen(func() {
 		e := dc.SendText("Ping")
@@ -77,7 +77,7 @@ func TestDataChannel_Send(t *testing.T) {
 	})
 
 	answerPC.OnDataChannel(func(d *DataChannel) {
-		assert.True(t, d.Ordered, "Ordered should be set to true")
+		assert.True(t, d.ordered, "Ordered should be set to true")
 
 		d.OnMessage(func(msg DataChannelMessage) {
 			e := d.Send([]byte("Pong"))
@@ -201,16 +201,16 @@ func TestDataChannelParamters(t *testing.T) {
 		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
 
 		// Check if parameters are correctly set
-		assert.True(t, dc.Ordered, "Ordered should be set to true")
-		if assert.NotNil(t, dc.MaxPacketLifeTime, "should not be nil") {
-			assert.Equal(t, maxPacketLifeTime, *dc.MaxPacketLifeTime, "should match")
+		assert.True(t, dc.Ordered(), "Ordered should be set to true")
+		if assert.NotNil(t, dc.MaxPacketLifeTime(), "should not be nil") {
+			assert.Equal(t, maxPacketLifeTime, *dc.MaxPacketLifeTime(), "should match")
 		}
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			// Check if parameters are correctly set
-			assert.True(t, d.Ordered, "Ordered should be set to true")
-			if assert.NotNil(t, d.MaxPacketLifeTime, "should not be nil") {
-				assert.Equal(t, maxPacketLifeTime, *d.MaxPacketLifeTime, "should match")
+			assert.True(t, d.ordered, "Ordered should be set to true")
+			if assert.NotNil(t, d.maxPacketLifeTime, "should not be nil") {
+				assert.Equal(t, maxPacketLifeTime, *d.maxPacketLifeTime, "should match")
 			}
 			done <- true
 		})
@@ -229,20 +229,40 @@ func TestDataChannelParamters(t *testing.T) {
 		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
 
 		// Check if parameters are correctly set
-		assert.False(t, dc.Ordered, "Ordered should be set to false")
-		if assert.NotNil(t, dc.MaxRetransmits, "should not be nil") {
-			assert.Equal(t, maxRetransmits, *dc.MaxRetransmits, "should match")
+		assert.False(t, dc.Ordered(), "Ordered should be set to false")
+		if assert.NotNil(t, dc.MaxRetransmits(), "should not be nil") {
+			assert.Equal(t, maxRetransmits, *dc.MaxRetransmits(), "should match")
 		}
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			// Check if parameters are correctly set
-			assert.False(t, d.Ordered, "Ordered should be set to false")
-			if assert.NotNil(t, d.MaxRetransmits, "should not be nil") {
-				assert.Equal(t, maxRetransmits, *d.MaxRetransmits, "should match")
+			assert.False(t, d.ordered, "Ordered should be set to false")
+			if assert.NotNil(t, d.maxRetransmits, "should not be nil") {
+				assert.Equal(t, maxRetransmits, *d.maxRetransmits, "should match")
 			}
 			done <- true
 		})
 
 		closeReliabilityParamTest(t, offerPC, answerPC, done)
+	})
+
+	t.Run("All other property methods", func(t *testing.T) {
+		id := uint16(123)
+		dc := &DataChannel{}
+		dc.id = &id
+		dc.label = "mylabel"
+		dc.protocol = "myprotocol"
+		dc.negotiated = true
+		dc.priority = PriorityTypeMedium
+
+		assert.Equal(t, dc.id, dc.ID(), "should match")
+		assert.Equal(t, dc.label, dc.Label(), "should match")
+		assert.Equal(t, dc.protocol, dc.Protocol(), "should match")
+		assert.Equal(t, dc.negotiated, dc.Negotiated(), "should match")
+		assert.Equal(t, dc.priority, dc.Priority(), "should match")
+		assert.Equal(t, dc.readyState, dc.ReadyState(), "should match")
+		assert.Equal(t, uint64(0), dc.BufferedAmount(), "should match")
+		dc.SetBufferedAmountLowThreshold(1500)
+		assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "should match")
 	})
 }
