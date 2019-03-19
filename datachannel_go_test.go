@@ -45,57 +45,6 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
-func TestDataChannel_Send(t *testing.T) {
-	report := test.CheckRoutines(t)
-	defer report()
-
-	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
-
-	if err != nil {
-		t.Fatalf("Failed to create a PC pair for testing")
-	}
-
-	done := make(chan bool)
-
-	dc, err := offerPC.CreateDataChannel("data", nil)
-
-	if err != nil {
-		t.Fatalf("Failed to create a PC pair for testing")
-	}
-
-	assert.True(t, dc.ordered, "Ordered should be set to true")
-
-	dc.OnOpen(func() {
-		e := dc.SendText("Ping")
-		if e != nil {
-			t.Fatalf("Failed to send string on data channel")
-		}
-	})
-	dc.OnMessage(func(msg DataChannelMessage) {
-		done <- true
-	})
-
-	answerPC.OnDataChannel(func(d *DataChannel) {
-		assert.True(t, d.ordered, "Ordered should be set to true")
-
-		d.OnMessage(func(msg DataChannelMessage) {
-			e := d.Send([]byte("Pong"))
-			if e != nil {
-				t.Fatalf("Failed to send string on data channel")
-			}
-		})
-	})
-
-	err = signalPair(offerPC, answerPC)
-
-	if err != nil {
-		t.Fatalf("Failed to signal our PC pair for testing")
-	}
-
-	closePair(t, offerPC, answerPC, done)
-}
-
 func TestDataChannel_EventHandlers(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()
@@ -186,7 +135,9 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	assert.EqualValues(t, expected, values)
 }
 
-func TestDataChannelParamters(t *testing.T) {
+// Note(albrow): This test includes some features that aren't supported by the
+// Wasm bindings (at least for now).
+func TestDataChannelParamters_Go(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -211,34 +162,6 @@ func TestDataChannelParamters(t *testing.T) {
 			assert.True(t, d.ordered, "Ordered should be set to true")
 			if assert.NotNil(t, d.maxPacketLifeTime, "should not be nil") {
 				assert.Equal(t, maxPacketLifeTime, *d.maxPacketLifeTime, "should match")
-			}
-			done <- true
-		})
-
-		closeReliabilityParamTest(t, offerPC, answerPC, done)
-	})
-
-	t.Run("MaxRetransmits exchange", func(t *testing.T) {
-		var ordered = false
-		var maxRetransmits uint16 = 3000
-		options := &DataChannelInit{
-			Ordered:        &ordered,
-			MaxRetransmits: &maxRetransmits,
-		}
-
-		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
-
-		// Check if parameters are correctly set
-		assert.False(t, dc.Ordered(), "Ordered should be set to false")
-		if assert.NotNil(t, dc.MaxRetransmits(), "should not be nil") {
-			assert.Equal(t, maxRetransmits, *dc.MaxRetransmits(), "should match")
-		}
-
-		answerPC.OnDataChannel(func(d *DataChannel) {
-			// Check if parameters are correctly set
-			assert.False(t, d.ordered, "Ordered should be set to false")
-			if assert.NotNil(t, d.maxRetransmits, "should not be nil") {
-				assert.Equal(t, maxRetransmits, *d.maxRetransmits, "should match")
 			}
 			done <- true
 		})
