@@ -43,7 +43,14 @@ Now go forth and build some awesome apps! Here are some **ideas** to get your cr
 * Build a conferencing application that processes audio/video and make decisions off of it.
 
 ### WebAssembly
-Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In this case the library will act as a wrapper around the JavaScript WebRTC API. This allows you to use WebRTC from Go in both server and browser side code with little to no changes. Check out the **[example applications](examples/README.md#webassembly)** for instructions on how to compile and run the WebAssembly examples.
+Pion WebRTC can be used when compiled to WebAssembly, also known as Wasm. In
+this case the library will act as a wrapper around the JavaScript WebRTC API.
+This allows you to use WebRTC from Go in both server and browser side code with
+little to no changes. Check out the
+**[example applications](examples/README.md#webassembly)** for instructions on
+how to compile and run the WebAssembly examples. You can also visit the
+[Wiki page on WebAssembly Development](https://github.com/pions/webrtc/wiki/WebAssembly-Development-and-Testing)
+for more information.
 
 ### Roadmap
 The library is in active development, please refer to the [roadmap](https://github.com/pions/webrtc/issues/9) to track our major milestones.
@@ -91,7 +98,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [Antoine Baché](https://github.com/Antonito) - *OGG Opus export*
 * [frank](https://github.com/feixiao) - *Building examples on OSX*
 * [mxmCherry](https://github.com/mxmCherry)
-* [Alex Browne](https://github.com/albrow) - *JavaScript/WASM bindings*
+* [Alex Browne](https://github.com/albrow) - *JavaScript/Wasm bindings*
 * [adwpc](https://github.com/adwpc) - *SFU example with websocket*
 
 ### License
