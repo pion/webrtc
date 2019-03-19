@@ -357,25 +357,3 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
 }
-
-func TestPeerConnection_PeropertyGetters(t *testing.T) {
-	pc := &PeerConnection{
-		currentLocalDescription:  &SessionDescription{},
-		pendingLocalDescription:  &SessionDescription{},
-		currentRemoteDescription: &SessionDescription{},
-		pendingRemoteDescription: &SessionDescription{},
-		signalingState:           SignalingStateHaveLocalOffer,
-		iceGatheringState:        ICEGatheringStateGathering,
-		iceConnectionState:       ICEConnectionStateChecking,
-		connectionState:          PeerConnectionStateConnecting,
-	}
-
-	assert.Equal(t, pc.currentLocalDescription, pc.CurrentLocalDescription(), "should match")
-	assert.Equal(t, pc.pendingLocalDescription, pc.PendingLocalDescription(), "should match")
-	assert.Equal(t, pc.currentRemoteDescription, pc.CurrentRemoteDescription(), "should match")
-	assert.Equal(t, pc.pendingRemoteDescription, pc.PendingRemoteDescription(), "should match")
-	assert.Equal(t, pc.signalingState, pc.SignalingState(), "should match")
-	assert.Equal(t, pc.iceGatheringState, pc.ICEGatheringState(), "should match")
-	assert.Equal(t, pc.iceConnectionState, pc.ICEConnectionState(), "should match")
-	assert.Equal(t, pc.connectionState, pc.ConnectionState(), "should match")
-}
