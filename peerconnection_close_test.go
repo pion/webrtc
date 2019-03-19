@@ -1,5 +1,3 @@
-// +build !js
-
 package webrtc
 
 import (
@@ -27,6 +25,11 @@ func TestPeerConnection_Close(t *testing.T) {
 
 	awaitSetup := make(chan struct{})
 	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		// Make sure this is the data channel we were looking for. (Not the one
+		// created in signalPair).
+		if d.Label() != "data" {
+			return
+		}
 		close(awaitSetup)
 	})
 
