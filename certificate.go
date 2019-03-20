@@ -89,11 +89,10 @@ func (c Certificate) Expires() time.Time {
 	return c.x509Cert.NotAfter
 }
 
-var fingerprintAlgorithms = []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
-
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
 func (c Certificate) GetFingerprints() []DTLSFingerprint {
+	fingerprintAlgorithms := []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
 	res := make([]DTLSFingerprint, len(fingerprintAlgorithms))
 
 	i := 0
