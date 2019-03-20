@@ -20,30 +20,31 @@ type ivfWriterPacketTest struct {
 	closeErr     error
 }
 
-var rawPkt = []byte{
-	0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-	0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
-}
-
-var validPacket = &rtp.Packet{
-	Header: rtp.Header{
-		Marker:           true,
-		Extension:        true,
-		ExtensionProfile: 1,
-		ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
-		Version:          2,
-		PayloadOffset:    20,
-		PayloadType:      96,
-		SequenceNumber:   27023,
-		Timestamp:        3653407706,
-		SSRC:             476325762,
-		CSRC:             []uint32{},
-	},
-	Payload: rawPkt[20:],
-	Raw:     rawPkt,
-}
-
 func TestIVFWriter_AddPacketAndClose(t *testing.T) {
+
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	validPacket := &rtp.Packet{
+		Header: rtp.Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
+			Version:          2,
+			PayloadOffset:    20,
+			PayloadType:      96,
+			SequenceNumber:   27023,
+			Timestamp:        3653407706,
+			SSRC:             476325762,
+			CSRC:             []uint32{},
+		},
+		Payload: rawPkt[20:],
+		Raw:     rawPkt,
+	}
+
 	assert := assert.New(t)
 
 	// The linter misbehave and thinks this code is the same as the tests in opuswriter_test
