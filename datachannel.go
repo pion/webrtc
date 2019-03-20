@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/pions/datachannel"
+	"github.com/pions/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
 
@@ -50,13 +51,14 @@ type DataChannel struct {
 
 	// A reference to the associated api object used by this datachannel
 	api *API
+	log *logging.LeveledLogger
 }
 
 // NewDataChannel creates a new DataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelParameters) (*DataChannel, error) {
-	d, err := api.newDataChannel(params)
+	d, err := api.newDataChannel(params, logging.NewScopedLogger("ortc"))
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +73,7 @@ func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelPara
 
 // newDataChannel is an internal constructor for the data channel used to
 // create the DataChannel object before the networking is set up.
-func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, error) {
+func (api *API) newDataChannel(params *DataChannelParameters, log *logging.LeveledLogger) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
@@ -85,6 +87,7 @@ func (api *API) newDataChannel(params *DataChannelParameters) (*DataChannel, err
 		maxRetransmits:    params.MaxRetransmits,
 		readyState:        DataChannelStateConnecting,
 		api:               api,
+		log:               log,
 	}, nil
 }
 
@@ -258,7 +261,7 @@ func (d *DataChannel) readLoop() {
 		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err == io.ErrShortBuffer {
-			pcLog.Warnf("Failed to read from data channel: The message is larger than %d bytes.\n", dataChannelBufferSize)
+			d.log.Warnf("Failed to read from data channel: The message is larger than %d bytes.\n", dataChannelBufferSize)
 			continue
 		}
 		if err != nil {
