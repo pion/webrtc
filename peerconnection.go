@@ -1373,6 +1373,10 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 
 	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
+
+		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
+			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+		}
 	}
 
 	weSend := false
