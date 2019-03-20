@@ -91,7 +91,7 @@ func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 	)
 
 	if err != nil {
-		iceLog.Warn(err.Error())
+		a.log.Warn(err.Error())
 		return
 	}
 
@@ -101,6 +101,6 @@ func (a *Agent) keepaliveCandidate(local, remote *Candidate) {
 func (a *Agent) sendSTUN(msg *stun.Message, local, remote *Candidate) {
 	_, err := local.writeTo(msg.Pack(), remote)
 	if err != nil {
-		iceLog.Tracef("failed to send STUN message: %s", err)
+		a.log.Tracef("failed to send STUN message: %s", err)
 	}
 }

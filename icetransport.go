@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/pions/logging"
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/mux"
 )
@@ -27,6 +28,8 @@ type ICETransport struct {
 	gatherer *ICEGatherer
 	conn     *ice.Conn
 	mux      *mux.Mux
+
+	log *logging.LeveledLogger
 }
 
 // func (t *ICETransport) GetLocalCandidates() []ICECandidate {
@@ -53,7 +56,10 @@ type ICETransport struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewICETransport(gatherer *ICEGatherer) *ICETransport {
-	return &ICETransport{gatherer: gatherer}
+	return &ICETransport{
+		gatherer: gatherer,
+		log:      logging.NewScopedLogger("ortc"),
+	}
 }
 
 // Start incoming connectivity checks based on its configured role.
@@ -78,7 +84,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	if err := agent.OnSelectedCandidatePairChange(func(local, remote *ice.Candidate) {
 		candidates, err := newICECandidatesFromICE([]*ice.Candidate{local, remote})
 		if err != nil {
-			pcLog.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
+			t.log.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
 			return
 		}
 		t.onSelectedCandidatePairChange(NewICECandidatePair(&candidates[0], &candidates[1]))

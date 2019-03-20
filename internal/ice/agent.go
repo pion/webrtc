@@ -12,6 +12,7 @@ import (
 
 	"errors"
 
+	"github.com/pions/logging"
 	"github.com/pions/stun"
 	"github.com/pions/transport/packetio"
 	"github.com/pions/webrtc/internal/util"
@@ -81,6 +82,8 @@ type Agent struct {
 	// State for closing
 	done chan struct{}
 	err  atomicError
+
+	log *logging.LeveledLogger
 }
 
 func (a *Agent) ok() error {
@@ -144,6 +147,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		done:        make(chan struct{}),
 		portmin:     config.PortMin,
 		portmax:     config.PortMax,
+		log:         logging.NewScopedLogger("ice"),
 	}
 
 	// Make sure the buffer doesn't grow indefinitely.
@@ -224,14 +228,14 @@ func (a *Agent) gatherCandidatesLocal(networkTypes []NetworkType) {
 		for _, network := range supportedNetworks {
 			conn, err := a.listenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
-				iceLog.Warnf("could not listen %s %s\n", network, ip)
+				a.log.Warnf("could not listen %s %s\n", network, ip)
 				continue
 			}
 
 			port := conn.LocalAddr().(*net.UDPAddr).Port
 			c, err := NewCandidateHost(network, ip, port, ComponentRTP)
 			if err != nil {
-				iceLog.Warnf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
+				a.log.Warnf("Failed to create host candidate: %s %s %d: %v\n", network, ip, port, err)
 				continue
 			}
 
@@ -253,12 +257,12 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL, networkTypes []NetworkTy
 			case SchemeTypeSTUN:
 				laddr, xoraddr, err := allocateUDP(network, url)
 				if err != nil {
-					iceLog.Warnf("could not allocate %s %s: %v\n", network, url, err)
+					a.log.Warnf("could not allocate %s %s: %v\n", network, url, err)
 					continue
 				}
 				conn, err := net.ListenUDP(network, laddr)
 				if err != nil {
-					iceLog.Warnf("could not listen %s %s: %v\n", network, laddr, err)
+					a.log.Warnf("could not listen %s %s: %v\n", network, laddr, err)
 				}
 
 				ip := xoraddr.IP
@@ -267,7 +271,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL, networkTypes []NetworkTy
 				relPort := laddr.Port
 				c, err := NewCandidateServerReflexive(network, ip, port, ComponentRTP, relIP, relPort)
 				if err != nil {
-					iceLog.Warnf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
+					a.log.Warnf("Failed to create server reflexive candidate: %s %s %d: %v\n", network, ip, port, err)
 					continue
 				}
 
@@ -279,7 +283,7 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL, networkTypes []NetworkTy
 				c.start(a, conn)
 
 			default:
-				iceLog.Warnf("scheme %s is not implemented\n", url.Scheme)
+				a.log.Warnf("scheme %s is not implemented\n", url.Scheme)
 				continue
 			}
 		}
@@ -328,7 +332,7 @@ func (a *Agent) startConnectivityChecks(isControlling bool, remoteUfrag, remoteP
 	case remotePwd == "":
 		return fmt.Errorf("remotePwd is empty")
 	}
-	iceLog.Debugf("Started agent: isControlling? %t, remoteUfrag: %q, remotePwd: %q", isControlling, remoteUfrag, remotePwd)
+	a.log.Debugf("Started agent: isControlling? %t, remoteUfrag: %q, remotePwd: %q", isControlling, remoteUfrag, remotePwd)
 
 	return a.run(func(agent *Agent) {
 		agent.isControlling = isControlling
@@ -377,17 +381,17 @@ func (a *Agent) pingCandidate(local, remote *Candidate) {
 	}
 
 	if err != nil {
-		iceLog.Debug(err.Error())
+		a.log.Debug(err.Error())
 		return
 	}
 
-	iceLog.Tracef("ping STUN from %s to %s\n", local.String(), remote.String())
+	a.log.Tracef("ping STUN from %s to %s\n", local.String(), remote.String())
 	a.sendSTUN(msg, local, remote)
 }
 
 func (a *Agent) updateConnectionState(newState ConnectionState) {
 	if a.connectionState != newState {
-		iceLog.Infof("Setting new connection state: %s", newState)
+		a.log.Infof("Setting new connection state: %s", newState)
 		a.connectionState = newState
 		hdlr := a.onConnectionStateChangeHdlr
 		if hdlr != nil {
@@ -413,7 +417,7 @@ func (bp byPairPriority) Less(i, j int) bool {
 func (a *Agent) setValidPair(local, remote *Candidate, selected, controlling bool) {
 	// TODO: avoid duplicates
 	p := newCandidatePair(local, remote, controlling)
-	iceLog.Tracef("Found valid candidate pair: %s (selected? %t)", p, selected)
+	a.log.Tracef("Found valid candidate pair: %s (selected? %t)", p, selected)
 
 	if selected {
 		// Notify when the selected pair changes
@@ -459,10 +463,10 @@ func (a *Agent) taskLoop() {
 		select {
 		case <-a.connectivityChan:
 			if a.validateSelectedPair() {
-				iceLog.Trace("checking keepalive")
+				a.log.Trace("checking keepalive")
 				a.checkKeepalive()
 			} else {
-				iceLog.Trace("pinging all candidates")
+				a.log.Trace("pinging all candidates")
 				a.pingAllCandidates()
 			}
 
@@ -584,7 +588,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					iceLog.Warnf("Failed to close candidate %s: %v", c, err)
+					a.log.Warnf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.localCandidates, net)
@@ -593,7 +597,7 @@ func (a *Agent) Close() error {
 			for _, c := range cs {
 				err := c.close()
 				if err != nil {
-					iceLog.Warnf("Failed to close candidate %s: %v", c, err)
+					a.log.Warnf("Failed to close candidate %s: %v", c, err)
 				}
 			}
 			delete(agent.remoteCandidates, net)
@@ -601,7 +605,7 @@ func (a *Agent) Close() error {
 
 		err := a.buffer.Close()
 		if err != nil {
-			iceLog.Warnf("failed to close buffer: %v", err)
+			a.log.Warnf("failed to close buffer: %v", err)
 		}
 	})
 	if err != nil {
@@ -617,15 +621,15 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) *Can
 	var ip net.IP
 	var port int
 
-	switch a := addr.(type) {
+	switch casted := addr.(type) {
 	case *net.UDPAddr:
-		ip = a.IP
-		port = a.Port
+		ip = casted.IP
+		port = casted.Port
 	case *net.TCPAddr:
-		ip = a.IP
-		port = a.Port
+		ip = casted.IP
+		port = casted.Port
 	default:
-		iceLog.Warnf("unsupported address type %T", a)
+		a.log.Warnf("unsupported address type %T", a)
 		return nil
 	}
 
@@ -654,7 +658,7 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
 		},
 		&stun.Fingerprint{},
 	); err != nil {
-		iceLog.Warnf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
+		a.log.Warnf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
 	} else {
 		a.sendSTUN(out, local, remote)
 	}
@@ -662,13 +666,13 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote *Candidate) {
 
 func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlled := m.GetOneAttribute(stun.AttrIceControlled); isControlled && !a.isControlling {
-		iceLog.Debug("inbound isControlled && a.isControlling == false")
+		a.log.Debug("inbound isControlled && a.isControlling == false")
 		return
 	}
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	_, usepair := m.GetOneAttribute(stun.AttrUseCandidate)
-	iceLog.Tracef("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
+	a.log.Tracef("got controlled message (success? %t, usepair? %t)", successResponse, usepair)
 	// Remember the working pair and select it when marked with usepair
 	a.setValidPair(localCandidate, remoteCandidate, usepair, false)
 
@@ -680,13 +684,13 @@ func (a *Agent) handleInboundControlled(m *stun.Message, localCandidate, remoteC
 
 func (a *Agent) handleInboundControlling(m *stun.Message, localCandidate, remoteCandidate *Candidate) {
 	if _, isControlling := m.GetOneAttribute(stun.AttrIceControlling); isControlling && a.isControlling {
-		iceLog.Debug("inbound isControlling && a.isControlling == true")
+		a.log.Debug("inbound isControlling && a.isControlling == true")
 		return
 	} else if _, useCandidate := m.GetOneAttribute(stun.AttrUseCandidate); useCandidate && a.isControlling {
-		iceLog.Debug("useCandidate && a.isControlling == true")
+		a.log.Debug("useCandidate && a.isControlling == true")
 		return
 	}
-	iceLog.Tracef("got controlling message: %#v", m)
+	a.log.Tracef("got controlling message: %#v", m)
 
 	successResponse := m.Method == stun.MethodBinding && m.Class == stun.ClassSuccessResponse
 	// Remember the working pair and select it when receiving a success response
@@ -738,14 +742,14 @@ func (a *Agent) handleNewPeerReflexiveCandidate(local *Candidate, remote net.Add
 
 // handleInbound processes STUN traffic from a remote candidate
 func (a *Agent) handleInbound(m *stun.Message, local *Candidate, remote net.Addr) {
-	iceLog.Tracef("inbound STUN from %s to %s", remote.String(), local.String())
+	a.log.Tracef("inbound STUN from %s to %s", remote.String(), local.String())
 	remoteCandidate := a.findRemoteCandidate(local.NetworkType, remote)
 	if remoteCandidate == nil {
-		iceLog.Debugf("detected a new peer-reflexive candiate: %s ", remote)
+		a.log.Debugf("detected a new peer-reflexive candiate: %s ", remote)
 		err := a.handleNewPeerReflexiveCandidate(local, remote)
 		if err != nil {
 			// Log warning, then move on..
-			iceLog.Warn(err.Error())
+			a.log.Warn(err.Error())
 		}
 		return
 	}

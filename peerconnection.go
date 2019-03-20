@@ -14,15 +14,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/logging"
 	"github.com/pions/rtcp"
 	"github.com/pions/sdp/v2"
 	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/util"
-	"github.com/pions/webrtc/pkg/logging"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
-
-var pcLog = logging.NewScopedLogger("pc")
 
 // PeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another PeerConnection instance in a
@@ -73,6 +71,7 @@ type PeerConnection struct {
 
 	// A reference to the associated API state used by this connection
 	api *API
+	log *logging.LeveledLogger
 }
 
 // NewPeerConnection creates a peerconnection with the default
@@ -109,6 +108,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		dataChannels:       make(map[uint16]*DataChannel),
 
 		api: api,
+		log: logging.NewScopedLogger("pc"),
 	}
 
 	var err error
@@ -215,7 +215,7 @@ func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) (done 
 	hdlr := pc.onSignalingStateChangeHandler
 	pc.mu.RUnlock()
 
-	pcLog.Infof("signaling state changed to %s", newState)
+	pc.log.Infof("signaling state changed to %s", newState)
 	done = make(chan struct{})
 	if hdlr == nil {
 		close(done)
@@ -251,7 +251,7 @@ func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) (done chan struct{})
 	hdlr := pc.onTrackHandler
 	pc.mu.RUnlock()
 
-	pcLog.Debugf("got new track: %+v", t)
+	pc.log.Debugf("got new track: %+v", t)
 	done = make(chan struct{})
 	if hdlr == nil || t == nil {
 		close(done)
@@ -279,7 +279,7 @@ func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) (don
 	hdlr := pc.onICEConnectionStateChangeHandler
 	pc.mu.RUnlock()
 
-	pcLog.Infof("ICE connection state changed: %s", cs)
+	pc.log.Infof("ICE connection state changed: %s", cs)
 	done = make(chan struct{})
 	if hdlr == nil {
 		close(done)
@@ -470,7 +470,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 		case ICETransportStateClosed:
 			cs = ICEConnectionStateClosed
 		default:
-			pcLog.Warnf("OnConnectionStateChange: unhandled ICE state: %s", state)
+			pc.log.Warnf("OnConnectionStateChange: unhandled ICE state: %s", state)
 			return
 		}
 		pc.iceStateChange(cs)
@@ -801,7 +801,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 		if err != nil {
 			// TODO: Handle error
-			pcLog.Warnf("Failed to start manager: %s", err)
+			pc.log.Warnf("Failed to start manager: %s", err)
 			return
 		}
 
@@ -812,7 +812,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		})
 		if err != nil {
 			// TODO: Handle error
-			pcLog.Warnf("Failed to start manager: %s", err)
+			pc.log.Warnf("Failed to start manager: %s", err)
 			return
 		}
 
@@ -829,7 +829,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 					}})
 
 				if err != nil {
-					pcLog.Warnf("Failed to start Sender: %s", err)
+					pc.log.Warnf("Failed to start Sender: %s", err)
 				}
 			}
 		}
@@ -842,7 +842,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		})
 		if err != nil {
 			// TODO: Handle error
-			pcLog.Warnf("Failed to start SCTP: %s", err)
+			pc.log.Warnf("Failed to start SCTP: %s", err)
 			return
 		}
 
@@ -858,7 +858,7 @@ func (pc *PeerConnection) openDataChannels() {
 	for _, d := range pc.dataChannels {
 		err := d.open(pc.sctpTransport)
 		if err != nil {
-			pcLog.Warnf("failed to open data channel: %s", err)
+			pc.log.Warnf("failed to open data channel: %s", err)
 			continue
 		}
 	}
@@ -883,7 +883,7 @@ func (pc *PeerConnection) openSRTP() {
 			if attr.Key == sdp.AttrKeySSRC {
 				ssrc, err := strconv.ParseUint(strings.Split(attr.Value, " ")[0], 10, 32)
 				if err != nil {
-					pcLog.Warnf("Failed to parse SSRC: %v", err)
+					pc.log.Warnf("Failed to parse SSRC: %v", err)
 					continue
 				}
 
@@ -896,7 +896,7 @@ func (pc *PeerConnection) openSRTP() {
 		go func(ssrc uint32, codecType RTPCodecType) {
 			receiver, err := pc.api.NewRTPReceiver(codecType, pc.dtlsTransport)
 			if err != nil {
-				pcLog.Warnf("Could not create RTPReceiver %s", err)
+				pc.log.Warnf("Could not create RTPReceiver %s", err)
 				return
 			}
 
@@ -904,7 +904,7 @@ func (pc *PeerConnection) openSRTP() {
 				Encodings: RTPDecodingParameters{
 					RTPCodingParameters{SSRC: ssrc},
 				}}); err != nil {
-				pcLog.Warnf("RTPReceiver Receive failed %s", err)
+				pc.log.Warnf("RTPReceiver Receive failed %s", err)
 				return
 			}
 
@@ -915,7 +915,7 @@ func (pc *PeerConnection) openSRTP() {
 			)
 
 			if err = receiver.Track().determinePayloadType(); err != nil {
-				pcLog.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+				pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
 				return
 			}
 
@@ -924,13 +924,13 @@ func (pc *PeerConnection) openSRTP() {
 
 			sdpCodec, err := pc.currentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
 			if err != nil {
-				pcLog.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
+				pc.log.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
 				return
 			}
 
 			codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
 			if err != nil {
-				pcLog.Warnf("codec %s in not registered", sdpCodec)
+				pc.log.Warnf("codec %s in not registered", sdpCodec)
 				return
 			}
 
@@ -942,7 +942,7 @@ func (pc *PeerConnection) openSRTP() {
 			if pc.onTrackHandler != nil {
 				pc.onTrack(receiver.Track(), receiver)
 			} else {
-				pcLog.Warnf("OnTrack unset, unable to handle incoming media streams")
+				pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
 			}
 		}(i, incomingSSRCes[i])
 	}
@@ -957,13 +957,13 @@ func (pc *PeerConnection) drainSRTP() {
 		for {
 			srtpSession, err := pc.dtlsTransport.getSRTPSession()
 			if err != nil {
-				pcLog.Warnf("drainSRTP failed to open SrtpSession: %v", err)
+				pc.log.Warnf("drainSRTP failed to open SrtpSession: %v", err)
 				return
 			}
 
 			r, ssrc, err := srtpSession.AcceptStream()
 			if err != nil {
-				pcLog.Warnf("Failed to accept RTP %v \n", err)
+				pc.log.Warnf("Failed to accept RTP %v \n", err)
 				return
 			}
 
@@ -972,11 +972,11 @@ func (pc *PeerConnection) drainSRTP() {
 				for {
 					_, header, err := r.ReadRTP(rtpBuf)
 					if err != nil {
-						pcLog.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
+						pc.log.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
 						return
 					}
 
-					pcLog.Debugf("got RTP: %+v", header)
+					pc.log.Debugf("got RTP: %+v", header)
 				}
 			}()
 		}
@@ -985,13 +985,13 @@ func (pc *PeerConnection) drainSRTP() {
 	for {
 		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 		if err != nil {
-			pcLog.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
+			pc.log.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
 			return
 		}
 
 		r, ssrc, err := srtcpSession.AcceptStream()
 		if err != nil {
-			pcLog.Warnf("Failed to accept RTCP %v \n", err)
+			pc.log.Warnf("Failed to accept RTCP %v \n", err)
 			return
 		}
 
@@ -1000,10 +1000,10 @@ func (pc *PeerConnection) drainSRTP() {
 			for {
 				_, header, err := r.ReadRTCP(rtcpBuf)
 				if err != nil {
-					pcLog.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
+					pc.log.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
 					return
 				}
-				pcLog.Debugf("got RTCP: %+v", header)
+				pc.log.Debugf("got RTCP: %+v", header)
 			}
 		}()
 	}
@@ -1194,7 +1194,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	//
 	// See https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api for details
 
-	d, err := pc.api.newDataChannel(params)
+	d, err := pc.api.newDataChannel(params, pc.log)
 	if err != nil {
 		return nil, err
 	}

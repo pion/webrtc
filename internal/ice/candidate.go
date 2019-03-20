@@ -132,6 +132,7 @@ func (c *Candidate) recvLoop() {
 		close(c.closedCh)
 	}()
 
+	log := c.agent.log
 	buffer := make([]byte, receiveMTU)
 	for {
 		n, srcAddr, err := c.conn.ReadFrom(buffer)
@@ -143,14 +144,14 @@ func (c *Candidate) recvLoop() {
 			var m *stun.Message
 			m, err = stun.NewMessage(buffer[:n])
 			if err != nil {
-				iceLog.Warnf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
+				log.Warnf("Failed to handle decode ICE from %s to %s: %v", c.addr(), srcAddr, err)
 				continue
 			}
 			err = c.agent.run(func(agent *Agent) {
 				agent.handleInbound(m, c, srcAddr)
 			})
 			if err != nil {
-				iceLog.Warnf("Failed to handle message: %v", err)
+				log.Warnf("Failed to handle message: %v", err)
 			}
 
 			continue
@@ -159,14 +160,14 @@ func (c *Candidate) recvLoop() {
 				agent.noSTUNSeen(c, srcAddr)
 			})
 			if err != nil {
-				iceLog.Warnf("Failed to handle message: %v", err)
+				log.Warnf("Failed to handle message: %v", err)
 			}
 		}
 
 		// NOTE This will return packetio.ErrFull if the buffer ever manages to fill up.
 		_, err = c.agent.buffer.Write(buffer[:n])
 		if err != nil {
-			iceLog.Warnf("failed to write packet")
+			log.Warnf("failed to write packet")
 		}
 	}
 }

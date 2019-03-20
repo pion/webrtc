@@ -4,11 +4,9 @@ import (
 	"net"
 	"sync"
 
+	"github.com/pions/logging"
 	"github.com/pions/transport/packetio"
-	"github.com/pions/webrtc/pkg/logging"
 )
-
-var muxLog = logging.NewScopedLogger("mux")
 
 // The maximum amount of data that can be buffered before returning errors.
 const maxBufferSize = 1000 * 1000 // 1MB
@@ -20,6 +18,8 @@ type Mux struct {
 	endpoints  map[*Endpoint]MatchFunc
 	bufferSize int
 	closedCh   chan struct{}
+
+	log *logging.LeveledLogger
 }
 
 // NewMux creates a new Mux
@@ -29,6 +29,7 @@ func NewMux(conn net.Conn, bufferSize int) *Mux {
 		endpoints:  make(map[*Endpoint]MatchFunc),
 		bufferSize: bufferSize,
 		closedCh:   make(chan struct{}),
+		log:        logging.NewScopedLogger("mux"),
 	}
 
 	go m.readLoop()
@@ -118,7 +119,7 @@ func (m *Mux) dispatch(buf []byte) error {
 	m.lock.Unlock()
 
 	if endpoint == nil {
-		muxLog.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+		m.log.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
 		return nil
 	}
 
