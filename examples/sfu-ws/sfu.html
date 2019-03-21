@@ -16,7 +16,7 @@
 
 <body>
 <video id="video1" width="320" height="240" autoplay muted controls></video> <br />
-
+<input id="msginput" type="text" style="width: 320px;height: 24px;" placeholder="typing here..." onkeydown="sendMessage(this)"><br />
 
 <button class="sessbtn" onclick="window.createSession(true)">Publish</button>
 <button class="sessbtn" onclick="window.createSession(false)">Subscribe</button>
@@ -35,6 +35,7 @@ var log = msg => {
 
 var sock = null;
 var wsuri = "wss://" + location.host + "/ws";
+var dataChannel = null;
 window.onload = function() {
     sock = new WebSocket(wsuri);
     sock.onopen = function() {
@@ -54,6 +55,20 @@ window.onload = function() {
         <!-- console.log("websocket error: " + e.data); -->
     }
 };
+
+window.sendMessage = element => {
+    if(event.key === 'Enter') {
+        let message = element.value
+        if (dataChannel === null){
+            return;
+        }
+        if (message === ''){
+            return alert('Message must not be empty')
+        }
+        dataChannel.send(message)
+        element.value = '' 
+    }
+}
 
 window.createSession = isPublisher => {
     let pc = new RTCPeerConnection({
@@ -75,7 +90,10 @@ window.createSession = isPublisher => {
 
     if (isPublisher) {
         navigator.mediaDevices.getUserMedia({ video: true, audio: true})
-            .then(stream => pc.addStream(document.getElementById('video1').srcObject = stream))
+            .then(stream => {
+                pc.addStream(document.getElementById('video1').srcObject = stream)
+                dataChannel = pc.createDataChannel('data')
+            })
             .catch(log)
             pc.onnegotiationneeded = e => {
                 <!-- console.log("Publisher createOffer") -->
@@ -85,6 +103,9 @@ window.createSession = isPublisher => {
             }
     } else {
         <!-- console.log("Subcriber createOffer") -->
+        document.getElementById('msginput').style = 'display: none'
+        dataChannel = pc.createDataChannel('data')
+        dataChannel.onmessage = e => log(`receive data from '${dataChannel.label}' payload '${e.data}'`)
         pc.createOffer({ offerToReceiveVideo: true , offerToReceiveAudio: true})
             .then(d => pc.setLocalDescription(d))
             .catch(log)
