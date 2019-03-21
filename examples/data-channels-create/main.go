@@ -50,7 +50,7 @@ func main() {
 			// Send the message as text
 			sendErr := dataChannel.SendText(message)
 			if sendErr != nil {
-				panic(err)
+				panic(sendErr)
 			}
 		}
 	})
