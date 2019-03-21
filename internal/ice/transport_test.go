@@ -23,13 +23,14 @@ func TestStressDuplex(t *testing.T) {
 
 func testTimeout(t *testing.T, c *Conn, timeout time.Duration) {
 	const pollrate = 100 * time.Millisecond
-	statechan := make(chan ConnectionState)
 	ticker := time.NewTicker(pollrate)
 
 	for cnt := time.Duration(0); cnt <= timeout+taskLoopInterval; cnt += pollrate {
 		<-ticker.C
-		err := c.agent.run(func(agent *Agent) {
-			statechan <- agent.connectionState
+
+		var state ConnectionState
+		err := c.agent.runInline(func(agent *Agent) {
+			state = agent.connectionState
 		})
 
 		if err != nil {
@@ -37,8 +38,7 @@ func testTimeout(t *testing.T, c *Conn, timeout time.Duration) {
 			panic(err)
 		}
 
-		cs := <-statechan
-		if cs != ConnectionStateConnected {
+		if state != ConnectionStateConnected {
 			if cnt < timeout {
 				t.Fatalf("Connection timed out early. (after %d ms)", cnt/time.Millisecond)
 			} else {

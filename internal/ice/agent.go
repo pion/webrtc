@@ -79,6 +79,8 @@ type Agent struct {
 
 	buffer *packetio.Buffer
 
+	runMutex sync.Mutex
+
 	// State for closing
 	done chan struct{}
 	err  atomicError
@@ -178,7 +180,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 
 // OnConnectionStateChange sets a handler that is fired when the connection state changes
 func (a *Agent) OnConnectionStateChange(f func(ConnectionState)) error {
-	return a.run(func(agent *Agent) {
+	return a.runInline(func(agent *Agent) {
 		agent.onConnectionStateChangeHdlr = f
 	})
 }
@@ -186,7 +188,7 @@ func (a *Agent) OnConnectionStateChange(f func(ConnectionState)) error {
 // OnSelectedCandidatePairChange sets a handler that is fired when the final candidate
 // pair is selected
 func (a *Agent) OnSelectedCandidatePairChange(f func(*Candidate, *Candidate)) error {
-	return a.run(func(agent *Agent) {
+	return a.runInline(func(agent *Agent) {
 		agent.onSelectedCandidatePairChangeHdlr = f
 	})
 }
@@ -455,6 +457,21 @@ func (a *Agent) run(t task) error {
 		return a.getErr()
 	case a.taskChan <- t:
 	}
+
+	return nil
+}
+
+func (a *Agent) runInline(t task) error {
+	a.runMutex.Lock()
+	defer a.runMutex.Unlock()
+
+	err := a.ok()
+	if err != nil {
+		return err
+	}
+
+	t(a)
+
 	return nil
 }
 
@@ -462,18 +479,26 @@ func (a *Agent) taskLoop() {
 	for {
 		select {
 		case <-a.connectivityChan:
-			if a.validateSelectedPair() {
-				a.log.Trace("checking keepalive")
-				a.checkKeepalive()
-			} else {
-				a.log.Trace("pinging all candidates")
-				a.pingAllCandidates()
+			// Returns err if the agent is done.
+			err := a.runInline(func(a *Agent) {
+				if a.validateSelectedPair() {
+					a.log.Trace("checking keepalive")
+					a.checkKeepalive()
+				} else {
+					a.log.Trace("pinging all candidates")
+					a.pingAllCandidates()
+				}
+			})
+
+			if err != nil {
+				return
 			}
-
 		case t := <-a.taskChan:
-			// Run the task
-			t(a)
-
+			// Returns err if the agent is done.
+			err = a.runInline(t)
+			if err != nil {
+				return err
+			}
 		case <-a.done:
 			return
 		}
@@ -551,21 +576,18 @@ func (a *Agent) addRemoteCandidate(c *Candidate) {
 }
 
 // GetLocalCandidates returns the local candidates
-func (a *Agent) GetLocalCandidates() ([]*Candidate, error) {
-	res := make(chan []*Candidate)
-
-	err := a.run(func(agent *Agent) {
-		var candidates []*Candidate
+func (a *Agent) GetLocalCandidates() (candidates []*Candidate, err error) {
+	err = a.runInline(func(agent *Agent) {
 		for _, set := range agent.localCandidates {
 			candidates = append(candidates, set...)
 		}
-		res <- candidates
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	return <-res, nil
+	return candidates, nil
 }
 
 // GetLocalUserCredentials returns the local user credentials
@@ -575,11 +597,7 @@ func (a *Agent) GetLocalUserCredentials() (frag string, pwd string) {
 
 // Close cleans up the Agent
 func (a *Agent) Close() error {
-	done := make(chan struct{})
-	err := a.run(func(agent *Agent) {
-		defer func() {
-			close(done)
-		}()
+	return a.runInline(func(agent *Agent) {
 		agent.err.Store(ErrClosed)
 		close(agent.done)
 
@@ -608,13 +626,6 @@ func (a *Agent) Close() error {
 			a.log.Warnf("failed to close buffer: %v", err)
 		}
 	})
-	if err != nil {
-		return err
-	}
-
-	<-done
-
-	return nil
 }
 
 func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) *Candidate {
@@ -775,30 +786,25 @@ func (a *Agent) noSTUNSeen(local *Candidate, remote net.Addr) {
 	}
 }
 
-func (a *Agent) getBestPair() (*candidatePair, error) {
-	res := make(chan *candidatePair)
-
-	err := a.run(func(agent *Agent) {
+func (a *Agent) getBestPair() (res *candidatePair, err error) {
+	err = a.runInline(func(agent *Agent) {
 		if agent.selectedPair != nil {
-			res <- agent.selectedPair
+			res = agent.selectedPair
 			return
 		}
 		for _, p := range agent.validPairs {
-			res <- p
+			res = p
 			return
 		}
-		res <- nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	out := <-res
-
-	if out == nil {
+	if res == nil {
 		return nil, errors.New("no Valid Candidate Pairs Available")
 	}
 
-	return out, nil
+	return res, nil
 }

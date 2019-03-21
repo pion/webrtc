@@ -312,3 +312,22 @@ func TestHandlePeerReflexive(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkGetBestPair(b *testing.B) {
+	a, err := NewAgent(&AgentConfig{})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// There are no pairs so this will error.
+		_, _ = a.getBestPair()
+	}
+
+	err = a.Close()
+	if err != nil {
+		b.Fatal(err)
+	}
+}
