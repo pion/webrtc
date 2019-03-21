@@ -197,10 +197,11 @@ func NewRTPCodec(
 
 // RTPCodecCapability provides information about codec capabilities.
 type RTPCodecCapability struct {
-	MimeType    string
-	ClockRate   uint32
-	Channels    uint16
-	SDPFmtpLine string
+	MimeType     string
+	ClockRate    uint32
+	Channels     uint16
+	SDPFmtpLine  string
+	RTCPFeedback []RTCPFeedback
 }
 
 // RTPHeaderExtensionCapability is used to define a RFC5285 RTP header extension supported by the codec.
