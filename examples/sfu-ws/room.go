@@ -35,8 +35,8 @@ var (
 	// Local track
 	videoTrack     *webrtc.Track
 	audioTrack     *webrtc.Track
-	videoTrackLock *sync.RWMutex = new(sync.RWMutex)
-	audioTrackLock *sync.RWMutex = new(sync.RWMutex)
+	videoTrackLock = sync.RWMutex{}
+	audioTrackLock = sync.RWMutex{}
 
 	// Websocket upgrader
 	upgrader = websocket.Upgrader{}
@@ -51,7 +51,9 @@ func room(w http.ResponseWriter, r *http.Request) {
 	// Websocket client
 	c, err := upgrader.Upgrade(w, r, nil)
 	checkError(err)
-	defer c.Close()
+	defer func() {
+		checkError(c.Close())
+	}()
 
 	// Read sdp from websocket
 	mt, msg, err := c.ReadMessage()

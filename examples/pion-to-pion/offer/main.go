@@ -48,23 +48,23 @@ func main() {
 
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label, dataChannel.ID)
+		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
 
 		for range time.NewTicker(5 * time.Second).C {
 			message := signal.RandSeq(15)
 			fmt.Printf("Sending '%s'\n", message)
 
 			// Send the message as text
-			err := dataChannel.SendText(message)
-			if err != nil {
-				panic(err)
+			sendTextErr := dataChannel.SendText(message)
+			if sendTextErr != nil {
+				panic(sendTextErr)
 			}
 		}
 	})
 
 	// Register text message handling
 	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
-		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label, string(msg.Data))
+		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label(), string(msg.Data))
 	})
 
 	// Create an offer to send to the browser
@@ -104,7 +104,12 @@ func mustSignalViaHTTP(offer webrtc.SessionDescription, address string) webrtc.S
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		closeErr := resp.Body.Close()
+		if closeErr != nil {
+			panic(closeErr)
+		}
+	}()
 
 	var answer webrtc.SessionDescription
 	err = json.NewDecoder(resp.Body).Decode(&answer)

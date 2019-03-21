@@ -46,12 +46,12 @@ func main() {
 
 	// Handle incoming data channels
 	sctp.OnDataChannel(func(channel *webrtc.DataChannel) {
-		fmt.Printf("New DataChannel %s %d\n", channel.Label, channel.ID)
+		fmt.Printf("New DataChannel %s %d\n", channel.Label(), channel.ID())
 
 		// Register the handlers
 		channel.OnOpen(handleOnOpen(channel))
 		channel.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label, string(msg.Data))
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label(), string(msg.Data))
 		})
 	})
 
@@ -131,7 +131,7 @@ func main() {
 		// channel.OnOpen(handleOnOpen(channel)) // TODO: OnOpen on handle ChannelAck
 		go handleOnOpen(channel)() // Temporary alternative
 		channel.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label, string(msg.Data))
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", channel.Label(), string(msg.Data))
 		})
 	}
 
@@ -150,7 +150,7 @@ type Signal struct {
 
 func handleOnOpen(channel *webrtc.DataChannel) func() {
 	return func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label, channel.ID)
+		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label(), channel.ID())
 
 		for range time.NewTicker(5 * time.Second).C {
 			message := signal.RandSeq(15)

@@ -90,13 +90,19 @@ func serve(addr string) error {
 					exampleType == "js",
 				}
 
-				temp.Execute(w, data)
+				err = temp.Execute(w, data)
+				if err != nil {
+					panic(err)
+				}
 				return
 			}
 		}
 
 		// Serve the main page
-		homeTemplate.Execute(w, examples)
+		err = homeTemplate.Execute(w, examples)
+		if err != nil {
+			panic(err)
+		}
 	})
 
 	// Start the server
@@ -109,7 +115,12 @@ func getExamples() (*Examples, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list examples (please run in the examples folder): %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		closeErr := file.Close()
+		if closeErr != nil {
+			panic(closeErr)
+		}
+	}()
 
 	var examples Examples
 	err = json.NewDecoder(file).Decode(&examples)

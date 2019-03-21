@@ -62,6 +62,6 @@ func (p *Pipeline) Stop() {
 // Push pushes a buffer on the appsrc of the GStreamer Pipeline
 func (p *Pipeline) Push(buffer []byte) {
 	b := C.CBytes(buffer)
-	defer C.free(unsafe.Pointer(b))
+	defer C.free(b)
 	C.gstreamer_receive_push_buffer(p.Pipeline, b, C.int(len(buffer)))
 }

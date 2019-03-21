@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pions/datachannel"
@@ -55,7 +56,7 @@ func main() {
 
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
-		fmt.Printf("Data channel '%s'-'%d' open.\n", dataChannel.Label, dataChannel.ID)
+		fmt.Printf("Data channel '%s'-'%d' open.\n", dataChannel.Label(), dataChannel.ID())
 
 		// Detach the data channel
 		raw, dErr := dataChannel.Detach()
@@ -114,7 +115,7 @@ func ReadLoop(d *datachannel.DataChannel) {
 }
 
 // WriteLoop shows how to write to the datachannel directly
-func WriteLoop(d *datachannel.DataChannel) {
+func WriteLoop(d io.Writer) {
 	for range time.NewTicker(5 * time.Second).C {
 		message := signal.RandSeq(messageSize)
 		fmt.Printf("Sending %s \n", message)
