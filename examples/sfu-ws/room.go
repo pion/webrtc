@@ -40,6 +40,9 @@ var (
 
 	// Websocket upgrader
 	upgrader = websocket.Upgrader{}
+
+	// Broadcast channels
+	broadcastHub = newHub()
 )
 
 const (
@@ -131,11 +134,24 @@ func room(w http.ResponseWriter, r *http.Request) {
 
 		// Send server sdp to publisher
 		checkError(c.WriteMessage(mt, []byte(answer.SDP)))
+
+		// Register incoming channel
+		pubReceiver.OnDataChannel(func(d *webrtc.DataChannel) {
+			d.OnMessage(func(msg webrtc.DataChannelMessage) {
+				// Broadcast the data to subSenders
+				broadcastHub.broadcastChannel <- msg.Data
+			})
+		})
 	} else {
 
 		// Create a new PeerConnection
 		subSender, err := api.NewPeerConnection(peerConnectionConfig)
 		checkError(err)
+
+		// Register data channel creation handling
+		subSender.OnDataChannel(func(d *webrtc.DataChannel) {
+			broadcastHub.addListener(d)
+		})
 
 		// Waiting for publisher track finish
 		for {
