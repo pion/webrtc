@@ -40,9 +40,9 @@ func gstreamerReceiveMain() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
-				if err != nil {
-					fmt.Println(err)
+				rtcpSendErr := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
+				if rtcpSendErr != nil {
+					fmt.Println(rtcpSendErr)
 				}
 			}
 		}()
@@ -53,8 +53,8 @@ func gstreamerReceiveMain() {
 		pipeline.Start()
 		buf := make([]byte, 1400)
 		for {
-			i, err := track.Read(buf)
-			if err != nil {
+			i, readErr := track.Read(buf)
+			if readErr != nil {
 				panic(err)
 			}
 

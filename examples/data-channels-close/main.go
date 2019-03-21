@@ -39,16 +39,16 @@ func main() {
 
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
+		fmt.Printf("New DataChannel %s %d\n", d.Label(), d.ID())
 
 		// Register channel opening handling
 		d.OnOpen(func() {
-			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label, d.ID)
+			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
 
 			ticker := time.NewTicker(5 * time.Second)
 
 			d.OnClose(func() {
-				fmt.Printf("Data channel '%s'-'%d' closed.\n", d.Label, d.ID)
+				fmt.Printf("Data channel '%s'-'%d' closed.\n", d.Label(), d.ID())
 				ticker.Stop()
 			})
 
@@ -58,14 +58,14 @@ func main() {
 				fmt.Printf("Sending '%s'\n", message)
 
 				// Send the message as text
-				err := d.SendText(message)
-				if err != nil {
+				sendErr := d.SendText(message)
+				if sendErr != nil {
 					panic(err)
 				}
 
 				cnt--
 				if cnt < 0 {
-					fmt.Printf("Sent %d times. Closing data channel '%s'-'%d'.\n", *closeAfter, d.Label, d.ID)
+					fmt.Printf("Sent %d times. Closing data channel '%s'-'%d'.\n", *closeAfter, d.Label(), d.ID())
 					ticker.Stop()
 					err = d.Close()
 					if err != nil {
@@ -77,7 +77,7 @@ func main() {
 
 		// Register message handling
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label, string(msg.Data))
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label(), string(msg.Data))
 		})
 	})
 

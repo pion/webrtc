@@ -55,24 +55,24 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
-				if err := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}); err != nil {
-					fmt.Println(err)
+				if rtcpSendErr := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}); rtcpSendErr != nil {
+					fmt.Println(rtcpSendErr)
 				}
 			}
 		}()
 
 		// Create a local track, all our SFU clients will be fed via this track
-		localTrack, err := peerConnection.NewTrack(remoteTrack.PayloadType(), remoteTrack.SSRC(), "video", "pion")
-		if err != nil {
-			panic(err)
+		localTrack, newTrackErr := peerConnection.NewTrack(remoteTrack.PayloadType(), remoteTrack.SSRC(), "video", "pion")
+		if newTrackErr != nil {
+			panic(newTrackErr)
 		}
 		localTrackChan <- localTrack
 
 		rtpBuf := make([]byte, 1400)
 		for {
-			i, err := remoteTrack.Read(rtpBuf)
-			if err != nil {
-				panic(err)
+			i, readErr := remoteTrack.Read(rtpBuf)
+			if readErr != nil {
+				panic(readErr)
 			}
 
 			if _, err = localTrack.Write(rtpBuf[:i]); err != nil {

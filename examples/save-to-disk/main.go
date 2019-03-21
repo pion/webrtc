@@ -104,8 +104,18 @@ func main() {
 			fmt.Println("Ctrl+C the remote client to stop the demo")
 		} else if connectionState == webrtc.ICEConnectionStateFailed ||
 			connectionState == webrtc.ICEConnectionStateDisconnected {
-			opusFile.Close()
-			ivfFile.Close()
+
+			closeErr := opusFile.Close()
+			if closeErr != nil {
+				panic(closeErr)
+			}
+
+			closeErr = ivfFile.Close()
+			if closeErr != nil {
+				panic(closeErr)
+
+			}
+
 			fmt.Println("Done writing media files")
 			os.Exit(0)
 		}

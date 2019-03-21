@@ -76,16 +76,16 @@ func main() {
 		codec := track.Codec()
 		if codec.Name == webrtc.Opus {
 			fmt.Println("Got Opus track, saving to disk as output.opus")
-			i, err := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
-			if err != nil {
-				panic(err)
+			i, opusNewErr := opuswriter.New("output.opus", codec.ClockRate, codec.Channels)
+			if opusNewErr != nil {
+				panic(opusNewErr)
 			}
 			saveToDisk(i, track)
 		} else if codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
-			i, err := ivfwriter.New("output.ivf")
-			if err != nil {
-				panic(err)
+			i, ivfNewErr := ivfwriter.New("output.ivf")
+			if ivfNewErr != nil {
+				panic(ivfNewErr)
 			}
 			saveToDisk(i, track)
 		}
@@ -137,9 +137,9 @@ func main() {
 			panic(err)
 		}
 
-		answer, err := peerConnection.CreateAnswer(nil)
-		if err != nil {
-			panic(err)
+		answer, answerErr := peerConnection.CreateAnswer(nil)
+		if answerErr != nil {
+			panic(answerErr)
 		}
 
 		err = peerConnection.SetLocalDescription(answer)

@@ -41,27 +41,27 @@ func main() {
 
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-		fmt.Printf("New DataChannel %s %d\n", d.Label, d.ID)
+		fmt.Printf("New DataChannel %s %d\n", d.Label(), d.ID())
 
 		// Register channel opening handling
 		d.OnOpen(func() {
-			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label, d.ID)
+			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
 
 			for range time.NewTicker(5 * time.Second).C {
 				message := signal.RandSeq(15)
 				fmt.Printf("Sending '%s'\n", message)
 
 				// Send the message as text
-				err := d.SendText(message)
-				if err != nil {
-					panic(err)
+				sendTextErr := d.SendText(message)
+				if sendTextErr != nil {
+					panic(sendTextErr)
 				}
 			}
 		})
 
 		// Register text message handling
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label, string(msg.Data))
+			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label(), string(msg.Data))
 		})
 	})
 
@@ -117,7 +117,9 @@ func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription,
 
 	})
 
-	go http.ListenAndServe(address, nil)
+	go func() {
+		panic(http.ListenAndServe(address, nil))
+	}()
 	fmt.Println("Listening on", address)
 
 	return
