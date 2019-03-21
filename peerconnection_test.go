@@ -157,24 +157,6 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			},
 			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize},
 		},
-		{
-			name: "update ICEServers, no TURN credentials",
-			init: func() (*PeerConnection, error) {
-				return NewPeerConnection(Configuration{})
-			},
-			config: Configuration{
-				ICEServers: []ICEServer{
-					{
-						URLs: []string{
-							"stun:stun.l.google.com:19302",
-							"turns:google.de?transport=tcp",
-						},
-						Username: "unittest",
-					},
-				},
-			},
-			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials},
-		},
 	} {
 		pc, err := test.init()
 		if err != nil {
@@ -197,7 +179,6 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 		ICETransportPolicy:   ICETransportPolicyAll,
 		BundlePolicy:         BundlePolicyBalanced,
 		RTCPMuxPolicy:        RTCPMuxPolicyRequire,
-		Certificates:         []Certificate{},
 		ICECandidatePoolSize: 0,
 	}
 	actual := pc.GetConfiguration()

@@ -1,4 +1,4 @@
-// +build js
+// +build js,wasm
 
 package webrtc
 

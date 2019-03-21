@@ -234,6 +234,24 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 			},
 			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingCertificates},
 		},
+		{
+			name: "update ICEServers, no TURN credentials",
+			init: func() (*PeerConnection, error) {
+				return NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				ICEServers: []ICEServer{
+					{
+						URLs: []string{
+							"stun:stun.l.google.com:19302",
+							"turns:google.de?transport=tcp",
+						},
+						Username: "unittest",
+					},
+				},
+			},
+			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials},
+		},
 	} {
 		pc, err := test.init()
 		if err != nil {
