@@ -1,4 +1,4 @@
-// +build js
+// +build js,wasm
 
 // Package webrtc implements the WebRTC 1.0 as defined in W3C WebRTC specification document.
 package webrtc
@@ -48,7 +48,6 @@ func (pc *PeerConnection) OnSignalingStateChange(f func(SignalingState)) {
 		defer oldHandler.Release()
 	}
 	onSignalingStateChangeHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		// TODO(albrow): Protect args access; recover from panics.
 		state := newSignalingState(args[0].String())
 		go f(state)
 		return js.Undefined()
@@ -287,7 +286,6 @@ func (pc *PeerConnection) OnICECandidate(f func(candidate *string)) {
 		defer oldHandler.Release()
 	}
 	onICECandidateHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		// TODO(albrow): Protect args access; recover from panics.
 		candidate := valueToStringPointer(args[0].Get("candidate"))
 		go f(candidate)
 		return js.Undefined()
@@ -358,9 +356,7 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) (err error) {
 	return nil
 }
 
-// Note(albrow) SendRTCP is not included in MDN WebRTC documentation.
-// SendRTCP sends a user provided RTCP packet to the connected peer
-// If no peer is connected the packet is discarded
+// Note: SendRTCP is not supported.
 // func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
 // 	return errors.New("Not yet implemented")
 // }
@@ -469,9 +465,7 @@ func configurationToValue(configuration Configuration) js.Value {
 		"peerIdentity":         stringToValueOrUndefined(configuration.PeerIdentity),
 		"iceCandidatePoolSize": uint8ToValueOrUndefined(configuration.ICECandidatePoolSize),
 
-		// TODO(albrow): Docs for RTCCertificate are underspecified.
-		// https://developer.mozilla.org/en-US/docs/Web/API/RTCCertificate How
-		// should we handle this?
+		// Note: Certificates are not currently supported.
 		// "certificates": configuration.Certificates,
 	})
 }
@@ -491,9 +485,9 @@ func iceServerToValue(server ICEServer) js.Value {
 	return js.ValueOf(map[string]interface{}{
 		"urls":     stringsToValue(server.URLs), // required
 		"username": stringToValueOrUndefined(server.Username),
-		// TODO(albrow): credential is not currently supported.
+		// Note: credential and credentialType are not currently supported.
 		// "credential":     interfaceToValueOrUndefined(server.Credential),
-		"credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
+		// "credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
 	})
 }
 
@@ -509,9 +503,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 		PeerIdentity:         valueToStringOrZero(configValue.Get("peerIdentity")),
 		ICECandidatePoolSize: valueToUint8OrZero(configValue.Get("iceCandidatePoolSize")),
 
-		// TODO(albrow): Docs for RTCCertificate are underspecified.
-		// https://developer.mozilla.org/en-US/docs/Web/API/RTCCertificate How
-		// should we handle this?
+		// Note: Certificates are not supported.
 		// Certificates []Certificate
 	}
 }
@@ -531,9 +523,9 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 	return ICEServer{
 		URLs:     valueToStrings(iceServerValue.Get("urls")), // required
 		Username: valueToStringOrZero(iceServerValue.Get("username")),
-		// TODO(albrow): Handle Credential which might have different types.
+		// Note: Credential and CredentialType are not currently supported.
 		// Credential: iceServerValue.Get("credential"),
-		CredentialType: newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType"))),
+		// CredentialType: newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType"))),
 	}
 }
 

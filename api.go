@@ -1,3 +1,5 @@
+// +build !js
+
 package webrtc
 
 // API bundles the global funcions of the WebRTC and ORTC API.
