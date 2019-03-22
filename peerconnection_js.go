@@ -22,7 +22,7 @@ type PeerConnection struct {
 	onDataChannelHandler             *js.Func
 	onICEConectionStateChangeHandler *js.Func
 	onICECandidateHandler            *js.Func
-	onNegotiationNeededHandler       *js.Func
+	onICEGatheringStateChangeHandler *js.Func
 }
 
 // NewPeerConnection creates a peerconnection with the default
@@ -276,17 +276,15 @@ func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 	return newICEConnectionState(pc.underlying.Get("iceConnectionState").String())
 }
 
-// TODO(albrow): This function doesn't exist in the Go implementation.
-// TODO(albrow): Follow the spec more closely. Handler should accept
-// RTCPeerConnectionIceEvent instead of *string.
-// https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onicecandidate
-func (pc *PeerConnection) OnICECandidate(f func(candidate *string)) {
+// OnICECandidate sets an event handler which is invoked when a new ICE
+// candidate is found.
+func (pc *PeerConnection) OnICECandidate(f func(candidate *ICECandidate)) {
 	if pc.onICECandidateHandler != nil {
 		oldHandler := pc.onICECandidateHandler
 		defer oldHandler.Release()
 	}
 	onICECandidateHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		candidate := valueToStringPointer(args[0].Get("candidate"))
+		candidate := valueToICECandidate(args[0].Get("candidate"))
 		go f(candidate)
 		return js.Undefined()
 	})
@@ -294,18 +292,19 @@ func (pc *PeerConnection) OnICECandidate(f func(candidate *string)) {
 	pc.underlying.Set("onicecandidate", onICECandidateHandler)
 }
 
-// TODO(albrow): This function doesn't exist in the Go implementation.
-func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
-	if pc.onNegotiationNeededHandler != nil {
-		oldHandler := pc.onNegotiationNeededHandler
+// OnICEGatheringStateChange sets an event handler which is invoked when the
+// ICE candidate gathering state has changed.
+func (pc *PeerConnection) OnICEGatheringStateChange(f func()) {
+	if pc.onICEGatheringStateChangeHandler != nil {
+		oldHandler := pc.onICEGatheringStateChangeHandler
 		defer oldHandler.Release()
 	}
-	onNegotiationNeededHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+	onICEGatheringStateChangeHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		go f()
 		return js.Undefined()
 	})
-	pc.onNegotiationNeededHandler = &onNegotiationNeededHandler
-	pc.underlying.Set("onnegotiationneeded", onNegotiationNeededHandler)
+	pc.onICEGatheringStateChangeHandler = &onICEGatheringStateChangeHandler
+	pc.underlying.Set("onicegatheringstatechange", onICEGatheringStateChangeHandler)
 }
 
 // // GetSenders returns the RTPSender that are currently attached to this PeerConnection
@@ -384,8 +383,8 @@ func (pc *PeerConnection) Close() (err error) {
 	if pc.onICECandidateHandler != nil {
 		pc.onICECandidateHandler.Release()
 	}
-	if pc.onNegotiationNeededHandler != nil {
-		pc.onNegotiationNeededHandler.Release()
+	if pc.onICEGatheringStateChangeHandler != nil {
+		pc.onICEGatheringStateChangeHandler.Release()
 	}
 
 	return nil
@@ -527,6 +526,36 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 		// Credential: iceServerValue.Get("credential"),
 		// CredentialType: newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType"))),
 	}
+}
+
+func valueToICECandidate(val js.Value) *ICECandidate {
+	if val == js.Null() || val == js.Undefined() {
+		return nil
+	}
+	protocol, _ := newICEProtocol(val.Get("protocol").String())
+	candidateType, _ := newICECandidateType(val.Get("type").String())
+	return &ICECandidate{
+		Foundation:     val.Get("foundation").String(),
+		Priority:       valueToUint32OrZero(val.Get("priority")),
+		IP:             val.Get("ip").String(),
+		Protocol:       protocol,
+		Port:           valueToUint16OrZero(val.Get("port")),
+		Typ:            candidateType,
+		Component:      stringToComponentIDOrZero(val.Get("component").String()),
+		RelatedAddress: val.Get("relatedAddress").String(),
+		RelatedPort:    valueToUint16OrZero(val.Get("relatedPort")),
+	}
+}
+
+func stringToComponentIDOrZero(val string) uint16 {
+	// See: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceComponent
+	switch val {
+	case "rtp":
+		return 1
+	case "rtcp":
+		return 2
+	}
+	return 0
 }
 
 func sessionDescriptionToValue(desc *SessionDescription) js.Value {

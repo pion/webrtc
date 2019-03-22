@@ -158,6 +158,12 @@ func TestDataChannelParamters_Go(t *testing.T) {
 		}
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+
 			// Check if parameters are correctly set
 			assert.True(t, d.ordered, "Ordered should be set to true")
 			if assert.NotNil(t, d.maxPacketLifeTime, "should not be nil") {

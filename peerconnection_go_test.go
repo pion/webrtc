@@ -34,39 +34,6 @@ func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, er
 
 	return pca, pcb, nil
 }
-
-func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	offer, err := pcOffer.CreateOffer(nil)
-	if err != nil {
-		return err
-	}
-
-	if err = pcOffer.SetLocalDescription(offer); err != nil {
-		return err
-	}
-
-	err = pcAnswer.SetRemoteDescription(offer)
-	if err != nil {
-		return err
-	}
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	if err != nil {
-		return err
-	}
-
-	if err = pcAnswer.SetLocalDescription(answer); err != nil {
-		return err
-	}
-
-	err = pcOffer.SetRemoteDescription(answer)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func TestNew_Go(t *testing.T) {
 	api := NewAPI()
 	t.Run("Success", func(t *testing.T) {

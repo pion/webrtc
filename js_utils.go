@@ -92,6 +92,20 @@ func valueToUint8OrZero(val js.Value) uint8 {
 	return uint8(val.Int())
 }
 
+func valueToUint16OrZero(val js.Value) uint16 {
+	if val == js.Null() || val == js.Undefined() {
+		return 0
+	}
+	return uint16(val.Int())
+}
+
+func valueToUint32OrZero(val js.Value) uint32 {
+	if val == js.Null() || val == js.Undefined() {
+		return 0
+	}
+	return uint32(val.Int())
+}
+
 func valueToStrings(val js.Value) []string {
 	result := make([]string, val.Length())
 	for i := 0; i < val.Length(); i++ {

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/pions/webrtc"
-
 	"github.com/pions/webrtc/examples/internal/signal"
 )
 
