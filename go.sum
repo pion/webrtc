@@ -23,8 +23,8 @@ github.com/pions/datachannel v1.2.0 h1:N12qhHSRVlgBcaal2Hi4skdz7VI4yz6bNC5IJDMzC
 github.com/pions/datachannel v1.2.0/go.mod h1:MKPEKJRwX/a9/tyQvcVTUI9szyf8ZuUyZxSA9AVMSro=
 github.com/pions/dtls v1.2.2 h1:izn/74bIBxVuHb+NdirkmWMH/yFNd8PBVXJgeH/ofGU=
 github.com/pions/dtls v1.2.2/go.mod h1:5o0cLHyBEl8CvuA88enDDM6aBwn4SNo8md2dPhcynfc=
-github.com/pions/ice v0.1.0 h1:V3RaaUV7QEFUrNk2tHzRqNo3ldCwwnghEpDIQ8+m/eA=
-github.com/pions/ice v0.1.0/go.mod h1:vGnMrwYxOMmfR093luGSh2yMm1DDpPqj8lGRNsmo9VQ=
+github.com/pions/ice v0.1.1 h1:SZouAvl9RnrNnCHxSnurOfzqK2+oD0ZeURSoxuOs0tI=
+github.com/pions/ice v0.1.1/go.mod h1:vGnMrwYxOMmfR093luGSh2yMm1DDpPqj8lGRNsmo9VQ=
 github.com/pions/logging v0.1.0 h1:vr+vInmjaRI06CqPWErEQpywxaqoIZcUjQ2eN68jRbk=
 github.com/pions/logging v0.1.0/go.mod h1:duuz9/Se8ujqvq7OPzbnPpRlha6A0fk1Ba2wrbn4zew=
 github.com/pions/qtls-vendor-extracted v0.0.0-20190210024908-018998217c65 h1:skcEQZ2eUdm1WKlYu7y1y0HBzOwa1pgSAwvhG6PrI2s=

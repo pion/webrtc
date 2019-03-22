@@ -183,12 +183,9 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pcAnswer, err := NewPeerConnection(Configuration{})
+	api := NewAPI()
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,4 +262,87 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatalf("PeerConnection OnTrack fired even though we got no packets")
 	}
 	onTrackFiredLock.Unlock()
+}
+
+/*
+Integration test for behavior around media and disconnected peers
+
+* Sending RTP and RTCP to a disconnected Peer shouldn't return an error
+
+*/
+func TestPeerConnection_Media_Disconnected(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.SetConnectionTimeout(time.Duration(1)*time.Second, time.Duration(250)*time.Millisecond)
+
+	api := NewAPI(WithSettingEngine(s))
+	api.mediaEngine.RegisterDefaultCodecs()
+
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Sender, err := pcOffer.AddTrack(vp8Track)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	haveDisconnected := make(chan error)
+	pcOffer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateDisconnected {
+			close(haveDisconnected)
+		} else if iceState == ICEConnectionStateConnected {
+			// Assert that DTLS is done by pull remote certificate, don't tear down the PC early
+			for {
+				if len(vp8Sender.Transport().GetRemoteCertificate()) != 0 {
+					pcAnswer.sctpTransport.lock.RLock()
+					haveAssocation := pcAnswer.sctpTransport.association != nil
+					pcAnswer.sctpTransport.lock.RUnlock()
+
+					if haveAssocation {
+						break
+					}
+				}
+
+				time.Sleep(time.Second)
+			}
+
+			if pcCloseErr := pcAnswer.Close(); pcCloseErr != nil {
+				haveDisconnected <- pcCloseErr
+			}
+		}
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err, ok := <-haveDisconnected
+	if ok {
+		t.Fatal(err)
+	}
+	for i := 0; i <= 5; i++ {
+		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); rtpErr != nil {
+			t.Fatal(rtpErr)
+		} else if rtcpErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: 0}); rtcpErr != nil {
+			t.Fatal(rtcpErr)
+		}
+	}
+
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
