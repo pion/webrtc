@@ -27,9 +27,10 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
-	iceTransport     *ICETransport
-	certificates     []Certificate
-	remoteParameters DTLSParameters
+	iceTransport      *ICETransport
+	certificates      []Certificate
+	remoteParameters  DTLSParameters
+	remoteCertificate []byte
 	// State     DTLSTransportState
 
 	// OnStateChange func()
@@ -93,6 +94,14 @@ func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
 		Role:         DTLSRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
 	}
+}
+
+// GetRemoteCertificate returns the certificate chain in use by the remote side
+// returns an empty list prior to selection of the remote certificate
+func (t *DTLSTransport) GetRemoteCertificate() []byte {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.remoteCertificate
 }
 
 func (t *DTLSTransport) startSRTP() error {
@@ -220,6 +229,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return fmt.Errorf("peer didn't provide certificate via DTLS")
 	}
 
+	t.remoteCertificate = remoteCert.Raw
 	return t.validateFingerPrint(remoteParameters, remoteCert)
 }
 
