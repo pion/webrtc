@@ -4,6 +4,13 @@
 # license that can be found in the LICENSE file.
 # Modified work copyright 2019 Alex Browne.
 
+# Check Node.js version
+if [[ $(node --version) =~ v[0-9]\. ]]
+then
+	echo "Node.js version >= 10 is required"
+	exit 1
+fi
+
 SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do
 	DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
