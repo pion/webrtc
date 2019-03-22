@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -24,6 +25,56 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	}
 
 	return pca, pcb, nil
+}
+
+func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
+	offerChan := make(chan SessionDescription)
+	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
+		if candidate == nil {
+			offerChan <- *pcOffer.PendingLocalDescription()
+		}
+	})
+
+	// Note(albrow): We need to create a data channel in order to trigger ICE
+	// candidate gathering in the background for the JavaScript/Wasm bindings. If
+	// we don't do this, the complete offer including ICE candidates will never be
+	// generated.
+	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+		return err
+	}
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		return err
+	}
+	if err := pcOffer.SetLocalDescription(offer); err != nil {
+		return err
+	}
+
+	timeout := time.After(3 * time.Second)
+	select {
+	case <-timeout:
+		return fmt.Errorf("timed out waiting to receive offer")
+	case offer := <-offerChan:
+		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
+			return err
+		}
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		if err != nil {
+			return err
+		}
+
+		if err = pcAnswer.SetLocalDescription(answer); err != nil {
+			return err
+		}
+
+		err = pcOffer.SetRemoteDescription(answer)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 }
 
 func TestNew(t *testing.T) {

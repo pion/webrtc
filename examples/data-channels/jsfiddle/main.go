@@ -39,23 +39,25 @@ func main() {
 		log(fmt.Sprintf("Message from DataChannel %s payload %s", sendChannel.Label(), string(msg.Data)))
 	})
 
+	// Create offer
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		handleError(err)
+	}
+	if err := pc.SetLocalDescription(offer); err != nil {
+		handleError(err)
+	}
+
 	// Add handlers for setting up the connection.
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log(fmt.Sprint(state))
 	})
-	pc.OnICECandidate(func(candidate *string) {
+	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate != nil {
 			encodedDescr := signal.Encode(pc.LocalDescription())
 			el := getElementByID("localSessionDescription")
 			el.Set("value", encodedDescr)
 		}
-	})
-	pc.OnNegotiationNeeded(func() {
-		offer, err := pc.CreateOffer(nil)
-		if err != nil {
-			handleError(err)
-		}
-		pc.SetLocalDescription(offer)
 	})
 
 	// Set up global callbacks which will be triggered on button clicks.
