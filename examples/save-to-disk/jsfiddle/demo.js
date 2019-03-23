@@ -12,8 +12,10 @@ var log = msg => {
 }
 
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-  .then(stream => pc.addStream(document.getElementById('video1').srcObject = stream))
-  .catch(log)
+  .then(stream => {
+    pc.addStream(document.getElementById('video1').srcObject = stream)
+    pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
+  }).catch(log)
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 pc.onicecandidate = event => {
@@ -21,9 +23,6 @@ pc.onicecandidate = event => {
     document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
   }
 }
-
-pc.onnegotiationneeded = e =>
-  pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
   let sd = document.getElementById('remoteSessionDescription').value

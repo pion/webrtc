@@ -42,9 +42,15 @@
 		"type": "browser"
 	},
 	{
-		"title": "SFU",
-		"link": "sfu",
-		"description": "The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"title": "Minimal SFU",
+		"link": "sfu-minimal",
+		"description": "The minimal SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"type": "browser"
+	},
+	{
+		"title": "WebSocket SFU",
+		"link": "#",
+		"description": "The Websocket SFU example demonstrates how to broadcast a video to multiple peers. This is similar to Minimal SFU, but all signaling is done via websockets like a more full featured application.",
 		"type": "browser"
 	}
 ]
