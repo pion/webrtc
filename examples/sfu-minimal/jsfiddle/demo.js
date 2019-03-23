@@ -20,13 +20,12 @@ window.createSession = isPublisher => {
 
   if (isPublisher) {
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-      .then(stream => pc.addStream(document.getElementById('video1').srcObject = stream))
-      .catch(log)
-    pc.onnegotiationneeded = e => {
-      pc.createOffer()
-        .then(d => pc.setLocalDescription(d))
-        .catch(log)
-    }
+      .then(stream => {
+        pc.addStream(document.getElementById('video1').srcObject = stream)
+        pc.createOffer()
+          .then(d => pc.setLocalDescription(d))
+          .catch(log)
+      }).catch(log)
   } else {
     pc.createOffer({ offerToReceiveVideo: true })
       .then(d => pc.setLocalDescription(d))

@@ -10,7 +10,7 @@ go get github.com/pions/webrtc/examples/sfu-minimal
 ```
 
 ### Open sfu-minimal example page
-[jsfiddle.net](https://jsfiddle.net/5cwx0rns/11/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
+[jsfiddle.net](https://jsfiddle.net/4g03uqrx/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
 
 ### Run SFU Minimal
 #### Linux/macOS
