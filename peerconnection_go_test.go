@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pions/ice"
 	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/mux"
 	"github.com/pions/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"

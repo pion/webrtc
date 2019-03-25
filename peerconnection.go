@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pions/ice"
 	"github.com/pions/logging"
 	"github.com/pions/rtcp"
 	"github.com/pions/sdp/v2"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/util"
 	"github.com/pions/webrtc/pkg/rtcerr"
 )
