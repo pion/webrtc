@@ -7,8 +7,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/pions/ice"
 	"github.com/pions/logging"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/pions/webrtc/internal/mux"
 )
 

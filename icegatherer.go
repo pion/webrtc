@@ -6,7 +6,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/pions/webrtc/internal/ice"
+	"github.com/pions/ice"
 )
 
 // The ICEGatherer gathers local host, server reflexive and relay

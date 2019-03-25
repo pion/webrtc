@@ -4,8 +4,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/pions/ice"
 	"github.com/pions/sdp/v2"
-	"github.com/pions/webrtc/internal/ice"
 	"github.com/stretchr/testify/assert"
 )
 
