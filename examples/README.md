@@ -12,7 +12,7 @@ We've build an extensive collection of examples covering common use-cases. You c
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [Janus Gateway](janus-gateway): Example janus-gateway is a collection of examples showing how to use Pion WebRTC with [janus-gateway](https://github.com/meetecho/janus-gateway).
 * [SFU Minimal](sfu-minimal): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
-* [SFU Websocket](sfu-websocket): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
+* [SFU Websocket](sfu-ws): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
 
 #### Data Channel API
 * [Data Channels](data-channels): The data-channels example shows how you can send/recv DataChannel messages from a web browser.
