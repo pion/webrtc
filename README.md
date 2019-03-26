@@ -102,6 +102,7 @@ Check out the **[contributing wiki](https://github.com/pions/webrtc/wiki/Contrib
 * [adwpc](https://github.com/adwpc) - *SFU example with websocket*
 * [imalic3](https://github.com/imalic3) - *SFU websocket example with datachannel broadcast*
 * [Žiga Željko](https://github.com/zigazeljko)
+* [Simonacca Fotokite](https://github.com/simonacca-fotokite)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
