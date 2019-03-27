@@ -71,6 +71,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
     _sfuSample = new SfuWsSample();
 
+    _sfuSample.onError = (error){
+      print(error);
+      _sfuSample.close();
+      setState(() {
+        _sfuSample = null;
+      });
+    };
+
     _sfuSample.onOpen = () {
       if (_type == PeerType.kPublisher)
         _sfuSample.createPublisher();
