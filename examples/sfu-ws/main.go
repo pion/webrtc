@@ -6,6 +6,9 @@ import (
 	"net/http"
 
 	"github.com/pions/webrtc"
+	"github.com/povilasv/prommod"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func checkError(err error) {
@@ -32,8 +35,13 @@ func init() {
 }
 
 func main() {
+
+	prometheus.Register(prommod.NewCollector("sfu-ws"))
+
 	port := flag.String("p", "8443", "https port")
 	flag.Parse()
+
+	http.Handle("/metrics", promhttp.Handler())
 
 	// Websocket handle func
 	http.HandleFunc("/ws", room)
