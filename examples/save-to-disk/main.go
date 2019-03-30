@@ -26,7 +26,7 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 		if err != nil {
 			panic(err)
 		}
-		if err := i.AddPacket(rtpPacket); err != nil {
+		if err := i.WriteRTP(rtpPacket); err != nil {
 			panic(err)
 		}
 	}
