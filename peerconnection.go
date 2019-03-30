@@ -1309,9 +1309,9 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) error {
 	return fmt.Errorf("TODO SetIdentityProvider")
 }
 
-// SendRTCP sends a user provided RTCP packet to the connected peer
+// WriteRTCP sends a user provided RTCP packet to the connected peer
 // If no peer is connected the packet is discarded
-func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
+func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
 	raw, err := pkt.Marshal()
 	if err != nil {
 		return err
@@ -1319,19 +1319,19 @@ func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
 
 	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 	if err != nil {
-		return nil // TODO SendRTCP before would gracefully discard packets until ready
+		return nil // TODO WriteRTCP before would gracefully discard packets until ready
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
 	if err != nil {
-		return fmt.Errorf("SendRTCP failed to open WriteStream: %v", err)
+		return fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
 	}
 
 	if _, err := writeStream.Write(raw); err != nil {
 		if err == ice.ErrNoCandidatePairs {
 			return nil
 		}
-		return fmt.Errorf("SendRTCP failed to write: %v", err)
+		return fmt.Errorf("WriteRTCP failed to write: %v", err)
 	}
 	return nil
 }

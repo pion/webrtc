@@ -55,7 +55,7 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
-				if rtcpSendErr := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}); rtcpSendErr != nil {
+				if rtcpSendErr := peerConnection.WriteRTCP(&rtcp.PictureLossIndication{MediaSSRC: remoteTrack.SSRC()}); rtcpSendErr != nil {
 					fmt.Println(rtcpSendErr)
 				}
 			}

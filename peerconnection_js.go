@@ -355,8 +355,8 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) (err error) {
 	return nil
 }
 
-// Note: SendRTCP is not supported.
-// func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
+// Note: WriteRTCP is not supported.
+// func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
 // 	return errors.New("Not yet implemented")
 // }
 
