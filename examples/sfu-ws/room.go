@@ -83,7 +83,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 				go func() {
 					ticker := time.NewTicker(rtcpPLIInterval)
 					for range ticker.C {
-						checkError(pubReceiver.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: videoTrack.SSRC()}))
+						checkError(pubReceiver.WriteRTCP(&rtcp.PictureLossIndication{MediaSSRC: videoTrack.SSRC()}))
 					}
 				}()
 
