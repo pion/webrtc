@@ -96,7 +96,7 @@ func (r *Reader) Next() (Packet, error) {
 	}
 
 	return Packet{
-		Offset:  h.Offset,
+		Offset:  h.offset(),
 		IsRTCP:  h.PacketLength == 0,
 		Payload: payload,
 	}, nil

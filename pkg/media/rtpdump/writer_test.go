@@ -22,7 +22,7 @@ func TestWriter(t *testing.T) {
 	}
 
 	if err := writer.WritePacket(Packet{
-		Offset:  1,
+		Offset:  time.Millisecond,
 		IsRTCP:  false,
 		Payload: []byte{9},
 	}); err != nil {
@@ -52,12 +52,12 @@ func TestRoundTrip(t *testing.T) {
 
 	packets := []Packet{
 		{
-			Offset:  1,
+			Offset:  time.Millisecond,
 			IsRTCP:  false,
 			Payload: []byte{9},
 		},
 		{
-			Offset:  999,
+			Offset:  999 * time.Millisecond,
 			IsRTCP:  true,
 			Payload: []byte{9},
 		},

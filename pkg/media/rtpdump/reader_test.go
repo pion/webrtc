@@ -146,7 +146,7 @@ func TestReader(t *testing.T) {
 			},
 			WantPackets: []Packet{
 				{
-					Offset: 1,
+					Offset: time.Millisecond,
 					IsRTCP: true,
 					Payload: []byte{
 						0x81, 0xcb, 0x00, 0x0c,
@@ -179,7 +179,7 @@ func TestReader(t *testing.T) {
 			},
 			WantPackets: []Packet{
 				{
-					Offset:  1,
+					Offset:  time.Millisecond,
 					IsRTCP:  true,
 					Payload: []byte{0x81},
 				},
@@ -220,7 +220,7 @@ func TestReader(t *testing.T) {
 			},
 			WantPackets: []Packet{
 				{
-					Offset: 1,
+					Offset: time.Millisecond,
 					IsRTCP: true,
 					Payload: []byte{
 						0x81, 0xcb, 0x00, 0x0c,
@@ -229,7 +229,7 @@ func TestReader(t *testing.T) {
 					},
 				},
 				{
-					Offset: 2,
+					Offset: 2 * time.Millisecond,
 					IsRTCP: false,
 					Payload: []byte{
 						0x90, 0x60, 0x69, 0x8f,
