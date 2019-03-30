@@ -75,7 +75,7 @@ func (h *Header) Unmarshal(d []byte) error {
 // truncated packets to support logging just the headers of RTP/RTCP packets.
 type Packet struct {
 	// Offset is the time since the start of recording in millseconds
-	Offset uint32
+	Offset time.Duration
 	// IsRTCP is true if the payload is RTCP, false if the payload is RTP
 	IsRTCP bool
 	// Payload is the binary RTP or or RTCP payload. The contents may not parse
@@ -93,7 +93,7 @@ func (p Packet) Marshal() ([]byte, error) {
 	hdr := packetHeader{
 		Length:       uint16(len(p.Payload)) + 8,
 		PacketLength: uint16(packetLength),
-		Offset:       p.Offset,
+		Offset:       p.offsetMs(),
 	}
 	hdrData, err := hdr.Marshal()
 	if err != nil {
@@ -112,7 +112,7 @@ func (p *Packet) Unmarshal(d []byte) error {
 		return err
 	}
 
-	p.Offset = hdr.Offset
+	p.Offset = hdr.offset()
 	p.IsRTCP = hdr.Length != 0 && hdr.PacketLength == 0
 
 	if hdr.Length < 8 {
@@ -124,6 +124,10 @@ func (p *Packet) Unmarshal(d []byte) error {
 	p.Payload = d[8:hdr.Length]
 
 	return nil
+}
+
+func (p *Packet) offsetMs() uint32 {
+	return uint32(p.Offset / time.Millisecond)
 }
 
 type packetHeader struct {
@@ -156,4 +160,8 @@ func (p *packetHeader) Unmarshal(d []byte) error {
 	p.Offset = binary.BigEndian.Uint32(d[4:])
 
 	return nil
+}
+
+func (p packetHeader) offset() time.Duration {
+	return time.Duration(p.Offset) * time.Millisecond
 }

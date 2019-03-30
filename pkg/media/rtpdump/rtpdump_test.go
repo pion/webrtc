@@ -95,7 +95,7 @@ func TestPacketRoundTrip(t *testing.T) {
 		},
 		{
 			Packet: Packet{
-				Offset:  123,
+				Offset:  123 * time.Millisecond,
 				IsRTCP:  false,
 				Payload: []byte{1, 2, 3, 4},
 			},
