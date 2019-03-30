@@ -113,7 +113,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 
 	for _, t := range addPacketTestCase {
 		if t.writer != nil {
-			res := t.writer.AddPacket(t.packet)
+			res := t.writer.WriteRTP(t.packet)
 			assert.Equal(res, t.err, t.message)
 		}
 	}

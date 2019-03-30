@@ -140,8 +140,8 @@ func (i *OpusWriter) createPage(payload []uint8, headerType uint8, granulePos ui
 	return page
 }
 
-// AddPacket adds a new packet and writes the appropriate headers for it
-func (i *OpusWriter) AddPacket(packet *rtp.Packet) error {
+// WriteRTP adds a new packet and writes the appropriate headers for it
+func (i *OpusWriter) WriteRTP(packet *rtp.Packet) error {
 	if i.stream == nil {
 		return fmt.Errorf("file not opened")
 	}
