@@ -195,3 +195,153 @@ func TestDataChannelParamters_Go(t *testing.T) {
 		assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "should match")
 	})
 }
+
+func TestDataChannelBufferedAmount(t *testing.T) {
+	t.Run("set before datachannel becomes open", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
+
+		var nCbs int
+		buf := make([]byte, 1000)
+
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		done := make(chan bool)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+			var nPacketsReceived int
+			d.OnMessage(func(msg DataChannelMessage) {
+				nPacketsReceived++
+
+				if nPacketsReceived == 10 {
+					go func() {
+						time.Sleep(time.Second)
+						done <- true
+					}()
+				}
+			})
+			assert.True(t, d.Ordered(), "Ordered should be set to true")
+		})
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		assert.True(t, dc.Ordered(), "Ordered should be set to true")
+
+		dc.OnOpen(func() {
+			for i := 0; i < 10; i++ {
+				e := dc.Send(buf)
+				if e != nil {
+					t.Fatalf("Failed to send string on data channel")
+				}
+				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mimatch")
+
+				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+			}
+		})
+
+		dc.OnMessage(func(msg DataChannelMessage) {
+		})
+
+		// The value is temporarily stored in the dc object
+		// until the dc gets opened
+		dc.SetBufferedAmountLowThreshold(1500)
+		// The callback function is temporarily stored in the dc object
+		// until the dc gets opened
+		dc.OnBufferedAmountLow(func() {
+			nCbs++
+		})
+
+		err = signalPair(offerPC, answerPC)
+		if err != nil {
+			t.Fatalf("Failed to signal our PC pair for testing")
+		}
+
+		closePair(t, offerPC, answerPC, done)
+
+		assert.True(t, nCbs > 0, "callback should be made at least once")
+	})
+
+	t.Run("set after datachannel becomes open", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
+
+		var nCbs int
+		buf := make([]byte, 1000)
+
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		done := make(chan bool)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+			var nPacketsReceived int
+			d.OnMessage(func(msg DataChannelMessage) {
+				nPacketsReceived++
+
+				if nPacketsReceived == 10 {
+					go func() {
+						time.Sleep(time.Second)
+						done <- true
+					}()
+				}
+			})
+			assert.True(t, d.Ordered(), "Ordered should be set to true")
+		})
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		assert.True(t, dc.Ordered(), "Ordered should be set to true")
+
+		dc.OnOpen(func() {
+			// The value should directly be passed to sctp
+			dc.SetBufferedAmountLowThreshold(1500)
+			// The callback function should directly be passed to sctp
+			dc.OnBufferedAmountLow(func() {
+				nCbs++
+			})
+
+			for i := 0; i < 10; i++ {
+				e := dc.Send(buf)
+				if e != nil {
+					t.Fatalf("Failed to send string on data channel")
+				}
+				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mimatch")
+
+				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+			}
+		})
+
+		dc.OnMessage(func(msg DataChannelMessage) {
+		})
+
+		err = signalPair(offerPC, answerPC)
+		if err != nil {
+			t.Fatalf("Failed to signal our PC pair for testing")
+		}
+
+		closePair(t, offerPC, answerPC, done)
+
+		assert.True(t, nCbs > 0, "callback should be made at least once")
+	})
+}
