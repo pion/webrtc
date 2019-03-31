@@ -364,3 +364,14 @@ func TestPeerConnection_PeropertyGetters(t *testing.T) {
 	assert.Equal(t, pc.iceConnectionState, pc.ICEConnectionState(), "should match")
 	assert.Equal(t, pc.connectionState, pc.ConnectionState(), "should match")
 }
+
+func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Errorf("New PeerConnection: got error: %v", err)
+	}
+	_, err = pc.CreateAnswer(nil)
+	if !reflect.DeepEqual(&rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}, err) {
+		t.Errorf("CreateAnswer without RemoteDescription: got error: %v", err)
+	}
+}
