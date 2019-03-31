@@ -885,7 +885,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 		pc.openSRTP()
 
-		for _, tranceiver := range pc.rtpTransceivers {
+		for _, tranceiver := range pc.GetTransceivers() {
 			if tranceiver.Sender != nil {
 				err = tranceiver.Sender.Send(RTPSendParameters{
 					Encodings: RTPEncodingParameters{
@@ -1164,7 +1164,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 	var transceiver *RTPTransceiver
-	for _, t := range pc.rtpTransceivers {
+	for _, t := range pc.GetTransceivers() {
 		if !t.stopped &&
 			t.Sender != nil &&
 			!t.Sender.hasSent() &&
