@@ -39,12 +39,12 @@ type DataChannel struct {
 	// "blob". This attribute controls how binary data is exposed to scripts.
 	// binaryType                 string
 
-	// OnBufferedAmountLow func()
 	// OnError             func()
 
-	onMessageHandler func(DataChannelMessage)
-	onOpenHandler    func()
-	onCloseHandler   func()
+	onMessageHandler    func(DataChannelMessage)
+	onOpenHandler       func()
+	onCloseHandler      func()
+	onBufferedAmountLow func()
 
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
@@ -140,6 +140,10 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		d.mu.Unlock()
 		return err
 	}
+
+	// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
+	dc.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
+	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 
 	d.readyState = DataChannelStateOpen
 	d.mu.Unlock()
@@ -458,8 +462,10 @@ func (d *DataChannel) BufferedAmount() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pion/sctp#11)
-	return 0
+	if d.dataChannel == nil {
+		return 0
+	}
+	return d.dataChannel.BufferedAmount()
 }
 
 // BufferedAmountLowThreshold represents the threshold at which the
@@ -467,23 +473,39 @@ func (d *DataChannel) BufferedAmount() uint64 {
 // from above this threshold to equal or below it, the bufferedamountlow
 // event fires. BufferedAmountLowThreshold is initially zero on each new
 // DataChannel, but the application may change its value at any time.
+// The threshold is set to 0 by default.
 func (d *DataChannel) BufferedAmountLowThreshold() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pion/sctp#11)
-	return d.bufferedAmountLowThreshold
+	if d.dataChannel == nil {
+		return d.bufferedAmountLowThreshold
+	}
+	return d.dataChannel.BufferedAmountLowThreshold()
 }
 
-// SetBufferedAmountLowThreshold represents the threshold at which the
-// bufferedAmount is considered to be low. When the bufferedAmount decreases
-// from above this threshold to equal or below it, the bufferedamountlow
-// event fires. BufferedAmountLowThreshold is initially zero on each new
-// DataChannel, but the application may change its value at any time.
+// SetBufferedAmountLowThreshold is used to update the threshold.
+// See BufferedAmountLowThreshold().
 func (d *DataChannel) SetBufferedAmountLowThreshold(th uint64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// TODO: wire to SCTP (pion/sctp#11)
 	d.bufferedAmountLowThreshold = th
+
+	if d.dataChannel != nil {
+		d.dataChannel.SetBufferedAmountLowThreshold(th)
+	}
+}
+
+// OnBufferedAmountLow sets an event handler which is invoked when
+// the number of bytes of outgoing data becomes lower than the
+// BufferedAmountLowThreshold.
+func (d *DataChannel) OnBufferedAmountLow(f func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.onBufferedAmountLow = f
+	if d.dataChannel != nil {
+		d.dataChannel.OnBufferedAmountLow(f)
+	}
 }

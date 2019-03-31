@@ -106,7 +106,7 @@ func TestDataChannel_Send(t *testing.T) {
 	closePair(t, offerPC, answerPC, done)
 }
 
-func TestDataChannelParamters(t *testing.T) {
+func TestDataChannelParameters(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
