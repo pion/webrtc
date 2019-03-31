@@ -546,6 +546,8 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	switch {
 	case options != nil:
 		return SessionDescription{}, fmt.Errorf("TODO handle options")
+	case pc.RemoteDescription() == nil:
+		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed:
