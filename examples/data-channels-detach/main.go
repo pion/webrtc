@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/pions/datachannel"
 	"github.com/pions/webrtc"
 
 	"github.com/pions/webrtc/examples/internal/signal"
@@ -100,7 +99,7 @@ func main() {
 }
 
 // ReadLoop shows how to read from the datachannel directly
-func ReadLoop(d *datachannel.DataChannel) {
+func ReadLoop(d io.Reader) {
 	for {
 		buffer := make([]byte, messageSize)
 		n, err := d.Read(buffer)
@@ -109,7 +108,7 @@ func ReadLoop(d *datachannel.DataChannel) {
 			return
 		}
 
-		fmt.Printf("Message from DataChannel '%s': %s\n", d.Label, string(buffer[:n]))
+		fmt.Printf("Message from DataChannel: %s\n", string(buffer[:n]))
 	}
 }
 

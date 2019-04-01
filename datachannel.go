@@ -328,7 +328,7 @@ func (d *DataChannel) ensureOpen() error {
 // Please reffer to the data-channels-detach example and the
 // pions/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
-func (d *DataChannel) Detach() (*datachannel.DataChannel, error) {
+func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
