@@ -64,6 +64,7 @@ func (g *ICEGatherer) Gather() error {
 		PortMax:           g.api.settingEngine.ephemeralUDP.PortMax,
 		ConnectionTimeout: g.api.settingEngine.timeout.ICEConnection,
 		KeepaliveInterval: g.api.settingEngine.timeout.ICEKeepalive,
+		LoggerFactory:     g.api.settingEngine.LoggerFactory,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes

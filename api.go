@@ -2,6 +2,10 @@
 
 package webrtc
 
+import (
+	"github.com/pions/logging"
+)
+
 // API bundles the global funcions of the WebRTC and ORTC API.
 // Some of these functions are also exported globally using the
 // defaultAPI object. Note that the global version of the API
@@ -21,6 +25,10 @@ func NewAPI(options ...func(*API)) *API {
 
 	if a.settingEngine == nil {
 		a.settingEngine = &SettingEngine{}
+	}
+
+	if a.settingEngine.LoggerFactory == nil {
+		a.settingEngine.LoggerFactory = logging.NewDefaultLoggerFactory()
 	}
 
 	if a.mediaEngine == nil {

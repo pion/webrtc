@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pions/ice"
+	"github.com/pions/logging"
 )
 
 // SettingEngine allows influencing behavior in ways that are not
@@ -26,6 +27,7 @@ type SettingEngine struct {
 	candidates struct {
 		ICENetworkTypes []NetworkType
 	}
+	LoggerFactory logging.LoggerFactory
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
