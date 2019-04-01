@@ -51,14 +51,14 @@ type DataChannel struct {
 
 	// A reference to the associated api object used by this datachannel
 	api *API
-	log *logging.LeveledLogger
+	log logging.LeveledLogger
 }
 
 // NewDataChannel creates a new DataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelParameters) (*DataChannel, error) {
-	d, err := api.newDataChannel(params, logging.NewScopedLogger("ortc"))
+	d, err := api.newDataChannel(params, api.settingEngine.LoggerFactory.NewLogger("ortc"))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelPara
 
 // newDataChannel is an internal constructor for the data channel used to
 // create the DataChannel object before the networking is set up.
-func (api *API) newDataChannel(params *DataChannelParameters, log *logging.LeveledLogger) (*DataChannel, error) {
+func (api *API) newDataChannel(params *DataChannelParameters, log logging.LeveledLogger) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}

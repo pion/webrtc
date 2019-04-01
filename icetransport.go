@@ -29,7 +29,9 @@ type ICETransport struct {
 	conn     *ice.Conn
 	mux      *mux.Mux
 
-	log *logging.LeveledLogger
+	api *API
+
+	log logging.LeveledLogger
 }
 
 // func (t *ICETransport) GetLocalCandidates() []ICECandidate {
@@ -58,7 +60,8 @@ type ICETransport struct {
 func (api *API) NewICETransport(gatherer *ICEGatherer) *ICETransport {
 	return &ICETransport{
 		gatherer: gatherer,
-		log:      logging.NewScopedLogger("ortc"),
+		api:      api,
+		log:      api.settingEngine.LoggerFactory.NewLogger("ortc"),
 	}
 }
 
@@ -126,7 +129,13 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 
 	t.conn = iceConn
-	t.mux = mux.NewMux(t.conn, receiveMTU)
+
+	config := mux.Config{
+		Conn:          t.conn,
+		BufferSize:    receiveMTU,
+		LoggerFactory: t.api.settingEngine.LoggerFactory,
+	}
+	t.mux = mux.NewMux(config)
 
 	return nil
 }

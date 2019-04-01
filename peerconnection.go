@@ -72,7 +72,7 @@ type PeerConnection struct {
 
 	// A reference to the associated API state used by this connection
 	api *API
-	log *logging.LeveledLogger
+	log logging.LeveledLogger
 }
 
 // NewPeerConnection creates a peerconnection with the default
@@ -109,7 +109,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		dataChannels:       make(map[uint16]*DataChannel),
 
 		api: api,
-		log: logging.NewScopedLogger("pc"),
+		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 
 	var err error
