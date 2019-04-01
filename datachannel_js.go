@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"syscall/js"
 )
 
@@ -20,6 +21,9 @@ type DataChannel struct {
 	onOpenHandler    *js.Func
 	onCloseHandler   *js.Func
 	onMessageHandler *js.Func
+
+	// A reference to the associated api object used by this datachannel
+	api *API
 }
 
 // OnOpen sets an event handler which is invoked when

@@ -23,11 +23,19 @@ type PeerConnection struct {
 	onICEConectionStateChangeHandler *js.Func
 	onICECandidateHandler            *js.Func
 	onICEGatheringStateChangeHandler *js.Func
+
+	// A reference to the associated API state used by this connection
+	api *API
 }
 
-// NewPeerConnection creates a peerconnection with the default
-// codecs.
-func NewPeerConnection(configuration Configuration) (_ *PeerConnection, err error) {
+// NewPeerConnection creates a peerconnection.
+func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+	api := NewAPI()
+	return api.NewPeerConnection(configuration)
+}
+
+// NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
+func (api *API) NewPeerConnection(configuration Configuration) (_ *PeerConnection, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = recoveryToError(e)
@@ -37,6 +45,7 @@ func NewPeerConnection(configuration Configuration) (_ *PeerConnection, err erro
 	underlying := js.Global().Get("window").Get("RTCPeerConnection").New(configMap)
 	return &PeerConnection{
 		underlying: underlying,
+		api:        api,
 	}, nil
 }
 
@@ -71,6 +80,7 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 		// property of this PeerConnection, but at the cost of additional overhead.
 		dataChannel := &DataChannel{
 			underlying: args[0].Get("channel"),
+			api:        pc.api,
 		}
 		go f(dataChannel)
 		return js.Undefined()
@@ -341,6 +351,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	channel := pc.underlying.Call("createDataChannel", label, dataChannelInitToValue(options))
 	return &DataChannel{
 		underlying: channel,
+		api:        pc.api,
 	}, nil
 }
 
