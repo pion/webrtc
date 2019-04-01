@@ -5,6 +5,8 @@ package webrtc
 import (
 	"fmt"
 	"syscall/js"
+
+	"github.com/pions/datachannel"
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
@@ -64,8 +66,15 @@ func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 		defer oldHandler.Release()
 	}
 	onMessageHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		msg := valueToDataChannelMessage(args[0].Get("data"))
-		go f(msg)
+		// TODO: Ensure message order?
+		data := args[0].Get("data")
+		go func() {
+			// valueToDataChannelMessage may block when handling 'Blob' data
+			// so we need to call it from a new routine. See:
+			// https://godoc.org/syscall/js#FuncOf
+			msg := valueToDataChannelMessage(data)
+			f(msg)
+		}()
 		return js.Undefined()
 	})
 	d.onMessageHandler = &onMessageHandler
@@ -94,6 +103,23 @@ func (d *DataChannel) SendText(s string) (err error) {
 	}()
 	d.underlying.Call("send", s)
 	return nil
+}
+
+// Detach allows you to detach the underlying datachannel. This provides
+// an idiomatic API to work with, however it disables the OnMessage callback.
+// Before calling Detach you have to enable this behavior by calling
+// webrtc.DetachDataChannels(). Combining detached and normal data channels
+// is not supported.
+// Please reffer to the data-channels-detach example and the
+// pions/datachannel documentation for the correct way to handle the
+// resulting DataChannel object.
+func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
+	if !d.api.settingEngine.detach.DataChannels {
+		return nil, fmt.Errorf("enable detaching by calling webrtc.DetachDataChannels()")
+	}
+
+	detached := newDetachedDataChannel(d)
+	return detached, nil
 }
 
 // Close Closes the DataChannel. It may be called regardless of whether
@@ -246,6 +272,8 @@ func valueToDataChannelMessage(val js.Value) DataChannelMessage {
 			}()
 			return js.Undefined()
 		}))
+
+		reader.Call("readAsArrayBuffer", val)
 
 		// Wait for the FileReader to finish reading/loading.
 		<-doneChan
