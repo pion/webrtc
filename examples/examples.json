@@ -18,6 +18,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Data Channels Detach",
+		"link": "data-channels-detach",
+		"description": "The data-channels-detach is an example that shows how you can detach a data channel.",
+		"type": "browser"
+	},
+	{
 		"title": "Gstreamer Receive",
 		"link": "gstreamer-receive",
 		"description": "The gstreamer-receive example shows how to receive media from the browser and play it live. This example uses GStreamer for rendering.",
