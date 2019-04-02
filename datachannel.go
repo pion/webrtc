@@ -133,6 +133,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
 		ReliabilityParameter: reliabilityParameteer,
 		Label:                d.label,
+		LoggerFactory:        d.api.settingEngine.LoggerFactory,
 	}
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)
