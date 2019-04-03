@@ -270,7 +270,7 @@ func (d *DataChannel) readLoop() {
 			d.mu.Unlock()
 			if err != io.EOF {
 				// TODO: Throw OnError
-				fmt.Println("Failed to read from data channel", err)
+				d.log.Errorf("Failed to read from data channel %v", err)
 			}
 			d.onClose()
 			return
