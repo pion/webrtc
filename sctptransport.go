@@ -4,11 +4,11 @@ package webrtc
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sync"
 
 	"github.com/pions/datachannel"
+	"github.com/pions/logging"
 	"github.com/pions/sctp"
 )
 
@@ -39,6 +39,7 @@ type SCTPTransport struct {
 	onDataChannelHandler func(*DataChannel)
 
 	api *API
+	log logging.LeveledLogger
 }
 
 // NewSCTPTransport creates a new SCTPTransport.
@@ -50,6 +51,7 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 		State:         SCTPTransportStateConnecting,
 		port:          5000, // TODO
 		api:           api,
+		log:           api.settingEngine.LoggerFactory.NewLogger("ortc"),
 	}
 
 	res.updateMessageSize()
@@ -132,7 +134,7 @@ func (r *SCTPTransport) acceptDataChannels() {
 	for {
 		dc, err := datachannel.Accept(a)
 		if err != nil {
-			fmt.Println("Failed to accept data channel:", err)
+			r.log.Errorf("Failed to accept data channel: %v", err)
 			// TODO: Kill DataChannel/PeerConnection?
 			return
 		}
@@ -163,15 +165,21 @@ func (r *SCTPTransport) acceptDataChannels() {
 		}
 
 		sid := dc.StreamIdentifier()
-		rtcDC := &DataChannel{
-			id:                &sid,
-			label:             dc.Config.Label,
-			ordered:           ordered,
-			maxPacketLifeTime: maxPacketLifeTime,
-			maxRetransmits:    maxRetransmits,
-			readyState:        DataChannelStateOpen,
-			api:               r.api,
+		rtcDC, err := r.api.newDataChannel(&DataChannelParameters{
+			ID:                sid,
+			Label:             dc.Config.Label,
+			Ordered:           ordered,
+			MaxPacketLifeTime: maxPacketLifeTime,
+			MaxRetransmits:    maxRetransmits,
+		}, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
+
+		if err != nil {
+			r.log.Errorf("Failed to accept data channel: %v", err)
+			// TODO: Kill DataChannel/PeerConnection?
+			return
 		}
+
+		rtcDC.readyState = DataChannelStateOpen
 
 		<-r.onDataChannel(rtcDC)
 		rtcDC.handleOpen(dc)
