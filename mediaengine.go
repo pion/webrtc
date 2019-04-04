@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pions/rtp"
-	"github.com/pions/rtp/codecs"
-	"github.com/pions/sdp/v2"
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
+	"github.com/pion/sdp/v2"
 )
 
 // PayloadTypes for the default codecs
@@ -32,7 +32,7 @@ func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 	return codec.PayloadType
 }
 
-// RegisterDefaultCodecs is a helper that registers the default codecs supported by pions-webrtc
+// RegisterDefaultCodecs is a helper that registers the default codecs supported by pion-webrtc
 func (m *MediaEngine) RegisterDefaultCodecs() {
 	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
@@ -73,7 +73,7 @@ func (m *MediaEngine) getCodecsByKind(kind RTPCodecType) []*RTPCodec {
 	return codecs
 }
 
-// Names for the default codecs supported by pions-webrtc
+// Names for the default codecs supported by pion-webrtc
 const (
 	G722 = "G722"
 	Opus = "opus"

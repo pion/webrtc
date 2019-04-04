@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/dtls"
-	"github.com/pions/srtp"
-	"github.com/pions/webrtc/internal/mux"
-	"github.com/pions/webrtc/internal/util"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/dtls"
+	"github.com/pion/srtp"
+	"github.com/pion/webrtc/internal/mux"
+	"github.com/pion/webrtc/internal/util"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 // DTLSTransport allows an application access to information about the DTLS

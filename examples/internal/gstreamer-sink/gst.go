@@ -10,7 +10,7 @@ import "C"
 import (
 	"unsafe"
 
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 )
 
 // StartMainLoop starts GLib's main loop

@@ -4,7 +4,7 @@ save-to-disk is a simple application that shows how to record your webcam using 
 ## Instructions
 ### Download save-to-disk
 ```
-go get github.com/pions/webrtc/examples/save-to-disk
+go get github.com/pion/webrtc/examples/save-to-disk
 ```
 
 ### Open save-to-disk example page

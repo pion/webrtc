@@ -3,7 +3,7 @@ package main
 import (
 	"sync"
 
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 )
 
 type BroadcastHub struct {

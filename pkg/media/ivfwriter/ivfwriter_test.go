@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/pions/rtp"
+	"github.com/pion/rtp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +63,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			message:      "IVFWriter shouldn't be able to write something an empty packet",
 			messageClose: "IVFWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          fmt.Errorf("Payload is not large enough to container header"),
+			err:          fmt.Errorf("invalid nil packet"),
 			closeErr:     nil,
 		},
 		{

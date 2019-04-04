@@ -6,7 +6,7 @@ This could serve as the building block to building conferencing software, and ot
 ## Instructions
 ### Download sfu-ws
 ```
-go get github.com/pions/webrtc/examples/sfu-ws
+go get github.com/pion/webrtc/examples/sfu-ws
 ```
 
 ### Run SFU

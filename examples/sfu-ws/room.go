@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/pions/rtcp"
-	"github.com/pions/webrtc"
+	"github.com/pion/rtcp"
+	"github.com/pion/webrtc"
 )
 
 // Peer config

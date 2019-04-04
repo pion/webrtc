@@ -7,9 +7,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/pions/datachannel"
-	"github.com/pions/logging"
-	"github.com/pions/sctp"
+	"github.com/pion/datachannel"
+	"github.com/pion/logging"
+	"github.com/pion/sctp"
 )
 
 const sctpMaxChannels = uint16(65535)

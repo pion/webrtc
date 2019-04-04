@@ -1,6 +1,6 @@
 {
   "name": "webrtc",
-  "repository": "git@github.com:pions/webrtc.git",
+  "repository": "git@github.com:pion/webrtc.git",
   "private": true,
   "devDependencies": {
     "wrtc": "^0.3.5"

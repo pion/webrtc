@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"syscall/js"
 
-	"github.com/pions/datachannel"
+	"github.com/pion/datachannel"
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
@@ -111,7 +111,7 @@ func (d *DataChannel) SendText(s string) (err error) {
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
 // Please reffer to the data-channels-detach example and the
-// pions/datachannel documentation for the correct way to handle the
+// pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	if !d.api.settingEngine.detach.DataChannels {

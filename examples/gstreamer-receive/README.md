@@ -10,7 +10,7 @@ This example requires you have GStreamer installed, these are the supported plat
 `pacman -S mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gst-libav mingw-w64-x86_64-gst-plugins-good mingw-w64-x86_64-gst-plugins-bad mingw-w64-x86_64-gst-plugins-ugly`
 ### Download gstreamer-receive
 ```
-go get github.com/pions/webrtc/examples/gstreamer-receive
+go get github.com/pion/webrtc/examples/gstreamer-receive
 ```
 
 ### Open gstreamer-receive example page

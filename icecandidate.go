@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pions/ice"
-	"github.com/pions/sdp/v2"
+	"github.com/pion/ice"
+	"github.com/pion/sdp/v2"
 )
 
 // ICECandidate represents a ice candidate

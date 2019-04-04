@@ -7,9 +7,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/pions/datachannel"
-	"github.com/pions/logging"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/datachannel"
+	"github.com/pion/logging"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
@@ -326,7 +326,7 @@ func (d *DataChannel) ensureOpen() error {
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
 // Please reffer to the data-channels-detach example and the
-// pions/datachannel documentation for the correct way to handle the
+// pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	d.mu.Lock()
@@ -458,7 +458,7 @@ func (d *DataChannel) BufferedAmount() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	return 0
 }
 
@@ -471,7 +471,7 @@ func (d *DataChannel) BufferedAmountLowThreshold() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	return d.bufferedAmountLowThreshold
 }
 
@@ -484,6 +484,6 @@ func (d *DataChannel) SetBufferedAmountLowThreshold(th uint64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	d.bufferedAmountLowThreshold = th
 }

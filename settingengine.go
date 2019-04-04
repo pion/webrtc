@@ -5,8 +5,8 @@ package webrtc
 import (
 	"time"
 
-	"github.com/pions/ice"
-	"github.com/pions/logging"
+	"github.com/pion/ice"
+	"github.com/pion/logging"
 )
 
 // SettingEngine allows influencing behavior in ways that are not

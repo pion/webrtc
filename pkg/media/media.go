@@ -1,7 +1,7 @@
 package media
 
 import (
-	"github.com/pions/rtp"
+	"github.com/pion/rtp"
 )
 
 // Sample contains media, and the amount of samples in it

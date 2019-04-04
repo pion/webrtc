@@ -4,7 +4,7 @@ data-channels-create is a pion-WebRTC application that shows how you can send/re
 ## Instructions
 ### Download data-channels-create
 ```
-go get github.com/pions/webrtc/examples/data-channels-create
+go get github.com/pion/webrtc/examples/data-channels-create
 ```
 
 ### Open data-channels-create example page

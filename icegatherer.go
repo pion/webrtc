@@ -6,7 +6,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/pions/ice"
+	"github.com/pion/ice"
 )
 
 // The ICEGatherer gathers local host, server reflexive and relay

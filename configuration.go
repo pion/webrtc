@@ -3,7 +3,7 @@
 package webrtc
 
 import (
-	"github.com/pions/ice"
+	"github.com/pion/ice"
 )
 
 // Configuration defines a set of parameters to configure how the

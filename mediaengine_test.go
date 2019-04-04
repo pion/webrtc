@@ -5,7 +5,7 @@ package webrtc
 import (
 	"testing"
 
-	"github.com/pions/sdp/v2"
+	"github.com/pion/sdp/v2"
 	"github.com/stretchr/testify/assert"
 )
 

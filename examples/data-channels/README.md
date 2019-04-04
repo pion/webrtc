@@ -4,7 +4,7 @@ data-channels is a pion-WebRTC application that shows how you can send/recv Data
 ## Instructions
 ### Download data-channels
 ```
-go get github.com/pions/webrtc/examples/data-channels
+go get github.com/pion/webrtc/examples/data-channels
 ```
 
 ### Open data-channels example page

@@ -3,8 +3,8 @@
 package webrtc
 
 import (
-	"github.com/pions/ice"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/ice"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 // ICEServer describes a single STUN and TURN server that can be used by
