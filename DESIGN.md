@@ -16,7 +16,7 @@ cross-compiling of multiple libraries, you now can run anywhere with one `go bui
 If you know how to use WebRTC in your browser, you know how to use Pion WebRTC.
 We try our best just to duplicate the Javascript API, so your code can look the same everywhere.
 
-If this is your first time using WebRTC, don't worry! We have multiple [examples](https://github.com/pions/webrtc/tree/master/examples) and [GoDoc](https://godoc.org/github.com/pions/webrtc)
+If this is your first time using WebRTC, don't worry! We have multiple [examples](https://github.com/pion/webrtc/tree/master/examples) and [GoDoc](https://godoc.org/github.com/pion/webrtc)
 
 ### Bring your own media
 Pion WebRTC doesn't make any assumptions about where your audio, video or text come from. You can use FFmpeg, GStreamer, MLT or just serve a video file.

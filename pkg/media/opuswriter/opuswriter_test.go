@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/pions/rtp"
+	"github.com/pion/rtp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,7 +62,7 @@ func TestOpusWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OpusWriter shouldn't be able to write an empty packet",
 			messageClose: "OpusWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          fmt.Errorf("Payload is not large enough"),
+			err:          fmt.Errorf("invalid nil packet"),
 			closeErr:     nil,
 		},
 		{

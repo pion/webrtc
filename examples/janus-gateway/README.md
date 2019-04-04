@@ -9,7 +9,7 @@ This example demonstrates how to download a video from a Janus streaming room. B
 You should confirm that you can successfully watch `Opus/VP8 live stream coming from gstreamer (live)` in the stream demo web UI
 
 ### Running
-run `main.go` in `github.com/pions/webrtc/examples/janus-gateway/streaming`
+run `main.go` in `github.com/pion/webrtc/examples/janus-gateway/streaming`
 
 If this worked you will see the following.
 ```
@@ -24,7 +24,7 @@ You will see output.ivf in the current folder.
 This example demonstrates how to stream to a Janus video-room using pion-WebRTC
 
 ### Running
-run `main.go` in `github.com/pions/webrtc/examples/janus-gateway/video-room`
+run `main.go` in `github.com/pion/webrtc/examples/janus-gateway/video-room`
 
 OSX
 ```sh

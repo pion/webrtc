@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/webrtc/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -239,7 +239,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.Equal(t, expected.BundlePolicy, actual.BundlePolicy)
 	assert.Equal(t, expected.RTCPMuxPolicy, actual.RTCPMuxPolicy)
 	// TODO(albrow): Uncomment this after #513 is fixed.
-	// See: https://github.com/pions/webrtc/issues/513.
+	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
 }

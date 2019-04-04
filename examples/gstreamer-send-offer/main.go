@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
-	"github.com/pions/webrtc/examples/internal/signal"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-src"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 func main() {

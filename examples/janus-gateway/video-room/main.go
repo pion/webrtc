@@ -7,9 +7,9 @@ import (
 	"time"
 
 	janus "github.com/notedit/janus-go"
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-src"
 )
 
 func watchHandle(handle *janus.Handle) {

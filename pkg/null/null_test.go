@@ -211,7 +211,7 @@ func TestNewRune(t *testing.T) {
 }
 
 func TestNewString(t *testing.T) {
-	value := string("pions")
+	value := string("pion")
 	nullable := NewString(value)
 
 	assert.Equal(t,

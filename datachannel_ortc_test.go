@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/internal/util"
+	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/internal/util"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {

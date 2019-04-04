@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/transport/test"
+	"github.com/pion/transport/test"
 )
 
 func TestNewICEGatherer_Success(t *testing.T) {

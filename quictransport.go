@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/dtls"
-	"github.com/pions/quic"
-	"github.com/pions/webrtc/internal/mux"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/dtls"
+	"github.com/pion/quic"
+	"github.com/pion/webrtc/internal/mux"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 // QUICTransport is a specialization of QuicTransportBase focused on

@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/pions/rtp"
-	"github.com/pions/rtp/codecs"
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 )
 
 // IVFWriter is used to take RTP packets and write them to an IVF on disk
@@ -71,8 +71,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 	}
 
 	vp8Packet := codecs.VP8Packet{}
-	_, err := vp8Packet.Unmarshal(packet)
-	if err != nil {
+	if _, err := vp8Packet.Unmarshal(packet.Payload); err != nil {
 		return err
 	}
 

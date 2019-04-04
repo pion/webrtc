@@ -8,8 +8,8 @@ import (
 	"math/rand"
 	"os"
 
-	"github.com/pions/rtp"
-	"github.com/pions/rtp/codecs"
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 )
 
 // OpusWriter is used to take RTP packets and write them to an OGG on disk
@@ -105,7 +105,7 @@ func (i *OpusWriter) writeHeaders() error {
 	oggCommentHeader := make([]byte, 21)
 	copy(oggCommentHeader[0:], []byte("OpusTags"))          // Magic Signature 'OpusTags'
 	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)  // Vendor Length
-	copy(oggCommentHeader[12:], []byte("pions"))            // Vendor name 'pions'
+	copy(oggCommentHeader[12:], []byte("pion"))             // Vendor name 'pion'
 	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0) // User Comment List Length
 
 	// RFC specifies that the page where the CommentHeader completes should have a granule position of 0
@@ -145,9 +145,9 @@ func (i *OpusWriter) WriteRTP(packet *rtp.Packet) error {
 	if i.stream == nil {
 		return fmt.Errorf("file not opened")
 	}
+
 	opusPacket := codecs.OpusPacket{}
-	_, err := opusPacket.Unmarshal(packet)
-	if err != nil {
+	if _, err := opusPacket.Unmarshal(packet.Payload); err != nil {
 		// Only handle Opus packets
 		return err
 	}
@@ -163,7 +163,7 @@ func (i *OpusWriter) WriteRTP(packet *rtp.Packet) error {
 
 	data := i.createPage(payload, 0, i.previousGranulePosition)
 
-	_, err = i.stream.Write(data)
+	_, err := i.stream.Write(data)
 	return err
 }
 

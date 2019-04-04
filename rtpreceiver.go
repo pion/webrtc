@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/srtp"
+	"github.com/pion/rtcp"
+	"github.com/pion/srtp"
 )
 
 // RTPReceiver allows an application to inspect the receipt of a Track

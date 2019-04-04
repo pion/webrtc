@@ -5,11 +5,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/webrtc"
+	"github.com/pion/rtcp"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-sink"
-	"github.com/pions/webrtc/examples/internal/signal"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-sink"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 // gstreamerReceiveMain is launched in a goroutine because the main thread is needed

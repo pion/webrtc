@@ -1,6 +1,6 @@
 FROM golang:1.12
 
-RUN go get -u github.com/pions/webrtc/examples/pion-to-pion/answer
+RUN go get -u github.com/pion/webrtc/examples/pion-to-pion/answer
 
 CMD ["answer"]
 

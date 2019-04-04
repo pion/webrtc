@@ -5,10 +5,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/webrtc"
+	"github.com/pion/rtcp"
+	"github.com/pion/webrtc"
 
-	"github.com/pions/webrtc/examples/internal/signal"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 var peerConnectionConfig = webrtc.Configuration{
