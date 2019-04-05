@@ -21,17 +21,17 @@ type SCTPTransport struct {
 	dtlsTransport *DTLSTransport
 
 	// State represents the current state of the SCTP transport.
-	State SCTPTransportState
+	state SCTPTransportState
 
 	port uint16
 
 	// MaxMessageSize represents the maximum size of data that can be passed to
 	// DataChannel's send() method.
-	MaxMessageSize float64
+	maxMessageSize float64
 
 	// MaxChannels represents the maximum amount of DataChannel's that can
 	// be used simultaneously.
-	MaxChannels *uint16
+	maxChannels *uint16
 
 	// OnStateChange  func()
 
@@ -48,7 +48,7 @@ type SCTPTransport struct {
 func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
 		dtlsTransport: dtls,
-		State:         SCTPTransportStateConnecting,
+		state:         SCTPTransportStateConnecting,
 		port:          5000, // TODO
 		api:           api,
 		log:           api.settingEngine.LoggerFactory.NewLogger("ortc"),
@@ -83,7 +83,7 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	defer r.lock.Unlock()
 
 	// TODO: port
-	_ = r.MaxMessageSize // TODO
+	_ = r.maxMessageSize // TODO
 
 	if err := r.ensureDTLS(); err != nil {
 		return err
@@ -113,7 +113,7 @@ func (r *SCTPTransport) Stop() error {
 	}
 
 	r.association = nil
-	r.State = SCTPTransportStateClosed
+	r.state = SCTPTransportStateClosed
 
 	return nil
 }
@@ -216,10 +216,13 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 }
 
 func (r *SCTPTransport) updateMessageSize() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	var remoteMaxMessageSize float64 = 65536 // TODO: get from SDP
 	var canSendSize float64 = 65536          // TODO: Get from SCTP implementation
 
-	r.MaxMessageSize = r.calcMessageSize(remoteMaxMessageSize, canSendSize)
+	r.maxMessageSize = r.calcMessageSize(remoteMaxMessageSize, canSendSize)
 }
 
 func (r *SCTPTransport) calcMessageSize(remoteMaxMessageSize, canSendSize float64) float64 {
@@ -244,5 +247,24 @@ func (r *SCTPTransport) calcMessageSize(remoteMaxMessageSize, canSendSize float6
 
 func (r *SCTPTransport) updateMaxChannels() {
 	val := sctpMaxChannels
-	r.MaxChannels = &val
+	r.maxChannels = &val
+}
+
+// MaxChannels is the maximum number of RTCDataChannels that can be open simultaneously.
+func (r *SCTPTransport) MaxChannels() uint16 {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.maxChannels == nil {
+		return sctpMaxChannels
+	}
+
+	return *r.maxChannels
+}
+
+// State returns the current state of the SCTPTransport
+func (r *SCTPTransport) State() SCTPTransportState {
+	r.lock.RLock()
+	defer r.lock.RLock()
+	return r.state
 }

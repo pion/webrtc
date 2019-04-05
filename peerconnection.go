@@ -1364,7 +1364,7 @@ func (pc *PeerConnection) generateDataChannelID(client bool) (uint16, error) {
 
 	max := sctpMaxChannels
 	if pc.sctpTransport != nil {
-		max = *pc.sctpTransport.MaxChannels
+		max = pc.sctpTransport.MaxChannels()
 	}
 
 	for ; id < max-1; id += 2 {
