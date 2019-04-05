@@ -133,7 +133,10 @@ func (s *testORTCStack) getSignal() (*testORTCSignal, error) {
 		return nil, err
 	}
 
-	dtlsParams := s.dtls.GetLocalParameters()
+	dtlsParams, err := s.dtls.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
 
 	sctpCapabilities := s.sctp.GetCapabilities()
 

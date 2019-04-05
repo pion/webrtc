@@ -73,7 +73,10 @@ func main() {
 		panic(err)
 	}
 
-	quicParams := qt.GetLocalParameters()
+	quicParams, err := qt.GetLocalParameters()
+	if err != nil {
+		panic(err)
+	}
 
 	s := Signal{
 		ICECandidates:  iceCandidates,
