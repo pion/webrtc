@@ -1,4 +1,5 @@
 // +build !js
+// +build !noquic
 
 package webrtc
 
