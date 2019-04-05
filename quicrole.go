@@ -1,3 +1,5 @@
+// +build quic
+
 package webrtc
 
 // QUICRole indicates the role of the Quic transport.

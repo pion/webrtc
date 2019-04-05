@@ -1,3 +1,5 @@
+// +build quic
+
 package webrtc
 
 // QUICParameters holds information relating to QUIC configuration.
