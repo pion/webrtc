@@ -1,3 +1,5 @@
+// +build quic
+
 package main
 
 import (
