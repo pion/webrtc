@@ -79,4 +79,8 @@ var (
 	// ErrNoRemoteDescription indicates that an operation was rejected because
 	// the remote description is not set
 	ErrNoRemoteDescription = errors.New("remote description is not set")
+
+	// ErrIncorrectSDPSemantics indicates that the PeerConnection was configured to
+	// generate SDP Answers with different SDP Semantics than the received Offer
+	ErrIncorrectSDPSemantics = errors.New("offer SDP semantics does not match configuration")
 )
