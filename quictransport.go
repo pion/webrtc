@@ -8,12 +8,12 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/pion/dtls"
+	"github.com/pion/logging"
 	"github.com/pion/quic"
 	"github.com/pion/webrtc/internal/mux"
 	"github.com/pion/webrtc/pkg/rtcerr"
@@ -28,6 +28,9 @@ type QUICTransport struct {
 
 	iceTransport *ICETransport
 	certificates []Certificate
+
+	api *API
+	log logging.LeveledLogger
 }
 
 // NewQUICTransport creates a new QUICTransport.
@@ -37,7 +40,11 @@ type QUICTransport struct {
 // highly experimental. It is currently not supported by
 // any browsers yet.
 func (api *API) NewQUICTransport(transport *ICETransport, certificates []Certificate) (*QUICTransport, error) {
-	t := &QUICTransport{iceTransport: transport}
+	t := &QUICTransport{
+		iceTransport: transport,
+		api:          api,
+		log:          api.settingEngine.LoggerFactory.NewLogger("quic"),
+	}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -125,7 +132,7 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 			return err
 		}
 	} else {
-		fmt.Println("Warning: Certificate not checked")
+		t.log.Errorf("Warning: Certificate not checked")
 	}
 
 	return nil
