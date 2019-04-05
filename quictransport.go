@@ -63,18 +63,22 @@ func (api *API) NewQUICTransport(transport *ICETransport, certificates []Certifi
 }
 
 // GetLocalParameters returns the Quic parameters of the local QUICParameters upon construction.
-func (t *QUICTransport) GetLocalParameters() QUICParameters {
+func (t *QUICTransport) GetLocalParameters() (QUICParameters, error) {
 	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
-		prints := c.GetFingerprints() // TODO: Should be only one?
+		prints, err := c.GetFingerprints() // TODO: Should be only one?
+		if err != nil {
+			return QUICParameters{}, err
+
+		}
 		fingerprints = append(fingerprints, prints...)
 	}
 
 	return QUICParameters{
 		Role:         QUICRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
-	}
+	}, nil
 }
 
 // Start Quic transport with the parameters of the remote

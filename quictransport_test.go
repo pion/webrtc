@@ -126,7 +126,10 @@ func (s *testQuicStack) getSignal() (*testQuicSignal, error) {
 		return nil, err
 	}
 
-	quicParams := s.quic.GetLocalParameters()
+	quicParams, err := s.quic.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
 
 	return &testQuicSignal{
 		ICECandidates:  iceCandidates,

@@ -446,7 +446,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 
 	d := sdp.NewJSEPSessionDescription(useIdentity)
-	pc.addFingerprint(d)
+	if err := pc.addFingerprint(d); err != nil {
+		return SessionDescription{}, err
+	}
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -560,7 +562,9 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	}
 
 	d := sdp.NewJSEPSessionDescription(useIdentity)
-	pc.addFingerprint(d)
+	if err = pc.addFingerprint(d); err != nil {
+		return SessionDescription{}, err
+	}
 
 	getDirection := func(media *sdp.MediaDescription) RTPTransceiverDirection {
 		for _, a := range media.Attributes {
@@ -1475,11 +1479,16 @@ func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
 	pc.onICEConnectionStateChange(newState)
 }
 
-func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) {
+func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) error {
 	// TODO: Handle multiple certificates
-	for _, fingerprint := range pc.configuration.Certificates[0].GetFingerprints() {
+	fingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
+	if err != nil {
+		return err
+	}
+	for _, fingerprint := range fingerprints {
 		d.WithFingerprint(fingerprint.Algorithm, strings.ToUpper(fingerprint.Value))
 	}
+	return nil
 }
 
 func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, t *RTPTransceiver, midOffset int, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {

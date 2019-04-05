@@ -93,7 +93,7 @@ func (c Certificate) Expires() time.Time {
 
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
-func (c Certificate) GetFingerprints() []DTLSFingerprint {
+func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
 	fingerprintAlgorithms := []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
 	res := make([]DTLSFingerprint, len(fingerprintAlgorithms))
 
@@ -101,8 +101,7 @@ func (c Certificate) GetFingerprints() []DTLSFingerprint {
 	for _, algo := range fingerprintAlgorithms {
 		value, err := dtls.Fingerprint(c.x509Cert, algo)
 		if err != nil {
-			fmt.Printf("Failed to create fingerprint: %v\n", err)
-			continue
+			return nil, fmt.Errorf("failed to create fingerprint: %v", err)
 		}
 		res[i] = DTLSFingerprint{
 			Algorithm: algo.String(),
@@ -110,7 +109,7 @@ func (c Certificate) GetFingerprints() []DTLSFingerprint {
 		}
 	}
 
-	return res[:i+1]
+	return res[:i+1], nil
 }
 
 // GenerateCertificate causes the creation of an X.509 certificate and

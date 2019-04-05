@@ -82,18 +82,22 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 }
 
 // GetLocalParameters returns the DTLS parameters of the local DTLSTransport upon construction.
-func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
+func (t *DTLSTransport) GetLocalParameters() (DTLSParameters, error) {
 	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
-		prints := c.GetFingerprints() // TODO: Should be only one?
+		prints, err := c.GetFingerprints() // TODO: Should be only one?
+		if err != nil {
+			return DTLSParameters{}, err
+		}
+
 		fingerprints = append(fingerprints, prints...)
 	}
 
 	return DTLSParameters{
 		Role:         DTLSRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
-	}
+	}, nil
 }
 
 // GetRemoteCertificate returns the certificate chain in use by the remote side

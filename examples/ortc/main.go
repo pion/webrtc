@@ -71,7 +71,10 @@ func main() {
 		panic(err)
 	}
 
-	dtlsParams := dtls.GetLocalParameters()
+	dtlsParams, err := dtls.GetLocalParameters()
+	if err != nil {
+		panic(err)
+	}
 
 	sctpCapabilities := sctp.GetCapabilities()
 
