@@ -20,9 +20,10 @@ type DataChannel struct {
 
 	// Keep track of handlers/callbacks so we can call Release as required by the
 	// syscall/js API. Initially nil.
-	onOpenHandler    *js.Func
-	onCloseHandler   *js.Func
-	onMessageHandler *js.Func
+	onOpenHandler       *js.Func
+	onCloseHandler      *js.Func
+	onMessageHandler    *js.Func
+	onBufferedAmountLow *js.Func
 
 	// A reference to the associated api object used by this datachannel
 	api *API
@@ -143,6 +144,9 @@ func (d *DataChannel) Close() (err error) {
 	if d.onMessageHandler != nil {
 		d.onMessageHandler.Release()
 	}
+	if d.onBufferedAmountLow != nil {
+		d.onBufferedAmountLow.Release()
+	}
 
 	return nil
 }
@@ -234,6 +238,28 @@ func (d *DataChannel) BufferedAmount() uint64 {
 // DataChannel, but the application may change its value at any time.
 func (d *DataChannel) BufferedAmountLowThreshold() uint64 {
 	return uint64(d.underlying.Get("bufferedAmountLowThreshold").Int())
+}
+
+// SetBufferedAmountLowThreshold is used to update the threshold.
+// See BufferedAmountLowThreshold().
+func (d *DataChannel) SetBufferedAmountLowThreshold(th uint64) {
+	d.underlying.Set("bufferedAmountLowThreshold", th)
+}
+
+// OnBufferedAmountLow sets an event handler which is invoked when
+// the number of bytes of outgoing data becomes lower than the
+// BufferedAmountLowThreshold.
+func (d *DataChannel) OnBufferedAmountLow(f func()) {
+	if d.onBufferedAmountLow != nil {
+		oldHandler := d.onBufferedAmountLow
+		defer oldHandler.Release()
+	}
+	onBufferedAmountLow := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		go f()
+		return js.Undefined()
+	})
+	d.onBufferedAmountLow = &onBufferedAmountLow
+	d.underlying.Set("onbufferedamountlow", onBufferedAmountLow)
 }
 
 // valueToDataChannelMessage converts the given value to a DataChannelMessage.
