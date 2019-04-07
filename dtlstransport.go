@@ -42,13 +42,15 @@ type DTLSTransport struct {
 	srtcpSession  *srtp.SessionSRTCP
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
+
+	api *API
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
-	t := &DTLSTransport{iceTransport: transport}
+	t := &DTLSTransport{iceTransport: transport, api: api}
 
 	if len(certificates) > 0 {
 		now := time.Now()
@@ -119,7 +121,8 @@ func (t *DTLSTransport) startSRTP() error {
 	}
 
 	srtpConfig := &srtp.Config{
-		Profile: srtp.ProtectionProfileAes128CmHmacSha1_80,
+		Profile:       srtp.ProtectionProfileAes128CmHmacSha1_80,
+		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
 
 	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.isClient())
@@ -210,6 +213,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		PrivateKey:             cert.privateKey,
 		SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
 		ClientAuth:             dtls.RequireAnyClientCert,
+		LoggerFactory:          t.api.settingEngine.LoggerFactory,
 	}
 	if t.isClient() {
 		// Assumes the peer offered to be passive and we accepted.
