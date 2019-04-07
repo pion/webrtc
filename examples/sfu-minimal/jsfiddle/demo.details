@@ -1,5 +1,5 @@
 ---
- name: gstreamer-receive
- description: Example of using pion-WebRTC to play video using GStreamer
+ name: sfu-minimal
+ description: Example of a minimal SFU using Pion WebRTC
  authors:
    - Sean DuBois

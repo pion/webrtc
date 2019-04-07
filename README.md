@@ -33,6 +33,8 @@ Use the tag [v1.2.0](https://github.com/pion/webrtc/tree/v1.2.0) if you'd like t
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
 
+For more full featured examples that use 3rd party libraries see our **[example-webrtc-applications](https://github.com/pion/example-webrtc-applications)** repo.
+
 The Pion WebRTC API closely matches the JavaScript **[WebRTC API](https://w3c.github.io/webrtc-pc/)**. Most existing documentation is therefore also usefull when working with Pion. Furthermore, our **[GoDoc](https://godoc.org/github.com/pion/webrtc)** is actively maintained.
 
 Now go forth and build some awesome apps! Here are some **ideas** to get your creative juices flowing:
