@@ -13,7 +13,7 @@ import (
 
 	"github.com/pion/rtcp"
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/pkg/media"
+	"github.com/pion/webrtc/v2/pkg/media"
 )
 
 /*

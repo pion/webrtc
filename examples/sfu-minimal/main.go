@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/pion/rtcp"
-	"github.com/pion/webrtc"
+	"github.com/pion/webrtc/v2"
 
-	"github.com/pion/webrtc/examples/internal/signal"
+	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
 
 var peerConnectionConfig = webrtc.Configuration{
