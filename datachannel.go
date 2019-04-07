@@ -9,7 +9,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/pkg/rtcerr"
+	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
