@@ -12,8 +12,7 @@ require (
 	github.com/pion/rtp v1.1.1
 	github.com/pion/sctp v1.5.0
 	github.com/pion/sdp/v2 v2.1.1
-	github.com/pion/srtp v1.2.0
+	github.com/pion/srtp v1.2.1
 	github.com/pion/transport v0.6.0
-	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.3.0
 )
