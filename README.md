@@ -24,7 +24,7 @@ See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
 
 ### Breaking Changes
 
-Pion WebRTC v2.0.0 has arrived! See the [release notes](https://github.com/pion/webrtc/wiki/v2.0.0-Release-Notes) to learn about the new features breaking changes.
+Pion WebRTC v2.0.0 has arrived! See the [release notes](https://pion.ly/knowledge-base/release-notes/webrtc-v2.0.0/) to learn about the new features breaking changes.
 
 Have any questions? Join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
 
