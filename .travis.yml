@@ -24,7 +24,6 @@ install:
   - yarn install
 
 before_install:
-  - sudo apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
   - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
 
 before_script:

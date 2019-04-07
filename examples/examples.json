@@ -24,18 +24,6 @@
 		"type": "browser"
 	},
 	{
-		"title": "Gstreamer Receive",
-		"link": "gstreamer-receive",
-		"description": "The gstreamer-receive example shows how to receive media from the browser and play it live. This example uses GStreamer for rendering.",
-		"type": "browser"
-	},
-	{
-		"title": "Gstreamer Send",
-		"link": "gstreamer-send",
-		"description": "Example gstreamer-send shows how to send video to your browser. This example uses GStreamer to process the video.",
-		"type": "browser"
-	},
-	{
 		"title": "Pion to Pion",
 		"link": "#",
 		"description": "Example pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.",
@@ -45,18 +33,6 @@
 		"title": "Save to Disk",
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
-		"type": "browser"
-	},
-	{
-		"title": "Minimal SFU",
-		"link": "sfu-minimal",
-		"description": "The minimal SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
-		"type": "browser"
-	},
-	{
-		"title": "WebSocket SFU",
-		"link": "#",
-		"description": "The Websocket SFU example demonstrates how to broadcast a video to multiple peers. This is similar to Minimal SFU, but all signaling is done via websockets like a more full featured application.",
 		"type": "browser"
 	}
 ]
