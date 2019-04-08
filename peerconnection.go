@@ -468,10 +468,11 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 
 	for _, t := range pc.GetTransceivers() {
-		pc.addTransceiverSDP(d, t, bundleCount, iceParams, candidates, sdp.ConnectionRoleActpass)
+		pc.addTransceiverSDP(d, t, strconv.Itoa(bundleCount), iceParams, candidates, sdp.ConnectionRoleActpass)
 		appendBundle()
 	}
-	pc.addDataMediaSection(d, bundleCount, iceParams, candidates, sdp.ConnectionRoleActive)
+
+	pc.addDataMediaSection(d, strconv.Itoa(bundleCount), iceParams, candidates, sdp.ConnectionRoleActive)
 	appendBundle()
 
 	for _, m := range d.MediaDescriptions {
@@ -601,16 +602,24 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	}
 
 	bundleValue := "BUNDLE"
-	bundleCount := 0
-	appendBundle := func() {
-		bundleValue += " " + strconv.Itoa(bundleCount)
-		bundleCount++
+	appendBundle := func(midValue string) {
+		bundleValue += " " + midValue
 	}
 
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
+		midValue := ""
+		for _, attr := range media.Attributes {
+			if attr.Key == "mid" {
+				midValue = attr.Value
+			}
+		}
+		if midValue == "" {
+			return SessionDescription{}, fmt.Errorf("RemoteDescription contained media section without mid value")
+		}
+
 		if media.MediaName.Media == "application" {
-			pc.addDataMediaSection(d, bundleCount, iceParams, candidates, sdp.ConnectionRoleActive)
-			appendBundle()
+			pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
+			appendBundle(midValue)
 			continue
 		}
 
@@ -621,8 +630,8 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		}
 
 		t := satisfyPeerMedia(kind, direction)
-		pc.addTransceiverSDP(d, t, bundleCount, iceParams, candidates, sdp.ConnectionRoleActive)
-		appendBundle()
+		pc.addTransceiverSDP(d, t, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
+		appendBundle(midValue)
 	}
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
@@ -1491,10 +1500,10 @@ func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) error {
 	return nil
 }
 
-func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, t *RTPTransceiver, midOffset int, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
+func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, t *RTPTransceiver, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
 	media := sdp.NewJSEPMediaDescription(t.kind.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
-		WithValueAttribute(sdp.AttrKeyMID, strconv.Itoa(midOffset)).
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
@@ -1529,7 +1538,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, t *RTPTra
 	d.WithMedia(media)
 }
 
-func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midOffset int, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
+func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   "application",
@@ -1546,7 +1555,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midOffs
 		},
 	}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
-		WithValueAttribute(sdp.AttrKeyMID, strconv.Itoa(midOffset)).
+		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
