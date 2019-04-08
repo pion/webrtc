@@ -475,6 +475,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	pc.addDataMediaSection(d, strconv.Itoa(bundleCount), iceParams, candidates, sdp.ConnectionRoleActive)
 	appendBundle()
 
+	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+
 	for _, m := range d.MediaDescriptions {
 		m.WithPropertyAttribute("setup:actpass")
 	}
