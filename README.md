@@ -87,7 +87,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Denis](https://github.com/Hixon10) - *Adding docker-compose to pion-to-pion example*
 * [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
 * [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
-* [Michael MacDonald](https://github.com/mjmac)
+* [Michael MacDonald](https://github.com/mjmac) - *Plan B compatibility, Remote TURN/Trickle-ICE, Logging framework*
 * [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
 * [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements, G.722 support, Bugfixes*
 * [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification*
