@@ -17,7 +17,7 @@ const (
 	DefaultPayloadTypeOpus = 111
 	DefaultPayloadTypeVP8  = 96
 	DefaultPayloadTypeVP9  = 98
-	DefaultPayloadTypeH264 = 100
+	DefaultPayloadTypeH264 = 102
 )
 
 // MediaEngine defines the codecs supported by a PeerConnection
