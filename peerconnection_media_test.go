@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/rtcp"
+	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v2/pkg/media"
 )
@@ -450,5 +452,47 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	err = pcAnswer.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestOfferRejectionMissingCodec(t *testing.T) {
+	api := NewAPI()
+	api.mediaEngine.RegisterDefaultCodecs()
+	pc, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noCodecAPI := NewAPI()
+	noCodecPC, err := noCodecAPI.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pc.AddTrack(track); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := signalPair(pc, noCodecPC); err != nil {
+		t.Fatal(err)
+	}
+
+	var sdes sdp.SessionDescription
+	if err := sdes.Unmarshal([]byte(pc.RemoteDescription().SDP)); err != nil {
+		t.Fatal(err)
+	}
+	var videoDesc sdp.MediaDescription
+	for _, m := range sdes.MediaDescriptions {
+		if m.MediaName.Media == "video" {
+			videoDesc = *m
+		}
+	}
+
+	if got, want := videoDesc.MediaName.Formats, []string{"0"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", *videoDesc.MediaName.String())
 	}
 }
