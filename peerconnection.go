@@ -1640,12 +1640,17 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
 
-	for _, codec := range pc.api.mediaEngine.getCodecsByKind(t.kind) {
+	codecs := pc.api.mediaEngine.getCodecsByKind(t.kind)
+	for _, codec := range codecs {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
 		}
+	}
+	if len(codecs) == 0 {
+		// Explicitly reject track if we don't have the codec
+		media.MediaName.Formats = []string{"0"}
 	}
 
 	for _, mt := range transceivers {
