@@ -1650,7 +1650,15 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 	}
 	if len(codecs) == 0 {
 		// Explicitly reject track if we don't have the codec
-		media.MediaName.Formats = []string{"0"}
+		d.WithMedia(&sdp.MediaDescription{
+			MediaName: sdp.MediaName{
+				Media:   t.kind.String(),
+				Port:    sdp.RangedPort{Value: 0},
+				Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
+				Formats: []string{"0"},
+			},
+		})
+		return nil
 	}
 
 	for _, mt := range transceivers {
