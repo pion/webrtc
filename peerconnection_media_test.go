@@ -58,7 +58,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.WriteRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}); routineErr != nil {
+				if routineErr := pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}}); routineErr != nil {
 					awaitRTCPRecieverSend <- routineErr
 					return
 				}
@@ -122,7 +122,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.WriteRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC(), MediaSSRC: vp8Track.SSRC()}); routineErr != nil {
+			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC(), MediaSSRC: vp8Track.SSRC()}}); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 
@@ -353,7 +353,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	for i := 0; i <= 5; i++ {
 		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); rtpErr != nil {
 			t.Fatal(rtpErr)
-		} else if rtcpErr := pcOffer.WriteRTCP(&rtcp.PictureLossIndication{MediaSSRC: 0}); rtcpErr != nil {
+		} else if rtcpErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}}); rtcpErr != nil {
 			t.Fatal(rtcpErr)
 		}
 	}
@@ -440,7 +440,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		t.Fatal("Write to Track with no RTPSenders did not return io.ErrClosedPipe")
 	}
 
-	if err = pcAnswer.WriteRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}); err != io.ErrClosedPipe {
+	if err = pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}}); err != io.ErrClosedPipe {
 		t.Fatal("WriteRTCP to closed PeerConnection did not return io.ErrClosedPipe")
 	}
 
