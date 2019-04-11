@@ -1523,8 +1523,8 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) error {
 
 // WriteRTCP sends a user provided RTCP packet to the connected peer
 // If no peer is connected the packet is discarded
-func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
-	raw, err := pkt.Marshal()
+func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
+	raw, err := rtcp.Marshal(pkts)
 	if err != nil {
 		return err
 	}
@@ -1637,8 +1637,8 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
-		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
-		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
+		WithPropertyAttribute(sdp.AttrKeyRTCPMux). // TODO: support RTCP fallback
+		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
 	codecs := pc.api.mediaEngine.getCodecsByKind(t.kind)
 	for _, codec := range codecs {
