@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/pion/datachannel v1.3.0
-	github.com/pion/dtls v1.3.2
+	github.com/pion/dtls v1.3.3
 	github.com/pion/ice v0.2.1
 	github.com/pion/logging v0.2.1
 	github.com/pion/quic v0.1.1
