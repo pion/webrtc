@@ -4,29 +4,6 @@ import (
 	"time"
 )
 
-// verify subtypes conform to Stats
-var (
-	_ Stats = AudioReceiverStats{}
-	_ Stats = CertificateStats{}
-	_ Stats = CodecStats{}
-	_ Stats = DataChannelStats{}
-	_ Stats = ICECandidatePairStats{}
-	_ Stats = ICECandidateStats{}
-	_ Stats = InboundRTPStreamStats{}
-	_ Stats = MediaStreamStats{}
-	_ Stats = OutboundRTPStreamStats{}
-	_ Stats = PeerConnectionStats{}
-	_ Stats = RemoteInboundRTPStreamStats{}
-	_ Stats = RemoteOutboundRTPStreamStats{}
-	_ Stats = RTPContributingSourceStats{}
-	_ Stats = SenderAudioTrackAttachmentStats{}
-	_ Stats = SenderAudioTrackAttachmentStats{}
-	_ Stats = SenderVideoTrackAttachmentStats{}
-	_ Stats = VideoReceiverStats{}
-	_ Stats = VideoReceiverStats{}
-	_ Stats = VideoSenderStats{}
-)
-
 // A Stats object contains a set of statistics copies out of a monitored component
 // of the WebRTC stack at a specific time.
 type Stats interface {
