@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -26,5 +27,41 @@ func TestStatsTimestampTime(t *testing.T) {
 		if got, want := test.Timestamp.Time(), test.WantTime.UTC(); got != want {
 			t.Fatalf("StatsTimestamp(%v).Time() = %v, want %v", test.Timestamp, got, want)
 		}
+	}
+}
+
+// TODO(maxhawkins): replace with a more meaningful test
+func TestStatsMarshal(t *testing.T) {
+	for _, test := range []Stats{
+		AudioReceiverStats{},
+		AudioSenderStats{},
+		CertificateStats{},
+		CodecStats{},
+		DataChannelStats{},
+		ICECandidatePairStats{},
+		ICECandidateStats{},
+		InboundRTPStreamStats{},
+		MediaStreamStats{},
+		OutboundRTPStreamStats{},
+		PeerConnectionStats{},
+		RemoteInboundRTPStreamStats{},
+		RemoteOutboundRTPStreamStats{},
+		RTPContributingSourceStats{},
+		SenderAudioTrackAttachmentStats{},
+		SenderAudioTrackAttachmentStats{},
+		SenderVideoTrackAttachmentStats{},
+		TransportStats{},
+		VideoReceiverStats{},
+		VideoReceiverStats{},
+		VideoSenderStats{},
+	} {
+		_, err := json.Marshal(test)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		test.Timestamp()
+		test.Type()
+		test.ID()
 	}
 }
