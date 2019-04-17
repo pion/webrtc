@@ -55,3 +55,37 @@ func TestPeerConnection_Close(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Assert that a PeerConnection that is shutdown before ICE starts doesn't leak
+func TestPeerConnection_Close_PreICE(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	answer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = pcAnswer.SetRemoteDescription(answer); err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
