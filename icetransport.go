@@ -148,7 +148,10 @@ func (t *ICETransport) Stop() error {
 
 	if t.mux != nil {
 		return t.mux.Close()
+	} else if t.gatherer != nil {
+		return t.gatherer.Close()
 	}
+
 	return nil
 }
 
