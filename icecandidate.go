@@ -88,7 +88,7 @@ func newICECandidateFromICE(i *ice.Candidate) (ICECandidate, error) {
 
 	c := ICECandidate{
 		Foundation: "foundation",
-		Priority:   uint32(i.Priority()),
+		Priority:   i.Priority(),
 		IP:         i.IP.String(),
 		Protocol:   protocol,
 		Port:       uint16(i.Port),
