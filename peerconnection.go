@@ -621,6 +621,8 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 			switch {
 			case t.kind != kind:
 				continue
+			case direction == RTPTransceiverDirectionSendrecv && t.Direction == RTPTransceiverDirectionSendonly:
+				continue
 			case direction != RTPTransceiverDirectionSendrecv && direction == t.Direction:
 				continue
 			case direction == RTPTransceiverDirectionInactive:
