@@ -106,6 +106,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Žiga Željko](https://github.com/zigazeljko)
 * [Simonacca Fotokite](https://github.com/simonacca-fotokite)
 * [Marouane](https://github.com/nindolabs) *Fix Offer bundle generation*
+* [Christopher Fry](https://github.com/christopherfry)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

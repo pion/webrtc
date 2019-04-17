@@ -264,11 +264,33 @@ a=mid:data
 a=sctpmap:5000 webrtc-datachannel 1024
 `
 
+const videoOffer = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=msid-semantic: WMS
+m=video 50862 UDP/TLS/RTP/SAVPF 96 97 98 99 100 101 102 122 127 121 125 107 108 109 124 120 123 119 114 115 116
+c=IN IP4 192.168.20.129
+a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=candidate:211962667 1 udp 2122194687 10.0.3.1 40864 typ host generation 0
+a=candidate:1002017894 1 tcp 1518280447 192.168.20.129 0 typ host tcptype active generation 0
+a=candidate:1109506011 1 tcp 1518214911 10.0.3.1 0 typ host tcptype active generation 0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:0
+a=sendrecv
+a=msid:F6y7JPMh5PqgYQoLyN0Rqo8drmRxvkn6wDNp 6937f4fd-fd25-4cb7-a9e4-05f4d2c7ccd4
+`
+
 func TestSetRemoteDescription(t *testing.T) {
 	testCases := []struct {
 		desc SessionDescription
 	}{
 		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}},
+		{SessionDescription{Type: SDPTypeOffer, SDP: videoOffer}},
 	}
 
 	for i, testCase := range testCases {
@@ -313,6 +335,64 @@ func TestCreateOfferAnswer(t *testing.T) {
 	err = offerPeerConn.SetRemoteDescription(answer)
 	if err != nil {
 		t.Errorf("SetRemoteDescription (Originator): got error: %v", err)
+	}
+}
+
+func TestPeerConnect_CreateAnswer_SendrecvDirectionWithSendrecvMedia(t *testing.T) {
+	offer := SessionDescription{Type: SDPTypeOffer, SDP: videoOffer};
+	expectedMediaDirection := "sendrecv"
+
+	peerConn, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = peerConn.SetRemoteDescription(offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = peerConn.AddTransceiver(RTPCodecTypeVideo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sd, err := peerConn.CreateAnswer(nil);
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, exist := sd.parsed.MediaDescriptions[0].Attribute(expectedMediaDirection)
+	if !exist {
+		t.Errorf("Expected %s attribute", expectedMediaDirection)
+	}
+}
+
+func TestPeerConnection_CreateAnswer_RecvonlyDirectionWithSendrecvMedia(t *testing.T) {
+	offer := SessionDescription{Type: SDPTypeOffer, SDP: videoOffer};
+	expectedMediaDirection := "recvonly"
+
+	peerConn, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = peerConn.SetRemoteDescription(offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = peerConn.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sd, err := peerConn.CreateAnswer(nil);
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, exist := sd.parsed.MediaDescriptions[0].Attribute(expectedMediaDirection)
+	if !exist {
+		t.Errorf("Expected %s attribute", expectedMediaDirection)
 	}
 }
 
