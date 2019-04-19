@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -13,6 +14,7 @@ import (
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
+var errSCTPNotEstablished = errors.New("SCTP not establisched")
 
 // DataChannel represents a WebRTC DataChannel
 // The DataChannel interface represents a network channel
@@ -154,9 +156,14 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 }
 
 func (d *DataChannel) ensureSCTP() error {
-	if d.sctpTransport == nil ||
-		d.sctpTransport.association == nil {
-		return fmt.Errorf("SCTP not establisched")
+	if d.sctpTransport == nil {
+		return errSCTPNotEstablished
+	}
+
+	d.sctpTransport.lock.RLock()
+	defer d.sctpTransport.lock.RUnlock()
+	if d.sctpTransport.association == nil {
+		return errSCTPNotEstablished
 	}
 	return nil
 }
