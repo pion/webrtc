@@ -7,6 +7,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -374,4 +375,92 @@ func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
 	if !reflect.DeepEqual(&rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}, err) {
 		t.Errorf("CreateAnswer without RemoteDescription: got error: %v", err)
 	}
+}
+
+func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
+	createTransceiver := func(kind RTPCodecType, direction RTPTransceiverDirection) *RTPTransceiver {
+		return &RTPTransceiver{Mid: newTransceiverMid, kind: kind, Direction: direction}
+	}
+
+	for _, test := range []struct {
+		name string
+
+		kinds      []RTPCodecType
+		directions []RTPTransceiverDirection
+
+		localTransceivers []*RTPTransceiver
+		want              []*RTPTransceiver
+	}{
+		{
+			"Audio and Video Transceivers can not satifsy each other",
+			[]RTPCodecType{RTPCodecTypeVideo},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv)},
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive)},
+		},
+		{
+			"No local Transceivers, every remote should get an inactive",
+			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeAudio, RTPCodecTypeVideo, RTPCodecTypeVideo},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly, RTPTransceiverDirectionInactive},
+
+			[]*RTPTransceiver{},
+
+			[]*RTPTransceiver{
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
+				createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionInactive),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
+			},
+		},
+		{
+			"Local Recv can satisfy remote SendRecv",
+			[]RTPCodecType{RTPCodecTypeVideo},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
+
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly)},
+
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly)},
+		},
+		{
+			"Don't satisify a Sendonly with a SendRecv, later SendRecv will be marked as Inactive",
+			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeVideo},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv},
+
+			[]*RTPTransceiver{
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly),
+			},
+
+			[]*RTPTransceiver{
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv),
+			},
+		},
+	} {
+		if len(test.kinds) != len(test.directions) {
+			t.Fatal("Kinds and Directions must be the same length")
+		}
+
+		got := []*RTPTransceiver{}
+		for i := range test.kinds {
+			res, filteredLocalTransceivers := satisfyTypeAndDirection(test.kinds[i], test.directions[i], test.localTransceivers)
+
+			got = append(got, res)
+			test.localTransceivers = filteredLocalTransceivers
+		}
+
+		if !reflect.DeepEqual(got, test.want) {
+			gotStr := ""
+			for _, t := range got {
+				gotStr += fmt.Sprintf("%+v\n", t)
+			}
+
+			wantStr := ""
+			for _, t := range test.want {
+				wantStr += fmt.Sprintf("%+v\n", t)
+			}
+			t.Errorf("satisfyTypeAndDirection %q: \ngot\n%s \nwant\n%s", test.name, gotStr, wantStr)
+		}
+	}
+
 }

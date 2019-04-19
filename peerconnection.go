@@ -26,6 +26,10 @@ import (
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
+const (
+	newTransceiverMid = "NEW"
+)
+
 // PeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another PeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
@@ -596,6 +600,40 @@ func (pc *PeerConnection) getMidValue(media *sdp.MediaDescription) string {
 	return ""
 }
 
+// Given a direction+type pluck a transceiver from the passed list
+// if no entry satisfies the requested type+direction return a inactive Transceiver
+func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransceiverDirection, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
+	// Get direction order from most preferred to least
+	getPreferredDirections := func() []RTPTransceiverDirection {
+		switch remoteDirection {
+		case RTPTransceiverDirectionSendrecv:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+		case RTPTransceiverDirectionSendonly:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+		case RTPTransceiverDirectionRecvonly:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv}
+		}
+		return []RTPTransceiverDirection{}
+	}
+
+	for _, possibleDirection := range getPreferredDirections() {
+		for i := range localTransceivers {
+			t := localTransceivers[i]
+			if t.kind != remoteKind || possibleDirection != t.Direction {
+				continue
+			}
+
+			return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
+		}
+	}
+
+	return &RTPTransceiver{
+		Mid:       newTransceiverMid,
+		kind:      remoteKind,
+		Direction: RTPTransceiverDirectionInactive,
+	}, localTransceivers
+}
+
 func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) (*sdp.SessionDescription, error) {
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -612,34 +650,10 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 		bundleValue += " " + midValue
 	}
 
-	newTransceiverMid := "NEW"
+	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	satisfyPeerMedia := func(kind RTPCodecType, direction RTPTransceiverDirection) *RTPTransceiver {
-		for i := range localTransceivers {
-			t := localTransceivers[i]
-
-			switch {
-			case t.kind != kind:
-				continue
-			case direction == RTPTransceiverDirectionSendrecv && t.Direction != RTPTransceiverDirectionSendrecv:
-				continue
-			case direction != RTPTransceiverDirectionSendrecv && direction == t.Direction:
-				continue
-			case direction == RTPTransceiverDirectionInactive:
-				continue
-			}
-			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
-			return t
-		}
-
-		return &RTPTransceiver{
-			Mid:       newTransceiverMid,
-			kind:      kind,
-			Direction: RTPTransceiverDirectionInactive,
-		}
-	}
-
 	detectedPlanB := pc.descriptionIsPlanB(pc.RemoteDescription())
+
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		midValue := pc.getMidValue(media)
 		if midValue == "" {
@@ -658,7 +672,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 			continue
 		}
 
-		t := satisfyPeerMedia(kind, direction)
+		t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 		mediaTransceivers := []*RTPTransceiver{t}
 		switch pc.configuration.SDPSemantics {
 		case SDPSemanticsUnifiedPlanWithFallback:
@@ -676,7 +690,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 			// media entry with all matching local transceivers
 			for {
 				// keep going until we can't get any more
-				t := satisfyPeerMedia(kind, direction)
+				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 				if t.Mid == newTransceiverMid {
 					break
 				}
