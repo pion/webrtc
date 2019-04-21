@@ -59,9 +59,5 @@ func TestStatsMarshal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		test.Timestamp()
-		test.Type()
-		test.ID()
 	}
 }
