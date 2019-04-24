@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,54 +57,122 @@ func closeReliabilityParamTest(t *testing.T, pc1, pc2 *PeerConnection, done chan
 }
 
 func TestDataChannel_Send(t *testing.T) {
-	report := test.CheckRoutines(t)
-	defer report()
+	t.Run("before signaling", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
 
-	offerPC, answerPC, err := newPair()
-	if err != nil {
-		t.Fatalf("Failed to create a PC pair for testing")
-	}
-
-	done := make(chan bool)
-
-	answerPC.OnDataChannel(func(d *DataChannel) {
-		// Make sure this is the data channel we were looking for. (Not the one
-		// created in signalPair).
-		if d.Label() != expectedLabel {
-			return
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
 		}
-		d.OnMessage(func(msg DataChannelMessage) {
-			e := d.Send([]byte("Pong"))
+
+		done := make(chan bool)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+			d.OnMessage(func(msg DataChannelMessage) {
+				e := d.Send([]byte("Pong"))
+				if e != nil {
+					t.Fatalf("Failed to send string on data channel")
+				}
+			})
+			assert.True(t, d.Ordered(), "Ordered should be set to true")
+		})
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		assert.True(t, dc.Ordered(), "Ordered should be set to true")
+
+		dc.OnOpen(func() {
+			e := dc.SendText("Ping")
 			if e != nil {
 				t.Fatalf("Failed to send string on data channel")
 			}
 		})
-		assert.True(t, d.Ordered(), "Ordered should be set to true")
-	})
+		dc.OnMessage(func(msg DataChannelMessage) {
+			done <- true
+		})
 
-	dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
-	if err != nil {
-		t.Fatalf("Failed to create a PC pair for testing")
-	}
-
-	assert.True(t, dc.Ordered(), "Ordered should be set to true")
-
-	dc.OnOpen(func() {
-		e := dc.SendText("Ping")
-		if e != nil {
-			t.Fatalf("Failed to send string on data channel")
+		err = signalPair(offerPC, answerPC)
+		if err != nil {
+			t.Fatalf("Failed to signal our PC pair for testing: %+v", err)
 		}
-	})
-	dc.OnMessage(func(msg DataChannelMessage) {
-		done <- true
+
+		closePair(t, offerPC, answerPC, done)
 	})
 
-	err = signalPair(offerPC, answerPC)
-	if err != nil {
-		t.Fatalf("Failed to signal our PC pair for testing")
-	}
+	t.Run("after connected", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
 
-	closePair(t, offerPC, answerPC, done)
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		done := make(chan bool)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+			d.OnMessage(func(msg DataChannelMessage) {
+				e := d.Send([]byte("Pong"))
+				if e != nil {
+					t.Fatalf("Failed to send string on data channel")
+				}
+			})
+			assert.True(t, d.Ordered(), "Ordered should be set to true")
+		})
+
+		once := &sync.Once{}
+		offerPC.OnICEConnectionStateChange(func(state ICEConnectionState) {
+			if state == ICEConnectionStateConnected || state == ICEConnectionStateCompleted {
+				// wasm fires completed state multiple times
+				once.Do(func() {
+					dc, createErr := offerPC.CreateDataChannel(expectedLabel, nil)
+					if createErr != nil {
+						t.Fatalf("Failed to create a PC pair for testing")
+					}
+
+					assert.True(t, dc.Ordered(), "Ordered should be set to true")
+
+					dc.OnMessage(func(msg DataChannelMessage) {
+						done <- true
+					})
+					// TODO: currently there is no way of properly subscribing to OnOpen with the js binding,
+					// because CreateDataChannel might return an already open data channel
+					//
+					e := dc.SendText("Ping")
+					if e != nil {
+						// wasm binding doesn't fire OnOpen (we probably already missed it)
+						dc.OnOpen(func() {
+							e = dc.SendText("Ping")
+							if e != nil {
+								t.Fatalf("Failed to send string on data channel")
+							}
+						})
+					}
+				})
+			}
+		})
+
+		err = signalPair(offerPC, answerPC)
+		if err != nil {
+			t.Fatalf("Failed to signal our PC pair for testing")
+		}
+
+		closePair(t, offerPC, answerPC, done)
+	})
 }
 
 func TestDataChannelParameters(t *testing.T) {
