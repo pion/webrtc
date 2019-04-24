@@ -1056,7 +1056,15 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 // openDataChannels opens the existing data channels
 func (pc *PeerConnection) openDataChannels() {
-	for _, d := range pc.dataChannels {
+	pc.mu.Lock()
+	// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
+	dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
+	for k, v := range pc.dataChannels {
+		dataChannels[k] = v
+	}
+	pc.mu.Unlock()
+
+	for _, d := range dataChannels {
 		err := d.open(pc.sctpTransport)
 		if err != nil {
 			pc.log.Warnf("failed to open data channel: %s", err)
@@ -1433,8 +1441,11 @@ func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTr
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
 func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelInit) (*DataChannel, error) {
+	pc.mu.Lock()
+
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
 	if pc.isClosed {
+		pc.mu.Unlock()
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -1450,6 +1461,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	if options == nil || options.ID == nil {
 		var err error
 		if params.ID, err = pc.generateDataChannelID(true); err != nil {
+			pc.mu.Unlock()
 			return nil, err
 		}
 	} else {
@@ -1488,19 +1500,25 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 
 	d, err := pc.api.newDataChannel(params, pc.log)
 	if err != nil {
+		pc.mu.Unlock()
 		return nil, err
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
 	if d.maxPacketLifeTime != nil && d.maxRetransmits != nil {
+		pc.mu.Unlock()
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
 	// Remember datachannel
 	pc.dataChannels[params.ID] = d
 
+	sctpReady := pc.sctpTransport != nil && pc.sctpTransport.association != nil
+
+	pc.mu.Unlock()
+
 	// Open if networking already started
-	if pc.sctpTransport != nil {
+	if sctpReady {
 		err = d.open(pc.sctpTransport)
 		if err != nil {
 			return nil, err

@@ -96,6 +96,11 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 // open opens the datachannel over the sctp transport
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	d.mu.Lock()
+	if d.sctpTransport != nil {
+		// already open
+		d.mu.Unlock()
+		return nil
+	}
 	d.sctpTransport = sctpTransport
 
 	if err := d.ensureSCTP(); err != nil {
