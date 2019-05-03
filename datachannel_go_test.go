@@ -3,12 +3,18 @@
 package webrtc
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"io"
+	"io/ioutil"
 	"math/big"
+	"reflect"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -343,5 +349,206 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 		closePair(t, offerPC, answerPC, done)
 
 		assert.True(t, nCbs > 0, "callback should be made at least once")
+	})
+}
+
+func TestEOF(t *testing.T) {
+	log := logging.NewDefaultLoggerFactory().NewLogger("test")
+	label := "test-channel"
+	testData := []byte("this is some test data")
+
+	t.Run("Detach", func(t *testing.T) {
+		// Use Detach data channels mode
+		s := SettingEngine{}
+		s.DetachDataChannels()
+		api := NewAPI(WithSettingEngine(s))
+
+		// Set up two peer connections.
+		config := Configuration{}
+		pca, err := api.NewPeerConnection(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pcb, err := api.NewPeerConnection(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		defer func() { assert.NoError(t, pca.Close(), "should succeed") }()
+		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
+
+		var wg sync.WaitGroup
+
+		dcChan := make(chan *DataChannel)
+		pcb.OnDataChannel(func(dc *DataChannel) {
+			if dc.Label() != label {
+				return
+			}
+			log.Debug("OnDataChannel was called")
+			dc.OnOpen(func() {
+				dcChan <- dc
+			})
+		})
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			var dc io.ReadWriteCloser
+			var msg []byte
+
+			log.Debug("Waiting for OnDataChannel")
+			attached := <-dcChan
+			log.Debug("data channel opened")
+			dc, err = attached.Detach()
+			if err != nil {
+				log.Debugf("Detach failed: %s\n", err.Error())
+				t.Error(err)
+			}
+			defer func() { assert.NoError(t, dc.Close(), "should succeed") }()
+
+			log.Debug("Waiting for ping...")
+			msg, err = ioutil.ReadAll(dc)
+			log.Debugf("Received ping! \"%s\"\n", string(msg))
+			if err != nil {
+				t.Error(err)
+			}
+
+			if !bytes.Equal(msg, testData) {
+				t.Errorf("expected %q, got %q", string(msg), string(testData))
+			} else {
+				log.Debug("Received ping successfully!")
+			}
+		}()
+
+		if err = signalPair(pca, pcb); err != nil {
+			t.Fatal(err)
+		}
+
+		attached, err := pca.CreateDataChannel(label, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		log.Debug("Waiting for data channel to open")
+		open := make(chan struct{})
+		attached.OnOpen(func() {
+			open <- struct{}{}
+		})
+		<-open
+		log.Debug("data channel opened")
+
+		var dc io.ReadWriteCloser
+		dc, err = attached.Detach()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Debug("Sending ping...")
+			if _, err := dc.Write(testData); err != nil {
+				t.Error(err)
+			}
+			log.Debug("Sent ping")
+
+			assert.NoError(t, dc.Close(), "should succeed")
+
+			log.Debug("Wating for EOF")
+			ret, err := ioutil.ReadAll(dc)
+			assert.Nil(t, err, "should succeed")
+			assert.Equal(t, 0, len(ret), "should be empty")
+		}()
+
+		wg.Wait()
+	})
+
+	t.Run("No detach", func(t *testing.T) {
+		// Use Detach data channels mode
+		s := SettingEngine{}
+		//s.DetachDataChannels()
+		api := NewAPI(WithSettingEngine(s))
+
+		// Set up two peer connections.
+		config := Configuration{}
+		pca, err := api.NewPeerConnection(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { assert.NoError(t, pca.Close(), "should succeed") }()
+
+		pcb, err := api.NewPeerConnection(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
+
+		var dca, dcb *DataChannel
+		var dcbClosed bool
+		doneCh := make(chan struct{})
+
+		pcb.OnDataChannel(func(dc *DataChannel) {
+			if dc.Label() != label {
+				return
+			}
+
+			log.Debugf("pcb: new datachannel: %s\n", dc.Label())
+
+			dcb = dc
+			// Register channel opening handling
+			dcb.OnOpen(func() {
+				log.Debug("pcb: datachannel opened")
+			})
+
+			dcb.OnClose(func() {
+				log.Debug("pcb: data channel closed")
+				dcbClosed = true
+			})
+
+			// Register the OnMessage to handle incoming messages
+			log.Debug("pcb: registering onMessage callback")
+			dcb.OnMessage(func(dcMsg DataChannelMessage) {
+				log.Debugf("pcb: received ping: %s\n", string(dcMsg.Data))
+				if !reflect.DeepEqual(dcMsg.Data, testData) {
+					t.Error("data mismatch")
+				}
+			})
+		})
+
+		dca, err = pca.CreateDataChannel(label, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		dca.OnOpen(func() {
+			log.Debug("pca: data channel opened")
+			log.Debugf("pca: sending \"%s\"", string(testData))
+			if err := dca.Send(testData); err != nil {
+				t.Fatal(err)
+			}
+			log.Debug("pca: sent ping")
+			assert.NoError(t, dca.Close(), "should succeed")
+		})
+
+		dca.OnClose(func() {
+			log.Debug("pca: data channel closed")
+			close(doneCh)
+		})
+
+		// Register the OnMessage to handle incoming messages
+		log.Debug("pca: registering onMessage callback")
+		dca.OnMessage(func(dcMsg DataChannelMessage) {
+			log.Debugf("pca: received pong: %s\n", string(dcMsg.Data))
+			if !reflect.DeepEqual(dcMsg.Data, testData) {
+				t.Error("data mismatch")
+			}
+		})
+
+		if err := signalPair(pca, pcb); err != nil {
+			t.Fatal(err)
+		}
+
+		<-doneCh
+		assert.True(t, dcbClosed, "dcb should be closed by now")
 	})
 }
