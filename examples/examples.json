@@ -34,5 +34,11 @@
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
 		"type": "browser"
+	},
+	{
+		"title": "SFU Minimal",
+		"link": "sfu-minimal",
+		"description": "The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"type": "browser"
 	}
 ]
