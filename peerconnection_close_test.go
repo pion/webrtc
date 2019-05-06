@@ -86,22 +86,24 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	for {
+		if pcAnswer.iceTransport.State() == ICETransportStateChecking {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
 	err = pcAnswer.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Assert that ICEGatherer is shutdown, test timeout will prevent deadlock
-	pcAnswer.iceTransport.lock.Lock()
-	gatherer := pcAnswer.iceTransport.gatherer
-	pcAnswer.iceTransport.lock.Unlock()
+	// Assert that ICETransport is shutdown, test timeout will prevent deadlock
 	for {
-		gatherer.lock.RLock()
-		if gatherer.agent == nil {
+		if pcAnswer.iceTransport.State() == ICETransportStateClosed {
 			time.Sleep(time.Second * 3)
 			return
 		}
-		gatherer.lock.RUnlock()
 
 		time.Sleep(time.Second)
 	}
