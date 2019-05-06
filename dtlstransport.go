@@ -200,10 +200,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return err
 	}
 
-	mx := t.iceTransport.mux
-	dtlsEndpoint := mx.NewEndpoint(mux.MatchDTLS)
-	t.srtpEndpoint = mx.NewEndpoint(mux.MatchSRTP)
-	t.srtcpEndpoint = mx.NewEndpoint(mux.MatchSRTCP)
+	dtlsEndpoint := t.iceTransport.NewEndpoint(mux.MatchDTLS)
+	t.srtpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTP)
+	t.srtcpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTCP)
 
 	// TODO: handle multiple certs
 	cert := t.certificates[0]
@@ -291,8 +290,7 @@ func (t *DTLSTransport) validateFingerPrint(remoteParameters DTLSParameters, rem
 
 func (t *DTLSTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
-		t.iceTransport.conn == nil ||
-		t.iceTransport.mux == nil {
+		t.iceTransport.State() == ICETransportStateNew {
 		return errors.New("ICE connection not started")
 	}
 

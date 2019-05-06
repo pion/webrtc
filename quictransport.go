@@ -118,7 +118,7 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 		Certificate: cert.x509Cert,
 		PrivateKey:  cert.privateKey,
 	}
-	endpoint := t.iceTransport.mux.NewEndpoint(mux.MatchAll)
+	endpoint := t.iceTransport.NewEndpoint(mux.MatchAll)
 	err := t.TransportBase.StartBase(endpoint, cfg)
 	if err != nil {
 		return err
@@ -161,8 +161,7 @@ func (t *QUICTransport) validateFingerPrint(remoteParameters QUICParameters, rem
 
 func (t *QUICTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
-		t.iceTransport.conn == nil ||
-		t.iceTransport.mux == nil {
+		t.iceTransport.State() == ICETransportStateNew {
 		return errors.New("ICE connection not started")
 	}
 
