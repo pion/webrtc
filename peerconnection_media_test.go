@@ -255,8 +255,8 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 
 		receivers := pc.GetReceivers()
-		if len(receivers) != 1 {
-			t.Errorf("Each PeerConnection should have one RTPReceiver, we have %d", len(receivers))
+		if len(receivers) != 2 {
+			t.Errorf("Each PeerConnection should have two RTPReceivers, we have %d", len(receivers))
 		}
 
 		transceivers := pc.GetTransceivers()

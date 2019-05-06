@@ -1361,14 +1361,19 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			return nil, err
 		}
 	} else {
+		receiver, err := pc.api.NewRTPReceiver(track.Kind(), pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+
 		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 		if err != nil {
 			return nil, err
 		}
 		transceiver = pc.newRTPTransceiver(
-			nil,
+			receiver,
 			sender,
-			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionSendrecv,
 			track.Kind(),
 		)
 	}
