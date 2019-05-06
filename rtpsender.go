@@ -22,6 +22,8 @@ type RTPSender struct {
 	// A reference to the associated api object
 	api *API
 
+	pacingStrategy RTPSenderPacingStrategy
+
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan interface{}
 }
@@ -58,6 +60,16 @@ func (r *RTPSender) Transport() *DTLSTransport {
 	return r.transport
 }
 
+// SetPacingStrategy sets the RTPSenderPacingStrategy for this sender
+func (r *RTPSender) SetPacingStrategy(ps RTPSenderPacingStrategy) error {
+	if r.hasSent() {
+		return fmt.Errorf("cannot set sender pacing strategy after Send() is called")
+	}
+
+	r.pacingStrategy = ps
+	return nil
+}
+
 // Send Attempts to set the parameters controlling the sending of media.
 func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.mu.Lock()
@@ -75,6 +87,29 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.rtcpReadStream, err = srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
 	if err != nil {
 		return err
+	}
+
+	srtpSession, err := r.transport.getSRTPSession()
+	if err != nil {
+		return err
+	}
+
+	writeStream, err := srtpSession.OpenWriteStream()
+	if err != nil {
+		return err
+	}
+
+	if r.pacingStrategy != nil {
+		if err := r.pacingStrategy.SetRTCPSource(r.rtcpReadStream); err != nil {
+			return err
+		}
+		if err := r.pacingStrategy.SetRTPSink(writeStream); err != nil {
+			return err
+		}
+	} else {
+		r.pacingStrategy = &RTPSenderPacingPassthrough{
+			rtpSink: writeStream,
+		}
 	}
 
 	r.track.mu.Lock()
@@ -110,6 +145,7 @@ func (r *RTPSender) Stop() error {
 	close(r.stopCalled)
 
 	if r.hasSent() {
+		r.pacingStrategy.Stop()
 		return r.rtcpReadStream.Close()
 	}
 
@@ -139,17 +175,7 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 	case <-r.stopCalled:
 		return 0, fmt.Errorf("RTPSender has been stopped")
 	case <-r.sendCalled:
-		srtpSession, err := r.transport.getSRTPSession()
-		if err != nil {
-			return 0, err
-		}
-
-		writeStream, err := srtpSession.OpenWriteStream()
-		if err != nil {
-			return 0, err
-		}
-
-		n, err := writeStream.WriteRTP(header, payload)
+		n, err := r.pacingStrategy.SendRTP(header, payload)
 		if err == ice.ErrNoCandidatePairs {
 			err = nil
 		}
