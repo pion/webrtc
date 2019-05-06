@@ -107,6 +107,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Marouane](https://github.com/nindolabs) *Fix Offer bundle generation*
 * [Christopher Fry](https://github.com/christopherfry)
 * [Adam Kiss](https://github.com/masterada)
+* [xsbchen](https://github.com/xsbchen)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
