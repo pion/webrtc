@@ -62,7 +62,7 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.Sample {
 			return &media.Sample{Data: data, Samples: samples}
 		}
 
-		p, err := s.depacketizer.Unmarshal(s.buffer[i])
+		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}

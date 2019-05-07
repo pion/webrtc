@@ -18,8 +18,8 @@ type sampleBuilderTest struct {
 type fakeDepacketizer struct {
 }
 
-func (f *fakeDepacketizer) Unmarshal(packet *rtp.Packet) ([]byte, error) {
-	return packet.Payload, nil
+func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
+	return r, nil
 }
 
 var testCases = []sampleBuilderTest{
