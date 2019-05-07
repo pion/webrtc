@@ -19,6 +19,7 @@
 </p>
 <br>
 
+
 See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
 
 ### Breaking Changes
@@ -62,6 +63,13 @@ Pion has an active community on the [Golang Slack](https://invite.slack.golangbr
 We are always looking to support **your projects**. Please reach out if you have something to build!
 
 If you need commercial support or don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
+
+
+### Project status
+
+[![Stargazers over time](https://starchart.cc/pion/webrtc.svg)](https://starchart.cc/pion/webrtc)
+
+
 
 ### Related projects
 * [pion/turn](https://github.com/pion/turn): A simple extendable Golang TURN server
