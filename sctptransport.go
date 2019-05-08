@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"errors"
+	"io"
 	"math"
 	"sync"
 
@@ -139,7 +140,9 @@ func (r *SCTPTransport) acceptDataChannels() {
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		})
 		if err != nil {
-			r.log.Errorf("Failed to accept data channel: %v", err)
+			if err != io.EOF {
+				r.log.Errorf("Failed to accept data channel: %v", err)
+			}
 			// TODO: Kill DataChannel/PeerConnection?
 			return
 		}
