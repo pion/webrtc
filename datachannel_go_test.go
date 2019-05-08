@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -394,24 +395,23 @@ func TestEOF(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			var dc io.ReadWriteCloser
 			var msg []byte
 
 			log.Debug("Waiting for OnDataChannel")
 			attached := <-dcChan
 			log.Debug("data channel opened")
-			dc, err = attached.Detach()
-			if err != nil {
-				log.Debugf("Detach failed: %s\n", err.Error())
-				t.Error(err)
+			dc, err2 := attached.Detach()
+			if err2 != nil {
+				log.Debugf("Detach failed: %s\n", err2.Error())
+				t.Error(err2)
 			}
 			defer func() { assert.NoError(t, dc.Close(), "should succeed") }()
 
 			log.Debug("Waiting for ping...")
-			msg, err = ioutil.ReadAll(dc)
+			msg, err2 = ioutil.ReadAll(dc)
 			log.Debugf("Received ping! \"%s\"\n", string(msg))
-			if err != nil {
-				t.Error(err)
+			if err2 != nil {
+				t.Error(err2)
 			}
 
 			if !bytes.Equal(msg, testData) {
@@ -447,16 +447,16 @@ func TestEOF(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			log.Debug("Sending ping...")
-			if _, err := dc.Write(testData); err != nil {
-				t.Error(err)
+			if _, err2 := dc.Write(testData); err2 != nil {
+				t.Error(err2)
 			}
 			log.Debug("Sent ping")
 
 			assert.NoError(t, dc.Close(), "should succeed")
 
 			log.Debug("Wating for EOF")
-			ret, err := ioutil.ReadAll(dc)
-			assert.Nil(t, err, "should succeed")
+			ret, err2 := ioutil.ReadAll(dc)
+			assert.Nil(t, err2, "should succeed")
 			assert.Equal(t, 0, len(ret), "should be empty")
 		}()
 
@@ -484,7 +484,7 @@ func TestEOF(t *testing.T) {
 		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
 
 		var dca, dcb *DataChannel
-		var dcbClosed bool
+		var nDCbCbs int32
 		doneCh := make(chan struct{})
 
 		pcb.OnDataChannel(func(dc *DataChannel) {
@@ -502,7 +502,7 @@ func TestEOF(t *testing.T) {
 
 			dcb.OnClose(func() {
 				log.Debug("pcb: data channel closed")
-				dcbClosed = true
+				atomic.AddInt32(&nDCbCbs, 1)
 			})
 
 			// Register the OnMessage to handle incoming messages
@@ -549,6 +549,6 @@ func TestEOF(t *testing.T) {
 		}
 
 		<-doneCh
-		assert.True(t, dcbClosed, "dcb should be closed by now")
+		assert.Equal(t, int32(1), atomic.LoadInt32(&nDCbCbs), "dcb should be closed by now")
 	})
 }
