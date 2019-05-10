@@ -31,7 +31,7 @@ type ICETransport struct {
 	conn     *ice.Conn
 	mux      *mux.Mux
 
-	api *API
+	loggerFactory logging.LoggerFactory
 
 	log logging.LeveledLogger
 }
@@ -57,14 +57,12 @@ type ICETransport struct {
 // }
 
 // NewICETransport creates a new NewICETransport.
-// This constructor is part of the ORTC API. It is not
-// meant to be used together with the basic WebRTC API.
-func (api *API) NewICETransport(gatherer *ICEGatherer) *ICETransport {
+func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory) *ICETransport {
 	return &ICETransport{
-		gatherer: gatherer,
-		api:      api,
-		log:      api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		state:    ICETransportStateNew,
+		gatherer:      gatherer,
+		loggerFactory: loggerFactory,
+		log:           loggerFactory.NewLogger("ortc"),
+		state:         ICETransportStateNew,
 	}
 }
 
@@ -141,7 +139,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	config := mux.Config{
 		Conn:          t.conn,
 		BufferSize:    receiveMTU,
-		LoggerFactory: t.api.settingEngine.LoggerFactory,
+		LoggerFactory: t.loggerFactory,
 	}
 	t.mux = mux.NewMux(config)
 
