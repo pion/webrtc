@@ -5,11 +5,13 @@ package webrtc
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/pion/ice"
+	"github.com/pion/logging"
 )
 
-// The ICEGatherer gathers local host, server reflexive and relay
+// ICEGatherer gathers local host, server reflexive and relay
 // candidates, as well as enabling the retrieval of local Interactive
 // Connectivity Establishment (ICE) parameters which can be
 // exchanged in signaling.
@@ -21,13 +23,24 @@ type ICEGatherer struct {
 
 	agent *ice.Agent
 
-	api *API
+	portMin           uint16
+	portMax           uint16
+	connectionTimeout *time.Duration
+	keepaliveInterval *time.Duration
+	loggerFactory     logging.LoggerFactory
+	networkTypes      []NetworkType
 }
 
 // NewICEGatherer creates a new NewICEGatherer.
-// This constructor is part of the ORTC API. It is not
-// meant to be used together with the basic WebRTC API.
-func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
+func NewICEGatherer(
+	portMin uint16,
+	portMax uint16,
+	connectionTimeout *time.Duration,
+	keepaliveInterval *time.Duration,
+	loggerFactory logging.LoggerFactory,
+	networkTypes []NetworkType,
+	opts ICEGatherOptions,
+) (*ICEGatherer, error) {
 	var validatedServers []*ice.URL
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
@@ -40,9 +53,14 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 	}
 
 	return &ICEGatherer{
-		state:            ICEGathererStateNew,
-		validatedServers: validatedServers,
-		api:              api,
+		state:             ICEGathererStateNew,
+		validatedServers:  validatedServers,
+		portMin:           portMin,
+		portMax:           portMax,
+		connectionTimeout: connectionTimeout,
+		keepaliveInterval: keepaliveInterval,
+		loggerFactory:     loggerFactory,
+		networkTypes:      networkTypes,
 	}, nil
 }
 
@@ -60,14 +78,14 @@ func (g *ICEGatherer) Gather() error {
 
 	config := &ice.AgentConfig{
 		Urls:              g.validatedServers,
-		PortMin:           g.api.settingEngine.ephemeralUDP.PortMin,
-		PortMax:           g.api.settingEngine.ephemeralUDP.PortMax,
-		ConnectionTimeout: g.api.settingEngine.timeout.ICEConnection,
-		KeepaliveInterval: g.api.settingEngine.timeout.ICEKeepalive,
-		LoggerFactory:     g.api.settingEngine.LoggerFactory,
+		PortMin:           g.portMin,
+		PortMax:           g.portMax,
+		ConnectionTimeout: g.connectionTimeout,
+		KeepaliveInterval: g.keepaliveInterval,
+		LoggerFactory:     g.loggerFactory,
 	}
 
-	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
+	requestedNetworkTypes := g.networkTypes
 	if len(requestedNetworkTypes) == 0 {
 		requestedNetworkTypes = supportedNetworkTypes
 	}
