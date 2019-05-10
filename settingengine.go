@@ -45,8 +45,8 @@ func (e *SettingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.D
 }
 
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
-// ICE UDP connections can allocate from. This setting currently only
-// affects host candidates, not server reflexive candidates.
+// ICE UDP connections can allocate from. This affects both host candidates,
+// and the local address of server reflexive candidates.
 func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error {
 	if portMax < portMin {
 		return ice.ErrPort
