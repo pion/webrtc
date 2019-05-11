@@ -24,8 +24,13 @@ Integration test for bi-directional peers
 This asserts we can send RTP and RTCP both ways, and blocks until
 each side gets something (and asserts payload contents)
 */
-
+// nolint: gocyclo
 func TestPeerConnection_Media_Sample(t *testing.T) {
+	const (
+		expectedTrackID    = "video"
+		expectedTrackLabel = "pion"
+	)
+
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -54,7 +59,20 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPRecieverRecv := make(chan error)
 	awaitRTCPRecieverSend := make(chan error)
 
+	trackMetadataValid := make(chan error)
+
 	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
+		if track.ID() != expectedTrackID {
+			trackMetadataValid <- fmt.Errorf("Incoming Track ID is invalid expected(%s) actual(%s)", expectedTrackID, track.ID())
+			return
+		}
+
+		if track.Label() != expectedTrackLabel {
+			trackMetadataValid <- fmt.Errorf("Incoming Track Label is invalid expected(%s) actual(%s)", expectedTrackLabel, track.Label())
+			return
+		}
+		close(trackMetadataValid)
+
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
@@ -94,7 +112,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}
 	})
 
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), expectedTrackID, expectedTrackLabel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,11 +164,16 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err, ok := <-trackMetadataValid
+	if ok {
+		t.Fatal(err)
+	}
+
 	<-awaitRTPRecv
 	<-awaitRTPSend
 
 	<-awaitRTCPSenderRecv
-	err, ok := <-awaitRTCPSenderSend
+	err, ok = <-awaitRTCPSenderSend
 	if ok {
 		t.Fatal(err)
 	}

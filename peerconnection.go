@@ -1089,7 +1089,13 @@ func (pc *PeerConnection) descriptionIsPlanB(desc *SessionDescription) bool {
 
 // openSRTP opens knows inbound SRTP streams from the RemoteDescription
 func (pc *PeerConnection) openSRTP() {
-	incomingSSRCes := map[uint32]RTPCodecType{}
+	type incomingTrack struct {
+		kind  RTPCodecType
+		label string
+		id    string
+		ssrc  uint32
+	}
+	incomingTracks := map[uint32]incomingTrack{}
 
 	remoteIsPlanB := false
 	switch pc.configuration.SDPSemantics {
@@ -1108,22 +1114,32 @@ func (pc *PeerConnection) openSRTP() {
 			}
 
 			if attr.Key == sdp.AttrKeySSRC {
-				ssrc, err := strconv.ParseUint(strings.Split(attr.Value, " ")[0], 10, 32)
+				split := strings.Split(attr.Value, " ")
+				ssrc, err := strconv.ParseUint(split[0], 10, 32)
 				if err != nil {
 					pc.log.Warnf("Failed to parse SSRC: %v", err)
 					continue
 				}
 
-				incomingSSRCes[uint32(ssrc)] = codecType
-				break
+				trackID := ""
+				trackLabel := ""
+				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
+					trackLabel = split[1][len("msid:"):]
+					trackID = split[2]
+				}
+
+				incomingTracks[uint32(ssrc)] = incomingTrack{codecType, trackLabel, trackID, uint32(ssrc)}
+				if trackID != "" && trackLabel != "" {
+					break // Remote provided Label+ID, we have all the information we need
+				}
 			}
 		}
 	}
 
-	startReceiver := func(ssrc uint32, receiver *RTPReceiver) {
+	startReceiver := func(incoming incomingTrack, receiver *RTPReceiver) {
 		err := receiver.Receive(RTPReceiveParameters{
 			Encodings: RTPDecodingParameters{
-				RTPCodingParameters{SSRC: ssrc},
+				RTPCodingParameters{SSRC: incoming.ssrc},
 			}})
 		if err != nil {
 			pc.log.Warnf("RTPReceiver Receive failed %s", err)
@@ -1151,6 +1167,8 @@ func (pc *PeerConnection) openSRTP() {
 		}
 
 		receiver.Track().mu.Lock()
+		receiver.Track().id = incoming.id
+		receiver.Track().label = incoming.label
 		receiver.Track().kind = codec.Type
 		receiver.Track().codec = codec
 		receiver.Track().mu.Unlock()
@@ -1163,11 +1181,11 @@ func (pc *PeerConnection) openSRTP() {
 	}
 
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	for ssrc := range incomingSSRCes {
+	for ssrc, incoming := range incomingTracks {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
 			switch {
-			case incomingSSRCes[ssrc] != t.kind:
+			case incomingTracks[ssrc].kind != t.kind:
 				continue
 			case t.Direction != RTPTransceiverDirectionRecvonly && t.Direction != RTPTransceiverDirectionSendrecv:
 				continue
@@ -1175,23 +1193,23 @@ func (pc *PeerConnection) openSRTP() {
 				continue
 			}
 
-			delete(incomingSSRCes, ssrc)
+			delete(incomingTracks, ssrc)
 			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
-			go startReceiver(ssrc, t.Receiver)
+			go startReceiver(incoming, t.Receiver)
 			break
 		}
 	}
 
 	if remoteIsPlanB {
-		for ssrc, kind := range incomingSSRCes {
-			t, err := pc.AddTransceiver(kind, RtpTransceiverInit{
+		for ssrc, incoming := range incomingTracks {
+			t, err := pc.AddTransceiver(incoming.kind, RtpTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
 				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 				continue
 			}
-			go startReceiver(ssrc, t.Receiver)
+			go startReceiver(incoming, t.Receiver)
 		}
 	}
 }
