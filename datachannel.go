@@ -187,6 +187,10 @@ func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.onOpenHandler = f
+	if d.readyState == DataChannelStateOpen {
+		// If the data channel is already open, call the handler immediately.
+		go d.onOpenHandler()
+	}
 }
 
 func (d *DataChannel) onOpen() (done chan struct{}) {
