@@ -56,6 +56,41 @@ func closeReliabilityParamTest(t *testing.T, pc1, pc2 *PeerConnection, done chan
 	closePair(t, pc1, pc2, done)
 }
 
+func TestDataChannel_Open(t *testing.T) {
+	t.Run("handler should be called once", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
+
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		openCalls := make(chan bool, 2)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			d.OnOpen(func() {
+				if d.Label() != expectedLabel {
+					return
+				}
+				openCalls <- true
+			})
+		})
+
+		_, err = offerPC.CreateDataChannel(expectedLabel, nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerPC, answerPC))
+
+		// wait for open handlers to be executed
+		time.Sleep(1 * time.Second)
+		assert.Len(t, openCalls, 1)
+
+		assert.NoError(t, offerPC.Close())
+		assert.NoError(t, answerPC.Close())
+	})
+}
+
 func TestDataChannel_Send(t *testing.T) {
 	t.Run("before signaling", func(t *testing.T) {
 		report := test.CheckRoutines(t)
