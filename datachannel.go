@@ -44,6 +44,8 @@ type DataChannel struct {
 	// OnError             func()
 
 	onMessageHandler    func(DataChannelMessage)
+	onceMutex           sync.Mutex
+	openHandlerOnce     sync.Once
 	onOpenHandler       func()
 	onCloseHandler      func()
 	onBufferedAmountLow func()
@@ -186,10 +188,15 @@ func (d *DataChannel) Transport() *SCTPTransport {
 func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.openHandlerOnce = sync.Once{}
 	d.onOpenHandler = f
 	if d.readyState == DataChannelStateOpen {
 		// If the data channel is already open, call the handler immediately.
-		go d.onOpenHandler()
+		go func() {
+			d.onceMutex.Lock()
+			d.openHandlerOnce.Do(d.onOpenHandler)
+			d.onceMutex.Unlock()
+		}()
 	}
 }
 
@@ -205,7 +212,9 @@ func (d *DataChannel) onOpen() (done chan struct{}) {
 	}
 
 	go func() {
-		hdlr()
+		d.onceMutex.Lock()
+		d.openHandlerOnce.Do(hdlr)
+		d.onceMutex.Unlock()
 		close(done)
 	}()
 

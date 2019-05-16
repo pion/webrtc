@@ -66,28 +66,36 @@ func TestDataChannel_Open(t *testing.T) {
 			t.Fatalf("Failed to create a PC pair for testing")
 		}
 
+		done := make(chan bool)
 		openCalls := make(chan bool, 2)
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
+			if d.Label() != expectedLabel {
+				return
+			}
 			d.OnOpen(func() {
-				if d.Label() != expectedLabel {
-					return
-				}
 				openCalls <- true
+			})
+			d.OnMessage(func(msg DataChannelMessage) {
+				done <- true
 			})
 		})
 
-		_, err = offerPC.CreateDataChannel(expectedLabel, nil)
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		assert.NoError(t, err)
+
+		dc.OnOpen(func() {
+			e := dc.SendText("Ping")
+			if e != nil {
+				t.Fatalf("Failed to send string on data channel")
+			}
+		})
 
 		assert.NoError(t, signalPair(offerPC, answerPC))
 
-		// wait for open handlers to be executed
-		time.Sleep(1 * time.Second)
-		assert.Len(t, openCalls, 1)
+		closePair(t, offerPC, answerPC, done)
 
-		assert.NoError(t, offerPC.Close())
-		assert.NoError(t, answerPC.Close())
+		assert.Len(t, openCalls, 1)
 	})
 }
 
