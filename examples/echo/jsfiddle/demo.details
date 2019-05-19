@@ -1,0 +1,5 @@
+---
+ name: echo
+ description: Example of how to have Pion send back to the user exactly what it receives using the same PeerConnection.
+ authors:
+   - Sean DuBois
