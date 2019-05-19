@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
@@ -16,6 +17,7 @@ type IVFWriter struct {
 	fd           *os.File
 	count        uint64
 	currentFrame []byte
+	startTime    time.Time
 }
 
 // New builds a new IVF writer
@@ -39,7 +41,8 @@ func NewWith(out io.Writer) (*IVFWriter, error) {
 	}
 
 	writer := &IVFWriter{
-		stream: out,
+		stream:    out,
+		startTime: time.Now(),
 	}
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
@@ -83,6 +86,10 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 		return nil
 	}
 
+	if i.count == 0 {
+		i.startTime = time.Now()
+	}
+
 	frameHeader := make([]byte, 12)
 	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(i.currentFrame))) // Frame length
 	binary.LittleEndian.PutUint64(frameHeader[4:], i.count)                     // PTS
@@ -106,6 +113,7 @@ func (i *IVFWriter) Close() error {
 		i.stream = nil
 	}()
 
+	now := time.Now()
 	if i.fd == nil {
 		// Returns no error as it may be convenient to call
 		// Close() multiple times
@@ -118,6 +126,20 @@ func (i *IVFWriter) Close() error {
 	buff := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buff, uint32(i.count))
 	if _, err := i.fd.Write(buff); err != nil {
+		return err
+	}
+
+	// Update the framerate
+	if _, err := i.fd.Seek(16, 0); err != nil {
+		return err
+	}
+
+	duration := now.Sub(i.startTime).Seconds() * 100
+	frames := i.count * 100
+	frameInfo := make([]byte, 8)
+	binary.LittleEndian.PutUint32(frameInfo[0:], uint32(frames))
+	binary.LittleEndian.PutUint32(frameInfo[4:], uint32(duration))
+	if _, err := i.fd.Write(frameInfo); err != nil {
 		return err
 	}
 
