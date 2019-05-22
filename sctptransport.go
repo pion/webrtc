@@ -187,8 +187,6 @@ func (r *SCTPTransport) acceptDataChannels() {
 			return
 		}
 
-		rtcDC.readyState = DataChannelStateOpen
-
 		<-r.onDataChannel(rtcDC)
 		rtcDC.handleOpen(dc)
 	}
