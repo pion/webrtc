@@ -154,8 +154,6 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
 	dc.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
-
-	d.readyState = DataChannelStateOpen
 	d.mu.Unlock()
 
 	d.handleOpen(dc)
@@ -273,6 +271,7 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
 	d.mu.Lock()
+	d.readyState = DataChannelStateOpen
 	d.dataChannel = dc
 	d.mu.Unlock()
 
