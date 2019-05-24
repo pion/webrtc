@@ -90,8 +90,8 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}); err != nil {
 		return err
 	}
-	if err := agent.OnSelectedCandidatePairChange(func(local, remote *ice.Candidate) {
-		candidates, err := newICECandidatesFromICE([]*ice.Candidate{local, remote})
+	if err := agent.OnSelectedCandidatePairChange(func(local, remote ice.Candidate) {
+		candidates, err := newICECandidatesFromICE([]ice.Candidate{local, remote})
 		if err != nil {
 			t.log.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
 			return
