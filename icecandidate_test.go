@@ -12,8 +12,15 @@ import (
 func TestICECandidate_Convert(t *testing.T) {
 	testCases := []struct {
 		native ICECandidate
-		ice    *ice.Candidate
-		sdp    sdp.ICECandidate
+
+		expectedType           ice.CandidateType
+		expectedNetwork        string
+		expectedIP             net.IP
+		expectedPort           int
+		expectedComponent      uint16
+		expectedRelatedAddress *ice.CandidateRelatedAddress
+
+		sdp sdp.ICECandidate
 	}{
 		{
 			ICECandidate{
@@ -24,14 +31,15 @@ func TestICECandidate_Convert(t *testing.T) {
 				Port:       1234,
 				Typ:        ICECandidateTypeHost,
 				Component:  1,
-			}, &ice.Candidate{
-				IP:              net.ParseIP("1.0.0.1"),
-				NetworkType:     ice.NetworkTypeUDP4,
-				Port:            1234,
-				Type:            ice.CandidateTypeHost,
-				Component:       1,
-				LocalPreference: 65535,
 			},
+
+			ice.CandidateTypeHost,
+			"udp",
+			net.ParseIP("1.0.0.1"),
+			1234,
+			1,
+			nil,
+
 			sdp.ICECandidate{
 				Foundation: "foundation",
 				Priority:   128,
@@ -53,18 +61,18 @@ func TestICECandidate_Convert(t *testing.T) {
 				Component:      1,
 				RelatedAddress: "1.0.0.1",
 				RelatedPort:    4321,
-			}, &ice.Candidate{
-				IP:              net.ParseIP("::1"),
-				NetworkType:     ice.NetworkTypeUDP6,
-				Port:            1234,
-				Type:            ice.CandidateTypeServerReflexive,
-				Component:       1,
-				LocalPreference: 65535,
-				RelatedAddress: &ice.CandidateRelatedAddress{
-					Address: "1.0.0.1",
-					Port:    4321,
-				},
 			},
+
+			ice.CandidateTypeServerReflexive,
+			"udp",
+			net.ParseIP("::1"),
+			1234,
+			1,
+			&ice.CandidateRelatedAddress{
+				Address: "1.0.0.1",
+				Port:    4321,
+			},
+
 			sdp.ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
@@ -88,18 +96,18 @@ func TestICECandidate_Convert(t *testing.T) {
 				Component:      1,
 				RelatedAddress: "1.0.0.1",
 				RelatedPort:    4321,
-			}, &ice.Candidate{
-				IP:              net.ParseIP("::1"),
-				NetworkType:     ice.NetworkTypeUDP6,
-				Port:            1234,
-				Type:            ice.CandidateTypePeerReflexive,
-				Component:       1,
-				LocalPreference: 65535,
-				RelatedAddress: &ice.CandidateRelatedAddress{
-					Address: "1.0.0.1",
-					Port:    4321,
-				},
 			},
+
+			ice.CandidateTypePeerReflexive,
+			"udp",
+			net.ParseIP("::1"),
+			1234,
+			1,
+			&ice.CandidateRelatedAddress{
+				Address: "1.0.0.1",
+				Port:    4321,
+			},
+
 			sdp.ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
@@ -123,11 +131,22 @@ func TestICECandidate_Convert(t *testing.T) {
 		)
 		actualICE, err := testCase.native.toICE()
 		assert.Nil(t, err)
-		assert.Equal(t,
-			testCase.ice,
-			actualICE,
-			"testCase: %d ice not equal %v", i, actualSDP,
-		)
+
+		var expectedICE ice.Candidate
+
+		switch testCase.expectedType {
+		case ice.CandidateTypeHost:
+			expectedICE, err = ice.NewCandidateHost(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent)
+		case ice.CandidateTypeServerReflexive:
+			expectedICE, err = ice.NewCandidateServerReflexive(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent,
+				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
+		case ice.CandidateTypePeerReflexive:
+			expectedICE, err = ice.NewCandidatePeerReflexive(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent,
+				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
+		}
+
+		assert.Nil(t, err)
+		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualSDP)
 	}
 }
 

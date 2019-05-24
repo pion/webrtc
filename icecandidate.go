@@ -62,7 +62,7 @@ func (c ICECandidate) toSDP() sdp.ICECandidate {
 
 // Conversion for package ice
 
-func newICECandidatesFromICE(iceCandidates []*ice.Candidate) ([]ICECandidate, error) {
+func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, error) {
 	candidates := []ICECandidate{}
 
 	for _, i := range iceCandidates {
@@ -76,12 +76,12 @@ func newICECandidatesFromICE(iceCandidates []*ice.Candidate) ([]ICECandidate, er
 	return candidates, nil
 }
 
-func newICECandidateFromICE(i *ice.Candidate) (ICECandidate, error) {
-	typ, err := convertTypeFromICE(i.Type)
+func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
+	typ, err := convertTypeFromICE(i.Type())
 	if err != nil {
 		return ICECandidate{}, err
 	}
-	protocol, err := newICEProtocol(i.NetworkType.NetworkShort())
+	protocol, err := newICEProtocol(i.NetworkType().NetworkShort())
 	if err != nil {
 		return ICECandidate{}, err
 	}
@@ -89,22 +89,22 @@ func newICECandidateFromICE(i *ice.Candidate) (ICECandidate, error) {
 	c := ICECandidate{
 		Foundation: "foundation",
 		Priority:   i.Priority(),
-		IP:         i.IP.String(),
+		IP:         i.IP().String(),
 		Protocol:   protocol,
-		Port:       uint16(i.Port),
-		Component:  i.Component,
+		Port:       uint16(i.Port()),
+		Component:  i.Component(),
 		Typ:        typ,
 	}
 
-	if i.RelatedAddress != nil {
-		c.RelatedAddress = i.RelatedAddress.Address
-		c.RelatedPort = uint16(i.RelatedAddress.Port)
+	if i.RelatedAddress() != nil {
+		c.RelatedAddress = i.RelatedAddress().Address
+		c.RelatedPort = uint16(i.RelatedAddress().Port)
 	}
 
 	return c, nil
 }
 
-func (c ICECandidate) toICE() (*ice.Candidate, error) {
+func (c ICECandidate) toICE() (ice.Candidate, error) {
 	ip := net.ParseIP(c.IP)
 	if ip == nil {
 		return nil, errors.New("failed to parse IP address")
