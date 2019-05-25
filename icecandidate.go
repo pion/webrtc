@@ -121,7 +121,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			c.RelatedAddress, int(c.RelatedPort))
 	case ICECandidateTypeRelay:
 		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
-			c.RelatedAddress, int(c.RelatedPort))
+			c.RelatedAddress, int(c.RelatedPort), nil)
 	default:
 		return nil, fmt.Errorf("unknown candidate type: %s", c.Typ)
 	}
