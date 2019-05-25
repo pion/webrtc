@@ -11,7 +11,6 @@ func TestNewICECredentialType(t *testing.T) {
 		credentialTypeString   string
 		expectedCredentialType ICECredentialType
 	}{
-		{unknownStr, ICECredentialType(Unknown)},
 		{"password", ICECredentialTypePassword},
 		{"oauth", ICECredentialTypeOauth},
 	}
@@ -30,7 +29,6 @@ func TestICECredentialType_String(t *testing.T) {
 		credentialType ICECredentialType
 		expectedString string
 	}{
-		{ICECredentialType(Unknown), unknownStr},
 		{ICECredentialTypePassword, "password"},
 		{ICECredentialTypeOauth, "oauth"},
 	}

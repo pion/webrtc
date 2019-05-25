@@ -34,13 +34,16 @@ func (s ICEServer) validate() ([]*ice.URL, error) {
 			if s.Username == "" || s.Credential == nil {
 				return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}
 			}
+			url.Username = s.Username
 
 			switch s.CredentialType {
 			case ICECredentialTypePassword:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
-				if _, ok := s.Credential.(string); !ok {
+				password, ok := s.Credential.(string)
+				if !ok {
 					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
 				}
+				url.Password = password
 
 			case ICECredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
