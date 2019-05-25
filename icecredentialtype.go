@@ -7,7 +7,7 @@ type ICECredentialType int
 const (
 	// ICECredentialTypePassword describes username and pasword based
 	// credentials as described in https://tools.ietf.org/html/rfc5389.
-	ICECredentialTypePassword ICECredentialType = iota + 1
+	ICECredentialTypePassword ICECredentialType = iota
 
 	// ICECredentialTypeOauth describes token based credential as described
 	// in https://tools.ietf.org/html/rfc7635.
