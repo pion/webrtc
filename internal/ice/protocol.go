@@ -5,42 +5,42 @@ import (
 	"strings"
 )
 
-// ICEProtocol indicates the transport protocol type that is used in the
+// Protocol indicates the transport protocol type that is used in the
 // ice.URL structure.
-type ICEProtocol int
+type Protocol int
 
 const (
-	// ICEProtocolUDP indicates the URL uses a UDP transport.
-	ICEProtocolUDP ICEProtocol = iota + 1
+	// ProtocolUDP indicates the URL uses a UDP transport.
+	ProtocolUDP Protocol = iota + 1
 
-	// ICEProtocolTCP indicates the URL uses a TCP transport.
-	ICEProtocolTCP
+	// ProtocolTCP indicates the URL uses a TCP transport.
+	ProtocolTCP
 )
 
 // This is done this way because of a linter.
 const (
-	iceProtocolUDPStr = "udp"
-	iceProtocolTCPStr = "tcp"
+	protocolUDPStr = "udp"
+	protocolTCPStr = "tcp"
 )
 
-// NewICEProtocol takes a string and converts it to ICEProtocol
-func NewICEProtocol(raw string) (ICEProtocol, error) {
+// NewProtocol takes a string and converts it to Protocol
+func NewProtocol(raw string) (Protocol, error) {
 	switch {
-	case strings.EqualFold(iceProtocolUDPStr, raw):
-		return ICEProtocolUDP, nil
-	case strings.EqualFold(iceProtocolTCPStr, raw):
-		return ICEProtocolTCP, nil
+	case strings.EqualFold(protocolUDPStr, raw):
+		return ProtocolUDP, nil
+	case strings.EqualFold(protocolTCPStr, raw):
+		return ProtocolTCP, nil
 	default:
-		return ICEProtocol(Unknown), fmt.Errorf("unknown protocol: %s", raw)
+		return Protocol(Unknown), fmt.Errorf("unknown protocol: %s", raw)
 	}
 }
 
-func (t ICEProtocol) String() string {
+func (t Protocol) String() string {
 	switch t {
-	case ICEProtocolUDP:
-		return iceProtocolUDPStr
-	case ICEProtocolTCP:
-		return iceProtocolTCPStr
+	case ProtocolUDP:
+		return protocolUDPStr
+	case ProtocolTCP:
+		return protocolTCPStr
 	default:
 		return ErrUnknownType.Error()
 	}

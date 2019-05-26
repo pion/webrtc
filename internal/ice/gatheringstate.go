@@ -1,52 +1,52 @@
 package ice
 
-// ICEGatheringState describes the state of the candidate gathering process.
-type ICEGatheringState int
+// GatheringState describes the state of the candidate gathering process.
+type GatheringState int
 
 const (
-	// ICEGatheringStateNew indicates that any of the ICETransports are
+	// GatheringStateNew indicates that any of the ICETransports are
 	// in the "new" gathering state and none of the transports are in the
 	// "gathering" state, or there are no transports.
-	ICEGatheringStateNew ICEGatheringState = iota + 1
+	GatheringStateNew GatheringState = iota + 1
 
-	// ICEGatheringStateGathering indicates that any of the ICETransports
+	// GatheringStateGathering indicates that any of the ICETransports
 	// are in the "gathering" state.
-	ICEGatheringStateGathering
+	GatheringStateGathering
 
-	// ICEGatheringStateComplete indicates that at least one ICETransport
+	// GatheringStateComplete indicates that at least one Transport
 	// exists, and all ICETransports are in the "completed" gathering state.
-	ICEGatheringStateComplete
+	GatheringStateComplete
 )
 
 // This is done this way because of a linter.
 const (
-	iceGatheringStateNewStr       = "new"
-	iceGatheringStateGatheringStr = "gathering"
-	iceGatheringStateCompleteStr  = "complete"
+	gatheringStateNewStr       = "new"
+	gatheringStateGatheringStr = "gathering"
+	gatheringStateCompleteStr  = "complete"
 )
 
-// NewICEGatheringState takes a string and converts it to ICEGatheringState
-func NewICEGatheringState(raw string) ICEGatheringState {
+// NewGatheringState takes a string and converts it to GatheringState
+func NewGatheringState(raw string) GatheringState {
 	switch raw {
-	case iceGatheringStateNewStr:
-		return ICEGatheringStateNew
-	case iceGatheringStateGatheringStr:
-		return ICEGatheringStateGathering
-	case iceGatheringStateCompleteStr:
-		return ICEGatheringStateComplete
+	case gatheringStateNewStr:
+		return GatheringStateNew
+	case gatheringStateGatheringStr:
+		return GatheringStateGathering
+	case gatheringStateCompleteStr:
+		return GatheringStateComplete
 	default:
-		return ICEGatheringState(Unknown)
+		return GatheringState(Unknown)
 	}
 }
 
-func (t ICEGatheringState) String() string {
+func (t GatheringState) String() string {
 	switch t {
-	case ICEGatheringStateNew:
-		return iceGatheringStateNewStr
-	case ICEGatheringStateGathering:
-		return iceGatheringStateGatheringStr
-	case ICEGatheringStateComplete:
-		return iceGatheringStateCompleteStr
+	case GatheringStateNew:
+		return gatheringStateNewStr
+	case GatheringStateGathering:
+		return gatheringStateGatheringStr
+	case GatheringStateComplete:
+		return gatheringStateCompleteStr
 	default:
 		return ErrUnknownType.Error()
 	}

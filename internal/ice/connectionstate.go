@@ -1,93 +1,93 @@
 package ice
 
-// ICEConnectionState indicates signaling state of the ICE Connection.
-type ICEConnectionState int
+// ConnectionState indicates signaling state of the ICE Connection.
+type ConnectionState int
 
 const (
-	// ICEConnectionStateNew indicates that any of the ICETransports are
+	// ConnectionStateNew indicates that any of the ICETransports are
 	// in the "new" state and none of them are in the "checking", "disconnected"
 	// or "failed" state, or all ICETransports are in the "closed" state, or
 	// there are no transports.
-	ICEConnectionStateNew ICEConnectionState = iota + 1
+	ConnectionStateNew ConnectionState = iota + 1
 
-	// ICEConnectionStateChecking indicates that any of the ICETransports
+	// ConnectionStateChecking indicates that any of the ICETransports
 	// are in the "checking" state and none of them are in the "disconnected"
 	// or "failed" state.
-	ICEConnectionStateChecking
+	ConnectionStateChecking
 
-	// ICEConnectionStateConnected indicates that all ICETransports are
+	// ConnectionStateConnected indicates that all ICETransports are
 	// in the "connected", "completed" or "closed" state and at least one of
 	// them is in the "connected" state.
-	ICEConnectionStateConnected
+	ConnectionStateConnected
 
-	// ICEConnectionStateCompleted indicates that all ICETransports are
+	// ConnectionStateCompleted indicates that all ICETransports are
 	// in the "completed" or "closed" state and at least one of them is in the
 	// "completed" state.
-	ICEConnectionStateCompleted
+	ConnectionStateCompleted
 
-	// ICEConnectionStateDisconnected indicates that any of the
+	// ConnectionStateDisconnected indicates that any of the
 	// ICETransports are in the "disconnected" state and none of them are
 	// in the "failed" state.
-	ICEConnectionStateDisconnected
+	ConnectionStateDisconnected
 
-	// ICEConnectionStateFailed indicates that any of the ICETransports
+	// ConnectionStateFailed indicates that any of the ICETransports
 	// are in the "failed" state.
-	ICEConnectionStateFailed
+	ConnectionStateFailed
 
-	// ICEConnectionStateClosed indicates that the PeerConnection's
+	// ConnectionStateClosed indicates that the PeerConnection's
 	// isClosed is true.
-	ICEConnectionStateClosed
+	ConnectionStateClosed
 )
 
 // This is done this way because of a linter.
 const (
-	iceConnectionStateNewStr          = "new"
-	iceConnectionStateCheckingStr     = "checking"
-	iceConnectionStateConnectedStr    = "connected"
-	iceConnectionStateCompletedStr    = "completed"
-	iceConnectionStateDisconnectedStr = "disconnected"
-	iceConnectionStateFailedStr       = "failed"
-	iceConnectionStateClosedStr       = "closed"
+	connectionStateNewStr          = "new"
+	connectionStateCheckingStr     = "checking"
+	connectionStateConnectedStr    = "connected"
+	connectionStateCompletedStr    = "completed"
+	connectionStateDisconnectedStr = "disconnected"
+	connectionStateFailedStr       = "failed"
+	connectionStateClosedStr       = "closed"
 )
 
-// NewICEConnectionState takes a string and converts it to ICEConnectionState
-func NewICEConnectionState(raw string) ICEConnectionState {
+// NewConnectionState takes a string and converts it to ConnectionState
+func NewConnectionState(raw string) ConnectionState {
 	switch raw {
-	case iceConnectionStateNewStr:
-		return ICEConnectionStateNew
-	case iceConnectionStateCheckingStr:
-		return ICEConnectionStateChecking
-	case iceConnectionStateConnectedStr:
-		return ICEConnectionStateConnected
-	case iceConnectionStateCompletedStr:
-		return ICEConnectionStateCompleted
-	case iceConnectionStateDisconnectedStr:
-		return ICEConnectionStateDisconnected
-	case iceConnectionStateFailedStr:
-		return ICEConnectionStateFailed
-	case iceConnectionStateClosedStr:
-		return ICEConnectionStateClosed
+	case connectionStateNewStr:
+		return ConnectionStateNew
+	case connectionStateCheckingStr:
+		return ConnectionStateChecking
+	case connectionStateConnectedStr:
+		return ConnectionStateConnected
+	case connectionStateCompletedStr:
+		return ConnectionStateCompleted
+	case connectionStateDisconnectedStr:
+		return ConnectionStateDisconnected
+	case connectionStateFailedStr:
+		return ConnectionStateFailed
+	case connectionStateClosedStr:
+		return ConnectionStateClosed
 	default:
-		return ICEConnectionState(Unknown)
+		return ConnectionState(Unknown)
 	}
 }
 
-func (c ICEConnectionState) String() string {
+func (c ConnectionState) String() string {
 	switch c {
-	case ICEConnectionStateNew:
-		return iceConnectionStateNewStr
-	case ICEConnectionStateChecking:
-		return iceConnectionStateCheckingStr
-	case ICEConnectionStateConnected:
-		return iceConnectionStateConnectedStr
-	case ICEConnectionStateCompleted:
-		return iceConnectionStateCompletedStr
-	case ICEConnectionStateDisconnected:
-		return iceConnectionStateDisconnectedStr
-	case ICEConnectionStateFailed:
-		return iceConnectionStateFailedStr
-	case ICEConnectionStateClosed:
-		return iceConnectionStateClosedStr
+	case ConnectionStateNew:
+		return connectionStateNewStr
+	case ConnectionStateChecking:
+		return connectionStateCheckingStr
+	case ConnectionStateConnected:
+		return connectionStateConnectedStr
+	case ConnectionStateCompleted:
+		return connectionStateCompletedStr
+	case ConnectionStateDisconnected:
+		return connectionStateDisconnectedStr
+	case ConnectionStateFailed:
+		return connectionStateFailedStr
+	case ConnectionStateClosed:
+		return connectionStateClosedStr
 	default:
 		return ErrUnknownType.Error()
 	}

@@ -6,21 +6,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewICEProtocol(t *testing.T) {
+func TestNewProtocol(t *testing.T) {
 	testCases := []struct {
 		protoString   string
 		shouldFail    bool
-		expectedProto ICEProtocol
+		expectedProto Protocol
 	}{
-		{unknownStr, true, ICEProtocol(Unknown)},
-		{"udp", false, ICEProtocolUDP},
-		{"tcp", false, ICEProtocolTCP},
-		{"UDP", false, ICEProtocolUDP},
-		{"TCP", false, ICEProtocolTCP},
+		{unknownStr, true, Protocol(Unknown)},
+		{"udp", false, ProtocolUDP},
+		{"tcp", false, ProtocolTCP},
+		{"UDP", false, ProtocolUDP},
+		{"TCP", false, ProtocolTCP},
 	}
 
 	for i, testCase := range testCases {
-		actual, err := NewICEProtocol(testCase.protoString)
+		actual, err := NewProtocol(testCase.protoString)
 		if (err != nil) != testCase.shouldFail {
 			t.Error(err)
 		}
@@ -32,14 +32,14 @@ func TestNewICEProtocol(t *testing.T) {
 	}
 }
 
-func TestICEProtocol_String(t *testing.T) {
+func TestProtocol_String(t *testing.T) {
 	testCases := []struct {
-		proto          ICEProtocol
+		proto          Protocol
 		expectedString string
 	}{
-		{ICEProtocol(Unknown), unknownStr},
-		{ICEProtocolUDP, "udp"},
-		{ICEProtocolTCP, "tcp"},
+		{Protocol(Unknown), unknownStr},
+		{ProtocolUDP, "udp"},
+		{ProtocolTCP, "tcp"},
 	}
 
 	for i, testCase := range testCases {

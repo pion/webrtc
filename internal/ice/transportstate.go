@@ -2,104 +2,104 @@ package ice
 
 import "github.com/pion/ice"
 
-// ICETransportState represents the current state of the ICE transport.
-type ICETransportState int
+// TransportState represents the current state of the ICE transport.
+type TransportState int
 
 const (
-	// ICETransportStateNew indicates the ICETransport is waiting
+	// TransportStateNew indicates the Transport is waiting
 	// for remote candidates to be supplied.
-	ICETransportStateNew = iota + 1
+	TransportStateNew = iota + 1
 
-	// ICETransportStateChecking indicates the ICETransport has
+	// TransportStateChecking indicates the Transport has
 	// received at least one remote candidate, and a local and remote
 	// ICECandidateComplete dictionary was not added as the last candidate.
-	ICETransportStateChecking
+	TransportStateChecking
 
-	// ICETransportStateConnected indicates the ICETransport has
+	// TransportStateConnected indicates the Transport has
 	// received a response to an outgoing connectivity check, or has
 	// received incoming DTLS/media after a successful response to an
 	// incoming connectivity check, but is still checking other candidate
 	// pairs to see if there is a better connection.
-	ICETransportStateConnected
+	TransportStateConnected
 
-	// ICETransportStateCompleted indicates the ICETransport tested
+	// TransportStateCompleted indicates the Transport tested
 	// all appropriate candidate pairs and at least one functioning
 	// candidate pair has been found.
-	ICETransportStateCompleted
+	TransportStateCompleted
 
-	// ICETransportStateFailed indicates the ICETransport the last
+	// TransportStateFailed indicates the Transport the last
 	// candidate was added and all appropriate candidate pairs have either
 	// failed connectivity checks or have lost consent.
-	ICETransportStateFailed
+	TransportStateFailed
 
-	// ICETransportStateDisconnected indicates the ICETransport has received
+	// TransportStateDisconnected indicates the Transport has received
 	// at least one local and remote candidate, but the final candidate was
 	// received yet and all appropriate candidate pairs thus far have been
 	// tested and failed.
-	ICETransportStateDisconnected
+	TransportStateDisconnected
 
-	// ICETransportStateClosed indicates the ICETransport has shut down
+	// TransportStateClosed indicates the Transport has shut down
 	// and is no longer responding to STUN requests.
-	ICETransportStateClosed
+	TransportStateClosed
 )
 
-func (c ICETransportState) String() string {
+func (c TransportState) String() string {
 	switch c {
-	case ICETransportStateNew:
+	case TransportStateNew:
 		return "new"
-	case ICETransportStateChecking:
+	case TransportStateChecking:
 		return "checking"
-	case ICETransportStateConnected:
+	case TransportStateConnected:
 		return "connected"
-	case ICETransportStateCompleted:
+	case TransportStateCompleted:
 		return "completed"
-	case ICETransportStateFailed:
+	case TransportStateFailed:
 		return "failed"
-	case ICETransportStateDisconnected:
+	case TransportStateDisconnected:
 		return "disconnected"
-	case ICETransportStateClosed:
+	case TransportStateClosed:
 		return "closed"
 	default:
 		return unknownStr
 	}
 }
 
-func newICETransportStateFromICE(i ice.ConnectionState) ICETransportState {
+func newTransportStateFromICE(i ice.ConnectionState) TransportState {
 	switch i {
 	case ice.ConnectionStateNew:
-		return ICETransportStateNew
+		return TransportStateNew
 	case ice.ConnectionStateChecking:
-		return ICETransportStateChecking
+		return TransportStateChecking
 	case ice.ConnectionStateConnected:
-		return ICETransportStateConnected
+		return TransportStateConnected
 	case ice.ConnectionStateCompleted:
-		return ICETransportStateCompleted
+		return TransportStateCompleted
 	case ice.ConnectionStateFailed:
-		return ICETransportStateFailed
+		return TransportStateFailed
 	case ice.ConnectionStateDisconnected:
-		return ICETransportStateDisconnected
+		return TransportStateDisconnected
 	case ice.ConnectionStateClosed:
-		return ICETransportStateClosed
+		return TransportStateClosed
 	default:
-		return ICETransportState(Unknown)
+		return TransportState(Unknown)
 	}
 }
 
-func (c ICETransportState) toICE() ice.ConnectionState {
+func (c TransportState) toICE() ice.ConnectionState {
 	switch c {
-	case ICETransportStateNew:
+	case TransportStateNew:
 		return ice.ConnectionStateNew
-	case ICETransportStateChecking:
+	case TransportStateChecking:
 		return ice.ConnectionStateChecking
-	case ICETransportStateConnected:
+	case TransportStateConnected:
 		return ice.ConnectionStateConnected
-	case ICETransportStateCompleted:
+	case TransportStateCompleted:
 		return ice.ConnectionStateCompleted
-	case ICETransportStateFailed:
+	case TransportStateFailed:
 		return ice.ConnectionStateFailed
-	case ICETransportStateDisconnected:
+	case TransportStateDisconnected:
 		return ice.ConnectionStateDisconnected
-	case ICETransportStateClosed:
+	case TransportStateClosed:
 		return ice.ConnectionStateClosed
 	default:
 		return ice.ConnectionState(Unknown)

@@ -6,43 +6,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewICEConnectionState(t *testing.T) {
+func TestNewConnectionState(t *testing.T) {
 	testCases := []struct {
 		stateString   string
-		expectedState ICEConnectionState
+		expectedState ConnectionState
 	}{
-		{unknownStr, ICEConnectionState(Unknown)},
-		{"new", ICEConnectionStateNew},
-		{"checking", ICEConnectionStateChecking},
-		{"connected", ICEConnectionStateConnected},
-		{"completed", ICEConnectionStateCompleted},
-		{"disconnected", ICEConnectionStateDisconnected},
-		{"failed", ICEConnectionStateFailed},
-		{"closed", ICEConnectionStateClosed},
+		{unknownStr, ConnectionState(Unknown)},
+		{"new", ConnectionStateNew},
+		{"checking", ConnectionStateChecking},
+		{"connected", ConnectionStateConnected},
+		{"completed", ConnectionStateCompleted},
+		{"disconnected", ConnectionStateDisconnected},
+		{"failed", ConnectionStateFailed},
+		{"closed", ConnectionStateClosed},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			NewICEConnectionState(testCase.stateString),
+			NewConnectionState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestICEConnectionState_String(t *testing.T) {
+func TestConnectionState_String(t *testing.T) {
 	testCases := []struct {
-		state          ICEConnectionState
+		state          ConnectionState
 		expectedString string
 	}{
-		{ICEConnectionState(Unknown), unknownStr},
-		{ICEConnectionStateNew, "new"},
-		{ICEConnectionStateChecking, "checking"},
-		{ICEConnectionStateConnected, "connected"},
-		{ICEConnectionStateCompleted, "completed"},
-		{ICEConnectionStateDisconnected, "disconnected"},
-		{ICEConnectionStateFailed, "failed"},
-		{ICEConnectionStateClosed, "closed"},
+		{ConnectionState(Unknown), unknownStr},
+		{ConnectionStateNew, "new"},
+		{ConnectionStateChecking, "checking"},
+		{ConnectionStateConnected, "connected"},
+		{ConnectionStateCompleted, "completed"},
+		{ConnectionStateDisconnected, "disconnected"},
+		{ConnectionStateFailed, "failed"},
+		{ConnectionStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {

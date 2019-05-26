@@ -1,34 +1,34 @@
 package ice
 
-// ICEGathererState represents the current state of the ICE gatherer.
-type ICEGathererState byte
+// GathererState represents the current state of the ICE gatherer.
+type GathererState byte
 
 const (
-	// ICEGathererStateNew indicates object has been created but
+	// GathererStateNew indicates object has been created but
 	// gather() has not been called.
-	ICEGathererStateNew ICEGathererState = iota + 1
+	GathererStateNew GathererState = iota + 1
 
-	// ICEGathererStateGathering indicates gather() has been called,
-	// and the ICEGatherer is in the process of gathering candidates.
-	ICEGathererStateGathering
+	// GathererStateGathering indicates gather() has been called,
+	// and the Gatherer is in the process of gathering candidates.
+	GathererStateGathering
 
-	// ICEGathererStateComplete indicates the ICEGatherer has completed gathering.
-	ICEGathererStateComplete
+	// GathererStateComplete indicates the Gatherer has completed gathering.
+	GathererStateComplete
 
-	// ICEGathererStateClosed indicates the closed state can only be entered
-	// when the ICEGatherer has been closed intentionally by calling close().
-	ICEGathererStateClosed
+	// GathererStateClosed indicates the closed state can only be entered
+	// when the Gatherer has been closed intentionally by calling close().
+	GathererStateClosed
 )
 
-func (s ICEGathererState) String() string {
+func (s GathererState) String() string {
 	switch s {
-	case ICEGathererStateNew:
+	case GathererStateNew:
 		return "new"
-	case ICEGathererStateGathering:
+	case GathererStateGathering:
 		return "gathering"
-	case ICEGathererStateComplete:
+	case GathererStateComplete:
 		return "complete"
-	case ICEGathererStateClosed:
+	case GathererStateClosed:
 		return "closed"
 	default:
 		return unknownStr

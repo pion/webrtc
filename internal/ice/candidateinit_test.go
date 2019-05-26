@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestICECandidateInit_Serialization(t *testing.T) {
+func TestCandidateInit_Serialization(t *testing.T) {
 	tt := []struct {
-		candidate  ICECandidateInit
+		candidate  CandidateInit
 		serialized string
 	}{
-		{ICECandidateInit{
+		{CandidateInit{
 			Candidate:        "candidate:abc123",
 			SDPMid:           refString("0"),
 			SDPMLineIndex:    refUint16(0),
 			UsernameFragment: "def",
 		}, `{"candidate":"candidate:abc123","sdpMid":"0","sdpMLineIndex":0,"usernameFragment":"def"}`},
-		{ICECandidateInit{
+		{CandidateInit{
 			Candidate:        "candidate:abc123",
 			UsernameFragment: "def",
 		}, `{"candidate":"candidate:abc123","usernameFragment":"def"}`},
@@ -34,7 +34,7 @@ func TestICECandidateInit_Serialization(t *testing.T) {
 			t.Errorf("%d expected %s got %s", i, tc.serialized, actualSerialized)
 		}
 
-		var actual ICECandidateInit
+		var actual CandidateInit
 		err = json.Unmarshal(b, &actual)
 		if err != nil {
 			t.Errorf("Failed to unmarshal %d: %v", i, err)

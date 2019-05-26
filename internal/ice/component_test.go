@@ -6,33 +6,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestICEComponent(t *testing.T) {
+func TestComponent(t *testing.T) {
 	testCases := []struct {
 		componentString   string
-		expectedComponent ICEComponent
+		expectedComponent Component
 	}{
-		{unknownStr, ICEComponent(Unknown)},
-		{"rtp", ICEComponentRTP},
-		{"rtcp", ICEComponentRTCP},
+		{unknownStr, Component(Unknown)},
+		{"rtp", ComponentRTP},
+		{"rtcp", ComponentRTCP},
 	}
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			newICEComponent(testCase.componentString),
+			newComponent(testCase.componentString),
 			testCase.expectedComponent,
 			"testCase: %d %v", i, testCase,
 		)
 	}
 }
 
-func TestICEComponent_String(t *testing.T) {
+func TestComponent_String(t *testing.T) {
 	testCases := []struct {
-		state          ICEComponent
+		state          Component
 		expectedString string
 	}{
-		{ICEComponent(Unknown), unknownStr},
-		{ICEComponentRTP, "rtp"},
-		{ICEComponentRTCP, "rtcp"},
+		{Component(Unknown), unknownStr},
+		{ComponentRTP, "rtp"},
+		{ComponentRTCP, "rtcp"},
 	}
 
 	for i, testCase := range testCases {

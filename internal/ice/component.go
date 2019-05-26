@@ -1,46 +1,46 @@
 package ice
 
-// ICEComponent describes if the ice transport is used for RTP
+// Component describes if the ice transport is used for RTP
 // (or RTCP multiplexing).
-type ICEComponent int
+type Component int
 
 const (
-	// ICEComponentRTP indicates that the ICE Transport is used for RTP (or
+	// ComponentRTP indicates that the ICE Transport is used for RTP (or
 	// RTCP multiplexing), as defined in
 	// https://tools.ietf.org/html/rfc5245#section-4.1.1.1. Protocols
 	// multiplexed with RTP (e.g. data channel) share its component ID. This
 	// represents the component-id value 1 when encoded in candidate-attribute.
-	ICEComponentRTP ICEComponent = iota + 1
+	ComponentRTP Component = iota + 1
 
-	// ICEComponentRTCP indicates that the ICE Transport is used for RTCP as
+	// ComponentRTCP indicates that the ICE Transport is used for RTCP as
 	// defined by https://tools.ietf.org/html/rfc5245#section-4.1.1.1. This
 	// represents the component-id value 2 when encoded in candidate-attribute.
-	ICEComponentRTCP
+	ComponentRTCP
 )
 
 // This is done this way because of a linter.
 const (
-	iceComponentRTPStr  = "rtp"
-	iceComponentRTCPStr = "rtcp"
+	componentRTPStr  = "rtp"
+	componentRTCPStr = "rtcp"
 )
 
-func newICEComponent(raw string) ICEComponent {
+func newComponent(raw string) Component {
 	switch raw {
-	case iceComponentRTPStr:
-		return ICEComponentRTP
-	case iceComponentRTCPStr:
-		return ICEComponentRTCP
+	case componentRTPStr:
+		return ComponentRTP
+	case componentRTCPStr:
+		return ComponentRTCP
 	default:
-		return ICEComponent(Unknown)
+		return Component(Unknown)
 	}
 }
 
-func (t ICEComponent) String() string {
+func (t Component) String() string {
 	switch t {
-	case ICEComponentRTP:
-		return iceComponentRTPStr
-	case ICEComponentRTCP:
-		return iceComponentRTCPStr
+	case ComponentRTP:
+		return componentRTPStr
+	case ComponentRTCP:
+		return componentRTCPStr
 	default:
 		return ErrUnknownType.Error()
 	}

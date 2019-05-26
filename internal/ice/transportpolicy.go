@@ -1,45 +1,45 @@
 package ice
 
-// ICETransportPolicy defines the ICE candidate policy surface the
+// TransportPolicy defines the ICE candidate policy surface the
 // permitted candidates. Only these candidates are used for connectivity checks.
-type ICETransportPolicy int
+type TransportPolicy int
 
-// ICEGatherPolicy is the ORTC equivalent of ICETransportPolicy
-type ICEGatherPolicy = ICETransportPolicy
+// GatherPolicy is the ORTC equivalent of TransportPolicy
+type GatherPolicy = TransportPolicy
 
 const (
-	// ICETransportPolicyAll indicates any type of candidate is used.
-	ICETransportPolicyAll ICETransportPolicy = iota
+	// TransportPolicyAll indicates any type of candidate is used.
+	TransportPolicyAll TransportPolicy = iota
 
-	// ICETransportPolicyRelay indicates only media relay candidates such
+	// TransportPolicyRelay indicates only media relay candidates such
 	// as candidates passing through a TURN server are used.
-	ICETransportPolicyRelay
+	TransportPolicyRelay
 )
 
 // This is done this way because of a linter.
 const (
-	iceTransportPolicyRelayStr = "relay"
-	iceTransportPolicyAllStr   = "all"
+	transportPolicyRelayStr = "relay"
+	transportPolicyAllStr   = "all"
 )
 
-// NewICETransportPolicy takes a string and converts it to ICETransportPolicy
-func NewICETransportPolicy(raw string) ICETransportPolicy {
+// NewTransportPolicy takes a string and converts it to TransportPolicy
+func NewTransportPolicy(raw string) TransportPolicy {
 	switch raw {
-	case iceTransportPolicyRelayStr:
-		return ICETransportPolicyRelay
-	case iceTransportPolicyAllStr:
-		return ICETransportPolicyAll
+	case transportPolicyRelayStr:
+		return TransportPolicyRelay
+	case transportPolicyAllStr:
+		return TransportPolicyAll
 	default:
-		return ICETransportPolicy(Unknown)
+		return TransportPolicy(Unknown)
 	}
 }
 
-func (t ICETransportPolicy) String() string {
+func (t TransportPolicy) String() string {
 	switch t {
-	case ICETransportPolicyRelay:
-		return iceTransportPolicyRelayStr
-	case ICETransportPolicyAll:
-		return iceTransportPolicyAllStr
+	case TransportPolicyRelay:
+		return transportPolicyRelayStr
+	case TransportPolicyAll:
+		return transportPolicyAllStr
 	default:
 		return ErrUnknownType.Error()
 	}
