@@ -25,6 +25,7 @@ type ICEGatherer struct {
 
 	portMin           uint16
 	portMax           uint16
+	candidateTypes    []ice.CandidateType
 	connectionTimeout *time.Duration
 	keepaliveInterval *time.Duration
 	loggerFactory     logging.LoggerFactory
@@ -52,6 +53,11 @@ func NewICEGatherer(
 		}
 	}
 
+	candidateTypes := []ice.CandidateType{}
+	if opts.ICEGatherPolicy == ICETransportPolicyRelay {
+		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
+	}
+
 	return &ICEGatherer{
 		state:             ICEGathererStateNew,
 		validatedServers:  validatedServers,
@@ -61,6 +67,7 @@ func NewICEGatherer(
 		keepaliveInterval: keepaliveInterval,
 		loggerFactory:     loggerFactory,
 		networkTypes:      networkTypes,
+		candidateTypes:    candidateTypes,
 	}, nil
 }
 
@@ -83,6 +90,7 @@ func (g *ICEGatherer) Gather() error {
 		ConnectionTimeout: g.connectionTimeout,
 		KeepaliveInterval: g.keepaliveInterval,
 		LoggerFactory:     g.loggerFactory,
+		CandidateTypes:    g.candidateTypes,
 	}
 
 	requestedNetworkTypes := g.networkTypes

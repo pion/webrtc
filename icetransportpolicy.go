@@ -4,13 +4,16 @@ package webrtc
 // permitted candidates. Only these candidates are used for connectivity checks.
 type ICETransportPolicy int
 
+// ICEGatherPolicy is the ORTC equivalent of ICETransportPolicy
+type ICEGatherPolicy = ICETransportPolicy
+
 const (
+	// ICETransportPolicyAll indicates any type of candidate is used.
+	ICETransportPolicyAll ICETransportPolicy = iota
+
 	// ICETransportPolicyRelay indicates only media relay candidates such
 	// as candidates passing through a TURN server are used.
-	ICETransportPolicyRelay ICETransportPolicy = iota + 1
-
-	// ICETransportPolicyAll indicates any type of candidate is used.
-	ICETransportPolicyAll
+	ICETransportPolicyRelay
 )
 
 // This is done this way because of a linter.
