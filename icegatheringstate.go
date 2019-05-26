@@ -25,7 +25,8 @@ const (
 	iceGatheringStateCompleteStr  = "complete"
 )
 
-func newICEGatheringState(raw string) ICEGatheringState {
+// NewICEGatheringState takes a string and converts it to ICEGatheringState
+func NewICEGatheringState(raw string) ICEGatheringState {
 	switch raw {
 	case iceGatheringStateNewStr:
 		return ICEGatheringStateNew

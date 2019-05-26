@@ -20,4 +20,4 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
 # We changed this line to require our node_shim.js.
-exec node --require=./test-wasm/node_shim.js "$(go env GOROOT)/misc/wasm/wasm_exec.js" "$@"
+exec node --require="${DIR}/node_shim.js" "$(go env GOROOT)/misc/wasm/wasm_exec.js" "$@"

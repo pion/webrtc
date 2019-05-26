@@ -41,7 +41,8 @@ const (
 	iceCandidateTypeRelayStr = "relay"
 )
 
-func newICECandidateType(raw string) (ICECandidateType, error) {
+// NewICECandidateType takes a string and converts it into ICECandidateType
+func NewICECandidateType(raw string) (ICECandidateType, error) {
 	switch raw {
 	case iceCandidateTypeHostStr:
 		return ICECandidateTypeHost, nil

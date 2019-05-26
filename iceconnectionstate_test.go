@@ -24,7 +24,7 @@ func TestNewICEConnectionState(t *testing.T) {
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newICEConnectionState(testCase.stateString),
+			NewICEConnectionState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}

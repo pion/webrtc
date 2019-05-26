@@ -45,7 +45,7 @@ func NewICEGatherer(
 	var validatedServers []*ice.URL
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
-			url, err := server.validate()
+			url, err := server.urls()
 			if err != nil {
 				return nil, err
 			}

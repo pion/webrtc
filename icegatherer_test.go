@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/transport/test"
 )
 
@@ -21,9 +22,7 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	api := NewAPI()
-
-	gatherer, err := api.NewICEGatherer(opts)
+	gatherer, err := NewICEGatherer(0, 0, nil, nil, logging.NewDefaultLoggerFactory(), nil, opts)
 	if err != nil {
 		t.Error(err)
 	}

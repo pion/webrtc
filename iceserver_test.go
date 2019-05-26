@@ -34,7 +34,7 @@ func TestICEServer_validate(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
-			_, err := testCase.iceServer.validate()
+			_, err := testCase.iceServer.urls()
 			assert.Nil(t, err, "testCase: %d %v", i, testCase)
 		}
 	})
@@ -73,7 +73,7 @@ func TestICEServer_validate(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
-			_, err := testCase.iceServer.validate()
+			_, err := testCase.iceServer.urls()
 			assert.EqualError(t,
 				err,
 				testCase.expectedErr.Error(),

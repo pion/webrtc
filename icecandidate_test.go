@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/pion/ice"
-	"github.com/pion/sdp/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,8 +18,6 @@ func TestICECandidate_Convert(t *testing.T) {
 		expectedPort           int
 		expectedComponent      uint16
 		expectedRelatedAddress *ice.CandidateRelatedAddress
-
-		sdp sdp.ICECandidate
 	}{
 		{
 			ICECandidate{
@@ -39,16 +36,6 @@ func TestICECandidate_Convert(t *testing.T) {
 			1234,
 			1,
 			nil,
-
-			sdp.ICECandidate{
-				Foundation: "foundation",
-				Priority:   128,
-				IP:         "1.0.0.1",
-				Protocol:   "udp",
-				Port:       1234,
-				Typ:        "host",
-				Component:  1,
-			},
 		},
 		{
 			ICECandidate{
@@ -71,18 +58,6 @@ func TestICECandidate_Convert(t *testing.T) {
 			&ice.CandidateRelatedAddress{
 				Address: "1.0.0.1",
 				Port:    4321,
-			},
-
-			sdp.ICECandidate{
-				Foundation:     "foundation",
-				Priority:       128,
-				IP:             "::1",
-				Protocol:       "udp",
-				Port:           1234,
-				Typ:            "srflx",
-				Component:      1,
-				RelatedAddress: "1.0.0.1",
-				RelatedPort:    4321,
 			},
 		},
 		{
@@ -107,28 +82,10 @@ func TestICECandidate_Convert(t *testing.T) {
 				Address: "1.0.0.1",
 				Port:    4321,
 			},
-
-			sdp.ICECandidate{
-				Foundation:     "foundation",
-				Priority:       128,
-				IP:             "::1",
-				Protocol:       "udp",
-				Port:           1234,
-				Typ:            "prflx",
-				Component:      1,
-				RelatedAddress: "1.0.0.1",
-				RelatedPort:    4321,
-			},
 		},
 	}
 
 	for i, testCase := range testCases {
-		actualSDP := testCase.native.toSDP()
-		assert.Equal(t,
-			testCase.sdp,
-			actualSDP,
-			"testCase: %d sdp not equal %v", i, actualSDP,
-		)
 		actualICE, err := testCase.native.toICE()
 		assert.Nil(t, err)
 
@@ -146,7 +103,7 @@ func TestICECandidate_Convert(t *testing.T) {
 		}
 
 		assert.Nil(t, err)
-		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualSDP)
+		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualICE)
 	}
 }
 

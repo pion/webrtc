@@ -50,7 +50,8 @@ const (
 	iceConnectionStateClosedStr       = "closed"
 )
 
-func newICEConnectionState(raw string) ICEConnectionState {
+// NewICEConnectionState takes a string and converts it to ICEConnectionState
+func NewICEConnectionState(raw string) ICEConnectionState {
 	switch raw {
 	case iceConnectionStateNewStr:
 		return ICEConnectionStateNew

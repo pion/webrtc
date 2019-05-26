@@ -22,7 +22,8 @@ const (
 	iceTransportPolicyAllStr   = "all"
 )
 
-func newICETransportPolicy(raw string) ICETransportPolicy {
+// NewICETransportPolicy takes a string and converts it to ICETransportPolicy
+func NewICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
 	case iceTransportPolicyRelayStr:
 		return ICETransportPolicyRelay
