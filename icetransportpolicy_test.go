@@ -11,7 +11,6 @@ func TestNewICETransportPolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy ICETransportPolicy
 	}{
-		{unknownStr, ICETransportPolicy(Unknown)},
 		{"relay", ICETransportPolicyRelay},
 		{"all", ICETransportPolicyAll},
 	}
@@ -30,7 +29,6 @@ func TestICETransportPolicy_String(t *testing.T) {
 		policy         ICETransportPolicy
 		expectedString string
 	}{
-		{ICETransportPolicy(Unknown), unknownStr},
 		{ICETransportPolicyRelay, "relay"},
 		{ICETransportPolicyAll, "all"},
 	}
