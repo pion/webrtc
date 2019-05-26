@@ -8,26 +8,26 @@ import (
 	"github.com/pion/ice"
 )
 
-// ICECandidate represents a ice candidate
-type ICECandidate struct {
-	Foundation     string           `json:"foundation"`
-	Priority       uint32           `json:"priority"`
-	IP             string           `json:"ip"`
-	Protocol       ICEProtocol      `json:"protocol"`
-	Port           uint16           `json:"port"`
-	Typ            ICECandidateType `json:"type"`
-	Component      uint16           `json:"component"`
-	RelatedAddress string           `json:"relatedAddress"`
-	RelatedPort    uint16           `json:"relatedPort"`
+// Candidate represents a ice candidate
+type Candidate struct {
+	Foundation     string        `json:"foundation"`
+	Priority       uint32        `json:"priority"`
+	IP             string        `json:"ip"`
+	Protocol       Protocol      `json:"protocol"`
+	Port           uint16        `json:"port"`
+	Typ            CandidateType `json:"type"`
+	Component      uint16        `json:"component"`
+	RelatedAddress string        `json:"relatedAddress"`
+	RelatedPort    uint16        `json:"relatedPort"`
 }
 
 // Conversion for package ice
 
-func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, error) {
-	candidates := []ICECandidate{}
+func newCandidatesFromICE(iceCandidates []ice.Candidate) ([]Candidate, error) {
+	candidates := []Candidate{}
 
 	for _, i := range iceCandidates {
-		c, err := newICECandidateFromICE(i)
+		c, err := newCandidateFromICE(i)
 		if err != nil {
 			return nil, err
 		}
@@ -37,17 +37,17 @@ func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, err
 	return candidates, nil
 }
 
-func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
+func newCandidateFromICE(i ice.Candidate) (Candidate, error) {
 	typ, err := convertTypeFromICE(i.Type())
 	if err != nil {
-		return ICECandidate{}, err
+		return Candidate{}, err
 	}
-	protocol, err := NewICEProtocol(i.NetworkType().NetworkShort())
+	protocol, err := NewProtocol(i.NetworkType().NetworkShort())
 	if err != nil {
-		return ICECandidate{}, err
+		return Candidate{}, err
 	}
 
-	c := ICECandidate{
+	c := Candidate{
 		Foundation: "foundation",
 		Priority:   i.Priority(),
 		IP:         i.IP().String(),
@@ -65,22 +65,22 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 	return c, nil
 }
 
-func (c ICECandidate) toICE() (ice.Candidate, error) {
+func (c Candidate) toICE() (ice.Candidate, error) {
 	ip := net.ParseIP(c.IP)
 	if ip == nil {
 		return nil, errors.New("failed to parse IP address")
 	}
 
 	switch c.Typ {
-	case ICECandidateTypeHost:
+	case CandidateTypeHost:
 		return ice.NewCandidateHost(c.Protocol.String(), ip, int(c.Port), c.Component)
-	case ICECandidateTypeSrflx:
+	case CandidateTypeSrflx:
 		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
-	case ICECandidateTypePrflx:
+	case CandidateTypePrflx:
 		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
-	case ICECandidateTypeRelay:
+	case CandidateTypeRelay:
 		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	default:
@@ -88,22 +88,22 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 	}
 }
 
-func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
+func convertTypeFromICE(t ice.CandidateType) (CandidateType, error) {
 	switch t {
 	case ice.CandidateTypeHost:
-		return ICECandidateTypeHost, nil
+		return CandidateTypeHost, nil
 	case ice.CandidateTypeServerReflexive:
-		return ICECandidateTypeSrflx, nil
+		return CandidateTypeSrflx, nil
 	case ice.CandidateTypePeerReflexive:
-		return ICECandidateTypePrflx, nil
+		return CandidateTypePrflx, nil
 	case ice.CandidateTypeRelay:
-		return ICECandidateTypeRelay, nil
+		return CandidateTypeRelay, nil
 	default:
-		return ICECandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
+		return CandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
 	}
 }
 
-func (c ICECandidate) String() string {
+func (c Candidate) String() string {
 	ic, err := c.toICE()
 	if err != nil {
 		return fmt.Sprintf("%#v failed to convert to ICE: %s", c, err)

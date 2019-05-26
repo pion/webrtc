@@ -10,7 +10,7 @@ import (
 	"github.com/pion/transport/test"
 )
 
-func TestNewICEGatherer_Success(t *testing.T) {
+func TestGatherer_Success(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
@@ -18,16 +18,16 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	opts := ICEGatherOptions{
-		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
+	opts := GatherOptions{
+		ICEServers: []Server{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	gatherer, err := NewICEGatherer(0, 0, nil, nil, logging.NewDefaultLoggerFactory(), nil, opts)
+	gatherer, err := NewGatherer(0, 0, nil, nil, logging.NewDefaultLoggerFactory(), nil, opts)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if gatherer.State() != ICEGathererStateNew {
+	if gatherer.State() != GathererStateNew {
 		t.Fatalf("Expected gathering state new")
 	}
 

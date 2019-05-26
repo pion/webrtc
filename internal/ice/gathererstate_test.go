@@ -6,16 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestICEGathererState_String(t *testing.T) {
+func TestGathererState_String(t *testing.T) {
 	testCases := []struct {
-		state          ICEGathererState
+		state          GathererState
 		expectedString string
 	}{
-		{ICEGathererState(Unknown), unknownStr},
-		{ICEGathererStateNew, "new"},
-		{ICEGathererStateGathering, "gathering"},
-		{ICEGathererStateComplete, "complete"},
-		{ICEGathererStateClosed, "closed"},
+		{GathererState(Unknown), unknownStr},
+		{GathererStateNew, "new"},
+		{GathererStateGathering, "gathering"},
+		{GathererStateComplete, "complete"},
+		{GathererStateClosed, "closed"},
 	}
 
 	for i, testCase := range testCases {

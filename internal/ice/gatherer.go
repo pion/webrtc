@@ -11,13 +11,13 @@ import (
 	"github.com/pion/logging"
 )
 
-// ICEGatherer gathers local host, server reflexive and relay
+// Gatherer gathers local host, server reflexive and relay
 // candidates, as well as enabling the retrieval of local Interactive
 // Connectivity Establishment (ICE) parameters which can be
 // exchanged in signaling.
-type ICEGatherer struct {
+type Gatherer struct {
 	lock  sync.RWMutex
-	state ICEGathererState
+	state GathererState
 
 	validatedServers []*ice.URL
 
@@ -33,20 +33,20 @@ type ICEGatherer struct {
 	log               logging.LeveledLogger
 	networkTypes      []NetworkType
 
-	onLocalCandidateHdlr func(candidate *ICECandidate)
-	onStateChangeHdlr    func(state ICEGathererState)
+	onLocalCandidateHdlr func(candidate *Candidate)
+	onStateChangeHdlr    func(state GathererState)
 }
 
-// NewICEGatherer creates a new NewICEGatherer.
-func NewICEGatherer(
+// NewGatherer creates a new Gatherer.
+func NewGatherer(
 	portMin uint16,
 	portMax uint16,
 	connectionTimeout *time.Duration,
 	keepaliveInterval *time.Duration,
 	loggerFactory logging.LoggerFactory,
 	networkTypes []NetworkType,
-	opts ICEGatherOptions,
-) (*ICEGatherer, error) {
+	opts GatherOptions,
+) (*Gatherer, error) {
 	var validatedServers []*ice.URL
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
@@ -59,12 +59,12 @@ func NewICEGatherer(
 	}
 
 	candidateTypes := []ice.CandidateType{}
-	if opts.ICEGatherPolicy == ICETransportPolicyRelay {
+	if opts.ICEGatherPolicy == TransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
 
-	return &ICEGatherer{
-		state:             ICEGathererStateNew,
+	return &Gatherer{
+		state:             GathererStateNew,
 		validatedServers:  validatedServers,
 		portMin:           portMin,
 		portMax:           portMax,
@@ -77,7 +77,7 @@ func NewICEGatherer(
 	}, nil
 }
 
-func (g *ICEGatherer) createAgent() error {
+func (g *Gatherer) createAgent() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	agentIsTrickle := g.onLocalCandidateHdlr != nil || g.onStateChangeHdlr != nil
@@ -118,14 +118,14 @@ func (g *ICEGatherer) createAgent() error {
 	g.agent = agent
 	g.agentIsTrickle = agentIsTrickle
 	if agentIsTrickle {
-		g.state = ICEGathererStateComplete
+		g.state = GathererStateComplete
 	}
 
 	return nil
 }
 
 // Gather ICE candidates.
-func (g *ICEGatherer) Gather() error {
+func (g *Gatherer) Gather() error {
 	if err := g.createAgent(); err != nil {
 		return err
 	}
@@ -140,17 +140,17 @@ func (g *ICEGatherer) Gather() error {
 		return nil
 	}
 
-	g.setState(ICEGathererStateGathering)
+	g.setState(GathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {
 		if candidate != nil {
-			c, err := newICECandidateFromICE(candidate)
+			c, err := newCandidateFromICE(candidate)
 			if err != nil {
 				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
 				return
 			}
 			onLocalCandidateHdlr(&c)
 		} else {
-			g.setState(ICEGathererStateComplete)
+			g.setState(GathererStateComplete)
 			onLocalCandidateHdlr(nil)
 		}
 	}); err != nil {
@@ -160,7 +160,7 @@ func (g *ICEGatherer) Gather() error {
 }
 
 // Close prunes all local candidates, and closes the ports.
-func (g *ICEGatherer) Close() error {
+func (g *Gatherer) Close() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -177,22 +177,22 @@ func (g *ICEGatherer) Close() error {
 	return nil
 }
 
-// GetLocalParameters returns the ICE parameters of the ICEGatherer.
-func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
+// GetLocalParameters returns the ICE parameters of the Gatherer.
+func (g *Gatherer) GetLocalParameters() (Parameters, error) {
 	if err := g.createAgent(); err != nil {
-		return ICEParameters{}, err
+		return Parameters{}, err
 	}
 
 	frag, pwd := g.agent.GetLocalUserCredentials()
-	return ICEParameters{
+	return Parameters{
 		UsernameFragment: frag,
 		Password:         pwd,
 		ICELite:          false,
 	}, nil
 }
 
-// GetLocalCandidates returns the sequence of valid local candidates associated with the ICEGatherer.
-func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
+// GetLocalCandidates returns the sequence of valid local candidates associated with the Gatherer.
+func (g *Gatherer) GetLocalCandidates() ([]Candidate, error) {
 	if err := g.createAgent(); err != nil {
 		return nil, err
 	}
@@ -201,31 +201,31 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 		return nil, err
 	}
 
-	return newICECandidatesFromICE(iceCandidates)
+	return newCandidatesFromICE(iceCandidates)
 }
 
 // OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
-func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
+func (g *Gatherer) OnLocalCandidate(f func(*Candidate)) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.onLocalCandidateHdlr = f
 }
 
-// OnStateChange fires any time the ICEGatherer changes
-func (g *ICEGatherer) OnStateChange(f func(ICEGathererState)) {
+// OnStateChange fires any time the Gatherer changes
+func (g *Gatherer) OnStateChange(f func(GathererState)) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.onStateChangeHdlr = f
 }
 
 // State indicates the current state of the ICE gatherer.
-func (g *ICEGatherer) State() ICEGathererState {
+func (g *Gatherer) State() GathererState {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	return g.state
 }
 
-func (g *ICEGatherer) setState(s ICEGathererState) {
+func (g *Gatherer) setState(s GathererState) {
 	g.lock.Lock()
 	g.state = s
 	hdlr := g.onStateChangeHdlr
@@ -236,12 +236,13 @@ func (g *ICEGatherer) setState(s ICEGathererState) {
 	}
 }
 
-func (g *ICEGatherer) getAgent() *ice.Agent {
+func (g *Gatherer) getAgent() *ice.Agent {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	return g.agent
 }
 
-func (g *ICEGatherer) AgentIsTrickle() bool {
+// AgentIsTrickle returns true if agent is in trickle mode.
+func (g *Gatherer) AgentIsTrickle() bool {
 	return g.agentIsTrickle
 }

@@ -1,44 +1,44 @@
 package ice
 
-// ICERole describes the role ice.Agent is playing in selecting the
+// Role describes the role ice.Agent is playing in selecting the
 // preferred the candidate pair.
-type ICERole int
+type Role int
 
 const (
-	// ICERoleControlling indicates that the ICE agent that is responsible
+	// RoleControlling indicates that the ICE agent that is responsible
 	// for selecting the final choice of candidate pairs and signaling them
 	// through STUN and an updated offer, if needed. In any session, one agent
 	// is always controlling. The other is the controlled agent.
-	ICERoleControlling ICERole = iota + 1
+	RoleControlling Role = iota + 1
 
-	// ICERoleControlled indicates that an ICE agent that waits for the
+	// RoleControlled indicates that an ICE agent that waits for the
 	// controlling agent to select the final choice of candidate pairs.
-	ICERoleControlled
+	RoleControlled
 )
 
 // This is done this way because of a linter.
 const (
-	iceRoleControllingStr = "controlling"
-	iceRoleControlledStr  = "controlled"
+	roleControllingStr = "controlling"
+	roleControlledStr  = "controlled"
 )
 
-func newICERole(raw string) ICERole {
+func newRole(raw string) Role {
 	switch raw {
-	case iceRoleControllingStr:
-		return ICERoleControlling
-	case iceRoleControlledStr:
-		return ICERoleControlled
+	case roleControllingStr:
+		return RoleControlling
+	case roleControlledStr:
+		return RoleControlled
 	default:
-		return ICERole(Unknown)
+		return Role(Unknown)
 	}
 }
 
-func (t ICERole) String() string {
+func (t Role) String() string {
 	switch t {
-	case ICERoleControlling:
-		return iceRoleControllingStr
-	case ICERoleControlled:
-		return iceRoleControlledStr
+	case RoleControlling:
+		return roleControllingStr
+	case RoleControlled:
+		return roleControlledStr
 	default:
 		return ErrUnknownType.Error()
 	}

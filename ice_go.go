@@ -13,21 +13,22 @@ type (
 
 	// ICETransport allows an application access to information about the ICE
 	// transport over which packets are sent and received.
-	ICETransport = ice.ICETransport
+	ICETransport = ice.Transport
 
 	// ICEGatherer gathers local host, server reflexive and relay
 	// candidates, as well as enabling the retrieval of local Interactive
 	// Connectivity Establishment (ICE) parameters which can be
 	// exchanged in signaling.
-	ICEGatherer = ice.ICEGatherer
+	ICEGatherer = ice.Gatherer
 )
 
 var (
+
 	// NewICEGatherer creates a new NewICEGatherer.
-	NewICEGatherer = ice.NewICEGatherer
+	NewICEGatherer = ice.NewGatherer
 
 	// NewICETransport creates a new NewICETransport.
-	NewICETransport = ice.NewICETransport
+	NewICETransport = ice.NewTransport
 )
 
 // NewICEGatherer creates a new NewICEGatherer.
