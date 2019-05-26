@@ -204,7 +204,7 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 
 	if len(configuration.ICEServers) > 0 {
 		for _, server := range configuration.ICEServers {
-			if _, err := server.validate(); err != nil {
+			if err := server.Validate(); err != nil {
 				return err
 			}
 		}
@@ -424,7 +424,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error {
 	if len(configuration.ICEServers) > 0 {
 		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
 		for _, server := range configuration.ICEServers {
-			if _, err := server.validate(); err != nil {
+			if err := server.Validate(); err != nil {
 				return err
 			}
 		}
@@ -1730,7 +1730,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 
 	media = media.WithPropertyAttribute(t.Direction.String())
 	for _, c := range candidates {
-		sdpCandidate := c.toSDP()
+		sdpCandidate := iceCandidateToSDP(c)
 		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
 		sdpCandidate.Component = 1
 		media.WithICECandidate(sdpCandidate)
@@ -1769,7 +1769,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
 	for _, c := range candidates {
-		sdpCandidate := c.toSDP()
+		sdpCandidate := iceCandidateToSDP(c)
 		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
 		sdpCandidate.Component = 1
 		media.WithICECandidate(sdpCandidate)

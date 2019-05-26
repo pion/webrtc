@@ -18,7 +18,7 @@ func TestNewICETransportPolicy(t *testing.T) {
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedPolicy,
-			newICETransportPolicy(testCase.policyString),
+			NewICETransportPolicy(testCase.policyString),
 			"testCase: %d %v", i, testCase,
 		)
 	}

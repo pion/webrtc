@@ -102,7 +102,7 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 		defer oldHandler.Release()
 	}
 	onICEConectionStateChangeHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		connectionState := newICEConnectionState(pc.underlying.Get("iceConnectionState").String())
+		connectionState := NewICEConnectionState(pc.underlying.Get("iceConnectionState").String())
 		go f(connectionState)
 		return js.Undefined()
 	})
@@ -283,7 +283,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) (err error
 // ICEConnectionState returns the ICE connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
-	return newICEConnectionState(pc.underlying.Get("iceConnectionState").String())
+	return NewICEConnectionState(pc.underlying.Get("iceConnectionState").String())
 }
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
@@ -453,7 +453,7 @@ func (pc *PeerConnection) SignalingState() SignalingState {
 // instance.
 func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 	rawState := pc.underlying.Get("iceGatheringState").String()
-	return newICEGatheringState(rawState)
+	return NewICEGatheringState(rawState)
 }
 
 // ConnectionState attribute the connection state of the PeerConnection
@@ -507,7 +507,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 	}
 	return Configuration{
 		ICEServers:           valueToICEServers(configValue.Get("iceServers")),
-		ICETransportPolicy:   newICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
+		ICETransportPolicy:   NewICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
 		BundlePolicy:         newBundlePolicy(valueToStringOrZero(configValue.Get("bundlePolicy"))),
 		RTCPMuxPolicy:        newRTCPMuxPolicy(valueToStringOrZero(configValue.Get("rtcpMuxPolicy"))),
 		PeerIdentity:         valueToStringOrZero(configValue.Get("peerIdentity")),
@@ -543,8 +543,8 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 	if val == js.Null() || val == js.Undefined() {
 		return nil
 	}
-	protocol, _ := newICEProtocol(val.Get("protocol").String())
-	candidateType, _ := newICECandidateType(val.Get("type").String())
+	protocol, _ := NewICEProtocol(val.Get("protocol").String())
+	candidateType, _ := NewICECandidateType(val.Get("type").String())
 	return &ICECandidate{
 		Foundation:     val.Get("foundation").String(),
 		Priority:       valueToUint32OrZero(val.Get("priority")),

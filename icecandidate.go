@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/pion/ice"
-	"github.com/pion/sdp/v2"
 )
 
 // ICECandidate represents a ice candidate
@@ -20,44 +19,6 @@ type ICECandidate struct {
 	Component      uint16           `json:"component"`
 	RelatedAddress string           `json:"relatedAddress"`
 	RelatedPort    uint16           `json:"relatedPort"`
-}
-
-// Conversion for package sdp
-
-func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
-	typ, err := newICECandidateType(c.Typ)
-	if err != nil {
-		return ICECandidate{}, err
-	}
-	protocol, err := newICEProtocol(c.Protocol)
-	if err != nil {
-		return ICECandidate{}, err
-	}
-	return ICECandidate{
-		Foundation:     c.Foundation,
-		Priority:       c.Priority,
-		IP:             c.IP,
-		Protocol:       protocol,
-		Port:           c.Port,
-		Component:      c.Component,
-		Typ:            typ,
-		RelatedAddress: c.RelatedAddress,
-		RelatedPort:    c.RelatedPort,
-	}, nil
-}
-
-func (c ICECandidate) toSDP() sdp.ICECandidate {
-	return sdp.ICECandidate{
-		Foundation:     c.Foundation,
-		Priority:       c.Priority,
-		IP:             c.IP,
-		Protocol:       c.Protocol.String(),
-		Port:           c.Port,
-		Component:      c.Component,
-		Typ:            c.Typ.String(),
-		RelatedAddress: c.RelatedAddress,
-		RelatedPort:    c.RelatedPort,
-	}
 }
 
 // Conversion for package ice
@@ -81,7 +42,7 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 	if err != nil {
 		return ICECandidate{}, err
 	}
-	protocol, err := newICEProtocol(i.NetworkType().NetworkShort())
+	protocol, err := NewICEProtocol(i.NetworkType().NetworkShort())
 	if err != nil {
 		return ICECandidate{}, err
 	}

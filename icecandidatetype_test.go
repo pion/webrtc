@@ -20,7 +20,7 @@ func TestICECandidateType(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		actual, err := newICECandidateType(testCase.typeString)
+		actual, err := NewICECandidateType(testCase.typeString)
 		if (err != nil) != testCase.shouldFail {
 			t.Error(err)
 		}

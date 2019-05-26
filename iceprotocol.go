@@ -23,7 +23,8 @@ const (
 	iceProtocolTCPStr = "tcp"
 )
 
-func newICEProtocol(raw string) (ICEProtocol, error) {
+// NewICEProtocol takes a string and converts it to ICEProtocol
+func NewICEProtocol(raw string) (ICEProtocol, error) {
 	switch {
 	case strings.EqualFold(iceProtocolUDPStr, raw):
 		return ICEProtocolUDP, nil

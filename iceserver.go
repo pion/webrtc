@@ -20,7 +20,13 @@ func (s ICEServer) parseURL(i int) (*ice.URL, error) {
 	return ice.ParseURL(s.URLs[i])
 }
 
-func (s ICEServer) validate() ([]*ice.URL, error) {
+// Validate checks if the ICEServer struct is valid
+func (s ICEServer) Validate() error {
+	_, err := s.urls()
+	return err
+}
+
+func (s ICEServer) urls() ([]*ice.URL, error) {
 	urls := []*ice.URL{}
 
 	for i := range s.URLs {

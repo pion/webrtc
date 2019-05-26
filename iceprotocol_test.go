@@ -20,7 +20,7 @@ func TestNewICEProtocol(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		actual, err := newICEProtocol(testCase.protoString)
+		actual, err := NewICEProtocol(testCase.protoString)
 		if (err != nil) != testCase.shouldFail {
 			t.Error(err)
 		}

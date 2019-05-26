@@ -20,7 +20,7 @@ func TestNewICEGatheringState(t *testing.T) {
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedState,
-			newICEGatheringState(testCase.stateString),
+			NewICEGatheringState(testCase.stateString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
