@@ -389,3 +389,31 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
 }
+
+func TestMultipleOfferAnswer(t *testing.T) {
+	nonTricklePeerConn, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Errorf("New PeerConnection: got error: %v", err)
+	}
+
+	if _, err = nonTricklePeerConn.CreateOffer(nil); err != nil {
+		t.Errorf("First Offer: got error: %v", err)
+	}
+	if _, err = nonTricklePeerConn.CreateOffer(nil); err != nil {
+		t.Errorf("Second Offer: got error: %v", err)
+	}
+
+	tricklePeerConn, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Errorf("New PeerConnection: got error: %v", err)
+	}
+	tricklePeerConn.OnICECandidate(func(i *ICECandidate) {
+	})
+
+	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+		t.Errorf("First Offer: got error: %v", err)
+	}
+	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+		t.Errorf("Second Offer: got error: %v", err)
+	}
+}

@@ -43,7 +43,6 @@ type PeerConnection struct {
 	currentRemoteDescription *SessionDescription
 	pendingRemoteDescription *SessionDescription
 	signalingState           SignalingState
-	iceGatheringState        ICEGatheringState
 	iceConnectionState       ICEConnectionState
 	connectionState          PeerConnectionState
 
@@ -69,8 +68,6 @@ type PeerConnection struct {
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
 	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
-	onICECandidateHandler             func(*ICECandidate)
-	onICEGatheringStateChangeHandler  func()
 
 	iceGatherer   *ICEGatherer
 	iceTransport  *ICETransport
@@ -111,7 +108,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		lastAnswer:         "",
 		signalingState:     SignalingStateStable,
 		iceConnectionState: ICEConnectionStateNew,
-		iceGatheringState:  ICEGatheringStateNew,
 		connectionState:    PeerConnectionStateNew,
 		dataChannels:       make(map[uint16]*DataChannel),
 
@@ -124,18 +120,11 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 
-	// For now we eagerly allocate and start the gatherer
 	gatherer, err := pc.createICEGatherer()
 	if err != nil {
 		return nil, err
 	}
 	pc.iceGatherer = gatherer
-
-	err = pc.gather()
-
-	if err != nil {
-		return nil, err
-	}
 
 	// Create the ice transport
 	iceTransport := pc.createICETransport()
@@ -252,57 +241,14 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
 // candidate is found.
-// BUG: trickle ICE is not supported so this event is triggered immediately when
-// SetLocalDescription is called. Typically, you only need to use this method
-// if you want API compatibility with the JavaScript/Wasm bindings.
 func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	pc.onICECandidateHandler = f
+	pc.iceGatherer.OnLocalCandidate(f)
 }
 
 // OnICEGatheringStateChange sets an event handler which is invoked when the
 // ICE candidate gathering state has changed.
-// BUG: trickle ICE is not supported so this event is triggered immediately when
-// SetLocalDescription is called. Typically, you only need to use this method
-// if you want API compatibility with the JavaScript/Wasm bindings.
-func (pc *PeerConnection) OnICEGatheringStateChange(f func()) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	pc.onICEGatheringStateChangeHandler = f
-}
-
-// signalICECandidateGatheringComplete should be called after ICE candidate
-// gathering is complete. It triggers the appropriate event handlers in order to
-// emulate a trickle ICE process.
-func (pc *PeerConnection) signalICECandidateGatheringComplete() error {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-
-	// Call onICECandidateHandler for all candidates.
-	if pc.onICECandidateHandler != nil {
-		candidates, err := pc.iceGatherer.GetLocalCandidates()
-		if err != nil {
-			return err
-		}
-		for i := range candidates {
-			go pc.onICECandidateHandler(&candidates[i])
-		}
-		// Call the handler one last time with nil. This is a signal that candidate
-		// gathering is complete.
-		go pc.onICECandidateHandler(nil)
-	}
-
-	pc.iceGatheringState = ICEGatheringStateComplete
-
-	// Also trigger the onICEGatheringStateChangeHandler
-	if pc.onICEGatheringStateChangeHandler != nil {
-		// Note: Gathering is already done at this point, but some clients might
-		// still expect the state change handler to be triggered.
-		go pc.onICEGatheringStateChangeHandler()
-	}
-
-	return nil
+func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGathererState)) {
+	pc.iceGatherer.OnStateChange(f)
 }
 
 // OnTrack sets an event handler which is called when remote track
@@ -464,6 +410,12 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, err
 	}
 
+	if !pc.iceGatherer.agentIsTrickle {
+		if err = pc.iceGatherer.Gather(); err != nil {
+			return SessionDescription{}, err
+		}
+	}
+
 	candidates, err := pc.iceGatherer.GetLocalCandidates()
 	if err != nil {
 		return SessionDescription{}, err
@@ -547,10 +499,6 @@ func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	}
 
 	return g, nil
-}
-
-func (pc *PeerConnection) gather() error {
-	return pc.iceGatherer.Gather()
 }
 
 func (pc *PeerConnection) createICETransport() *ICETransport {
@@ -639,6 +587,12 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
 		return nil, err
+	}
+
+	if !pc.iceGatherer.agentIsTrickle {
+		if err = pc.iceGatherer.Gather(); err != nil {
+			return nil, err
+		}
 	}
 
 	candidates, err := pc.iceGatherer.GetLocalCandidates()
@@ -872,8 +826,6 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		}
 	}
 
-	// TODO: Initiate ICE candidate gathering?
-
 	desc.parsed = &sdp.SessionDescription{}
 	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
 		return err
@@ -882,14 +834,10 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return err
 	}
 
-	// Call the appropriate event handlers to signal that ICE candidate gathering
-	// is complete. In reality it completed a while ago, but triggering these
-	// events helps maintain API compatibility with the JavaScript/Wasm bindings.
-	if err := pc.signalICECandidateGatheringComplete(); err != nil {
-		return err
+	if !pc.iceGatherer.agentIsTrickle {
+		return nil
 	}
-
-	return nil
+	return pc.iceGatherer.Gather()
 }
 
 // LocalDescription returns pendingLocalDescription if it is not null and
@@ -897,8 +845,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 // determine if setLocalDescription has already been called.
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-localdescription
 func (pc *PeerConnection) LocalDescription() *SessionDescription {
-	if pc.pendingLocalDescription != nil {
-		return pc.pendingLocalDescription
+	if localDescription := pc.PendingLocalDescription(); localDescription != nil {
+		return localDescription
 	}
 	return pc.currentLocalDescription
 }
@@ -911,6 +859,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 	if pc.isClosed {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	if !pc.iceGatherer.agentIsTrickle {
+		if err := pc.iceGatherer.Gather(); err != nil {
+			return err
+		}
 	}
 
 	desc.parsed = &sdp.SessionDescription{}
@@ -1729,18 +1683,8 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 	}
 
 	media = media.WithPropertyAttribute(t.Direction.String())
-	for _, c := range candidates {
-		sdpCandidate := iceCandidateToSDP(c)
-		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
-		sdpCandidate.Component = 1
-		media.WithICECandidate(sdpCandidate)
-		sdpCandidate.Component = 2
-		media.WithICECandidate(sdpCandidate)
-	}
-	if len(candidates) != 0 {
-		media.WithPropertyAttribute("end-of-candidates")
-	}
 
+	addCandidatesToMediaDescriptions(candidates, media)
 	d.WithMedia(media)
 
 	return nil
@@ -1768,16 +1712,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
-	for _, c := range candidates {
-		sdpCandidate := iceCandidateToSDP(c)
-		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
-		sdpCandidate.Component = 1
-		media.WithICECandidate(sdpCandidate)
-		sdpCandidate.Component = 2
-		media.WithICECandidate(sdpCandidate)
-	}
-	media.WithPropertyAttribute("end-of-candidates")
-
+	addCandidatesToMediaDescriptions(candidates, media)
 	d.WithMedia(media)
 }
 
@@ -1812,12 +1747,39 @@ func (pc *PeerConnection) newRTPTransceiver(
 	return t
 }
 
+func (pc *PeerConnection) populateLocalCandidates(orig *SessionDescription) *SessionDescription {
+	if orig == nil {
+		return nil
+	} else if pc.iceGatherer == nil {
+		return orig
+	}
+
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
+	if err != nil {
+		return orig
+	}
+
+	parsed := pc.pendingLocalDescription.parsed
+	for _, m := range parsed.MediaDescriptions {
+		addCandidatesToMediaDescriptions(candidates, m)
+	}
+	sdp, err := parsed.Marshal()
+	if err != nil {
+		return orig
+	}
+
+	return &SessionDescription{
+		SDP:  string(sdp),
+		Type: pc.pendingLocalDescription.Type,
+	}
+}
+
 // CurrentLocalDescription represents the local description that was
 // successfully negotiated the last time the PeerConnection transitioned
 // into the stable state plus any local candidates that have been generated
 // by the ICEAgent since the offer or answer was created.
 func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
-	return pc.currentLocalDescription
+	return pc.populateLocalCandidates(pc.currentLocalDescription)
 }
 
 // PendingLocalDescription represents a local description that is in the
@@ -1825,7 +1787,7 @@ func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 // generated by the ICEAgent since the offer or answer was created. If the
 // PeerConnection is in the stable state, the value is null.
 func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
-	return pc.pendingLocalDescription
+	return pc.populateLocalCandidates(pc.pendingLocalDescription)
 }
 
 // CurrentRemoteDescription represents the last remote description that was
@@ -1854,11 +1816,32 @@ func (pc *PeerConnection) SignalingState() SignalingState {
 // ICEGatheringState attribute returns the ICE gathering state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
-	return pc.iceGatheringState
+	switch pc.iceGatherer.State() {
+	case ICEGathererStateNew:
+		return ICEGatheringStateNew
+	case ICEGathererStateGathering:
+		return ICEGatheringStateGathering
+	default:
+		return ICEGatheringStateComplete
+	}
 }
 
 // ConnectionState attribute returns the connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	return pc.connectionState
+}
+
+func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription) {
+	for _, c := range candidates {
+		sdpCandidate := iceCandidateToSDP(c)
+		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
+		sdpCandidate.Component = 1
+		m.WithICECandidate(sdpCandidate)
+		sdpCandidate.Component = 2
+		m.WithICECandidate(sdpCandidate)
+	}
+	if len(candidates) != 0 {
+		m.WithPropertyAttribute("end-of-candidates")
+	}
 }
