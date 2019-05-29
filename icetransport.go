@@ -260,8 +260,7 @@ func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 }
 
 func (t *ICETransport) ensureGatherer() error {
-	if t.gatherer == nil ||
-		t.gatherer.agent == nil {
+	if t.gatherer == nil || t.gatherer.getAgent() == nil {
 		return errors.New("gatherer not started")
 	}
 

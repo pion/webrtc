@@ -351,7 +351,6 @@ func TestPeerConnection_PeropertyGetters(t *testing.T) {
 		currentRemoteDescription: &SessionDescription{},
 		pendingRemoteDescription: &SessionDescription{},
 		signalingState:           SignalingStateHaveLocalOffer,
-		iceGatheringState:        ICEGatheringStateGathering,
 		iceConnectionState:       ICEConnectionStateChecking,
 		connectionState:          PeerConnectionStateConnecting,
 	}
@@ -361,7 +360,6 @@ func TestPeerConnection_PeropertyGetters(t *testing.T) {
 	assert.Equal(t, pc.currentRemoteDescription, pc.CurrentRemoteDescription(), "should match")
 	assert.Equal(t, pc.pendingRemoteDescription, pc.PendingRemoteDescription(), "should match")
 	assert.Equal(t, pc.signalingState, pc.SignalingState(), "should match")
-	assert.Equal(t, pc.iceGatheringState, pc.ICEGatheringState(), "should match")
 	assert.Equal(t, pc.iceConnectionState, pc.ICEConnectionState(), "should match")
 	assert.Equal(t, pc.connectionState, pc.ConnectionState(), "should match")
 }
