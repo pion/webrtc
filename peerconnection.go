@@ -410,7 +410,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, err
 	}
 
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.iceGatherer.AgentIsTrickle() {
 		if err = pc.iceGatherer.Gather(); err != nil {
 			return SessionDescription{}, err
 		}
@@ -589,7 +589,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 		return nil, err
 	}
 
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.iceGatherer.AgentIsTrickle() {
 		if err = pc.iceGatherer.Gather(); err != nil {
 			return nil, err
 		}
@@ -834,7 +834,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return err
 	}
 
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.iceGatherer.AgentIsTrickle() {
 		return nil
 	}
 	return pc.iceGatherer.Gather()
@@ -861,7 +861,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.iceGatherer.AgentIsTrickle() {
 		if err := pc.iceGatherer.Gather(); err != nil {
 			return err
 		}
