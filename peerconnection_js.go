@@ -165,7 +165,7 @@ func (pc *PeerConnection) checkConfiguration(configuration Configuration) error 
 	if len(configuration.ICEServers) > 0 {
 		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
 		for _, server := range configuration.ICEServers {
-			if _, err := server.validate(); err != nil {
+			if err := server.Validate(); err != nil {
 				return err
 			}
 		}
