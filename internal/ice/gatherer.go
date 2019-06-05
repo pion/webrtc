@@ -117,7 +117,7 @@ func (g *Gatherer) createAgent() error {
 
 	g.agent = agent
 	g.agentIsTrickle = agentIsTrickle
-	if agentIsTrickle {
+	if !agentIsTrickle {
 		g.state = GathererStateComplete
 	}
 

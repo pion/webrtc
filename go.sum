@@ -26,8 +26,8 @@ github.com/pion/datachannel v1.4.3 h1:tqS6YiqqAiFCxGGhvn1K7fHEzemK9Aov025dE/isGF
 github.com/pion/datachannel v1.4.3/go.mod h1:SpMJbuu8v+qbA94m6lWQwSdCf8JKQvgmdSHDNtcbe+w=
 github.com/pion/dtls v1.3.5 h1:mBioifvh6JSE9pD4FtJh5WoizygoqkOJNJyS5Ns+y1U=
 github.com/pion/dtls v1.3.5/go.mod h1:CjlPLfQdsTg3G4AEXjJp8FY5bRweBlxHrgoFrN+fQsk=
-github.com/pion/ice v0.3.5 h1:gyncrIZOMKcyIphHhqOq3LpnHob/2f6a7xjmhNPpXgw=
-github.com/pion/ice v0.3.5/go.mod h1:TZS3GXqGcbLvQuTZR/emgHlqq/fT/jqycfw/ynZCoh4=
+github.com/pion/ice v0.3.6 h1:m9Yiho/16BQiTUKoiXANTxdndcHYIM5/bOdetcRyNY4=
+github.com/pion/ice v0.3.6/go.mod h1:TZS3GXqGcbLvQuTZR/emgHlqq/fT/jqycfw/ynZCoh4=
 github.com/pion/logging v0.2.1 h1:LwASkBKZ+2ysGJ+jLv1E/9H1ge0k1nTfi1X+5zirkDk=
 github.com/pion/logging v0.2.1/go.mod h1:k0/tDVsRCX2Mb2ZEmTqNa7CWsQPc+YYCB7Q+5pahoms=
 github.com/pion/quic v0.1.1 h1:D951FV+TOqI9A0rTF7tHx0Loooqz+nyzjEyj8o3PuMA=
