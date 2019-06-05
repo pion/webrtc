@@ -21,8 +21,13 @@ type SettingEngine struct {
 		DataChannels bool
 	}
 	timeout struct {
-		ICEConnection *time.Duration
-		ICEKeepalive  *time.Duration
+		ICEConnection                *time.Duration
+		ICEKeepalive                 *time.Duration
+		ICECandidateSelectionTimeout *time.Duration
+		ICEHostAcceptanceMinWait     *time.Duration
+		ICESrflxAcceptanceMinWait    *time.Duration
+		ICEPrflxAcceptanceMinWait    *time.Duration
+		ICERelayAcceptanceMinWait    *time.Duration
 	}
 	candidates struct {
 		ICENetworkTypes []NetworkType

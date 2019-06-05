@@ -22,7 +22,7 @@ func TestGatherer_Success(t *testing.T) {
 		ICEServers: []Server{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	gatherer, err := NewGatherer(0, 0, nil, nil, logging.NewDefaultLoggerFactory(), nil, opts)
+	gatherer, err := NewGatherer(0, 0, nil, nil, nil, nil, nil, nil, nil, logging.NewDefaultLoggerFactory(), nil, opts)
 	if err != nil {
 		t.Error(err)
 	}
