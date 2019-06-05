@@ -24,14 +24,19 @@ type Gatherer struct {
 	agentIsTrickle bool
 	agent          *ice.Agent
 
-	portMin           uint16
-	portMax           uint16
-	candidateTypes    []ice.CandidateType
-	connectionTimeout *time.Duration
-	keepaliveInterval *time.Duration
-	loggerFactory     logging.LoggerFactory
-	log               logging.LeveledLogger
-	networkTypes      []NetworkType
+	portMin                   uint16
+	portMax                   uint16
+	candidateTypes            []ice.CandidateType
+	connectionTimeout         *time.Duration
+	keepaliveInterval         *time.Duration
+	candidateSelectionTimeout *time.Duration
+	hostAcceptanceMinWait     *time.Duration
+	srflxAcceptanceMinWait    *time.Duration
+	prflxAcceptanceMinWait    *time.Duration
+	relayAcceptanceMinWait    *time.Duration
+	loggerFactory             logging.LoggerFactory
+	log                       logging.LeveledLogger
+	networkTypes              []NetworkType
 
 	onLocalCandidateHdlr func(candidate *Candidate)
 	onStateChangeHdlr    func(state GathererState)
@@ -41,8 +46,13 @@ type Gatherer struct {
 func NewGatherer(
 	portMin uint16,
 	portMax uint16,
-	connectionTimeout *time.Duration,
-	keepaliveInterval *time.Duration,
+	connectionTimeout,
+	keepaliveInterval,
+	candidateSelectionTimeout,
+	hostAcceptanceMinWait,
+	srflxAcceptanceMinWait,
+	prflxAcceptanceMinWait,
+	relayAcceptanceMinWait *time.Duration,
 	loggerFactory logging.LoggerFactory,
 	networkTypes []NetworkType,
 	opts GatherOptions,
@@ -64,16 +74,21 @@ func NewGatherer(
 	}
 
 	return &Gatherer{
-		state:             GathererStateNew,
-		validatedServers:  validatedServers,
-		portMin:           portMin,
-		portMax:           portMax,
-		connectionTimeout: connectionTimeout,
-		keepaliveInterval: keepaliveInterval,
-		loggerFactory:     loggerFactory,
-		log:               loggerFactory.NewLogger("ice"),
-		networkTypes:      networkTypes,
-		candidateTypes:    candidateTypes,
+		state:                     GathererStateNew,
+		validatedServers:          validatedServers,
+		portMin:                   portMin,
+		portMax:                   portMax,
+		connectionTimeout:         connectionTimeout,
+		keepaliveInterval:         keepaliveInterval,
+		loggerFactory:             loggerFactory,
+		log:                       loggerFactory.NewLogger("ice"),
+		networkTypes:              networkTypes,
+		candidateTypes:            candidateTypes,
+		candidateSelectionTimeout: candidateSelectionTimeout,
+		hostAcceptanceMinWait:     hostAcceptanceMinWait,
+		srflxAcceptanceMinWait:    srflxAcceptanceMinWait,
+		prflxAcceptanceMinWait:    prflxAcceptanceMinWait,
+		relayAcceptanceMinWait:    relayAcceptanceMinWait,
 	}, nil
 }
 
@@ -91,14 +106,19 @@ func (g *Gatherer) createAgent() error {
 	}
 
 	config := &ice.AgentConfig{
-		Trickle:           agentIsTrickle,
-		Urls:              g.validatedServers,
-		PortMin:           g.portMin,
-		PortMax:           g.portMax,
-		ConnectionTimeout: g.connectionTimeout,
-		KeepaliveInterval: g.keepaliveInterval,
-		LoggerFactory:     g.loggerFactory,
-		CandidateTypes:    g.candidateTypes,
+		Trickle:                   agentIsTrickle,
+		Urls:                      g.validatedServers,
+		PortMin:                   g.portMin,
+		PortMax:                   g.portMax,
+		ConnectionTimeout:         g.connectionTimeout,
+		KeepaliveInterval:         g.keepaliveInterval,
+		LoggerFactory:             g.loggerFactory,
+		CandidateTypes:            g.candidateTypes,
+		CandidateSelectionTimeout: g.candidateSelectionTimeout,
+		HostAcceptanceMinWait:     g.hostAcceptanceMinWait,
+		SrflxAcceptanceMinWait:    g.srflxAcceptanceMinWait,
+		PrflxAcceptanceMinWait:    g.prflxAcceptanceMinWait,
+		RelayAcceptanceMinWait:    g.relayAcceptanceMinWait,
 	}
 
 	requestedNetworkTypes := g.networkTypes
