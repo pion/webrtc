@@ -1,10 +1,10 @@
 package webrtc
 
 import (
-	"github.com/pion/webrtc/v2/internal/ice"
+	"github.com/pion/webrtc/v2/pkg/ice"
 )
 
-//go:generate go run internal/tools/gen/genaliasdocs.go -pkg "./internal/ice" $GOFILE
+//go:generate go run internal/tools/gen/genaliasdocs.go -pkg "./pkg/ice" $GOFILE
 
 const (
 
