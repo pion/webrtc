@@ -42,7 +42,7 @@ script:
   - rm -rf internal/tools # Remove tools, no test coverage for them
   - go test -tags quic -coverpkg=$(go list ./... | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
   - GOOS=js GOARCH=wasm go test -exec="${PWD}/test-wasm/go_js_wasm_exec" -v .
-  - GOOS=js GOARCH=wasm go test -exec="${PWD}/test-wasm/go_js_wasm_exec" -v ./pkg/ice
+  - GOOS=js GOARCH=wasm go test -exec="${PWD}/test-wasm/go_js_wasm_exec" -v ./internal/ice
   - bash <(curl -s https://codecov.io/bash)
   - bash .github/assert-contributors.sh
   - bash .github/lint-disallowed-functions-in-library.sh

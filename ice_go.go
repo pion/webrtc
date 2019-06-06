@@ -4,10 +4,10 @@ package webrtc
 
 import (
 	"github.com/pion/sdp/v2"
-	"github.com/pion/webrtc/v2/pkg/ice"
+	"github.com/pion/webrtc/v2/internal/ice"
 )
 
-//go:generate go run internal/tools/gen/genaliasdocs.go -pkg "./pkg/ice" -build-tags "!js" $GOFILE
+//go:generate go run internal/tools/gen/genaliasdocs.go -pkg "./internal/ice" -build-tags "!js" $GOFILE
 
 type (
 
@@ -24,7 +24,7 @@ type (
 
 var (
 
-	// NewICEGatherer creates a new Gatherer.
+	// NewICEGatherer creates a new NewICEGatherer.
 	NewICEGatherer = ice.NewGatherer
 
 	// NewICETransport creates a new NewICETransport.
