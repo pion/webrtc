@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"github.com/pion/sdp/v2"
+
 	"github.com/pion/webrtc/v2/internal/ice"
 )
 
@@ -46,6 +47,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		api.settingEngine.timeout.ICEPrflxAcceptanceMinWait,
 		api.settingEngine.timeout.ICERelayAcceptanceMinWait,
 		api.settingEngine.LoggerFactory,
+		api.settingEngine.candidates.ICETrickle,
 		api.settingEngine.candidates.ICENetworkTypes,
 		opts,
 	)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pion/ice"
 	"github.com/pion/logging"
+
 	"github.com/pion/webrtc/v2/internal/mux"
 )
 
@@ -260,8 +261,13 @@ func (t *Transport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 }
 
 func (t *Transport) ensureGatherer() error {
-	if t.gatherer == nil || t.gatherer.getAgent() == nil {
+	if t.gatherer == nil {
 		return errors.New("gatherer not started")
+	} else if t.gatherer.getAgent() == nil && t.gatherer.AgentIsTrickle() {
+		// Special case for trickle=true. (issue-707)
+		if err := t.gatherer.createAgent(); err != nil {
+			return err
+		}
 	}
 
 	return nil

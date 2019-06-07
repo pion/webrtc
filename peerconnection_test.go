@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/webrtc/v2/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer)

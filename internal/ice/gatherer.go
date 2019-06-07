@@ -3,7 +3,6 @@
 package ice
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -54,6 +53,7 @@ func NewGatherer(
 	prflxAcceptanceMinWait,
 	relayAcceptanceMinWait *time.Duration,
 	loggerFactory logging.LoggerFactory,
+	agentIsTrickle bool,
 	networkTypes []NetworkType,
 	opts GatherOptions,
 ) (*Gatherer, error) {
@@ -68,7 +68,7 @@ func NewGatherer(
 		}
 	}
 
-	candidateTypes := []ice.CandidateType{}
+	candidateTypes := make([]ice.CandidateType, 0)
 	if opts.ICEGatherPolicy == TransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
@@ -82,6 +82,7 @@ func NewGatherer(
 		keepaliveInterval:         keepaliveInterval,
 		loggerFactory:             loggerFactory,
 		log:                       loggerFactory.NewLogger("ice"),
+		agentIsTrickle:            agentIsTrickle,
 		networkTypes:              networkTypes,
 		candidateTypes:            candidateTypes,
 		candidateSelectionTimeout: candidateSelectionTimeout,
@@ -95,18 +96,13 @@ func NewGatherer(
 func (g *Gatherer) createAgent() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	agentIsTrickle := g.onLocalCandidateHdlr != nil || g.onStateChangeHdlr != nil
 
 	if g.agent != nil {
-		if !g.agentIsTrickle && agentIsTrickle {
-			return errors.New("ICEAgent created without OnCandidate or StateChange handler, but now has one set")
-		}
-
 		return nil
 	}
 
 	config := &ice.AgentConfig{
-		Trickle:                   agentIsTrickle,
+		Trickle:                   g.agentIsTrickle,
 		Urls:                      g.validatedServers,
 		PortMin:                   g.portMin,
 		PortMax:                   g.portMax,
@@ -136,8 +132,7 @@ func (g *Gatherer) createAgent() error {
 	}
 
 	g.agent = agent
-	g.agentIsTrickle = agentIsTrickle
-	if !agentIsTrickle {
+	if !g.agentIsTrickle {
 		g.state = GathererStateComplete
 	}
 
@@ -260,6 +255,29 @@ func (g *Gatherer) getAgent() *ice.Agent {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	return g.agent
+}
+
+// SignalCandidates imitates gathering process to backward support old tricle
+// false behavior.
+func (g *Gatherer) SignalCandidates() error {
+	candidates, err := g.GetLocalCandidates()
+	if err != nil {
+		return err
+	}
+
+	g.lock.Lock()
+	onLocalCandidateHdlr := g.onLocalCandidateHdlr
+	g.lock.Unlock()
+
+	if onLocalCandidateHdlr != nil {
+		for i := range candidates {
+			go onLocalCandidateHdlr(&candidates[i])
+		}
+		// Call the handler one last time with nil. This is a signal that candidate
+		// gathering is complete.
+		go onLocalCandidateHdlr(nil)
+	}
+	return nil
 }
 
 // AgentIsTrickle returns true if agent is in trickle mode.
