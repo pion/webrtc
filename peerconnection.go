@@ -7,12 +7,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	mathRand "math/rand"
-	"regexp"
-
 	"fmt"
 	"io"
+	mathRand "math/rand"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
+
 	"github.com/pion/webrtc/v2/internal/util"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
@@ -120,11 +120,16 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 
-	gatherer, err := pc.createICEGatherer()
+	pc.iceGatherer, err = pc.createICEGatherer()
 	if err != nil {
 		return nil, err
 	}
-	pc.iceGatherer = gatherer
+
+	if !pc.iceGatherer.AgentIsTrickle() {
+		if err = pc.iceGatherer.Gather(); err != nil {
+			return nil, err
+		}
+	}
 
 	// Create the ice transport
 	iceTransport := pc.createICETransport()
@@ -410,12 +415,6 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, err
 	}
 
-	if !pc.iceGatherer.AgentIsTrickle() {
-		if err = pc.iceGatherer.Gather(); err != nil {
-			return SessionDescription{}, err
-		}
-	}
-
 	candidates, err := pc.iceGatherer.GetLocalCandidates()
 	if err != nil {
 		return SessionDescription{}, err
@@ -429,8 +428,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 
 	if pc.configuration.SDPSemantics == SDPSemanticsPlanB {
-		video := []*RTPTransceiver{}
-		audio := []*RTPTransceiver{}
+		video := make([]*RTPTransceiver, 0)
+		audio := make([]*RTPTransceiver, 0)
 		for _, t := range pc.GetTransceivers() {
 			switch t.kind {
 			case RTPCodecTypeVideo:
@@ -475,14 +474,14 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		m.WithPropertyAttribute("setup:actpass")
 	}
 
-	sdp, err := d.Marshal()
+	sdpBytes, err := d.Marshal()
 	if err != nil {
 		return SessionDescription{}, err
 	}
 
 	desc := SessionDescription{
 		Type:   SDPTypeOffer,
-		SDP:    string(sdp),
+		SDP:    string(sdpBytes),
 		parsed: d,
 	}
 	pc.lastOffer = desc.SDP
@@ -589,12 +588,6 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 		return nil, err
 	}
 
-	if !pc.iceGatherer.AgentIsTrickle() {
-		if err = pc.iceGatherer.Gather(); err != nil {
-			return nil, err
-		}
-	}
-
 	candidates, err := pc.iceGatherer.GetLocalCandidates()
 	if err != nil {
 		return nil, err
@@ -693,14 +686,14 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, err
 	}
 
-	sdp, err := d.Marshal()
+	sdpBytes, err := d.Marshal()
 	if err != nil {
 		return SessionDescription{}, err
 	}
 
 	desc := SessionDescription{
 		Type:   SDPTypeAnswer,
-		SDP:    string(sdp),
+		SDP:    string(sdpBytes),
 		parsed: d,
 	}
 	pc.lastAnswer = desc.SDP
@@ -835,6 +828,13 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	if !pc.iceGatherer.AgentIsTrickle() {
+		// To support all unittests which are following the future trickle=true
+		// setup while also support the old trickle=false synchronous gathering
+		// process this is necessary to avoid calling Garther() in multiple
+		// pleces; which causes race conditions. (issue-707)
+		if err := pc.iceGatherer.SignalCandidates(); err != nil {
+			return err
+		}
 		return nil
 	}
 	return pc.iceGatherer.Gather()
@@ -859,12 +859,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 	if pc.isClosed {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	}
-
-	if !pc.iceGatherer.AgentIsTrickle() {
-		if err := pc.iceGatherer.Gather(); err != nil {
-			return err
-		}
 	}
 
 	desc.parsed = &sdp.SessionDescription{}

@@ -30,6 +30,7 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait    *time.Duration
 	}
 	candidates struct {
+		ICETrickle      bool
 		ICENetworkTypes []NetworkType
 	}
 	LoggerFactory logging.LoggerFactory
@@ -60,6 +61,12 @@ func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 	e.ephemeralUDP.PortMin = portMin
 	e.ephemeralUDP.PortMax = portMax
 	return nil
+}
+
+// SetTrickle configures whether or not the ice agent should gather candidates
+// via the trickle method or synchronously.
+func (e *SettingEngine) SetTrickle(trickle bool) {
+	e.candidates.ICETrickle = trickle
 }
 
 // SetNetworkTypes configures what types of candidate networks are supported
