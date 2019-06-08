@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pion/ice"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/srtp"
@@ -149,11 +148,7 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 			return 0, err
 		}
 
-		n, err := writeStream.WriteRTP(header, payload)
-		if err == ice.ErrNoCandidatePairs {
-			err = nil
-		}
-		return n, err
+		return writeStream.WriteRTP(header, payload)
 	}
 }
 
