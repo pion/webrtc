@@ -50,6 +50,31 @@ func (e *SettingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.D
 	e.timeout.ICEKeepalive = &keepAlive
 }
 
+// SetCandidateSelectionTimeout sets the max ICECandidateSelectionTimeout
+func (e *SettingEngine) SetCandidateSelectionTimeout(t time.Duration) {
+	e.timeout.ICECandidateSelectionTimeout = &t
+}
+
+// SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait
+func (e *SettingEngine) SetHostAcceptanceMinWait(t time.Duration) {
+	e.timeout.ICEHostAcceptanceMinWait = &t
+}
+
+// SetSrflxAcceptanceMinWait sets the ICESrflxAcceptanceMinWait
+func (e *SettingEngine) SetSrflxAcceptanceMinWait(t time.Duration) {
+	e.timeout.ICESrflxAcceptanceMinWait = &t
+}
+
+// SetPrflxAcceptanceMinWait sets the ICEPrflxAcceptanceMinWait
+func (e *SettingEngine) SetPrflxAcceptanceMinWait(t time.Duration) {
+	e.timeout.ICEPrflxAcceptanceMinWait = &t
+}
+
+// SetRelayAcceptanceMinWait sets the ICERelayAcceptanceMinWait
+func (e *SettingEngine) SetRelayAcceptanceMinWait(t time.Duration) {
+	e.timeout.ICERelayAcceptanceMinWait = &t
+}
+
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
 // ICE UDP connections can allocate from. This affects both host candidates,
 // and the local address of server reflexive candidates.
