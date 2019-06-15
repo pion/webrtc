@@ -124,7 +124,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 
-	if !pc.iceGatherer.AgentIsTrickle() {
+	if !pc.iceGatherer.agentIsTrickle {
 		if err = pc.iceGatherer.Gather(); err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 
 	if len(configuration.ICEServers) > 0 {
 		for _, server := range configuration.ICEServers {
-			if err := server.Validate(); err != nil {
+			if err := server.validate(); err != nil {
 				return err
 			}
 		}
@@ -374,7 +374,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error {
 	if len(configuration.ICEServers) > 0 {
 		// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3)
 		for _, server := range configuration.ICEServers {
-			if err := server.Validate(); err != nil {
+			if err := server.validate(); err != nil {
 				return err
 			}
 		}
@@ -826,7 +826,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return err
 	}
 
-	if !pc.iceGatherer.AgentIsTrickle() {
+	if !pc.iceGatherer.agentIsTrickle {
 		// To support all unittests which are following the future trickle=true
 		// setup while also support the old trickle=false synchronous gathering
 		// process this is necessary to avoid calling Garther() in multiple

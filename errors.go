@@ -19,6 +19,14 @@ var (
 	// ErrCertificateExpired indicates that an x509 certificate has expired.
 	ErrCertificateExpired = errors.New("x509Cert expired")
 
+	// ErrNoTurnCredencials indicates that a TURN server URL was provided
+	// without required credentials.
+	ErrNoTurnCredencials = errors.New("turn server credentials required")
+
+	// ErrTurnCredencials indicates that provided TURN credentials are partial
+	// or malformed.
+	ErrTurnCredencials = errors.New("invalid turn server credentials")
+
 	// ErrExistingTrack indicates that a track already exists.
 	ErrExistingTrack = errors.New("track already exists")
 
