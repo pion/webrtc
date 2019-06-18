@@ -1102,6 +1102,11 @@ func (pc *PeerConnection) openSRTP() {
 		pc.mu.RLock()
 		defer pc.mu.RUnlock()
 
+		if pc.currentLocalDescription == nil {
+			pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
+			return
+		}
+
 		sdpCodec, err := pc.currentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
 		if err != nil {
 			pc.log.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
