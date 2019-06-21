@@ -1,9 +1,7 @@
 package webrtc
 
 import (
-	"errors"
 	"fmt"
-	"net"
 
 	"github.com/pion/ice"
 )
@@ -12,7 +10,7 @@ import (
 type ICECandidate struct {
 	Foundation     string           `json:"foundation"`
 	Priority       uint32           `json:"priority"`
-	IP             string           `json:"ip"`
+	Address        string           `json:"address"`
 	Protocol       ICEProtocol      `json:"protocol"`
 	Port           uint16           `json:"port"`
 	Typ            ICECandidateType `json:"type"`
@@ -50,7 +48,7 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 	c := ICECandidate{
 		Foundation: "foundation",
 		Priority:   i.Priority(),
-		IP:         i.IP().String(),
+		Address:    i.Address(),
 		Protocol:   protocol,
 		Port:       uint16(i.Port()),
 		Component:  i.Component(),
@@ -66,22 +64,17 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 }
 
 func (c ICECandidate) toICE() (ice.Candidate, error) {
-	ip := net.ParseIP(c.IP)
-	if ip == nil {
-		return nil, errors.New("failed to parse IP address")
-	}
-
 	switch c.Typ {
 	case ICECandidateTypeHost:
-		return ice.NewCandidateHost(c.Protocol.String(), ip, int(c.Port), c.Component)
+		return ice.NewCandidateHost(c.Protocol.String(), c.Address, int(c.Port), c.Component)
 	case ICECandidateTypeSrflx:
-		return ice.NewCandidateServerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
+		return ice.NewCandidateServerReflexive(c.Protocol.String(), c.Address, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	case ICECandidateTypePrflx:
-		return ice.NewCandidatePeerReflexive(c.Protocol.String(), ip, int(c.Port), c.Component,
+		return ice.NewCandidatePeerReflexive(c.Protocol.String(), c.Address, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	case ICECandidateTypeRelay:
-		return ice.NewCandidateRelay(c.Protocol.String(), ip, int(c.Port), c.Component,
+		return ice.NewCandidateRelay(c.Protocol.String(), c.Address, int(c.Port), c.Component,
 			c.RelatedAddress, int(c.RelatedPort))
 	default:
 		return nil, fmt.Errorf("unknown candidate type: %s", c.Typ)

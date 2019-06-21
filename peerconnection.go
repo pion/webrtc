@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	mathRand "math/rand"
-	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1694,7 +1693,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 			NetworkType: "IN",
 			AddressType: "IP4",
 			Address: &sdp.Address{
-				IP: net.ParseIP("0.0.0.0"),
+				Address: "0.0.0.0",
 			},
 		},
 	}).
