@@ -1,7 +1,6 @@
 package webrtc
 
 import (
-	"net"
 	"testing"
 
 	"github.com/pion/ice"
@@ -14,7 +13,7 @@ func TestICECandidate_Convert(t *testing.T) {
 
 		expectedType           ice.CandidateType
 		expectedNetwork        string
-		expectedIP             net.IP
+		expectedAddress        string
 		expectedPort           int
 		expectedComponent      uint16
 		expectedRelatedAddress *ice.CandidateRelatedAddress
@@ -23,7 +22,7 @@ func TestICECandidate_Convert(t *testing.T) {
 			ICECandidate{
 				Foundation: "foundation",
 				Priority:   128,
-				IP:         "1.0.0.1",
+				Address:    "1.0.0.1",
 				Protocol:   ICEProtocolUDP,
 				Port:       1234,
 				Typ:        ICECandidateTypeHost,
@@ -32,7 +31,7 @@ func TestICECandidate_Convert(t *testing.T) {
 
 			ice.CandidateTypeHost,
 			"udp",
-			net.ParseIP("1.0.0.1"),
+			"1.0.0.1",
 			1234,
 			1,
 			nil,
@@ -41,7 +40,7 @@ func TestICECandidate_Convert(t *testing.T) {
 			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       ICEProtocolUDP,
 				Port:           1234,
 				Typ:            ICECandidateTypeSrflx,
@@ -52,7 +51,7 @@ func TestICECandidate_Convert(t *testing.T) {
 
 			ice.CandidateTypeServerReflexive,
 			"udp",
-			net.ParseIP("::1"),
+			"::1",
 			1234,
 			1,
 			&ice.CandidateRelatedAddress{
@@ -64,7 +63,7 @@ func TestICECandidate_Convert(t *testing.T) {
 			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       ICEProtocolUDP,
 				Port:           1234,
 				Typ:            ICECandidateTypePrflx,
@@ -75,7 +74,7 @@ func TestICECandidate_Convert(t *testing.T) {
 
 			ice.CandidateTypePeerReflexive,
 			"udp",
-			net.ParseIP("::1"),
+			"::1",
 			1234,
 			1,
 			&ice.CandidateRelatedAddress{
@@ -93,12 +92,12 @@ func TestICECandidate_Convert(t *testing.T) {
 
 		switch testCase.expectedType {
 		case ice.CandidateTypeHost:
-			expectedICE, err = ice.NewCandidateHost(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent)
+			expectedICE, err = ice.NewCandidateHost(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent)
 		case ice.CandidateTypeServerReflexive:
-			expectedICE, err = ice.NewCandidateServerReflexive(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent,
+			expectedICE, err = ice.NewCandidateServerReflexive(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent,
 				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
 		case ice.CandidateTypePeerReflexive:
-			expectedICE, err = ice.NewCandidatePeerReflexive(testCase.expectedNetwork, testCase.expectedIP, testCase.expectedPort, testCase.expectedComponent,
+			expectedICE, err = ice.NewCandidatePeerReflexive(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent,
 				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
 		}
 

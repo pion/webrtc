@@ -548,7 +548,7 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 	return &ICECandidate{
 		Foundation:     val.Get("foundation").String(),
 		Priority:       valueToUint32OrZero(val.Get("priority")),
-		IP:             val.Get("ip").String(),
+		Address:        val.Get("address").String(),
 		Protocol:       protocol,
 		Port:           valueToUint16OrZero(val.Get("port")),
 		Typ:            candidateType,

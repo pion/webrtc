@@ -19,7 +19,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			ICECandidate{
 				Foundation: "foundation",
 				Priority:   128,
-				IP:         "1.0.0.1",
+				Address:    "1.0.0.1",
 				Protocol:   ICEProtocolUDP,
 				Port:       1234,
 				Typ:        ICECandidateTypeHost,
@@ -29,7 +29,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			sdp.ICECandidate{
 				Foundation: "foundation",
 				Priority:   128,
-				IP:         "1.0.0.1",
+				Address:    "1.0.0.1",
 				Protocol:   "udp",
 				Port:       1234,
 				Typ:        "host",
@@ -40,7 +40,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       ICEProtocolUDP,
 				Port:           1234,
 				Typ:            ICECandidateTypeSrflx,
@@ -52,7 +52,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			sdp.ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       "udp",
 				Port:           1234,
 				Typ:            "srflx",
@@ -65,7 +65,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       ICEProtocolUDP,
 				Port:           1234,
 				Typ:            ICECandidateTypePrflx,
@@ -77,7 +77,7 @@ func TestICECandidateToSDP(t *testing.T) {
 			sdp.ICECandidate{
 				Foundation:     "foundation",
 				Priority:       128,
-				IP:             "::1",
+				Address:        "::1",
 				Protocol:       "udp",
 				Port:           1234,
 				Typ:            "prflx",

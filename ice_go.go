@@ -44,7 +44,7 @@ func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
 	return ICECandidate{
 		Foundation:     c.Foundation,
 		Priority:       c.Priority,
-		IP:             c.IP,
+		Address:        c.Address,
 		Protocol:       protocol,
 		Port:           c.Port,
 		Component:      c.Component,
@@ -58,7 +58,7 @@ func iceCandidateToSDP(c ICECandidate) sdp.ICECandidate {
 	return sdp.ICECandidate{
 		Foundation:     c.Foundation,
 		Priority:       c.Priority,
-		IP:             c.IP,
+		Address:        c.Address,
 		Protocol:       c.Protocol.String(),
 		Port:           c.Port,
 		Component:      c.Component,
