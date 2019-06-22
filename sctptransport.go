@@ -36,8 +36,9 @@ type SCTPTransport struct {
 
 	// OnStateChange  func()
 
-	association          *sctp.Association
-	onDataChannelHandler func(*DataChannel)
+	association                *sctp.Association
+	onDataChannelHandler       func(*DataChannel)
+	onDataChannelOpenedHandler func(*DataChannel)
 
 	api *API
 	log logging.LeveledLogger
@@ -189,6 +190,14 @@ func (r *SCTPTransport) acceptDataChannels() {
 
 		<-r.onDataChannel(rtcDC)
 		rtcDC.handleOpen(dc)
+
+		r.lock.Lock()
+		dcOpenedHdlr := r.onDataChannelOpenedHandler
+		r.lock.Unlock()
+
+		if dcOpenedHdlr != nil {
+			dcOpenedHdlr(rtcDC)
+		}
 	}
 }
 
@@ -198,6 +207,14 @@ func (r *SCTPTransport) OnDataChannel(f func(*DataChannel)) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.onDataChannelHandler = f
+}
+
+// OnDataChannelOpened sets an event handler which is invoked when a data
+// channel is opened
+func (r *SCTPTransport) OnDataChannelOpened(f func(*DataChannel)) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.onDataChannelOpenedHandler = f
 }
 
 func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {

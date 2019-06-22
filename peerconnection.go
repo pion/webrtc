@@ -32,7 +32,8 @@ const (
 // peer-to-peer communications with another PeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
 type PeerConnection struct {
-	mu sync.RWMutex
+	statsID string
+	mu      sync.RWMutex
 
 	configuration Configuration
 
@@ -55,7 +56,10 @@ type PeerConnection struct {
 	rtpTransceivers []*RTPTransceiver
 
 	// DataChannels
-	dataChannels map[uint16]*DataChannel
+	dataChannels          map[uint16]*DataChannel
+	dataChannelsOpened    uint32
+	dataChannelsRequested uint32
+	dataChannelsAccepted  uint32
 
 	// OnNegotiationNeeded        func() // FIXME NOT-USED
 	// OnICECandidateError        func() // FIXME NOT-USED
@@ -92,6 +96,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
 	pc := &PeerConnection{
+		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
 		configuration: Configuration{
 			ICEServers:           []ICEServer{},
 			ICETransportPolicy:   ICETransportPolicyAll,
@@ -389,6 +394,12 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error {
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-getconfiguration
 func (pc *PeerConnection) GetConfiguration() Configuration {
 	return pc.configuration
+}
+
+func (pc *PeerConnection) getStatsID() string {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+	return pc.statsID
 }
 
 // CreateOffer starts the PeerConnection and generates the localDescription
@@ -923,10 +934,19 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	sctp.OnDataChannel(func(d *DataChannel) {
 		pc.mu.RLock()
 		hdlr := pc.onDataChannelHandler
+		pc.dataChannels[*d.ID()] = d
+		pc.dataChannelsAccepted++
 		pc.mu.RUnlock()
 		if hdlr != nil {
 			hdlr(d)
 		}
+	})
+
+	// Wire up the on datachannel opened handler
+	sctp.OnDataChannelOpened(func(d *DataChannel) {
+		pc.mu.RLock()
+		pc.dataChannelsOpened++
+		pc.mu.RUnlock()
 	})
 
 	go func() {
@@ -996,29 +1016,30 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		}
 
 		// Open data channels that where created before signaling
-		pc.openDataChannels()
+		pc.mu.Lock()
+		// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
+		dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
+		for k, v := range pc.dataChannels {
+			dataChannels[k] = v
+		}
+		pc.mu.Unlock()
+
+		var openedDCCount uint32
+		for _, d := range dataChannels {
+			err := d.open(pc.sctpTransport)
+			if err != nil {
+				pc.log.Warnf("failed to open data channel: %s", err)
+				continue
+			}
+			openedDCCount++
+		}
+
+		pc.mu.Lock()
+		pc.dataChannelsOpened += openedDCCount
+		pc.mu.Unlock()
 	}()
 
 	return nil
-}
-
-// openDataChannels opens the existing data channels
-func (pc *PeerConnection) openDataChannels() {
-	pc.mu.Lock()
-	// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
-	dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
-	for k, v := range pc.dataChannels {
-		dataChannels[k] = v
-	}
-	pc.mu.Unlock()
-
-	for _, d := range dataChannels {
-		err := d.open(pc.sctpTransport)
-		if err != nil {
-			pc.log.Warnf("failed to open data channel: %s", err)
-			continue
-		}
-	}
 }
 
 func (pc *PeerConnection) descriptionIsPlanB(desc *SessionDescription) bool {
@@ -1491,6 +1512,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 
 	sctpReady := pc.sctpTransport != nil && pc.sctpTransport.association != nil
 
+	pc.dataChannelsRequested++
 	pc.mu.Unlock()
 
 	// Open if networking already started
@@ -1822,6 +1844,40 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	return pc.connectionState
+}
+
+// GetStats return data providing statistics about the overall connection
+func (pc *PeerConnection) GetStats() StatsReport {
+	statsCollector := newStatsReportCollector()
+	statsCollector.Collecting()
+
+	pc.mu.Lock()
+	var dataChannelsClosed uint32
+	for _, d := range pc.dataChannels {
+		state := d.ReadyState()
+
+		if state != DataChannelStateConnecting && state != DataChannelStateOpen {
+			dataChannelsClosed++
+		}
+
+		d.collectStats(statsCollector)
+	}
+
+	pc.iceGatherer.collectStats(statsCollector)
+
+	stats := PeerConnectionStats{
+		Timestamp:             statsTimestampNow(),
+		Type:                  StatsTypePeerConnection,
+		ID:                    pc.statsID,
+		DataChannelsOpened:    pc.dataChannelsOpened,
+		DataChannelsClosed:    dataChannelsClosed,
+		DataChannelsRequested: pc.dataChannelsRequested,
+		DataChannelsAccepted:  pc.dataChannelsAccepted,
+	}
+	pc.mu.Unlock()
+
+	statsCollector.Collect(stats.ID, stats)
+	return statsCollector.Ready()
 }
 
 func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription) {

@@ -2,6 +2,8 @@ package webrtc
 
 import (
 	"fmt"
+
+	"github.com/pion/ice"
 )
 
 var supportedNetworkTypes = []NetworkType{
@@ -51,6 +53,22 @@ func (t NetworkType) String() string {
 	}
 }
 
+// Protocol returns udp or tcp
+func (t NetworkType) Protocol() string {
+	switch t {
+	case NetworkTypeUDP4:
+		return "udp"
+	case NetworkTypeUDP6:
+		return "udp"
+	case NetworkTypeTCP4:
+		return "tcp"
+	case NetworkTypeTCP6:
+		return "tcp"
+	default:
+		return ErrUnknownType.Error()
+	}
+}
+
 func newNetworkType(raw string) (NetworkType, error) {
 	switch raw {
 	case networkTypeUDP4Str:
@@ -63,5 +81,20 @@ func newNetworkType(raw string) (NetworkType, error) {
 		return NetworkTypeTCP6, nil
 	default:
 		return NetworkType(Unknown), fmt.Errorf("unknown network type: %s", raw)
+	}
+}
+
+func getNetworkType(iceNetworkType ice.NetworkType) (NetworkType, error) {
+	switch iceNetworkType {
+	case ice.NetworkTypeUDP4:
+		return NetworkTypeUDP4, nil
+	case ice.NetworkTypeUDP6:
+		return NetworkTypeUDP6, nil
+	case ice.NetworkTypeTCP4:
+		return NetworkTypeTCP4, nil
+	case ice.NetworkTypeTCP6:
+		return NetworkTypeTCP6, nil
+	default:
+		return NetworkType(Unknown), fmt.Errorf("unknown network type: %s", iceNetworkType.String())
 	}
 }

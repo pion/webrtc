@@ -1,7 +1,11 @@
 package webrtc
 
 import (
+	"fmt"
+	"sync"
 	"time"
+
+	"github.com/pion/ice"
 )
 
 // A Stats object contains a set of statistics copies out of a monitored component
@@ -76,8 +80,49 @@ func (s StatsTimestamp) Time() time.Time {
 	return time.Unix(0, nanos).UTC()
 }
 
+func statsTimestampFrom(t time.Time) StatsTimestamp {
+	return StatsTimestamp(t.UnixNano() / int64(time.Millisecond))
+}
+
+func statsTimestampNow() StatsTimestamp {
+	return statsTimestampFrom(time.Now())
+}
+
 // StatsReport collects Stats objects indexed by their ID.
 type StatsReport map[string]Stats
+
+type statsReportCollector struct {
+	collectingGroup sync.WaitGroup
+	report          StatsReport
+	mux             sync.Mutex
+}
+
+func newStatsReportCollector() *statsReportCollector {
+	return &statsReportCollector{report: make(StatsReport)}
+}
+
+func (src *statsReportCollector) Collecting() {
+	src.collectingGroup.Add(1)
+}
+
+func (src *statsReportCollector) Collect(id string, stats Stats) {
+	src.mux.Lock()
+	defer src.mux.Unlock()
+
+	src.report[id] = stats
+	src.collectingGroup.Done()
+}
+
+func (src *statsReportCollector) Done() {
+	src.collectingGroup.Done()
+}
+
+func (src *statsReportCollector) Ready() StatsReport {
+	src.collectingGroup.Wait()
+	src.mux.Lock()
+	defer src.mux.Unlock()
+	return src.report
+}
 
 // CodecType specifies whether a CodecStats objects represents a media format
 // that is being encoded or decoded
@@ -1137,6 +1182,25 @@ type TransportStats struct {
 // StatsICECandidatePairState is the state of an ICE candidate pair used in the
 // ICECandidatePairStats object.
 type StatsICECandidatePairState string
+
+func toStatsICECandidatePairState(state ice.CandidatePairState) (StatsICECandidatePairState, error) {
+	switch state {
+	case ice.CandidatePairStateWaiting:
+		return StatsICECandidatePairStateWaiting, nil
+	case ice.CandidatePairStateInProgress:
+		return StatsICECandidatePairStateInProgress, nil
+	case ice.CandidatePairStateFailed:
+		return StatsICECandidatePairStateFailed, nil
+	case ice.CandidatePairStateSucceeded:
+		return StatsICECandidatePairStateSucceeded, nil
+	default:
+		// NOTE: this should never happen[tm]
+		err := fmt.Errorf(
+			"cannot convert to StatsICECandidatePairStateSucceeded invalid ice candidate state: %s",
+			state.String())
+		return StatsICECandidatePairState(Unknown), err
+	}
+}
 
 const (
 	// StatsICECandidatePairStateFrozen means a check for this pair hasn't been

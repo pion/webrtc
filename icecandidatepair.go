@@ -2,13 +2,16 @@ package webrtc
 
 import "fmt"
 
-type (
-	// ICECandidatePair represents an ICE Candidate pair
-	ICECandidatePair struct {
-		Local  *ICECandidate
-		Remote *ICECandidate
-	}
-)
+// ICECandidatePair represents an ICE Candidate pair
+type ICECandidatePair struct {
+	statsID string
+	Local   *ICECandidate
+	Remote  *ICECandidate
+}
+
+func newICECandidatePairStatsID(localID, remoteID string) string {
+	return fmt.Sprintf("%s-%s", localID, remoteID)
+}
 
 func (p *ICECandidatePair) String() string {
 	return fmt.Sprintf("(local) %s <-> (remote) %s", p.Local, p.Remote)
@@ -17,8 +20,10 @@ func (p *ICECandidatePair) String() string {
 // NewICECandidatePair returns an initialized *ICECandidatePair
 // for the given pair of ICECandidate instances
 func NewICECandidatePair(local, remote *ICECandidate) *ICECandidatePair {
+	statsID := newICECandidatePairStatsID(local.statsID, remote.statsID)
 	return &ICECandidatePair{
-		Local:  local,
-		Remote: remote,
+		statsID: statsID,
+		Local:   local,
+		Remote:  remote,
 	}
 }

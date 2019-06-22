@@ -1,6 +1,10 @@
 package webrtc
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/pion/ice"
+)
 
 // ICECandidateType represents the type of the ICE candidate used.
 type ICECandidateType int
@@ -69,5 +73,24 @@ func (t ICECandidateType) String() string {
 		return iceCandidateTypeRelayStr
 	default:
 		return ErrUnknownType.Error()
+	}
+}
+
+func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error) {
+	switch candidateType {
+	case ice.CandidateTypeHost:
+		return ICECandidateTypeHost, nil
+	case ice.CandidateTypeServerReflexive:
+		return ICECandidateTypeSrflx, nil
+	case ice.CandidateTypePeerReflexive:
+		return ICECandidateTypePrflx, nil
+	case ice.CandidateTypeRelay:
+		return ICECandidateTypeRelay, nil
+	default:
+		// NOTE: this should never happen[tm]
+		err := fmt.Errorf(
+			"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid typej: %s",
+			candidateType.String())
+		return ICECandidateType(Unknown), err
 	}
 }
