@@ -8,6 +8,7 @@ import (
 
 // ICECandidate represents a ice candidate
 type ICECandidate struct {
+	statsID        string
 	Foundation     string           `json:"foundation"`
 	Priority       uint32           `json:"priority"`
 	Address        string           `json:"address"`
@@ -46,6 +47,7 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 	}
 
 	c := ICECandidate{
+		statsID:    i.ID(),
 		Foundation: "foundation",
 		Priority:   i.Priority(),
 		Address:    i.Address(),
@@ -64,18 +66,50 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 }
 
 func (c ICECandidate) toICE() (ice.Candidate, error) {
+	candidateID := c.statsID
 	switch c.Typ {
 	case ICECandidateTypeHost:
-		return ice.NewCandidateHost(c.Protocol.String(), c.Address, int(c.Port), c.Component)
+		config := ice.CandidateHostConfig{
+			CandidateID: candidateID,
+			Network:     c.Protocol.String(),
+			Address:     c.Address,
+			Port:        int(c.Port),
+			Component:   c.Component,
+		}
+		return ice.NewCandidateHost(&config)
 	case ICECandidateTypeSrflx:
-		return ice.NewCandidateServerReflexive(c.Protocol.String(), c.Address, int(c.Port), c.Component,
-			c.RelatedAddress, int(c.RelatedPort))
+		config := ice.CandidateServerReflexiveConfig{
+			CandidateID: candidateID,
+			Network:     c.Protocol.String(),
+			Address:     c.Address,
+			Port:        int(c.Port),
+			Component:   c.Component,
+			RelAddr:     c.RelatedAddress,
+			RelPort:     int(c.RelatedPort),
+		}
+		return ice.NewCandidateServerReflexive(&config)
 	case ICECandidateTypePrflx:
-		return ice.NewCandidatePeerReflexive(c.Protocol.String(), c.Address, int(c.Port), c.Component,
-			c.RelatedAddress, int(c.RelatedPort))
+		config := ice.CandidatePeerReflexiveConfig{
+			CandidateID: candidateID,
+			Network:     c.Protocol.String(),
+			Address:     c.Address,
+			Port:        int(c.Port),
+			Component:   c.Component,
+			RelAddr:     c.RelatedAddress,
+			RelPort:     int(c.RelatedPort),
+		}
+		return ice.NewCandidatePeerReflexive(&config)
 	case ICECandidateTypeRelay:
-		return ice.NewCandidateRelay(c.Protocol.String(), c.Address, int(c.Port), c.Component,
-			c.RelatedAddress, int(c.RelatedPort))
+		config := ice.CandidateRelayConfig{
+			CandidateID: candidateID,
+			Network:     c.Protocol.String(),
+			Address:     c.Address,
+			Port:        int(c.Port),
+			Component:   c.Component,
+			RelAddr:     c.RelatedAddress,
+			RelPort:     int(c.RelatedPort),
+		}
+		return ice.NewCandidateRelay(&config)
 	default:
 		return nil, fmt.Errorf("unknown candidate type: %s", c.Typ)
 	}

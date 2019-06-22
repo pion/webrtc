@@ -85,23 +85,46 @@ func TestICECandidate_Convert(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		actualICE, err := testCase.native.toICE()
-		assert.Nil(t, err)
-
 		var expectedICE ice.Candidate
-
+		var err error
 		switch testCase.expectedType {
 		case ice.CandidateTypeHost:
-			expectedICE, err = ice.NewCandidateHost(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent)
+			config := ice.CandidateHostConfig{
+				Network:   testCase.expectedNetwork,
+				Address:   testCase.expectedAddress,
+				Port:      testCase.expectedPort,
+				Component: testCase.expectedComponent,
+			}
+			expectedICE, err = ice.NewCandidateHost(&config)
 		case ice.CandidateTypeServerReflexive:
-			expectedICE, err = ice.NewCandidateServerReflexive(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent,
-				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
+			config := ice.CandidateServerReflexiveConfig{
+				Network:   testCase.expectedNetwork,
+				Address:   testCase.expectedAddress,
+				Port:      testCase.expectedPort,
+				Component: testCase.expectedComponent,
+				RelAddr:   testCase.expectedRelatedAddress.Address,
+				RelPort:   testCase.expectedRelatedAddress.Port,
+			}
+			expectedICE, err = ice.NewCandidateServerReflexive(&config)
+			assert.NoError(t, err)
 		case ice.CandidateTypePeerReflexive:
-			expectedICE, err = ice.NewCandidatePeerReflexive(testCase.expectedNetwork, testCase.expectedAddress, testCase.expectedPort, testCase.expectedComponent,
-				testCase.expectedRelatedAddress.Address, testCase.expectedRelatedAddress.Port)
+			config := ice.CandidatePeerReflexiveConfig{
+				Network:   testCase.expectedNetwork,
+				Address:   testCase.expectedAddress,
+				Port:      testCase.expectedPort,
+				Component: testCase.expectedComponent,
+				RelAddr:   testCase.expectedRelatedAddress.Address,
+				RelPort:   testCase.expectedRelatedAddress.Port,
+			}
+			expectedICE, err = ice.NewCandidatePeerReflexive(&config)
 		}
+		assert.NoError(t, err)
 
-		assert.Nil(t, err)
+		// first copy the candidate ID so it matches the new one
+		testCase.native.statsID = expectedICE.ID()
+		actualICE, err := testCase.native.toICE()
+		assert.NoError(t, err)
+
 		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualICE)
 	}
 }
