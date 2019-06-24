@@ -850,6 +850,20 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 	return pc.currentLocalDescription
 }
 
+func mediaClosed(m *sdp.MediaDescription) bool {
+	if m.MediaName.Port.Value == 0 {
+		return true
+	}
+
+	for _, attr := range m.Attributes {
+		if attr.Key == "inactive" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	// FIXME: Remove this when renegotiation is supported
@@ -902,7 +916,20 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	fingerprint, ok := desc.parsed.Attribute("fingerprint")
 	if !ok {
-		fingerprint, ok = desc.parsed.MediaDescriptions[0].Attribute("fingerprint")
+
+		for _, m := range desc.parsed.MediaDescriptions {
+			if mediaClosed(m) {
+				continue
+			}
+
+			fingerprint, ok = m.Attribute("fingerprint")
+			if !ok {
+				return fmt.Errorf("could not find fingerprint")
+			}
+
+			break
+		}
+
 		if !ok {
 			return fmt.Errorf("could not find fingerprint")
 		}
