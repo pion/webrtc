@@ -119,6 +119,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Alex Harford](https://github.com/alexjh)
 * [Aleksandr Razumov](https://github.com/ernado)
 * [mchlrhw](https://github.com/mchlrhw)
+* [AlexWoo(武杰)](https://github.com/AlexWoo) *Fix RemoteDescription parsing for certificate fingerprint*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -874,7 +874,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		weOffer = false
 	}
 
+	fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
+		if !haveFingerprint {
+			fingerprint, haveFingerprint = m.Attribute("fingerprint")
+		}
+
 		for _, a := range m.Attributes {
 			switch {
 			case a.IsICECandidate():
@@ -899,20 +904,16 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		}
 	}
 
-	fingerprint, ok := desc.parsed.Attribute("fingerprint")
-	if !ok {
-		fingerprint, ok = desc.parsed.MediaDescriptions[0].Attribute("fingerprint")
-		if !ok {
-			return fmt.Errorf("could not find fingerprint")
-		}
+	if !haveFingerprint {
+		return fmt.Errorf("could not find fingerprint")
 	}
-	var fingerprintHash string
+
 	parts := strings.Split(fingerprint, " ")
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid fingerprint")
 	}
 	fingerprint = parts[1]
-	fingerprintHash = parts[0]
+	fingerprintHash := parts[0]
 
 	// Create the SCTP transport
 	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
