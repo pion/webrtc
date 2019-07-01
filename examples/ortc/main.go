@@ -14,7 +14,7 @@ func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
 	flag.Parse()
 
-	// Everything below is the pion-WebRTC (ORTC) API! Thanks for using it ❤️.
+	// Everything below is the Pion WebRTC (ORTC) API! Thanks for using it ❤️.
 
 	// Prepare ICE gathering options
 	iceOptions := webrtc.ICEGatherOptions{

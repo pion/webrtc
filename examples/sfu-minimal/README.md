@@ -1,5 +1,5 @@
 # sfu-minimal
-sfu-minimal is a pion-WebRTC application that demonstrates how to broadcast a video to many peers, while only requiring the broadcaster to upload once.
+sfu-minimal is a Pion WebRTC application that demonstrates how to broadcast a video to many peers, while only requiring the broadcaster to upload once.
 
 This could serve as the building block to building conferencing software, and other applications where publishers are bandwidth constrained.
 
@@ -29,4 +29,4 @@ You can change the listening port using `-port 8011`
 
 You can `Join the broadcast` as many times as you want. The `sfu-minimal` Golang application is relaying all traffic, so your browser only has to upload once.
 
-Congrats, you have used pion-WebRTC! Now start building something cool
+Congrats, you have used Pion WebRTC! Now start building something cool

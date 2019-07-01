@@ -1,5 +1,5 @@
 # data-channels
-data-channels is a pion-WebRTC application that shows how you can send/recv DataChannel messages from a web browser
+data-channels is a Pion WebRTC application that shows how you can send/recv DataChannel messages from a web browser
 
 ## Instructions
 ### Download data-channels
@@ -28,4 +28,4 @@ Now you can put whatever you want in the `Message` textarea, and when you hit `S
 
 You can also type in your terminal, and when you hit enter it will appear in your web browser.
 
-Congrats, you have used pion-WebRTC! Now start building something cool
+Congrats, you have used Pion WebRTC! Now start building something cool

@@ -21,7 +21,7 @@ func main() {
 
 	// This example shows off the experimental implementation of webrtc-quic.
 
-	// Everything below is the pion-WebRTC (ORTC) API! Thanks for using it ❤️.
+	// Everything below is the Pion WebRTC (ORTC) API! Thanks for using it ❤️.
 
 	// Create an API object
 	api := webrtc.NewAPI()

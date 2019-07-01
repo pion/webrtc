@@ -1,5 +1,5 @@
 # save-to-disk
-save-to-disk is a simple application that shows how to record your webcam using pion-WebRTC and save to disk.
+save-to-disk is a simple application that shows how to record your webcam using Pion WebRTC and save to disk.
 
 ## Instructions
 ### Download save-to-disk
@@ -25,4 +25,4 @@ Copy the text that `save-to-disk` just emitted and copy into second text area
 In the folder you ran `save-to-disk` you should now have a file `output-1.ivf` play with your video player of choice!
 > Note: In order to correctly create the files, the remote client (JSFiddle) should be closed. The Go example will automatically close itself.
 
-Congrats, you have used pion-WebRTC! Now start building something cool
+Congrats, you have used Pion WebRTC! Now start building something cool
