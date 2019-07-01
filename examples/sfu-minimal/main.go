@@ -26,7 +26,7 @@ const (
 func main() {
 	sdpChan := signal.HTTPSDPServer()
 
-	// Everything below is the pion-WebRTC API, thanks for using it ❤️.
+	// Everything below is the Pion WebRTC API, thanks for using it ❤️.
 	// Create a MediaEngine object to configure the supported codec
 	m := webrtc.MediaEngine{}
 

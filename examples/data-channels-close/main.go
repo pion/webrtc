@@ -14,7 +14,7 @@ func main() {
 	closeAfter := flag.Int("close-after", 5, "Close data channel after sending X times.")
 	flag.Parse()
 
-	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
+	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

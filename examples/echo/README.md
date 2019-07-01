@@ -24,4 +24,4 @@ Copy the text that `echo` just emitted and copy into second text area
 ### Hit 'Start Session' in jsfiddle, enjoy your video!
 Your browser should send video to Pion, and then it will be relayed right back to you.
 
-Congrats, you have used pion-WebRTC! Now start building something cool
+Congrats, you have used Pion WebRTC! Now start building something cool

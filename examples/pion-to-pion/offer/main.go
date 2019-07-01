@@ -17,7 +17,7 @@ func main() {
 	addr := flag.String("address", ":50000", "Address that the HTTP server is hosted on.")
 	flag.Parse()
 
-	// Everything below is the pion-WebRTC API! Thanks for using it ❤️.
+	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

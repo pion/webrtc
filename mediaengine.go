@@ -32,7 +32,7 @@ func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 	return codec.PayloadType
 }
 
-// RegisterDefaultCodecs is a helper that registers the default codecs supported by pion-webrtc
+// RegisterDefaultCodecs is a helper that registers the default codecs supported by Pion WebRTC
 func (m *MediaEngine) RegisterDefaultCodecs() {
 	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
@@ -73,7 +73,7 @@ func (m *MediaEngine) getCodecsByKind(kind RTPCodecType) []*RTPCodec {
 	return codecs
 }
 
-// Names for the default codecs supported by pion-webrtc
+// Names for the default codecs supported by Pion WebRTC
 const (
 	G722 = "G722"
 	Opus = "opus"
