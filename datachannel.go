@@ -556,11 +556,14 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		Protocol:              d.protocol,
 		DataChannelIdentifier: int32(*d.id),
 		// TransportID string `json:"transportId"`
-		State:            d.readyState,
-		MessagesSent:     d.dataChannel.MessagesSent(),
-		BytesSent:        d.dataChannel.BytesSent(),
-		MessagesReceived: d.dataChannel.MessagesReceived(),
-		BytesReceived:    d.dataChannel.BytesReceived(),
+		State: d.readyState,
+	}
+
+	if d.dataChannel != nil {
+		stats.MessagesSent = d.dataChannel.MessagesSent()
+		stats.BytesSent = d.dataChannel.BytesSent()
+		stats.MessagesReceived = d.dataChannel.MessagesReceived()
+		stats.BytesReceived = d.dataChannel.BytesReceived()
 	}
 
 	collector.Collect(stats.ID, stats)
