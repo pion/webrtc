@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/pion/datachannel"
@@ -13,7 +14,7 @@ import (
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
-const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
+const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
 var errSCTPNotEstablished = errors.New("SCTP not establisched")
 
 // DataChannel represents a WebRTC DataChannel
@@ -289,10 +290,6 @@ func (d *DataChannel) readLoop() {
 	for {
 		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
-		if err == io.ErrShortBuffer {
-			d.log.Warnf("Failed to read from data channel: The message is larger than %d bytes.\n", dataChannelBufferSize)
-			continue
-		}
 		if err != nil {
 			d.mu.Lock()
 			d.readyState = DataChannelStateClosed
