@@ -8,15 +8,118 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v2/pkg/media"
 )
+
+func TestSRTPDrainLeak(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sawRTCPDrainMessage := make(chan bool, 1)
+	sawRTPDrainmessage := make(chan bool, 1)
+
+	s := SettingEngine{
+		LoggerFactory: testCatchAllLoggerFactory{
+			callback: func(msg string) {
+				if strings.Contains(msg, "Incoming unhandled RTP ssrc") {
+					select {
+					case sawRTPDrainmessage <- true:
+					default:
+					}
+				} else if strings.Contains(msg, "Incoming unhandled RTCP ssrc") {
+					select {
+					case sawRTCPDrainMessage <- true:
+					default:
+					}
+				}
+			},
+		},
+	}
+	api := NewAPI(WithSettingEngine(s))
+	api.mediaEngine.RegisterDefaultCodecs()
+
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtlsConnected := make(chan interface{})
+
+	pcOffer.dtlsTransport.OnStateChange(func(s DTLSTransportState) {
+		if s == DTLSTransportStateConnected {
+			close(dtlsConnected)
+		}
+
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-dtlsConnected
+
+	srtpSession, err := pcOffer.dtlsTransport.getSRTPSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	srtpStream, err := srtpSession.OpenWriteStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srtcpSession, err := pcOffer.dtlsTransport.getSRTCPSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	srtcpStream, err := srtcpSession.OpenWriteStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Send 5 RTP/RTCP packets with different SSRCes
+	var i uint32
+	for i = 0; i < 5; i++ {
+		if _, err = srtpStream.WriteRTP(&rtp.Header{Version: 2, SSRC: i}, []byte{0x00, 0x01, 0x03}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i = 0; i < 5; i++ {
+		var raw []byte
+		raw, err = rtcp.Marshal([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: i}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err = srtcpStream.Write(raw); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	<-sawRTCPDrainMessage
+	<-sawRTPDrainmessage
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 /*
 Integration test for bi-directional peers
