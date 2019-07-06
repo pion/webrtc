@@ -1201,24 +1201,13 @@ func (pc *PeerConnection) drainSRTP() {
 				return
 			}
 
-			r, ssrc, err := srtpSession.AcceptStream()
+			_, ssrc, err := srtpSession.AcceptStream()
 			if err != nil {
 				pc.log.Warnf("Failed to accept RTP %v \n", err)
 				return
 			}
 
-			go func() {
-				rtpBuf := make([]byte, receiveMTU)
-				for {
-					_, header, err := r.ReadRTP(rtpBuf)
-					if err != nil {
-						pc.log.Warnf("Failed to read, drainSRTP done for: %v %d \n", err, ssrc)
-						return
-					}
-
-					pc.log.Debugf("got RTP: %+v", header)
-				}
-			}()
+			pc.log.Debugf("Incoming unhandled RTP ssrc(%d)", ssrc)
 		}
 	}()
 
@@ -1229,23 +1218,12 @@ func (pc *PeerConnection) drainSRTP() {
 			return
 		}
 
-		r, ssrc, err := srtcpSession.AcceptStream()
+		_, ssrc, err := srtcpSession.AcceptStream()
 		if err != nil {
 			pc.log.Warnf("Failed to accept RTCP %v \n", err)
 			return
 		}
-
-		go func() {
-			rtcpBuf := make([]byte, receiveMTU)
-			for {
-				_, header, err := r.ReadRTCP(rtcpBuf)
-				if err != nil {
-					pc.log.Warnf("Failed to read, drainSRTCP done for: %v %d \n", err, ssrc)
-					return
-				}
-				pc.log.Debugf("got RTCP: %+v", header)
-			}
-		}()
+		pc.log.Debugf("Incoming unhandled RTCP ssrc(%d)", ssrc)
 	}
 }
 

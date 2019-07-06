@@ -86,6 +86,7 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 	return t.iceTransport
 }
 
+// onStateChange requires the caller holds the lock
 func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
 	t.state = state
 	hdlr := t.onStateChangeHdlr
@@ -224,6 +225,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 	if err := t.ensureICEConn(); err != nil {
 		return err
+	}
+
+	if t.state != DTLSTransportStateNew {
+		return &rtcerr.InvalidStateError{Err: fmt.Errorf("attempted to start DTLSTransport that is not in new state: %s", t.state)}
 	}
 
 	dtlsEndpoint := t.iceTransport.NewEndpoint(mux.MatchDTLS)

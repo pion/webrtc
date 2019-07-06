@@ -3,15 +3,12 @@
 package webrtc
 
 import (
-	"bufio"
 	"errors"
-	"io"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pion/logging"
 	"github.com/pion/webrtc/v2/pkg/media"
 )
 
@@ -53,11 +50,20 @@ func runOfferingPeer(offerChan chan<- SessionDescription, answerChan <-chan Sess
 }
 
 func runAnsweringPeer(offerChan <-chan SessionDescription, answerChan chan<- SessionDescription, resultChan chan<- error) {
-	config := Configuration{}
-	peerConnection, err := NewPeerConnection(config)
-	check(err)
+	s := SettingEngine{
+		LoggerFactory: testCatchAllLoggerFactory{
+			callback: func(msg string) {
+				if strings.Contains(msg, "SetLocalDescription not called") {
+					resultChan <- nil
+				}
+			},
+		},
+	}
+	api := NewAPI(WithSettingEngine(s))
+	api.mediaEngine.RegisterDefaultCodecs()
 
-	initLogWatcher(peerConnection, resultChan)
+	peerConnection, err := api.NewPeerConnection(Configuration{})
+	check(err)
 
 	_, err = peerConnection.AddTransceiver(RTPCodecTypeAudio)
 	check(err)
@@ -76,32 +82,6 @@ func runAnsweringPeer(offerChan <-chan SessionDescription, answerChan chan<- Ses
 	answer, err := peerConnection.CreateAnswer(nil)
 	check(err)
 	answerChan <- answer
-}
-
-func initLogWatcher(peerConnection *PeerConnection, resultChan chan<- error) {
-	expectedLogging := "SetLocalDescription not called"
-
-	r, w := io.Pipe()
-
-	// replace the existing logger with one we can slurp from
-	loggerFactory := &logging.DefaultLoggerFactory{
-		Writer:          w,
-		DefaultLogLevel: logging.LogLevelWarn,
-	}
-	peerConnection.log = loggerFactory.NewLogger("pc")
-
-	scanner := bufio.NewScanner(r)
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, expectedLogging) {
-				// we found what we were looking for
-				resultChan <- nil
-				break
-			}
-		}
-		check(scanner.Err())
-	}()
 }
 
 func TestNoPanicIfSetLocalDescriptionNotCalledByAnsweringPeer(t *testing.T) {
