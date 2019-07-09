@@ -57,7 +57,9 @@ func MatchZRTP(b []byte) bool {
 
 // MatchDTLS is a MatchFunc that accepts packets with the first byte in [20..63]
 // as defied in RFC7983
-var MatchDTLS = MatchRange(20, 63)
+func MatchDTLS(b []byte) bool {
+	return MatchRange(20, 63)(b)
+}
 
 // MatchTURN is a MatchFunc that accepts packets with the first byte in [64..79]
 // as defied in RFC7983

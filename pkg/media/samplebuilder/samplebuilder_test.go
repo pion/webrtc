@@ -22,74 +22,72 @@ func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
 	return r, nil
 }
 
-var testCases = []sampleBuilderTest{
-	{
-		message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
-		packets: []*rtp.Packet{
-			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
-		},
-		samples: []*media.Sample{},
-		maxLate: 50,
-	},
-	{
-		message: "SampleBuilder should emit one packet, we had three packets with unique timestamps",
-		packets: []*rtp.Packet{
-			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
-			{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
-			{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x03}},
-		},
-		samples: []*media.Sample{
-			{Data: []byte{0x02}, Samples: 1},
-		},
-		maxLate: 50,
-	},
-	{
-		message: "SampleBuilder should emit one packet, we had two packets but two with duplicate timestamps",
-		packets: []*rtp.Packet{
-			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
-			{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
-			{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 6}, Payload: []byte{0x03}},
-			{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 7}, Payload: []byte{0x04}},
-		},
-		samples: []*media.Sample{
-			{Data: []byte{0x02, 0x03}, Samples: 1},
-		},
-		maxLate: 50,
-	},
-	{
-		message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one",
-		packets: []*rtp.Packet{
-			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
-			{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
-			{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
-		},
-		samples: []*media.Sample{},
-		maxLate: 50,
-	},
-	{
-		message: "SampleBuilder should emit multiple valid packets",
-		packets: []*rtp.Packet{
-			{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{0x01}},
-			{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 2}, Payload: []byte{0x02}},
-			{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 3}, Payload: []byte{0x03}},
-			{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 4}, Payload: []byte{0x04}},
-			{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 5}, Payload: []byte{0x05}},
-			{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 6}, Payload: []byte{0x06}},
-		},
-		samples: []*media.Sample{
-			{Data: []byte{0x02}, Samples: 1},
-			{Data: []byte{0x03}, Samples: 1},
-			{Data: []byte{0x04}, Samples: 1},
-			{Data: []byte{0x05}, Samples: 1},
-		},
-		maxLate: 50,
-	},
-}
-
 func TestSampleBuilder(t *testing.T) {
 	assert := assert.New(t)
 
-	for _, t := range testCases {
+	for _, t := range []sampleBuilderTest{
+		{
+			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+			},
+			samples: []*media.Sample{},
+			maxLate: 50,
+		},
+		{
+			message: "SampleBuilder should emit one packet, we had three packets with unique timestamps",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x03}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x02}, Samples: 1},
+			},
+			maxLate: 50,
+		},
+		{
+			message: "SampleBuilder should emit one packet, we had two packets but two with duplicate timestamps",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 6}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 7}, Payload: []byte{0x04}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x02, 0x03}, Samples: 1},
+			},
+			maxLate: 50,
+		},
+		{
+			message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
+			},
+			samples: []*media.Sample{},
+			maxLate: 50,
+		},
+		{
+			message: "SampleBuilder should emit multiple valid packets",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 2}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 3}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 4}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 5}, Payload: []byte{0x05}},
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 6}, Payload: []byte{0x06}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x02}, Samples: 1},
+				{Data: []byte{0x03}, Samples: 1},
+				{Data: []byte{0x04}, Samples: 1},
+				{Data: []byte{0x05}, Samples: 1},
+			},
+			maxLate: 50,
+		},
+	} {
 		s := New(t.maxLate, &fakeDepacketizer{})
 		samples := []*media.Sample{}
 

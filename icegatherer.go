@@ -119,7 +119,7 @@ func (g *ICEGatherer) createAgent() error {
 
 	requestedNetworkTypes := g.networkTypes
 	if len(requestedNetworkTypes) == 0 {
-		requestedNetworkTypes = supportedNetworkTypes
+		requestedNetworkTypes = supportedNetworkTypes()
 	}
 
 	for _, typ := range requestedNetworkTypes {

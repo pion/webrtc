@@ -42,6 +42,8 @@ type DTLSTransport struct {
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
 
+	dtlsMatcher mux.MatchFunc
+
 	api *API
 }
 
@@ -53,6 +55,7 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 		iceTransport: transport,
 		api:          api,
 		state:        DTLSTransportStateNew,
+		dtlsMatcher:  mux.MatchDTLS,
 	}
 
 	if len(certificates) > 0 {

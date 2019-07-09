@@ -7,9 +7,6 @@ import (
 	"sync"
 )
 
-// The file starts with #!rtpplay1.0 address/port\n
-var preambleRegexp = regexp.MustCompile(`#\!rtpplay1\.0 \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,5}\n`)
-
 // Reader reads the RTPDump file format
 type Reader struct {
 	readerMu sync.Mutex
@@ -31,6 +28,9 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 	if err != nil {
 		return nil, hdr, err
 	}
+
+	// The file starts with #!rtpplay1.0 address/port\n
+	var preambleRegexp = regexp.MustCompile(`#\!rtpplay1\.0 \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,5}\n`)
 	if !preambleRegexp.Match(peek) {
 		return nil, hdr, errMalformed
 	}

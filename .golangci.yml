@@ -9,7 +9,6 @@ linters:
   disable:
     - maligned
     - lll
-    - gochecknoglobals
 
 issues:
   exclude-use-default: false
