@@ -9,9 +9,9 @@ import (
 	"time"
 )
 
-var validPreamble = []byte("#!rtpplay1.0 224.2.0.1/3456\n")
-
 func TestReader(t *testing.T) {
+	validPreamble := []byte("#!rtpplay1.0 224.2.0.1/3456\n")
+
 	for _, test := range []struct {
 		Name        string
 		Data        []byte

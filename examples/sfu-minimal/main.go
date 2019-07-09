@@ -11,14 +11,6 @@ import (
 	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
 
-var peerConnectionConfig = webrtc.Configuration{
-	ICEServers: []webrtc.ICEServer{
-		{
-			URLs: []string{"stun:stun.l.google.com:19302"},
-		},
-	},
-}
-
 const (
 	rtcpPLIInterval = time.Second * 3
 )
@@ -40,6 +32,14 @@ func main() {
 	offer := webrtc.SessionDescription{}
 	signal.Decode(<-sdpChan, &offer)
 	fmt.Println("")
+
+	peerConnectionConfig := webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	}
 
 	// Create a new RTCPeerConnection
 	peerConnection, err := api.NewPeerConnection(peerConnectionConfig)

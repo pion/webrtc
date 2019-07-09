@@ -15,7 +15,6 @@ import (
 
 	"github.com/pion/ice"
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/v2/internal/mux"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
@@ -300,15 +299,6 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
 // We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost
 func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
-	dtlsMatchFunc := mux.MatchDTLS
-	defer func() {
-		mux.MatchDTLS = dtlsMatchFunc
-	}()
-
-	// Drop all incoming DTLS traffic
-	mux.MatchDTLS = func([]byte) bool {
-		return false
-	}
 
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
@@ -318,6 +308,13 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Drop all incoming DTLS traffic
+	dropAllDTLS := func([]byte) bool {
+		return false
+	}
+	offerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
+	answerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
 
 	if err = signalPair(offerPC, answerPC); err != nil {
 		t.Fatal(err)

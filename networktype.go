@@ -6,11 +6,13 @@ import (
 	"github.com/pion/ice"
 )
 
-var supportedNetworkTypes = []NetworkType{
-	NetworkTypeUDP4,
-	NetworkTypeUDP6,
-	// NetworkTypeTCP4, // Not supported yet
-	// NetworkTypeTCP6, // Not supported yet
+func supportedNetworkTypes() []NetworkType {
+	return []NetworkType{
+		NetworkTypeUDP4,
+		NetworkTypeUDP6,
+		// NetworkTypeTCP4, // Not supported yet
+		// NetworkTypeTCP6, // Not supported yet
+	}
 }
 
 // NetworkType represents the type of network
