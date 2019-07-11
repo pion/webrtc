@@ -22,6 +22,8 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [ORTC QUIC](ortc-quic): Example ortc-quic shows how you an use the ORTC API for QUIC DataChannel communication.
 * [Pion to Pion](pion-to-pion): Example pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.
 
+#### Miscellaneous
+* [Custom Logger](custom-logger) The custom-logger demonstrates how the user can override the logging and process messages instead of printing to stdout. It has no corresponding web page.
 
 ### Usage
 We've made it easy to run the browser based examples on your local machine.

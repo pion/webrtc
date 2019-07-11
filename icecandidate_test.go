@@ -136,7 +136,7 @@ func TestConvertTypeFromICE(t *testing.T) {
 			t.Fatal("failed coverting ice.CandidateTypeHost")
 		}
 		if ct != ICECandidateTypeHost {
-			t.Fatal("should be coverted to ICECandidateTypeHost")
+			t.Fatal("should be converted to ICECandidateTypeHost")
 		}
 	})
 	t.Run("srflx", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestConvertTypeFromICE(t *testing.T) {
 			t.Fatal("failed coverting ice.CandidateTypeServerReflexive")
 		}
 		if ct != ICECandidateTypeSrflx {
-			t.Fatal("should be coverted to ICECandidateTypeSrflx")
+			t.Fatal("should be converted to ICECandidateTypeSrflx")
 		}
 	})
 	t.Run("prflx", func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestConvertTypeFromICE(t *testing.T) {
 			t.Fatal("failed coverting ice.CandidateTypePeerReflexive")
 		}
 		if ct != ICECandidateTypePrflx {
-			t.Fatal("should be coverted to ICECandidateTypePrflx")
+			t.Fatal("should be converted to ICECandidateTypePrflx")
 		}
 	})
 }

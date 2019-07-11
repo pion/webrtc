@@ -387,7 +387,7 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 		want              []*RTPTransceiver
 	}{
 		{
-			"Audio and Video Transceivers can not satifsy each other",
+			"Audio and Video Transceivers can not satisfy each other",
 			[]RTPCodecType{RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 			[]*RTPTransceiver{createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv)},
