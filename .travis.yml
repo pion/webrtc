@@ -32,11 +32,11 @@ before_install:
   - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
 
 before_script:
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.14.0
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.17.1
 
 script:
   - golangci-lint run --build-tags quic ./...
-  - cd examples && golangci-lint run --build-tags quic ./... -D gochecknoinits
+  - cd examples && golangci-lint run --build-tags quic ./...
   - cd ..
   - rm -rf examples # Remove examples, no test coverage for them
   - go test -tags quic -coverpkg=$(go list ./... | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...

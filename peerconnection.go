@@ -513,7 +513,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 	t := pc.api.NewICETransport(pc.iceGatherer)
 
 	t.OnConnectionStateChange(func(state ICETransportState) {
-		cs := ICEConnectionStateNew
+		var cs ICEConnectionState
 		switch state {
 		case ICETransportStateNew:
 			cs = ICEConnectionStateNew
