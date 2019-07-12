@@ -1,0 +1,23 @@
+package ivfreader
+
+import (
+	"bytes"
+	// "io"
+	"testing"
+	// "github.com/stretchr/testify/assert"
+)
+
+func TestIVFReader_ReadValidHeader(t *testing.T) {
+	// Valid IVF container file taken from:
+	// https://chromium.googlesource.com/chromium/chromium/+/refs/heads/trunk/media/test/data/test-25fps.vp8
+	rawHeader := []byte{
+		0x44, 0x4b, 0x49, 0x46, 0x00, 0x00, 0x20, 0x00,
+		0x56, 0x50, 0x38, 0x30, 0x40, 0x01, 0xf0, 0x00,
+		0x32, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+		0xfa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	}
+	stream := bytes.NewBuffer(rawHeader)
+
+	_, _ = NewWith(stream)
+	// TODO: Validate header properties
+}
