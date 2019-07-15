@@ -35,4 +35,21 @@ func TestConfiguration_getICEServers(t *testing.T) {
 		_, err := cfg.getICEServers()
 		assert.NotNil(t, err)
 	})
+
+	t.Run("Success", func(t *testing.T) {
+		// ignore the fact that stun URLs shouldn't have a query
+		serverStr := "stun:global.stun.twilio.com:3478?transport=udp"
+		expectedServerStr := "stun:global.stun.twilio.com:3478"
+		cfg := Configuration{
+			ICEServers: []ICEServer{
+				{
+					URLs: []string{serverStr},
+				},
+			},
+		}
+
+		parsedURLs, err := cfg.getICEServers()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedServerStr, (*parsedURLs)[0].String())
+	})
 }
