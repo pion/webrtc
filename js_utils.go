@@ -162,8 +162,7 @@ func recoveryToError(e interface{}) error {
 
 func uint8ArrayValueToBytes(val js.Value) []byte {
 	result := make([]byte, val.Length())
-	for i := 0; i < val.Length(); i++ {
-		result[i] = byte(val.Index(i).Int())
-	}
+	jsResult := js.TypedArrayOf(result)
+	jsResult.Call("set", val)
 	return result
 }
