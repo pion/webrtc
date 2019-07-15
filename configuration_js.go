@@ -2,10 +2,6 @@
 
 package webrtc
 
-import (
-	"github.com/pion/ice"
-)
-
 // Configuration defines a set of parameters to configure how the
 // peer-to-peer communication via PeerConnection is established or
 // re-established.
@@ -36,18 +32,4 @@ type Configuration struct {
 
 	// ICECandidatePoolSize describes the size of the prefetched ICE pool.
 	ICECandidatePoolSize uint8
-}
-
-func (c Configuration) getICEServers() (*[]*ice.URL, error) {
-	var iceServers []*ice.URL
-	for _, server := range c.ICEServers {
-		for _, rawURL := range server.URLs {
-			url, err := ice.ParseURL(rawURL)
-			if err != nil {
-				return nil, err
-			}
-			iceServers = append(iceServers, url)
-		}
-	}
-	return &iceServers, nil
 }
