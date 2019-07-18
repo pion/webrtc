@@ -47,7 +47,7 @@ func main() {
 				// Send the message as text
 				sendErr := d.SendText(message)
 				if sendErr != nil {
-					panic(err)
+					panic(sendErr)
 				}
 			}
 		})
