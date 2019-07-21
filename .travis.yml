@@ -21,6 +21,7 @@ install:
   - export PATH=$GOROOT/bin:$PATH
   - go version
   - go env
+  - go get -u github.com/matoous/godox
   # Install Node 11 (required for WASM tests)
   - source ~/.nvm/nvm.sh
   - nvm install 11
@@ -35,6 +36,7 @@ before_script:
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.17.1
 
 script:
+  - godox
   - golangci-lint run --build-tags quic ./...
   - cd examples && golangci-lint run --build-tags quic ./...
   - cd ..
