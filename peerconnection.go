@@ -23,10 +23,6 @@ import (
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
-const (
-	newTransceiverMid = "NEW"
-)
-
 // PeerConnection represents a WebRTC connection that establishes a
 // peer-to-peer communications with another PeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
@@ -579,7 +575,6 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 	}
 
 	return &RTPTransceiver{
-		Mid:       newTransceiverMid,
 		kind:      remoteKind,
 		Direction: RTPTransceiverDirectionInactive,
 	}, localTransceivers
@@ -642,7 +637,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 			for {
 				// keep going until we can't get any more
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-				if t.Mid == newTransceiverMid {
+				if t.Direction == RTPTransceiverDirectionInactive {
 					break
 				}
 				mediaTransceivers = append(mediaTransceivers, t)
@@ -1338,7 +1333,6 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		)
 	}
 
-	transceiver.Mid = track.Kind().String() // TODO: Mid generation
 	return transceiver.Sender, nil
 }
 

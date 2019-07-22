@@ -374,7 +374,7 @@ func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
 
 func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 	createTransceiver := func(kind RTPCodecType, direction RTPTransceiverDirection) *RTPTransceiver {
-		return &RTPTransceiver{Mid: newTransceiverMid, kind: kind, Direction: direction}
+		return &RTPTransceiver{kind: kind, Direction: direction}
 	}
 
 	for _, test := range []struct {
