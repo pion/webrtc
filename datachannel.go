@@ -140,7 +140,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 
 	cfg := &datachannel.Config{
 		ChannelType:          channelType,
-		Priority:             datachannel.ChannelPriorityNormal, // TODO: Wiring
+		Priority:             datachannel.ChannelPriorityNormal,
 		ReliabilityParameter: reliabilityParameteer,
 		Label:                d.label,
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
