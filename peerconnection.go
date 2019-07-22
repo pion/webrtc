@@ -851,8 +851,7 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
-	// FIXME: Remove this when renegotiation is supported
-	if pc.currentRemoteDescription != nil {
+	if pc.currentRemoteDescription != nil { // pion/webrtc#207
 		return fmt.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
 	if pc.isClosed {
@@ -958,7 +957,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		)
 
 		if err != nil {
-			// TODO: Handle error
+			// pion/webrtc#614
 			pc.log.Warnf("Failed to start manager: %s", err)
 			return
 		}
@@ -969,7 +968,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 		})
 		if err != nil {
-			// TODO: Handle error
+			// pion/webrtc#614
 			pc.log.Warnf("Failed to start manager: %s", err)
 			return
 		}
@@ -999,7 +998,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			MaxMessageSize: 0,
 		})
 		if err != nil {
-			// TODO: Handle error
+			// pion/webrtc#614
 			pc.log.Warnf("Failed to start SCTP: %s", err)
 			return
 		}
@@ -1403,9 +1402,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	// TODO: Add additional options once implemented. DataChannelInit
-	// implements all options. DataChannelParameters implements the
-	// options that actually have an effect at this point.
+	// pion/webrtc#748
 	params := &DataChannelParameters{
 		Label:   label,
 		Ordered: true,
@@ -1445,13 +1442,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
-	// TODO: Enable validation of other parameters once they are implemented.
-	// - Protocol
-	// - Negotiated
-	// - Priority:
-	//
-	// See https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api for details
-
+	// pion/webrtc#748
 	d, err := pc.api.newDataChannel(params, pc.log)
 	if err != nil {
 		pc.mu.Unlock()
@@ -1607,7 +1598,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 	// Use the first transceiver to generate the section attributes
 	t := transceivers[0]
 	media := sdp.NewJSEPMediaDescription(t.kind.String(), []string{}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // pion/webrtc#494
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux). // TODO: support RTCP fallback
@@ -1669,7 +1660,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 			},
 		},
 	}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // pion/webrtc#494
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
