@@ -8,7 +8,6 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	Mid       string
 	Sender    *RTPSender
 	Receiver  *RTPReceiver
 	Direction RTPTransceiverDirection
