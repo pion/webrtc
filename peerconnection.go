@@ -60,11 +60,6 @@ type PeerConnection struct {
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
 
-	// OnNegotiationNeeded        func() // FIXME NOT-USED
-	// OnICECandidateError        func() // FIXME NOT-USED
-
-	// OnConnectionStateChange    func() // FIXME NOT-USED
-
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
 	onTrackHandler                    func(*Track, *RTPReceiver)
@@ -1268,10 +1263,6 @@ func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 	return pc.iceConnectionState
 }
 
-// ------------------------------------------------------------------------
-// --- FIXME - BELOW CODE NEEDS RE-ORGANIZATION - https://w3c.github.io/webrtc-pc/#rtp-media-api
-// ------------------------------------------------------------------------
-
 // GetSenders returns the RTPSender that are currently attached to this PeerConnection
 func (pc *PeerConnection) GetSenders() []*RTPSender {
 	pc.mu.Lock()
@@ -1348,13 +1339,8 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	}
 
 	transceiver.Mid = track.Kind().String() // TODO: Mid generation
-
 	return transceiver.Sender, nil
 }
-
-// func (pc *PeerConnection) RemoveTrack() {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
-// }
 
 // AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
 func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
