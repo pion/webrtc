@@ -295,7 +295,7 @@ func (d *DataChannel) readLoop() {
 			d.readyState = DataChannelStateClosed
 			d.mu.Unlock()
 			if err != io.EOF {
-				// TODO: Throw OnError
+				// pion/webrtc#746
 				d.log.Errorf("Failed to read from data channel %v", err)
 			}
 			d.onClose()
