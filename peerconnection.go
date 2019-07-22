@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/ice"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
@@ -1559,6 +1558,13 @@ func (pc *PeerConnection) Close() error {
 	if pc.isClosed {
 		return nil
 	}
+	// Try closing everything and collect the errors
+	// Shutdown strategy:
+	// 1. All Conn close by closing their underlying Conn.
+	// 2. A Mux stops this chain. It won't close the underlying
+	//    Conn if one of the endpoints is closed down. To
+	//    continue the chain the Mux has to be closed.
+	var closeErrs []error
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.isClosed = true
@@ -1567,26 +1573,14 @@ func (pc *PeerConnection) Close() error {
 	pc.signalingState = SignalingStateClosed
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
-	// pc.ICEConnectionState = ICEConnectionStateClosed
-	pc.iceStateChange(ice.ConnectionStateClosed) // FIXME REMOVE
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
-	pc.connectionState = PeerConnectionStateClosed
-
-	// Try closing everything and collect the errors
-	var closeErrs []error
-
-	// Shutdown strategy:
-	// 1. All Conn close by closing their underlying Conn.
-	// 2. A Mux stops this chain. It won't close the underlying
-	//    Conn if one of the endpoints is closed down. To
-	//    continue the chain the Mux has to be closed.
-
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
+	pc.connectionState = PeerConnectionStateClosed
 
 	if err := pc.dtlsTransport.Stop(); err != nil {
 		closeErrs = append(closeErrs, err)
@@ -1603,9 +1597,6 @@ func (pc *PeerConnection) Close() error {
 			closeErrs = append(closeErrs, err)
 		}
 	}
-
-	// TODO: Figure out stopping ICE transport & Gatherer independently.
-	// pc.iceGatherer()
 	return util.FlattenErrs(closeErrs)
 }
 
