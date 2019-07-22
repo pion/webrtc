@@ -35,6 +35,13 @@ func TestPeerConnection_Close(t *testing.T) {
 		close(awaitSetup)
 	})
 
+	awaitICEClosed := make(chan struct{})
+	pcAnswer.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateClosed {
+			close(awaitICEClosed)
+		}
+	})
+
 	_, err = pcOffer.CreateDataChannel("data", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -56,6 +63,8 @@ func TestPeerConnection_Close(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	<-awaitICEClosed
 }
 
 // Assert that a PeerConnection that is shutdown before ICE starts doesn't leak
