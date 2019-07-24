@@ -1601,7 +1601,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // pion/webrtc#494
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
-		WithPropertyAttribute(sdp.AttrKeyRTCPMux). // TODO: support RTCP fallback
+		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
 	codecs := pc.api.mediaEngine.getCodecsByKind(t.kind)

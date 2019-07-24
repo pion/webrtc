@@ -24,8 +24,6 @@ type SCTPTransport struct {
 	// State represents the current state of the SCTP transport.
 	state SCTPTransportState
 
-	port uint16
-
 	// MaxMessageSize represents the maximum size of data that can be passed to
 	// DataChannel's send() method.
 	maxMessageSize float64
@@ -51,7 +49,6 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
 		dtlsTransport: dtls,
 		state:         SCTPTransportStateConnecting,
-		port:          5000, // TODO
 		api:           api,
 		log:           api.settingEngine.LoggerFactory.NewLogger("ortc"),
 	}
@@ -83,9 +80,6 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
-	// TODO: port
-	_ = r.maxMessageSize // TODO
 
 	if err := r.ensureDTLS(); err != nil {
 		return err
@@ -143,8 +137,8 @@ func (r *SCTPTransport) acceptDataChannels() {
 		if err != nil {
 			if err != io.EOF {
 				r.log.Errorf("Failed to accept data channel: %v", err)
+				// pion/webrtc#754
 			}
-			// TODO: Kill DataChannel/PeerConnection?
 			return
 		}
 
@@ -184,7 +178,7 @@ func (r *SCTPTransport) acceptDataChannels() {
 
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
-			// TODO: Kill DataChannel/PeerConnection?
+			// pion/webrtc#754
 			return
 		}
 
