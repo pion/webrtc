@@ -118,7 +118,7 @@ func (t *DTLSTransport) GetLocalParameters() (DTLSParameters, error) {
 	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
-		prints, err := c.GetFingerprints() // TODO: Should be only one?
+		prints, err := c.GetFingerprints()
 		if err != nil {
 			return DTLSParameters{}, err
 		}
@@ -238,7 +238,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	t.srtpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTP)
 	t.srtcpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTCP)
 
-	// TODO: handle multiple certs
+	// pion/webrtc#753
 	cert := t.certificates[0]
 
 	dtlsCofig := &dtls.Config{

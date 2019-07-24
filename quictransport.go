@@ -75,7 +75,7 @@ func (t *QUICTransport) GetLocalParameters() (QUICParameters, error) {
 	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
-		prints, err := c.GetFingerprints() // TODO: Should be only one?
+		prints, err := c.GetFingerprints()
 		if err != nil {
 			return QUICParameters{}, err
 
@@ -98,7 +98,7 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 		return err
 	}
 
-	// TODO: handle multiple certs
+	// pion/webrtc#753
 	cert := t.certificates[0]
 
 	isClient := true

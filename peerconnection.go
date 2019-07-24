@@ -1580,7 +1580,7 @@ func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
 }
 
 func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) error {
-	// TODO: Handle multiple certificates
+	// pion/webrtc#753
 	fingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
 	if err != nil {
 		return err
