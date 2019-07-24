@@ -1509,7 +1509,7 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 
 	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 	if err != nil {
-		return nil // TODO WriteRTCP before would gracefully discard packets until ready
+		return nil
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
