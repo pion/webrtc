@@ -27,7 +27,7 @@ type MediaEngine struct {
 
 // RegisterCodec registers a codec to a media engine
 func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
-	// TODO: generate PayloadType if not set
+	// pion/webrtc#43
 	m.codecs = append(m.codecs, codec)
 	return codec.PayloadType
 }
@@ -56,7 +56,7 @@ func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
 			codec.ClockRate == sdpCodec.ClockRate &&
 			(sdpCodec.EncodingParameters == "" ||
 				strconv.Itoa(int(codec.Channels)) == sdpCodec.EncodingParameters) &&
-			codec.SDPFmtpLine == sdpCodec.Fmtp { // TODO: Protocol specific matching?
+			codec.SDPFmtpLine == sdpCodec.Fmtp { // pion/webrtc#43
 			return codec, nil
 		}
 	}
