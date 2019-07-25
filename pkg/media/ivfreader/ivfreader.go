@@ -4,73 +4,130 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
-	"github.com/pion/rtp"
 )
 
-// TODO: Description
-// TODO: Formatting, move to separate file
-type IVFHeader struct {
-	signature string // 0-3
-	version uint16 // 4-5
-	header_size uint16 // 6-7
-	fourcc string // 8-11
-	width uint16 // 12-13
-	height uint16 // 14-15
-	timebase_denum uint32 // 16-19
-	timebase_num uint32 // 20-23
-	num_frames uint32 // 24-27
-	unused uint32 // 28-31
+const (
+	ivfFileHeaderSignature = "DKIF"
+	ivfFileHeaderSize      = 32
+	ivfFrameHeaderSize     = 12
+)
+
+// IVFFileHeader 32-byte header for IVF files
+// https://wiki.multimedia.cx/index.php/IVF
+type IVFFileHeader struct {
+	signature     string // 0-3
+	version       uint16 // 4-5
+	headerSize    uint16 // 6-7
+	fourcc        string // 8-11
+	width         uint16 // 12-13
+	height        uint16 // 14-15
+	timebaseDenum uint32 // 16-19
+	timebaseNum   uint32 // 20-23
+	numFrames     uint32 // 24-27
+	unused        uint32 // 28-31
 }
 
-// IVFReader is used to read RTP packets
-// TODO: Formatting
+// IVFFrameHeader 12-byte header for IVF frames
+// https://wiki.multimedia.cx/index.php/IVF
+type IVFFrameHeader struct {
+	frameSize uint32 // 0-3
+	timestamp uint64 // 4-11
+}
+
+// IVFReader is used to read IVF files and return frame payloads
 type IVFReader struct {
 	stream io.Reader
-	fd *os.File
-	count uint64
-	currentFrame []byte
 }
 
-// NewWith initialize a new IVF reader with an io.Reader input
-func NewWith(in io.Reader) (*IVFReader, error) {
+// NewWith returns a new IVF reader and IVF file header
+// with an io.Reader input
+func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	if in == nil {
-		return nil, fmt.Errorf("stream is nil")
+		return nil, nil, fmt.Errorf("stream is nil")
 	}
 
 	reader := &IVFReader{
 		stream: in,
 	}
-	return reader, nil
-}
 
-func (i *IVFReader) ParseNextFrame(h *IVFHeader) (*rtp.Packet, error) {
-	// TODO
-	return nil, nil
-}
-
-func (i *IVFReader) ParseFileHeader() (*IVFHeader, error) {
-	buffer := make([]byte, 32)
-
-	header := &IVFHeader{}
-
-	bytes_read, err := i.stream.Read(buffer)
+	// TODO: Return file header somewhere else?
+	header, err := reader.parseFileHeader()
 	if err != nil {
-		return nil, err
-	} else if bytes_read != 32 {
-		return nil, nil // TODO: Throw error
+		return nil, nil, err
 	}
 
-	header.signature = string(buffer[:4])
-	header.version = binary.LittleEndian.Uint16(buffer[4:6])
-	header.header_size = binary.LittleEndian.Uint16(buffer[6:8])
-	header.fourcc = string(buffer[8:12])
-	header.width = binary.LittleEndian.Uint16(buffer[12:14])
-	header.height = binary.LittleEndian.Uint16(buffer[14:16])
-	header.timebase_denum = binary.LittleEndian.Uint32(buffer[16:20])
-	header.timebase_num = binary.LittleEndian.Uint32(buffer[20:24])
-	header.num_frames = binary.LittleEndian.Uint32(buffer[24:28])
-	header.unused = binary.LittleEndian.Uint32(buffer[28:32])
+	return reader, header, nil
+}
+
+// ParseNextFrame reads from stream and returns IVF frame payload, header,
+// and an error if there is incomplete frame data.
+// Returns all nil values when no more frames are available.
+func (i *IVFReader) ParseNextFrame() (*[]byte, *IVFFrameHeader, error) {
+	buffer := make([]byte, ivfFrameHeaderSize)
+	var header *IVFFrameHeader
+	switch bytesRead, err := i.stream.Read(buffer); bytesRead {
+	case ivfFrameHeaderSize:
+		header = &IVFFrameHeader{
+			frameSize: binary.LittleEndian.Uint32(buffer[:4]),
+			timestamp: binary.LittleEndian.Uint64(buffer[4:12]),
+		}
+	case 0:
+		if err == io.EOF {
+			// No more frames to parse
+			return nil, nil, nil
+		}
+		fallthrough
+	default:
+		if err != nil {
+			return nil, nil, err
+		}
+		// io.Reader.Read(n) may not return EOF err when n > 0 bytes
+		// are read and instead return 0, EOF in subsequent call
+		return nil, nil, fmt.Errorf("incomplete frame header")
+	}
+
+	payload := make([]byte, header.frameSize)
+	bytesRead, err := i.stream.Read(payload)
+	if err != nil {
+		return nil, nil, err
+	} else if bytesRead != int(header.frameSize) {
+		return nil, nil, fmt.Errorf("incomplete frame data")
+	}
+	return &payload, header, nil
+}
+
+// parseFileHeader reads 32 bytes from stream and returns
+// IVF file header. This is always called before ParseNextFrame()
+func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
+	buffer := make([]byte, ivfFileHeaderSize)
+
+	bytesRead, err := i.stream.Read(buffer)
+	if err != nil {
+		return nil, err
+	} else if bytesRead != ivfFileHeaderSize {
+		return nil, fmt.Errorf("incomplete file header")
+	}
+
+	header := &IVFFileHeader{
+		signature:     string(buffer[:4]),
+		version:       binary.LittleEndian.Uint16(buffer[4:6]),
+		headerSize:    binary.LittleEndian.Uint16(buffer[6:8]),
+		fourcc:        string(buffer[8:12]),
+		width:         binary.LittleEndian.Uint16(buffer[12:14]),
+		height:        binary.LittleEndian.Uint16(buffer[14:16]),
+		timebaseDenum: binary.LittleEndian.Uint32(buffer[16:20]),
+		timebaseNum:   binary.LittleEndian.Uint32(buffer[20:24]),
+		numFrames:     binary.LittleEndian.Uint32(buffer[24:28]),
+		unused:        binary.LittleEndian.Uint32(buffer[28:32]),
+	}
+
+	if header.signature != ivfFileHeaderSignature {
+		return nil, fmt.Errorf("IVF signature mismatch")
+	} else if header.version != uint16(0) {
+		errStr := fmt.Sprintf("IVF version unknown: %d,"+
+			" parser may not parse correctly", header.version)
+		return nil, fmt.Errorf(errStr)
+	}
 
 	return header, nil
 }
