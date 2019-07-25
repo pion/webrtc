@@ -125,6 +125,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Cecylia Bocovich](https://github.com/cohosh)
 * [Slugalisk](https://github.com/slugalisk)
 * [Agugua Kenechukwu](https://github.com/spaceCh1mp)
+* [Ato Araki](https://github.com/atotto)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -8,7 +8,7 @@ go get github.com/pion/webrtc/examples/echo
 ```
 
 ### Open echo example page
-[jsfiddle.net](https://jsfiddle.net/3m0zute8/) you should see two text-areas and a 'Start Session' button.
+[jsfiddle.net](https://jsfiddle.net/j3yhron4/) you should see two text-areas and a 'Start Session' button.
 
 ### Run echo, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser, copy that and:
