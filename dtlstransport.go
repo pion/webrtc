@@ -247,6 +247,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
 		ClientAuth:             dtls.RequireAnyClientCert,
 		LoggerFactory:          t.api.settingEngine.LoggerFactory,
+		InsecureSkipVerify:     true,
 	}
 
 	t.onStateChange(DTLSTransportStateConnecting)
