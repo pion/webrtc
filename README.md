@@ -124,6 +124,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [AlexWoo(武杰)](https://github.com/AlexWoo) *Fix RemoteDescription parsing for certificate fingerprint*
 * [Cecylia Bocovich](https://github.com/cohosh)
 * [Slugalisk](https://github.com/slugalisk)
+* [Agugua Kenechukwu](https://github.com/spaceCh1mp)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

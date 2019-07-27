@@ -42,14 +42,13 @@ type DataChannel struct {
 	// "blob". This attribute controls how binary data is exposed to scripts.
 	// binaryType                 string
 
-	// OnError             func()
-
 	onMessageHandler    func(DataChannelMessage)
 	onceMutex           sync.Mutex
 	openHandlerOnce     sync.Once
 	onOpenHandler       func()
 	onCloseHandler      func()
 	onBufferedAmountLow func()
+	onErrorHandler      func(error)
 
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
@@ -286,6 +285,33 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
 	}
 }
 
+// OnError sets an event handler which is invoked when
+// the underlying data transport cannot be read.
+func (d *DataChannel) OnError(f func(err error)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.onErrorHandler = f
+}
+
+func (d *DataChannel) onError(err error) (done chan struct{}) {
+	d.mu.RLock()
+	hdlr := d.onErrorHandler
+	d.mu.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	go func() {
+		hdlr(err)
+		close(done)
+	}()
+
+	return
+}
+
 func (d *DataChannel) readLoop() {
 	for {
 		buffer := make([]byte, dataChannelBufferSize)
@@ -295,8 +321,7 @@ func (d *DataChannel) readLoop() {
 			d.readyState = DataChannelStateClosed
 			d.mu.Unlock()
 			if err != io.EOF {
-				// pion/webrtc#746
-				d.log.Errorf("Failed to read from data channel %v", err)
+				d.onError(err)
 			}
 			d.onClose()
 			return
