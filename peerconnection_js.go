@@ -73,10 +73,11 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 		defer oldHandler.Release()
 	}
 	onDataChannelHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		// BUG(albrow): This reference to the underlying DataChannel doesn't know
+		// pion/webrtc/projects/15
+		// This reference to the underlying DataChannel doesn't know
 		// about any other references to the same DataChannel. This might result in
-		// memory leaks where we don't clean up handler functions. Could possibly
-		// fix by keeping a mutex-protected list of all DataChannel references as a
+		// memory leaks where we don't clean up handler functions. Could possibly fix
+		// by keeping a mutex-protected list of all DataChannel references as a
 		// property of this PeerConnection, but at the cost of additional overhead.
 		dataChannel := &DataChannel{
 			underlying: args[0].Get("channel"),
@@ -124,7 +125,7 @@ func (pc *PeerConnection) checkConfiguration(configuration Configuration) error 
 		}
 	}
 
-	// TODO: Enable these checks once Certificates are supported.
+	// https://github.com/pion/webrtc/issues/513
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4)
 	// if len(configuration.Certificates) > 0 {
 	// 	if len(configuration.Certificates) != len(existingConfiguration.Certificates) {

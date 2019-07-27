@@ -236,8 +236,8 @@ func (r *SCTPTransport) updateMessageSize() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	var remoteMaxMessageSize float64 = 65536 // TODO: get from SDP
-	var canSendSize float64 = 65536          // TODO: Get from SCTP implementation
+	var remoteMaxMessageSize float64 = 65536 // pion/webrtc#758
+	var canSendSize float64 = 65536          // pion/webrtc#758
 
 	r.maxMessageSize = r.calcMessageSize(remoteMaxMessageSize, canSendSize)
 }
