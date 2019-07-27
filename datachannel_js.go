@@ -67,7 +67,7 @@ func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 		defer oldHandler.Release()
 	}
 	onMessageHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		// TODO: Ensure message order?
+		// pion/webrtc/projects/15
 		data := args[0].Get("data")
 		go func() {
 			// valueToDataChannelMessage may block when handling 'Blob' data

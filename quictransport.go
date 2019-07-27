@@ -125,7 +125,6 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 	}
 
 	// Check the fingerprint if a certificate was exchanged
-	// TODO: Check why never received.
 	remoteCerts := t.TransportBase.GetRemoteCertificates()
 	if len(remoteCerts) > 0 {
 		err := t.validateFingerPrint(remoteParameters, remoteCerts[0])
