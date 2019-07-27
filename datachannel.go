@@ -50,6 +50,7 @@ type DataChannel struct {
 	onOpenHandler       func()
 	onCloseHandler      func()
 	onBufferedAmountLow func()
+	onErrorHandler      func()
 
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
@@ -286,6 +287,30 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
 	}
 }
 
+// OnError sets an event handler which is invoked when
+// the underlying data transport cannot be read.
+func (d *DataChannel) OnError(f func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.onErrorHandler = f
+}
+
+func (d *DataChannel) onError() (done chan struct{}) {
+	d.mu.RLock()
+	hdlr := d.onErrorHandler
+	d.mu.RUnlock()
+
+	done = make(chan struct{})
+	if hdlr == nil {
+		close(done)
+		return
+	}
+
+	hdlr()
+
+	return
+}
+
 func (d *DataChannel) readLoop() {
 	for {
 		buffer := make([]byte, dataChannelBufferSize)
@@ -296,7 +321,7 @@ func (d *DataChannel) readLoop() {
 			d.mu.Unlock()
 			if err != io.EOF {
 				// pion/webrtc#746
-				d.log.Errorf("Failed to read from data channel %v", err)
+				d.onError()
 			}
 			d.onClose()
 			return
