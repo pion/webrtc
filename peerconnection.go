@@ -1336,23 +1336,29 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 }
 
 // AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
+// Deprecated: Use AddTrack, AddTransceiverFromKind or AddTransceiverFromTrack
 func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+	return pc.AddTransceiverFromKind(trackOrKind, init...)
+}
+
+// AddTransceiverFromKind Create a new RTCRtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
+func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
 	direction := RTPTransceiverDirectionSendrecv
 	if len(init) > 1 {
-		return nil, fmt.Errorf("AddTransceiver only accepts one RtpTransceiverInit")
+		return nil, fmt.Errorf("AddTransceiverFromKind only accepts one RtpTransceiverInit")
 	} else if len(init) == 1 {
 		direction = init[0].Direction
 	}
 
 	switch direction {
 	case RTPTransceiverDirectionSendrecv:
-		receiver, err := pc.api.NewRTPReceiver(trackOrKind, pc.dtlsTransport)
+		receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
 		if err != nil {
 			return nil, err
 		}
 
 		payloadType := DefaultPayloadTypeOpus
-		if trackOrKind == RTPCodecTypeVideo {
+		if kind == RTPCodecTypeVideo {
 			payloadType = DefaultPayloadTypeVP8
 		}
 
@@ -1370,11 +1376,11 @@ func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTr
 			receiver,
 			sender,
 			RTPTransceiverDirectionSendrecv,
-			trackOrKind,
+			kind,
 		), nil
 
 	case RTPTransceiverDirectionRecvonly:
-		receiver, err := pc.api.NewRTPReceiver(trackOrKind, pc.dtlsTransport)
+		receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
 		if err != nil {
 			return nil, err
 		}
@@ -1383,10 +1389,55 @@ func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTr
 			receiver,
 			nil,
 			RTPTransceiverDirectionRecvonly,
-			trackOrKind,
+			kind,
 		), nil
 	default:
-		return nil, fmt.Errorf("AddTransceiver currently only suports recvonly and sendrecv")
+		return nil, fmt.Errorf("AddTransceiverFromKind currently only supports recvonly and sendrecv")
+	}
+}
+
+// AddTransceiverFromTrack Creates a new send only transceiver and add it to the set of
+func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+	direction := RTPTransceiverDirectionSendrecv
+	if len(init) > 1 {
+		return nil, fmt.Errorf("AddTransceiverFromTrack only accepts one RtpTransceiverInit")
+	} else if len(init) == 1 {
+		direction = init[0].Direction
+	}
+
+	switch direction {
+	case RTPTransceiverDirectionSendrecv:
+		receiver, err := pc.api.NewRTPReceiver(track.Kind(), pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+
+		return pc.newRTPTransceiver(
+			receiver,
+			sender,
+			RTPTransceiverDirectionSendrecv,
+			track.Kind(),
+		), nil
+
+	case RTPTransceiverDirectionSendonly:
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+
+		return pc.newRTPTransceiver(
+			nil,
+			sender,
+			RTPTransceiverDirectionSendonly,
+			track.Kind(),
+		), nil
+	default:
+		return nil, fmt.Errorf("AddTransceiverFromTrack currently only supports sendonly and sendrecv")
 	}
 }
 
