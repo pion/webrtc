@@ -18,7 +18,18 @@ import (
 	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/stretchr/testify/assert"
 )
+
+func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
+	for _, media := range offer.parsed.MediaDescriptions {
+		if media.MediaName.Media == kind.String() {
+			_, exists := media.Attribute(direction.String())
+			return exists
+		}
+	}
+	return false
+}
 
 func TestSRTPDrainLeak(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -621,4 +632,213 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 	if got, want := videoDesc.MediaName.Formats, []string{"0"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", *videoDesc.MediaName.String())
 	}
+}
+
+func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	track, err := pc.NewTrack(
+		DefaultPayloadTypeOpus,
+		0xDEADBEEF,
+		"track-id",
+		"track-label",
+	)
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiverFromTrack(track, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionSendonly,
+	})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if transceiver.Receiver != nil {
+		t.Errorf("Transceiver shouldn't have a receiver")
+	}
+
+	if transceiver.Sender == nil {
+		t.Errorf("Transceiver should have a sender")
+	}
+
+	if len(pc.GetTransceivers()) != 1 {
+		t.Errorf("PeerConnection should have one transceiver but has %d", len(pc.GetTransceivers()))
+	}
+
+	if len(pc.GetSenders()) != 1 {
+		t.Errorf("PeerConnection should have one sender but has %d", len(pc.GetSenders()))
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly) {
+		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendonly)
+	}
+}
+
+func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	track, err := pc.NewTrack(
+		DefaultPayloadTypeOpus,
+		0xDEADBEEF,
+		"track-id",
+		"track-label",
+	)
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiverFromTrack(track, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionSendrecv,
+	})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if transceiver.Receiver == nil {
+		t.Errorf("Transceiver should have a receiver")
+	}
+
+	if transceiver.Sender == nil {
+		t.Errorf("Transceiver should have a sender")
+	}
+
+	if len(pc.GetTransceivers()) != 1 {
+		t.Errorf("PeerConnection should have one transceiver but has %d", len(pc.GetTransceivers()))
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv) {
+		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
+	}
+}
+
+func TestAddTransceiver(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionSendrecv,
+	})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if transceiver.Receiver == nil {
+		t.Errorf("Transceiver should have a receiver")
+	}
+
+	if transceiver.Sender == nil {
+		t.Errorf("Transceiver should have a sender")
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv) {
+		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
+	}
+}
+
+func TestAddTransceiverFromKind(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionRecvonly,
+	})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if transceiver.Receiver == nil {
+		t.Errorf("Transceiver should have a receiver")
+	}
+
+	if transceiver.Sender != nil {
+		t.Errorf("Transceiver shouldn't have a sender")
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly) {
+		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionRecvonly)
+	}
+}
+
+func TestAddTransceiverFromKindFailsSendOnly(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionSendonly,
+	})
+
+	if transceiver != nil {
+		t.Error("AddTransceiverFromKind shouldn't succeed with Direction RTPTransceiverDirectionSendonly")
+	}
+
+	assert.NotNil(t, err)
+}
+
+func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	track, err := pc.NewTrack(
+		DefaultPayloadTypeH264,
+		0xDEADBEEF,
+		"track-id",
+		"track-label",
+	)
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	transceiver, err := pc.AddTransceiverFromTrack(track, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionRecvonly,
+	})
+
+	if transceiver != nil {
+		t.Error("AddTransceiverFromTrack shouldn't succeed with Direction RTPTransceiverDirectionRecvonly")
+	}
+
+	assert.NotNil(t, err)
 }
