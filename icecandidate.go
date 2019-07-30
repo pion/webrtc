@@ -137,3 +137,26 @@ func (c ICECandidate) String() string {
 	}
 	return ic.String()
 }
+
+// ToJSON returns an ICECandidateInit
+// as indicated by the spec https://w3c.github.io/webrtc-pc/#dom-rtcicecandidate-tojson
+func (c ICECandidate) ToJSON() ICECandidateInit {
+	candidate := fmt.Sprintf("candidate:%s %d %s %d %s %d typ %s",
+		c.Foundation,
+		c.Component,
+		c.Protocol,
+		c.Priority,
+		c.Address,
+		c.Port,
+		c.Typ)
+
+	if len(c.RelatedAddress) > 0 {
+		candidate = fmt.Sprintf("%s raddr %s rport %d",
+			candidate,
+			c.RelatedAddress,
+			c.RelatedPort)
+	}
+
+	var sdpmLineIndex uint16
+	return ICECandidateInit{Candidate: candidate, SDPMLineIndex: &sdpmLineIndex}
+}
