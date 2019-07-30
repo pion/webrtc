@@ -147,6 +147,10 @@ func (g *ICEGatherer) Gather() error {
 
 	g.lock.Lock()
 	onLocalCandidateHdlr := g.onLocalCandidateHdlr
+	if onLocalCandidateHdlr == nil {
+		onLocalCandidateHdlr = func(*ICECandidate) {}
+	}
+
 	isTrickle := g.agentIsTrickle
 	agent := g.agent
 	g.lock.Unlock()
