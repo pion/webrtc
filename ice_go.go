@@ -53,17 +53,3 @@ func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
 		RelatedPort:    c.RelatedPort,
 	}, nil
 }
-
-func iceCandidateToSDP(c ICECandidate) sdp.ICECandidate {
-	return sdp.ICECandidate{
-		Foundation:     c.Foundation,
-		Priority:       c.Priority,
-		Address:        c.Address,
-		Protocol:       c.Protocol.String(),
-		Port:           c.Port,
-		Component:      c.Component,
-		Typ:            c.Typ.String(),
-		RelatedAddress: c.RelatedAddress,
-		RelatedPort:    c.RelatedPort,
-	}
-}

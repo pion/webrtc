@@ -825,17 +825,21 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return err
 	}
 
+	// To support all unittests which are following the future trickle=true
+	// setup while also support the old trickle=false synchronous gathering
+	// process this is necessary to avoid calling Garther() in multiple
+	// pleces; which causes race conditions. (issue-707)
 	if !pc.iceGatherer.agentIsTrickle {
-		// To support all unittests which are following the future trickle=true
-		// setup while also support the old trickle=false synchronous gathering
-		// process this is necessary to avoid calling Garther() in multiple
-		// pleces; which causes race conditions. (issue-707)
 		if err := pc.iceGatherer.SignalCandidates(); err != nil {
 			return err
 		}
 		return nil
 	}
-	return pc.iceGatherer.Gather()
+
+	if desc.Type == SDPTypeAnswer {
+		return pc.iceGatherer.Gather()
+	}
+	return nil
 }
 
 // LocalDescription returns pendingLocalDescription if it is not null and
@@ -850,7 +854,7 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
-func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
+func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { //nolint pion/webrtc#614
 	if pc.currentRemoteDescription != nil { // pion/webrtc#207
 		return fmt.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
@@ -1027,6 +1031,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		pc.mu.Unlock()
 	}()
 
+	if (desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer) && pc.iceGatherer.agentIsTrickle {
+		return pc.iceGatherer.Gather()
+	}
 	return nil
 }
 
