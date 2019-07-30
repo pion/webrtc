@@ -50,7 +50,6 @@ func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 		stream: in,
 	}
 
-	// TODO: Return file header somewhere else?
 	header, err := reader.parseFileHeader()
 	if err != nil {
 		return nil, nil, err
@@ -62,38 +61,32 @@ func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 // ParseNextFrame reads from stream and returns IVF frame payload, header,
 // and an error if there is incomplete frame data.
 // Returns all nil values when no more frames are available.
-func (i *IVFReader) ParseNextFrame() (*[]byte, *IVFFrameHeader, error) {
+func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 	buffer := make([]byte, ivfFrameHeaderSize)
 	var header *IVFFrameHeader
-	switch bytesRead, err := i.stream.Read(buffer); bytesRead {
-	case ivfFrameHeaderSize:
-		header = &IVFFrameHeader{
-			frameSize: binary.LittleEndian.Uint32(buffer[:4]),
-			timestamp: binary.LittleEndian.Uint64(buffer[4:12]),
-		}
-	case 0:
-		if err == io.EOF {
-			// No more frames to parse
-			return nil, nil, nil
-		}
-		fallthrough
-	default:
-		if err != nil {
-			return nil, nil, err
-		}
+
+	bytesRead, err := i.stream.Read(buffer)
+	if err != nil {
+		return nil, nil, err
+	} else if bytesRead != ivfFrameHeaderSize {
 		// io.Reader.Read(n) may not return EOF err when n > 0 bytes
 		// are read and instead return 0, EOF in subsequent call
 		return nil, nil, fmt.Errorf("incomplete frame header")
 	}
 
+	header = &IVFFrameHeader{
+		frameSize: binary.LittleEndian.Uint32(buffer[:4]),
+		timestamp: binary.LittleEndian.Uint64(buffer[4:12]),
+	}
+
 	payload := make([]byte, header.frameSize)
-	bytesRead, err := i.stream.Read(payload)
+	bytesRead, err = i.stream.Read(payload)
 	if err != nil {
 		return nil, nil, err
 	} else if bytesRead != int(header.frameSize) {
 		return nil, nil, fmt.Errorf("incomplete frame data")
 	}
-	return &payload, header, nil
+	return payload, header, nil
 }
 
 // parseFileHeader reads 32 bytes from stream and returns
