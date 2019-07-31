@@ -1,9 +1,9 @@
-# pion-to-pion
-pion-to-pion is an example of two pion instances communicating directly!
+# pion-to-pion-trickle
+pion-to-pion-trickle is an example of two pion instances communicating directly!
+This example uses Trickle ICE, this allows communication to begin before gathering
+has completed.
 
-To see an example of `pion-to-pion` that uses Trickle ICE see `pion-to-pion-trickle`.
-This may connect faster (and will eventually become the default API) but requires
-more code.
+See `pion-to-pion` example of a non-Trickle version of this.
 
 The SDP offer and answer are exchanged automatically over HTTP.
 The `answer` side acts like a HTTP server and should therefore be ran first.
@@ -21,10 +21,3 @@ offer
 ```
 
 You should see them connect and start to exchange messages.
-
-## You can use Docker-compose to start this example:
-```sh
-docker-compose up -d
-```
-
-Now, you can see message exchanging, using `docker logs`.
