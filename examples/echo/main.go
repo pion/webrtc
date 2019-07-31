@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pion/rtcp"
@@ -31,10 +31,14 @@ func main() {
 	// Add codecs to the mediaEngine. Note that even though we are only going to echo back the sender's video we also
 	// add audio codecs. This is because createAnswer will create an audioTransceiver and associated SDP and we currently
 	// cannot tell it not to. The audio SDP must match the sender's codecs too...
-	err = setCodecsFromOffer(offerSD, &mediaEngine)
+	videoPayloadTypePtr, err := setCodecsFromOffer(offerSD, &mediaEngine)
 	if err != nil {
 		panic(err)
 	}
+	if videoPayloadTypePtr == nil {
+		panic("no video payload type in offer sdp")
+	}
+
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
 
 	// Prepare the configuration
@@ -50,36 +54,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
 	if err != nil {
 		panic(err)
 	}
 
-	// Transceivers for audio and video are created by CreateAnswer if not present.
-	// We create the video transceiver here so we can get its sender's SSRC
-	transceiver, err := peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo)
+	// Create Track that we send video back to browser on
+	outputTrack, err := peerConnection.NewTrack(*videoPayloadTypePtr, rand.Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}
 
-	// Create an answer
-	answer, err := peerConnection.CreateAnswer(nil)
-	if err != nil {
+	// Add this newly created track to the PeerConnection
+	if _, err = peerConnection.AddTrack(outputTrack); err != nil {
 		panic(err)
 	}
 
-	// Sets the LocalDescription, and starts our UDP listeners
-	err = peerConnection.SetLocalDescription(answer)
-	if err != nil {
-		panic(err)
-	}
-
-	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(answer))
-
-	outputTrack := transceiver.Sender.Track()
 	// Set a handler for when a new remote track starts, this handler copies inbound RTP packets,
 	// replaces the SSRC and sends them back
 	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
@@ -106,6 +97,7 @@ func main() {
 			// Replace the SSRC with the SSRC of the outbound track.
 			// The only change we are making replacing the SSRC, the RTP packets are unchanged otherwise
 			rtp.SSRC = outputTrack.SSRC()
+			rtp.PayloadType = webrtc.DefaultPayloadTypeVP8
 
 			if writeErr := outputTrack.WriteRTP(rtp); writeErr != nil {
 				panic(writeErr)
@@ -118,53 +110,73 @@ func main() {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 
+	// Create an answer
+	answer, err := peerConnection.CreateAnswer(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// Sets the LocalDescription, and starts our UDP listeners
+	err = peerConnection.SetLocalDescription(answer)
+	if err != nil {
+		panic(err)
+	}
+
+	// Output the answer in base64 so we can paste it in browser
+	fmt.Println(signal.Encode(answer))
+
 	// Block forever
 	select {}
 	}
 
 // setCodecsFromOffer finds all codecs in a session description and adds them to a MediaEngine, using dynamic
-// payload types and parameters from the sdp
-func setCodecsFromOffer(offerSD sdp.SessionDescription, mediaEngine *webrtc.MediaEngine) error {
+// payload types and parameters from the sdp. Returns dynamic payload type of first video
+func setCodecsFromOffer(offerSD sdp.SessionDescription, mediaEngine *webrtc.MediaEngine) (*uint8, error) {
+	var firstVideoPayloadType *uint8
+	setfirstVideoPayloadType := false
 	for _, md := range offerSD.MediaDescriptions {
-		formats, err := md.MediaFormats()
-	if err != nil {
-			return err
-	}
-		for _, format := range formats {
-			if format.MediaType == "video" || format.MediaType == "audio" {
-				splits := strings.Split(format.EncodingName, "/")
-				if len(splits) < 2 {
-					return fmt.Errorf("unexpected encoding name %s", format.EncodingName)
-				}
-				codecName := splits[0]
-				cr, err := strconv.Atoi(splits[1])
-	if err != nil {
-					return fmt.Errorf("couldn't extract integer clock rate from encoding name %s", format.EncodingName)
-	}
-				clockRate := uint32(cr)
-				payloadType := uint8(format.PayloadType)
-				var codec *webrtc.RTPCodec
-				switch codecName {
-				case webrtc.G722:
-					codec = webrtc.NewRTPG722Codec(payloadType, clockRate)
-				case webrtc.Opus:
-					codec = webrtc.NewRTPOpusCodec(payloadType, clockRate)
-				case webrtc.VP8:
-					codec = webrtc.NewRTPVP8Codec(payloadType, clockRate)
-					codec.SDPFmtpLine = format.Parameters
-				case webrtc.VP9:
-					codec = webrtc.NewRTPVP9Codec(payloadType, clockRate)
-					codec.SDPFmtpLine = format.Parameters
-				case webrtc.H264:
-					codec = webrtc.NewRTPH264Codec(payloadType, clockRate)
-					codec.SDPFmtpLine = format.Parameters
-				default:
-					//fmt.Printf("ignoring offer codec %s\n", codecName)
-					continue
-				}
-				mediaEngine.RegisterCodec(codec)
+		if firstVideoPayloadType == nil {
+			if md.MediaName.Media == "video" {
+				setfirstVideoPayloadType = true
+			}
+		}
+		for _, format := range md.MediaName.Formats {
+			pt, err := strconv.Atoi(format)
+			if err != nil {
+				return nil, fmt.Errorf("format parse error")
+			}
+			payloadType := uint8(pt)
+			payloadCodec, err := offerSD.GetCodecForPayloadType(payloadType)
+			if err != nil {
+				return nil, fmt.Errorf("could not find codec for payload type %d", payloadType)
+			}
+			var codec *webrtc.RTPCodec
+			clockRate := payloadCodec.ClockRate
+			parameters := payloadCodec.Fmtp
+			switch payloadCodec.Name {
+			case webrtc.G722:
+				codec = webrtc.NewRTPG722Codec(payloadType, clockRate)
+			case webrtc.Opus:
+				codec = webrtc.NewRTPOpusCodec(payloadType, clockRate)
+			case webrtc.VP8:
+				codec = webrtc.NewRTPVP8Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case webrtc.VP9:
+				codec = webrtc.NewRTPVP9Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case webrtc.H264:
+				codec = webrtc.NewRTPH264Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			default:
+				//fmt.Printf("ignoring offer codec %s\n", codecName)
+				continue
+			}
+			mediaEngine.RegisterCodec(codec)
+			if setfirstVideoPayloadType {
+				firstVideoPayloadType = &payloadType
+				setfirstVideoPayloadType = false
 			}
 		}
 	}
-	return nil
+	return firstVideoPayloadType, nil
 }

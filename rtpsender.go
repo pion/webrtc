@@ -161,8 +161,3 @@ func (r *RTPSender) hasSent() bool {
 		return false
 	}
 }
-
-// Track returns a pointer to the sender's track
-func (r *RTPSender) Track() *Track {
-	return r.track
-}
