@@ -127,7 +127,7 @@ func main() {
 
 	// Block forever
 	select {}
-	}
+}
 
 // setCodecsFromOffer finds all codecs in a session description and adds them to a MediaEngine, using dynamic
 // payload types and parameters from the sdp. Returns dynamic payload type of first video
