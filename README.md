@@ -127,6 +127,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Agugua Kenechukwu](https://github.com/spaceCh1mp)
 * [Ato Araki](https://github.com/atotto)
 * [Rafael Viscarra](https://github.com/rviscarra)
+* [Mike Coleman](https://github.com/fivebats)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
