@@ -1364,12 +1364,12 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 			return nil, err
 		}
 
-		payloadType := DefaultPayloadTypeOpus
-		if kind == RTPCodecTypeVideo {
-			payloadType = DefaultPayloadTypeVP8
+		codecs := pc.api.mediaEngine.getCodecsByKind(kind)
+		if len(codecs) == 0 {
+			return nil, fmt.Errorf("no %s codecs found", kind.String())
 		}
 
-		track, err := pc.NewTrack(uint8(payloadType), mathRand.Uint32(), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultLabelLength))
+		track, err := pc.NewTrack(codecs[0].PayloadType, mathRand.Uint32(), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultLabelLength))
 		if err != nil {
 			return nil, err
 		}
