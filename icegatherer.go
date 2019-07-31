@@ -274,12 +274,14 @@ func (g *ICEGatherer) SignalCandidates() error {
 	g.lock.Unlock()
 
 	if onLocalCandidateHdlr != nil {
-		for i := range candidates {
-			go onLocalCandidateHdlr(&candidates[i])
-		}
-		// Call the handler one last time with nil. This is a signal that candidate
-		// gathering is complete.
-		go onLocalCandidateHdlr(nil)
+		go func() {
+			for i := range candidates {
+				onLocalCandidateHdlr(&candidates[i])
+			}
+			// Call the handler one last time with nil. This is a signal that candidate
+			// gathering is complete.
+			onLocalCandidateHdlr(nil)
+		}()
 	}
 	return nil
 }
