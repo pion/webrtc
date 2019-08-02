@@ -31,7 +31,7 @@ func main() {
 	// Add codecs to the mediaEngine. Note that even though we are only going to echo back the sender's video we also
 	// add audio codecs. This is because createAnswer will create an audioTransceiver and associated SDP and we currently
 	// cannot tell it not to. The audio SDP must match the sender's codecs too...
-	err = populateMediaEngineFromSDP(offerSD, &mediaEngine)
+	err = mediaEngine.PopulateFromSDP(offerSD)
 	if err != nil {
 		panic(err)
 	}
@@ -145,45 +145,4 @@ func firstVideoPayloadType(sd sdp.SessionDescription) (uint8, error) {
 		}
 	}
 	return 0, fmt.Errorf("no video descriptors found")
-}
-
-// populateMediaEngineFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
-// payload types and parameters from the sdp.
-func populateMediaEngineFromSDP(sd sdp.SessionDescription, mediaEngine *webrtc.MediaEngine) error {
-	for _, md := range sd.MediaDescriptions {
-		for _, format := range md.MediaName.Formats {
-			pt, err := strconv.Atoi(format)
-			if err != nil {
-				return fmt.Errorf("format parse error")
-			}
-			payloadType := uint8(pt)
-			payloadCodec, err := sd.GetCodecForPayloadType(payloadType)
-			if err != nil {
-				return fmt.Errorf("could not find codec for payload type %d", payloadType)
-			}
-			var codec *webrtc.RTPCodec
-			clockRate := payloadCodec.ClockRate
-			parameters := payloadCodec.Fmtp
-			switch payloadCodec.Name {
-			case webrtc.G722:
-				codec = webrtc.NewRTPG722Codec(payloadType, clockRate)
-			case webrtc.Opus:
-				codec = webrtc.NewRTPOpusCodec(payloadType, clockRate)
-			case webrtc.VP8:
-				codec = webrtc.NewRTPVP8Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
-			case webrtc.VP9:
-				codec = webrtc.NewRTPVP9Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
-			case webrtc.H264:
-				codec = webrtc.NewRTPH264Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
-			default:
-				//fmt.Printf("ignoring offer codec %s\n", codecName)
-				continue
-			}
-			mediaEngine.RegisterCodec(codec)
-		}
-	}
-	return nil
 }
