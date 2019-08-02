@@ -44,15 +44,20 @@ func (m *MediaEngine) RegisterDefaultCodecs() {
 
 // PopulateFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
 // payload types and parameters from the sdp.
-func (m *MediaEngine) PopulateFromSDP(sd sdp.SessionDescription) error {
-	for _, md := range sd.MediaDescriptions {
+func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
+	sdpsd := sdp.SessionDescription{}
+	err := sdpsd.Unmarshal([]byte(sd.SDP))
+	if err != nil {
+		return err
+	}
+	for _, md := range sdpsd.MediaDescriptions {
 		for _, format := range md.MediaName.Formats {
 			pt, err := strconv.Atoi(format)
 			if err != nil {
 				return fmt.Errorf("format parse error")
 			}
 			payloadType := uint8(pt)
-			payloadCodec, err := sd.GetCodecForPayloadType(payloadType)
+			payloadCodec, err := sdpsd.GetCodecForPayloadType(payloadType)
 			if err != nil {
 				return fmt.Errorf("could not find codec for payload type %d", payloadType)
 			}
