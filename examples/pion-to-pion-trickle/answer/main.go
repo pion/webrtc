@@ -50,7 +50,7 @@ func main() {
 		}
 
 		payload := []byte(c.ToJSON().Candidate)
-		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
+		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *offerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 		if onICECandidateErr != nil {
 			panic(onICECandidateErr)
 		} else if closeErr := resp.Body.Close(); closeErr != nil {
@@ -88,12 +88,6 @@ func main() {
 			panic(err)
 		}
 
-		// Sets the LocalDescription, and starts our UDP listeners
-		err = peerConnection.SetLocalDescription(answer)
-		if err != nil {
-			panic(err)
-		}
-
 		// Send our answer to the HTTP server listening in the other process
 		payload, err := json.Marshal(answer)
 		if err != nil {
@@ -104,6 +98,12 @@ func main() {
 			panic(err)
 		} else if closeErr := resp.Body.Close(); closeErr != nil {
 			panic(closeErr)
+		}
+
+		// Sets the LocalDescription, and starts our UDP listeners
+		err = peerConnection.SetLocalDescription(answer)
+		if err != nil {
+			panic(err)
 		}
 	})
 
