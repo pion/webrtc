@@ -31,7 +31,7 @@ func main() {
 	// Add codecs to the mediaEngine. Note that even though we are only going to echo back the sender's video we also
 	// add audio codecs. This is because createAnswer will create an audioTransceiver and associated SDP and we currently
 	// cannot tell it not to. The audio SDP must match the sender's codecs too...
-	err = mediaEngine.PopulateFromSDP(offerSD)
+	err = mediaEngine.PopulateFromSDP(offer)
 	if err != nil {
 		panic(err)
 	}
