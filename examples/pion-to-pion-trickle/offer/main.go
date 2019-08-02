@@ -53,13 +53,9 @@ func main() {
 		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 		if onICECandidateErr != nil {
 			panic(onICECandidateErr)
+		} else if closeErr := resp.Body.Close(); closeErr != nil {
+			panic(closeErr)
 		}
-		defer func() {
-			closeErr := resp.Body.Close()
-			if closeErr != nil {
-				panic(closeErr)
-			}
-		}()
 	})
 
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
@@ -141,13 +137,9 @@ func main() {
 	resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 	if err != nil {
 		panic(err)
+	} else if err := resp.Body.Close(); err != nil {
+		panic(err)
 	}
-	defer func() {
-		closeErr := resp.Body.Close()
-		if closeErr != nil {
-			panic(closeErr)
-		}
-	}()
 
 	// Block forever
 	select {}
