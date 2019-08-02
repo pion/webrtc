@@ -79,7 +79,7 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 				codec = NewRTPH264Codec(payloadType, clockRate)
 				codec.SDPFmtpLine = parameters
 			default:
-				//fmt.Printf("ignoring offer codec %s\n", codecName)
+				// ignoring other codecs
 				continue
 			}
 			m.RegisterCodec(codec)
