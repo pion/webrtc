@@ -53,13 +53,9 @@ func main() {
 		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 		if onICECandidateErr != nil {
 			panic(onICECandidateErr)
+		} else if closeErr := resp.Body.Close(); closeErr != nil {
+			panic(closeErr)
 		}
-		defer func() {
-			closeErr := resp.Body.Close()
-			if closeErr != nil {
-				panic(closeErr)
-			}
-		}()
 	})
 
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
@@ -106,16 +102,10 @@ func main() {
 		resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *offerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 		if err != nil {
 			panic(err)
+		} else if closeErr := resp.Body.Close(); closeErr != nil {
+			panic(closeErr)
 		}
-		defer func() {
-			closeErr := resp.Body.Close()
-			if closeErr != nil {
-				panic(closeErr)
-			}
-		}()
 	})
-	// Start HTTP server that accepts requests from the offer process
-	go func() { panic(http.ListenAndServe(*answerAddr, nil)) }()
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
@@ -149,6 +139,6 @@ func main() {
 		})
 	})
 
-	// Block forever
-	select {}
+	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
+	panic(http.ListenAndServe(*answerAddr, nil))
 }
