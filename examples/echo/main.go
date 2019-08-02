@@ -31,11 +31,12 @@ func main() {
 	// Add codecs to the mediaEngine. Note that even though we are only going to echo back the sender's video we also
 	// add audio codecs. This is because createAnswer will create an audioTransceiver and associated SDP and we currently
 	// cannot tell it not to. The audio SDP must match the sender's codecs too...
-	videoPayloadTypePtr, err := setCodecsFromOffer(offerSD, &mediaEngine)
+	err = populateMediaEngineFromSDP(offerSD, &mediaEngine)
 	if err != nil {
 		panic(err)
 	}
-	if videoPayloadTypePtr == nil {
+	videoPayloadType, err := firstVideoPayloadType(offerSD)
+	if err != nil {
 		panic("no video payload type in offer sdp")
 	}
 
@@ -61,7 +62,7 @@ func main() {
 	}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(*videoPayloadTypePtr, rand.Uint32(), "video", "pion")
+	outputTrack, err := peerConnection.NewTrack(videoPayloadType, rand.Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +98,6 @@ func main() {
 			// Replace the SSRC with the SSRC of the outbound track.
 			// The only change we are making replacing the SSRC, the RTP packets are unchanged otherwise
 			rtp.SSRC = outputTrack.SSRC()
-			rtp.PayloadType = webrtc.DefaultPayloadTypeVP8
 
 			if writeErr := outputTrack.WriteRTP(rtp); writeErr != nil {
 				panic(writeErr)
@@ -129,26 +129,37 @@ func main() {
 	select {}
 }
 
-// setCodecsFromOffer finds all codecs in a session description and adds them to a MediaEngine, using dynamic
-// payload types and parameters from the sdp. Returns dynamic payload type of first video
-func setCodecsFromOffer(offerSD sdp.SessionDescription, mediaEngine *webrtc.MediaEngine) (*uint8, error) {
-	var firstVideoPayloadType *uint8
-	setfirstVideoPayloadType := false
-	for _, md := range offerSD.MediaDescriptions {
-		if firstVideoPayloadType == nil {
-			if md.MediaName.Media == "video" {
-				setfirstVideoPayloadType = true
+// firstVideoPayloadType finds the dynamic payload type of the first video
+// codec in the session description
+func firstVideoPayloadType(sd sdp.SessionDescription) (uint8, error) {
+	for _, md := range sd.MediaDescriptions {
+		if md.MediaName.Media == "video" {
+			if len(md.MediaName.Formats) == 0 {
+				return 0, fmt.Errorf("no video payload types found")
 			}
+			payloadType, err := strconv.Atoi(md.MediaName.Formats[0])
+			if err != nil {
+				return 0, err
+			}
+			return uint8(payloadType), nil
 		}
+	}
+	return 0, fmt.Errorf("no video descriptors found")
+}
+
+// populateMediaEngineFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
+// payload types and parameters from the sdp.
+func populateMediaEngineFromSDP(sd sdp.SessionDescription, mediaEngine *webrtc.MediaEngine) error {
+	for _, md := range sd.MediaDescriptions {
 		for _, format := range md.MediaName.Formats {
 			pt, err := strconv.Atoi(format)
 			if err != nil {
-				return nil, fmt.Errorf("format parse error")
+				return fmt.Errorf("format parse error")
 			}
 			payloadType := uint8(pt)
-			payloadCodec, err := offerSD.GetCodecForPayloadType(payloadType)
+			payloadCodec, err := sd.GetCodecForPayloadType(payloadType)
 			if err != nil {
-				return nil, fmt.Errorf("could not find codec for payload type %d", payloadType)
+				return fmt.Errorf("could not find codec for payload type %d", payloadType)
 			}
 			var codec *webrtc.RTPCodec
 			clockRate := payloadCodec.ClockRate
@@ -172,11 +183,7 @@ func setCodecsFromOffer(offerSD sdp.SessionDescription, mediaEngine *webrtc.Medi
 				continue
 			}
 			mediaEngine.RegisterCodec(codec)
-			if setfirstVideoPayloadType {
-				firstVideoPayloadType = &payloadType
-				setfirstVideoPayloadType = false
-			}
 		}
 	}
-	return firstVideoPayloadType, nil
+	return nil
 }
