@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,47 @@ func (m *MediaEngine) RegisterDefaultCodecs() {
 	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
 	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
 	m.RegisterCodec(NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000))
+}
+
+// PopulateFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
+// payload types and parameters from the sdp.
+func (m *MediaEngine) PopulateFromSDP(sd sdp.SessionDescription) error {
+	for _, md := range sd.MediaDescriptions {
+		for _, format := range md.MediaName.Formats {
+			pt, err := strconv.Atoi(format)
+			if err != nil {
+				return fmt.Errorf("format parse error")
+			}
+			payloadType := uint8(pt)
+			payloadCodec, err := sd.GetCodecForPayloadType(payloadType)
+			if err != nil {
+				return fmt.Errorf("could not find codec for payload type %d", payloadType)
+			}
+			var codec *RTPCodec
+			clockRate := payloadCodec.ClockRate
+			parameters := payloadCodec.Fmtp
+			switch payloadCodec.Name {
+			case G722:
+				codec = NewRTPG722Codec(payloadType, clockRate)
+			case Opus:
+				codec = NewRTPOpusCodec(payloadType, clockRate)
+			case VP8:
+				codec = NewRTPVP8Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case VP9:
+				codec = NewRTPVP9Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case H264:
+				codec = NewRTPH264Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			default:
+				//fmt.Printf("ignoring offer codec %s\n", codecName)
+				continue
+			}
+			m.RegisterCodec(codec)
+		}
+	}
+	return nil
 }
 
 func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
