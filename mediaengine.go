@@ -88,6 +88,15 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 	return nil
 }
 
+// FirsCodecOfKind returns the first codec of a chosen kind in the codecs list
+func (m *MediaEngine) FirsCodecOfKind(kind RTPCodecType) (*RTPCodec, error) {
+	foundCodecs := m.getCodecsByKind(kind)
+	if len(foundCodecs) == 0 {
+		return nil, fmt.Errorf("none found")
+	}
+	return foundCodecs[0], nil
+}
+
 func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
 	for _, codec := range m.codecs {
 		if codec.PayloadType == payloadType {
