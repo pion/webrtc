@@ -3,11 +3,9 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/pion/rtcp"
-	"github.com/pion/sdp/v2"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
@@ -18,11 +16,7 @@ func main() {
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
 	signal.Decode(signal.MustReadStdin(), &offer)
-	var offerSD sdp.SessionDescription
-	err := offerSD.Unmarshal([]byte(offer.SDP))
-	if err != nil {
-		panic(err)
-	}
+
 	// We make our own mediaEngine so we can place the sender's codecs in it. Since we are echoing their RTP packet
 	// back to them we are actually codec agnostic - we can accept all their codecs. This also ensures that we use the
 	// dynamic media type from the sender in our answer.
@@ -31,13 +25,14 @@ func main() {
 	// Add codecs to the mediaEngine. Note that even though we are only going to echo back the sender's video we also
 	// add audio codecs. This is because createAnswer will create an audioTransceiver and associated SDP and we currently
 	// cannot tell it not to. The audio SDP must match the sender's codecs too...
-	err = mediaEngine.PopulateFromSDP(offer)
+	err := mediaEngine.PopulateFromSDP(offer)
 	if err != nil {
 		panic(err)
 	}
-	videoPayloadType, err := firstVideoPayloadType(offerSD)
+
+	preferredCodec, err := mediaEngine.FirsCodecOfKind(webrtc.RTPCodecTypeVideo)
 	if err != nil {
-		panic("no video payload type in offer sdp")
+		panic("no video codec in offer sdp")
 	}
 
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
@@ -62,7 +57,7 @@ func main() {
 	}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(videoPayloadType, rand.Uint32(), "video", "pion")
+	outputTrack, err := peerConnection.NewTrack(preferredCodec.PayloadType, rand.Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}
@@ -127,22 +122,4 @@ func main() {
 
 	// Block forever
 	select {}
-}
-
-// firstVideoPayloadType finds the dynamic payload type of the first video
-// codec in the session description
-func firstVideoPayloadType(sd sdp.SessionDescription) (uint8, error) {
-	for _, md := range sd.MediaDescriptions {
-		if md.MediaName.Media == "video" {
-			if len(md.MediaName.Formats) == 0 {
-				return 0, fmt.Errorf("no video payload types found")
-			}
-			payloadType, err := strconv.Atoi(md.MediaName.Formats[0])
-			if err != nil {
-				return 0, err
-			}
-			return uint8(payloadType), nil
-		}
-	}
-	return 0, fmt.Errorf("no video descriptors found")
 }
