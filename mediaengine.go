@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,61 @@ func (m *MediaEngine) RegisterDefaultCodecs() {
 	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
 	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
 	m.RegisterCodec(NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000))
+}
+
+// PopulateFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
+// payload types and parameters from the sdp.
+func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
+	sdpsd := sdp.SessionDescription{}
+	err := sdpsd.Unmarshal([]byte(sd.SDP))
+	if err != nil {
+		return err
+	}
+	for _, md := range sdpsd.MediaDescriptions {
+		for _, format := range md.MediaName.Formats {
+			pt, err := strconv.Atoi(format)
+			if err != nil {
+				return fmt.Errorf("format parse error")
+			}
+			payloadType := uint8(pt)
+			payloadCodec, err := sdpsd.GetCodecForPayloadType(payloadType)
+			if err != nil {
+				return fmt.Errorf("could not find codec for payload type %d", payloadType)
+			}
+			var codec *RTPCodec
+			clockRate := payloadCodec.ClockRate
+			parameters := payloadCodec.Fmtp
+			switch payloadCodec.Name {
+			case G722:
+				codec = NewRTPG722Codec(payloadType, clockRate)
+			case Opus:
+				codec = NewRTPOpusCodec(payloadType, clockRate)
+			case VP8:
+				codec = NewRTPVP8Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case VP9:
+				codec = NewRTPVP9Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			case H264:
+				codec = NewRTPH264Codec(payloadType, clockRate)
+				codec.SDPFmtpLine = parameters
+			default:
+				// ignoring other codecs
+				continue
+			}
+			m.RegisterCodec(codec)
+		}
+	}
+	return nil
+}
+
+// FirstCodecOfKind returns the first codec of a chosen kind in the codecs list
+func (m *MediaEngine) FirstCodecOfKind(kind RTPCodecType) (*RTPCodec, error) {
+	foundCodecs := m.getCodecsByKind(kind)
+	if len(foundCodecs) == 0 {
+		return nil, fmt.Errorf("none found")
+	}
+	return foundCodecs[0], nil
 }
 
 func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
