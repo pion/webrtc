@@ -30,7 +30,7 @@ func main() {
 		panic(err)
 	}
 
-	preferredCodec, err := mediaEngine.FirsCodecOfKind(webrtc.RTPCodecTypeVideo)
+	preferredCodec, err := mediaEngine.FirstCodecOfKind(webrtc.RTPCodecTypeVideo)
 	if err != nil {
 		panic("no video codec in offer sdp")
 	}
