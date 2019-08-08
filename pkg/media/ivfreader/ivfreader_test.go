@@ -43,12 +43,12 @@ func TestIVFReader_ParseValidFileHeader(t *testing.T) {
 
 	assert.Equal("DKIF", header.signature, "signature is 'DKIF'")
 	assert.Equal(uint16(0), header.version, "version should be 0")
-	assert.Equal("VP80", header.fourcc, "FourCC should be 'VP80'")
-	assert.Equal(uint16(176), header.width, "width should be 176")
-	assert.Equal(uint16(144), header.height, "height should be 144")
-	assert.Equal(uint32(30000), header.timebaseDenum, "timebase denominator should be 30000")
-	assert.Equal(uint32(1000), header.timebaseNum, "timebase numerator should be 1000")
-	assert.Equal(uint32(29), header.numFrames, "number of frames should be 29")
+	assert.Equal("VP80", header.FourCC, "FourCC should be 'VP80'")
+	assert.Equal(uint16(176), header.Width, "width should be 176")
+	assert.Equal(uint16(144), header.Height, "height should be 144")
+	assert.Equal(uint32(30000), header.TimebaseDenominator, "timebase denominator should be 30000")
+	assert.Equal(uint32(1000), header.TimebaseNumerator, "timebase numerator should be 1000")
+	assert.Equal(uint32(29), header.NumFrames, "number of frames should be 29")
 	assert.Equal(uint32(0), header.unused, "bytes should be unused")
 }
 
@@ -81,7 +81,7 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 	payload, header, err := reader.ParseNextFrame()
 
 	assert.Nil(err, "Should have parsed frame #1 without error")
-	assert.Equal(uint32(4), header.frameSize, "Frame header frameSize should be 4")
+	assert.Equal(uint32(4), header.FrameSize, "Frame header frameSize should be 4")
 	assert.Equal(4, len(payload), "Payload should be length 4")
 	assert.Equal(
 		payload,
@@ -94,7 +94,7 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 	payload, header, err = reader.ParseNextFrame()
 
 	assert.Nil(err, "Should have parsed frame #2 without error")
-	assert.Equal(uint32(12), header.frameSize, "Frame header frameSize should be 4")
+	assert.Equal(uint32(12), header.FrameSize, "Frame header frameSize should be 4")
 	assert.Equal(12, len(payload), "Payload should be length 12")
 	assert.Equal(
 		payload,

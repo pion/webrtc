@@ -36,6 +36,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Play from Disk",
+		"link": "play-from-disk",
+		"description": "The play-from-disk example demonstrates how to send video to your browser from a file saved to disk.",
+		"type": "browser"
+	},
+	{
 		"title": "Save to Disk",
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",

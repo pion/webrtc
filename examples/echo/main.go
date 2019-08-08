@@ -30,9 +30,9 @@ func main() {
 		panic(err)
 	}
 
-	preferredCodec, err := mediaEngine.FirstCodecOfKind(webrtc.RTPCodecTypeVideo)
-	if err != nil {
-		panic("no video codec in offer sdp")
+	videoCodecs := mediaEngine.GetCodecsByKind(webrtc.RTPCodecTypeVideo)
+	if len(videoCodecs) == 0 {
+		panic("Offer contained no video codecs")
 	}
 
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(preferredCodec.PayloadType, rand.Uint32(), "video", "pion")
+	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}
