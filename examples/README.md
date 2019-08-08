@@ -8,7 +8,8 @@ For more full featured examples that use 3rd party libraries see our **[example-
 
 ### Overview
 #### Media API
-* [Echo](echo): The echo example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection .
+* [Echo](echo): The echo example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.
+* [Play from disk](play-from-disk): The play-from-disk example demonstrates how to send video to your browser from a file saved to disk.
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [SFU Minimal](sfu-minimal): The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
 
