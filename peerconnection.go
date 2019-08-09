@@ -464,7 +464,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	if pc.configuration.SDPSemantics == SDPSemanticsPlanB {
 		midValue = "data"
 	}
-	pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
+	pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActpass)
 	appendBundle(midValue)
 
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
