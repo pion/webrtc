@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"github.com/pion/sdp/v2"
+)
+
 // DTLSRole indicates the role of the DTLS transport.
 type DTLSRole byte
 
@@ -27,4 +31,30 @@ func (r DTLSRole) String() string {
 	default:
 		return unknownStr
 	}
+}
+
+// Iterate a SessionDescription from a remote to determine if an explicit
+// role can been determined for local connection. The decision is made from the first role we we parse.
+// If no role can be found we return DTLSRoleAuto
+func dtlsRoleFromRemoteSDP(sessionDescription *sdp.SessionDescription) DTLSRole {
+	if sessionDescription == nil {
+		return DTLSRoleAuto
+	}
+
+	for _, mediaSection := range sessionDescription.MediaDescriptions {
+		for _, attribute := range mediaSection.Attributes {
+			if attribute.Key == "setup" {
+				switch attribute.Value {
+				case "active":
+					return DTLSRoleServer
+				case "passive":
+					return DTLSRoleClient
+				default:
+					return DTLSRoleAuto
+				}
+			}
+		}
+	}
+
+	return DTLSRoleAuto
 }
