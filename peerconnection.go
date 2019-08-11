@@ -470,7 +470,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
 	for _, m := range d.MediaDescriptions {
-		m.WithPropertyAttribute("setup:actpass")
+		m.WithValueAttribute(sdp.AttrKeyConnectionSetup, "actpass")
 	}
 
 	sdpBytes, err := d.Marshal()
@@ -968,7 +968,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 		// Start the dtls transport
 		err = pc.dtlsTransport.Start(DTLSParameters{
-			Role:         DTLSRoleAuto,
+			Role:         dtlsRoleFromRemoteSDP(desc.parsed),
 			Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 		})
 		if err != nil {
@@ -1656,7 +1656,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 	// Use the first transceiver to generate the section attributes
 	t := transceivers[0]
 	media := sdp.NewJSEPMediaDescription(t.kind.String(), []string{}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // pion/webrtc#494
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
@@ -1718,7 +1718,7 @@ func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValu
 			},
 		},
 	}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // pion/webrtc#494
+		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
