@@ -23,6 +23,8 @@ type RTPSender struct {
 
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan interface{}
+
+	payloadType *uint8 // Senders should have a codec parameter dictionary at some point
 }
 
 // NewRTPSender constructs a new RTPSender
@@ -132,7 +134,8 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 	return rtcp.Unmarshal(b[:i])
 }
 
-// sendRTP should only be called by a track, this only exists so we can keep state in one place
+// sendRTP should only be called by a track, this only exists so we can keep state in one place.
+// Overwrites the payload type field in the rtp header.
 func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 	select {
 	case <-r.stopCalled:
@@ -147,7 +150,25 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-
+		// Hopefully this next part is temporary and will be removed when senders obtain payload
+		// types from their session instead of the track.
+		// Obtain payload type for this sender. Currently taken from the sender's MediaEngine
+		// to match the track's codec by name.
+		// (But tracks should not have codecs - this should be set here by the
+		// peer connection or transceiver...)
+		if r.payloadType == nil {
+			// this setup should only happen on the first call to sendRTP
+			codecs := r.api.mediaEngine.GetCodecsByName(r.track.codec.Name)
+			if len(codecs) == 0 {
+				return 0, fmt.Errorf("no %d codecs in media engine", r.track.codec.Name)
+			}
+			payloadType := codecs[0].PayloadType
+			r.payloadType = &payloadType
+		}
+		// Overwrite the payload type in the RTP header.
+		if r.payloadType != nil {
+			header.PayloadType = *r.payloadType
+		}
 		return writeStream.WriteRTP(header, payload)
 	}
 }

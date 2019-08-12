@@ -29,4 +29,9 @@ You can change the listening port using `-port 8011`
 
 You can `Join the broadcast` as many times as you want. The `sfu-minimal` Golang application is relaying all traffic, so your browser only has to upload once.
 
+When using `curl` Instead of pasting the SDP into the terminal, you may prefer using a paste-from-clipboard command:
+
+* Linux: `xclip -o | curl http://localhost:8080/sdp -d @-`
+* macOS: `pbpaste | curl http://localhost:8080/sdp -d @-`
+
 Congrats, you have used Pion WebRTC! Now start building something cool

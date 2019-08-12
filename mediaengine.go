@@ -130,6 +130,17 @@ const (
 	H264 = "H264"
 )
 
+// GetCodecsByName returns all codecs of a chosen name in the codecs list
+func (m *MediaEngine) GetCodecsByName(codecName string) []*RTPCodec {
+	var codecs []*RTPCodec
+	for _, codec := range m.codecs {
+		if codec.Name == codecName {
+			codecs = append(codecs, codec)
+		}
+	}
+	return codecs
+}
+
 // NewRTPG722Codec is a helper to create a G722 codec
 func NewRTPG722Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeAudio,
