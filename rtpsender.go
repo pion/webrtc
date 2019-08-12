@@ -160,7 +160,7 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 			// this setup should only happen on the first call to sendRTP
 			codecs := r.api.mediaEngine.GetCodecsByName(r.track.codec.Name)
 			if len(codecs) == 0 {
-				return 0, fmt.Errorf("no %d codecs in media engine", r.track.codec.Name)
+				return 0, fmt.Errorf("no %s codecs in media engine", r.track.codec.Name)
 			}
 			payloadType := codecs[0].PayloadType
 			r.payloadType = &payloadType
