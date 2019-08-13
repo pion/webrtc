@@ -153,7 +153,7 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 		// Hopefully this next part is temporary and will be removed when senders obtain payload
 		// types from their session instead of the track.
 		// Obtain payload type for this sender. Currently taken from the sender's MediaEngine
-		// to match the track's codec by name.
+		// to match the track's codec, which could have a different payload type.
 		// (But tracks should not have codecs - this should be set here by the
 		// peer connection or transceiver...)
 		if r.payloadType == nil {
@@ -162,8 +162,15 @@ func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
 			if len(codecs) == 0 {
 				return 0, fmt.Errorf("no %s codecs in media engine", r.track.codec.Name)
 			}
-			payloadType := codecs[0].PayloadType
-			r.payloadType = &payloadType
+			for _,c := range codecs {
+				if sameCodec(c, r.track.codec) {
+					r.payloadType = &c.PayloadType
+					break
+				}
+			}
+			if r.payloadType == nil {
+				return 0, fmt.Errorf("could not match %s codec from track to media engine", r.track.codec.Name)
+			}
 		}
 		// Overwrite the payload type in the RTP header.
 		if r.payloadType != nil {
@@ -181,4 +188,30 @@ func (r *RTPSender) hasSent() bool {
 	default:
 		return false
 	}
+}
+
+
+// sameCodec indicates if two codecs match in type, parameters,
+// etc, not checking payload type, so it is useful for comparing
+// codecs from different MediaEngines
+func sameCodec(codecA, codecB *RTPCodec) bool {
+	if codecA.Name != codecB.Name {
+		return false
+	}
+	if codecA.Type != codecB.Type {
+		return false
+	}
+	if codecA.SDPFmtpLine != codecB.SDPFmtpLine {
+		return false
+	}
+	if codecA.Channels != codecB.Channels {
+		return false
+	}
+	if codecA.ClockRate != codecB.ClockRate {
+		return false
+	}
+	if codecA.MimeType != codecB.MimeType {
+		return false
+	}
+	return true
 }
