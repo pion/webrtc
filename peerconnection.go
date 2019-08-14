@@ -469,10 +469,6 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
-	for _, m := range d.MediaDescriptions {
-		m.WithValueAttribute(sdp.AttrKeyConnectionSetup, "actpass")
-	}
-
 	sdpBytes, err := d.Marshal()
 	if err != nil {
 		return SessionDescription{}, err

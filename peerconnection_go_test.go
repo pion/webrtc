@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 
@@ -458,4 +459,31 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 		}
 	}
 
+}
+
+func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	sdp, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	re := regexp.MustCompile(`a=setup:[[:alpha:]]+`)
+
+	matches := re.FindAllStringIndex(sdp.SDP, -1)
+
+	// 5 because a datachannel is always added
+	assert.Len(t, matches, 5)
 }
