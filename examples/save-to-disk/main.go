@@ -9,7 +9,7 @@ import (
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/pion/webrtc/v2/pkg/media/ivfwriter"
-	"github.com/pion/webrtc/v2/pkg/media/opuswriter"
+	"github.com/pion/webrtc/v2/pkg/media/oggwriter"
 
 	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
@@ -68,7 +68,7 @@ func main() {
 		panic(err)
 	}
 
-	opusFile, err := opuswriter.New("output.opus", 48000, 2)
+	oggFile, err := oggwriter.New("output.ogg", 48000, 2)
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +95,7 @@ func main() {
 		codec := track.Codec()
 		if codec.Name == webrtc.Opus {
 			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")
-			saveToDisk(opusFile, track)
+			saveToDisk(oggFile, track)
 		} else if codec.Name == webrtc.VP8 {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			saveToDisk(ivfFile, track)
@@ -112,7 +112,7 @@ func main() {
 		} else if connectionState == webrtc.ICEConnectionStateFailed ||
 			connectionState == webrtc.ICEConnectionStateDisconnected {
 
-			closeErr := opusFile.Close()
+			closeErr := oggFile.Close()
 			if closeErr != nil {
 				panic(closeErr)
 			}
