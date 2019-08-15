@@ -47,7 +47,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 
 	assert := assert.New(t)
 
-	// The linter misbehave and thinks this code is the same as the tests in opuswriter_test
+	// The linter misbehave and thinks this code is the same as the tests in oggwriter_test
 	// nolint:dupl
 	addPacketTestCase := []ivfWriterPacketTest{
 		{
