@@ -130,6 +130,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Mike Coleman](https://github.com/fivebats)
 * [Suhas Gaddam](https://github.com/suhasgaddam)
 * [Atsushi Watanabe](https://github.com/at-wat)
+* [Robert Eperjesi](https://github.com/epes)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

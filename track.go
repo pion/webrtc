@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	rtpOutboundMTU          = 1400
+	rtpOutboundMTU          = 1200
 	trackDefaultIDLength    = 16
 	trackDefaultLabelLength = 16
 )
