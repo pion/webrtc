@@ -1476,6 +1476,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	if options != nil {
 		// Ordered indicates if data is allowed to be delivered out of order. The
 		// default value of true, guarantees that data will be delivered in order.
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
 		if options.Ordered != nil {
 			params.Ordered = *options.Ordered
 		}
@@ -1488,11 +1489,6 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #8)
 		if options.MaxRetransmits != nil {
 			params.MaxRetransmits = options.MaxRetransmits
-		}
-
-		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #9)
-		if options.Ordered != nil {
-			params.Ordered = *options.Ordered
 		}
 	}
 
