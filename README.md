@@ -131,6 +131,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Suhas Gaddam](https://github.com/suhasgaddam)
 * [Atsushi Watanabe](https://github.com/at-wat)
 * [Robert Eperjesi](https://github.com/epes)
+* [Aaron France](https://github.com/AeroNotix)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
