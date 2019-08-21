@@ -1853,7 +1853,15 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		d.collectStats(statsCollector)
 	}
 
-	pc.iceGatherer.collectStats(statsCollector)
+	if pc.iceGatherer != nil {
+		pc.iceGatherer.collectStats(statsCollector)
+	}
+	if pc.iceTransport != nil {
+		pc.iceTransport.collectStats(statsCollector)
+	}
+	if pc.sctpTransport != nil {
+		pc.sctpTransport.collectStats(statsCollector)
+	}
 
 	stats := PeerConnectionStats{
 		Timestamp:             statsTimestampNow(),

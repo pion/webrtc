@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -281,4 +282,25 @@ func (r *SCTPTransport) State() SCTPTransportState {
 	r.lock.RLock()
 	defer r.lock.RLock()
 	return r.state
+}
+
+func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
+	r.lock.Lock()
+	association := r.association
+	r.lock.Unlock()
+
+	collector.Collecting()
+
+	stats := TransportStats{
+		Timestamp: statsTimestampFrom(time.Now()),
+		Type:      StatsTypeTransport,
+		ID:        "sctpTransport",
+	}
+
+	if association != nil {
+		stats.BytesSent = association.BytesSent()
+		stats.BytesReceived = association.BytesReceived()
+	}
+
+	collector.Collect(stats.ID, stats)
 }
