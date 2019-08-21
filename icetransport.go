@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/pion/ice"
 	"github.com/pion/logging"
@@ -270,4 +271,25 @@ func (t *ICETransport) ensureGatherer() error {
 	}
 
 	return nil
+}
+
+func (t *ICETransport) collectStats(collector *statsReportCollector) {
+	t.lock.Lock()
+	conn := t.conn
+	t.lock.Unlock()
+
+	collector.Collecting()
+
+	stats := TransportStats{
+		Timestamp: statsTimestampFrom(time.Now()),
+		Type:      StatsTypeTransport,
+		ID:        "iceTransport",
+	}
+
+	if conn != nil {
+		stats.BytesSent = conn.BytesSent()
+		stats.BytesReceived = conn.BytesReceived()
+	}
+
+	collector.Collect(stats.ID, stats)
 }

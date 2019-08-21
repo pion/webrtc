@@ -98,6 +98,15 @@ func getDataChannelStats(t *testing.T, report StatsReport, dc *DataChannel) Data
 	return stats
 }
 
+func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+	stats, ok := report[statsID]
+	assert.True(t, ok)
+	transportStats, ok := stats.(TransportStats)
+	assert.True(t, ok)
+	assert.Equal(t, transportStats.Type, StatsTypeTransport)
+	return transportStats
+}
+
 func findLocalCandidateStats(report StatsReport) []ICECandidateStats {
 	result := []ICECandidateStats{}
 	for _, s := range report {
@@ -274,6 +283,16 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsAccepted)
 	dcStatsAnswer = getDataChannelStats(t, reportPCOffer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
+
+	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
+	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
+	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
+	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
+
+	answerSCTPTransportStats := getTransportStats(t, reportPCAnswer, "sctpTransport")
+	offerSCTPTransportStats := getTransportStats(t, reportPCOffer, "sctpTransport")
+	assert.GreaterOrEqual(t, offerSCTPTransportStats.BytesSent, answerSCTPTransportStats.BytesReceived)
+	assert.GreaterOrEqual(t, answerSCTPTransportStats.BytesSent, offerSCTPTransportStats.BytesReceived)
 
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
