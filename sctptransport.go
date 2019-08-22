@@ -94,7 +94,7 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	}
 	r.association = sctpAssociation
 
-	go r.acceptDataChannels()
+	go r.acceptDataChannels(sctpAssociation)
 
 	return nil
 }
@@ -126,10 +126,7 @@ func (r *SCTPTransport) ensureDTLS() error {
 	return nil
 }
 
-func (r *SCTPTransport) acceptDataChannels() {
-	r.lock.RLock()
-	a := r.association
-	r.lock.RUnlock()
+func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 	for {
 		dc, err := datachannel.Accept(a, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
