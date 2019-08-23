@@ -223,44 +223,39 @@ func TestDataChannelParameters(t *testing.T) {
 	defer report()
 
 	t.Run("MaxPacketLifeTime exchange", func(t *testing.T) {
-		// Note(albrow): See https://github.com/node-webrtc/node-webrtc/issues/492.
-		// There is a bug in the npm wrtc package which causes this test to fail.
-		// TODO(albrow): Uncomment this once issue is resolved.
-		t.Skip("Skipping because of upstream issue")
+		ordered := true
+		maxPacketLifeTime := uint16(3)
+		options := &DataChannelInit{
+			Ordered:           &ordered,
+			MaxPacketLifeTime: &maxPacketLifeTime,
+		}
 
-		// var ordered = true
-		// var maxPacketLifeTime uint16 = 3
-		// options := &DataChannelInit{
-		// 	Ordered:           &ordered,
-		// 	MaxPacketLifeTime: &maxPacketLifeTime,
-		// }
+		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
 
-		// offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
+		// Check if parameters are correctly set
+		assert.Equal(t, dc.Ordered(), ordered, "Ordered should be same value as set in DataChannelInit")
+		if assert.NotNil(t, dc.MaxPacketLifeTime(), "should not be nil") {
+			assert.Equal(t, maxPacketLifeTime, *dc.MaxPacketLifeTime(), "should match")
+		}
 
-		// // Check if parameters are correctly set
-		// assert.True(t, dc.Ordered(), "Ordered should be set to true")
-		// if assert.NotNil(t, dc.MaxPacketLifeTime(), "should not be nil") {
-		// 	assert.Equal(t, maxPacketLifeTime, *dc.MaxPacketLifeTime(), "should match")
-		// }
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			if d.Label() != expectedLabel {
+				return
+			}
+			// Check if parameters are correctly set
+			assert.Equal(t, d.Ordered(), ordered, "Ordered should be same value as set in DataChannelInit")
+			if assert.NotNil(t, d.MaxPacketLifeTime(), "should not be nil") {
+				assert.Equal(t, maxPacketLifeTime, *d.MaxPacketLifeTime(), "should match")
+			}
+			done <- true
+		})
 
-		// answerPC.OnDataChannel(func(d *DataChannel) {
-		// 	if d.Label() != expectedLabel {
-		// 		return
-		// 	}
-		// 	// Check if parameters are correctly set
-		// 	assert.True(t, d.Ordered(), "Ordered should be set to true")
-		// 	if assert.NotNil(t, d.MaxPacketLifeTime(), "should not be nil") {
-		// 		assert.Equal(t, maxPacketLifeTime, *d.MaxPacketLifeTime(), "should match")
-		// 	}
-		// 	done <- true
-		// })
-
-		// closeReliabilityParamTest(t, offerPC, answerPC, done)
+		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
 
 	t.Run("MaxRetransmits exchange", func(t *testing.T) {
-		var ordered = false
-		var maxRetransmits uint16 = 3000
+		ordered := false
+		maxRetransmits := uint16(3000)
 		options := &DataChannelInit{
 			Ordered:        &ordered,
 			MaxRetransmits: &maxRetransmits,
