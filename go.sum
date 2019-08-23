@@ -24,8 +24,8 @@ github.com/pion/datachannel v1.4.5 h1:paz18kYAetpTdK8tlMAtDY+Ayxrv5fndZ5XPZwiZHr
 github.com/pion/datachannel v1.4.5/go.mod h1:SpMJbuu8v+qbA94m6lWQwSdCf8JKQvgmdSHDNtcbe+w=
 github.com/pion/dtls v1.5.1 h1:LcCs1l9fzsHC4y+ENjLyuxOAe+k0DV65T2n4tjwM7xw=
 github.com/pion/dtls v1.5.1/go.mod h1:CjlPLfQdsTg3G4AEXjJp8FY5bRweBlxHrgoFrN+fQsk=
-github.com/pion/ice v0.5.11 h1:LoIsBs+/WPU21uwqxpsiSUjxT4v7pzUq/GoNFcnG9iw=
-github.com/pion/ice v0.5.11/go.mod h1:FSTDLP+ian3PtxRjervtyDP2AOqt2c6cvfebZ7dwLnI=
+github.com/pion/ice v0.5.12 h1:9sVfIUju8fNh9Fkn3eg98YlKqASwkyLhdWcMvFsrnZI=
+github.com/pion/ice v0.5.12/go.mod h1:FSTDLP+ian3PtxRjervtyDP2AOqt2c6cvfebZ7dwLnI=
 github.com/pion/logging v0.2.1/go.mod h1:k0/tDVsRCX2Mb2ZEmTqNa7CWsQPc+YYCB7Q+5pahoms=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
 github.com/pion/logging v0.2.2/go.mod h1:k0/tDVsRCX2Mb2ZEmTqNa7CWsQPc+YYCB7Q+5pahoms=
@@ -38,8 +38,8 @@ github.com/pion/rtcp v1.2.1/go.mod h1:a5dj2d6BKIKHl43EnAOIrCczcjESrtPuMgfmL6/K6Q
 github.com/pion/rtp v1.1.3 h1:GTYSTsSLF5vH+UqShGYQEBdoYasWjTTC9UeYglnUO+o=
 github.com/pion/rtp v1.1.3/go.mod h1:/l4cvcKd0D3u9JLs2xSVI95YkfXW87a3br3nqmVtSlE=
 github.com/pion/sctp v1.6.3/go.mod h1:cCqpLdYvgEUdl715+qbWtgT439CuQrAgy8BZTp0aEfA=
-github.com/pion/sctp v1.6.8 h1:HVkIHNnZRf3IlcLmoHz/WtSrlfeA/qejsEQwi8snB2I=
-github.com/pion/sctp v1.6.8/go.mod h1:cCqpLdYvgEUdl715+qbWtgT439CuQrAgy8BZTp0aEfA=
+github.com/pion/sctp v1.6.9 h1:G5Ttf/z5klWaCpE4jnqKWvbOuwfL3vBLyRdiFdtBIYQ=
+github.com/pion/sctp v1.6.9/go.mod h1:cCqpLdYvgEUdl715+qbWtgT439CuQrAgy8BZTp0aEfA=
 github.com/pion/sdp/v2 v2.3.0 h1:5EhwPh1xKWYYjjvMuubHoMLy6M0B9U26Hh7q3f7vEGk=
 github.com/pion/sdp/v2 v2.3.0/go.mod h1:idSlWxhfWQDtTy9J05cgxpHBu/POwXN2VDRGYxT/EjU=
 github.com/pion/srtp v1.2.6 h1:mHQuAMh0P67R7/j1F260u3O+fbRWLyjKLRPZYYvODFM=
