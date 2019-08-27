@@ -487,3 +487,85 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	// 5 because a datachannel is always added
 	assert.Len(t, matches, 5)
 }
+
+func TestPeerConnection_createDTLSFingerprintFromGoodFingerprint(t *testing.T) {
+	fingerprint := "sha-256 AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF"
+
+	actual, err := createDTLSFingerprintFrom(fingerprint)
+
+	expected := DTLSFingerprint{
+		Algorithm: "sha-256",
+		Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+	}
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual)
+}
+
+func TestPeerConnection_createDTLSFingerprintFromBadFingerprint(t *testing.T) {
+	fingerprint := "sha-256AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF"
+
+	actual, err := createDTLSFingerprintFrom(fingerprint)
+
+	expected := DTLSFingerprint{}
+
+	assert.Error(t, err)
+	assert.EqualError(t, err, "invalid fingerprint")
+	assert.Equal(t, expected, actual)
+}
+
+func TestPeerConnection_appendToDTLSFingerprintsIfNoFingerprint(t *testing.T) {
+	var dtlsFingerprints []DTLSFingerprint
+	haveFingerprint := false
+	fingerprint := ""
+
+	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+
+	var expected []DTLSFingerprint
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPeerConnection_appendToDTLSFingerprintsIfWithFingerprint(t *testing.T) {
+	var dtlsFingerprints []DTLSFingerprint
+	haveFingerprint := true
+	fingerprint := "sha-256 AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF"
+
+	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+
+	expected := []DTLSFingerprint{
+		{
+			Algorithm: "sha-256",
+			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+		},
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPeerConnection_appendToDTLSFingerprintsIfWithFingerprintToExistingFingerprints(t *testing.T) {
+	dtlsFingerprints := []DTLSFingerprint{
+		{
+			Algorithm: "sha-256",
+			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+		},
+	}
+
+	haveFingerprint := true
+	fingerprint := "sha-256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:kk:ll:mm:nn:oo:pp:qq:rr:ss:tt:uu:vv:ww:xx:yy:zz:aa:bb:cc:dd:ee:ff"
+
+	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+
+	expected := []DTLSFingerprint{
+		{
+			Algorithm: "sha-256",
+			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+		},
+		{
+			Algorithm: "sha-256",
+			Value:     "aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:kk:ll:mm:nn:oo:pp:qq:rr:ss:tt:uu:vv:ww:xx:yy:zz:aa:bb:cc:dd:ee:ff",
+		},
+	}
+
+	assert.Equal(t, expected, actual)
+}

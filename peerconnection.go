@@ -849,6 +849,30 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 	return pc.currentLocalDescription
 }
 
+func createDTLSFingerprintFrom(fingerprint string) (DTLSFingerprint, error) {
+	dtlsFingerprint := DTLSFingerprint{}
+
+	parts := strings.Split(fingerprint, " ")
+	if len(parts) != 2 {
+		return dtlsFingerprint, fmt.Errorf("invalid fingerprint")
+	}
+
+	dtlsFingerprint.Algorithm = parts[0]
+	dtlsFingerprint.Value = parts[1]
+
+	return dtlsFingerprint, nil
+}
+
+func appendToDTLSFingerprintsIf(haveFingerprint bool, fingerprint string, dtlsFingerprints []DTLSFingerprint) []DTLSFingerprint {
+	if haveFingerprint {
+		if dtlsFingerprint, err := createDTLSFingerprintFrom(fingerprint); err == nil {
+			dtlsFingerprints = append(dtlsFingerprints, dtlsFingerprint)
+		}
+	}
+
+	return dtlsFingerprints
+}
+
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { //nolint pion/webrtc#614
 	if pc.currentRemoteDescription != nil { // pion/webrtc#207
@@ -873,11 +897,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		weOffer = false
 	}
 
+	var dtlsFingerprints []DTLSFingerprint
 	fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
+	dtlsFingerprints = appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
-		if !haveFingerprint {
-			fingerprint, haveFingerprint = m.Attribute("fingerprint")
-		}
+		fingerprint, haveFingerprint := m.Attribute("fingerprint")
+		dtlsFingerprints = appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
 
 		for _, a := range m.Attributes {
 			switch {
@@ -903,16 +929,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	if !haveFingerprint {
+	if 0 == len(dtlsFingerprints) {
 		return fmt.Errorf("could not find fingerprint")
 	}
-
-	parts := strings.Split(fingerprint, " ")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid fingerprint")
-	}
-	fingerprint = parts[1]
-	fingerprintHash := parts[0]
 
 	// Create the SCTP transport
 	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
@@ -965,7 +984,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		// Start the dtls transport
 		err = pc.dtlsTransport.Start(DTLSParameters{
 			Role:         dtlsRoleFromRemoteSDP(desc.parsed),
-			Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
+			Fingerprints: dtlsFingerprints,
 		})
 		if err != nil {
 			// pion/webrtc#614
