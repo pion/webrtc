@@ -877,6 +877,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	if desc.Type == SDPTypeOffer {
 		weOffer = false
 	}
+	remoteIsLite := false
+	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeySSRC); haveRemoteIs && liteValue == "ice-lite" {
+		remoteIsLite = true
+	}
 
 	fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
@@ -948,7 +952,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 		// Start the ice transport
 		iceRole := ICERoleControlled
-		if weOffer {
+		// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+		// If both or neither agents are lite the offering agent is controlling.
+		// RFC 8445 S6.1.1
+		if (weOffer && remoteIsLite == pc.iceGatherer.lite) || (remoteIsLite && !pc.iceGatherer.lite) {
 			iceRole = ICERoleControlling
 		}
 		err := pc.iceTransport.Start(
