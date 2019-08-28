@@ -13,10 +13,10 @@ go get github.com/pion/webrtc/examples/echo
 ### Run echo, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser, copy that and:
 #### Linux/macOS
-Run `echo $BROWSER_SDP | echo`
+Run `echo $BROWSER_SDP | ./echo`
 #### Windows
 1. Paste the SessionDescription into a file.
-1. Run `echo < my_file`
+1. Run `./echo < my_file`
 
 ### Input echo's SessionDescription into your browser
 Copy the text that `echo` just emitted and copy into second text area
