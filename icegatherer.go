@@ -21,6 +21,7 @@ type ICEGatherer struct {
 	validatedServers []*ice.URL
 
 	agentIsTrickle bool
+	lite           bool
 	agent          *ice.Agent
 
 	portMin                   uint16
@@ -54,6 +55,7 @@ func NewICEGatherer(
 	relayAcceptanceMinWait *time.Duration,
 	loggerFactory logging.LoggerFactory,
 	agentIsTrickle bool,
+	lite bool,
 	networkTypes []NetworkType,
 	opts ICEGatherOptions,
 ) (*ICEGatherer, error) {
@@ -69,7 +71,9 @@ func NewICEGatherer(
 	}
 
 	candidateTypes := []ice.CandidateType{}
-	if opts.ICEGatherPolicy == ICETransportPolicyRelay {
+	if lite {
+		candidateTypes = append(candidateTypes, ice.CandidateTypeHost)
+	} else if opts.ICEGatherPolicy == ICETransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
 
@@ -83,6 +87,7 @@ func NewICEGatherer(
 		loggerFactory:             loggerFactory,
 		log:                       loggerFactory.NewLogger("ice"),
 		agentIsTrickle:            agentIsTrickle,
+		lite:                      lite,
 		networkTypes:              networkTypes,
 		candidateTypes:            candidateTypes,
 		candidateSelectionTimeout: candidateSelectionTimeout,
@@ -103,6 +108,7 @@ func (g *ICEGatherer) createAgent() error {
 
 	config := &ice.AgentConfig{
 		Trickle:                   g.agentIsTrickle,
+		Lite:                      g.lite,
 		Urls:                      g.validatedServers,
 		PortMin:                   g.portMin,
 		PortMax:                   g.portMax,

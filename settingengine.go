@@ -30,6 +30,7 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait    *time.Duration
 	}
 	candidates struct {
+		ICELite         bool
 		ICETrickle      bool
 		ICENetworkTypes []NetworkType
 	}
@@ -86,6 +87,11 @@ func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 	e.ephemeralUDP.PortMin = portMin
 	e.ephemeralUDP.PortMax = portMax
 	return nil
+}
+
+// SetLite configures whether or not the ice agent should be a lite agent
+func (e *SettingEngine) SetLite(lite bool) {
+	e.candidates.ICELite = lite
 }
 
 // SetTrickle configures whether or not the ice agent should gather candidates
