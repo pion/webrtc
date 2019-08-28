@@ -24,9 +24,9 @@
 		"type": "browser"
 	},
 	{
-		"title": "Echo",
-		"link": "echo",
-		"description": "The echo example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.",
+		"title": "Reflect",
+		"link": "reflect",
+		"description": "The reflect example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.",
 		"type": "browser"
 	},
 	{
