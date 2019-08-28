@@ -12,8 +12,7 @@ import (
 
 // IVFWriter is used to take RTP packets and write them to an IVF on disk
 type IVFWriter struct {
-	stream       io.Writer
-	fd           *os.File
+	ioWriter     io.Writer
 	count        uint64
 	currentFrame []byte
 }
@@ -28,7 +27,7 @@ func New(fileName string) (*IVFWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	writer.fd = f
+	writer.ioWriter = f
 	return writer, nil
 }
 
@@ -39,7 +38,7 @@ func NewWith(out io.Writer) (*IVFWriter, error) {
 	}
 
 	writer := &IVFWriter{
-		stream: out,
+		ioWriter: out,
 	}
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
@@ -60,13 +59,13 @@ func (i *IVFWriter) writeHeader() error {
 	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count, will be updated on first Close() call
 	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
 
-	_, err := i.stream.Write(header)
+	_, err := i.ioWriter.Write(header)
 	return err
 }
 
 // WriteRTP adds a new packet and writes the appropriate headers for it
 func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
-	if i.stream == nil {
+	if i.ioWriter == nil {
 		return fmt.Errorf("file not opened")
 	}
 
@@ -89,9 +88,9 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 
 	i.count++
 
-	if _, err := i.stream.Write(frameHeader); err != nil {
+	if _, err := i.ioWriter.Write(frameHeader); err != nil {
 		return err
-	} else if _, err := i.stream.Write(i.currentFrame); err != nil {
+	} else if _, err := i.ioWriter.Write(i.currentFrame); err != nil {
 		return err
 	}
 
@@ -101,25 +100,31 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 
 // Close stops the recording
 func (i *IVFWriter) Close() error {
-	defer func() {
-		i.fd = nil
-		i.stream = nil
-	}()
-
-	if i.fd == nil {
+	if i.ioWriter == nil {
 		// Returns no error as it may be convenient to call
 		// Close() multiple times
 		return nil
 	}
-	// Update the framecount
-	if _, err := i.fd.Seek(24, 0); err != nil {
-		return err
-	}
-	buff := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buff, uint32(i.count))
-	if _, err := i.fd.Write(buff); err != nil {
-		return err
+
+	defer func() {
+		i.ioWriter = nil
+	}()
+
+	if ws, ok := i.ioWriter.(io.WriteSeeker); ok {
+		// Update the framecount
+		if _, err := ws.Seek(24, 0); err != nil {
+			return err
+		}
+		buff := make([]byte, 4)
+		binary.LittleEndian.PutUint32(buff, uint32(i.count))
+		if _, err := ws.Write(buff); err != nil {
+			return err
+		}
 	}
 
-	return i.fd.Close()
+	if closer, ok := i.ioWriter.(io.Closer); ok {
+		return closer.Close()
+	}
+
+	return nil
 }

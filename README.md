@@ -133,6 +133,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Robert Eperjesi](https://github.com/epes)
 * [Aaron France](https://github.com/AeroNotix)
 * [Gareth Hayes](https://github.com/gazhayes)
+* [Sebastian Waisbrot](https://github.com/seppo0010)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
