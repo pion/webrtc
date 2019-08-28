@@ -460,6 +460,11 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 	}
 
+	if pc.iceGatherer.lite {
+		// RFC 5245 S15.3
+		d = d.WithValueAttribute(sdp.AttrKeyICELite, "ice-lite")
+	}
+
 	midValue := strconv.Itoa(bundleCount)
 	if pc.configuration.SDPSemantics == SDPSemanticsPlanB {
 		midValue = "data"
