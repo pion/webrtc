@@ -92,6 +92,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 		readyState:        DataChannelStateConnecting,
 		api:               api,
 		log:               log,
+		negotiated:        params.Negotiated,
 	}, nil
 }
 

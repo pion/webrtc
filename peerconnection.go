@@ -1470,6 +1470,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 			return nil, err
 		}
 	} else {
+		params.Negotiated = *options.Negotiated
 		params.ID = *options.ID
 	}
 
