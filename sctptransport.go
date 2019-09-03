@@ -121,7 +121,7 @@ func (r *SCTPTransport) Stop() error {
 func (r *SCTPTransport) ensureDTLS() error {
 	if r.dtlsTransport == nil ||
 		r.dtlsTransport.conn == nil {
-		return errors.New("DTLS not establisched")
+		return errors.New("DTLS not established")
 	}
 
 	return nil

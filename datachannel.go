@@ -15,7 +15,7 @@ import (
 )
 
 const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
-var errSCTPNotEstablished = errors.New("SCTP not establisched")
+var errSCTPNotEstablished = errors.New("SCTP not established")
 
 // DataChannel represents a WebRTC DataChannel
 // The DataChannel interface represents a network channel
