@@ -90,7 +90,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 	assert.NotNil(writer, "Writer shouldn't be nil")
 	err = writer.Close()
 	assert.Nil(err, "IVFWriter should be able to close the stream")
-	writer.stream = nil
+	writer.ioWriter = nil
 	addPacketTestCase[0].writer = writer
 
 	// Second test tries to write an empty packet
