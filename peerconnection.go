@@ -462,7 +462,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 	if pc.iceGatherer.lite {
 		// RFC 5245 S15.3
-		d = d.WithValueAttribute(sdp.AttrKeyICELite, "ice-lite")
+		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
 	}
 
 	midValue := strconv.Itoa(bundleCount)
@@ -878,7 +878,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		weOffer = false
 	}
 	remoteIsLite := false
-	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeySSRC); haveRemoteIs && liteValue == "ice-lite" {
+	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeyICELite); haveRemoteIs && liteValue == sdp.AttrKeyICELite {
 		remoteIsLite = true
 	}
 
