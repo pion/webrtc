@@ -514,58 +514,68 @@ func TestPeerConnection_createDTLSFingerprintFromBadFingerprint(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestPeerConnection_appendToDTLSFingerprintsIfNoFingerprint(t *testing.T) {
-	var dtlsFingerprints []DTLSFingerprint
+func TestPeerConnection_setDTLSFingerprintIfNoFingerprint(t *testing.T) {
+	var dtlsFingerprint *DTLSFingerprint
 	haveFingerprint := false
 	fingerprint := ""
 
-	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+	actual, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint)
+	assert.NoError(t, err)
 
-	var expected []DTLSFingerprint
-
-	assert.Equal(t, expected, actual)
+	assert.Nil(t, actual)
 }
 
-func TestPeerConnection_appendToDTLSFingerprintsIfWithFingerprint(t *testing.T) {
-	var dtlsFingerprints []DTLSFingerprint
+func TestPeerConnection_setDTLSFingerprintIfWithFingerprint(t *testing.T) {
+	var dtlsFingerprint *DTLSFingerprint
 	haveFingerprint := true
 	fingerprint := "sha-256 AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF"
 
-	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+	actual, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint)
+	assert.NoError(t, err)
 
-	expected := []DTLSFingerprint{
-		{
-			Algorithm: "sha-256",
-			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
-		},
+	assert.NotNil(t, actual)
+
+	expected := DTLSFingerprint{
+		Algorithm: "sha-256",
+		Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
 	}
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, *actual)
 }
 
-func TestPeerConnection_appendToDTLSFingerprintsIfWithFingerprintToExistingFingerprints(t *testing.T) {
-	dtlsFingerprints := []DTLSFingerprint{
-		{
-			Algorithm: "sha-256",
-			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
-		},
+func TestPeerConnection_setDTLSFingerprintIfWithFingerprintMultipleSameFingerprints(t *testing.T) {
+	dtlsFingerprint := &DTLSFingerprint{
+		Algorithm: "sha-256",
+		Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+	}
+
+	haveFingerprint := true
+	fingerprint := "sha-256 AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF"
+
+	actual, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, actual)
+
+	expected := DTLSFingerprint{
+		Algorithm: "sha-256",
+		Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
+	}
+
+	assert.Equal(t, expected, *actual)
+}
+
+func TestPeerConnection_setDTLSFingerprintIfWithFingerprintMultipleDifferentFingerprints(t *testing.T) {
+	dtlsFingerprint := &DTLSFingerprint{
+		Algorithm: "sha-256",
+		Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
 	}
 
 	haveFingerprint := true
 	fingerprint := "sha-256 aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:kk:ll:mm:nn:oo:pp:qq:rr:ss:tt:uu:vv:ww:xx:yy:zz:aa:bb:cc:dd:ee:ff"
 
-	actual := appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+	actual, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint)
+	assert.Error(t, err)
 
-	expected := []DTLSFingerprint{
-		{
-			Algorithm: "sha-256",
-			Value:     "AA:BB:CC:DD:EE:FF:GG:HH:II:JJ:KK:LL:MM:NN:OO:PP:QQ:RR:SS:TT:UU:VV:WW:XX:YY:ZZ:AA:BB:CC:DD:EE:FF",
-		},
-		{
-			Algorithm: "sha-256",
-			Value:     "aa:bb:cc:dd:ee:ff:gg:hh:ii:jj:kk:ll:mm:nn:oo:pp:qq:rr:ss:tt:uu:vv:ww:xx:yy:zz:aa:bb:cc:dd:ee:ff",
-		},
-	}
-
-	assert.Equal(t, expected, actual)
+	assert.Nil(t, actual)
 }

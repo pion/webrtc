@@ -863,14 +863,20 @@ func createDTLSFingerprintFrom(fingerprint string) (DTLSFingerprint, error) {
 	return dtlsFingerprint, nil
 }
 
-func appendToDTLSFingerprintsIf(haveFingerprint bool, fingerprint string, dtlsFingerprints []DTLSFingerprint) []DTLSFingerprint {
+func setDTLSFingerprintIf(haveFingerprint bool, fingerprint string, dtlsFingerprint *DTLSFingerprint) (*DTLSFingerprint, error) {
 	if haveFingerprint {
-		if dtlsFingerprint, err := createDTLSFingerprintFrom(fingerprint); err == nil {
-			dtlsFingerprints = append(dtlsFingerprints, dtlsFingerprint)
+		if fp, err := createDTLSFingerprintFrom(fingerprint); err != nil {
+			return nil, err
+		} else {
+			if dtlsFingerprint == nil {
+				return &fp, nil
+			} else if *dtlsFingerprint != fp {
+				return nil, fmt.Errorf("fingerprint in media descriptions do not match")
+			}
 		}
 	}
 
-	return dtlsFingerprints
+	return dtlsFingerprint, nil
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
@@ -897,13 +903,15 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		weOffer = false
 	}
 
-	var dtlsFingerprints []DTLSFingerprint
-	fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
-	dtlsFingerprints = appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+	var dtlsFingerprint *DTLSFingerprint
 
 	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
 		fingerprint, haveFingerprint := m.Attribute("fingerprint")
-		dtlsFingerprints = appendToDTLSFingerprintsIf(haveFingerprint, fingerprint, dtlsFingerprints)
+		if fp, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint); err != nil {
+			return err
+		} else {
+			dtlsFingerprint = fp
+		}
 
 		for _, a := range m.Attributes {
 			switch {
@@ -929,8 +937,15 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	if 0 == len(dtlsFingerprints) {
-		return fmt.Errorf("could not find fingerprint")
+	if dtlsFingerprint == nil {
+		fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
+		if fp, err := setDTLSFingerprintIf(haveFingerprint, fingerprint, dtlsFingerprint); err != nil {
+			return err
+		} else if fp == nil {
+			return fmt.Errorf("could not find fingerprint")
+		} else {
+			dtlsFingerprint = fp
+		}
 	}
 
 	// Create the SCTP transport
@@ -984,7 +999,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		// Start the dtls transport
 		err = pc.dtlsTransport.Start(DTLSParameters{
 			Role:         dtlsRoleFromRemoteSDP(desc.parsed),
-			Fingerprints: dtlsFingerprints,
+			Fingerprints: []DTLSFingerprint{*dtlsFingerprint},
 		})
 		if err != nil {
 			// pion/webrtc#614
