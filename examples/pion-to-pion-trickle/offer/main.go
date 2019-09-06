@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v2"
@@ -18,6 +19,14 @@ func main() {
 	offerAddr := flag.String("offer-address", ":50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", "127.0.0.1:60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
+
+	// Create wait groups to do two things:
+	// 1) Wait until we send our initial offer before sending ICE candidates to the peer
+	// 2) Wait until we receive their answer before adding remote ICE candidates
+	var offerwg sync.WaitGroup
+	var answerwg sync.WaitGroup
+	offerwg.Add(1)
+	answerwg.Add(1)
 
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
@@ -50,6 +59,7 @@ func main() {
 		}
 
 		payload := []byte(c.ToJSON().Candidate)
+		offerwg.Wait()
 		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
 		if onICECandidateErr != nil {
 			panic(onICECandidateErr)
@@ -66,6 +76,7 @@ func main() {
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
+		answerwg.Wait()
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -81,6 +92,7 @@ func main() {
 		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
 			panic(sdpErr)
 		}
+		answerwg.Done()
 	})
 	// Start HTTP server that accepts requests from the answer process
 	go func() { panic(http.ListenAndServe(*offerAddr, nil)) }()
@@ -125,6 +137,7 @@ func main() {
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
+	// Note: this will start the gathering of ICE candidates
 	if err = peerConnection.SetLocalDescription(offer); err != nil {
 		panic(err)
 	}
@@ -140,6 +153,7 @@ func main() {
 	} else if err := resp.Body.Close(); err != nil {
 		panic(err)
 	}
+	offerwg.Done()
 
 	// Block forever
 	select {}
