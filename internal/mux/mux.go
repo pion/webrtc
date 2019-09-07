@@ -127,7 +127,11 @@ func (m *Mux) dispatch(buf []byte) error {
 	m.lock.Unlock()
 
 	if endpoint == nil {
-		m.log.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+		if len(buf) > 0 {
+			m.log.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+		} else {
+			m.log.Warnf("Warning: mux: no endpoint for zero length packet")
+		}
 		return nil
 	}
 

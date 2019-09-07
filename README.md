@@ -135,6 +135,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Gareth Hayes](https://github.com/gazhayes)
 * [Sebastian Waisbrot](https://github.com/seppo0010)
 * [Masataka Hisasue](https://github.com/sylba2050) - *Fix Docs*
+* [Hongchao Ma(马洪超)](https://github.com/hcm007)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
