@@ -487,3 +487,73 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	// 5 because a datachannel is always added
 	assert.Len(t, matches, 5)
 }
+
+// Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
+// When trickle in on by default we can move this to peerconnection_test.go
+func TestGatherOnSetLocalDescription(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	pcOfferGathered := make(chan SessionDescription)
+	pcAnswerGathered := make(chan SessionDescription)
+
+	s := SettingEngine{}
+	s.SetTrickle(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	pcOffer, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	// We need to create a data channel in order to trigger ICE
+	if _, err = pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+		t.Error(err.Error())
+	}
+
+	pcOffer.OnICECandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(pcOfferGathered)
+		}
+	})
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	} else if err = pcOffer.SetLocalDescription(offer); err != nil {
+		t.Error(err.Error())
+	}
+
+	<-pcOfferGathered
+
+	pcAnswer, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	pcAnswer.OnICECandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(pcAnswerGathered)
+		}
+	})
+
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
+		t.Error(err.Error())
+	}
+
+	select {
+	case <-pcAnswerGathered:
+		t.Fatal("pcAnswer started gathering with no SetLocalDescription")
+	// Gathering is async, not sure of a better way to catch this currently
+	case <-time.After(3 * time.Second):
+	}
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	if err != nil {
+		t.Error(err.Error())
+	} else if err = pcAnswer.SetLocalDescription(answer); err != nil {
+		t.Error(err.Error())
+	}
+
+	<-pcAnswerGathered
+}
