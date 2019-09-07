@@ -12,7 +12,7 @@ services:
 install:
   # Manually download and install Go 1.12 instead of using gimme.
   # It looks like gimme Go causes some errors on go-test for Wasm.
-  - wget -O go.tar.gz https://dl.google.com/go/go1.12.linux-amd64.tar.gz
+  - wget -O go.tar.gz https://dl.google.com/go/go1.13.linux-amd64.tar.gz
   - tar -C ~ -xzf go.tar.gz
   - rm go.tar.gz
   - export GOROOT=~/go
@@ -20,7 +20,7 @@ install:
   - go version
   - go env
   - go get -u github.com/matoous/godox
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.17.1
+  - GO111MODULE=off go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
   # Install Node 11 (required for WASM tests)
   - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
   - source ~/.nvm/nvm.sh
@@ -42,4 +42,4 @@ script:
   - go test -tags quic -coverpkg=$(go list ./... | grep -v examples | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
   - GOOS=js GOARCH=wasm go test -exec="./test-wasm/go_js_wasm_exec" -v .
   - bash <(curl -s https://codecov.io/bash)
-  - docker run -e "GO111MODULE=on" -v $PWD:/go/src/github.com/pion/webrtc -w /go/src/github.com/pion/webrtc -it i386/golang:1.12-buster '/usr/local/go/bin/go' 'test' '-tags' 'quic' "-coverpkg=$(go list ./... | grep -v examples | tr '\n' ',')" '-v' './...'
+  - docker run -e "GO111MODULE=on" -v $PWD:/go/src/github.com/pion/webrtc -w /go/src/github.com/pion/webrtc -it i386/golang:1.13-buster '/usr/local/go/bin/go' 'test' '-tags' 'quic' "-coverpkg=$(go list ./... | grep -v examples | tr '\n' ',')" '-v' './...'
