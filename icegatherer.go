@@ -71,7 +71,9 @@ func NewICEGatherer(
 	}
 
 	candidateTypes := []ice.CandidateType{}
-	if opts.ICEGatherPolicy == ICETransportPolicyRelay {
+	if lite {
+		candidateTypes = append(candidateTypes, ice.CandidateTypeHost)
+	} else if opts.ICEGatherPolicy == ICETransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
 

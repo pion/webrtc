@@ -487,3 +487,75 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	// 5 because a datachannel is always added
 	assert.Len(t, matches, 5)
 }
+
+func TestPeerConnection_OfferingLite(t *testing.T) {
+	s := SettingEngine{}
+	s.SetLite(true)
+	offerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	answerPC, err := NewAPI().NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = signalPair(offerPC, answerPC); err != nil {
+		t.Fatal(err)
+	}
+
+	iceComplete := make(chan interface{})
+	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			select {
+			case <-iceComplete:
+			default:
+				close(iceComplete)
+			}
+		}
+	})
+
+	<-iceComplete
+	if err = offerPC.Close(); err != nil {
+		t.Fatal(err)
+	} else if err = answerPC.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPeerConnection_AnsweringLite(t *testing.T) {
+	offerPC, err := NewAPI().NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := SettingEngine{}
+	s.SetLite(true)
+	answerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = signalPair(offerPC, answerPC); err != nil {
+		t.Fatal(err)
+	}
+
+	iceComplete := make(chan interface{})
+	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			select {
+			case <-iceComplete:
+			default:
+				close(iceComplete)
+			}
+		}
+	})
+
+	<-iceComplete
+	if err = offerPC.Close(); err != nil {
+		t.Fatal(err)
+	} else if err = answerPC.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
