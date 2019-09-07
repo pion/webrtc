@@ -89,9 +89,9 @@ func (d *DataChannel) Send(data []byte) (err error) {
 			err = recoveryToError(e)
 		}
 	}()
-	array := js.TypedArrayOf([]uint8(data))
-	defer array.Release()
-	d.underlying.Call("send", array.Value)
+	array := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(array, data)
+	d.underlying.Call("send", array)
 	return nil
 }
 
