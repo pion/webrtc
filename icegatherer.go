@@ -228,6 +228,26 @@ func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.onLocalCandidateHdlr = f
+
+	iceCandidates, err := g.agent.GetLocalCandidates()
+	if err != nil {
+		return
+	}
+
+	if len(iceCandidates) > 0 {
+		candidates, err := newICECandidatesFromICE(iceCandidates)
+		if err != nil {
+			return
+		}
+
+		for _, c := range candidates {
+			g.onLocalCandidateHdlr(&c)
+		}
+	}
+
+	if g.state == ICEGathererStateComplete {
+		g.onLocalCandidateHdlr(nil)
+	}
 }
 
 // OnStateChange fires any time the ICEGatherer changes

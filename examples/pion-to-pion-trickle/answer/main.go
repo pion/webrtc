@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/pion/webrtc/v2"
@@ -19,14 +18,6 @@ func main() {
 	offerAddr := flag.String("offer-address", "localhost:50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", ":60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
-
-	// Create wait groups to do two things:
-	// 1) Wait until we receive an initial offer before adding remote ICE candidates
-	// 2) Wait until we send our answer before sending ICE candidates to the peer
-	var offerwg sync.WaitGroup
-	var answerwg sync.WaitGroup
-	offerwg.Add(1)
-	answerwg.Add(1)
 
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
@@ -51,23 +42,6 @@ func main() {
 		panic(err)
 	}
 
-	// When an ICE candidate is available send to the other Pion instance
-	// the other Pion instance will add this candidate by calling AddICECandidate
-	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-
-		payload := []byte(c.ToJSON().Candidate)
-		answerwg.Wait()
-		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *offerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
-		if onICECandidateErr != nil {
-			panic(onICECandidateErr)
-		} else if closeErr := resp.Body.Close(); closeErr != nil {
-			panic(closeErr)
-		}
-	})
-
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
 	// This allows us to add ICE candidates faster, we don't have to wait for STUN or TURN
 	// candidates which may be slower
@@ -76,7 +50,6 @@ func main() {
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
-		offerwg.Wait()
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -110,14 +83,28 @@ func main() {
 		} else if closeErr := resp.Body.Close(); closeErr != nil {
 			panic(closeErr)
 		}
-		answerwg.Add(1) //We have now sent the answer and can send candidates to the peer
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerConnection.SetLocalDescription(answer)
 		if err != nil {
 			panic(err)
 		}
-		offerwg.Done() //We have now received the initial offer and can add candidates
+
+		// When an ICE candidate is available send to the other Pion instance
+		// the other Pion instance will add this candidate by calling AddICECandidate
+		peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
+			if c == nil {
+				return
+			}
+
+			payload := []byte(c.ToJSON().Candidate)
+			resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *offerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
+			if onICECandidateErr != nil {
+				panic(onICECandidateErr)
+			} else if closeErr := resp.Body.Close(); closeErr != nil {
+				panic(closeErr)
+			}
+		})
 	})
 
 	// Set the handler for ICE connection state
