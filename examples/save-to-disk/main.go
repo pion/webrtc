@@ -111,7 +111,6 @@ func main() {
 			fmt.Println("Ctrl+C the remote client to stop the demo")
 		} else if connectionState == webrtc.ICEConnectionStateFailed ||
 			connectionState == webrtc.ICEConnectionStateDisconnected {
-
 			closeErr := oggFile.Close()
 			if closeErr != nil {
 				panic(closeErr)
@@ -120,7 +119,6 @@ func main() {
 			closeErr = ivfFile.Close()
 			if closeErr != nil {
 				panic(closeErr)
-
 			}
 
 			fmt.Println("Done writing media files")

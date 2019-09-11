@@ -837,10 +837,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return nil
 	}
 
-	if desc.Type == SDPTypeAnswer {
-		return pc.iceGatherer.Gather()
-	}
-	return nil
+	return pc.iceGatherer.Gather()
 }
 
 // LocalDescription returns pendingLocalDescription if it is not null and
@@ -1039,9 +1036,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		pc.mu.Unlock()
 	}()
 
-	if (desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer) && pc.iceGatherer.agentIsTrickle {
-		return pc.iceGatherer.Gather()
-	}
 	return nil
 }
 
@@ -1079,7 +1073,6 @@ func (pc *PeerConnection) openSRTP() {
 
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, attr := range media.Attributes {
-
 			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
 				continue
@@ -1750,7 +1743,6 @@ func (pc *PeerConnection) newRTPTransceiver(
 	direction RTPTransceiverDirection,
 	kind RTPCodecType,
 ) *RTPTransceiver {
-
 	t := &RTPTransceiver{
 		Receiver:  receiver,
 		Sender:    sender,

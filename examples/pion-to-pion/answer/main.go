@@ -114,7 +114,6 @@ func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription,
 		if err != nil {
 			panic(err)
 		}
-
 	})
 
 	go func() {
