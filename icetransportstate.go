@@ -104,5 +104,4 @@ func (c ICETransportState) toICE() ice.ConnectionState {
 	default:
 		return ice.ConnectionState(Unknown)
 	}
-
 }

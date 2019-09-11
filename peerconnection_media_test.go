@@ -72,7 +72,6 @@ func TestSRTPDrainLeak(t *testing.T) {
 		if s == DTLSTransportStateConnected {
 			close(dtlsConnected)
 		}
-
 	})
 
 	err = signalPair(pcOffer, pcAnswer)
@@ -635,7 +634,6 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -686,7 +684,6 @@ func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
 }
 
 func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -733,7 +730,6 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 }
 
 func TestAddTransceiver(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -765,7 +761,6 @@ func TestAddTransceiver(t *testing.T) {
 }
 
 func TestAddTransceiverFromKind(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -797,7 +792,6 @@ func TestAddTransceiverFromKind(t *testing.T) {
 }
 
 func TestAddTransceiverFromKindFailsSendOnly(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -815,7 +809,6 @@ func TestAddTransceiverFromKindFailsSendOnly(t *testing.T) {
 }
 
 func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
-
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())

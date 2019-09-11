@@ -30,7 +30,6 @@ func TestCodecRegistration(t *testing.T) {
 	for _, f := range testCases {
 		_, err := api.mediaEngine.getCodec(f.c)
 		assert.Equal(t, f.e, err)
-
 	}
 	_, err := api.mediaEngine.getCodecSDP(sdp.Codec{PayloadType: invalidPT})
 	assert.Equal(t, err, ErrCodecNotFound)

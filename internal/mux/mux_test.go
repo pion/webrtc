@@ -100,5 +100,4 @@ func TestNoEndpoints(t *testing.T) {
 	if err != nil {
 		panic("Failed to close network pipe")
 	}
-
 }

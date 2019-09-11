@@ -25,8 +25,8 @@ install:
   - export PATH=$GOROOT/bin:$PATH
   - go version
   - go env
-  - go get -u github.com/matoous/godox
-  - GO111MODULE=off go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+  - go get -u github.com/sean-der/godox
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.18.0
   # Install Node 11 (required for WASM tests)
   - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
   - source ~/.nvm/nvm.sh

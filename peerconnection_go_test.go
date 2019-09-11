@@ -35,6 +35,7 @@ func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, er
 
 	return pca, pcb, nil
 }
+
 func TestNew_Go(t *testing.T) {
 	api := NewAPI()
 	t.Run("Success", func(t *testing.T) {
@@ -300,7 +301,6 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
 // We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost
 func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
-
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
@@ -458,7 +458,6 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			t.Errorf("satisfyTypeAndDirection %q: \ngot\n%s \nwant\n%s", test.name, gotStr, wantStr)
 		}
 	}
-
 }
 
 func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {

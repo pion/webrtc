@@ -1061,7 +1061,6 @@ func (pc *PeerConnection) openSRTP() {
 
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, attr := range media.Attributes {
-
 			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
 				continue
@@ -1732,7 +1731,6 @@ func (pc *PeerConnection) newRTPTransceiver(
 	direction RTPTransceiverDirection,
 	kind RTPCodecType,
 ) *RTPTransceiver {
-
 	t := &RTPTransceiver{
 		Receiver:  receiver,
 		Sender:    sender,

@@ -78,7 +78,6 @@ func (t *QUICTransport) GetLocalParameters() (QUICParameters, error) {
 		prints, err := c.GetFingerprints()
 		if err != nil {
 			return QUICParameters{}, err
-
 		}
 		fingerprints = append(fingerprints, prints...)
 	}
