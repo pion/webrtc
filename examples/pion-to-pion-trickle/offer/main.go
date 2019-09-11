@@ -15,18 +15,29 @@ import (
 	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
 
+func signalCandidate(addr string, c *webrtc.ICECandidate) error {
+	payload := []byte(c.ToJSON().Candidate)
+	resp, err := http.Post(fmt.Sprintf("http://%s/candidate", addr),
+		"application/json; charset=utf-8", bytes.NewReader(payload))
+
+	if err != nil {
+		return err
+	}
+
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		return closeErr
+	}
+
+	return nil
+}
+
 func main() {
 	offerAddr := flag.String("offer-address", ":50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", "127.0.0.1:60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
 
-	// Create wait groups to do two things:
-	// 1) Wait until we send our initial offer before sending ICE candidates to the peer
-	// 2) Wait until we receive their answer before adding remote ICE candidates
-	var offerwg sync.WaitGroup
-	var answerwg sync.WaitGroup
-	offerwg.Add(1)
-	answerwg.Add(1)
+	var candidatesMux sync.Mutex
+	pendingCandidates := make([]*webrtc.ICECandidate, 0)
 
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
@@ -58,13 +69,14 @@ func main() {
 			return
 		}
 
-		payload := []byte(c.ToJSON().Candidate)
-		offerwg.Wait()
-		resp, onICECandidateErr := http.Post(fmt.Sprintf("http://%s/candidate", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload))
-		if onICECandidateErr != nil {
+		candidatesMux.Lock()
+		defer candidatesMux.Unlock()
+
+		desc := peerConnection.RemoteDescription()
+		if desc == nil {
+			pendingCandidates = append(pendingCandidates, c)
+		} else if onICECandidateErr := signalCandidate(*answerAddr, c); err != nil {
 			panic(onICECandidateErr)
-		} else if closeErr := resp.Body.Close(); closeErr != nil {
-			panic(closeErr)
 		}
 	})
 
@@ -76,7 +88,6 @@ func main() {
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
-		answerwg.Wait()
 		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 			panic(candidateErr)
 		}
@@ -92,7 +103,15 @@ func main() {
 		if sdpErr := peerConnection.SetRemoteDescription(sdp); sdpErr != nil {
 			panic(sdpErr)
 		}
-		answerwg.Done()
+
+		candidatesMux.Lock()
+		defer candidatesMux.Unlock()
+
+		for _, c := range pendingCandidates {
+			if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
+				panic(onICECandidateErr)
+			}
+		}
 	})
 	// Start HTTP server that accepts requests from the answer process
 	go func() { panic(http.ListenAndServe(*offerAddr, nil)) }()
@@ -153,7 +172,6 @@ func main() {
 	} else if err := resp.Body.Close(); err != nil {
 		panic(err)
 	}
-	offerwg.Done()
 
 	// Block forever
 	select {}
