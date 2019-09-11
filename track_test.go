@@ -71,7 +71,6 @@ func TestNewTracks(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to new video track")
 	}
-
 }
 
 func TestNewTracksWrite(t *testing.T) {
@@ -115,5 +114,4 @@ func TestNewTracksWrite(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to write to audio track")
 	}
-
 }

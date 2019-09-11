@@ -36,7 +36,6 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
 	s.lastPush = p.SequenceNumber
 	s.buffer[p.SequenceNumber-s.maxLate] = nil
-
 }
 
 // We have a valid collection of RTP Packets
