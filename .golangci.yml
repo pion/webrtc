@@ -13,3 +13,6 @@ linters:
 
 issues:
   exclude-use-default: false
+
+run:
+  skip-dirs-use-default: false
