@@ -286,9 +286,10 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 }
 
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) (done chan struct{}) {
-	pc.mu.RLock()
+	pc.mu.Lock()
+	pc.iceConnectionState = cs
 	hdlr := pc.onICEConnectionStateChangeHandler
-	pc.mu.RUnlock()
+	pc.mu.Unlock()
 
 	pc.log.Infof("ICE connection state changed: %s", cs)
 	done = make(chan struct{})
@@ -524,7 +525,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 			pc.log.Warnf("OnConnectionStateChange: unhandled ICE state: %s", state)
 			return
 		}
-		pc.iceStateChange(cs)
+		pc.onICEConnectionStateChange(cs)
 	})
 
 	return t
@@ -1624,14 +1625,6 @@ func (pc *PeerConnection) Close() error {
 		}
 	}
 	return util.FlattenErrs(closeErrs)
-}
-
-func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
-	pc.mu.Lock()
-	pc.iceConnectionState = newState
-	pc.mu.Unlock()
-
-	pc.onICEConnectionStateChange(newState)
 }
 
 func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) error {
