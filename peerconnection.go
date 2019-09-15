@@ -209,24 +209,15 @@ func (pc *PeerConnection) OnSignalingStateChange(f func(SignalingState)) {
 	pc.onSignalingStateChangeHandler = f
 }
 
-func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) (done chan struct{}) {
+func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) {
 	pc.mu.RLock()
 	hdlr := pc.onSignalingStateChangeHandler
 	pc.mu.RUnlock()
 
 	pc.log.Infof("signaling state changed to %s", newState)
-	done = make(chan struct{})
-	if hdlr == nil {
-		close(done)
-		return
+	if hdlr != nil {
+		go hdlr(newState)
 	}
-
-	go func() {
-		hdlr(newState)
-		close(done)
-	}()
-
-	return
 }
 
 // OnDataChannel sets an event handler which is invoked when a data
@@ -257,24 +248,15 @@ func (pc *PeerConnection) OnTrack(f func(*Track, *RTPReceiver)) {
 	pc.onTrackHandler = f
 }
 
-func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) (done chan struct{}) {
+func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) {
 	pc.mu.RLock()
 	hdlr := pc.onTrackHandler
 	pc.mu.RUnlock()
 
 	pc.log.Debugf("got new track: %+v", t)
-	done = make(chan struct{})
-	if hdlr == nil || t == nil {
-		close(done)
-		return
+	if hdlr != nil && t != nil {
+		go hdlr(t, r)
 	}
-
-	go func() {
-		hdlr(t, r)
-		close(done)
-	}()
-
-	return
 }
 
 // OnICEConnectionStateChange sets an event handler which is called

@@ -198,25 +198,18 @@ func (d *DataChannel) OnOpen(f func()) {
 	}
 }
 
-func (d *DataChannel) onOpen() (done chan struct{}) {
+func (d *DataChannel) onOpen() {
 	d.mu.RLock()
 	hdlr := d.onOpenHandler
 	d.mu.RUnlock()
 
-	done = make(chan struct{})
-	if hdlr == nil {
-		close(done)
-		return
+	if hdlr != nil {
+		go func() {
+			d.onceMutex.Lock()
+			d.openHandlerOnce.Do(hdlr)
+			d.onceMutex.Unlock()
+		}()
 	}
-
-	go func() {
-		d.onceMutex.Lock()
-		d.openHandlerOnce.Do(hdlr)
-		d.onceMutex.Unlock()
-		close(done)
-	}()
-
-	return
 }
 
 // OnClose sets an event handler which is invoked when
@@ -227,23 +220,14 @@ func (d *DataChannel) OnClose(f func()) {
 	d.onCloseHandler = f
 }
 
-func (d *DataChannel) onClose() (done chan struct{}) {
+func (d *DataChannel) onClose() {
 	d.mu.RLock()
 	hdlr := d.onCloseHandler
 	d.mu.RUnlock()
 
-	done = make(chan struct{})
-	if hdlr == nil {
-		close(done)
-		return
+	if hdlr != nil {
+		go hdlr()
 	}
-
-	go func() {
-		hdlr()
-		close(done)
-	}()
-
-	return
 }
 
 // OnMessage sets an event handler which is invoked on a binary
@@ -293,23 +277,14 @@ func (d *DataChannel) OnError(f func(err error)) {
 	d.onErrorHandler = f
 }
 
-func (d *DataChannel) onError(err error) (done chan struct{}) {
+func (d *DataChannel) onError(err error) {
 	d.mu.RLock()
 	hdlr := d.onErrorHandler
 	d.mu.RUnlock()
 
-	done = make(chan struct{})
-	if hdlr == nil {
-		close(done)
-		return
+	if hdlr != nil {
+		go hdlr(err)
 	}
-
-	go func() {
-		hdlr(err)
-		close(done)
-	}()
-
-	return
 }
 
 func (d *DataChannel) readLoop() {
