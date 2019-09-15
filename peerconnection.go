@@ -42,7 +42,7 @@ type PeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed          bool
+	isClosed          *atomicBool
 	negotiationNeeded bool
 
 	lastOffer  string
@@ -58,6 +58,7 @@ type PeerConnection struct {
 
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
+	onConnectionStateChangeHandler    func(PeerConnectionState)
 	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
 
@@ -95,7 +96,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		isClosed:           false,
+		isClosed:           &atomicBool{},
 		negotiationNeeded:  false,
 		lastOffer:          "",
 		lastAnswer:         "",
@@ -267,31 +268,30 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 	pc.onICEConnectionStateChangeHandler = f
 }
 
-func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) (done chan struct{}) {
+func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
 	pc.mu.Lock()
 	pc.iceConnectionState = cs
 	hdlr := pc.onICEConnectionStateChangeHandler
 	pc.mu.Unlock()
 
 	pc.log.Infof("ICE connection state changed: %s", cs)
-	done = make(chan struct{})
-	if hdlr == nil {
-		close(done)
-		return
+	if hdlr != nil {
+		go hdlr(cs)
 	}
+}
 
-	go func() {
-		hdlr(cs)
-		close(done)
-	}()
-
-	return
+// OnConnectionStateChange sets an event handler which is called
+// when the PeerConnectionState has changed
+func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	pc.onConnectionStateChangeHandler = f
 }
 
 // SetConfiguration updates the configuration of this PeerConnection object.
 func (pc *PeerConnection) SetConfiguration(configuration Configuration) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -383,7 +383,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
-	case pc.isClosed:
+	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -483,9 +483,52 @@ func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	return g, nil
 }
 
+// Update the PeerConnectionState given the state of relevant transports
+// https://www.w3.org/TR/webrtc/#rtcpeerconnectionstate-enum
+func (pc *PeerConnection) updateConnectionState() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	connectionState := PeerConnectionStateNew
+	switch {
+	// The RTCPeerConnection object's [[IsClosed]] slot is true.
+	case pc.isClosed.get():
+		connectionState = PeerConnectionStateClosed
+
+	// Any of the RTCIceTransports or RTCDtlsTransports are in a "failed" state.
+	case pc.iceConnectionState == ICEConnectionStateFailed || pc.dtlsTransport.State() == DTLSTransportStateFailed:
+		connectionState = PeerConnectionStateFailed
+
+	// Any of the RTCIceTransports or RTCDtlsTransports are in the "disconnected"
+	// state and none of them are in the "failed" or "connecting" or "checking" state.  */
+	case pc.iceConnectionState == ICEConnectionStateDisconnected:
+		connectionState = PeerConnectionStateDisconnected
+
+	// All RTCIceTransports and RTCDtlsTransports are in the "connected", "completed" or "closed"
+	// state and at least one of them is in the "connected" or "completed" state.
+	case pc.iceConnectionState == ICEConnectionStateConnected && pc.dtlsTransport.State() == DTLSTransportStateConnected:
+		connectionState = PeerConnectionStateConnected
+
+	//  Any of the RTCIceTransports or RTCDtlsTransports are in the "connecting" or
+	// "checking" state and none of them is in the "failed" state.
+	case pc.iceConnectionState == ICEConnectionStateChecking && pc.dtlsTransport.State() == DTLSTransportStateConnecting:
+		connectionState = PeerConnectionStateConnecting
+	}
+
+	if pc.connectionState == connectionState {
+		return
+	}
+
+	pc.log.Infof("peer connection state changed: %s", connectionState)
+	pc.connectionState = connectionState
+	hdlr := pc.onConnectionStateChangeHandler
+	if hdlr != nil {
+		go hdlr(connectionState)
+	}
+}
+
 func (pc *PeerConnection) createICETransport() *ICETransport {
 	t := pc.api.NewICETransport(pc.iceGatherer)
-
 	t.OnConnectionStateChange(func(state ICETransportState) {
 		var cs ICEConnectionState
 		switch state {
@@ -508,6 +551,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 			return
 		}
 		pc.onICEConnectionStateChange(cs)
+		pc.updateConnectionState()
 	})
 
 	return t
@@ -654,7 +698,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
-	case pc.isClosed:
+	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -684,7 +728,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 // 4.4.1.6 Set the SessionDescription
 func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -783,7 +827,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 
 // SetLocalDescription sets the SessionDescription of the local peer
 func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -835,11 +879,11 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
-func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { //nolint pion/webrtc#614
+func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if pc.currentRemoteDescription != nil { // pion/webrtc#207
 		return fmt.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
 	}
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -926,98 +970,17 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		pc.mu.RUnlock()
 	})
 
-	go func() {
-		// Star the networking in a new routine since it will block until
-		// the connection is actually established.
+	iceRole := ICERoleControlled
+	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+	// If both or neither agents are lite the offering agent is controlling.
+	// RFC 8445 S6.1.1
+	if (weOffer && remoteIsLite == pc.iceGatherer.lite) || (remoteIsLite && !pc.iceGatherer.lite) {
+		iceRole = ICERoleControlling
+	}
 
-		// Start the ice transport
-		iceRole := ICERoleControlled
-		// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
-		// If both or neither agents are lite the offering agent is controlling.
-		// RFC 8445 S6.1.1
-		if (weOffer && remoteIsLite == pc.iceGatherer.lite) || (remoteIsLite && !pc.iceGatherer.lite) {
-			iceRole = ICERoleControlling
-		}
-		err := pc.iceTransport.Start(
-			pc.iceGatherer,
-			ICEParameters{
-				UsernameFragment: remoteUfrag,
-				Password:         remotePwd,
-				ICELite:          false,
-			},
-			&iceRole,
-		)
-
-		if err != nil {
-			// pion/webrtc#614
-			pc.log.Warnf("Failed to start manager: %s", err)
-			return
-		}
-
-		// Start the dtls transport
-		err = pc.dtlsTransport.Start(DTLSParameters{
-			Role:         dtlsRoleFromRemoteSDP(desc.parsed),
-			Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
-		})
-		if err != nil {
-			// pion/webrtc#614
-			pc.log.Warnf("Failed to start manager: %s", err)
-			return
-		}
-
-		pc.openSRTP()
-
-		for _, tranceiver := range pc.GetTransceivers() {
-			if tranceiver.Sender != nil {
-				err = tranceiver.Sender.Send(RTPSendParameters{
-					Encodings: RTPEncodingParameters{
-						RTPCodingParameters{
-							SSRC:        tranceiver.Sender.track.SSRC(),
-							PayloadType: tranceiver.Sender.track.PayloadType(),
-						},
-					}})
-
-				if err != nil {
-					pc.log.Warnf("Failed to start Sender: %s", err)
-				}
-			}
-		}
-
-		go pc.drainSRTP()
-
-		// Start sctp
-		err = pc.sctpTransport.Start(SCTPCapabilities{
-			MaxMessageSize: 0,
-		})
-		if err != nil {
-			// pion/webrtc#614
-			pc.log.Warnf("Failed to start SCTP: %s", err)
-			return
-		}
-
-		// Open data channels that where created before signaling
-		pc.mu.Lock()
-		// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
-		dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
-		for k, v := range pc.dataChannels {
-			dataChannels[k] = v
-		}
-		pc.mu.Unlock()
-
-		var openedDCCount uint32
-		for _, d := range dataChannels {
-			err := d.open(pc.sctpTransport)
-			if err != nil {
-				pc.log.Warnf("failed to open data channel: %s", err)
-				continue
-			}
-			openedDCCount++
-		}
-
-		pc.mu.Lock()
-		pc.dataChannelsOpened += openedDCCount
-		pc.mu.Unlock()
-	}()
+	// Start the networking in a new routine since it will block until
+	// the connection is actually established.
+	go pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
 
 	return nil
 }
@@ -1286,7 +1249,7 @@ func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 
 // AddTrack adds a Track to the PeerConnection
 func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 	var transceiver *RTPTransceiver
@@ -1439,8 +1402,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	pc.mu.Lock()
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
-	if pc.isClosed {
-		pc.mu.Unlock()
+	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
@@ -1564,23 +1526,24 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
-	if pc.isClosed {
+	if pc.isClosed.get() {
 		return nil
 	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
+	pc.isClosed.set(true)
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
+	pc.signalingState = SignalingStateClosed
+
 	// Try closing everything and collect the errors
 	// Shutdown strategy:
 	// 1. All Conn close by closing their underlying Conn.
 	// 2. A Mux stops this chain. It won't close the underlying
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
+
 	var closeErrs []error
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
-	pc.isClosed = true
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
-	pc.signalingState = SignalingStateClosed
-
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
@@ -1589,7 +1552,7 @@ func (pc *PeerConnection) Close() error {
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
-	pc.connectionState = PeerConnectionStateClosed
+	pc.updateConnectionState()
 
 	if err := pc.dtlsTransport.Stop(); err != nil {
 		closeErrs = append(closeErrs, err)
@@ -1855,6 +1818,90 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	statsCollector.Collect(stats.ID, stats)
 	return statsCollector.Ready()
+}
+
+// Start all transports. PeerConnection now has enough state
+func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
+	// Start the ice transport
+	err := pc.iceTransport.Start(
+		pc.iceGatherer,
+		ICEParameters{
+			UsernameFragment: remoteUfrag,
+			Password:         remotePwd,
+			ICELite:          false,
+		},
+		&iceRole,
+	)
+	if err != nil {
+		pc.log.Warnf("Failed to start manager: %s", err)
+		return
+	}
+
+	// Start the dtls transport
+	err = pc.dtlsTransport.Start(DTLSParameters{
+		Role:         dtlsRole,
+		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
+	})
+	pc.updateConnectionState()
+	if err != nil {
+		pc.log.Warnf("Failed to start manager: %s", err)
+		return
+	}
+
+	pc.openSRTP()
+
+	for _, tranceiver := range pc.GetTransceivers() {
+		if tranceiver.Sender != nil {
+			err = tranceiver.Sender.Send(RTPSendParameters{
+				Encodings: RTPEncodingParameters{
+					RTPCodingParameters{
+						SSRC:        tranceiver.Sender.track.SSRC(),
+						PayloadType: tranceiver.Sender.track.PayloadType(),
+					},
+				}})
+			if err != nil {
+				pc.log.Warnf("Failed to start Sender: %s", err)
+			}
+		}
+	}
+
+	go pc.drainSRTP()
+
+	// Start sctp
+	if err = pc.sctpTransport.Start(SCTPCapabilities{
+		MaxMessageSize: 0,
+	}); err != nil {
+		pc.log.Warnf("Failed to start SCTP: %s", err)
+		if err = pc.sctpTransport.Stop(); err != nil {
+			pc.log.Warnf("Failed to stop SCTPTransport: %s", err)
+		}
+
+		return
+	}
+
+	// Open data channels that where created before signaling
+	pc.mu.Lock()
+	// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
+	dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
+	for k, v := range pc.dataChannels {
+		dataChannels[k] = v
+	}
+	pc.mu.Unlock()
+
+	var openedDCCount uint32
+	for _, d := range dataChannels {
+		err := d.open(pc.sctpTransport)
+		if err != nil {
+			pc.log.Warnf("failed to open data channel: %s", err)
+			continue
+		}
+		openedDCCount++
+	}
+
+	pc.mu.Lock()
+	pc.dataChannelsOpened += openedDCCount
+	pc.mu.Unlock()
+
 }
 
 func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription) {

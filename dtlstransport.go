@@ -273,11 +273,16 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Check the fingerprint if a certificate was exchanged
 	remoteCert := t.conn.RemoteCertificate()
 	if remoteCert == nil {
+		t.onStateChange(DTLSTransportStateFailed)
 		return fmt.Errorf("peer didn't provide certificate via DTLS")
 	}
 
 	t.remoteCertificate = remoteCert.Raw
-	return t.validateFingerPrint(remoteParameters, remoteCert)
+	err := t.validateFingerPrint(remoteParameters, remoteCert)
+	if err != nil {
+		t.onStateChange(DTLSTransportStateFailed)
+	}
+	return err
 }
 
 // Stop stops and closes the DTLSTransport object.

@@ -20,6 +20,7 @@ type PeerConnection struct {
 	// syscall/js API. Initially nil.
 	onSignalingStateChangeHandler    *js.Func
 	onDataChannelHandler             *js.Func
+	onConectionStateChangeHandler    *js.Func
 	onICEConectionStateChangeHandler *js.Func
 	onICECandidateHandler            *js.Func
 	onICEGatheringStateChangeHandler *js.Func
@@ -104,6 +105,22 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 	})
 	pc.onICEConectionStateChangeHandler = &onICEConectionStateChangeHandler
 	pc.underlying.Set("oniceconnectionstatechange", onICEConectionStateChangeHandler)
+}
+
+// OnConnectionStateChange sets an event handler which is called
+// when an PeerConnectionState is changed.
+func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
+	if pc.onConectionStateChangeHandler != nil {
+		oldHandler := pc.onConectionStateChangeHandler
+		defer oldHandler.Release()
+	}
+	onConectionStateChangeHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		connectionState := newPeerConnectionState(pc.underlying.Get("connectionState").String())
+		go f(connectionState)
+		return js.Undefined()
+	})
+	pc.onConectionStateChangeHandler = &onConectionStateChangeHandler
+	pc.underlying.Set("onconnectionstatechange", onConectionStateChangeHandler)
 }
 
 func (pc *PeerConnection) checkConfiguration(configuration Configuration) error {
@@ -356,6 +373,9 @@ func (pc *PeerConnection) Close() (err error) {
 	}
 	if pc.onDataChannelHandler != nil {
 		pc.onDataChannelHandler.Release()
+	}
+	if pc.onConectionStateChangeHandler != nil {
+		pc.onConectionStateChangeHandler.Release()
 	}
 	if pc.onICEConectionStateChangeHandler != nil {
 		pc.onICEConectionStateChangeHandler.Release()
