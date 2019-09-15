@@ -33,6 +33,7 @@ type SettingEngine struct {
 		ICELite         bool
 		ICETrickle      bool
 		ICENetworkTypes []NetworkType
+		InterfaceFilter func(string) bool
 	}
 	LoggerFactory logging.LoggerFactory
 }
@@ -104,4 +105,8 @@ func (e *SettingEngine) SetTrickle(trickle bool) {
 // during local and server reflexive gathering.
 func (e *SettingEngine) SetNetworkTypes(candidateTypes []NetworkType) {
 	e.candidates.ICENetworkTypes = candidateTypes
+}
+
+func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
+	e.candidates.InterfaceFilter = filter
 }
