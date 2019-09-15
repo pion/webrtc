@@ -367,14 +367,16 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	wasCalledMut := &sync.Mutex{}
 	// wg is used to wait for all event handlers to be called.
 	wg := &sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(6)
 
 	// Each sync.Once is used to ensure that we call wg.Done once for each event
 	// handler and don't add multiple entries to wasCalled. The event handlers can
 	// be called more than once in some cases.
 	onceOffererOnICEConnectionStateChange := &sync.Once{}
+	onceOffererOnConnectionStateChange := &sync.Once{}
 	onceOffererOnSignalingStateChange := &sync.Once{}
 	onceAnswererOnICEConnectionStateChange := &sync.Once{}
+	onceAnswererOnConnectionStateChange := &sync.Once{}
 	onceAnswererOnSignalingStateChange := &sync.Once{}
 
 	// Register all the event handlers.
@@ -383,6 +385,18 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "offerer OnICEConnectionStateChange")
+			wg.Done()
+		})
+	})
+	pcOffer.OnConnectionStateChange(func(callbackState PeerConnectionState) {
+		if storedState := pcOffer.ConnectionState(); callbackState != storedState {
+			t.Errorf("State in callback argument is different from ConnectionState(): callbackState=%s, storedState=%s", callbackState, storedState)
+		}
+
+		onceOffererOnConnectionStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "offerer OnConnectionStateChange")
 			wg.Done()
 		})
 	})
@@ -399,6 +413,14 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "answerer OnICEConnectionStateChange")
+			wg.Done()
+		})
+	})
+	pcAnswer.OnConnectionStateChange(func(PeerConnectionState) {
+		onceAnswererOnConnectionStateChange.Do(func() {
+			wasCalledMut.Lock()
+			defer wasCalledMut.Unlock()
+			wasCalled = append(wasCalled, "answerer OnConnectionStateChange")
 			wg.Done()
 		})
 	})
