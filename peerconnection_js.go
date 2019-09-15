@@ -90,11 +90,6 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 	pc.underlying.Set("ondatachannel", onDataChannelHandler)
 }
 
-// OnTrack sets an event handler which is called when remote track
-// arrives from a remote peer.
-// func (pc *PeerConnection) OnTrack(f func(*Track, *RTPReceiver)) {
-// }
-
 // OnICEConnectionStateChange sets an event handler which is called
 // when an ICE connection state is changed.
 func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState)) {
@@ -318,28 +313,6 @@ func (pc *PeerConnection) OnICEGatheringStateChange(f func()) {
 	pc.underlying.Set("onicegatheringstatechange", onICEGatheringStateChangeHandler)
 }
 
-// // GetSenders returns the RTPSender that are currently attached to this PeerConnection
-// func (pc *PeerConnection) GetSenders() []*RTPSender {
-// }
-
-// // GetReceivers returns the RTPReceivers that are currently attached to this RTCPeerConnection
-// func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
-// }
-
-// // GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
-// func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
-// }
-
-// // AddTrack adds a Track to the PeerConnection
-// func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
-// }
-
-// func (pc *PeerConnection) RemoveTrack() {
-// }
-
-// func (pc *PeerConnection) AddTransceiver() RTPTransceiver {
-// }
-
 // CreateDataChannel creates a new DataChannel object with the given label
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
@@ -366,11 +339,6 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) (err error) {
 	pc.underlying.Call("setIdentityProvider", provider)
 	return nil
 }
-
-// Note: WriteRTCP is not supported.
-// func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
-// 	return errors.New("Not yet implemented")
-// }
 
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() (err error) {
@@ -401,11 +369,6 @@ func (pc *PeerConnection) Close() (err error) {
 
 	return nil
 }
-
-// NewTrack Creates a new Track
-// func (pc *PeerConnection) NewTrack(payloadType uint8, ssrc uint32, id, label string) (*Track, error) {
-// 	return nil, errors.New("Not yet implemented")
-// }
 
 // CurrentLocalDescription represents the local description that was
 // successfully negotiated the last time the PeerConnection transitioned
