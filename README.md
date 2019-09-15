@@ -136,6 +136,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Sebastian Waisbrot](https://github.com/seppo0010)
 * [Masataka Hisasue](https://github.com/sylba2050) - *Fix Docs*
 * [Hongchao Ma(马洪超)](https://github.com/hcm007)
+* [Aaron France](https://github.com/AeroNotix)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

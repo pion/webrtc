@@ -37,6 +37,7 @@ type ICEGatherer struct {
 	loggerFactory             logging.LoggerFactory
 	log                       logging.LeveledLogger
 	networkTypes              []NetworkType
+	interfaceFilter           func(string) bool
 
 	onLocalCandidateHdlr func(candidate *ICECandidate)
 	onStateChangeHdlr    func(state ICEGathererState)
@@ -57,6 +58,7 @@ func NewICEGatherer(
 	agentIsTrickle bool,
 	lite bool,
 	networkTypes []NetworkType,
+	interfaceFilter func(string) bool,
 	opts ICEGatherOptions,
 ) (*ICEGatherer, error) {
 	var validatedServers []*ice.URL
@@ -95,6 +97,7 @@ func NewICEGatherer(
 		srflxAcceptanceMinWait:    srflxAcceptanceMinWait,
 		prflxAcceptanceMinWait:    prflxAcceptanceMinWait,
 		relayAcceptanceMinWait:    relayAcceptanceMinWait,
+		interfaceFilter:           interfaceFilter,
 	}, nil
 }
 
@@ -121,6 +124,7 @@ func (g *ICEGatherer) createAgent() error {
 		SrflxAcceptanceMinWait:    g.srflxAcceptanceMinWait,
 		PrflxAcceptanceMinWait:    g.prflxAcceptanceMinWait,
 		RelayAcceptanceMinWait:    g.relayAcceptanceMinWait,
+		InterfaceFilter:           g.interfaceFilter,
 	}
 
 	requestedNetworkTypes := g.networkTypes
