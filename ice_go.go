@@ -22,6 +22,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		api.settingEngine.candidates.ICETrickle,
 		api.settingEngine.candidates.ICELite,
 		api.settingEngine.candidates.ICENetworkTypes,
+		api.settingEngine.candidates.InterfaceFilter,
 		opts,
 	)
 }

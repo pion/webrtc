@@ -33,6 +33,7 @@ type SettingEngine struct {
 		ICELite         bool
 		ICETrickle      bool
 		ICENetworkTypes []NetworkType
+		InterfaceFilter func(string) bool
 	}
 	LoggerFactory logging.LoggerFactory
 }
@@ -104,4 +105,12 @@ func (e *SettingEngine) SetTrickle(trickle bool) {
 // during local and server reflexive gathering.
 func (e *SettingEngine) SetNetworkTypes(candidateTypes []NetworkType) {
 	e.candidates.ICENetworkTypes = candidateTypes
+}
+
+// SetInterfaceFilter sets the filtering functions when gathering ICE candidates
+// This can be used to exclude certain network interfaces from ICE. Which may be
+// useful if you know a certain interface will never succeed, or if you wish to reduce
+// the amount of information you wish to expose to the remote peer
+func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
+	e.candidates.InterfaceFilter = filter
 }
