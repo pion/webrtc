@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -626,5 +627,76 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 		t.Fatal(err)
 	} else if err = answerPC.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
+func TestInvalidFingerprintCausesFailed(t *testing.T) {
+	pcOffer, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offerChan := make(chan SessionDescription)
+	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
+		if candidate == nil {
+			offerChan <- *pcOffer.PendingLocalDescription()
+		}
+	})
+
+	connectionHasFailed, closeFunc := context.WithCancel(context.Background())
+	pcAnswer.OnConnectionStateChange(func(connectionState PeerConnectionState) {
+		if connectionState == PeerConnectionStateFailed {
+			closeFunc()
+		}
+	})
+
+	if _, err = pcOffer.CreateDataChannel("unusedDataChannel", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	} else if err := pcOffer.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case offer := <-offerChan:
+		// Replace with invalid fingerprint
+		re := regexp.MustCompile(`sha-256 (.*?)\r`)
+		offer.SDP = re.ReplaceAllString(offer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
+
+		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
+			t.Fatal(err)
+		}
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err = pcAnswer.SetLocalDescription(answer); err != nil {
+			t.Fatal(err)
+		}
+
+		err = pcOffer.SetRemoteDescription(answer)
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting to receive offer")
+	}
+
+	select {
+	case <-connectionHasFailed.Done():
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for connection to fail")
 	}
 }
