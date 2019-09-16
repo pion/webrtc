@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -38,21 +39,22 @@ func TestSRTPDrainLeak(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	sawRTCPDrainMessage := make(chan bool, 1)
-	sawRTPDrainmessage := make(chan bool, 1)
+	sawRTPDrainMessage := &atomicBool{}
+	sawRTCPDrainMessage := &atomicBool{}
+	seenBothMessages, closeFunc := context.WithCancel(context.Background())
 
 	s := SettingEngine{
 		LoggerFactory: testCatchAllLoggerFactory{
 			callback: func(msg string) {
 				if strings.Contains(msg, "Incoming unhandled RTP ssrc") {
-					select {
-					case sawRTPDrainmessage <- true:
-					default:
+					sawRTPDrainMessage.set(true)
+					if sawRTPDrainMessage.get() && sawRTCPDrainMessage.get() {
+						closeFunc()
 					}
 				} else if strings.Contains(msg, "Incoming unhandled RTCP ssrc") {
-					select {
-					case sawRTCPDrainMessage <- true:
-					default:
+					sawRTCPDrainMessage.set(true)
+					if sawRTPDrainMessage.get() && sawRTCPDrainMessage.get() {
+						closeFunc()
 					}
 				}
 			},
@@ -99,27 +101,36 @@ func TestSRTPDrainLeak(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Send 5 RTP/RTCP packets with different SSRCes
-	var i uint32
-	for i = 0; i < 5; i++ {
-		if _, err = srtpStream.WriteRTP(&rtp.Header{Version: 2, SSRC: i}, []byte{0x00, 0x01, 0x03}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for i = 0; i < 5; i++ {
-		var raw []byte
-		raw, err = rtcp.Marshal([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: i}})
-		if err != nil {
-			t.Fatal(err)
-		}
+	func() {
+		var rtpSsrc uint32
+		var rtcpSsrc uint32
 
-		if _, err = srtcpStream.Write(raw); err != nil {
-			t.Fatal(err)
-		}
-	}
+		for {
+			select {
+			case <-seenBothMessages.Done():
+				return
+			case <-time.After(200 * time.Millisecond):
+				// Send 5 RTP/RTCP packets with different SSRCes
+				for ; rtpSsrc%5 == 0; rtpSsrc++ {
+					if _, err = srtpStream.WriteRTP(&rtp.Header{Version: 2, SSRC: rtpSsrc}, []byte{0x00, 0x01, 0x03}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for ; rtcpSsrc%5 == 0; rtcpSsrc++ {
+					var raw []byte
+					raw, err = rtcp.Marshal([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: rtcpSsrc}})
+					if err != nil {
+						t.Fatal(err)
+					}
 
-	<-sawRTCPDrainMessage
-	<-sawRTPDrainmessage
+					if _, err = srtcpStream.Write(raw); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+		}
+	}()
+
 	err = pcOffer.Close()
 	if err != nil {
 		t.Fatal(err)
