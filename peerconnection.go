@@ -485,7 +485,7 @@ func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 
 // Update the PeerConnectionState given the state of relevant transports
 // https://www.w3.org/TR/webrtc/#rtcpeerconnectionstate-enum
-func (pc *PeerConnection) updateConnectionState() {
+func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnectionState, dtlsTransportState DTLSTransportState) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
@@ -496,22 +496,22 @@ func (pc *PeerConnection) updateConnectionState() {
 		connectionState = PeerConnectionStateClosed
 
 	// Any of the RTCIceTransports or RTCDtlsTransports are in a "failed" state.
-	case pc.iceConnectionState == ICEConnectionStateFailed || pc.dtlsTransport.State() == DTLSTransportStateFailed:
+	case iceConnectionState == ICEConnectionStateFailed || dtlsTransportState == DTLSTransportStateFailed:
 		connectionState = PeerConnectionStateFailed
 
 	// Any of the RTCIceTransports or RTCDtlsTransports are in the "disconnected"
 	// state and none of them are in the "failed" or "connecting" or "checking" state.  */
-	case pc.iceConnectionState == ICEConnectionStateDisconnected:
+	case iceConnectionState == ICEConnectionStateDisconnected:
 		connectionState = PeerConnectionStateDisconnected
 
 	// All RTCIceTransports and RTCDtlsTransports are in the "connected", "completed" or "closed"
 	// state and at least one of them is in the "connected" or "completed" state.
-	case pc.iceConnectionState == ICEConnectionStateConnected && pc.dtlsTransport.State() == DTLSTransportStateConnected:
+	case iceConnectionState == ICEConnectionStateConnected && dtlsTransportState == DTLSTransportStateConnected:
 		connectionState = PeerConnectionStateConnected
 
 	//  Any of the RTCIceTransports or RTCDtlsTransports are in the "connecting" or
 	// "checking" state and none of them is in the "failed" state.
-	case pc.iceConnectionState == ICEConnectionStateChecking && pc.dtlsTransport.State() == DTLSTransportStateConnecting:
+	case iceConnectionState == ICEConnectionStateChecking && dtlsTransportState == DTLSTransportStateConnecting:
 		connectionState = PeerConnectionStateConnecting
 	}
 
@@ -551,7 +551,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 			return
 		}
 		pc.onICEConnectionStateChange(cs)
-		pc.updateConnectionState()
+		pc.updateConnectionState(cs, pc.dtlsTransport.State())
 	})
 
 	return t
@@ -1552,7 +1552,7 @@ func (pc *PeerConnection) Close() error {
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
-	pc.updateConnectionState()
+	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
 	if err := pc.dtlsTransport.Stop(); err != nil {
 		closeErrs = append(closeErrs, err)
@@ -1842,7 +1842,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
-	pc.updateConnectionState()
+	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 	if err != nil {
 		pc.log.Warnf("Failed to start manager: %s", err)
 		return
