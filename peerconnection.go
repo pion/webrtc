@@ -422,13 +422,13 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 
 		if len(video) > 0 {
-			if err = pc.addTransceiverSDP(d, "video", iceParams, candidates, sdp.ConnectionRoleActpass, video...); err != nil {
+			if _, err = pc.addTransceiverSDP(d, "video", iceParams, candidates, sdp.ConnectionRoleActpass, video...); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle("video")
 		}
 		if len(audio) > 0 {
-			if err = pc.addTransceiverSDP(d, "audio", iceParams, candidates, sdp.ConnectionRoleActpass, audio...); err != nil {
+			if _, err = pc.addTransceiverSDP(d, "audio", iceParams, candidates, sdp.ConnectionRoleActpass, audio...); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle("audio")
@@ -436,7 +436,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	} else {
 		for _, t := range pc.GetTransceivers() {
 			midValue := strconv.Itoa(bundleCount)
-			if err = pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActpass, t); err != nil {
+			if _, err = pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActpass, t); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle(midValue)
@@ -675,10 +675,11 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
 			}
 		}
-		if err := pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive, mediaTransceivers...); err != nil {
+		if accepted, err := pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive, mediaTransceivers...); err != nil {
 			return nil, err
+		} else if accepted {
+			appendBundle(midValue)
 		}
-		appendBundle(midValue)
 	}
 
 	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
@@ -1584,9 +1585,9 @@ func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) error {
 	return nil
 }
 
-func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, transceivers ...*RTPTransceiver) error {
+func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, transceivers ...*RTPTransceiver) (bool, error) {
 	if len(transceivers) < 1 {
-		return fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
+		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
 	}
 	// Use the first transceiver to generate the section attributes
 	t := transceivers[0]
@@ -1615,7 +1616,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 				Formats: []string{"0"},
 			},
 		})
-		return nil
+		return false, nil
 	}
 
 	for _, mt := range transceivers {
@@ -1634,7 +1635,7 @@ func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, midValue 
 	addCandidatesToMediaDescriptions(candidates, media)
 	d.WithMedia(media)
 
-	return nil
+	return true, nil
 }
 
 func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
