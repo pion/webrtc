@@ -137,6 +137,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Masataka Hisasue](https://github.com/sylba2050) - *Fix Docs*
 * [Hongchao Ma(马洪超)](https://github.com/hcm007)
 * [Aaron France](https://github.com/AeroNotix)
+* [Chris Hiszpanski](https://github.com/thinkski) - *Fix Answer bundle generation*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
