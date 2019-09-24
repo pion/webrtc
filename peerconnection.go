@@ -225,8 +225,8 @@ func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) {
 // channel message arrives from a remote peer.
 func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
 	pc.onDataChannelHandler = f
+	pc.mu.Unlock()
 }
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
@@ -245,8 +245,8 @@ func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGathererState)) {
 // arrives from a remote peer.
 func (pc *PeerConnection) OnTrack(f func(*Track, *RTPReceiver)) {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
 	pc.onTrackHandler = f
+	pc.mu.Unlock()
 }
 
 func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) {
@@ -264,8 +264,8 @@ func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) {
 // when an ICE connection state is changed.
 func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState)) {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
 	pc.onICEConnectionStateChangeHandler = f
+	pc.mu.Unlock()
 }
 
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
@@ -284,8 +284,8 @@ func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
 // when the PeerConnectionState has changed
 func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
 	pc.onConnectionStateChangeHandler = f
+	pc.mu.Unlock()
 }
 
 // SetConfiguration updates the configuration of this PeerConnection object.
@@ -371,8 +371,9 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 
 func (pc *PeerConnection) getStatsID() string {
 	pc.mu.RLock()
-	defer pc.mu.RUnlock()
-	return pc.statsID
+	statsID := pc.statsID
+	pc.mu.RUnlock()
+	return statsID
 }
 
 // CreateOffer starts the PeerConnection and generates the localDescription
@@ -1206,9 +1207,9 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 // PeerConnection instance.
 func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 	pc.mu.RLock()
-	defer pc.mu.RUnlock()
-
-	return pc.iceConnectionState
+	state := pc.iceConnectionState
+	pc.mu.RUnlock()
+	return state
 }
 
 // GetSenders returns the RTPSender that are currently attached to this PeerConnection
@@ -1242,9 +1243,9 @@ func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 // GetTransceivers returns the RTCRtpTransceiver that are currently attached to this RTCPeerConnection
 func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
-
-	return pc.rtpTransceivers
+	rt := pc.rtpTransceivers
+	pc.mu.Unlock()
+	return rt
 }
 
 // AddTrack adds a Track to the PeerConnection
