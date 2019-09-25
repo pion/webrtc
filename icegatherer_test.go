@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice"
 	"github.com/pion/logging"
 	"github.com/pion/transport/test"
 )
@@ -113,4 +114,99 @@ func TestICEGather_LocalCandidateOrder(t *testing.T) {
 	if err := gatherer.Close(); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
+	t.Run("1:1 NAT with host", func(t *testing.T) {
+		opts := ICEGatherOptions{
+			ICEServers: []ICEServer{},
+		}
+
+		gatherer, err := NewICEGatherer(
+			0, 0, nil, nil, nil, nil, nil, nil, nil,
+			logging.NewDefaultLoggerFactory(),
+			false, false, nil, func(string) bool { return true },
+			[]string{"1.2.3.4"}, "host", // <---- testing here
+			opts)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(gatherer.nat1To1IPs) != 1 {
+			t.Fatal("unexpected nat1To1IPs length")
+		}
+		if gatherer.nat1To1IPs[0] != "1.2.3.4" {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+		if gatherer.nat1To1IPCandidateType != ice.CandidateTypeHost {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+
+		err = gatherer.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("1:1 NAT with srflx", func(t *testing.T) {
+		opts := ICEGatherOptions{
+			ICEServers: []ICEServer{},
+		}
+
+		gatherer, err := NewICEGatherer(
+			0, 0, nil, nil, nil, nil, nil, nil, nil,
+			logging.NewDefaultLoggerFactory(),
+			false, false, nil, func(string) bool { return true },
+			[]string{"4.5.6.7"}, "srflx", // <---- testing here
+			opts)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(gatherer.nat1To1IPs) != 1 {
+			t.Fatal("unexpected nat1To1IPs length")
+		}
+		if gatherer.nat1To1IPs[0] != "4.5.6.7" {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+		if gatherer.nat1To1IPCandidateType != ice.CandidateTypeServerReflexive {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+
+		err = gatherer.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("1:1 NAT with invalid candidate type", func(t *testing.T) {
+		opts := ICEGatherOptions{
+			ICEServers: []ICEServer{},
+		}
+
+		gatherer, err := NewICEGatherer(
+			0, 0, nil, nil, nil, nil, nil, nil, nil,
+			logging.NewDefaultLoggerFactory(),
+			false, false, nil, func(string) bool { return true },
+			[]string{"6.6.6.6"}, "prflx", // <---- testing here
+			opts)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(gatherer.nat1To1IPs) != 1 {
+			t.Fatal("unexpected nat1To1IPs length")
+		}
+		if gatherer.nat1To1IPs[0] != "6.6.6.6" {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+		if gatherer.nat1To1IPCandidateType != ice.CandidateTypeUnspecified {
+			t.Fatal("unexpected nat1To1IPs value")
+		}
+
+		err = gatherer.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	})
 }
