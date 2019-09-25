@@ -22,7 +22,7 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	gatherer, err := NewICEGatherer(0, 0, nil, nil, nil, nil, nil, nil, nil, logging.NewDefaultLoggerFactory(), false, false, nil, func(string) bool { return true }, opts)
+	gatherer, err := NewICEGatherer(0, 0, nil, nil, nil, nil, nil, nil, nil, logging.NewDefaultLoggerFactory(), false, false, nil, func(string) bool { return true }, nil, "", opts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -71,7 +71,7 @@ func TestICEGather_LocalCandidateOrder(t *testing.T) {
 	}
 
 	to := time.Second
-	gatherer, err := NewICEGatherer(10000, 10010, &to, &to, &to, &to, &to, &to, &to, logging.NewDefaultLoggerFactory(), false, false, []NetworkType{NetworkTypeUDP4}, func(string) bool { return true }, opts)
+	gatherer, err := NewICEGatherer(10000, 10010, &to, &to, &to, &to, &to, &to, &to, logging.NewDefaultLoggerFactory(), false, false, []NetworkType{NetworkTypeUDP4}, func(string) bool { return true }, nil, "", opts)
 	if err != nil {
 		t.Error(err)
 	}
