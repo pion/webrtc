@@ -38,6 +38,8 @@ type ICEGatherer struct {
 	log                       logging.LeveledLogger
 	networkTypes              []NetworkType
 	interfaceFilter           func(string) bool
+	nat1To1IPs                []string
+	nat1To1IPCandidateType    ice.CandidateType
 
 	onLocalCandidateHdlr func(candidate *ICECandidate)
 	onStateChangeHdlr    func(state ICEGathererState)
@@ -59,6 +61,8 @@ func NewICEGatherer(
 	lite bool,
 	networkTypes []NetworkType,
 	interfaceFilter func(string) bool,
+	nat1To1IPs []string,
+	nat1To1IPCandidate string,
 	opts ICEGatherOptions,
 ) (*ICEGatherer, error) {
 	var validatedServers []*ice.URL
@@ -77,6 +81,16 @@ func NewICEGatherer(
 		candidateTypes = append(candidateTypes, ice.CandidateTypeHost)
 	} else if opts.ICEGatherPolicy == ICETransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
+	}
+
+	var nat1To1IPCandidateType ice.CandidateType
+	switch nat1To1IPCandidate {
+	case "host":
+		nat1To1IPCandidateType = ice.CandidateTypeHost
+	case "srflx":
+		nat1To1IPCandidateType = ice.CandidateTypeServerReflexive
+	default:
+		nat1To1IPCandidateType = ice.CandidateTypeUnspecified
 	}
 
 	return &ICEGatherer{
@@ -98,6 +112,8 @@ func NewICEGatherer(
 		prflxAcceptanceMinWait:    prflxAcceptanceMinWait,
 		relayAcceptanceMinWait:    relayAcceptanceMinWait,
 		interfaceFilter:           interfaceFilter,
+		nat1To1IPs:                nat1To1IPs,
+		nat1To1IPCandidateType:    nat1To1IPCandidateType,
 	}, nil
 }
 
