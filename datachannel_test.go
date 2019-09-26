@@ -32,7 +32,7 @@ func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
 	}
 }
 
-func setUpReliabilityParamTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
+func setUpDataChannelParametersTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
 	offerPC, answerPC, err := newPair()
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
@@ -230,7 +230,7 @@ func TestDataChannelParameters(t *testing.T) {
 			MaxPacketLifeTime: &maxPacketLifeTime,
 		}
 
-		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
+		offerPC, answerPC, dc, done := setUpDataChannelParametersTest(t, options)
 
 		// Check if parameters are correctly set
 		assert.Equal(t, dc.Ordered(), ordered, "Ordered should be same value as set in DataChannelInit")
@@ -261,7 +261,7 @@ func TestDataChannelParameters(t *testing.T) {
 			MaxRetransmits: &maxRetransmits,
 		}
 
-		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
+		offerPC, answerPC, dc, done := setUpDataChannelParametersTest(t, options)
 
 		// Check if parameters are correctly set
 		assert.False(t, dc.Ordered(), "Ordered should be set to false")
@@ -280,6 +280,31 @@ func TestDataChannelParameters(t *testing.T) {
 			if assert.NotNil(t, d.MaxRetransmits(), "should not be nil") {
 				assert.Equal(t, maxRetransmits, *d.MaxRetransmits(), "should match")
 			}
+			done <- true
+		})
+
+		closeReliabilityParamTest(t, offerPC, answerPC, done)
+	})
+
+	t.Run("Protocol exchange", func(t *testing.T) {
+		protocol := "json"
+		options := &DataChannelInit{
+			Protocol: &protocol,
+		}
+
+		offerPC, answerPC, dc, done := setUpDataChannelParametersTest(t, options)
+
+		// Check if parameters are correctly set
+		assert.Equal(t, dc.Protocol(), protocol, "Protocol should match DataChannelInit")
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Make sure this is the data channel we were looking for. (Not the one
+			// created in signalPair).
+			if d.Label() != expectedLabel {
+				return
+			}
+			// Check if parameters are correctly set
+			assert.Equal(t, d.Protocol(), protocol, "Protocol should match what channel creator declared")
 			done <- true
 		})
 

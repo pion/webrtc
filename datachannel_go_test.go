@@ -156,7 +156,7 @@ func TestDataChannelParamters_Go(t *testing.T) {
 			MaxPacketLifeTime: &maxPacketLifeTime,
 		}
 
-		offerPC, answerPC, dc, done := setUpReliabilityParamTest(t, options)
+		offerPC, answerPC, dc, done := setUpDataChannelParametersTest(t, options)
 
 		// Check if parameters are correctly set
 		assert.True(t, dc.Ordered(), "Ordered should be set to true")
