@@ -30,7 +30,6 @@ type DataChannel struct {
 	protocol                   string
 	negotiated                 bool
 	id                         *uint16
-	priority                   PriorityType
 	readyState                 DataChannelState
 	bufferedAmountLowThreshold uint64
 
@@ -451,15 +450,6 @@ func (d *DataChannel) ID() *uint16 {
 	defer d.mu.RUnlock()
 
 	return d.id
-}
-
-// Priority represents the priority for this DataChannel. The priority is
-// assigned at channel creation time.
-func (d *DataChannel) Priority() PriorityType {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	return d.priority
 }
 
 // ReadyState represents the state of the DataChannel object.
