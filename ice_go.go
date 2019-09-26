@@ -24,7 +24,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		api.settingEngine.candidates.ICENetworkTypes,
 		api.settingEngine.candidates.InterfaceFilter,
 		api.settingEngine.candidates.NAT1To1IPs,
-		api.settingEngine.candidates.NAT1To1IPCandidate,
+		api.settingEngine.candidates.NAT1To1IPCandidateType,
 		opts,
 	)
 }

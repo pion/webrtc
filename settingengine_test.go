@@ -61,3 +61,23 @@ func TestDetachDataChannels(t *testing.T) {
 		t.Fatalf("Failed to enable detached data channels.")
 	}
 }
+
+func TestSetNAT1To1IPs(t *testing.T) {
+	s := SettingEngine{}
+	if s.candidates.NAT1To1IPs != nil {
+		t.Errorf("Invalid default value")
+	}
+	if s.candidates.NAT1To1IPCandidateType != 0 {
+		t.Errorf("Invalid default value")
+	}
+
+	ips := []string{"1.2.3.4"}
+	typ := ICECandidateTypeHost
+	s.SetNAT1To1IPs(ips, typ)
+	if len(s.candidates.NAT1To1IPs) != 1 || s.candidates.NAT1To1IPs[0] != "1.2.3.4" {
+		t.Fatalf("Failed to set NAT1To1IPs")
+	}
+	if s.candidates.NAT1To1IPCandidateType != typ {
+		t.Fatalf("Failed to set NAT1To1IPCandidateType")
+	}
+}
