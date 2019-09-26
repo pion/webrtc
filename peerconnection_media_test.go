@@ -4,18 +4,15 @@ package webrtc
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/rtcp"
-	"github.com/pion/rtp"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v2/pkg/media"
@@ -30,116 +27,6 @@ func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, directi
 		}
 	}
 	return false
-}
-
-func TestSRTPDrainLeak(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	sawRTPDrainMessage := &atomicBool{}
-	sawRTCPDrainMessage := &atomicBool{}
-	seenBothMessages, closeFunc := context.WithCancel(context.Background())
-
-	s := SettingEngine{
-		LoggerFactory: testCatchAllLoggerFactory{
-			callback: func(msg string) {
-				if strings.Contains(msg, "Incoming unhandled RTP ssrc") {
-					sawRTPDrainMessage.set(true)
-					if sawRTPDrainMessage.get() && sawRTCPDrainMessage.get() {
-						closeFunc()
-					}
-				} else if strings.Contains(msg, "Incoming unhandled RTCP ssrc") {
-					sawRTCPDrainMessage.set(true)
-					if sawRTPDrainMessage.get() && sawRTCPDrainMessage.get() {
-						closeFunc()
-					}
-				}
-			},
-		},
-	}
-	api := NewAPI(WithSettingEngine(s))
-	api.mediaEngine.RegisterDefaultCodecs()
-
-	pcOffer, pcAnswer, err := api.newPair()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dtlsConnected := make(chan interface{})
-
-	pcOffer.dtlsTransport.OnStateChange(func(s DTLSTransportState) {
-		if s == DTLSTransportStateConnected {
-			close(dtlsConnected)
-		}
-	})
-
-	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	<-dtlsConnected
-
-	srtpSession, err := pcOffer.dtlsTransport.getSRTPSession()
-	if err != nil {
-		t.Fatal(err)
-	}
-	srtpStream, err := srtpSession.OpenWriteStream()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	srtcpSession, err := pcOffer.dtlsTransport.getSRTCPSession()
-	if err != nil {
-		t.Fatal(err)
-	}
-	srtcpStream, err := srtcpSession.OpenWriteStream()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	func() {
-		var rtpSsrc uint32
-		var rtcpSsrc uint32
-
-		for {
-			select {
-			case <-seenBothMessages.Done():
-				return
-			case <-time.After(200 * time.Millisecond):
-				// Send 5 RTP/RTCP packets with different SSRCes
-				for ; rtpSsrc%5 == 0; rtpSsrc++ {
-					if _, err = srtpStream.WriteRTP(&rtp.Header{Version: 2, SSRC: rtpSsrc}, []byte{0x00, 0x01, 0x03}); err != nil {
-						t.Fatal(err)
-					}
-				}
-				for ; rtcpSsrc%5 == 0; rtcpSsrc++ {
-					var raw []byte
-					raw, err = rtcp.Marshal([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: rtcpSsrc}})
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					if _, err = srtcpStream.Write(raw); err != nil {
-						t.Fatal(err)
-					}
-				}
-			}
-		}
-	}()
-
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 /*
