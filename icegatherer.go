@@ -141,6 +141,8 @@ func (g *ICEGatherer) createAgent() error {
 		PrflxAcceptanceMinWait:    g.prflxAcceptanceMinWait,
 		RelayAcceptanceMinWait:    g.relayAcceptanceMinWait,
 		InterfaceFilter:           g.interfaceFilter,
+		NAT1To1IPs:                g.nat1To1IPs,
+		NAT1To1IPCandidateType:    g.nat1To1IPCandidateType,
 	}
 
 	requestedNetworkTypes := g.networkTypes
