@@ -62,7 +62,7 @@ func NewICEGatherer(
 	networkTypes []NetworkType,
 	interfaceFilter func(string) bool,
 	nat1To1IPs []string,
-	nat1To1IPCandidate string,
+	nat1To1IPCandidateType ICECandidateType,
 	opts ICEGatherOptions,
 ) (*ICEGatherer, error) {
 	var validatedServers []*ice.URL
@@ -83,14 +83,14 @@ func NewICEGatherer(
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
 
-	var nat1To1IPCandidateType ice.CandidateType
-	switch nat1To1IPCandidate {
-	case "host":
-		nat1To1IPCandidateType = ice.CandidateTypeHost
-	case "srflx":
-		nat1To1IPCandidateType = ice.CandidateTypeServerReflexive
+	var nat1To1CandiTyp ice.CandidateType
+	switch nat1To1IPCandidateType {
+	case ICECandidateTypeHost:
+		nat1To1CandiTyp = ice.CandidateTypeHost
+	case ICECandidateTypeSrflx:
+		nat1To1CandiTyp = ice.CandidateTypeServerReflexive
 	default:
-		nat1To1IPCandidateType = ice.CandidateTypeUnspecified
+		nat1To1CandiTyp = ice.CandidateTypeUnspecified
 	}
 
 	return &ICEGatherer{
@@ -113,7 +113,7 @@ func NewICEGatherer(
 		relayAcceptanceMinWait:    relayAcceptanceMinWait,
 		interfaceFilter:           interfaceFilter,
 		nat1To1IPs:                nat1To1IPs,
-		nat1To1IPCandidateType:    nat1To1IPCandidateType,
+		nat1To1IPCandidateType:    nat1To1CandiTyp,
 	}, nil
 }
 

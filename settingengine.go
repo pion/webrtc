@@ -30,12 +30,12 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait    *time.Duration
 	}
 	candidates struct {
-		ICELite            bool
-		ICETrickle         bool
-		ICENetworkTypes    []NetworkType
-		InterfaceFilter    func(string) bool
-		NAT1To1IPs         []string
-		NAT1To1IPCandidate string
+		ICELite                bool
+		ICETrickle             bool
+		ICENetworkTypes        []NetworkType
+		InterfaceFilter        func(string) bool
+		NAT1To1IPs             []string
+		NAT1To1IPCandidateType ICECandidateType
 	}
 	LoggerFactory logging.LoggerFactory
 }
@@ -117,27 +117,30 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 	e.candidates.InterfaceFilter = filter
 }
 
-// SetNAT1To1IPs has a list of external IP addresses of 1:1 (D)NAT.
+// SetNAT1To1IPs sets a list of external IP addresses of 1:1 (D)NAT
+// and a candidate type for which the external IP address is used.
 // This is useful when you are host a server using Pion on an AWS EC2 instance
 // which has a private address, behind a 1:1 DNAT with a public IP (e.g.
 // Elastic IP). In this case, you can give the public IP address so that
-// Pion will use the public IP address in its candidate instead of the private IP
-// address.
-func (e *SettingEngine) SetNAT1To1IPs(ips []string) {
-	e.candidates.NAT1To1IPs = ips
-}
-
-// SetNAT1To1IPCandidate is used along with SetNAT1To1IPs, to tell Pion which
+// Pion will use the public IP address in its candidate instead of the private
+// IP address. The second argument, candidateType, is used to tell Pion which
 // type of candidate should use the given public IP address.
 // Two types of candidates are supported:
-// - "host": The public IP address will be used for the host candidate in the SDP.
-// - "srflx": A server reflexive candidate with the given public IP address will be added
-// to the SDP. If you choose "host", then the private IP address won't be advertised with
-// the peer. Also, this option cannot be used along with mDNS.
-// If you choose "srflx", it simply adds a server reflexive candidate with the public IP.
-// The host candidate is still available along with mDNS capabilities unaffected.
-// Please note that you cannot give STUN server URL at the same time. It will result in
-// an error otherwise.
-func (e *SettingEngine) SetNAT1To1IPCandidate(candidate string) {
-	e.candidates.NAT1To1IPCandidate = candidate
+//
+// ICECandidateTypeHost:
+//		The public IP address will be used for the host candidate in the SDP.
+// ICECandidateTypeSrflx:
+//		A server reflexive candidate with the given public IP address will be added
+// to the SDP.
+//
+// Please note that if you choose ICECandidateTypeHost, then the private IP address
+// won't be advertised with the peer. Also, this option cannot be used along with mDNS.
+//
+// If you choose ICECandidateTypeSrflx, it simply adds a server reflexive candidate
+// with the public IP. The host candidate is still available along with mDNS
+// capabilities unaffected. Also, you cannot give STUN server URL at the same time.
+// It will result in an error otherwise.
+func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
+	e.candidates.NAT1To1IPs = ips
+	e.candidates.NAT1To1IPCandidateType = candidateType
 }

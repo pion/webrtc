@@ -23,7 +23,7 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
 	}
 
-	gatherer, err := NewICEGatherer(0, 0, nil, nil, nil, nil, nil, nil, nil, logging.NewDefaultLoggerFactory(), false, false, nil, func(string) bool { return true }, nil, "", opts)
+	gatherer, err := NewICEGatherer(0, 0, nil, nil, nil, nil, nil, nil, nil, logging.NewDefaultLoggerFactory(), false, false, nil, func(string) bool { return true }, nil, 0, opts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -72,7 +72,7 @@ func TestICEGather_LocalCandidateOrder(t *testing.T) {
 	}
 
 	to := time.Second
-	gatherer, err := NewICEGatherer(10000, 10010, &to, &to, &to, &to, &to, &to, &to, logging.NewDefaultLoggerFactory(), false, false, []NetworkType{NetworkTypeUDP4}, func(string) bool { return true }, nil, "", opts)
+	gatherer, err := NewICEGatherer(10000, 10010, &to, &to, &to, &to, &to, &to, &to, logging.NewDefaultLoggerFactory(), false, false, []NetworkType{NetworkTypeUDP4}, func(string) bool { return true }, nil, 0, opts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -126,7 +126,7 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			0, 0, nil, nil, nil, nil, nil, nil, nil,
 			logging.NewDefaultLoggerFactory(),
 			false, false, nil, func(string) bool { return true },
-			[]string{"1.2.3.4"}, "host", // <---- testing here
+			[]string{"1.2.3.4"}, ICECandidateTypeHost, // <---- testing here
 			opts)
 		if err != nil {
 			t.Error(err)
@@ -157,7 +157,7 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			0, 0, nil, nil, nil, nil, nil, nil, nil,
 			logging.NewDefaultLoggerFactory(),
 			false, false, nil, func(string) bool { return true },
-			[]string{"4.5.6.7"}, "srflx", // <---- testing here
+			[]string{"4.5.6.7"}, ICECandidateTypeSrflx, // <---- testing here
 			opts)
 		if err != nil {
 			t.Error(err)
@@ -188,7 +188,7 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			0, 0, nil, nil, nil, nil, nil, nil, nil,
 			logging.NewDefaultLoggerFactory(),
 			false, false, nil, func(string) bool { return true },
-			[]string{"6.6.6.6"}, "prflx", // <---- testing here
+			[]string{"6.6.6.6"}, ICECandidateTypePrflx, // <---- testing here
 			opts)
 		if err != nil {
 			t.Error(err)
