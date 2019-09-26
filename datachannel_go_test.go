@@ -189,13 +189,11 @@ func TestDataChannelParamters_Go(t *testing.T) {
 		dc.label = "mylabel"
 		dc.protocol = "myprotocol"
 		dc.negotiated = true
-		dc.priority = PriorityTypeMedium
 
 		assert.Equal(t, dc.id, dc.ID(), "should match")
 		assert.Equal(t, dc.label, dc.Label(), "should match")
 		assert.Equal(t, dc.protocol, dc.Protocol(), "should match")
 		assert.Equal(t, dc.negotiated, dc.Negotiated(), "should match")
-		assert.Equal(t, dc.priority, dc.Priority(), "should match")
 		assert.Equal(t, dc.readyState, dc.ReadyState(), "should match")
 		assert.Equal(t, uint64(0), dc.BufferedAmount(), "should match")
 		dc.SetBufferedAmountLowThreshold(1500)

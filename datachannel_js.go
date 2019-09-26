@@ -207,11 +207,6 @@ func (d *DataChannel) ID() *uint16 {
 	return valueToUint16Pointer(d.underlying.Get("id"))
 }
 
-// NOTE(albrow): Apparently not part of the JavaScript WebRTC API
-// // Priority represents the priority for this DataChannel. The priority is
-// // assigned at channel creation time.
-// Priority PriorityType
-
 // ReadyState represents the state of the DataChannel object.
 func (d *DataChannel) ReadyState() DataChannelState {
 	return newDataChannelState(d.underlying.Get("readyState").String())

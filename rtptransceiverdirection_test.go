@@ -8,8 +8,8 @@ import (
 
 func TestNewRTPTransceiverDirection(t *testing.T) {
 	testCases := []struct {
-		priorityString   string
-		expectedPriority RTPTransceiverDirection
+		directionString   string
+		expectedDirection RTPTransceiverDirection
 	}{
 		{unknownStr, RTPTransceiverDirection(Unknown)},
 		{"sendrecv", RTPTransceiverDirectionSendrecv},
@@ -20,8 +20,8 @@ func TestNewRTPTransceiverDirection(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			NewRTPTransceiverDirection(testCase.priorityString),
-			testCase.expectedPriority,
+			NewRTPTransceiverDirection(testCase.directionString),
+			testCase.expectedDirection,
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -29,7 +29,7 @@ func TestNewRTPTransceiverDirection(t *testing.T) {
 
 func TestRTPTransceiverDirection_String(t *testing.T) {
 	testCases := []struct {
-		priority       RTPTransceiverDirection
+		direction      RTPTransceiverDirection
 		expectedString string
 	}{
 		{RTPTransceiverDirection(Unknown), unknownStr},
@@ -41,7 +41,7 @@ func TestRTPTransceiverDirection_String(t *testing.T) {
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
-			testCase.priority.String(),
+			testCase.direction.String(),
 			testCase.expectedString,
 			"testCase: %d %v", i, testCase,
 		)

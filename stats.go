@@ -832,9 +832,6 @@ type AudioSenderStats struct {
 	// Kind is either "audio" or "video". This reflects the "kind" attribute of the MediaStreamTrack.
 	Kind string `json:"kind"`
 
-	// Priority indicates the priority set for the track.
-	Priority PriorityType `json:"priority"`
-
 	// AudioLevel represents the output audio level of the track.
 	//
 	// The value is a value between 0..1 (linear), where 1.0 represents 0 dBov,

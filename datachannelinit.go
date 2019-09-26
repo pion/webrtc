@@ -30,7 +30,4 @@ type DataChannelInit struct {
 
 	// ID overrides the default selection of ID for this channel.
 	ID *uint16
-
-	// Priority describes the priority of this channel.
-	Priority *PriorityType
 }
