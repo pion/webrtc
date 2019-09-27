@@ -733,3 +733,74 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 
 	assert.NotNil(t, err)
 }
+
+func TestOmitMediaFromBundleIfUnsupported(t *testing.T) {
+	const sdpOfferWithAudioAndVideo = `v=0
+o=- 6476616870435111971 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:sRIG
+a=ice-pwd:yZb5ZMsBlPoK577sGhjvEUtT
+a=ice-options:trickle
+a=fingerprint:sha-256 27:EF:25:BF:57:45:BC:1C:0D:36:42:FF:5E:93:71:D2:41:58:EA:46:FD:A8:2A:F3:13:94:6E:E6:43:23:CB:D7
+a=setup:actpass
+a=mid:0
+a=sendrecv
+a=rtpmap:111 opus/48000/2
+a=fmtp:111 minptime=10;useinbandfec=1
+m=video 9 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:sRIG
+a=ice-pwd:yZb5ZMsBlPoK577sGhjvEUtT
+a=ice-options:trickle
+a=fingerprint:sha-256 27:EF:25:BF:57:45:BC:1C:0D:36:42:FF:5E:93:71:D2:41:58:EA:46:FD:A8:2A:F3:13:94:6E:E6:43:23:CB:D7
+a=setup:actpass
+a=mid:1
+a=sendrecv
+a=rtpmap:96 H264/90000
+a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
+`
+	mediaEngine := MediaEngine{}
+	mediaEngine.RegisterCodec(
+		NewRTPH264Codec(DefaultPayloadTypeH264, 90000),
+	)
+
+	api := NewAPI(
+		WithMediaEngine(mediaEngine),
+	)
+
+	pc, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if err = pc.SetRemoteDescription(SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  sdpOfferWithAudioAndVideo,
+	}); nil != err {
+		t.Error(err.Error())
+	}
+
+	answer, err := pc.CreateAnswer(nil)
+	if nil != err {
+		t.Error(err.Error())
+	}
+
+	success := false
+	for _, attr := range answer.parsed.Attributes {
+		if "group" == attr.Key {
+			if "BUNDLE 1" == attr.Value {
+				success = true
+			}
+		}
+	}
+
+	if !success {
+		t.Fail()
+	}
+}
