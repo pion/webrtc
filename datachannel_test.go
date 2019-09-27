@@ -295,7 +295,7 @@ func TestDataChannelParameters(t *testing.T) {
 		offerPC, answerPC, dc, done := setUpDataChannelParametersTest(t, options)
 
 		// Check if parameters are correctly set
-		assert.Equal(t, dc.Protocol(), protocol, "Protocol should match DataChannelInit")
+		assert.Equal(t, protocol, dc.Protocol(), "Protocol should match DataChannelInit")
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
@@ -304,7 +304,7 @@ func TestDataChannelParameters(t *testing.T) {
 				return
 			}
 			// Check if parameters are correctly set
-			assert.Equal(t, d.Protocol(), protocol, "Protocol should match what channel creator declared")
+			assert.Equal(t, protocol, d.Protocol(), "Protocol should match what channel creator declared")
 			done <- true
 		})
 

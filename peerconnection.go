@@ -1441,6 +1441,17 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		if options.MaxRetransmits != nil {
 			params.MaxRetransmits = options.MaxRetransmits
 		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #10)
+		if options.Protocol != nil {
+			params.Protocol = *options.Protocol
+		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
+		if len(params.Protocol) > 65535 {
+			pc.mu.Unlock()
+			return nil, &rtcerr.TypeError{Err: ErrProtocolTooLarge}
+		}
 	}
 
 	// pion/webrtc#748
