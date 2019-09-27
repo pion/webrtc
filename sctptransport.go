@@ -169,6 +169,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		rtcDC, err := r.api.newDataChannel(&DataChannelParameters{
 			ID:                sid,
 			Label:             dc.Config.Label,
+			Protocol:          dc.Config.Protocol,
 			Ordered:           ordered,
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,

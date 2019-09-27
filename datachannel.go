@@ -84,6 +84,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 
 	return &DataChannel{
 		label:             params.Label,
+		protocol:          params.Protocol,
 		id:                &params.ID,
 		ordered:           params.Ordered,
 		maxPacketLifeTime: params.MaxPacketLifeTime,
@@ -141,6 +142,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		Priority:             datachannel.ChannelPriorityNormal,
 		ReliabilityParameter: reliabilityParameteer,
 		Label:                d.label,
+		Protocol:             d.protocol,
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
 	}
 
