@@ -617,9 +617,5 @@ func dataChannelInitToValue(options *DataChannelInit) js.Value {
 		"protocol":          stringPointerToValue(options.Protocol),
 		"negotiated":        boolPointerToValue(options.Negotiated),
 		"id":                uint16PointerToValue(options.ID),
-
-		// Note(albrow) Priority is not included in MDN WebRTC documentation. Should
-		// we include it here?
-		// "priority": options.Priority
 	})
 }

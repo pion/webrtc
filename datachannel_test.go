@@ -310,4 +310,58 @@ func TestDataChannelParameters(t *testing.T) {
 
 		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
+
+	t.Run("Negotiated exchange", func(t *testing.T) {
+		const expectedMessage = "Hello World"
+
+		negotiated := true
+		var id uint16 = 500
+		options := &DataChannelInit{
+			Negotiated: &negotiated,
+			ID:         &id,
+		}
+
+		offerPC, answerPC, offerDatachannel, done := setUpDataChannelParametersTest(t, options)
+		answerDatachannel, err := answerPC.CreateDataChannel(expectedLabel, options)
+		assert.NoError(t, err)
+
+		answerPC.OnDataChannel(func(d *DataChannel) {
+			// Ignore our default channel, exists to force ICE candidates. See signalPair for more info
+			if d.Label() == "initial_data_channel" {
+				return
+			}
+
+			t.Fatal("OnDataChannel must not be fired when negotiated == true")
+		})
+		offerPC.OnDataChannel(func(d *DataChannel) {
+			t.Fatal("OnDataChannel must not be fired when negotiated == true")
+		})
+
+		seenAnswerMessage := make(chan interface{})
+		seenOfferMessage := make(chan interface{})
+
+		answerDatachannel.OnMessage(func(msg DataChannelMessage) {
+			close(seenAnswerMessage)
+		})
+
+		offerDatachannel.OnMessage(func(msg DataChannelMessage) {
+			close(seenOfferMessage)
+		})
+
+		offerDatachannel.OnOpen(func() {
+			assert.NoError(t, offerDatachannel.SendText(expectedMessage))
+		})
+		answerDatachannel.OnOpen(func() {
+			assert.NoError(t, answerDatachannel.SendText(expectedMessage))
+		})
+
+		go func() {
+			<-seenAnswerMessage
+			<-seenOfferMessage
+			close(done)
+		}()
+
+		closeReliabilityParamTest(t, offerPC, answerPC, done)
+	})
+
 }
