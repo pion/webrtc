@@ -337,31 +337,40 @@ func TestDataChannelParameters(t *testing.T) {
 			t.Fatal("OnDataChannel must not be fired when negotiated == true")
 		})
 
-		seenAnswerMessage := make(chan interface{})
-		seenOfferMessage := make(chan interface{})
+		seenAnswerMessage := &atomicBool{}
+		seenOfferMessage := &atomicBool{}
 
 		answerDatachannel.OnMessage(func(msg DataChannelMessage) {
-			close(seenAnswerMessage)
+			if msg.IsString && string(msg.Data) == expectedMessage {
+				seenAnswerMessage.set(true)
+			}
 		})
 
 		offerDatachannel.OnMessage(func(msg DataChannelMessage) {
-			close(seenOfferMessage)
-		})
-
-		offerDatachannel.OnOpen(func() {
-			assert.NoError(t, offerDatachannel.SendText(expectedMessage))
-		})
-		answerDatachannel.OnOpen(func() {
-			assert.NoError(t, answerDatachannel.SendText(expectedMessage))
+			if msg.IsString && string(msg.Data) == expectedMessage {
+				seenOfferMessage.set(true)
+			}
 		})
 
 		go func() {
-			<-seenAnswerMessage
-			<-seenOfferMessage
-			close(done)
+			for {
+				if seenAnswerMessage.get() && seenOfferMessage.get() {
+					break
+				}
+
+				if offerDatachannel.ReadyState() == DataChannelStateOpen {
+					assert.NoError(t, offerDatachannel.SendText(expectedMessage))
+				}
+				if answerDatachannel.ReadyState() == DataChannelStateOpen {
+					assert.NoError(t, answerDatachannel.SendText(expectedMessage))
+				}
+
+				time.Sleep(500 * time.Millisecond)
+			}
+
+			done <- true
 		}()
 
 		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
-
 }

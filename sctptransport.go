@@ -170,6 +170,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 			ID:                sid,
 			Label:             dc.Config.Label,
 			Protocol:          dc.Config.Protocol,
+			Negotiated:        dc.Config.Negotiated,
 			Ordered:           ordered,
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
