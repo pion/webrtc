@@ -1452,6 +1452,11 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 			pc.mu.Unlock()
 			return nil, &rtcerr.TypeError{Err: ErrProtocolTooLarge}
 		}
+
+		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #12)
+		if options.Negotiated != nil {
+			params.Negotiated = *options.Negotiated
+		}
 	}
 
 	// pion/webrtc#748

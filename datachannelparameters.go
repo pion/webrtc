@@ -8,4 +8,5 @@ type DataChannelParameters struct {
 	Ordered           bool    `json:"ordered"`
 	MaxPacketLifeTime *uint16 `json:"maxPacketLifeTime"`
 	MaxRetransmits    *uint16 `json:"maxRetransmits"`
+	Negotiated        bool    `json:"negotiated"`
 }
