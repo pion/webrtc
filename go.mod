@@ -16,5 +16,5 @@ require (
 	github.com/pion/transport v0.8.9
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20190923162816-aa69164e4478 // indirect
-	golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe // indirect
+	golang.org/x/sys v0.0.0-20190927073244-c990c680b611 // indirect
 )
