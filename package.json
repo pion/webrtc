@@ -3,6 +3,6 @@
   "repository": "git@github.com:pion/webrtc.git",
   "private": true,
   "devDependencies": {
-    "wrtc": "^0.4.1"
+    "wrtc": "0.4.2"
   }
 }
