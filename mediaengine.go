@@ -14,6 +14,8 @@ import (
 
 // PayloadTypes for the default codecs
 const (
+	DefaultPayloadTypePCMU = 0
+	DefaultPayloadTypePCMA = 8
 	DefaultPayloadTypeG722 = 9
 	DefaultPayloadTypeOpus = 111
 	DefaultPayloadTypeVP8  = 96
@@ -35,6 +37,8 @@ func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by Pion WebRTC
 func (m *MediaEngine) RegisterDefaultCodecs() {
+	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypePCMU, 8000))
+	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypePCMA, 8000))
 	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
 	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
@@ -65,6 +69,10 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 			clockRate := payloadCodec.ClockRate
 			parameters := payloadCodec.Fmtp
 			switch payloadCodec.Name {
+			case PCMU:
+				codec = NewRTPPCMUCodec(payloadType, clockRate)
+			case PCMA:
+				codec = NewRTPPCMACodec(payloadType, clockRate)
 			case G722:
 				codec = NewRTPG722Codec(payloadType, clockRate)
 			case Opus:
@@ -123,12 +131,38 @@ func (m *MediaEngine) GetCodecsByKind(kind RTPCodecType) []*RTPCodec {
 
 // Names for the default codecs supported by Pion WebRTC
 const (
+	PCMU = "PCMU"
+	PCMA = "PCMA"
 	G722 = "G722"
 	Opus = "opus"
 	VP8  = "VP8"
 	VP9  = "VP9"
 	H264 = "H264"
 )
+
+// NewRTPPCMUCodec is a helper to create a PCMU codec
+func NewRTPPCMUCodec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeAudio,
+		PCMU,
+		clockrate,
+		0,
+		"",
+		payloadType,
+		&codecs.G711Payloader{})
+	return c
+}
+
+// NewRTPPCMACodec is a helper to create a PCMA codec
+func NewRTPPCMACodec(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodec(RTPCodecTypeAudio,
+		PCMA,
+		clockrate,
+		0,
+		"",
+		payloadType,
+		&codecs.G711Payloader{})
+	return c
+}
 
 // NewRTPG722Codec is a helper to create a G722 codec
 func NewRTPG722Codec(payloadType uint8, clockrate uint32) *RTPCodec {
