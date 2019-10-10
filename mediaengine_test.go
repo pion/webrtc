@@ -19,6 +19,8 @@ func TestCodecRegistration(t *testing.T) {
 		c uint8
 		e error
 	}{
+		{DefaultPayloadTypePCMU, nil},
+		{DefaultPayloadTypePCMA, nil},
 		{DefaultPayloadTypeG722, nil},
 		{DefaultPayloadTypeOpus, nil},
 		{DefaultPayloadTypeVP8, nil},
