@@ -48,7 +48,7 @@ Once the data channel is successfully opened, offerPC will start sending a serie
 
 Here's how to run the code.
 
-At the root of the example, `pion/webrtcp/examples/data-channels-flow-control/`:
+At the root of the example, `pion/webrtc/examples/data-channels-flow-control/`:
 ```
 $ go run main.go
 2019/08/31 14:56:41 OnOpen: data-824635025728. Start sending a series of 1024-byte packets as fast as it can
@@ -61,5 +61,3 @@ $ go run main.go
 2019/08/31 14:56:47 Throughput: 218.342 Mbps
  :
 ```
-
-

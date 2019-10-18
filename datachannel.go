@@ -15,7 +15,7 @@ import (
 )
 
 const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
-var errSCTPNotEstablished = errors.New("SCTP not establisched")
+var errSCTPNotEstablished = errors.New("SCTP not established")
 
 // DataChannel represents a WebRTC DataChannel
 // The DataChannel interface represents a network channel
@@ -112,7 +112,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	}
 
 	var channelType datachannel.ChannelType
-	var reliabilityParameteer uint32
+	var reliabilityParameter uint32
 
 	switch {
 	case d.maxPacketLifeTime == nil && d.maxRetransmits == nil:
@@ -123,14 +123,14 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		}
 
 	case d.maxRetransmits != nil:
-		reliabilityParameteer = uint32(*d.maxRetransmits)
+		reliabilityParameter = uint32(*d.maxRetransmits)
 		if d.ordered {
 			channelType = datachannel.ChannelTypePartialReliableRexmit
 		} else {
 			channelType = datachannel.ChannelTypePartialReliableRexmitUnordered
 		}
 	default:
-		reliabilityParameteer = uint32(*d.maxPacketLifeTime)
+		reliabilityParameter = uint32(*d.maxPacketLifeTime)
 		if d.ordered {
 			channelType = datachannel.ChannelTypePartialReliableTimed
 		} else {
@@ -141,7 +141,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	cfg := &datachannel.Config{
 		ChannelType:          channelType,
 		Priority:             datachannel.ChannelPriorityNormal,
-		ReliabilityParameter: reliabilityParameteer,
+		ReliabilityParameter: reliabilityParameter,
 		Label:                d.label,
 		Protocol:             d.protocol,
 		Negotiated:           d.negotiated,

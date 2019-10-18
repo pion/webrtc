@@ -289,7 +289,7 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 	return g.agent
 }
 
-// SignalCandidates imitates gathering process to backward support old tricle
+// SignalCandidates imitates gathering process to backward support old trickle
 // false behavior.
 func (g *ICEGatherer) SignalCandidates() error {
 	candidates, err := g.GetLocalCandidates()

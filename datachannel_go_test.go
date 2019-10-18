@@ -249,7 +249,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				if e != nil {
 					t.Fatalf("Failed to send string on data channel")
 				}
-				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mimatch")
+				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 
 				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
@@ -331,7 +331,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				if e != nil {
 					t.Fatalf("Failed to send string on data channel")
 				}
-				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mimatch")
+				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 
 				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}

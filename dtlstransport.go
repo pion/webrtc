@@ -241,7 +241,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// pion/webrtc#753
 	cert := t.certificates[0]
 
-	dtlsCofig := &dtls.Config{
+	dtlsConfig := &dtls.Config{
 		Certificate:            cert.x509Cert,
 		PrivateKey:             cert.privateKey,
 		SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
@@ -253,7 +253,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	t.onStateChange(DTLSTransportStateConnecting)
 	if t.isClient() {
 		// Assumes the peer offered to be passive and we accepted.
-		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsCofig)
+		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsConfig)
 		if err != nil {
 			t.onStateChange(DTLSTransportStateFailed)
 			return err
@@ -261,7 +261,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		t.conn = dtlsConn
 	} else {
 		// Assumes we offer to be passive and this is accepted.
-		dtlsConn, err := dtls.Server(dtlsEndpoint, dtlsCofig)
+		dtlsConn, err := dtls.Server(dtlsEndpoint, dtlsConfig)
 		if err != nil {
 			t.onStateChange(DTLSTransportStateFailed)
 			return err
