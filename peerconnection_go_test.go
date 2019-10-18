@@ -104,7 +104,7 @@ func TestNew_Go(t *testing.T) {
 						},
 					},
 				})
-			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}},
+			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials}},
 		}
 
 		for i, testCase := range testCases {
@@ -220,7 +220,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 					},
 				},
 			},
-			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials},
+			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials},
 		},
 	} {
 		pc, err := test.init()
