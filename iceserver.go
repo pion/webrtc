@@ -37,7 +37,7 @@ func (s ICEServer) urls() ([]*ice.URL, error) {
 		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
-				return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}
+				return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials}
 			}
 			url.Username = s.Username
 
@@ -46,18 +46,18 @@ func (s ICEServer) urls() ([]*ice.URL, error) {
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 				password, ok := s.Credential.(string)
 				if !ok {
-					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 				}
 				url.Password = password
 
 			case ICECredentialTypeOauth:
 				// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
 				if _, ok := s.Credential.(OAuthCredential); !ok {
-					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+					return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 				}
 
 			default:
-				return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+				return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 			}
 		}
 

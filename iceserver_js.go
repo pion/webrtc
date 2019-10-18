@@ -34,24 +34,24 @@ func (s ICEServer) validate() ([]*ice.URL, error) {
 		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
 			// // https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			// if s.Username == "" || s.Credential == nil {
-			// 	return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredencials}
+			// 	return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials}
 			// }
 
 			// switch s.CredentialType {
 			// case ICECredentialTypePassword:
 			// 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.3)
 			// 	if _, ok := s.Credential.(string); !ok {
-			// 		return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+			// 		return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 			// 	}
 
 			// case ICECredentialTypeOauth:
 			// 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.4)
 			// 	if _, ok := s.Credential.(OAuthCredential); !ok {
-			// 		return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+			// 		return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 			// 	}
 
 			// default:
-			// 	return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredencials}
+			// 	return nil, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}
 			// }
 			return nil, errors.New("TURN is not currently supported in the JavaScript/Wasm bindings")
 		}
