@@ -343,7 +343,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_PeropertyGetters(t *testing.T) {
+func TestPeerConnection_PropertyGetters(t *testing.T) {
 	pc := &PeerConnection{
 		currentLocalDescription:  &SessionDescription{},
 		pendingLocalDescription:  &SessionDescription{},
@@ -419,7 +419,7 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly)},
 		},
 		{
-			"Don't satisify a Sendonly with a SendRecv, later SendRecv will be marked as Inactive",
+			"Don't satisfy a Sendonly with a SendRecv, later SendRecv will be marked as Inactive",
 			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv},
 

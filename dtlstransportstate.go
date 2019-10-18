@@ -1,6 +1,6 @@
 package webrtc
 
-// DTLSTransportState indicates the dtsl transport establishment state.
+// DTLSTransportState indicates the DTLS transport establishment state.
 type DTLSTransportState int
 
 const (

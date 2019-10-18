@@ -8,7 +8,7 @@ import (
 type DTLSRole byte
 
 const (
-	// DTLSRoleAuto defines the DLTS role is determined based on
+	// DTLSRoleAuto defines the DTLS role is determined based on
 	// the resolved ICE role: the ICE controlled role acts as the DTLS
 	// client and the ICE controlling role acts as the DTLS server.
 	DTLSRoleAuto DTLSRole = iota + 1

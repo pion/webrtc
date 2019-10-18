@@ -92,7 +92,7 @@ func TestReader(t *testing.T) {
 				// packet header len=1048575
 				0xFF, 0xFF, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00,
-				// packet paylaod
+				// packet payload
 				0x00,
 			),
 			WantHeader: Header{

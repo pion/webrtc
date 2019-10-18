@@ -15,7 +15,7 @@ const (
 	pageHeaderTypeContinuationOfStream = 0x00
 	pageHeaderTypeBeginningOfStream    = 0x02
 	pageHeaderTypeEndOfStream          = 0x04
-	defaultPreSkip                     = 3840 // 3840 recommanded in the RFC
+	defaultPreSkip                     = 3840 // 3840 recommended in the RFC
 	idPageSignature                    = "OpusHead"
 	commentPageSignature               = "OpusTags"
 	pageHeaderSignature                = "OggS"

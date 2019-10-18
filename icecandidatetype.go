@@ -89,7 +89,7 @@ func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error)
 	default:
 		// NOTE: this should never happen[tm]
 		err := fmt.Errorf(
-			"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid typej: %s",
+			"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type: %s",
 			candidateType.String())
 		return ICECandidateType(Unknown), err
 	}

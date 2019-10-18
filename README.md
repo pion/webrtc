@@ -35,7 +35,7 @@ Check out the **[example applications](examples/README.md)** to help you along y
 
 For more full featured examples that use 3rd party libraries see our **[example-webrtc-applications](https://github.com/pion/example-webrtc-applications)** repo.
 
-The Pion WebRTC API closely matches the JavaScript **[WebRTC API](https://w3c.github.io/webrtc-pc/)**. Most existing documentation is therefore also usefull when working with Pion. Furthermore, our **[GoDoc](https://godoc.org/github.com/pion/webrtc)** is actively maintained.
+The Pion WebRTC API closely matches the JavaScript **[WebRTC API](https://w3c.github.io/webrtc-pc/)**. Most existing documentation is therefore also useful when working with Pion. Furthermore, our **[GoDoc](https://godoc.org/github.com/pion/webrtc)** is actively maintained.
 
 We maintain a [FAQ](https://pion.ly/knowledge-base/pion-basics/faq/) with answers to common questions. If you have a question not covered please submit a PR, we would be happy to answer it!
 

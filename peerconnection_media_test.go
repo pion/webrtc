@@ -67,8 +67,8 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPSenderRecv := make(chan bool)
 	awaitRTCPSenderSend := make(chan error)
 
-	awaitRTCPRecieverRecv := make(chan error)
-	awaitRTCPRecieverSend := make(chan error)
+	awaitRTCPReceiverRecv := make(chan error)
+	awaitRTCPReceiverSend := make(chan error)
 
 	trackMetadataValid := make(chan error)
 
@@ -88,13 +88,13 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 			for {
 				time.Sleep(time.Millisecond * 100)
 				if routineErr := pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}}); routineErr != nil {
-					awaitRTCPRecieverSend <- routineErr
+					awaitRTCPReceiverSend <- routineErr
 					return
 				}
 
 				select {
 				case <-awaitRTCPSenderRecv:
-					close(awaitRTCPRecieverSend)
+					close(awaitRTCPReceiverSend)
 					return
 				default:
 				}
@@ -104,9 +104,9 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			_, routineErr := receiver.Read(make([]byte, 1400))
 			if routineErr != nil {
-				awaitRTCPRecieverRecv <- routineErr
+				awaitRTCPReceiverRecv <- routineErr
 			} else {
-				close(awaitRTCPRecieverRecv)
+				close(awaitRTCPReceiverRecv)
 			}
 		}()
 
@@ -156,7 +156,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 			}
 
 			select {
-			case <-awaitRTCPRecieverRecv:
+			case <-awaitRTCPReceiverRecv:
 				close(awaitRTCPSenderSend)
 				return
 			default:
@@ -189,8 +189,8 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-awaitRTCPRecieverRecv
-	err, ok = <-awaitRTCPRecieverSend
+	<-awaitRTCPReceiverRecv
+	err, ok = <-awaitRTCPReceiverSend
 	if ok {
 		t.Fatal(err)
 	}
@@ -358,10 +358,10 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 			for {
 				if len(vp8Sender.Transport().GetRemoteCertificate()) != 0 {
 					pcAnswer.sctpTransport.lock.RLock()
-					haveAssocation := pcAnswer.sctpTransport.association != nil
+					haveAssociation := pcAnswer.sctpTransport.association != nil
 					pcAnswer.sctpTransport.lock.RUnlock()
 
-					if haveAssocation {
+					if haveAssociation {
 						break
 					}
 				}

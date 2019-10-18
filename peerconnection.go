@@ -856,8 +856,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 
 	// To support all unittests which are following the future trickle=true
 	// setup while also support the old trickle=false synchronous gathering
-	// process this is necessary to avoid calling Garther() in multiple
-	// pleces; which causes race conditions. (issue-707)
+	// process this is necessary to avoid calling Gather() in multiple
+	// places; which causes race conditions. (issue-707)
 	if !pc.iceGatherer.agentIsTrickle {
 		if err := pc.iceGatherer.SignalCandidates(); err != nil {
 			return err
