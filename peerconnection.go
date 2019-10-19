@@ -1000,14 +1000,65 @@ func (pc *PeerConnection) descriptionIsPlanB(desc *SessionDescription) bool {
 	return false
 }
 
+type incomingTrack struct {
+	kind  RTPCodecType
+	label string
+	id    string
+	ssrc  uint32
+}
+
+func (pc *PeerConnection) startReceiver(incoming incomingTrack, receiver *RTPReceiver) {
+	err := receiver.Receive(RTPReceiveParameters{
+		Encodings: RTPDecodingParameters{
+			RTPCodingParameters{SSRC: incoming.ssrc},
+		}})
+	if err != nil {
+		pc.log.Warnf("RTPReceiver Receive failed %s", err)
+		return
+	}
+
+	if err = receiver.Track().determinePayloadType(); err != nil {
+		pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+		return
+	}
+
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	if pc.currentLocalDescription == nil {
+		pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
+		return
+	}
+
+	sdpCodec, err := pc.currentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
+	if err != nil {
+		pc.log.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
+		return
+	}
+
+	codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
+	if err != nil {
+		pc.log.Warnf("codec %s in not registered", sdpCodec)
+		return
+	}
+
+	receiver.Track().mu.Lock()
+	receiver.Track().id = incoming.id
+	receiver.Track().label = incoming.label
+	receiver.Track().kind = codec.Type
+	receiver.Track().codec = codec
+	receiver.Track().mu.Unlock()
+
+	if pc.onTrackHandler != nil {
+		pc.onTrack(receiver.Track(), receiver)
+	} else {
+		pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
+	}
+
+}
+
 // openSRTP opens knows inbound SRTP streams from the RemoteDescription
 func (pc *PeerConnection) openSRTP() {
-	type incomingTrack struct {
-		kind  RTPCodecType
-		label string
-		id    string
-		ssrc  uint32
-	}
 	incomingTracks := map[uint32]incomingTrack{}
 
 	remoteIsPlanB := false
@@ -1048,55 +1099,6 @@ func (pc *PeerConnection) openSRTP() {
 		}
 	}
 
-	startReceiver := func(incoming incomingTrack, receiver *RTPReceiver) {
-		err := receiver.Receive(RTPReceiveParameters{
-			Encodings: RTPDecodingParameters{
-				RTPCodingParameters{SSRC: incoming.ssrc},
-			}})
-		if err != nil {
-			pc.log.Warnf("RTPReceiver Receive failed %s", err)
-			return
-		}
-
-		if err = receiver.Track().determinePayloadType(); err != nil {
-			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
-			return
-		}
-
-		pc.mu.RLock()
-		defer pc.mu.RUnlock()
-
-		if pc.currentLocalDescription == nil {
-			pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
-			return
-		}
-
-		sdpCodec, err := pc.currentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
-		if err != nil {
-			pc.log.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
-			return
-		}
-
-		codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
-		if err != nil {
-			pc.log.Warnf("codec %s in not registered", sdpCodec)
-			return
-		}
-
-		receiver.Track().mu.Lock()
-		receiver.Track().id = incoming.id
-		receiver.Track().label = incoming.label
-		receiver.Track().kind = codec.Type
-		receiver.Track().codec = codec
-		receiver.Track().mu.Unlock()
-
-		if pc.onTrackHandler != nil {
-			pc.onTrack(receiver.Track(), receiver)
-		} else {
-			pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
-		}
-	}
-
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	for ssrc, incoming := range incomingTracks {
 		for i := range localTransceivers {
@@ -1112,7 +1114,7 @@ func (pc *PeerConnection) openSRTP() {
 
 			delete(incomingTracks, ssrc)
 			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
-			go startReceiver(incoming, t.Receiver)
+			go pc.startReceiver(incoming, t.Receiver)
 			break
 		}
 	}
@@ -1126,15 +1128,46 @@ func (pc *PeerConnection) openSRTP() {
 				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 				continue
 			}
-			go startReceiver(incoming, t.Receiver)
+			go pc.startReceiver(incoming, t.Receiver)
 		}
 	}
 }
 
-// drainSRTP pulls and discards RTP/RTCP packets that don't match any SRTP
-// These could be sent to the user, but right now we don't provide an API
-// to distribute orphaned RTCP messages. This is needed to make sure we don't block
-// and provides useful debugging messages
+func (pc *PeerConnection) handleUndeclaredSSRC(ssrc uint32) bool {
+	if remoteDescription := pc.RemoteDescription(); remoteDescription != nil {
+		if len(remoteDescription.parsed.MediaDescriptions) == 1 {
+			onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
+			for _, a := range onlyMediaSection.Attributes {
+				if a.Key == ssrcStr {
+					return false
+				}
+			}
+
+			incoming := incomingTrack{
+				ssrc: ssrc,
+				kind: RTPCodecTypeVideo,
+			}
+			if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
+				incoming.kind = RTPCodecTypeAudio
+			}
+
+			t, err := pc.AddTransceiver(incoming.kind, RtpTransceiverInit{
+				Direction: RTPTransceiverDirectionSendrecv,
+			})
+			if err != nil {
+				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
+				return false
+			}
+			go pc.startReceiver(incoming, t.Receiver)
+			return true
+		}
+	}
+
+	return false
+}
+
+// drainSRTP pulls and discards RTP/RTCP packets that don't match any a:ssrc lines
+// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
 func (pc *PeerConnection) drainSRTP() {
 	go func() {
 		for {
@@ -1150,7 +1183,10 @@ func (pc *PeerConnection) drainSRTP() {
 				return
 			}
 
-			pc.log.Debugf("Incoming unhandled RTP ssrc(%d)", ssrc)
+			if !pc.handleUndeclaredSSRC(ssrc) {
+				pc.log.Errorf("Incoming unhandled RTP ssrc(%d)", ssrc)
+			}
+
 		}
 	}()
 
@@ -1166,7 +1202,7 @@ func (pc *PeerConnection) drainSRTP() {
 			pc.log.Warnf("Failed to accept RTCP %v \n", err)
 			return
 		}
-		pc.log.Debugf("Incoming unhandled RTCP ssrc(%d)", ssrc)
+		pc.log.Errorf("Incoming unhandled RTCP ssrc(%d)", ssrc)
 	}
 }
 

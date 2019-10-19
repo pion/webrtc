@@ -45,7 +45,7 @@ func getMdNames(sdp *sdp.SessionDescription) []string {
 func extractSsrcList(md *sdp.MediaDescription) []string {
 	ssrcMap := map[string]struct{}{}
 	for _, attr := range md.Attributes {
-		if attr.Key == "ssrc" {
+		if attr.Key == ssrcStr {
 			ssrc := strings.Fields(attr.Value)[0]
 			ssrcMap[ssrc] = struct{}{}
 		}
@@ -286,7 +286,7 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	extractSsrcList := func(md *sdp.MediaDescription) []string {
 		ssrcMap := map[string]struct{}{}
 		for _, attr := range md.Attributes {
-			if attr.Key == "ssrc" {
+			if attr.Key == ssrcStr {
 				ssrc := strings.Fields(attr.Value)[0]
 				ssrcMap[ssrc] = struct{}{}
 			}
