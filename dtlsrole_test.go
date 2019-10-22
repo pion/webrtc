@@ -69,8 +69,8 @@ a=setup:%s
 		{"No MediaDescriptions", parseSDP(noMedia), DTLSRoleAuto},
 		{"MediaDescription, no setup", parseSDP(mediaNoSetup), DTLSRoleAuto},
 		{"MediaDescription, setup:actpass", parseSDP(fmt.Sprintf(mediaSetupDeclared, "actpass")), DTLSRoleAuto},
-		{"MediaDescription, setup:passive", parseSDP(fmt.Sprintf(mediaSetupDeclared, "passive")), DTLSRoleClient},
-		{"MediaDescription, setup:active", parseSDP(fmt.Sprintf(mediaSetupDeclared, "active")), DTLSRoleServer},
+		{"MediaDescription, setup:passive", parseSDP(fmt.Sprintf(mediaSetupDeclared, "passive")), DTLSRoleServer},
+		{"MediaDescription, setup:active", parseSDP(fmt.Sprintf(mediaSetupDeclared, "active")), DTLSRoleClient},
 	}
 	for _, testCase := range testCases {
 		assert.Equal(t,

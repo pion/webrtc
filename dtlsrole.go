@@ -20,6 +20,11 @@ const (
 	DTLSRoleServer
 )
 
+const (
+	defaultDtlsRoleAnswer = DTLSRoleServer
+	defaultDtlsRoleOffer  = DTLSRoleAuto
+)
+
 func (r DTLSRole) String() string {
 	switch r {
 	case DTLSRoleAuto:
@@ -34,7 +39,7 @@ func (r DTLSRole) String() string {
 }
 
 // Iterate a SessionDescription from a remote to determine if an explicit
-// role can been determined for local connection. The decision is made from the first role we we parse.
+// role can been determined from it. The decision is made from the first role we we parse.
 // If no role can be found we return DTLSRoleAuto
 func dtlsRoleFromRemoteSDP(sessionDescription *sdp.SessionDescription) DTLSRole {
 	if sessionDescription == nil {
@@ -45,10 +50,10 @@ func dtlsRoleFromRemoteSDP(sessionDescription *sdp.SessionDescription) DTLSRole 
 		for _, attribute := range mediaSection.Attributes {
 			if attribute.Key == "setup" {
 				switch attribute.Value {
-				case "active":
-					return DTLSRoleServer
-				case "passive":
+				case sdp.ConnectionRoleActive.String():
 					return DTLSRoleClient
+				case sdp.ConnectionRolePassive.String():
+					return DTLSRoleServer
 				default:
 					return DTLSRoleAuto
 				}
@@ -57,4 +62,17 @@ func dtlsRoleFromRemoteSDP(sessionDescription *sdp.SessionDescription) DTLSRole 
 	}
 
 	return DTLSRoleAuto
+}
+
+func connectionRoleFromDtlsRole(d DTLSRole) sdp.ConnectionRole {
+	switch d {
+	case DTLSRoleClient:
+		return sdp.ConnectionRoleActive
+	case DTLSRoleServer:
+		return sdp.ConnectionRolePassive
+	case DTLSRoleAuto:
+		return sdp.ConnectionRoleActpass
+	default:
+		return sdp.ConnectionRole(0)
+	}
 }
