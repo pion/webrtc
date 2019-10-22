@@ -834,20 +834,6 @@ func TestUndeclaredSSRC(t *testing.T) {
 		close(onTrackFired)
 	})
 
-	go func() {
-		for {
-			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-			time.Sleep(time.Millisecond * 25)
-
-			select {
-			case <-onTrackFired:
-				return
-			default:
-				continue
-			}
-		}
-	}()
-
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
@@ -864,6 +850,20 @@ func TestUndeclaredSSRC(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	go func() {
+		for {
+			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+			time.Sleep(time.Millisecond * 25)
+
+			select {
+			case <-onTrackFired:
+				return
+			default:
+				continue
+			}
+		}
+	}()
 
 	<-onTrackFired
 	err = pcOffer.Close()

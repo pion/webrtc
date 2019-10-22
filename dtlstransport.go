@@ -155,7 +155,7 @@ func (t *DTLSTransport) startSRTP() error {
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
 
-	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.isClient())
+	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.role() == DTLSRoleClient)
 	if err != nil {
 		return fmt.Errorf("failed to extract sctp session keys: %v", err)
 	}
@@ -205,20 +205,28 @@ func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
 	return t.srtcpSession, nil
 }
 
-func (t *DTLSTransport) isClient() bool {
-	isClient := true
+func (t *DTLSTransport) role() DTLSRole {
+	// If remote has an explicit role use the inverse
 	switch t.remoteParameters.Role {
 	case DTLSRoleClient:
-		isClient = true
+		return DTLSRoleServer
 	case DTLSRoleServer:
-		isClient = false
-	default:
-		if t.iceTransport.Role() == ICERoleControlling {
-			isClient = false
-		}
+		return DTLSRoleClient
 	}
 
-	return isClient
+	// If SettingEngine has an explicit role
+	switch t.api.settingEngine.answeringDTLSRole {
+	case DTLSRoleServer:
+		return DTLSRoleServer
+	case DTLSRoleClient:
+		return DTLSRoleClient
+	}
+
+	// Remote was auto and no explicit role was configured via SettingEngine
+	if t.iceTransport.Role() == ICERoleControlling {
+		return DTLSRoleClient
+	}
+	return defaultDtlsRoleAnswer
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
@@ -237,6 +245,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	dtlsEndpoint := t.iceTransport.NewEndpoint(mux.MatchDTLS)
 	t.srtpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTP)
 	t.srtcpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTCP)
+	t.remoteParameters = remoteParameters
 
 	// pion/webrtc#753
 	cert := t.certificates[0]
@@ -251,8 +260,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	}
 
 	t.onStateChange(DTLSTransportStateConnecting)
-	if t.isClient() {
-		// Assumes the peer offered to be passive and we accepted.
+	if t.role() == DTLSRoleClient {
 		dtlsConn, err := dtls.Client(dtlsEndpoint, dtlsConfig)
 		if err != nil {
 			t.onStateChange(DTLSTransportStateFailed)
@@ -260,7 +268,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		}
 		t.conn = dtlsConn
 	} else {
-		// Assumes we offer to be passive and this is accepted.
 		dtlsConn, err := dtls.Server(dtlsEndpoint, dtlsConfig)
 		if err != nil {
 			t.onStateChange(DTLSTransportStateFailed)
@@ -278,7 +285,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	}
 
 	t.remoteCertificate = remoteCert.Raw
-	err := t.validateFingerPrint(remoteParameters, remoteCert)
+	err := t.validateFingerPrint(remoteCert)
 	if err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
 	}
@@ -314,8 +321,8 @@ func (t *DTLSTransport) Stop() error {
 	return util.FlattenErrs(closeErrs)
 }
 
-func (t *DTLSTransport) validateFingerPrint(remoteParameters DTLSParameters, remoteCert *x509.Certificate) error {
-	for _, fp := range remoteParameters.Fingerprints {
+func (t *DTLSTransport) validateFingerPrint(remoteCert *x509.Certificate) error {
+	for _, fp := range t.remoteParameters.Fingerprints {
 		hashAlgo, err := dtls.HashAlgorithmString(fp.Algorithm)
 		if err != nil {
 			return err

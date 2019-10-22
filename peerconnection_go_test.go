@@ -700,3 +700,52 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal("timed out waiting for connection to fail")
 	}
 }
+
+func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
+	runTest := func(r DTLSRole) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetAnsweringDTLSRole(r))
+
+		offerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		answerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err = signalPair(offerPC, answerPC); err != nil {
+			t.Fatal(err)
+		}
+
+		connectionComplete := make(chan interface{})
+		answerPC.OnConnectionStateChange(func(connectionState PeerConnectionState) {
+			if connectionState == PeerConnectionStateConnected {
+				select {
+				case <-connectionComplete:
+				default:
+					close(connectionComplete)
+				}
+			}
+		})
+
+		<-connectionComplete
+		if err = offerPC.Close(); err != nil {
+			t.Fatal(err)
+		} else if err = answerPC.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+	}
+
+	t.Run("Server", func(t *testing.T) {
+		runTest(DTLSRoleServer)
+	})
+
+	t.Run("Client", func(t *testing.T) {
+		runTest(DTLSRoleClient)
+	})
+
+}

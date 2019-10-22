@@ -5,6 +5,8 @@ package webrtc
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSetEphemeralUDPPortRange(t *testing.T) {
@@ -80,4 +82,10 @@ func TestSetNAT1To1IPs(t *testing.T) {
 	if s.candidates.NAT1To1IPCandidateType != typ {
 		t.Fatalf("Failed to set NAT1To1IPCandidateType")
 	}
+}
+
+func TestSetAnsweringDTLSRole(t *testing.T) {
+	s := SettingEngine{}
+	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRoleAuto), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
+	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRole(0)), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
 }

@@ -422,13 +422,13 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 
 		if len(video) > 0 {
-			if _, err = pc.addTransceiverSDP(d, "video", iceParams, candidates, sdp.ConnectionRoleActpass, video...); err != nil {
+			if _, err = pc.addTransceiverSDP(d, "video", iceParams, candidates, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), video...); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle("video")
 		}
 		if len(audio) > 0 {
-			if _, err = pc.addTransceiverSDP(d, "audio", iceParams, candidates, sdp.ConnectionRoleActpass, audio...); err != nil {
+			if _, err = pc.addTransceiverSDP(d, "audio", iceParams, candidates, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), audio...); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle("audio")
@@ -436,7 +436,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	} else {
 		for _, t := range pc.GetTransceivers() {
 			midValue := strconv.Itoa(bundleCount)
-			if _, err = pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActpass, t); err != nil {
+			if _, err = pc.addTransceiverSDP(d, midValue, iceParams, candidates, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), t); err != nil {
 				return SessionDescription{}, err
 			}
 			appendBundle(midValue)
@@ -452,7 +452,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	if pc.configuration.SDPSemantics == SDPSemanticsPlanB {
 		midValue = "data"
 	}
-	pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActpass)
+	pc.addDataMediaSection(d, midValue, iceParams, candidates, connectionRoleFromDtlsRole(defaultDtlsRoleOffer))
 	appendBundle(midValue)
 
 	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
@@ -624,6 +624,11 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 		bundleValue += " " + midValue
 	}
 
+	connectionRole := connectionRoleFromDtlsRole(pc.api.settingEngine.answeringDTLSRole)
+	if connectionRole == sdp.ConnectionRole(0) {
+		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
+	}
+
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	detectedPlanB := pc.descriptionIsPlanB(pc.RemoteDescription())
@@ -635,7 +640,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 		}
 
 		if media.MediaName.Media == "application" {
-			pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
+			pc.addDataMediaSection(d, midValue, iceParams, candidates, connectionRole)
 			appendBundle(midValue)
 			continue
 		}
@@ -675,7 +680,7 @@ func (pc *PeerConnection) addAnswerMediaTransceivers(d *sdp.SessionDescription) 
 				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
 			}
 		}
-		if accepted, err := pc.addTransceiverSDP(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive, mediaTransceivers...); err != nil {
+		if accepted, err := pc.addTransceiverSDP(d, midValue, iceParams, candidates, connectionRole, mediaTransceivers...); err != nil {
 			return nil, err
 		} else if accepted {
 			appendBundle(midValue)
