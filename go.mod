@@ -10,10 +10,11 @@ require (
 	github.com/pion/quic v0.1.1
 	github.com/pion/rtcp v1.2.1
 	github.com/pion/rtp v1.1.4
-	github.com/pion/sctp v1.7.1
+	github.com/pion/sctp v1.7.2
 	github.com/pion/sdp/v2 v2.3.1
 	github.com/pion/srtp v1.2.6
 	github.com/pion/transport v0.8.9
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20191002035440-2ec189313ef0 // indirect
+	gopkg.in/yaml.v2 v2.2.4 // indirect
 )

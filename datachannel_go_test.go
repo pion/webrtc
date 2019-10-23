@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -462,6 +461,9 @@ func TestEOF(t *testing.T) {
 	})
 
 	t.Run("No detach", func(t *testing.T) {
+		lim := test.TimeOut(time.Second * 5)
+		defer lim.Stop()
+
 		// Use Detach data channels mode
 		s := SettingEngine{}
 		//s.DetachDataChannels()
@@ -482,8 +484,8 @@ func TestEOF(t *testing.T) {
 		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
 
 		var dca, dcb *DataChannel
-		var nDCbCbs int32
-		doneCh := make(chan struct{})
+		dcaClosedCh := make(chan struct{})
+		dcbClosedCh := make(chan struct{})
 
 		pcb.OnDataChannel(func(dc *DataChannel) {
 			if dc.Label() != label {
@@ -499,8 +501,9 @@ func TestEOF(t *testing.T) {
 			})
 
 			dcb.OnClose(func() {
+				// (2)
 				log.Debug("pcb: data channel closed")
-				atomic.AddInt32(&nDCbCbs, 1)
+				close(dcbClosedCh)
 			})
 
 			// Register the OnMessage to handle incoming messages
@@ -525,12 +528,13 @@ func TestEOF(t *testing.T) {
 				t.Fatal(err)
 			}
 			log.Debug("pca: sent ping")
-			assert.NoError(t, dca.Close(), "should succeed")
+			assert.NoError(t, dca.Close(), "should succeed") // <-- dca closes
 		})
 
 		dca.OnClose(func() {
+			// (1)
 			log.Debug("pca: data channel closed")
-			close(doneCh)
+			close(dcaClosedCh)
 		})
 
 		// Register the OnMessage to handle incoming messages
@@ -546,7 +550,10 @@ func TestEOF(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		<-doneCh
-		assert.Equal(t, int32(1), atomic.LoadInt32(&nDCbCbs), "dcb should be closed by now")
+		// When dca closes the channel,
+		// (1) dca.Onclose() will fire immediately, then
+		// (2) dcb.OnClose will also fire
+		<-dcaClosedCh // (1)
+		<-dcbClosedCh // (2)
 	})
 }
