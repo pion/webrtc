@@ -139,6 +139,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Aaron France](https://github.com/AeroNotix)
 * [Chris Hiszpanski](https://github.com/thinkski) - *Fix Answer bundle generation*
 * [Vicken Simonian](https://github.com/vsimon)
+* [Guilherme Souza](https://github.com/gqgs)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
