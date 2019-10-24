@@ -7,10 +7,8 @@ import (
 	"time"
 
 	"github.com/pion/transport/test"
+	"github.com/stretchr/testify/assert"
 )
-
-// TestPeerConnection_Close is moved to it's own file because the tests
-// in rtcpeerconnection_test.go are leaky, making the goroutine report useless.
 
 func TestPeerConnection_Close(t *testing.T) {
 	// Limit runtime in case of deadlocks
@@ -54,15 +52,8 @@ func TestPeerConnection_Close(t *testing.T) {
 
 	<-awaitSetup
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 
 	<-awaitICEClosed
 }
@@ -86,10 +77,7 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
 
 	if err = pcAnswer.SetRemoteDescription(answer); err != nil {
 		t.Fatal(err)
@@ -102,10 +90,7 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcAnswer.Close())
 
 	// Assert that ICETransport is shutdown, test timeout will prevent deadlock
 	for {

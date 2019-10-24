@@ -9,15 +9,17 @@ import (
 	"time"
 
 	"github.com/pion/transport/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
-	iceComplete := make(chan bool)
+	report := test.CheckRoutines(t)
+	defer report()
 
-	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
+	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
@@ -32,6 +34,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	iceComplete := make(chan bool)
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
 			time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
@@ -52,23 +55,13 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 		}
 	}
 
-	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 	<-iceComplete
 
 	if atomic.LoadInt32(&senderCalledCandidateChange) == 0 {
 		t.Fatalf("Sender ICETransport OnSelectedCandidateChange was never called")
 	}
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }

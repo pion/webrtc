@@ -351,6 +351,9 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 }
 
 func TestEOF(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	log := logging.NewDefaultLoggerFactory().NewLogger("test")
 	label := "test-channel"
 	testData := []byte("this is some test data")

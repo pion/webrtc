@@ -38,6 +38,9 @@ func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, er
 }
 
 func TestNew_Go(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	api := NewAPI()
 	t.Run("Success", func(t *testing.T) {
 		secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -70,6 +73,7 @@ func TestNew_Go(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		assert.NotNil(t, pc)
+		assert.NoError(t, pc.Close())
 	})
 	t.Run("Failure", func(t *testing.T) {
 		testCases := []struct {
@@ -108,10 +112,13 @@ func TestNew_Go(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
-			_, err := testCase.initialize()
+			pc, err := testCase.initialize()
 			assert.EqualError(t, err, testCase.expectedErr.Error(),
 				"testCase: %d %v", i, testCase,
 			)
+			if pc != nil {
+				assert.NoError(t, pc.Close())
+			}
 		}
 	})
 }
@@ -120,6 +127,8 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 	// Note: this test includes all SetConfiguration features that are supported
 	// by Go but not the WASM bindings, namely: ICEServer.Credential,
 	// ICEServer.CredentialType, and Certificates.
+	report := test.CheckRoutines(t)
+	defer report()
 
 	api := NewAPI()
 
@@ -232,6 +241,8 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
 			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
+
+		assert.NoError(t, pc.Close())
 	}
 }
 
@@ -259,10 +270,6 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	api := NewAPI()
 	pc, err := api.NewPeerConnection(Configuration{})
 	assert.Nil(t, err)
-	defer func() {
-		err = pc.Close()
-		assert.NoError(t, err)
-	}()
 
 	onTrackCalled := make(chan struct{})
 	onICEConnectionStateChangeCalled := make(chan struct{})
@@ -301,6 +308,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	<-onTrackCalled
 	<-onICEConnectionStateChangeCalled
 	<-onDataChannelCalled
+	assert.NoError(t, pc.Close())
 }
 
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
@@ -308,6 +316,9 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
 
 	api := NewAPI()
 	offerPC, answerPC, err := api.newPair()
@@ -340,11 +351,8 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	})
 
 	<-iceComplete
-	if err = offerPC.Close(); err != nil {
-		t.Fatal(err)
-	} else if err = answerPC.Close(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
 }
 
 func TestPeerConnection_PropertyGetters(t *testing.T) {
@@ -368,6 +376,9 @@ func TestPeerConnection_PropertyGetters(t *testing.T) {
 }
 
 func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
@@ -376,6 +387,8 @@ func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
 	if !reflect.DeepEqual(&rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}, err) {
 		t.Errorf("CreateAnswer without RemoteDescription: got error: %v", err)
 	}
+
+	assert.NoError(t, pc.Close())
 }
 
 func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
@@ -490,6 +503,7 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 
 	// 5 because a datachannel is always added
 	assert.Len(t, matches, 5)
+	assert.NoError(t, pc.Close())
 }
 
 // Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
@@ -497,6 +511,9 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 func TestGatherOnSetLocalDescription(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
 
 	pcOfferGathered := make(chan SessionDescription)
 	pcAnswerGathered := make(chan SessionDescription)
@@ -558,11 +575,15 @@ func TestGatherOnSetLocalDescription(t *testing.T) {
 	} else if err = pcAnswer.SetLocalDescription(answer); err != nil {
 		t.Error(err.Error())
 	}
-
 	<-pcAnswerGathered
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestPeerConnection_OfferingLite(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	s := SettingEngine{}
 	s.SetLite(true)
 	offerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
@@ -591,14 +612,14 @@ func TestPeerConnection_OfferingLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	if err = offerPC.Close(); err != nil {
-		t.Fatal(err)
-	} else if err = answerPC.Close(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
 }
 
 func TestPeerConnection_AnsweringLite(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	offerPC, err := NewAPI().NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Fatal(err)
@@ -627,15 +648,15 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	if err = offerPC.Close(); err != nil {
-		t.Fatal(err)
-	} else if err = answerPC.Close(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
 }
 
 // An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
 func TestInvalidFingerprintCausesFailed(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pcOffer, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Fatal(err)
@@ -703,6 +724,9 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("timed out waiting for connection to fail")
 	}
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
@@ -736,13 +760,12 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 		})
 
 		<-connectionComplete
-		if err = offerPC.Close(); err != nil {
-			t.Fatal(err)
-		} else if err = answerPC.Close(); err != nil {
-			t.Fatal(err)
-		}
-
+		assert.NoError(t, offerPC.Close())
+		assert.NoError(t, answerPC.Close())
 	}
+
+	report := test.CheckRoutines(t)
+	defer report()
 
 	t.Run("Server", func(t *testing.T) {
 		runTest(DTLSRoleServer)

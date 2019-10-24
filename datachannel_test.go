@@ -16,19 +16,12 @@ import (
 const expectedLabel = "data"
 
 func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
-	var err error
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("closePair timed out waiting for done signal")
 	case <-done:
-		err = pc1.Close()
-		if err != nil {
-			t.Fatalf("Failed to close offer PC")
-		}
-		err = pc2.Close()
-		if err != nil {
-			t.Fatalf("Failed to close answer PC")
-		}
+		assert.NoError(t, pc1.Close())
+		assert.NoError(t, pc2.Close())
 	}
 }
 
