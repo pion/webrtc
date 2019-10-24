@@ -490,6 +490,77 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	}
 }
 
+// If a SessionDescription has a single media section and no SSRC
+// assume that it is meant to handle all RTP packets
+func TestUndeclaredSSRC(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	assert.NoError(t, err)
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(vp8Writer)
+	assert.NoError(t, err)
+
+	onTrackFired := make(chan *Track)
+	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
+		close(onTrackFired)
+	})
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+	// Filter SSRC lines, and remove SCTP
+	offer.SDP = regexp.MustCompile("a=ssrc.*").ReplaceAllString(offer.SDP, "")
+	offer.SDP = regexp.MustCompile("m=application(?s).*").ReplaceAllString(offer.SDP, "")
+	offer.SDP = regexp.MustCompile("\n\n").ReplaceAllString(offer.SDP, "")
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	go func() {
+		for {
+			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+			time.Sleep(time.Millisecond * 25)
+
+			select {
+			case <-onTrackFired:
+				return
+			default:
+				continue
+			}
+		}
+	}()
+
+	<-onTrackFired
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestOfferRejectionMissingCodec(t *testing.T) {
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
@@ -803,76 +874,5 @@ a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 
 	if !success {
 		t.Fail()
-	}
-}
-
-// If a SessionDescription has a single media section and no SSRC
-// assume that it is meant to handle all RTP packets
-func TestUndeclaredSSRC(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	api := NewAPI()
-	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
-	assert.NoError(t, err)
-
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
-	assert.NoError(t, err)
-
-	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
-	assert.NoError(t, err)
-
-	_, err = pcOffer.AddTrack(vp8Writer)
-	assert.NoError(t, err)
-
-	onTrackFired := make(chan *Track)
-	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
-		close(onTrackFired)
-	})
-
-	offer, err := pcOffer.CreateOffer(nil)
-	assert.NoError(t, err)
-
-	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-
-	// Filter SSRC lines, and remove SCTP
-	offer.SDP = regexp.MustCompile("a=ssrc.*").ReplaceAllString(offer.SDP, "")
-	offer.SDP = regexp.MustCompile("m=application(?s).*").ReplaceAllString(offer.SDP, "")
-	offer.SDP = regexp.MustCompile("\n\n").ReplaceAllString(offer.SDP, "")
-
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	assert.NoError(t, err)
-	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
-
-	go func() {
-		for {
-			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-			time.Sleep(time.Millisecond * 25)
-
-			select {
-			case <-onTrackFired:
-				return
-			default:
-				continue
-			}
-		}
-	}()
-
-	<-onTrackFired
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
 	}
 }
