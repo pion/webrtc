@@ -196,16 +196,8 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 	<-awaitRTPRecvClosed
 }
 
@@ -270,7 +262,6 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
 			go func() {
-				time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
 				close(iceComplete)
 			}()
 		}
@@ -300,15 +291,8 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 	}
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 
 	onTrackFiredLock.Lock()
 	if onTrackFired {
@@ -393,10 +377,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		}
 	}
 
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
 }
 
 /*
@@ -469,24 +450,13 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = pcOffer.Close(); err != nil {
-		t.Fatal(err)
-	} else if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != io.ErrClosedPipe {
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+
+	if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != io.ErrClosedPipe {
 		t.Fatal("Write to Track with no RTPSenders did not return io.ErrClosedPipe")
-	}
-
-	if err = pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}}); err != io.ErrClosedPipe {
+	} else if err = pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}}); err != io.ErrClosedPipe {
 		t.Fatal("WriteRTCP to closed PeerConnection did not return io.ErrClosedPipe")
-	}
-
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -550,18 +520,17 @@ func TestUndeclaredSSRC(t *testing.T) {
 	}()
 
 	<-onTrackFired
-	err = pcOffer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = pcAnswer.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestOfferRejectionMissingCodec(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pc, err := api.NewPeerConnection(Configuration{})
@@ -574,6 +543,15 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	iceComplete := make(chan bool)
+	noCodecPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			go func() {
+				close(iceComplete)
+			}()
+		}
+	})
 
 	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
@@ -601,9 +579,19 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 	if got, want := videoDesc.MediaName.Formats, []string{"0"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", *videoDesc.MediaName.String())
 	}
+
+	<-iceComplete
+	assert.NoError(t, noCodecPC.Close())
+	assert.NoError(t, pc.Close())
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -651,9 +639,17 @@ func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
 	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly) {
 		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendonly)
 	}
+
+	assert.NoError(t, pc.Close())
 }
 
 func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -697,9 +693,17 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv) {
 		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
 	}
+	assert.NoError(t, pc.Close())
 }
 
+// nolint: dupl
 func TestAddTransceiver(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -728,9 +732,17 @@ func TestAddTransceiver(t *testing.T) {
 	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv) {
 		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
 	}
+	assert.NoError(t, pc.Close())
 }
 
+// nolint: dupl
 func TestAddTransceiverFromKind(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -759,9 +771,16 @@ func TestAddTransceiverFromKind(t *testing.T) {
 	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly) {
 		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionRecvonly)
 	}
+	assert.NoError(t, pc.Close())
 }
 
 func TestAddTransceiverFromKindFailsSendOnly(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -776,9 +795,16 @@ func TestAddTransceiverFromKindFailsSendOnly(t *testing.T) {
 	}
 
 	assert.NotNil(t, err)
+	assert.NoError(t, pc.Close())
 }
 
 func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -804,6 +830,7 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 	}
 
 	assert.NotNil(t, err)
+	assert.NoError(t, pc.Close())
 }
 
 func TestOmitMediaFromBundleIfUnsupported(t *testing.T) {
@@ -837,6 +864,12 @@ a=sendrecv
 a=rtpmap:96 H264/90000
 a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 `
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	mediaEngine := MediaEngine{}
 	mediaEngine.RegisterCodec(
 		NewRTPH264Codec(DefaultPayloadTypeH264, 90000),
@@ -875,4 +908,5 @@ a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 	if !success {
 		t.Fail()
 	}
+	assert.NoError(t, pc.Close())
 }

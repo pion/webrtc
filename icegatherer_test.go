@@ -9,6 +9,7 @@ import (
 	"github.com/pion/ice"
 	"github.com/pion/logging"
 	"github.com/pion/transport/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewICEGatherer_Success(t *testing.T) {
@@ -56,16 +57,16 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		t.Fatalf("No candidates gathered")
 	}
 
-	err = gatherer.Close()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, gatherer.Close())
 }
 
 func TestICEGather_LocalCandidateOrder(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
 
 	opts := ICEGatherOptions{
 		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
@@ -111,12 +112,13 @@ func TestICEGather_LocalCandidateOrder(t *testing.T) {
 		}
 	}
 
-	if err := gatherer.Close(); err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, gatherer.Close())
 }
 
 func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
 	t.Run("1:1 NAT with host", func(t *testing.T) {
 		opts := ICEGatherOptions{
 			ICEServers: []ICEServer{},
@@ -142,10 +144,7 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			t.Fatal("unexpected nat1To1IPs value")
 		}
 
-		err = gatherer.Close()
-		if err != nil {
-			t.Error(err)
-		}
+		assert.NoError(t, gatherer.Close())
 	})
 
 	t.Run("1:1 NAT with srflx", func(t *testing.T) {
@@ -173,10 +172,7 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			t.Fatal("unexpected nat1To1IPs value")
 		}
 
-		err = gatherer.Close()
-		if err != nil {
-			t.Error(err)
-		}
+		assert.NoError(t, gatherer.Close())
 	})
 
 	t.Run("1:1 NAT with invalid candidate type", func(t *testing.T) {
@@ -204,9 +200,6 @@ func TestNewICEGatherer_NAT1To1IP(t *testing.T) {
 			t.Fatal("unexpected nat1To1IPs value")
 		}
 
-		err = gatherer.Close()
-		if err != nil {
-			t.Error(err)
-		}
+		assert.NoError(t, gatherer.Close())
 	})
 }
