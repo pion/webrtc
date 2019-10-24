@@ -247,31 +247,46 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 // }
 
 func TestPeerConnection_EventHandlers_Go(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	// Note: When testing the Go event handlers we peer into the state a bit more
 	// than what is possible for the environment agnostic (Go or WASM/JavaScript)
 	// EventHandlers test.
 	api := NewAPI()
 	pc, err := api.NewPeerConnection(Configuration{})
 	assert.Nil(t, err)
+	defer func() {
+		err = pc.Close()
+		assert.NoError(t, err)
+	}()
 
-	onTrackCalled := make(chan bool)
-	onICEConnectionStateChangeCalled := make(chan bool)
-	onDataChannelCalled := make(chan bool)
+	onTrackCalled := make(chan struct{})
+	onICEConnectionStateChangeCalled := make(chan struct{})
+	onDataChannelCalled := make(chan struct{})
 
 	// Verify that the noop case works
 	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
 
 	pc.OnTrack(func(t *Track, r *RTPReceiver) {
-		onTrackCalled <- true
+		close(onTrackCalled)
 	})
 
 	pc.OnICEConnectionStateChange(func(cs ICEConnectionState) {
-		onICEConnectionStateChangeCalled <- true
+		close(onICEConnectionStateChangeCalled)
 	})
 
 	pc.OnDataChannel(func(dc *DataChannel) {
-		onDataChannelCalled <- true
+		// Questions:
+		//  (1) How come this callback is made with dc being nil?
+		//  (2) How come this callback is made without CreateDataChannel?
+		if dc != nil {
+			close(onDataChannelCalled)
+		}
 	})
 
 	// Verify that the handlers deal with nil inputs
@@ -283,20 +298,9 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
 	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
 
-	allTrue := func(vals []bool) bool {
-		for _, val := range vals {
-			if !val {
-				return false
-			}
-		}
-		return true
-	}
-
-	assert.True(t, allTrue([]bool{
-		<-onTrackCalled,
-		<-onICEConnectionStateChangeCalled,
-		<-onDataChannelCalled,
-	}))
+	<-onTrackCalled
+	<-onICEConnectionStateChangeCalled
+	<-onDataChannelCalled
 }
 
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
