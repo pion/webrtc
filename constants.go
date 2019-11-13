@@ -7,5 +7,5 @@ const (
 	unknownStr = "unknown"
 	ssrcStr    = "ssrc"
 
-	receiveMTU = 8192
+	receiveMTU = 1200
 )
