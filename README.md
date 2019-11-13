@@ -140,6 +140,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Chris Hiszpanski](https://github.com/thinkski) - *Fix Answer bundle generation*
 * [Vicken Simonian](https://github.com/vsimon)
 * [Guilherme Souza](https://github.com/gqgs)
+* [Andrew N. Shalaev](https://github.com/isqad)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
