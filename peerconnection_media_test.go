@@ -544,15 +544,6 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	iceComplete := make(chan bool)
-	noCodecPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
-		if iceState == ICEConnectionStateConnected {
-			go func() {
-				close(iceComplete)
-			}()
-		}
-	})
-
 	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
@@ -580,7 +571,6 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", *videoDesc.MediaName.String())
 	}
 
-	<-iceComplete
 	assert.NoError(t, noCodecPC.Close())
 	assert.NoError(t, pc.Close())
 }

@@ -120,9 +120,11 @@ func main() {
 
 	// Construct the data channel as the offerer
 	if *isOffer {
+		var id uint16 = 1
+
 		dcParams := &webrtc.DataChannelParameters{
 			Label: "Foo",
-			ID:    1,
+			ID:    &id,
 		}
 		var channel *webrtc.DataChannel
 		channel, err = api.NewDataChannel(sctp, dcParams)
