@@ -19,38 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerateDataChannelID(t *testing.T) {
-	api := NewAPI()
-
-	testCases := []struct {
-		client bool
-		c      *PeerConnection
-		result uint16
-	}{
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 0},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 2},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 2: nil}, api: api}, 4},
-		{true, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil, 4: nil}, api: api}, 2},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{0: nil}, api: api}, 1},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil}, api: api}, 3},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 3: nil}, api: api}, 5},
-		{false, &PeerConnection{sctpTransport: api.NewSCTPTransport(nil), dataChannels: map[uint16]*DataChannel{1: nil, 5: nil}, api: api}, 3},
-	}
-
-	for _, testCase := range testCases {
-		id, err := testCase.c.generateDataChannelID(testCase.client)
-		if err != nil {
-			t.Errorf("failed to generate id: %v", err)
-			return
-		}
-		if id != testCase.result {
-			t.Errorf("Wrong id: %d expected %d", id, testCase.result)
-		}
-	}
-}
-
 func TestDataChannel_EventHandlers(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()

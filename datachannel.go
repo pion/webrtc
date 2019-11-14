@@ -86,7 +86,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 		label:             params.Label,
 		protocol:          params.Protocol,
 		negotiated:        params.Negotiated,
-		id:                &params.ID,
+		id:                params.ID,
 		ordered:           params.Ordered,
 		maxPacketLifeTime: params.MaxPacketLifeTime,
 		maxRetransmits:    params.MaxRetransmits,
@@ -146,6 +146,15 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		Protocol:             d.protocol,
 		Negotiated:           d.negotiated,
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
+	}
+
+	if d.id == nil {
+		generatedID, err := d.sctpTransport.generateDataChannelID(d.sctpTransport.dtlsTransport.role())
+		if err != nil {
+			return err
+		}
+
+		d.id = &generatedID
 	}
 
 	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)

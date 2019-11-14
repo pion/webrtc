@@ -50,12 +50,6 @@ type PeerConnection struct {
 
 	rtpTransceivers []*RTPTransceiver
 
-	// DataChannels
-	dataChannels          map[uint16]*DataChannel
-	dataChannelsOpened    uint32
-	dataChannelsRequested uint32
-	dataChannelsAccepted  uint32
-
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler func(ICEConnectionState)
 	onConnectionStateChangeHandler    func(PeerConnectionState)
@@ -103,7 +97,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		signalingState:     SignalingStateStable,
 		iceConnectionState: ICEConnectionStateNew,
 		connectionState:    PeerConnectionStateNew,
-		dataChannels:       make(map[uint16]*DataChannel),
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
@@ -135,6 +128,19 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 	pc.dtlsTransport = dtlsTransport
+
+	// Create the SCTP transport
+	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
+
+	// Wire up the on datachannel handler
+	pc.sctpTransport.OnDataChannel(func(d *DataChannel) {
+		pc.mu.RLock()
+		hdlr := pc.onDataChannelHandler
+		pc.mu.RUnlock()
+		if hdlr != nil {
+			hdlr(d)
+		}
+	})
 
 	return pc, nil
 }
@@ -953,29 +959,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprint = parts[1]
 	fingerprintHash := parts[0]
 
-	// Create the SCTP transport
-	sctp := pc.api.NewSCTPTransport(pc.dtlsTransport)
-	pc.sctpTransport = sctp
-
-	// Wire up the on datachannel handler
-	sctp.OnDataChannel(func(d *DataChannel) {
-		pc.mu.RLock()
-		hdlr := pc.onDataChannelHandler
-		pc.dataChannels[*d.ID()] = d
-		pc.dataChannelsAccepted++
-		pc.mu.RUnlock()
-		if hdlr != nil {
-			hdlr(d)
-		}
-	})
-
-	// Wire up the on datachannel opened handler
-	sctp.OnDataChannelOpened(func(d *DataChannel) {
-		pc.mu.RLock()
-		pc.dataChannelsOpened++
-		pc.mu.RUnlock()
-	})
-
 	iceRole := ICERoleControlled
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
 	// If both or neither agents are lite the offering agent is controlling.
@@ -1441,28 +1424,19 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 // and optional DataChannelInit used to configure properties of the
 // underlying channel such as data reliability.
 func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelInit) (*DataChannel, error) {
-	pc.mu.Lock()
-
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #2)
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	// pion/webrtc#748
 	params := &DataChannelParameters{
 		Label:   label,
 		Ordered: true,
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #19)
-	if options == nil || options.ID == nil {
-		var err error
-		if params.ID, err = pc.generateDataChannelID(true); err != nil {
-			pc.mu.Unlock()
-			return nil, err
-		}
-	} else {
-		params.ID = *options.ID
+	if options != nil {
+		params.ID = options.ID
 	}
 
 	if options != nil {
@@ -1490,7 +1464,6 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 
 		// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #11)
 		if len(params.Protocol) > 65535 {
-			pc.mu.Unlock()
 			return nil, &rtcerr.TypeError{Err: ErrProtocolTooLarge}
 		}
 
@@ -1500,56 +1473,29 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
-	// pion/webrtc#748
 	d, err := pc.api.newDataChannel(params, pc.log)
 	if err != nil {
-		pc.mu.Unlock()
 		return nil, err
 	}
 
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #16)
 	if d.maxPacketLifeTime != nil && d.maxRetransmits != nil {
-		pc.mu.Unlock()
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
-	// Remember datachannel
-	pc.dataChannels[params.ID] = d
+	pc.sctpTransport.lock.Lock()
+	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, d)
+	pc.sctpTransport.dataChannelsRequested++
+	pc.sctpTransport.lock.Unlock()
 
-	sctpReady := pc.sctpTransport != nil && pc.sctpTransport.association != nil
-
-	pc.dataChannelsRequested++
-	pc.mu.Unlock()
-
-	// Open if networking already started
-	if sctpReady {
-		err = d.open(pc.sctpTransport)
-		if err != nil {
+	// If SCTP already connected open all the channels
+	if pc.sctpTransport.State() == SCTPTransportStateConnected {
+		if err = d.open(pc.sctpTransport); err != nil {
 			return nil, err
 		}
 	}
 
 	return d, nil
-}
-
-func (pc *PeerConnection) generateDataChannelID(client bool) (uint16, error) {
-	var id uint16
-	if !client {
-		id++
-	}
-
-	max := sctpMaxChannels
-	if pc.sctpTransport != nil {
-		max = pc.sctpTransport.MaxChannels()
-	}
-
-	for ; id < max-1; id += 2 {
-		_, ok := pc.dataChannels[id]
-		if !ok {
-			return id, nil
-		}
-	}
-	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
@@ -1838,28 +1784,39 @@ func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 
 // GetStats return data providing statistics about the overall connection
 func (pc *PeerConnection) GetStats() StatsReport {
+	var (
+		dataChannelsAccepted  uint32
+		dataChannelsClosed    uint32
+		dataChannelsOpened    uint32
+		dataChannelsRequested uint32
+	)
 	statsCollector := newStatsReportCollector()
 	statsCollector.Collecting()
 
 	pc.mu.Lock()
-	var dataChannelsClosed uint32
-	for _, d := range pc.dataChannels {
-		state := d.ReadyState()
-
-		if state != DataChannelStateConnecting && state != DataChannelStateOpen {
-			dataChannelsClosed++
-		}
-
-		d.collectStats(statsCollector)
-	}
-
 	if pc.iceGatherer != nil {
 		pc.iceGatherer.collectStats(statsCollector)
 	}
 	if pc.iceTransport != nil {
 		pc.iceTransport.collectStats(statsCollector)
 	}
+
 	if pc.sctpTransport != nil {
+		pc.sctpTransport.lock.Lock()
+		dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
+		dataChannelsAccepted = pc.sctpTransport.dataChannelsAccepted
+		dataChannelsOpened = pc.sctpTransport.dataChannelsOpened
+		dataChannelsRequested = pc.sctpTransport.dataChannelsRequested
+		pc.sctpTransport.lock.Unlock()
+
+		for _, d := range dataChannels {
+			state := d.ReadyState()
+			if state != DataChannelStateConnecting && state != DataChannelStateOpen {
+				dataChannelsClosed++
+			}
+
+			d.collectStats(statsCollector)
+		}
 		pc.sctpTransport.collectStats(statsCollector)
 	}
 
@@ -1867,10 +1824,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		Timestamp:             statsTimestampNow(),
 		Type:                  StatsTypePeerConnection,
 		ID:                    pc.statsID,
-		DataChannelsOpened:    pc.dataChannelsOpened,
+		DataChannelsAccepted:  dataChannelsAccepted,
 		DataChannelsClosed:    dataChannelsClosed,
-		DataChannelsRequested: pc.dataChannelsRequested,
-		DataChannelsAccepted:  pc.dataChannelsAccepted,
+		DataChannelsOpened:    dataChannelsOpened,
+		DataChannelsRequested: dataChannelsRequested,
 	}
 	pc.mu.Unlock()
 
@@ -1937,14 +1894,11 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		return
 	}
 
-	// Open data channels that where created before signaling
-	pc.mu.Lock()
-	// make a copy of dataChannels to avoid race condition accessing pc.dataChannels
-	dataChannels := make(map[uint16]*DataChannel, len(pc.dataChannels))
-	for k, v := range pc.dataChannels {
-		dataChannels[k] = v
-	}
-	pc.mu.Unlock()
+	// DataChannels that need to be opened now that SCTP is available
+	// make a copy we may have incoming DataChannels mutating this while we open
+	pc.sctpTransport.lock.RLock()
+	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
+	pc.sctpTransport.lock.RUnlock()
 
 	var openedDCCount uint32
 	for _, d := range dataChannels {
@@ -1956,9 +1910,9 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		openedDCCount++
 	}
 
-	pc.mu.Lock()
-	pc.dataChannelsOpened += openedDCCount
-	pc.mu.Unlock()
+	pc.sctpTransport.lock.Lock()
+	pc.sctpTransport.dataChannelsOpened += openedDCCount
+	pc.sctpTransport.lock.Unlock()
 
 }
 

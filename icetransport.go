@@ -81,6 +81,10 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 
 	agent := t.gatherer.agent
+	if agent == nil {
+		return errors.New("ICEAgent does not exist, unable to start ICETransport")
+	}
+
 	if err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
 		state := newICETransportStateFromICE(iceState)
 		t.lock.Lock()
