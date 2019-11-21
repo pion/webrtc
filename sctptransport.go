@@ -86,20 +86,21 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
 func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	if err := r.ensureDTLS(); err != nil {
 		return err
 	}
 
 	sctpAssociation, err := sctp.Client(sctp.Config{
-		NetConn:       r.dtlsTransport.conn,
+		NetConn:       r.Transport().conn,
 		LoggerFactory: r.api.settingEngine.LoggerFactory,
 	})
 	if err != nil {
 		return err
 	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.association = sctpAssociation
 	r.state = SCTPTransportStateConnected
 
@@ -127,8 +128,8 @@ func (r *SCTPTransport) Stop() error {
 }
 
 func (r *SCTPTransport) ensureDTLS() error {
-	if r.dtlsTransport == nil ||
-		r.dtlsTransport.conn == nil {
+	dtlsTransport := r.Transport()
+	if dtlsTransport == nil || dtlsTransport.conn == nil {
 		return errors.New("DTLS not established")
 	}
 
