@@ -267,7 +267,7 @@ func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil {
 		return errors.New("gatherer not started")
-	} else if t.gatherer.getAgent() == nil && t.gatherer.agentIsTrickle {
+	} else if t.gatherer.getAgent() == nil && t.gatherer.api.settingEngine.candidates.ICETrickle {
 		// Special case for trickle=true. (issue-707)
 		if err := t.gatherer.createAgent(); err != nil {
 			return err

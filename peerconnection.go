@@ -112,7 +112,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.api.settingEngine.candidates.ICETrickle {
 		if err = pc.iceGatherer.Gather(); err != nil {
 			return nil, err
 		}
@@ -449,7 +449,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 	}
 
-	if pc.iceGatherer.lite {
+	if pc.api.settingEngine.candidates.ICELite {
 		// RFC 5245 S15.3
 		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
 	}
@@ -869,7 +869,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	// setup while also support the old trickle=false synchronous gathering
 	// process this is necessary to avoid calling Gather() in multiple
 	// places; which causes race conditions. (issue-707)
-	if !pc.iceGatherer.agentIsTrickle {
+	if !pc.api.settingEngine.candidates.ICETrickle {
 		if err := pc.iceGatherer.SignalCandidates(); err != nil {
 			return err
 		}
@@ -963,7 +963,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
 	// If both or neither agents are lite the offering agent is controlling.
 	// RFC 8445 S6.1.1
-	if (weOffer && remoteIsLite == pc.iceGatherer.lite) || (remoteIsLite && !pc.iceGatherer.lite) {
+	if (weOffer && remoteIsLite == pc.api.settingEngine.candidates.ICELite) || (remoteIsLite && !pc.api.settingEngine.candidates.ICELite) {
 		iceRole = ICERoleControlling
 	}
 
