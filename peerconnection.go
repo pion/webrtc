@@ -1546,9 +1546,28 @@ func (pc *PeerConnection) Close() error {
 	// 2. A Mux stops this chain. It won't close the underlying
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
-
 	var closeErrs []error
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
+	for _, t := range pc.rtpTransceivers {
+		if err := t.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6,#7)
+	if pc.sctpTransport != nil {
+		if err := pc.sctpTransport.Stop(); err != nil {
+			closeErrs = append(closeErrs, err)
+		}
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8)
+	if err := pc.dtlsTransport.Stop(); err != nil {
+		closeErrs = append(closeErrs, err)
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #9,#10,#11)
 	if pc.iceTransport != nil {
 		if err := pc.iceTransport.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
@@ -1558,21 +1577,6 @@ func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
-	if err := pc.dtlsTransport.Stop(); err != nil {
-		closeErrs = append(closeErrs, err)
-	}
-
-	if pc.sctpTransport != nil {
-		if err := pc.sctpTransport.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
-	}
-
-	for _, t := range pc.rtpTransceivers {
-		if err := t.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
-	}
 	return util.FlattenErrs(closeErrs)
 }
 
