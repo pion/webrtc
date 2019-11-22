@@ -96,6 +96,7 @@ func (g *ICEGatherer) createAgent() error {
 		InterfaceFilter:           g.api.settingEngine.candidates.InterfaceFilter,
 		NAT1To1IPs:                g.api.settingEngine.candidates.NAT1To1IPs,
 		NAT1To1IPCandidateType:    nat1To1CandiTyp,
+		Net:                       g.api.settingEngine.vnet,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
