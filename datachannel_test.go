@@ -211,6 +211,23 @@ func TestDataChannel_Send(t *testing.T) {
 	})
 }
 
+func TestDataChannel_Close(t *testing.T) {
+	t.Run("Close after PeerConnection Closed", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
+
+		offerPC, answerPC, err := newPair()
+		assert.NoError(t, err)
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, offerPC.Close())
+		assert.NoError(t, answerPC.Close())
+		assert.NoError(t, dc.Close())
+	})
+}
+
 func TestDataChannelParameters(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()

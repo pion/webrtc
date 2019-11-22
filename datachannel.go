@@ -266,8 +266,8 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 }
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
+	d.setReadyState(DataChannelStateOpen)
 	d.mu.Lock()
-	d.readyState = DataChannelStateOpen
 	d.dataChannel = dc
 	d.mu.Unlock()
 
@@ -304,9 +304,7 @@ func (d *DataChannel) readLoop() {
 		buffer := make([]byte, dataChannelBufferSize)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
-			d.mu.Lock()
-			d.readyState = DataChannelStateClosed
-			d.mu.Unlock()
+			d.setReadyState(DataChannelStateClosed)
 			if err != io.EOF {
 				d.onError(err)
 			}
@@ -385,15 +383,14 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	isClosed := d.readyState == DataChannelStateClosing || d.readyState == DataChannelStateClosed
+	d.mu.Unlock()
 
-	if d.readyState == DataChannelStateClosing ||
-		d.readyState == DataChannelStateClosed {
+	if isClosed {
 		return nil
 	}
 
-	d.readyState = DataChannelStateClosing
-
+	d.setReadyState(DataChannelStateClosing)
 	return d.dataChannel.Close()
 }
 
@@ -567,4 +564,11 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	}
 
 	collector.Collect(stats.ID, stats)
+}
+
+func (d *DataChannel) setReadyState(r DataChannelState) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.readyState = r
 }
