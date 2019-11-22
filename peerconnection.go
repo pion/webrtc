@@ -1555,7 +1555,16 @@ func (pc *PeerConnection) Close() error {
 		}
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6,#7)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
+	if pc.sctpTransport != nil {
+		pc.sctpTransport.lock.Lock()
+		for _, d := range pc.sctpTransport.dataChannels {
+			d.setReadyState(DataChannelStateClosed)
+		}
+		pc.sctpTransport.lock.Unlock()
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
 	if pc.sctpTransport != nil {
 		if err := pc.sctpTransport.Stop(); err != nil {
 			closeErrs = append(closeErrs, err)
