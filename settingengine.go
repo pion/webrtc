@@ -8,6 +8,7 @@ import (
 
 	"github.com/pion/ice"
 	"github.com/pion/logging"
+	"github.com/pion/transport/vnet"
 )
 
 // SettingEngine allows influencing behavior in ways that are not
@@ -39,6 +40,7 @@ type SettingEngine struct {
 		NAT1To1IPCandidateType ICECandidateType
 	}
 	answeringDTLSRole DTLSRole
+	vnet              *vnet.Net
 	LoggerFactory     logging.LoggerFactory
 }
 
@@ -162,4 +164,13 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 
 	e.answeringDTLSRole = role
 	return nil
+}
+
+// SetVNet sets the VNet instance that is passed to pion/ice
+//
+// VNet is a virtual network layer for Pion, allowing users to simulate
+// different topologies, latency, loss and jitter. This can be useful for
+// learning WebRTC concepts or testing your application in a lab environment
+func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
+	e.vnet = vnet
 }
