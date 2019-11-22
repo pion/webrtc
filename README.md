@@ -141,6 +141,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Vicken Simonian](https://github.com/vsimon)
 * [Guilherme Souza](https://github.com/gqgs)
 * [Andrew N. Shalaev](https://github.com/isqad)
+* [EricSong](https://github.com/xsephiroth) - *Implement GstV4l2Alsa example*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
