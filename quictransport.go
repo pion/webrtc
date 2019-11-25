@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/dtls"
+	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
 	"github.com/pion/quic"
 	"github.com/pion/webrtc/v2/internal/mux"

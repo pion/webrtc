@@ -14,7 +14,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/pion/dtls"
+	"github.com/pion/dtls/v2"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 

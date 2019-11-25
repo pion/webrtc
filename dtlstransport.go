@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/dtls"
+	"github.com/pion/dtls/v2"
 	"github.com/pion/srtp"
 	"github.com/pion/webrtc/v2/internal/mux"
 	"github.com/pion/webrtc/v2/internal/util"
@@ -254,8 +255,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		t.onStateChange(DTLSTransportStateConnecting)
 
 		return t.role(), &dtls.Config{
-			Certificate:            cert.x509Cert,
-			PrivateKey:             cert.privateKey,
+			Certificate: tls.Certificate{
+				Certificate: [][]byte{cert.x509Cert.Raw},
+				PrivateKey:  cert.privateKey,
+			},
 			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
 			ClientAuth:             dtls.RequireAnyClientCert,
 			LoggerFactory:          t.api.settingEngine.LoggerFactory,
@@ -291,14 +294,20 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	t.onStateChange(DTLSTransportStateConnected)
 
 	// Check the fingerprint if a certificate was exchanged
-	remoteCert := t.conn.RemoteCertificate()
-	if remoteCert == nil {
+	remoteCerts := t.conn.RemoteCertificate()
+	if len(remoteCerts) == 0 {
 		t.onStateChange(DTLSTransportStateFailed)
 		return fmt.Errorf("peer didn't provide certificate via DTLS")
 	}
+	t.remoteCertificate = remoteCerts[0]
 
-	t.remoteCertificate = remoteCert.Raw
-	err = t.validateFingerPrint(remoteCert)
+	parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
+	if err != nil {
+		t.onStateChange(DTLSTransportStateFailed)
+		return err
+	}
+
+	err = t.validateFingerPrint(parsedRemoteCert)
 	if err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
 	}
