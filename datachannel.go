@@ -383,7 +383,8 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
 	d.mu.Lock()
-	isClosed := d.readyState == DataChannelStateClosing || d.readyState == DataChannelStateClosed
+	isClosed := d.readyState == DataChannelStateClosed
+	haveSctpTransport := d.dataChannel != nil
 	d.mu.Unlock()
 
 	if isClosed {
@@ -391,6 +392,10 @@ func (d *DataChannel) Close() error {
 	}
 
 	d.setReadyState(DataChannelStateClosing)
+	if !haveSctpTransport {
+		return nil
+	}
+
 	return d.dataChannel.Close()
 }
 
