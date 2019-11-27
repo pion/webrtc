@@ -255,10 +255,11 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		t.onStateChange(DTLSTransportStateConnecting)
 
 		return t.role(), &dtls.Config{
-			Certificate: tls.Certificate{
-				Certificate: [][]byte{cert.x509Cert.Raw},
-				PrivateKey:  cert.privateKey,
-			},
+			Certificates: []tls.Certificate{
+				{
+					Certificate: [][]byte{cert.x509Cert.Raw},
+					PrivateKey:  cert.privateKey,
+				}},
 			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
 			ClientAuth:             dtls.RequireAnyClientCert,
 			LoggerFactory:          t.api.settingEngine.LoggerFactory,
