@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -23,6 +24,7 @@ var errSCTPNotEstablished = errors.New("SCTP not established")
 type DataChannel struct {
 	mu sync.RWMutex
 
+	statsID                    string
 	label                      string
 	ordered                    bool
 	maxPacketLifeTime          *uint16
@@ -83,6 +85,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 	}
 
 	return &DataChannel{
+		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
 		label:             params.Label,
 		protocol:          params.Protocol,
 		negotiated:        params.Negotiated,
@@ -540,25 +543,27 @@ func (d *DataChannel) OnBufferedAmountLow(f func()) {
 func (d *DataChannel) getStatsID() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return fmt.Sprintf("DataChannel-%d", *d.id)
+	return d.statsID
 }
 
 func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
-	statsID := d.getStatsID()
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	stats := DataChannelStats{
-		Timestamp:             statsTimestampNow(),
-		Type:                  StatsTypeDataChannel,
-		ID:                    statsID,
-		Label:                 d.label,
-		Protocol:              d.protocol,
-		DataChannelIdentifier: int32(*d.id),
+		Timestamp: statsTimestampNow(),
+		Type:      StatsTypeDataChannel,
+		ID:        d.statsID,
+		Label:     d.label,
+		Protocol:  d.protocol,
 		// TransportID string `json:"transportId"`
 		State: d.readyState,
+	}
+
+	if d.id != nil {
+		stats.DataChannelIdentifier = int32(*d.id)
 	}
 
 	if d.dataChannel != nil {
