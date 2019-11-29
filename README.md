@@ -22,14 +22,6 @@
 
 See [DESIGN.md](DESIGN.md) for an overview of features and future goals.
 
-### Breaking Changes
-
-Pion WebRTC v2.0.0 has arrived! See the [release notes](https://pion.ly/knowledge-base/release-notes/webrtc-v2.0.0/) to learn about new features and breaking changes.
-
-Have any questions? Join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
-
-We are actively planning [v2.1.0](https://github.com/pion/webrtc/projects/11) and would love your feedback! Anyone can add issues, and anything that you think can empower Pion users.
-
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
 
@@ -37,7 +29,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 
 The Pion WebRTC API closely matches the JavaScript **[WebRTC API](https://w3c.github.io/webrtc-pc/)**. Most existing documentation is therefore also useful when working with Pion. Furthermore, our **[GoDoc](https://godoc.org/github.com/pion/webrtc)** is actively maintained.
 
-We maintain a [FAQ](https://pion.ly/knowledge-base/pion-basics/faq/) with answers to common questions. If you have a question not covered please submit a PR, we would be happy to answer it!
+We maintain a [FAQ](https://github.com/pion/webrtc/wiki/FAQ) with answers to common questions. If you have a question not covered please submit a PR, we would be happy to answer it!
 
 Now go forth and build some awesome apps! Here are some **ideas** to get your creative juices flowing:
 * Send a video file to multiple browser in real time for perfectly synchronized movie watching.
@@ -66,12 +58,8 @@ We are always looking to support **your projects**. Please reach out if you have
 
 If you need commercial support or don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
 
-
 ### Project status
-
 [![Stargazers over time](https://starchart.cc/pion/webrtc.svg)](https://starchart.cc/pion/webrtc)
-
-
 
 ### Related projects
 * [pion/turn](https://github.com/pion/turn): A simple extendable Golang TURN server
