@@ -40,7 +40,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.Sample {
+func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) {
 	data := []byte{}
 
 	for i := firstBuffer; s.buffer[i] != nil; i++ {
@@ -58,17 +58,17 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.Sample {
 			for j := firstBuffer; j < i; j++ {
 				s.buffer[j] = nil
 			}
-			return &media.Sample{Data: data, Samples: samples}
+			return &media.Sample{Data: data, Samples: samples}, s.lastPopTimestamp
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
-			return nil
+			return nil, 0
 		}
 
 		data = append(data, p...)
 	}
-	return nil
+	return nil, 0
 }
 
 // Distance between two seqnums
@@ -82,6 +82,13 @@ func seqnumDistance(x, y uint16) uint16 {
 
 // Pop scans buffer for valid samples, returns nil when no valid samples have been found
 func (s *SampleBuilder) Pop() *media.Sample {
+	sample, _ := s.PopWithTimestamp()
+	return sample
+}
+
+// PopWithTimestamp scans buffer for valid samples and its RTP timestamp,
+// returns nil, 0 when no valid samples have been found
+func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	var i uint16
 	if !s.isContiguous {
 		i = s.lastPush - s.maxLate
@@ -115,5 +122,5 @@ func (s *SampleBuilder) Pop() *media.Sample {
 		// Initial validity checks have passed, walk forward
 		return s.buildSample(i)
 	}
-	return nil
+	return nil, 0
 }
