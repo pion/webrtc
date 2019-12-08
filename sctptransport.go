@@ -36,6 +36,8 @@ type SCTPTransport struct {
 
 	// OnStateChange  func()
 
+	onErrorHandler func(error)
+
 	association                *sctp.Association
 	onDataChannelHandler       func(*DataChannel)
 	onDataChannelOpenedHandler func(*DataChannel)
@@ -144,7 +146,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		if err != nil {
 			if err != io.EOF {
 				r.log.Errorf("Failed to accept data channel: %v", err)
-				// pion/webrtc#754
+				r.onError(err)
 			}
 			return
 		}
@@ -187,7 +189,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
-			// pion/webrtc#754
+			r.onError(err)
 			return
 		}
 
@@ -202,6 +204,24 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		if dcOpenedHdlr != nil {
 			dcOpenedHdlr(rtcDC)
 		}
+	}
+}
+
+// OnError sets an event handler which is invoked when
+// the SCTP connection error occurs.
+func (r *SCTPTransport) OnError(f func(err error)) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.onErrorHandler = f
+}
+
+func (r *SCTPTransport) onError(err error) {
+	r.lock.RLock()
+	hdlr := r.onErrorHandler
+	r.lock.RUnlock()
+
+	if hdlr != nil {
+		go hdlr(err)
 	}
 }
 
