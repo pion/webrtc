@@ -32,12 +32,13 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait    *time.Duration
 	}
 	candidates struct {
-		ICELite                bool
-		ICETrickle             bool
-		ICENetworkTypes        []NetworkType
-		InterfaceFilter        func(string) bool
-		NAT1To1IPs             []string
-		NAT1To1IPCandidateType ICECandidateType
+		ICELite                        bool
+		ICETrickle                     bool
+		ICENetworkTypes                []NetworkType
+		InterfaceFilter                func(string) bool
+		NAT1To1IPs                     []string
+		NAT1To1IPCandidateType         ICECandidateType
+		GenerateMulticastDNSCandidates bool
 	}
 	answeringDTLSRole DTLSRole
 	vnet              *vnet.Net
@@ -173,4 +174,9 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 // learning WebRTC concepts or testing your application in a lab environment
 func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
 	e.vnet = vnet
+}
+
+// GenerateMulticastDNSCandidates pion/ice to generate host candidates with mDNS names instead of IP Addresses
+func (e *SettingEngine) GenerateMulticastDNSCandidates(generateMulticastDNSCandidates bool) {
+	e.candidates.GenerateMulticastDNSCandidates = generateMulticastDNSCandidates
 }

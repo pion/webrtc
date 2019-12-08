@@ -78,6 +78,11 @@ func (g *ICEGatherer) createAgent() error {
 		nat1To1CandiTyp = ice.CandidateTypeUnspecified
 	}
 
+	var multicastDNSMode ice.MulticastDNSMode
+	if g.api.settingEngine.candidates.GenerateMulticastDNSCandidates {
+		multicastDNSMode = ice.MulticastDNSModeQueryAndGather
+	}
+
 	config := &ice.AgentConfig{
 		Trickle:                   g.api.settingEngine.candidates.ICETrickle,
 		Lite:                      g.api.settingEngine.candidates.ICELite,
@@ -97,6 +102,7 @@ func (g *ICEGatherer) createAgent() error {
 		NAT1To1IPs:                g.api.settingEngine.candidates.NAT1To1IPs,
 		NAT1To1IPCandidateType:    nat1To1CandiTyp,
 		Net:                       g.api.settingEngine.vnet,
+		MulticastDNSMode:          multicastDNSMode,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
