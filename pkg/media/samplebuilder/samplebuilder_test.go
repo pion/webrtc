@@ -9,10 +9,11 @@ import (
 )
 
 type sampleBuilderTest struct {
-	message string
-	packets []*rtp.Packet
-	samples []*media.Sample
-	maxLate uint16
+	message    string
+	packets    []*rtp.Packet
+	samples    []*media.Sample
+	timestamps []uint32
+	maxLate    uint16
 }
 
 type fakeDepacketizer struct {
@@ -23,16 +24,15 @@ func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
 }
 
 func TestSampleBuilder(t *testing.T) {
-	assert := assert.New(t)
-
-	for _, t := range []sampleBuilderTest{
+	testData := []sampleBuilderTest{
 		{
 			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
 			},
-			samples: []*media.Sample{},
-			maxLate: 50,
+			samples:    []*media.Sample{},
+			timestamps: []uint32{},
+			maxLate:    50,
 		},
 		{
 			message: "SampleBuilder should emit one packet, we had three packets with unique timestamps",
@@ -43,6 +43,9 @@ func TestSampleBuilder(t *testing.T) {
 			},
 			samples: []*media.Sample{
 				{Data: []byte{0x02}, Samples: 1},
+			},
+			timestamps: []uint32{
+				6,
 			},
 			maxLate: 50,
 		},
@@ -57,6 +60,9 @@ func TestSampleBuilder(t *testing.T) {
 			samples: []*media.Sample{
 				{Data: []byte{0x02, 0x03}, Samples: 1},
 			},
+			timestamps: []uint32{
+				6,
+			},
 			maxLate: 50,
 		},
 		{
@@ -66,8 +72,9 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
 				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
 			},
-			samples: []*media.Sample{},
-			maxLate: 50,
+			samples:    []*media.Sample{},
+			timestamps: []uint32{},
+			maxLate:    50,
 		},
 		{
 			message: "SampleBuilder should emit multiple valid packets",
@@ -85,21 +92,53 @@ func TestSampleBuilder(t *testing.T) {
 				{Data: []byte{0x04}, Samples: 1},
 				{Data: []byte{0x05}, Samples: 1},
 			},
+			timestamps: []uint32{
+				2,
+				3,
+				4,
+				5,
+			},
 			maxLate: 50,
 		},
-	} {
-		s := New(t.maxLate, &fakeDepacketizer{})
-		samples := []*media.Sample{}
-
-		for _, p := range t.packets {
-			s.Push(p)
-		}
-		for sample := s.Pop(); sample != nil; sample = s.Pop() {
-			samples = append(samples, sample)
-		}
-
-		assert.Equal(samples, t.samples, t.message)
 	}
+
+	t.Run("Pop", func(t *testing.T) {
+		assert := assert.New(t)
+
+		for _, t := range testData {
+			s := New(t.maxLate, &fakeDepacketizer{})
+			samples := []*media.Sample{}
+
+			for _, p := range t.packets {
+				s.Push(p)
+			}
+			for sample := s.Pop(); sample != nil; sample = s.Pop() {
+				samples = append(samples, sample)
+			}
+
+			assert.Equal(samples, t.samples, t.message)
+		}
+	})
+	t.Run("PopWithTimestamp", func(t *testing.T) {
+		assert := assert.New(t)
+
+		for _, t := range testData {
+			s := New(t.maxLate, &fakeDepacketizer{})
+			samples := []*media.Sample{}
+			timestamps := []uint32{}
+
+			for _, p := range t.packets {
+				s.Push(p)
+			}
+			for sample, timestamp := s.PopWithTimestamp(); sample != nil; sample, timestamp = s.PopWithTimestamp() {
+				samples = append(samples, sample)
+				timestamps = append(timestamps, timestamp)
+			}
+
+			assert.Equal(samples, t.samples, t.message)
+			assert.Equal(timestamps, t.timestamps, t.message)
+		}
+	})
 }
 
 // SampleBuilder should respect maxLate if we popped successfully but then have a gap larger then maxLate
