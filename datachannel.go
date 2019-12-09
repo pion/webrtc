@@ -34,6 +34,7 @@ type DataChannel struct {
 	id                         *uint16
 	readyState                 DataChannelState
 	bufferedAmountLowThreshold uint64
+	detachCalled               bool
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -196,6 +197,14 @@ func (d *DataChannel) Transport() *SCTPTransport {
 	return d.sctpTransport
 }
 
+// After onOpen is complete check that the user called detach
+// and provide an error message if the call was missed
+func (d *DataChannel) checkDetachAfterOpen() {
+	if d.api.settingEngine.detach.DataChannels && !d.detachCalled {
+		d.log.Error("webrtc.DetachDataChannels() enabled but didn't Detach, call Detach from OnOpen")
+	}
+}
+
 // OnOpen sets an event handler which is invoked when
 // the underlying data transport has been established (or re-established).
 func (d *DataChannel) OnOpen(f func()) {
@@ -208,6 +217,7 @@ func (d *DataChannel) OnOpen(f func()) {
 		go func() {
 			d.onceMutex.Lock()
 			d.openHandlerOnce.Do(d.onOpenHandler)
+			d.checkDetachAfterOpen()
 			d.onceMutex.Unlock()
 		}()
 	}
@@ -222,6 +232,7 @@ func (d *DataChannel) onOpen() {
 		go func() {
 			d.onceMutex.Lock()
 			d.openHandlerOnce.Do(hdlr)
+			d.checkDetachAfterOpen()
 			d.onceMutex.Unlock()
 		}()
 	}
@@ -364,7 +375,7 @@ func (d *DataChannel) ensureOpen() error {
 // Before calling Detach you have to enable this behavior by calling
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
-// Please reffer to the data-channels-detach example and the
+// Please refer to the data-channels-detach example and the
 // pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
@@ -378,6 +389,8 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	if d.dataChannel == nil {
 		return nil, fmt.Errorf("datachannel not opened yet, try calling Detach from OnOpen")
 	}
+
+	d.detachCalled = true
 
 	return d.dataChannel, nil
 }
