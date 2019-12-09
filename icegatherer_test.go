@@ -3,6 +3,8 @@
 package webrtc
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,5 +111,36 @@ func TestICEGather_LocalCandidateOrder(t *testing.T) {
 		}
 	}
 
+	assert.NoError(t, gatherer.Close())
+}
+
+func TestICEGather_mDNSCandidateGathering(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.GenerateMulticastDNSCandidates(true)
+
+	gatherer, err := NewAPI(WithSettingEngine(s)).NewICEGatherer(ICEGatherOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	gotMulticastDNSCandidate, resolveFunc := context.WithCancel(context.Background())
+	gatherer.OnLocalCandidate(func(c *ICECandidate) {
+		if c != nil && strings.HasSuffix(c.Address, ".local") {
+			resolveFunc()
+		}
+	})
+
+	if err := gatherer.SignalCandidates(); err != nil {
+		t.Error(err)
+	}
+
+	<-gotMulticastDNSCandidate.Done()
 	assert.NoError(t, gatherer.Close())
 }
