@@ -103,6 +103,7 @@ func (g *ICEGatherer) createAgent() error {
 		NAT1To1IPCandidateType:    nat1To1CandiTyp,
 		Net:                       g.api.settingEngine.vnet,
 		MulticastDNSMode:          multicastDNSMode,
+		MulticastDNSHostName:      g.api.settingEngine.candidates.MulticastDNSHostName,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
