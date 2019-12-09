@@ -39,6 +39,7 @@ type SettingEngine struct {
 		NAT1To1IPs                     []string
 		NAT1To1IPCandidateType         ICECandidateType
 		GenerateMulticastDNSCandidates bool
+		MulticastDNSHostName           string
 	}
 	answeringDTLSRole DTLSRole
 	vnet              *vnet.Net
@@ -176,7 +177,15 @@ func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
 	e.vnet = vnet
 }
 
-// GenerateMulticastDNSCandidates pion/ice to generate host candidates with mDNS names instead of IP Addresses
+// GenerateMulticastDNSCandidates instructs pion/ice to generate host candidates with mDNS hostnames instead of IP Addresses
 func (e *SettingEngine) GenerateMulticastDNSCandidates(generateMulticastDNSCandidates bool) {
 	e.candidates.GenerateMulticastDNSCandidates = generateMulticastDNSCandidates
+}
+
+// SetMulticastDNSHostName sets a static HostName to be used by pion/ice instead of generating one on startup
+//
+// This should only be used for a single PeerConnection. Having multiple PeerConnections with the same HostName will cause
+// undefined behavior
+func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
+	e.candidates.MulticastDNSHostName = hostName
 }
