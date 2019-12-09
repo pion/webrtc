@@ -104,6 +104,8 @@ func (g *ICEGatherer) createAgent() error {
 		Net:                       g.api.settingEngine.vnet,
 		MulticastDNSMode:          multicastDNSMode,
 		MulticastDNSHostName:      g.api.settingEngine.candidates.MulticastDNSHostName,
+		LocalUfrag:                g.api.settingEngine.candidates.UsernameFragment,
+		LocalPwd:                  g.api.settingEngine.candidates.Password,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes

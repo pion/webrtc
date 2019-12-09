@@ -146,3 +146,10 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 		IsCA:                  true,
 	})
 }
+
+// CertificateFromX509 creates a new WebRTC Certificate from a given PrivateKey and Certificate
+//
+// This can be used if you want to share a certificate across multiple PeerConnections
+func CertificateFromX509(privateKey crypto.PrivateKey, certificate *x509.Certificate) Certificate {
+	return Certificate{privateKey, certificate}
+}
