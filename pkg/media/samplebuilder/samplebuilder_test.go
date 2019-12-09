@@ -9,11 +9,13 @@ import (
 )
 
 type sampleBuilderTest struct {
-	message    string
-	packets    []*rtp.Packet
-	samples    []*media.Sample
-	timestamps []uint32
-	maxLate    uint16
+	message         string
+	packets         []*rtp.Packet
+	withHeadChecker bool
+	headBytes       []byte
+	samples         []*media.Sample
+	timestamps      []uint32
+	maxLate         uint16
 }
 
 type fakeDepacketizer struct {
@@ -21,6 +23,19 @@ type fakeDepacketizer struct {
 
 func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
 	return r, nil
+}
+
+type fakePartitionHeadChecker struct {
+	headBytes []byte
+}
+
+func (f *fakePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+	for _, b := range f.headBytes {
+		if payload[0] == b {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSampleBuilder(t *testing.T) {
@@ -77,6 +92,36 @@ func TestSampleBuilder(t *testing.T) {
 			maxLate:    50,
 		},
 		{
+			message: "SampleBuilder should emit a packet after a gap if PartitionHeadChecker assumes it head",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
+			},
+			withHeadChecker: true,
+			headBytes:       []byte{0x02},
+			samples: []*media.Sample{
+				{Data: []byte{0x02}, Samples: 0},
+			},
+			timestamps: []uint32{
+				6,
+			},
+			maxLate: 50,
+		},
+		{
+			message: "SampleBuilder shouldn't emit a packet after a gap if PartitionHeadChecker doesn't assume it head",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 7}, Payload: []byte{0x03}},
+			},
+			withHeadChecker: true,
+			headBytes:       []byte{},
+			samples:         []*media.Sample{},
+			timestamps:      []uint32{},
+			maxLate:         50,
+		},
+		{
 			message: "SampleBuilder should emit multiple valid packets",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{0x01}},
@@ -106,7 +151,14 @@ func TestSampleBuilder(t *testing.T) {
 		assert := assert.New(t)
 
 		for _, t := range testData {
-			s := New(t.maxLate, &fakeDepacketizer{})
+			var opts []Option
+			if t.withHeadChecker {
+				opts = append(opts, WithPartitionHeadChecker(
+					&fakePartitionHeadChecker{headBytes: t.headBytes},
+				))
+			}
+
+			s := New(t.maxLate, &fakeDepacketizer{}, opts...)
 			samples := []*media.Sample{}
 
 			for _, p := range t.packets {
@@ -123,7 +175,14 @@ func TestSampleBuilder(t *testing.T) {
 		assert := assert.New(t)
 
 		for _, t := range testData {
-			s := New(t.maxLate, &fakeDepacketizer{})
+			var opts []Option
+			if t.withHeadChecker {
+				opts = append(opts, WithPartitionHeadChecker(
+					&fakePartitionHeadChecker{headBytes: t.headBytes},
+				))
+			}
+
+			s := New(t.maxLate, &fakeDepacketizer{}, opts...)
 			samples := []*media.Sample{}
 			timestamps := []uint32{}
 
