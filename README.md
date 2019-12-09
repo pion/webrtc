@@ -130,6 +130,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Guilherme Souza](https://github.com/gqgs)
 * [Andrew N. Shalaev](https://github.com/isqad)
 * [David Hamilton](https://github.com/dihamilton)
+* [Ilya Mayorov](https://github.com/faroyam)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
