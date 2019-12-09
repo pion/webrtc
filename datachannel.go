@@ -34,6 +34,7 @@ type DataChannel struct {
 	id                         *uint16
 	readyState                 DataChannelState
 	bufferedAmountLowThreshold uint64
+	detached                   bool
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -172,6 +173,11 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	d.mu.Unlock()
 
 	d.handleOpen(dc)
+
+	if d.api.settingEngine.detach.DataChannels && !d.detached {
+		return fmt.Errorf("webrtc.DetachDataChannels() enabled but didn't Detach, call Detach from OnOpen")
+	}
+
 	return nil
 }
 
@@ -364,7 +370,7 @@ func (d *DataChannel) ensureOpen() error {
 // Before calling Detach you have to enable this behavior by calling
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
-// Please reffer to the data-channels-detach example and the
+// Please refer to the data-channels-detach example and the
 // pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
@@ -378,6 +384,8 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	if d.dataChannel == nil {
 		return nil, fmt.Errorf("datachannel not opened yet, try calling Detach from OnOpen")
 	}
+
+	d.detached = true
 
 	return d.dataChannel, nil
 }
