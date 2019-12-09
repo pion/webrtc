@@ -40,10 +40,13 @@ type SettingEngine struct {
 		NAT1To1IPCandidateType         ICECandidateType
 		GenerateMulticastDNSCandidates bool
 		MulticastDNSHostName           string
+		UsernameFragment               string
+		Password                       string
 	}
-	answeringDTLSRole DTLSRole
-	vnet              *vnet.Net
-	LoggerFactory     logging.LoggerFactory
+	answeringDTLSRole                         DTLSRole
+	disableCertificateFingerprintVerification bool
+	vnet                                      *vnet.Net
+	LoggerFactory                             logging.LoggerFactory
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -188,4 +191,17 @@ func (e *SettingEngine) GenerateMulticastDNSCandidates(generateMulticastDNSCandi
 // undefined behavior
 func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
 	e.candidates.MulticastDNSHostName = hostName
+}
+
+// SetICECredentials sets a staic uFrag/uPwd to be used by pion/ice
+//
+// This is useful if you want to do signalless WebRTC session, or having a reproducible environment with static credentials
+func (e *SettingEngine) SetICECredentials(usernameFragment, password string) {
+	e.candidates.UsernameFragment = usernameFragment
+	e.candidates.Password = password
+}
+
+// DisableCertificateFingerprintVerification disables fingerprint verification after DTLS Handshake has finished
+func (e *SettingEngine) DisableCertificateFingerprintVerification(isDisabled bool) {
+	e.disableCertificateFingerprintVerification = isDisabled
 }

@@ -294,6 +294,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 
+	if t.api.settingEngine.disableCertificateFingerprintVerification {
+		return nil
+	}
+
 	// Check the fingerprint if a certificate was exchanged
 	remoteCerts := t.conn.RemoteCertificate()
 	if len(remoteCerts) == 0 {
