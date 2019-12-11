@@ -196,13 +196,14 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 		pc.configuration.SDPSemantics = configuration.SDPSemantics
 	}
 
-	if len(configuration.ICEServers) > 0 {
-		for _, server := range configuration.ICEServers {
+	sanitizedICEServers := configuration.getICEServers()
+	if len(sanitizedICEServers) > 0 {
+		for _, server := range sanitizedICEServers {
 			if err := server.validate(); err != nil {
 				return err
 			}
 		}
-		pc.configuration.ICEServers = configuration.ICEServers
+		pc.configuration.ICEServers = sanitizedICEServers
 	}
 
 	return nil
@@ -479,7 +480,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	g, err := pc.api.NewICEGatherer(ICEGatherOptions{
-		ICEServers:      pc.configuration.ICEServers,
+		ICEServers:      pc.configuration.getICEServers(),
 		ICEGatherPolicy: pc.configuration.ICETransportPolicy,
 	})
 	if err != nil {
