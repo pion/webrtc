@@ -17,23 +17,8 @@ func TestConfiguration_getICEServers(t *testing.T) {
 			},
 		}
 
-		parsedURLs, err := cfg.getICEServers()
-		assert.Nil(t, err)
-		assert.Equal(t, expectedServerStr, (*parsedURLs)[0].String())
-	})
-
-	t.Run("Failure", func(t *testing.T) {
-		expectedServerStr := "stun.l.google.com:19302"
-		cfg := Configuration{
-			ICEServers: []ICEServer{
-				{
-					URLs: []string{expectedServerStr},
-				},
-			},
-		}
-
-		_, err := cfg.getICEServers()
-		assert.NotNil(t, err)
+		parsedURLs := cfg.getICEServers()
+		assert.Equal(t, expectedServerStr, parsedURLs[0].URLs[0])
 	})
 
 	t.Run("Success", func(t *testing.T) {
@@ -48,8 +33,7 @@ func TestConfiguration_getICEServers(t *testing.T) {
 			},
 		}
 
-		parsedURLs, err := cfg.getICEServers()
-		assert.Nil(t, err)
-		assert.Equal(t, expectedServerStr, (*parsedURLs)[0].String())
+		parsedURLs := cfg.getICEServers()
+		assert.Equal(t, expectedServerStr, parsedURLs[0].URLs[0])
 	})
 }
