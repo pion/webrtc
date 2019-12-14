@@ -12,6 +12,9 @@ These are the design principals that drive Pion WebRTC and hopefully convince yo
 Pion WebRTC is written in Go and extremely portable. Anywhere Golang runs, Pion WebRTC should work as well! Instead of dealing with complicated
 cross-compiling of multiple libraries, you now can run anywhere with one `go build`
 
+### Flexible
+When possible we leave all decisions to the user. When choice is possible (like what logging library is used) we defer to the developer.
+
 ### Simple API
 If you know how to use WebRTC in your browser, you know how to use Pion WebRTC.
 We try our best just to duplicate the Javascript API, so your code can look the same everywhere.
@@ -34,4 +37,7 @@ This makes learning and debugging easier, this WebRTC library was written to als
 Every commit is tested via travis-ci Go provides fantastic facilities for testing, and more will be added as time goes on.
 
 ### Shared libraries
-Every pion product is built using shared libraries, allowing others to review and reuse our libraries.
+Every Pion project is built using shared libraries, allowing others to review and reuse our libraries.
+
+### Community
+The most important part of Pion is the community. This projects only exist because of individual contributions. We aim to be radically open and do everything we can to support those that make Pion possible.
