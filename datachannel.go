@@ -45,7 +45,6 @@ type DataChannel struct {
 	// binaryType                 string
 
 	onMessageHandler    func(DataChannelMessage)
-	onceMutex           sync.Mutex
 	openHandlerOnce     sync.Once
 	onOpenHandler       func()
 	onCloseHandler      func()
@@ -212,17 +211,17 @@ func (d *DataChannel) checkDetachAfterOpen() {
 // the underlying data transport has been established (or re-established).
 func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	d.openHandlerOnce = sync.Once{}
 	d.onOpenHandler = f
-	if d.readyState == DataChannelStateOpen {
+	readyState := d.readyState
+	d.mu.Unlock()
+
+	if readyState == DataChannelStateOpen {
 		// If the data channel is already open, call the handler immediately.
-		go func() {
-			d.onceMutex.Lock()
-			d.openHandlerOnce.Do(d.onOpenHandler)
+		go d.openHandlerOnce.Do(func() {
+			f()
 			d.checkDetachAfterOpen()
-			d.onceMutex.Unlock()
-		}()
+		})
 	}
 }
 
@@ -232,12 +231,10 @@ func (d *DataChannel) onOpen() {
 	d.mu.RUnlock()
 
 	if hdlr != nil {
-		go func() {
-			d.onceMutex.Lock()
-			d.openHandlerOnce.Do(hdlr)
+		go d.openHandlerOnce.Do(func() {
+			hdlr()
 			d.checkDetachAfterOpen()
-			d.onceMutex.Unlock()
-		}()
+		})
 	}
 }
 
