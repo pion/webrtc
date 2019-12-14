@@ -70,7 +70,11 @@ func TestDataChannel_Open(t *testing.T) {
 				openCalls <- true
 			})
 			d.OnMessage(func(msg DataChannelMessage) {
-				done <- true
+				go func() {
+					// Wait a little bit to ensure all messages are processed.
+					time.Sleep(100 * time.Millisecond)
+					done <- true
+				}()
 			})
 		})
 
