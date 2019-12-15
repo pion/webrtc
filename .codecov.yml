@@ -1,0 +1,13 @@
+coverage:
+  status:
+    project:
+      default:
+        threshold: 2
+    patch:
+      default:
+        against: parent
+        target: 70%
+
+ignore:
+  - "examples/*"
+  - "examples/**/*"

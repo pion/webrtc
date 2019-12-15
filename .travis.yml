@@ -46,4 +46,12 @@ script:
   - go test -tags quic -coverpkg=$(go list ./... | grep -v examples | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
   - GOOS=js GOARCH=wasm go test -exec="./test-wasm/go_js_wasm_exec" -v .
   - bash <(curl -s https://codecov.io/bash)
-  - docker run -e "GO111MODULE=on" -v $PWD:/go/src/github.com/pion/webrtc -w /go/src/github.com/pion/webrtc -it i386/golang:1.13-buster '/usr/local/go/bin/go' 'test' '-tags' 'quic' "-coverpkg=$(go list ./... | grep -v examples | tr '\n' ',')" '-v' './...'
+  - |
+    docker run \
+      -e "GO111MODULE=on" \
+      -e "CGO_ENABLED=0" \
+      -v $PWD:/go/src/github.com/pion/webrtc \
+      -v $HOME/gopath/pkg/mod:/go/pkg/mod \
+      -w /go/src/github.com/pion/webrtc \
+      -it i386/golang:1.13-alpine \
+      '/usr/local/go/bin/go' 'test' '-tags' 'quic' "-coverpkg=$(go list ./... | grep -v examples | tr '\n' ',')" '-v' './...'
