@@ -156,3 +156,25 @@ func TestSampleBuilderMaxLate(t *testing.T) {
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 502}, Payload: []byte{0x02}})
 	assert.Equal(s.Pop(), &media.Sample{Data: []byte{0x02}, Samples: 1}, "Failed to build samples after large gap")
 }
+
+func TestSeqnumDistance(t *testing.T) {
+	testData := []struct {
+		x uint16
+		y uint16
+		d uint16
+	}{
+		{0x0001, 0x0003, 0x0002},
+		{0x0003, 0x0001, 0x0002},
+		{0xFFF3, 0xFFF1, 0x0002},
+		{0xFFF1, 0xFFF3, 0x0002},
+		{0xFFFF, 0x0001, 0x0002},
+		{0x0001, 0xFFFF, 0x0002},
+	}
+
+	for _, data := range testData {
+		if ret := seqnumDistance(data.x, data.y); ret != data.d {
+			t.Errorf("seqnumDistance(%d, %d) returned %d which must be %d",
+				data.x, data.y, ret, data.d)
+		}
+	}
+}

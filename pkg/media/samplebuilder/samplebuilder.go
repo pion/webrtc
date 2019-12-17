@@ -73,11 +73,12 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) 
 
 // Distance between two seqnums
 func seqnumDistance(x, y uint16) uint16 {
-	if x > y {
-		return x - y
+	diff := int16(x - y)
+	if diff < 0 {
+		return uint16(-diff)
 	}
 
-	return y - x
+	return uint16(diff)
 }
 
 // Pop scans buffer for valid samples, returns nil when no valid samples have been found
