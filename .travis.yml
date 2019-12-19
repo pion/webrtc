@@ -1,4 +1,6 @@
-language: c
+language: go
+go:
+  - 1.13
 
 branches:
   only:
@@ -8,50 +10,78 @@ cache:
   directories:
     - $HOME/.cache/go-build
     - $HOME/gopath/pkg/mod
+  npm: true
+  yarn: true
 
 env:
-  - GO111MODULE=on
+  global:
+    - GO111MODULE=on
+    - GO_VERSION=1.13
+    - GOLANGCI_LINT_VERSION=1.18.0
 
-services:
-  - docker
 
-install:
-  # Manually download and install Go 1.12 instead of using gimme.
-  # It looks like gimme Go causes some errors on go-test for Wasm.
-  - wget -O go.tar.gz https://dl.google.com/go/go1.13.linux-amd64.tar.gz
-  - tar -C ~ -xzf go.tar.gz
-  - rm go.tar.gz
-  - export GOROOT=~/go
-  - export PATH=$GOROOT/bin:$PATH
-  - go version
-  - go env
-  - go get -u github.com/sean-der/godox
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin v1.18.0
-  # Install Node 11 (required for WASM tests)
-  - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
-  - source ~/.nvm/nvm.sh
-  - nvm install 11
-  - node --version
-  - npm i -g yarn
-  - yarn install
-
-script:
-  - bash .github/assert-contributors.sh
-  - bash .github/lint-disallowed-functions-in-library.sh
-  - bash .github/lint-commit-message.sh
-  - bash .github/lint-filename.sh
-  - godox
-  - golangci-lint run --build-tags quic ./...
-  - rm -rf examples # Remove examples, no test coverage for them
-  - go test -tags quic -coverpkg=$(go list ./... | grep -v examples | tr '\n' ',') -coverprofile=cover.out -v -race -covermode=atomic ./...
-  - GOOS=js GOARCH=wasm go test -exec="./test-wasm/go_js_wasm_exec" -v .
-  - bash <(curl -s https://codecov.io/bash)
-  - |
-    docker run \
-      -e "GO111MODULE=on" \
-      -e "CGO_ENABLED=0" \
-      -v $PWD:/go/src/github.com/pion/webrtc \
-      -v $HOME/gopath/pkg/mod:/go/pkg/mod \
-      -w /go/src/github.com/pion/webrtc \
-      -it i386/golang:1.13-alpine \
-      '/usr/local/go/bin/go' 'test' '-tags' 'quic' "-coverpkg=$(go list ./... | grep -v examples | tr '\n' ',')" '-v' './...'
+jobs:
+  include:
+    - name: Lint
+      env: CACHE_NAME=lint
+      before_script:
+        - go get -u github.com/sean-der/godox
+        - |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | bash -s - -b $GOPATH/bin v${GOLANGCI_LINT_VERSION}
+      install: true
+      script:
+        - bash .github/assert-contributors.sh
+        - bash .github/lint-disallowed-functions-in-library.sh
+        - bash .github/lint-commit-message.sh
+        - bash .github/lint-filename.sh
+        - godox
+        - golangci-lint run --build-tags quic ./...
+    - name: Go
+      env: CACHE_NAME=go
+      install: true
+      script:
+        - rm -rf examples  # Remove examples, no test coverage for them
+        - coverpkgs=$(go list ./... | paste -s -d ',')
+        - |
+          go test -tags quic \
+            -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
+            -v -race ./...
+      after_success:
+        - bash <(curl -s https://codecov.io/bash) -cF go
+    - name: WASM
+      env: CACHE_NAME=wasm
+      language: node_js
+      node_js:
+        - 12
+      install:
+        # Manually download and install Go instead of using gimme.
+        # It looks like gimme Go causes some errors on go-test for Wasm.
+        - curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
+        - export GOROOT=~/go
+        - export PATH=$GOROOT/bin:$PATH
+        - yarn install
+      script:
+        - coverpkgs=$(go list ./... | paste -s -d ',')
+        - |
+          GOOS=js GOARCH=wasm go test \
+            -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
+            -exec="./test-wasm/go_js_wasm_exec" -v .
+      after_success:
+        - bash <(curl -s https://codecov.io/bash) -cF wasm
+    - name: Go on i386
+      env: CACHE_NAME=go386
+      language: bash
+      services: docker
+      script:
+        - |
+          docker run \
+            -u $(id -u):$(id -g) \
+            -e "GO111MODULE=on" \
+            -e "CGO_ENABLED=0" \
+            -v $PWD:/go/src/github.com/pion/webrtc \
+            -v $HOME/gopath/pkg/mod:/go/pkg/mod \
+            -v $HOME/.cache/go-build:/.cache/go-build \
+            -w /go/src/github.com/pion/webrtc \
+            -it i386/golang:${GO_VERSION}-alpine \
+            /usr/local/go/bin/go test -tags quic -v ./...
