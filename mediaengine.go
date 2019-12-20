@@ -21,6 +21,9 @@ const (
 	DefaultPayloadTypeVP8  = 96
 	DefaultPayloadTypeVP9  = 98
 	DefaultPayloadTypeH264 = 102
+
+	mediaNameAudio = "audio"
+	mediaNameVideo = "video"
 )
 
 // MediaEngine defines the codecs supported by a PeerConnection
@@ -49,22 +52,28 @@ func (m *MediaEngine) RegisterDefaultCodecs() {
 // PopulateFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
 // payload types and parameters from the sdp.
 func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
-	sdpsd := sdp.SessionDescription{}
-	err := sdpsd.Unmarshal([]byte(sd.SDP))
-	if err != nil {
+	sdp := sdp.SessionDescription{}
+	if err := sdp.Unmarshal([]byte(sd.SDP)); err != nil {
 		return err
 	}
-	for _, md := range sdpsd.MediaDescriptions {
+
+	for _, md := range sdp.MediaDescriptions {
+		if md.MediaName.Media != mediaNameAudio && md.MediaName.Media != mediaNameVideo {
+			continue
+		}
+
 		for _, format := range md.MediaName.Formats {
 			pt, err := strconv.Atoi(format)
 			if err != nil {
 				return fmt.Errorf("format parse error")
 			}
+
 			payloadType := uint8(pt)
-			payloadCodec, err := sdpsd.GetCodecForPayloadType(payloadType)
+			payloadCodec, err := sdp.GetCodecForPayloadType(payloadType)
 			if err != nil {
 				return fmt.Errorf("could not find codec for payload type %d", payloadType)
 			}
+
 			var codec *RTPCodec
 			clockRate := payloadCodec.ClockRate
 			parameters := payloadCodec.Fmtp
