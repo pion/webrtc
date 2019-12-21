@@ -41,14 +41,13 @@ jobs:
       env: CACHE_NAME=go
       install: true
       script:
-        - rm -rf examples  # Remove examples, no test coverage for them
-        - coverpkgs=$(go list ./... | paste -s -d ',')
+        - coverpkgs=$(go list ./... | grep -v examples | paste -s -d ',')
         - |
           go test -tags quic \
             -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
             -v -race ./...
       after_success:
-        - bash <(curl -s https://codecov.io/bash) -cF go
+        - bash <(curl -s https://codecov.io/bash) -c -F go
     - name: WASM
       env: CACHE_NAME=wasm
       language: node_js
@@ -68,7 +67,7 @@ jobs:
             -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
             -exec="./test-wasm/go_js_wasm_exec" -v .
       after_success:
-        - bash <(curl -s https://codecov.io/bash) -cF wasm
+        - bash <(curl -s https://codecov.io/bash) -c -F wasm
     - name: Go on i386
       env: CACHE_NAME=go386
       language: bash
