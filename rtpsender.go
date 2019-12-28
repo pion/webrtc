@@ -33,8 +33,8 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 		return nil, fmt.Errorf("DTLSTransport must not be nil")
 	}
 
-	track.mu.RLock()
-	defer track.mu.RUnlock()
+	track.mu.Lock()
+	defer track.mu.Unlock()
 	if track.receiver != nil {
 		return nil, fmt.Errorf("RTPSender can not be constructed with remote track")
 	}
