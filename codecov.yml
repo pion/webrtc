@@ -2,10 +2,10 @@ coverage:
   status:
     project:
       default:
-        threshold: 2
+        # Allow decreasing 2% of total coverage to avoid noise.
+        threshold: 2%
     patch:
       default:
-        against: parent
         target: 70%
 
 ignore:
