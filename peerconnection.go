@@ -1945,3 +1945,8 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 		m.WithPropertyAttribute("end-of-candidates")
 	}
 }
+
+// GetRegisteredRTPCodecs gets a list of registered RTPCodec from the underlying constructed MediaEngine
+func (pc *PeerConnection) GetRegisteredRTPCodecs(kind RTPCodecType) []*RTPCodec {
+	return pc.api.mediaEngine.GetCodecsByKind(kind)
+}
