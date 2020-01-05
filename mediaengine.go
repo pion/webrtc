@@ -209,6 +209,23 @@ func NewRTPVP8Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 	return c
 }
 
+// NewRTPVP8CodecExt is a helper to create an VP8 codec
+func NewRTPVP8CodecExt(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodecExt(RTPCodecTypeVideo,
+		VP8,
+		clockrate,
+		0,
+		"",
+		payloadType,
+		[]RTCPFeedback{
+			RTCPFeedback{
+				Type: "transport-cc",
+			},
+		},
+		&codecs.VP8Payloader{})
+	return c
+}
+
 // NewRTPVP9Codec is a helper to create an VP9 codec
 func NewRTPVP9Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeVideo,
@@ -229,6 +246,23 @@ func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 		0,
 		"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
 		payloadType,
+		&codecs.H264Payloader{})
+	return c
+}
+
+// NewRTPH264CodecExt is a helper to create an H264 codec
+func NewRTPH264CodecExt(payloadType uint8, clockrate uint32) *RTPCodec {
+	c := NewRTPCodecExt(RTPCodecTypeVideo,
+		H264,
+		clockrate,
+		0,
+		"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+		payloadType,
+		[]RTCPFeedback{
+			RTCPFeedback{
+				Type: "transport-cc",
+			},
+		},
 		&codecs.H264Payloader{})
 	return c
 }
@@ -293,6 +327,32 @@ func NewRTPCodec(
 			ClockRate:   clockrate,
 			Channels:    channels,
 			SDPFmtpLine: fmtp,
+		},
+		PayloadType: payloadType,
+		Payloader:   payloader,
+		Type:        codecType,
+		Name:        name,
+	}
+}
+
+// NewRTPCodecExt is used to define a new codec
+func NewRTPCodecExt(
+	codecType RTPCodecType,
+	name string,
+	clockrate uint32,
+	channels uint16,
+	fmtp string,
+	payloadType uint8,
+	rtcpfb []RTCPFeedback,
+	payloader rtp.Payloader,
+) *RTPCodec {
+	return &RTPCodec{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     codecType.String() + "/" + name,
+			ClockRate:    clockrate,
+			Channels:     channels,
+			SDPFmtpLine:  fmtp,
+			RTCPFeedback: rtcpfb,
 		},
 		PayloadType: payloadType,
 		Payloader:   payloader,
