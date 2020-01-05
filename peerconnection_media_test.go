@@ -900,3 +900,25 @@ a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 	}
 	assert.NoError(t, pc.Close())
 }
+
+func TestGetRegisteredRTPCodecs(t *testing.T) {
+	mediaEngine := MediaEngine{}
+	expectedCodec := NewRTPH264Codec(DefaultPayloadTypeH264, 90000)
+	mediaEngine.RegisterCodec(expectedCodec)
+
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pc, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	codecs := pc.GetRegisteredRTPCodecs(RTPCodecTypeVideo)
+	if len(codecs) != 1 {
+		t.Errorf("expected to get only 1 codec but got %d codecs", len(codecs))
+	}
+
+	actualCodec := codecs[0]
+	if actualCodec != expectedCodec {
+		t.Errorf("expected to get %v but got %v", expectedCodec, actualCodec)
+	}
+}
