@@ -77,6 +77,13 @@ func (t *Track) Codec() *RTPCodec {
 	return t.codec
 }
 
+// Packetizer gets the Packetizer of the track
+func (t *Track) Packetizer() rtp.Packetizer {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.packetizer
+}
+
 // Read reads data from the track. If this is a local track this will error
 func (t *Track) Read(b []byte) (n int, err error) {
 	t.mu.RLock()
