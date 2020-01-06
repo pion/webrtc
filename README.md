@@ -132,6 +132,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Ilya Mayorov](https://github.com/faroyam)
 * [Patrick Lange](https://github.com/langep)
 * [cyannuk](https://github.com/cyannuk)
+* [Lukas Herman](https://github.com/lherman-cs)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
