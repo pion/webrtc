@@ -1,5 +1,22 @@
 package webrtc
 
+const (
+	//TypeRTCPFBTransportCC ..
+	TypeRTCPFBTransportCC = "transport-cc"
+
+	//TypeRTCPFBGoogREMB ..
+	TypeRTCPFBGoogREMB = "goog-remb"
+
+	//TypeRTCPFBACK ..
+	TypeRTCPFBACK = "ack"
+
+	//TypeRTCPFBCCM ..
+	TypeRTCPFBCCM = "ccm"
+
+	//TypeRTCPFBNACK ..
+	TypeRTCPFBNACK = "nack"
+)
+
 // RTCPFeedback signals the connection to use additional RTCP packet types.
 // https://draft.ortc.org/#dom-rtcrtcpfeedback
 type RTCPFeedback struct {

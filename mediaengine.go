@@ -210,18 +210,14 @@ func NewRTPVP8Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 }
 
 // NewRTPVP8CodecExt is a helper to create an VP8 codec
-func NewRTPVP8CodecExt(payloadType uint8, clockrate uint32) *RTPCodec {
+func NewRTPVP8CodecExt(payloadType uint8, clockrate uint32, rtcpfb []RTCPFeedback) *RTPCodec {
 	c := NewRTPCodecExt(RTPCodecTypeVideo,
 		VP8,
 		clockrate,
 		0,
 		"",
 		payloadType,
-		[]RTCPFeedback{
-			RTCPFeedback{
-				Type: "transport-cc",
-			},
-		},
+		rtcpfb,
 		&codecs.VP8Payloader{})
 	return c
 }
@@ -251,18 +247,14 @@ func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 }
 
 // NewRTPH264CodecExt is a helper to create an H264 codec
-func NewRTPH264CodecExt(payloadType uint8, clockrate uint32) *RTPCodec {
+func NewRTPH264CodecExt(payloadType uint8, clockrate uint32, rtcpfb []RTCPFeedback) *RTPCodec {
 	c := NewRTPCodecExt(RTPCodecTypeVideo,
 		H264,
 		clockrate,
 		0,
 		"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
 		payloadType,
-		[]RTCPFeedback{
-			RTCPFeedback{
-				Type: "transport-cc",
-			},
-		},
+		rtcpfb,
 		&codecs.H264Payloader{})
 	return c
 }
