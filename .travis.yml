@@ -18,7 +18,7 @@ env:
     - GO111MODULE=on
     - GO_VERSION=1.13
     - GOLANGCI_LINT_VERSION=1.18.0
-
+    - NODEJS_VERSION=12
 
 jobs:
   include:
@@ -50,20 +50,15 @@ jobs:
         - bash <(curl -s https://codecov.io/bash) -c -F go
     - name: WASM
       env: CACHE_NAME=wasm
-      language: node_js
-      node_js:
-        - 12
       install:
-        # Manually download and install Go instead of using gimme.
-        # It looks like gimme Go causes some errors on go-test for Wasm.
-        - curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
-        - export GOROOT=~/go
-        - export PATH=$GOROOT/bin:$PATH
+        - wget https://raw.githubusercontent.com/creationix/nvm/v0.31.0/nvm.sh -O ~/.nvm/nvm.sh
+        - source ~/.nvm/nvm.sh
+        - nvm install ${NODEJS_VERSION}
         - yarn install
       script:
         - coverpkgs=$(go list ./... | paste -s -d ',')
         - |
-          GOOS=js GOARCH=wasm go test \
+          GOOS=js GOARCH=wasm PATH="$PATH:$(go env GOROOT)/misc/wasm" go test \
             -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
             -exec="./test-wasm/go_js_wasm_exec" -v .
       after_success:
