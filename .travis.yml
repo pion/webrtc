@@ -2,6 +2,9 @@ language: go
 go:
   - 1.13
 
+addons:
+  chrome: stable
+
 branches:
   only:
   - master
@@ -10,8 +13,6 @@ cache:
   directories:
     - $HOME/.cache/go-build
     - $HOME/gopath/pkg/mod
-  npm: true
-  yarn: true
 
 env:
   global:
@@ -59,13 +60,14 @@ jobs:
         - curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
         - export GOROOT=~/go
         - export PATH=$GOROOT/bin:$PATH
-        - yarn install
+        - go get github.com/agnivade/wasmbrowsertest
+        - mv $GOPATH/bin/wasmbrowsertest $GOPATH/bin/go_js_wasm_exec
       script:
         - coverpkgs=$(go list ./... | paste -s -d ',')
         - |
           GOOS=js GOARCH=wasm go test \
             -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
-            -exec="./test-wasm/go_js_wasm_exec" -v .
+            -v .
       after_success:
         - bash <(curl -s https://codecov.io/bash) -c -F wasm
     - name: Go on i386
