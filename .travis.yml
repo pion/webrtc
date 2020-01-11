@@ -121,6 +121,14 @@ jobs:
     - <<: *test_job
       name: Test 1.13
       go: 1.13
+    - <<: *test_job
+      name: Test 1.12
+      go: 1.12
+      arch: arm64
+    - <<: *test_job
+      name: Test 1.13
+      go: 1.13
+      arch: arm64
     - <<: *test_i386_job
       name: Test i386 1.12
       env: GO_VERSION=1.12
