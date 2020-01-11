@@ -13,7 +13,7 @@ require (
 	github.com/pion/sctp v1.7.3
 	github.com/pion/sdp/v2 v2.3.2
 	github.com/pion/srtp v1.2.6
-	github.com/pion/transport v0.8.10
+	github.com/pion/transport v0.8.11-0.20200111040231-57e331b2b1b9
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413 // indirect
 )
