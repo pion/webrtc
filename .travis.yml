@@ -19,7 +19,6 @@ env:
     - GO111MODULE=on
     - GO_VERSION=1.13
     - GOLANGCI_LINT_VERSION=1.19.1
-    - TEST_TIMEOUT=30s
 
 cache:
   directories:
@@ -51,7 +50,6 @@ test_job: &test_job
       go test \
         -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
         -tags quic \
-        -timeout=${TEST_TIMEOUT} \
         -v -race ./...
   after_success:
     - travis_retry bash <(curl -s https://codecov.io/bash) -c -F go
@@ -76,7 +74,6 @@ test_i386_job: &test_i386_job
         -it go-tester \
         /usr/local/go/bin/go test \
           -tags quic \
-          -timeout=${TEST_TIMEOUT} \
           -v ./...
 test_wasm_job: &test_wasm_job
   env: CACHE_NAME=wasm
@@ -101,7 +98,6 @@ test_wasm_job: &test_wasm_job
     - |
       GOOS=js GOARCH=wasm go test \
         -coverpkg=${coverpkgs} -coverprofile=cover.out -covermode=atomic \
-        -timeout=${TEST_TIMEOUT} \
         -exec="${GO_JS_WASM_EXEC}" \
         -v .
   after_success:
