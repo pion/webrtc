@@ -1,3 +1,4 @@
+// Package ivfwriter implements IVF media container writer
 package ivfwriter
 
 import (

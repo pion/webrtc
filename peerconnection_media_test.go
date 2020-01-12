@@ -888,8 +888,8 @@ a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 
 	success := false
 	for _, attr := range answer.parsed.Attributes {
-		if "group" == attr.Key {
-			if "BUNDLE 1" == attr.Value {
+		if attr.Key == "group" {
+			if attr.Value == "BUNDLE 1" {
 				success = true
 			}
 		}

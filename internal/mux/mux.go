@@ -1,3 +1,4 @@
+// Package mux multiplexes packets on a single socket (RFC7983)
 package mux
 
 import (

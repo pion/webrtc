@@ -38,7 +38,6 @@ func TestCodecRegistration(t *testing.T) {
 }
 
 func TestPopulateFromSDP(t *testing.T) {
-
 	const sdpValue = `v=0
 o=- 884433216 1576829404 IN IP4 0.0.0.0
 s=-

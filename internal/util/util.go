@@ -1,3 +1,4 @@
+// Package util provides auxiliary functions internally used in webrtc package
 package util
 
 import (

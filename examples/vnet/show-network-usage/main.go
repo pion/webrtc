@@ -58,7 +58,6 @@ func main() {
 				// c.UserData() returns a []byte of UDP payload
 				atomic.AddInt32(&outboundBytes, int32(len(c.UserData())))
 			}
-
 		}
 		return true
 	})
@@ -117,7 +116,6 @@ func main() {
 			time.Sleep(interval)
 			panicIfError(dc.SendText("My DataChannel Message"))
 		}
-
 	}
 
 	offerDataChannel.OnOpen(func() {
