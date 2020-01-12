@@ -1,3 +1,4 @@
+// Package samplebuilder provides functionality to reconstruct media frame from RTP packets
 package samplebuilder
 
 import (

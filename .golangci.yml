@@ -7,12 +7,18 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - maligned
-    - lll
     - funlen
+    - godox
+    - lll
+    - maligned
 
 issues:
   exclude-use-default: false
+  exclude-rules:
+    - path: rtptransceiverinit
+      text: "type RtpTransceiverInit should be RTPTransceiverInit"
+      linters:
+        - stylecheck
 
 run:
   skip-dirs-use-default: false

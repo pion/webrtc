@@ -1,3 +1,4 @@
+// Package oggwriter implements OGG media container writer
 package oggwriter
 
 import (

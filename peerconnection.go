@@ -1043,7 +1043,6 @@ func (pc *PeerConnection) startReceiver(incoming incomingTrack, receiver *RTPRec
 	} else {
 		pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
 	}
-
 }
 
 // openSRTP opens knows inbound SRTP streams from the RemoteDescription
@@ -1175,7 +1174,6 @@ func (pc *PeerConnection) drainSRTP() {
 			if !pc.handleUndeclaredSSRC(ssrc) {
 				pc.log.Errorf("Incoming unhandled RTP ssrc(%d)", ssrc)
 			}
-
 		}
 	}()
 
@@ -1932,7 +1930,6 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	pc.sctpTransport.lock.Lock()
 	pc.sctpTransport.dataChannelsOpened += openedDCCount
 	pc.sctpTransport.lock.Unlock()
-
 }
 
 func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription) {

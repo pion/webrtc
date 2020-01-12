@@ -1,3 +1,4 @@
+// Package ivfreader implements IVF media container reader
 package ivfreader
 
 import (
