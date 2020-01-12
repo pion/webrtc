@@ -79,8 +79,7 @@ test_i386_job: &test_i386_job
 test_wasm_job: &test_wasm_job
   env: CACHE_NAME=wasm
   language: node_js
-  node_js:
-    - 12
+  node_js: 12
   install:
     # Manually download and install Go instead of using gimme.
     # It looks like gimme Go causes some errors on go-test for Wasm.
