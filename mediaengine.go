@@ -230,7 +230,7 @@ func NewRTPVP9Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 		0,
 		"",
 		payloadType,
-		nil) // pion/webrtc#755
+		&codecs.VP9Payloader{})
 	return c
 }
 
