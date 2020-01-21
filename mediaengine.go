@@ -77,7 +77,8 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 			var codec *RTPCodec
 			clockRate := payloadCodec.ClockRate
 			parameters := payloadCodec.Fmtp
-			switch payloadCodec.Name {
+			codecName := strings.ToUpper(payloadCodec.Name)
+			switch codecName {
 			case PCMU:
 				codec = NewRTPPCMUCodec(payloadType, clockRate)
 			case PCMA:
@@ -143,7 +144,7 @@ const (
 	PCMU = "PCMU"
 	PCMA = "PCMA"
 	G722 = "G722"
-	Opus = "opus"
+	Opus = "OPUS"
 	VP8  = "VP8"
 	VP9  = "VP9"
 	H264 = "H264"
