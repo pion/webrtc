@@ -87,8 +87,8 @@ a=sctpmap:5000 webrtc-datachannel 1024
 	m.RegisterDefaultCodecs()
 	assert.NoError(t, m.PopulateFromSDP(SessionDescription{SDP: sdpValue}))
 
-	assertCodecWithPayloadType("opus", 111)
-	assertCodecWithPayloadType("VP8", 105)
-	assertCodecWithPayloadType("H264", 115)
-	assertCodecWithPayloadType("VP9", 135)
+	assertCodecWithPayloadType(Opus, 111)
+	assertCodecWithPayloadType(VP8, 105)
+	assertCodecWithPayloadType(H264, 115)
+	assertCodecWithPayloadType(VP9, 135)
 }

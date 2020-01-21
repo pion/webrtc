@@ -135,6 +135,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Lukas Herman](https://github.com/lherman-cs)
 * [Konstantin Chugalinskiy](https://github.com/kchugalinskiy)
 * [Bao Nguyen](https://github.com/sysbot)
+* [Luke S](https://github.com/encounter)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
