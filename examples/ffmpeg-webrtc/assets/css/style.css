@@ -1,0 +1,16 @@
+.wrapper {
+  margin-top:20px;
+}
+
+#camera-controls fieldset, .wrapper fieldset {
+  border:1px solid;
+  padding: 10px;
+}
+
+fieldset span {
+  display: block;
+}
+
+legend {
+  width: auto;
+}

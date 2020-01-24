@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+{{template "head"}}
+
+<body>
+  <div class="container fluid">
+    <div class="wrapper">
+      <div id="errors"></div>
+      <div id="camera-controls">
+        <fieldset>
+          <legend>Camera</legend>
+          <button id="play" type="button" onclick="play()">play</button>
+          <button id="stop" type="button" onclick="stop()">stop</button>
+        </fieldset>
+      </div>
+      <div id="video"></div>
+    </div>
+  </div>
+
+  {{template "scripts"}}
+
+  <script> 
+    offer        = "1"
+    answr        = "2"
+    off          = "3"
+    iceCandidate = "4"
+
+    var host = {{.}} 
+    ws_connect(host).then((ws_socket)=> {
+    }).catch((err)=>{
+      console.log(err)
+    })
+
+    ws_socket.onmessage = (e) => {
+      let m = JSON.parse(e.data)
+      //console.log(m)
+      let type = m.type
+
+     switch (type) {
+       case answr:
+          console.log("answer received")
+          let answer = m.message
+          console.log(answer)
+          peer_connection.setRemoteDescription(answer)
+       break
+
+       case iceCandidate:
+         console.log("trickle ice candidate: "+m.message)
+         let trickle_ice_candidate = m.message
+         peer_connection.addIceCandidate(
+           new RTCIceCandidate(trickle_ice_candidate)
+         )
+       break
+
+       default:
+        console.log("type did not match anything")
+      }
+    }
+
+    function stop() {
+        peer_connection.close()
+        console.log("peer_connection closed")
+        peer_connection = new RTCPeerConnection({
+          "ice_servers":[{ "urls" : "stun:stun.l.google.com:19302"},]
+        })
+        let msg = JSON.stringify({type: off})
+        ws_socket.send(msg)
+
+        let video = document.getElementById("video")
+        video.removeChild(video.firstChild)
+    }
+
+    var constraints = undefined
+    var ice_target = ""
+
+    peer_connection = new RTCPeerConnection({
+      "ice_servers":[{ "urls" : "stun:stun.l.google.com:19302"},]
+    })
+
+    function play() {
+      peer_connection.ontrack = function (event) {
+        console.log("`ontrack` event triggered")
+        var el = document.createElement(event.track.kind)
+        el.srcObject = event.streams[0]
+        el.autoplay = true
+        el.controls = true
+
+        document.getElementById('video').appendChild(el)
+      }
+
+      peer_connection.onicecandidate = (ice_event) => {
+        console.log("new ice candidate")
+        console.log(ice_event.candidate)
+        if (ice_event.candidate){
+          ws_socket.send(JSON.stringify(
+          {
+            type:iceCandidate,
+            msg:ice_event.candidate,
+          }))
+        }else{
+          console.log("ice gathering completed.")
+        }
+      }
+
+      let options = {
+        OfferToReceiveAudio: false,
+        OfferToReceiveVideo: true,
+      }
+
+      peer_connection.addTransceiver('video', {'direction': 'recvonly'})
+      peer_connection.createOffer(options)
+        .then(desc => peer_connection.setLocalDescription(desc)
+          .then(() =>
+            ws_socket.send(JSON.stringify({
+                type:offer,
+                message:peer_connection.localDescription,
+              })),
+              log_error)
+       ,log_error)
+       console.log("sent offer")
+    }
+
+
+    function log_error(error) {
+      if (error !== "Connection closed" && error !== undefined) {
+          log_comment("ERROR: "+error)
+      }
+    }
+
+    function log_comment(comment) {
+        console.log((new Date()+" "+comment))
+    }
+
+  </script>
+</body>
+</html>
