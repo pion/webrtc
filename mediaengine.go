@@ -40,13 +40,16 @@ func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
 
 // RegisterDefaultCodecs is a helper that registers the default codecs supported by Pion WebRTC
 func (m *MediaEngine) RegisterDefaultCodecs() {
+	// Audio Codecs in order of preference
+	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPPCMUCodec(DefaultPayloadTypePCMU, 8000))
 	m.RegisterCodec(NewRTPPCMACodec(DefaultPayloadTypePCMA, 8000))
-	m.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
 	m.RegisterCodec(NewRTPG722Codec(DefaultPayloadTypeG722, 8000))
+
+	// Video Codecs in order of preference
 	m.RegisterCodec(NewRTPVP8Codec(DefaultPayloadTypeVP8, 90000))
-	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
 	m.RegisterCodec(NewRTPVP9Codec(DefaultPayloadTypeVP9, 90000))
+	m.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
 }
 
 // PopulateFromSDP finds all codecs in a session description and adds them to a MediaEngine, using dynamic
