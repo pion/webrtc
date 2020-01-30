@@ -650,3 +650,56 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
 }
+
+func TestOnICEGatheringStateChange(t *testing.T) {
+	seenGathering := &atomicBool{}
+	seenComplete := &atomicBool{}
+
+	seenGatheringAndComplete := make(chan interface{})
+	seenClosed := make(chan interface{})
+
+	s := SettingEngine{}
+	s.SetTrickle(true)
+
+	peerConn, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConn.OnICEGatheringStateChange(func(s ICEGathererState) {
+		switch s {
+		case ICEGathererStateClosed:
+			close(seenClosed)
+			return
+		case ICEGathererStateGathering:
+			if seenComplete.get() {
+				t.Fatal("Completed before gathering")
+			}
+			seenGathering.set(true)
+		case ICEGathererStateComplete:
+			seenComplete.set(true)
+		}
+
+		if seenGathering.get() && seenComplete.get() {
+			close(seenGatheringAndComplete)
+		}
+	})
+
+	offer, err := peerConn.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, peerConn.SetLocalDescription(offer))
+
+	select {
+	case <-time.After(time.Second * 10):
+		t.Fatal("Gathering and Complete were never seen")
+	case <-seenClosed:
+		t.Fatal("Closed before PeerConnection Close")
+	case <-seenGatheringAndComplete:
+	}
+
+	assert.NoError(t, peerConn.Close())
+
+	select {
+	case <-time.After(time.Second * 10):
+		t.Fatal("Closed was never seen")
+	case <-seenClosed:
+	}
+}

@@ -6,7 +6,7 @@ type atomicBool struct {
 	val int32
 }
 
-func (b *atomicBool) set(value bool) {
+func (b *atomicBool) set(value bool) { // nolint: unparam
 	var i int32
 	if value {
 		i = 1

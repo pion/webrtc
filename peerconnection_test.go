@@ -465,17 +465,17 @@ func TestMultipleOfferAnswer(t *testing.T) {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
 
-	tricklePeerConn, err := NewPeerConnection(Configuration{})
+	secondPeerConn, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
-	tricklePeerConn.OnICECandidate(func(i *ICECandidate) {
+	secondPeerConn.OnICECandidate(func(i *ICECandidate) {
 	})
 
-	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("First Offer: got error: %v", err)
 	}
-	if _, err = tricklePeerConn.CreateOffer(nil); err != nil {
+	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
 }
