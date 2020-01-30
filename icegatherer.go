@@ -137,6 +137,8 @@ func (g *ICEGatherer) Gather() error {
 	}
 
 	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	onLocalCandidateHdlr := g.onLocalCandidateHdlr
 	if onLocalCandidateHdlr == nil {
 		onLocalCandidateHdlr = func(*ICECandidate) {}
@@ -144,7 +146,6 @@ func (g *ICEGatherer) Gather() error {
 
 	isTrickle := g.api.settingEngine.candidates.ICETrickle
 	agent := g.agent
-	g.lock.Unlock()
 
 	if !isTrickle {
 		return nil
@@ -160,7 +161,10 @@ func (g *ICEGatherer) Gather() error {
 			}
 			onLocalCandidateHdlr(&c)
 		} else {
+			g.lock.Lock()
 			g.setState(ICEGathererStateComplete)
+			g.lock.Unlock()
+
 			onLocalCandidateHdlr(nil)
 		}
 	}); err != nil {
@@ -176,13 +180,12 @@ func (g *ICEGatherer) Close() error {
 
 	if g.agent == nil {
 		return nil
-	}
-
-	err := g.agent.Close()
-	if err != nil {
+	} else if err := g.agent.Close(); err != nil {
 		return err
 	}
+
 	g.agent = nil
+	g.setState(ICEGathererStateClosed)
 
 	return nil
 }
@@ -236,12 +239,8 @@ func (g *ICEGatherer) State() ICEGathererState {
 }
 
 func (g *ICEGatherer) setState(s ICEGathererState) {
-	g.lock.Lock()
 	g.state = s
-	hdlr := g.onStateChangeHdlr
-	g.lock.Unlock()
-
-	if hdlr != nil {
+	if hdlr := g.onStateChangeHdlr; hdlr != nil {
 		go hdlr(s)
 	}
 }
