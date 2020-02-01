@@ -102,3 +102,65 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 }
+
+func TestPeerConnection_Close_DuringICE(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedOffer := make(chan struct{})
+	closedAnswer := make(chan struct{})
+	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			go func() {
+				if err2 := pcAnswer.Close(); err2 != nil {
+					t.Errorf("pcAnswer.Close() failed: %v", err2)
+				}
+				close(closedAnswer)
+				if err2 := pcOffer.Close(); err2 != nil {
+					t.Errorf("pcOffer.Close() failed: %v", err2)
+				}
+				close(closedOffer)
+			}()
+		}
+	})
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pcOffer.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	answer, err := pcAnswer.CreateAnswer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pcAnswer.SetLocalDescription(answer); err != nil {
+		t.Fatal(err)
+	}
+	if err = pcOffer.SetRemoteDescription(answer); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-closedAnswer:
+	case <-time.After(5 * time.Second):
+		t.Error("pcAnswer.Close() Timeout")
+	}
+	select {
+	case <-closedOffer:
+	case <-time.After(5 * time.Second):
+		t.Error("pcOffer.Close() Timeout")
+	}
+}

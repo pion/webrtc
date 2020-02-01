@@ -210,7 +210,8 @@ This test adds an input track and asserts
 * No deadlocks on shutdown
 */
 func TestPeerConnection_Media_Shutdown(t *testing.T) {
-	iceComplete := make(chan bool)
+	iceCompleteAnswer := make(chan struct{})
+	iceCompleteOffer := make(chan struct{})
 
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -250,7 +251,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var onTrackFiredLock sync.RWMutex
+	var onTrackFiredLock sync.Mutex
 	onTrackFired := false
 
 	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
@@ -261,9 +262,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
-			go func() {
-				close(iceComplete)
-			}()
+			close(iceCompleteAnswer)
+		}
+	})
+	pcOffer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateConnected {
+			close(iceCompleteOffer)
 		}
 	})
 
@@ -271,7 +275,8 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-iceComplete
+	<-iceCompleteAnswer
+	<-iceCompleteOffer
 
 	// Each PeerConnection should have one sender, one receiver and two transceivers
 	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
