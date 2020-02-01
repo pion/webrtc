@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/ice"
@@ -16,16 +17,15 @@ import (
 // ICETransport allows an application access to information about the ICE
 // transport over which packets are sent and received.
 type ICETransport struct {
-	lock     sync.RWMutex
-	lockHdlr sync.RWMutex
+	lock sync.RWMutex
 
 	role ICERole
 	// Component ICEComponent
 	// State ICETransportState
 	// gatheringState ICEGathererState
 
-	onConnectionStateChangeHdlr       func(ICETransportState)
-	onSelectedCandidatePairChangeHdlr func(*ICECandidatePair)
+	onConnectionStateChangeHdlr       atomic.Value // func(ICETransportState)
+	onSelectedCandidatePairChangeHdlr atomic.Value // func(*ICECandidatePair)
 
 	state ICETransportState
 
@@ -168,34 +168,26 @@ func (t *ICETransport) Stop() error {
 // OnSelectedCandidatePairChange sets a handler that is invoked when a new
 // ICE candidate pair is selected
 func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) {
-	t.lockHdlr.Lock()
-	defer t.lockHdlr.Unlock()
-	t.onSelectedCandidatePairChangeHdlr = f
+	t.onSelectedCandidatePairChangeHdlr.Store(f)
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
-	t.lockHdlr.RLock()
-	hdlr := t.onSelectedCandidatePairChangeHdlr
-	t.lockHdlr.RUnlock()
+	hdlr := t.onSelectedCandidatePairChangeHdlr.Load()
 	if hdlr != nil {
-		hdlr(pair)
+		hdlr.(func(*ICECandidatePair))(pair)
 	}
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
 // connection state changes.
 func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
-	t.lockHdlr.Lock()
-	defer t.lockHdlr.Unlock()
-	t.onConnectionStateChangeHdlr = f
+	t.onConnectionStateChangeHdlr.Store(f)
 }
 
 func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
-	t.lockHdlr.RLock()
-	hdlr := t.onConnectionStateChangeHdlr
-	t.lockHdlr.RUnlock()
+	hdlr := t.onConnectionStateChangeHdlr.Load()
 	if hdlr != nil {
-		hdlr(state)
+		hdlr.(func(ICETransportState))(state)
 	}
 }
 
