@@ -16,7 +16,8 @@ import (
 // ICETransport allows an application access to information about the ICE
 // transport over which packets are sent and received.
 type ICETransport struct {
-	lock sync.RWMutex
+	lock     sync.RWMutex
+	lockHdlr sync.RWMutex
 
 	role ICERole
 	// Component ICEComponent
@@ -167,15 +168,15 @@ func (t *ICETransport) Stop() error {
 // OnSelectedCandidatePairChange sets a handler that is invoked when a new
 // ICE candidate pair is selected
 func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lockHdlr.Lock()
+	defer t.lockHdlr.Unlock()
 	t.onSelectedCandidatePairChangeHdlr = f
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
-	t.lock.RLock()
+	t.lockHdlr.RLock()
 	hdlr := t.onSelectedCandidatePairChangeHdlr
-	t.lock.RUnlock()
+	t.lockHdlr.RUnlock()
 	if hdlr != nil {
 		hdlr(pair)
 	}
@@ -184,15 +185,15 @@ func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
 // OnConnectionStateChange sets a handler that is fired when the ICE
 // connection state changes.
 func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lockHdlr.Lock()
+	defer t.lockHdlr.Unlock()
 	t.onConnectionStateChangeHdlr = f
 }
 
 func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
-	t.lock.RLock()
+	t.lockHdlr.RLock()
 	hdlr := t.onConnectionStateChangeHdlr
-	t.lock.RUnlock()
+	t.lockHdlr.RUnlock()
 	if hdlr != nil {
 		hdlr(state)
 	}
