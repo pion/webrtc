@@ -1,0 +1,5 @@
+---
+ name: broadcast
+ description: Example of a broadcast using Pion WebRTC
+ authors:
+   - Sean DuBois
