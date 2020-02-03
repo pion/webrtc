@@ -77,6 +77,19 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 				return fmt.Errorf("could not find codec for payload type %d", payloadType)
 			}
 
+			var rtcpFeedback []RTCPFeedback
+			for _, rtcpFbStr := range payloadCodec.RTCPFeedback {
+				split := strings.SplitN(rtcpFbStr, " ", 2)
+				var parameter string
+				if len(split) > 1 {
+					parameter = split[1]
+				}
+				rtcpFeedback = append(rtcpFeedback, RTCPFeedback{
+					Type:      split[0],
+					Parameter: parameter,
+				})
+			}
+
 			var codec *RTPCodec
 			clockRate := payloadCodec.ClockRate
 			parameters := payloadCodec.Fmtp
@@ -91,13 +104,13 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 			case Opus:
 				codec = NewRTPOpusCodec(payloadType, clockRate)
 			case VP8:
-				codec = NewRTPVP8Codec(payloadType, clockRate)
+				codec = NewRTPVP8CodecExt(payloadType, clockRate, rtcpFeedback)
 				codec.SDPFmtpLine = parameters
 			case VP9:
 				codec = NewRTPVP9Codec(payloadType, clockRate)
 				codec.SDPFmtpLine = parameters
 			case H264:
-				codec = NewRTPH264Codec(payloadType, clockRate)
+				codec = NewRTPH264CodecExt(payloadType, clockRate, rtcpFeedback)
 				codec.SDPFmtpLine = parameters
 			default:
 				// ignoring other codecs

@@ -906,6 +906,74 @@ a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 	assert.NoError(t, pc.Close())
 }
 
+func TestPassesRTCPFeedback(t *testing.T) {
+	const sdpOfferWithVideo = `v=0
+o=- 6476616870435111971 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE video
+m=video 9 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:sRIG
+a=ice-pwd:yZb5ZMsBlPoK577sGhjvEUtT
+a=ice-options:trickle
+a=fingerprint:sha-256 27:EF:25:BF:57:45:BC:1C:0D:36:42:FF:5E:93:71:D2:41:58:EA:46:FD:A8:2A:F3:13:94:6E:E6:43:23:CB:D7
+a=setup:actpass
+a=mid:1
+a=sendrecv
+a=rtpmap:96 H264/90000
+a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+`
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sd := SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  sdpOfferWithVideo,
+	}
+	var mediaEngine MediaEngine
+	if err := mediaEngine.PopulateFromSDP(sd); err != nil {
+		t.Fatal(err.Error())
+	}
+
+	api := NewAPI(WithMediaEngine(mediaEngine))
+
+	pc, err := api.NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if err = pc.SetRemoteDescription(sd); nil != err {
+		t.Fatal(err.Error())
+	}
+
+	answer, err := pc.CreateAnswer(nil)
+	if nil != err {
+		t.Fatal(err.Error())
+	}
+
+	success := false
+	for _, attr := range answer.parsed.MediaDescriptions[0].Attributes {
+		if attr.Key == "rtcp-fb" {
+			if attr.Value == "96 ccm fir" {
+				success = true
+			}
+		}
+	}
+
+	if !success {
+		t.Errorf("expected rtcp-fb attributes from %v but got %v", sd, answer)
+	}
+	assert.NoError(t, pc.Close())
+}
+
 func TestGetRegisteredRTPCodecs(t *testing.T) {
 	mediaEngine := MediaEngine{}
 	expectedCodec := NewRTPH264Codec(DefaultPayloadTypeH264, 90000)
