@@ -48,9 +48,9 @@
 		"type": "browser"
 	},
 	{
-		"title": "SFU Minimal",
-		"link": "sfu-minimal",
-		"description": "The SFU example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
+		"title": "Broadcast",
+		"link": "broadcast",
+		"description": "The broadcast example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.",
 		"type": "browser"
 	},
 	{
