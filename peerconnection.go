@@ -989,14 +989,7 @@ func (pc *PeerConnection) descriptionIsPlanB(desc *SessionDescription) bool {
 	return false
 }
 
-type incomingTrack struct {
-	kind  RTPCodecType
-	label string
-	id    string
-	ssrc  uint32
-}
-
-func (pc *PeerConnection) startReceiver(incoming incomingTrack, receiver *RTPReceiver) {
+func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
 	err := receiver.Receive(RTPReceiveParameters{
 		Encodings: RTPDecodingParameters{
 			RTPCodingParameters{SSRC: incoming.ssrc},
@@ -1047,7 +1040,8 @@ func (pc *PeerConnection) startReceiver(incoming incomingTrack, receiver *RTPRec
 
 // openSRTP opens knows inbound SRTP streams from the RemoteDescription
 func (pc *PeerConnection) openSRTP() {
-	incomingTracks := map[uint32]incomingTrack{}
+	incomingTracks := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
+	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
 	remoteIsPlanB := false
 	switch pc.configuration.SDPSemantics {
@@ -1057,46 +1051,13 @@ func (pc *PeerConnection) openSRTP() {
 		remoteIsPlanB = pc.descriptionIsPlanB(pc.RemoteDescription())
 	}
 
-	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
-		for _, attr := range media.Attributes {
-			codecType := NewRTPCodecType(media.MediaName.Media)
-			if codecType == 0 {
-				continue
-			}
-
-			if attr.Key == sdp.AttrKeySSRC {
-				split := strings.Split(attr.Value, " ")
-				ssrc, err := strconv.ParseUint(split[0], 10, 32)
-				if err != nil {
-					pc.log.Warnf("Failed to parse SSRC: %v", err)
-					continue
-				}
-
-				trackID := ""
-				trackLabel := ""
-				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
-					trackLabel = split[1][len("msid:"):]
-					trackID = split[2]
-				}
-
-				incomingTracks[uint32(ssrc)] = incomingTrack{codecType, trackLabel, trackID, uint32(ssrc)}
-				if trackID != "" && trackLabel != "" {
-					break // Remote provided Label+ID, we have all the information we need
-				}
-			}
-		}
-	}
-
-	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	for ssrc, incoming := range incomingTracks {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
-			switch {
-			case incomingTracks[ssrc].kind != t.kind:
-				continue
-			case t.Direction != RTPTransceiverDirectionRecvonly && t.Direction != RTPTransceiverDirectionSendrecv:
-				continue
-			case t.Receiver == nil:
+
+			if (incomingTracks[ssrc].kind != t.kind) ||
+				(t.Direction != RTPTransceiverDirectionRecvonly && t.Direction != RTPTransceiverDirectionSendrecv) ||
+				(t.Receiver) == nil {
 				continue
 			}
 
@@ -1131,7 +1092,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc uint32) bool {
 				}
 			}
 
-			incoming := incomingTrack{
+			incoming := trackDetails{
 				ssrc: ssrc,
 				kind: RTPCodecTypeVideo,
 			}
@@ -1276,10 +1237,10 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
+
 	var transceiver *RTPTransceiver
 	for _, t := range pc.GetTransceivers() {
-		if !t.stopped &&
-			t.Sender != nil &&
+		if !t.stopped && t.Sender != nil &&
 			!t.Sender.hasSent() &&
 			t.Receiver != nil &&
 			t.Receiver.Track() != nil &&
@@ -1292,22 +1253,12 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		if err := transceiver.setSendingTrack(track); err != nil {
 			return nil, err
 		}
-	} else {
-		receiver, err := pc.api.NewRTPReceiver(track.Kind(), pc.dtlsTransport)
-		if err != nil {
-			return nil, err
-		}
+		return transceiver.Sender, nil
+	}
 
-		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
-		if err != nil {
-			return nil, err
-		}
-		transceiver = pc.newRTPTransceiver(
-			receiver,
-			sender,
-			RTPTransceiverDirectionSendrecv,
-			track.Kind(),
-		)
+	transceiver, err := pc.AddTransceiverFromTrack(track)
+	if err != nil {
+		return nil, err
 	}
 
 	return transceiver.Sender, nil
@@ -1321,6 +1272,10 @@ func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTr
 
 // AddTransceiverFromKind Create a new RTCRtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
 func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+	if pc.isClosed.get() {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
 	direction := RTPTransceiverDirectionSendrecv
 	if len(init) > 1 {
 		return nil, fmt.Errorf("AddTransceiverFromKind only accepts one RtpTransceiverInit")
@@ -1330,11 +1285,6 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 
 	switch direction {
 	case RTPTransceiverDirectionSendrecv:
-		receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
-		if err != nil {
-			return nil, err
-		}
-
 		codecs := pc.api.mediaEngine.GetCodecsByKind(kind)
 		if len(codecs) == 0 {
 			return nil, fmt.Errorf("no %s codecs found", kind.String())
@@ -1345,17 +1295,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 			return nil, err
 		}
 
-		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
-		if err != nil {
-			return nil, err
-		}
-
-		return pc.newRTPTransceiver(
-			receiver,
-			sender,
-			RTPTransceiverDirectionSendrecv,
-			kind,
-		), nil
+		return pc.AddTransceiverFromTrack(track, init...)
 
 	case RTPTransceiverDirectionRecvonly:
 		receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
@@ -1376,6 +1316,10 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 
 // AddTransceiverFromTrack Creates a new send only transceiver and add it to the set of
 func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+	if pc.isClosed.get() {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
 	direction := RTPTransceiverDirectionSendrecv
 	if len(init) > 1 {
 		return nil, fmt.Errorf("AddTransceiverFromTrack only accepts one RtpTransceiverInit")

@@ -48,5 +48,7 @@ func (t *RTPTransceiver) Stop() error {
 			return err
 		}
 	}
+
+	t.Direction = RTPTransceiverDirectionInactive
 	return nil
 }
