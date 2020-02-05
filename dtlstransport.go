@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
 	"github.com/pion/srtp"
 	"github.com/pion/webrtc/v2/internal/mux"
 	"github.com/pion/webrtc/v2/internal/util"
@@ -350,12 +351,12 @@ func (t *DTLSTransport) Stop() error {
 
 func (t *DTLSTransport) validateFingerPrint(remoteCert *x509.Certificate) error {
 	for _, fp := range t.remoteParameters.Fingerprints {
-		hashAlgo, err := dtls.HashAlgorithmString(fp.Algorithm)
+		hashAlgo, err := fingerprint.HashFromString(fp.Algorithm)
 		if err != nil {
 			return err
 		}
 
-		remoteValue, err := dtls.Fingerprint(remoteCert, hashAlgo)
+		remoteValue, err := fingerprint.Fingerprint(remoteCert, hashAlgo)
 		if err != nil {
 			return err
 		}
