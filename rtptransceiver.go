@@ -52,3 +52,36 @@ func (t *RTPTransceiver) Stop() error {
 	t.Direction = RTPTransceiverDirectionInactive
 	return nil
 }
+
+// Given a direction+type pluck a transceiver from the passed list
+// if no entry satisfies the requested type+direction return a inactive Transceiver
+func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransceiverDirection, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
+	// Get direction order from most preferred to least
+	getPreferredDirections := func() []RTPTransceiverDirection {
+		switch remoteDirection {
+		case RTPTransceiverDirectionSendrecv:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+		case RTPTransceiverDirectionSendonly:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+		case RTPTransceiverDirectionRecvonly:
+			return []RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv}
+		}
+		return []RTPTransceiverDirection{}
+	}
+
+	for _, possibleDirection := range getPreferredDirections() {
+		for i := range localTransceivers {
+			t := localTransceivers[i]
+			if t.kind != remoteKind || possibleDirection != t.Direction {
+				continue
+			}
+
+			return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
+		}
+	}
+
+	return &RTPTransceiver{
+		kind:      remoteKind,
+		Direction: RTPTransceiverDirectionInactive,
+	}, localTransceivers
+}
