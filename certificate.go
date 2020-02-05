@@ -14,7 +14,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
@@ -94,17 +94,21 @@ func (c Certificate) Expires() time.Time {
 // GetFingerprints returns the list of certificate fingerprints, one of which
 // is computed with the digest algorithm used in the certificate signature.
 func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
-	fingerprintAlgorithms := []dtls.HashAlgorithm{dtls.HashAlgorithmSHA256}
+	fingerprintAlgorithms := []crypto.Hash{crypto.SHA256}
 	res := make([]DTLSFingerprint, len(fingerprintAlgorithms))
 
 	i := 0
 	for _, algo := range fingerprintAlgorithms {
-		value, err := dtls.Fingerprint(c.x509Cert, algo)
+		name, err := fingerprint.StringFromHash(algo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create fingerprint: %v", err)
+		}
+		value, err := fingerprint.Fingerprint(c.x509Cert, algo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create fingerprint: %v", err)
 		}
 		res[i] = DTLSFingerprint{
-			Algorithm: algo.String(),
+			Algorithm: name,
 			Value:     value,
 		}
 	}
