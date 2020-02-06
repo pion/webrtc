@@ -277,10 +277,14 @@ func (g *ICEGatherer) SignalCandidates() error {
 }
 
 func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
-	collector.Collecting()
+	agent := g.getAgent()
+	if agent == nil {
+		return
+	}
 
-	go func(collector *statsReportCollector) {
-		for _, candidatePairStats := range g.agent.GetCandidatePairsStats() {
+	collector.Collecting()
+	go func(collector *statsReportCollector, agent *ice.Agent) {
+		for _, candidatePairStats := range agent.GetCandidatePairsStats() {
 			collector.Collecting()
 
 			state, err := toStatsICECandidatePairState(candidatePairStats.State)
@@ -326,7 +330,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			collector.Collect(stats.ID, stats)
 		}
 
-		for _, candidateStats := range g.agent.GetLocalCandidatesStats() {
+		for _, candidateStats := range agent.GetLocalCandidatesStats() {
 			collector.Collecting()
 
 			networkType, err := getNetworkType(candidateStats.NetworkType)
@@ -356,7 +360,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			collector.Collect(stats.ID, stats)
 		}
 
-		for _, candidateStats := range g.agent.GetRemoteCandidatesStats() {
+		for _, candidateStats := range agent.GetRemoteCandidatesStats() {
 			collector.Collecting()
 			networkType, err := getNetworkType(candidateStats.NetworkType)
 			if err != nil {
@@ -384,5 +388,5 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			collector.Collect(stats.ID, stats)
 		}
 		collector.Done()
-	}(collector)
+	}(collector, agent)
 }

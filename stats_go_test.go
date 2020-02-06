@@ -297,3 +297,12 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
 }
+
+func TestPeerConnection_GetStats_Closed(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, pc.Close())
+
+	pc.GetStats()
+}
