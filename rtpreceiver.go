@@ -114,6 +114,15 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	return rtcp.Unmarshal(b[:i])
 }
 
+func (r *RTPReceiver) haveReceived() bool {
+	select {
+	case <-r.received:
+		return true
+	default:
+		return false
+	}
+}
+
 // Stop irreversibly stops the RTPReceiver
 func (r *RTPReceiver) Stop() error {
 	r.mu.Lock()
