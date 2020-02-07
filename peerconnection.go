@@ -802,19 +802,23 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
-	if pc.currentRemoteDescription != nil { // pion/webrtc#207
-		return fmt.Errorf("remoteDescription is already defined, SetRemoteDescription can only be called once")
-	}
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
+	currentTransceivers := pc.GetTransceivers()
+	haveRemoteDescription := pc.currentRemoteDescription != nil
 	desc.parsed = &sdp.SessionDescription{}
 	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
 		return err
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
 		return err
+	}
+
+	if haveRemoteDescription {
+		go pc.startRenegotation(currentTransceivers)
+		return nil
 	}
 
 	weOffer := true
@@ -879,8 +883,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
-	go pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
-
+	go pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash, currentTransceivers)
 	return nil
 }
 
@@ -907,15 +910,9 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		return
 	}
 
-	sdpCodec, err := pc.currentLocalDescription.parsed.GetCodecForPayloadType(receiver.Track().PayloadType())
+	codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
 	if err != nil {
-		pc.log.Warnf("no codec could be found in RemoteDescription for payloadType %d", receiver.Track().PayloadType())
-		return
-	}
-
-	codec, err := pc.api.mediaEngine.getCodecSDP(sdpCodec)
-	if err != nil {
-		pc.log.Warnf("codec %s in not registered", sdpCodec)
+		pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
 		return
 	}
 
@@ -933,10 +930,9 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 }
 
-// openSRTP opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) openSRTP() {
-	incomingTracks := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
-	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+// startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
+func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetails, currentTransceivers []*RTPTransceiver) {
+	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
 	remoteIsPlanB := false
 	switch pc.configuration.SDPSemantics {
@@ -952,7 +948,8 @@ func (pc *PeerConnection) openSRTP() {
 
 			if (incomingTracks[ssrc].kind != t.kind) ||
 				(t.Direction != RTPTransceiverDirectionRecvonly && t.Direction != RTPTransceiverDirectionSendrecv) ||
-				(t.Receiver) == nil {
+				(t.Receiver) == nil ||
+				(t.Receiver.haveReceived()) {
 				continue
 			}
 
@@ -975,6 +972,61 @@ func (pc *PeerConnection) openSRTP() {
 			go pc.startReceiver(incoming, t.Receiver)
 		}
 	}
+}
+
+// startRTPSenders starts all outbound RTP streams
+func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
+	for _, tranceiver := range currentTransceivers {
+		if tranceiver.Sender != nil && !tranceiver.Sender.hasSent() {
+			err := tranceiver.Sender.Send(RTPSendParameters{
+				Encodings: RTPEncodingParameters{
+					RTPCodingParameters{
+						SSRC:        tranceiver.Sender.track.SSRC(),
+						PayloadType: tranceiver.Sender.track.PayloadType(),
+					},
+				}})
+			if err != nil {
+				pc.log.Warnf("Failed to start Sender: %s", err)
+			}
+		}
+	}
+}
+
+// Start SCTP subsystem
+func (pc *PeerConnection) startSCTP() {
+	// Start sctp
+	if err := pc.sctpTransport.Start(SCTPCapabilities{
+		MaxMessageSize: 0,
+	}); err != nil {
+		pc.log.Warnf("Failed to start SCTP: %s", err)
+		if err = pc.sctpTransport.Stop(); err != nil {
+			pc.log.Warnf("Failed to stop SCTPTransport: %s", err)
+		}
+
+		return
+	}
+
+	// DataChannels that need to be opened now that SCTP is available
+	// make a copy we may have incoming DataChannels mutating this while we open
+	pc.sctpTransport.lock.RLock()
+	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
+	pc.sctpTransport.lock.RUnlock()
+
+	var openedDCCount uint32
+	for _, d := range dataChannels {
+		if d.ReadyState() == DataChannelStateConnecting {
+			err := d.open(pc.sctpTransport)
+			if err != nil {
+				pc.log.Warnf("failed to open data channel: %s", err)
+				continue
+			}
+			openedDCCount++
+		}
+	}
+
+	pc.sctpTransport.lock.Lock()
+	pc.sctpTransport.dataChannelsOpened += openedDCCount
+	pc.sctpTransport.lock.Unlock()
 }
 
 // drainSRTP pulls and discards RTP/RTCP packets that don't match any a:ssrc lines
@@ -1569,7 +1621,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 }
 
 // Start all transports. PeerConnection now has enough state
-func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
+func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string, currentTransceivers []*RTPTransceiver) {
 	// Start the ice transport
 	err := pc.iceTransport.Start(
 		pc.iceGatherer,
@@ -1596,58 +1648,17 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		return
 	}
 
-	pc.openSRTP()
-
-	for _, tranceiver := range pc.GetTransceivers() {
-		if tranceiver.Sender != nil {
-			err = tranceiver.Sender.Send(RTPSendParameters{
-				Encodings: RTPEncodingParameters{
-					RTPCodingParameters{
-						SSRC:        tranceiver.Sender.track.SSRC(),
-						PayloadType: tranceiver.Sender.track.PayloadType(),
-					},
-				}})
-			if err != nil {
-				pc.log.Warnf("Failed to start Sender: %s", err)
-			}
-		}
-	}
-
+	pc.startRTPReceivers(trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed), currentTransceivers)
+	pc.startRTPSenders(currentTransceivers)
 	go pc.drainSRTP()
+	pc.startSCTP()
+}
 
-	// Start sctp
-	if err = pc.sctpTransport.Start(SCTPCapabilities{
-		MaxMessageSize: 0,
-	}); err != nil {
-		pc.log.Warnf("Failed to start SCTP: %s", err)
-		if err = pc.sctpTransport.Stop(); err != nil {
-			pc.log.Warnf("Failed to stop SCTPTransport: %s", err)
-		}
+func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceiver) {
+	// Delete orphaned Receivers TODO
 
-		return
-	}
-
-	// DataChannels that need to be opened now that SCTP is available
-	// make a copy we may have incoming DataChannels mutating this while we open
-	pc.sctpTransport.lock.RLock()
-	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-	pc.sctpTransport.lock.RUnlock()
-
-	var openedDCCount uint32
-	for _, d := range dataChannels {
-		if d.ReadyState() == DataChannelStateConnecting {
-			err := d.open(pc.sctpTransport)
-			if err != nil {
-				pc.log.Warnf("failed to open data channel: %s", err)
-				continue
-			}
-			openedDCCount++
-		}
-	}
-
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannelsOpened += openedDCCount
-	pc.sctpTransport.lock.Unlock()
+	pc.startRTPSenders(currentTransceivers)
+	pc.startRTPReceivers(trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed), currentTransceivers)
 }
 
 // GetRegisteredRTPCodecs gets a list of registered RTPCodec from the underlying constructed MediaEngine
