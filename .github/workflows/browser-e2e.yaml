@@ -1,0 +1,16 @@
+name: Browser E2E
+on:
+  pull_request:
+    branches: master
+
+jobs:
+  e2e-test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: test
+        run: |
+          docker build -t pion-webrtc-e2e -f e2e/Dockerfile .
+          docker run -i --rm pion-webrtc-e2e
