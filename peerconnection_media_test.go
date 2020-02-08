@@ -994,4 +994,6 @@ func TestGetRegisteredRTPCodecs(t *testing.T) {
 	if actualCodec != expectedCodec {
 		t.Errorf("expected to get %v but got %v", expectedCodec, actualCodec)
 	}
+
+	assert.NoError(t, pc.Close())
 }

@@ -1085,20 +1085,22 @@ func (pc *PeerConnection) drainSRTP() {
 		}
 	}()
 
-	for {
-		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
-		if err != nil {
-			pc.log.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
-			return
-		}
+	go func() {
+		for {
+			srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+			if err != nil {
+				pc.log.Warnf("drainSRTP failed to open SrtcpSession: %v", err)
+				return
+			}
 
-		_, ssrc, err := srtcpSession.AcceptStream()
-		if err != nil {
-			pc.log.Warnf("Failed to accept RTCP %v \n", err)
-			return
+			_, ssrc, err := srtcpSession.AcceptStream()
+			if err != nil {
+				pc.log.Warnf("Failed to accept RTCP %v \n", err)
+				return
+			}
+			pc.log.Errorf("Incoming unhandled RTCP ssrc(%d)", ssrc)
 		}
-		pc.log.Errorf("Incoming unhandled RTCP ssrc(%d)", ssrc)
-	}
+	}()
 }
 
 // RemoteDescription returns pendingRemoteDescription if it is not null and
@@ -1215,6 +1217,29 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 // Deprecated: Use AddTrack, AddTransceiverFromKind or AddTransceiverFromTrack
 func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
 	return pc.AddTransceiverFromKind(trackOrKind, init...)
+}
+
+// RemoveTrack removes a Track from the PeerConnection
+func (pc *PeerConnection) RemoveTrack(sender *RTPSender) error {
+	if pc.isClosed.get() {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	var transceiver *RTPTransceiver
+	for _, t := range pc.GetTransceivers() {
+		if t.Sender == sender {
+			transceiver = t
+			break
+		}
+	}
+
+	if transceiver == nil {
+		return &rtcerr.InvalidAccessError{Err: ErrSenderNotCreatedByConnection}
+	} else if err := sender.Stop(); err != nil {
+		return err
+	}
+
+	return transceiver.setSendingTrack(nil)
 }
 
 // AddTransceiverFromKind Create a new RTCRtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
@@ -1650,15 +1675,34 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 
 	pc.startRTPReceivers(trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed), currentTransceivers)
 	pc.startRTPSenders(currentTransceivers)
-	go pc.drainSRTP()
+	pc.drainSRTP()
 	pc.startSCTP()
 }
 
 func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceiver) {
-	// Delete orphaned Receivers TODO
+	trackDetails := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
+	for _, t := range currentTransceivers {
+		if t.Receiver == nil || t.Receiver.Track() == nil {
+			continue
+		} else if _, ok := trackDetails[t.Receiver.Track().ssrc]; ok {
+			continue
+		}
+
+		if err := t.Receiver.Stop(); err != nil {
+			pc.log.Warnf("Failed to stop RtpReceiver: %s", err)
+			continue
+		}
+
+		receiver, err := pc.api.NewRTPReceiver(t.Receiver.kind, pc.dtlsTransport)
+		if err != nil {
+			pc.log.Warnf("Failed to create new RtpReceiver: %s", err)
+			continue
+		}
+		t.Receiver = receiver
+	}
 
 	pc.startRTPSenders(currentTransceivers)
-	pc.startRTPReceivers(trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed), currentTransceivers)
+	pc.startRTPReceivers(trackDetails, currentTransceivers)
 }
 
 // GetRegisteredRTPCodecs gets a list of registered RTPCodec from the underlying constructed MediaEngine

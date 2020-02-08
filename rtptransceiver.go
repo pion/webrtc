@@ -19,17 +19,17 @@ type RTPTransceiver struct {
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {
-	if track == nil {
-		return fmt.Errorf("track must not be nil")
-	}
-
 	t.Sender.track = track
 
-	switch t.Direction {
-	case RTPTransceiverDirectionRecvonly:
+	switch {
+	case track != nil && t.Direction == RTPTransceiverDirectionRecvonly:
 		t.Direction = RTPTransceiverDirectionSendrecv
-	case RTPTransceiverDirectionInactive:
+	case track != nil && t.Direction == RTPTransceiverDirectionInactive:
 		t.Direction = RTPTransceiverDirectionSendonly
+	case track == nil && t.Direction == RTPTransceiverDirectionSendrecv:
+		t.Direction = RTPTransceiverDirectionRecvonly
+	case track == nil && t.Direction == RTPTransceiverDirectionSendonly:
+		t.Direction = RTPTransceiverDirectionInactive
 	default:
 		return fmt.Errorf("invalid state change in RTPTransceiver.setSending")
 	}

@@ -87,4 +87,8 @@ var (
 	// ErrProtocolTooLarge indicates that value given for a DataChannelInit protocol is
 	//longer then 65535 bytes
 	ErrProtocolTooLarge = errors.New("protocol is larger then 65535 bytes")
+
+	// ErrSenderNotCreatedByConnection indicates RemoveTrack was called with a RtpSender not created
+	// by this PeerConnection
+	ErrSenderNotCreatedByConnection = errors.New("RtpSender not created by this PeerConnection")
 )
