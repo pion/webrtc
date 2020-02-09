@@ -22,37 +22,38 @@ import (
 
 var silentOpusFrame = []byte{0xf8, 0xff, 0xfe} // 20ms, 8kHz, mono
 
-func TestE2E(t *testing.T) {
-	drivers := map[string]*agouti.WebDriver{
-		"Chrome": agouti.ChromeDriver(
-			agouti.ChromeOptions(
-				"args", []string{
-					"--headless",
-					"--disable-gpu",
-					"--no-sandbox",
+var drivers = map[string]func() *agouti.WebDriver{
+	"Chrome": func() *agouti.WebDriver {
+		return agouti.ChromeDriver(
+			agouti.ChromeOptions("args", []string{
+				"--headless",
+				"--disable-gpu",
+				"--no-sandbox",
+			}),
+			agouti.Desired(agouti.Capabilities{
+				"loggingPrefs": map[string]string{
+					"browser": "INFO",
 				},
-			),
-			agouti.Desired(
-				agouti.Capabilities{
-					"loggingPrefs": map[string]string{
-						"browser": "INFO",
-					},
-				},
-			),
-		),
-	}
-	for name, d := range drivers {
-		driver := d
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			}),
+		)
+	},
+}
 
+func TestE2E_Audio(t *testing.T) {
+	for name, d := range drivers {
+		driver := d()
+		t.Run(name, func(t *testing.T) {
 			if err := driver.Start(); err != nil {
 				t.Fatalf("Failed to start WebDriver: %v", err)
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer func() {
+				cancel()
+				time.Sleep(50 * time.Millisecond)
+				_ = driver.Stop()
+			}()
 			page, errPage := driver.NewPage()
 			if errPage != nil {
-				driver.Stop()
 				t.Fatalf("Failed to open page: %v", errPage)
 			}
 			if err := page.SetPageLoad(1000); err != nil {
@@ -62,60 +63,10 @@ func TestE2E(t *testing.T) {
 				t.Fatalf("Failed to set wait: %v", err)
 			}
 
-			type stats []struct {
-				Kind            string `json:"kind"`
-				Type            string `json:"type"`
-				PacketsReceived int    `json:"packetsReceived"`
-			}
-
 			chStarted := make(chan struct{})
 			chSDP := make(chan *webrtc.SessionDescription)
 			chStats := make(chan stats)
-			go func() {
-				for {
-					time.Sleep(time.Second)
-					logs, errLog := page.ReadNewLogs("browser")
-					if errLog != nil {
-						t.Errorf("Failed to read log: %v", errLog)
-						return
-					}
-					for _, log := range logs {
-						k, v, ok := parseLog(log)
-						if !ok {
-							t.Log(log.Message)
-							continue
-						}
-						switch k {
-						case "connection":
-							switch v {
-							case "connected":
-								close(chStarted)
-							case "failed":
-								t.Error("Browser reported connection failed")
-								return
-							}
-						case "sdp":
-							sdp := &webrtc.SessionDescription{}
-							if err := json.Unmarshal([]byte(v), sdp); err != nil {
-								t.Errorf("Failed to unmarshal SDP: %v", err)
-								return
-							}
-							chSDP <- sdp
-						case "stats":
-							s := &stats{}
-							if err := json.Unmarshal([]byte(v), &s); err != nil {
-								t.Fatal(err)
-							}
-							select {
-							case chStats <- *s:
-							case <-time.After(10 * time.Millisecond):
-							}
-						default:
-							t.Log(log.Message)
-						}
-					}
-				}
-			}()
+			go logParseLoop(ctx, t, page, chStarted, chSDP, chStats)
 
 			pwd, errPwd := os.Getwd()
 			if errPwd != nil {
@@ -132,7 +83,9 @@ func TestE2E(t *testing.T) {
 			if errTrack != nil {
 				t.Fatalf("Failed to create track: %v", errTrack)
 			}
-			defer pc.Close()
+			defer func() {
+				_ = pc.Close()
+			}()
 
 			answerBytes, errAnsSDP := json.Marshal(answer)
 			if errAnsSDP != nil {
@@ -152,7 +105,8 @@ func TestE2E(t *testing.T) {
 					if err := track.WriteSample(
 						media.Sample{Data: silentOpusFrame, Samples: 960},
 					); err != nil {
-						t.Fatalf("Failed to WriteSample: %v", err)
+						t.Errorf("Failed to WriteSample: %v", err)
+						return
 					}
 					select {
 					case <-time.After(20 * time.Millisecond):
@@ -193,6 +147,170 @@ func TestE2E(t *testing.T) {
 				t.Errorf("Number of OPUS packets is expected to be: 50/second, got: %d/second", packetsPerSecond)
 			}
 		})
+	}
+}
+
+func TestE2E_DataChannel(t *testing.T) {
+	for name, d := range drivers {
+		driver := d()
+		t.Run(name, func(t *testing.T) {
+			if err := driver.Start(); err != nil {
+				t.Fatalf("Failed to start WebDriver: %v", err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer func() {
+				cancel()
+				time.Sleep(50 * time.Millisecond)
+				_ = driver.Stop()
+			}()
+
+			page, errPage := driver.NewPage()
+			if errPage != nil {
+				t.Fatalf("Failed to open page: %v", errPage)
+			}
+			if err := page.SetPageLoad(1000); err != nil {
+				t.Fatalf("Failed to load page: %v", err)
+			}
+			if err := page.SetImplicitWait(1000); err != nil {
+				t.Fatalf("Failed to set wait: %v", err)
+			}
+
+			chStarted := make(chan struct{})
+			chSDP := make(chan *webrtc.SessionDescription)
+			go logParseLoop(ctx, t, page, chStarted, chSDP, nil)
+
+			pwd, errPwd := os.Getwd()
+			if errPwd != nil {
+				t.Fatalf("Failed to get working directory: %v", errPwd)
+			}
+			if err := page.Navigate(
+				fmt.Sprintf("file://%s/test.html", pwd),
+			); err != nil {
+				t.Fatalf("Failed to navigate: %v", err)
+			}
+
+			sdp := <-chSDP
+			pc, errPc := webrtc.NewPeerConnection(webrtc.Configuration{})
+			if errPc != nil {
+				t.Fatalf("Failed to create peer connection: %v", errPc)
+			}
+			defer func() {
+				_ = pc.Close()
+			}()
+
+			chValid := make(chan struct{})
+			pc.OnDataChannel(func(dc *webrtc.DataChannel) {
+				dc.OnOpen(func() {
+					// Ping
+					if err := dc.SendText("hello world"); err != nil {
+						t.Errorf("Failed to send data: %v", err)
+					}
+				})
+				dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+					// Pong
+					if string(msg.Data) != "HELLO WORLD" {
+						t.Errorf("expected message from browser: HELLO WORLD, got: %s", string(msg.Data))
+					} else {
+						chValid <- struct{}{}
+					}
+				})
+			})
+
+			if err := pc.SetRemoteDescription(*sdp); err != nil {
+				t.Fatalf("Failed to set remote description: %v", err)
+			}
+			answer, errAns := pc.CreateAnswer(nil)
+			if errAns != nil {
+				t.Fatalf("Failed to create answer: %v", errAns)
+			}
+			if err := pc.SetLocalDescription(answer); err != nil {
+				t.Fatalf("Failed to set local description: %v", err)
+			}
+
+			answerBytes, errAnsSDP := json.Marshal(answer)
+			if errAnsSDP != nil {
+				t.Fatalf("Failed to marshal SDP: %v", errAnsSDP)
+			}
+			var result string
+			if err := page.RunScript(
+				"pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)))",
+				map[string]interface{}{"answer": string(answerBytes)},
+				&result,
+			); err != nil {
+				t.Fatalf("Failed to run script to set SDP: %v", err)
+			}
+
+			select {
+			case <-chStarted:
+			case <-time.After(5 * time.Second):
+				t.Fatal("Timeout")
+			}
+			select {
+			case <-chValid:
+			case <-time.After(5 * time.Second):
+				t.Fatal("Timeout")
+			}
+		})
+	}
+}
+
+type stats []struct {
+	Kind            string `json:"kind"`
+	Type            string `json:"type"`
+	PacketsReceived int    `json:"packetsReceived"`
+}
+
+func logParseLoop(ctx context.Context, t *testing.T, page *agouti.Page, chStarted chan struct{}, chSDP chan *webrtc.SessionDescription, chStats chan stats) {
+	for {
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			return
+		}
+		logs, errLog := page.ReadNewLogs("browser")
+		if errLog != nil {
+			t.Errorf("Failed to read log: %v", errLog)
+			return
+		}
+		for _, log := range logs {
+			k, v, ok := parseLog(log)
+			if !ok {
+				t.Log(log.Message)
+				continue
+			}
+			switch k {
+			case "connection":
+				switch v {
+				case "connected":
+					close(chStarted)
+				case "failed":
+					t.Error("Browser reported connection failed")
+					return
+				}
+			case "sdp":
+				sdp := &webrtc.SessionDescription{}
+				if err := json.Unmarshal([]byte(v), sdp); err != nil {
+					t.Errorf("Failed to unmarshal SDP: %v", err)
+					return
+				}
+				chSDP <- sdp
+			case "stats":
+				if chStats == nil {
+					break
+				}
+				s := &stats{}
+				if err := json.Unmarshal([]byte(v), &s); err != nil {
+					t.Errorf("Failed to parse log: %v", err)
+					break
+				}
+				select {
+				case chStats <- *s:
+				case <-time.After(10 * time.Millisecond):
+				}
+			default:
+				t.Log(log.Message)
+			}
+		}
 	}
 }
 

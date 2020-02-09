@@ -21,6 +21,12 @@ pc.onicecandidate = event => {
   }
 }
 pc.addTransceiver('audio', {'direction': 'recvonly'})
+
+const dc = pc.createDataChannel("upper")
+dc.onmessage = event => {
+  dc.send(event.data.toUpperCase())
+}
+
 pc.createOffer().then(d => pc.setLocalDescription(d)).catch(console.log)
 
 const statsReport = async () => {
@@ -31,4 +37,5 @@ const statsReport = async () => {
   })
   console.log("stats", JSON.stringify(data))
 }
+
 </script>
