@@ -1,3 +1,5 @@
+// +build !js
+
 package webrtc
 
 import (
@@ -171,8 +173,8 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 	}
 
 	for _, mt := range transceivers {
-		if mt.Sender != nil && mt.Sender.track != nil {
-			track := mt.Sender.track
+		if mt.Sender() != nil && mt.Sender().track != nil {
+			track := mt.Sender().track
 			media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.ID())
 			if !isPlanB {
 				media = media.WithPropertyAttribute("msid:" + track.Label() + " " + track.ID())
@@ -181,7 +183,7 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 		}
 	}
 
-	media = media.WithPropertyAttribute(t.Direction.String())
+	media = media.WithPropertyAttribute(t.Direction().String())
 
 	addCandidatesToMediaDescriptions(candidates, media)
 	d.WithMedia(media)

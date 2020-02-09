@@ -612,7 +612,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 			for {
 				// keep going until we can't get any more
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-				if t.Direction == RTPTransceiverDirectionInactive {
+				if t.Direction() == RTPTransceiverDirectionInactive {
 					break
 				}
 				mediaTransceivers = append(mediaTransceivers, t)
@@ -947,15 +947,15 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 			t := localTransceivers[i]
 
 			if (incomingTracks[ssrc].kind != t.kind) ||
-				(t.Direction != RTPTransceiverDirectionRecvonly && t.Direction != RTPTransceiverDirectionSendrecv) ||
-				(t.Receiver) == nil ||
-				(t.Receiver.haveReceived()) {
+				(t.Direction() != RTPTransceiverDirectionRecvonly && t.Direction() != RTPTransceiverDirectionSendrecv) ||
+				(t.Receiver()) == nil ||
+				(t.Receiver().haveReceived()) {
 				continue
 			}
 
 			delete(incomingTracks, ssrc)
 			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
-			go pc.startReceiver(incoming, t.Receiver)
+			go pc.startReceiver(incoming, t.Receiver())
 			break
 		}
 	}
@@ -969,7 +969,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 				continue
 			}
-			go pc.startReceiver(incoming, t.Receiver)
+			go pc.startReceiver(incoming, t.Receiver())
 		}
 	}
 }
@@ -977,12 +977,12 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 // startRTPSenders starts all outbound RTP streams
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
 	for _, tranceiver := range currentTransceivers {
-		if tranceiver.Sender != nil && !tranceiver.Sender.hasSent() {
-			err := tranceiver.Sender.Send(RTPSendParameters{
+		if tranceiver.Sender() != nil && !tranceiver.Sender().hasSent() {
+			err := tranceiver.Sender().Send(RTPSendParameters{
 				Encodings: RTPEncodingParameters{
 					RTPCodingParameters{
-						SSRC:        tranceiver.Sender.track.SSRC(),
-						PayloadType: tranceiver.Sender.track.PayloadType(),
+						SSRC:        tranceiver.Sender().track.SSRC(),
+						PayloadType: tranceiver.Sender().track.PayloadType(),
 					},
 				}})
 			if err != nil {
@@ -1057,7 +1057,7 @@ func (pc *PeerConnection) drainSRTP() {
 					pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 					return false
 				}
-				go pc.startReceiver(incoming, t.Receiver)
+				go pc.startReceiver(incoming, t.Receiver())
 				return true
 			}
 		}
@@ -1108,6 +1108,9 @@ func (pc *PeerConnection) drainSRTP() {
 // determine if setRemoteDescription has already been called.
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-remotedescription
 func (pc *PeerConnection) RemoteDescription() *SessionDescription {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
 	if pc.pendingRemoteDescription != nil {
 		return pc.pendingRemoteDescription
 	}
@@ -1152,8 +1155,8 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 
 	result := []*RTPSender{}
 	for _, tranceiver := range pc.rtpTransceivers {
-		if tranceiver.Sender != nil {
-			result = append(result, tranceiver.Sender)
+		if tranceiver.Sender() != nil {
+			result = append(result, tranceiver.Sender())
 		}
 	}
 	return result
@@ -1166,8 +1169,8 @@ func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 
 	result := []*RTPReceiver{}
 	for _, tranceiver := range pc.rtpTransceivers {
-		if tranceiver.Receiver != nil {
-			result = append(result, tranceiver.Receiver)
+		if tranceiver.Receiver() != nil {
+			result = append(result, tranceiver.Receiver())
 		}
 	}
 	return result
@@ -1189,11 +1192,11 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 
 	var transceiver *RTPTransceiver
 	for _, t := range pc.GetTransceivers() {
-		if !t.stopped && t.Sender != nil &&
-			!t.Sender.hasSent() &&
-			t.Receiver != nil &&
-			t.Receiver.Track() != nil &&
-			t.Receiver.Track().Kind() == track.Kind() {
+		if !t.stopped && t.Sender() != nil &&
+			!t.Sender().hasSent() &&
+			t.Receiver() != nil &&
+			t.Receiver().Track() != nil &&
+			t.Receiver().Track().Kind() == track.Kind() {
 			transceiver = t
 			break
 		}
@@ -1202,7 +1205,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		if err := transceiver.setSendingTrack(track); err != nil {
 			return nil, err
 		}
-		return transceiver.Sender, nil
+		return transceiver.Sender(), nil
 	}
 
 	transceiver, err := pc.AddTransceiverFromTrack(track)
@@ -1210,7 +1213,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, err
 	}
 
-	return transceiver.Sender, nil
+	return transceiver.Sender(), nil
 }
 
 // AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
@@ -1227,7 +1230,7 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) error {
 
 	var transceiver *RTPTransceiver
 	for _, t := range pc.GetTransceivers() {
-		if t.Sender == sender {
+		if t.Sender() == sender {
 			transceiver = t
 			break
 		}
@@ -1522,12 +1525,11 @@ func (pc *PeerConnection) newRTPTransceiver(
 	direction RTPTransceiverDirection,
 	kind RTPCodecType,
 ) *RTPTransceiver {
-	t := &RTPTransceiver{
-		Receiver:  receiver,
-		Sender:    sender,
-		Direction: direction,
-		kind:      kind,
-	}
+	t := &RTPTransceiver{kind: kind}
+	t.setReceiver(receiver)
+	t.setSender(sender)
+	t.setDirection(direction)
+
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
@@ -1682,23 +1684,23 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceiver) {
 	trackDetails := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
 	for _, t := range currentTransceivers {
-		if t.Receiver == nil || t.Receiver.Track() == nil {
+		if t.Receiver() == nil || t.Receiver().Track() == nil {
 			continue
-		} else if _, ok := trackDetails[t.Receiver.Track().ssrc]; ok {
+		} else if _, ok := trackDetails[t.Receiver().Track().ssrc]; ok {
 			continue
 		}
 
-		if err := t.Receiver.Stop(); err != nil {
+		if err := t.Receiver().Stop(); err != nil {
 			pc.log.Warnf("Failed to stop RtpReceiver: %s", err)
 			continue
 		}
 
-		receiver, err := pc.api.NewRTPReceiver(t.Receiver.kind, pc.dtlsTransport)
+		receiver, err := pc.api.NewRTPReceiver(t.Receiver().kind, pc.dtlsTransport)
 		if err != nil {
 			pc.log.Warnf("Failed to create new RtpReceiver: %s", err)
 			continue
 		}
-		t.Receiver = receiver
+		t.setReceiver(receiver)
 	}
 
 	pc.startRTPSenders(currentTransceivers)

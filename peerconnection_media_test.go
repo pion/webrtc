@@ -610,11 +610,11 @@ func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	if transceiver.Receiver != nil {
+	if transceiver.Receiver() != nil {
 		t.Errorf("Transceiver shouldn't have a receiver")
 	}
 
-	if transceiver.Sender == nil {
+	if transceiver.Sender() == nil {
 		t.Errorf("Transceiver should have a sender")
 	}
 
@@ -668,11 +668,11 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	if transceiver.Receiver == nil {
+	if transceiver.Receiver() == nil {
 		t.Errorf("Transceiver should have a receiver")
 	}
 
-	if transceiver.Sender == nil {
+	if transceiver.Sender() == nil {
 		t.Errorf("Transceiver should have a sender")
 	}
 
@@ -711,11 +711,11 @@ func TestAddTransceiver(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	if transceiver.Receiver == nil {
+	if transceiver.Receiver() == nil {
 		t.Errorf("Transceiver should have a receiver")
 	}
 
-	if transceiver.Sender == nil {
+	if transceiver.Sender() == nil {
 		t.Errorf("Transceiver should have a sender")
 	}
 
@@ -750,11 +750,11 @@ func TestAddTransceiverFromKind(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	if transceiver.Receiver == nil {
+	if transceiver.Receiver() == nil {
 		t.Errorf("Transceiver should have a receiver")
 	}
 
-	if transceiver.Sender != nil {
+	if transceiver.Sender() != nil {
 		t.Errorf("Transceiver shouldn't have a sender")
 	}
 
