@@ -1,7 +1,11 @@
 name: Browser E2E
 on:
   pull_request:
-    branches: master
+    branches:
+      - master
+  push:
+    branches:
+      - master
 
 jobs:
   e2e-test:
