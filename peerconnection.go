@@ -654,91 +654,98 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	cur := pc.signalingState
-	setLocal := stateChangeOpSetLocal
-	setRemote := stateChangeOpSetRemote
-	newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous offer")}
-	newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous answer")}
+	nextState, err := func() (SignalingState, error) {
+		pc.mu.Lock()
+		defer pc.mu.Unlock()
 
-	var nextState SignalingState
-	var err error
-	switch op {
-	case setLocal:
-		switch sd.Type {
-		// stable->SetLocal(offer)->have-local-offer
-		case SDPTypeOffer:
-			if sd.SDP != pc.lastOffer {
-				return newSDPDoesNotMatchOffer
+		cur := pc.signalingState
+		setLocal := stateChangeOpSetLocal
+		setRemote := stateChangeOpSetRemote
+		newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous offer")}
+		newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous answer")}
+
+		var nextState SignalingState
+		var err error
+		switch op {
+		case setLocal:
+			switch sd.Type {
+			// stable->SetLocal(offer)->have-local-offer
+			case SDPTypeOffer:
+				if sd.SDP != pc.lastOffer {
+					return nextState, newSDPDoesNotMatchOffer
+				}
+				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalOffer, setLocal, sd.Type)
+				if err == nil {
+					pc.pendingLocalDescription = sd
+				}
+			// have-remote-offer->SetLocal(answer)->stable
+			// have-local-pranswer->SetLocal(answer)->stable
+			case SDPTypeAnswer:
+				if sd.SDP != pc.lastAnswer {
+					return nextState, newSDPDoesNotMatchAnswer
+				}
+				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
+				if err == nil {
+					pc.currentLocalDescription = sd
+					pc.currentRemoteDescription = pc.pendingRemoteDescription
+					pc.pendingRemoteDescription = nil
+					pc.pendingLocalDescription = nil
+				}
+			case SDPTypeRollback:
+				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
+				if err == nil {
+					pc.pendingLocalDescription = nil
+				}
+			// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
+			case SDPTypePranswer:
+				if sd.SDP != pc.lastAnswer {
+					return nextState, newSDPDoesNotMatchAnswer
+				}
+				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalPranswer, setLocal, sd.Type)
+				if err == nil {
+					pc.pendingLocalDescription = sd
+				}
+			default:
+				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
 			}
-			nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalOffer, setLocal, sd.Type)
-			if err == nil {
-				pc.pendingLocalDescription = sd
-			}
-		// have-remote-offer->SetLocal(answer)->stable
-		// have-local-pranswer->SetLocal(answer)->stable
-		case SDPTypeAnswer:
-			if sd.SDP != pc.lastAnswer {
-				return newSDPDoesNotMatchAnswer
-			}
-			nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
-			if err == nil {
-				pc.currentLocalDescription = sd
-				pc.currentRemoteDescription = pc.pendingRemoteDescription
-				pc.pendingRemoteDescription = nil
-				pc.pendingLocalDescription = nil
-			}
-		case SDPTypeRollback:
-			nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
-			if err == nil {
-				pc.pendingLocalDescription = nil
-			}
-		// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
-		case SDPTypePranswer:
-			if sd.SDP != pc.lastAnswer {
-				return newSDPDoesNotMatchAnswer
-			}
-			nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalPranswer, setLocal, sd.Type)
-			if err == nil {
-				pc.pendingLocalDescription = sd
+		case setRemote:
+			switch sd.Type {
+			// stable->SetRemote(offer)->have-remote-offer
+			case SDPTypeOffer:
+				nextState, err = checkNextSignalingState(cur, SignalingStateHaveRemoteOffer, setRemote, sd.Type)
+				if err == nil {
+					pc.pendingRemoteDescription = sd
+				}
+			// have-local-offer->SetRemote(answer)->stable
+			// have-remote-pranswer->SetRemote(answer)->stable
+			case SDPTypeAnswer:
+				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setRemote, sd.Type)
+				if err == nil {
+					pc.currentRemoteDescription = sd
+					pc.currentLocalDescription = pc.pendingLocalDescription
+					pc.pendingRemoteDescription = nil
+					pc.pendingLocalDescription = nil
+				}
+			case SDPTypeRollback:
+				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setRemote, sd.Type)
+				if err == nil {
+					pc.pendingRemoteDescription = nil
+				}
+			// have-local-offer->SetRemote(pranswer)->have-remote-pranswer
+			case SDPTypePranswer:
+				nextState, err = checkNextSignalingState(cur, SignalingStateHaveRemotePranswer, setRemote, sd.Type)
+				if err == nil {
+					pc.pendingRemoteDescription = sd
+				}
+			default:
+				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
 			}
 		default:
-			return &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
+			return nextState, &rtcerr.OperationError{Err: fmt.Errorf("unhandled state change op: %q", op)}
 		}
-	case setRemote:
-		switch sd.Type {
-		// stable->SetRemote(offer)->have-remote-offer
-		case SDPTypeOffer:
-			nextState, err = checkNextSignalingState(cur, SignalingStateHaveRemoteOffer, setRemote, sd.Type)
-			if err == nil {
-				pc.pendingRemoteDescription = sd
-			}
-		// have-local-offer->SetRemote(answer)->stable
-		// have-remote-pranswer->SetRemote(answer)->stable
-		case SDPTypeAnswer:
-			nextState, err = checkNextSignalingState(cur, SignalingStateStable, setRemote, sd.Type)
-			if err == nil {
-				pc.currentRemoteDescription = sd
-				pc.currentLocalDescription = pc.pendingLocalDescription
-				pc.pendingRemoteDescription = nil
-				pc.pendingLocalDescription = nil
-			}
-		case SDPTypeRollback:
-			nextState, err = checkNextSignalingState(cur, SignalingStateStable, setRemote, sd.Type)
-			if err == nil {
-				pc.pendingRemoteDescription = nil
-			}
-		// have-local-offer->SetRemote(pranswer)->have-remote-pranswer
-		case SDPTypePranswer:
-			nextState, err = checkNextSignalingState(cur, SignalingStateHaveRemotePranswer, setRemote, sd.Type)
-			if err == nil {
-				pc.pendingRemoteDescription = sd
-			}
-		default:
-			return &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
-		}
-	default:
-		return &rtcerr.OperationError{Err: fmt.Errorf("unhandled state change op: %q", op)}
-	}
+
+		return nextState, nil
+	}()
 
 	if err == nil {
 		pc.signalingState = nextState
