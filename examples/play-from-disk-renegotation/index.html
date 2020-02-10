@@ -1,0 +1,71 @@
+<html>
+  <head>
+    <title>play-from-disk-renegotation</title>
+  </head>
+
+  <body>
+    <button onclick="window.addVideo()"> Add Video </button><br />
+    <button onclick="window.removeVideo()"> Remove Video </button><br />
+
+
+    <h3> Video </h3>
+    <div id="remoteVideos"></div> <br />
+
+    <h3> Logs </h3>
+    <div id="logs"></div>
+  </body>
+
+  <script>
+    let activeVideos = 0
+    let pc = new RTCPeerConnection()
+    pc.ontrack = function (event) {
+      var el = document.createElement(event.track.kind)
+      el.srcObject = event.streams[0]
+      el.autoplay = true
+      el.controls = true
+
+      event.track.onmute = function(event) {
+        el.parentNode.removeChild(el);
+      }
+
+      document.getElementById('remoteVideos').appendChild(el)
+    }
+
+    let doSignaling = method => {
+      pc.createOffer()
+        .then(offer => {
+          pc.setLocalDescription(offer)
+
+          return fetch(`/${method}`, {
+            method: 'post',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(offer)
+          })
+        })
+        .then(res => res.json())
+        .then(res => pc.setRemoteDescription(res))
+        .catch(alert)
+    }
+
+    // Create a noop DataChannel. By default PeerConnections do not connect
+    // if they have no media tracks or DataChannels
+    pc.createDataChannel('noop')
+    doSignaling('createPeerConnection')
+
+    window.addVideo = () => {
+      if (pc.getTransceivers().length <= activeVideos) {
+        pc.addTransceiver('video')
+        activeVideos++
+      }
+
+      doSignaling('addVideo')
+    };
+
+    window.removeVideo = () => {
+      doSignaling('removeVideo')
+    };
+  </script>
+</html>
