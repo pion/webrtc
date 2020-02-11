@@ -50,11 +50,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// Set the remote SessionDescription
-	err = peerConnection.SetRemoteDescription(offer)
-	if err != nil {
-		panic(err)
-	}
 
 	// Create Track that we send video back to browser on
 	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video", "pion")
@@ -64,6 +59,12 @@ func main() {
 
 	// Add this newly created track to the PeerConnection
 	if _, err = peerConnection.AddTrack(outputTrack); err != nil {
+		panic(err)
+	}
+
+	// Set the remote SessionDescription
+	err = peerConnection.SetRemoteDescription(offer)
+	if err != nil {
 		panic(err)
 	}
 
