@@ -37,6 +37,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					log.Warnf("Failed to parse SSRC: %v", err)
 					continue
 				}
+				if existingValues, ok := incomingTracks[uint32(ssrc)]; ok && existingValues.label != "" && existingValues.id != "" {
+					continue // This ssrc is already fully defined
+				}
 
 				trackID := ""
 				trackLabel := ""
@@ -46,9 +49,6 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 				}
 
 				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
-				if trackID != "" && trackLabel != "" {
-					break // Remote provided Label+ID, we have all the information we need
-				}
 			}
 		}
 	}
