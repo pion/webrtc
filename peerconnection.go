@@ -423,8 +423,13 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			}
 		}
 
-		mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
-		mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
+		if len(video) > 1 {
+			mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
+		}
+
+		if len(audio) > 1 {
+			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
+		}
 		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 	} else {
 		for _, t := range pc.GetTransceivers() {
