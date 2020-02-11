@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -244,17 +245,6 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 		assert.NoError(t, pc.Close())
 	}
 }
-
-// TODO - This unittest needs to be completed when CreateDataChannel is complete
-// func TestPeerConnection_CreateDataChannel(t *testing.T) {
-// 	pc, err := New(Configuration{})
-// 	assert.Nil(t, err)
-//
-// 	_, err = pc.CreateDataChannel("data", &DataChannelInit{
-//
-// 	})
-// 	assert.Nil(t, err)
-// }
 
 func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	lim := test.TimeOut(time.Second * 5)
@@ -705,4 +695,63 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 		t.Fatal("Closed was never seen")
 	case <-seenClosed:
 	}
+}
+
+// Assert that when Trickle is enabled two connections can connect
+func TestPeerConnectionTrickle(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.SetTrickle(true)
+
+	api := NewAPI(WithSettingEngine(s))
+	offerPC, answerPC, err := api.newPair()
+	assert.NoError(t, err)
+
+	offerPC.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+		}
+	})
+
+	answerPC.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, offerPC.AddICECandidate(c.ToJSON()))
+		}
+	})
+
+	offerPCConnected, offerPCConnectedCancel := context.WithCancel(context.Background())
+	offerPC.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateConnected {
+			offerPCConnectedCancel()
+		}
+	})
+
+	answerPCConnected, answerPCConnectedCancel := context.WithCancel(context.Background())
+	answerPC.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateConnected {
+			answerPCConnectedCancel()
+		}
+	})
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	assert.NoError(t, offerPC.SetRemoteDescription(answer))
+
+	<-answerPCConnected.Done()
+	<-offerPCConnected.Done()
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
 }
