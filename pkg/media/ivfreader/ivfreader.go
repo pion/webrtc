@@ -37,7 +37,8 @@ type IVFFrameHeader struct {
 
 // IVFReader is used to read IVF files and return frame payloads
 type IVFReader struct {
-	stream io.Reader
+	stream               io.Reader
+	bytesReadSuccesfully int64
 }
 
 // NewWith returns a new IVF reader and IVF file header
@@ -59,6 +60,13 @@ func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	return reader, header, nil
 }
 
+// ResetReader resets the internal stream of IVFReader. This is useful
+// for live streams, where the end of the file might be read without the
+// data being finished.
+func (i *IVFReader) ResetReader(reset func(bytesRead int64) io.Reader) {
+	i.stream = reset(i.bytesReadSuccesfully)
+}
+
 // ParseNextFrame reads from stream and returns IVF frame payload, header,
 // and an error if there is incomplete frame data.
 // Returns all nil values when no more frames are available.
@@ -67,6 +75,7 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 	var header *IVFFrameHeader
 
 	bytesRead, err := i.stream.Read(buffer)
+	headerBytesRead := bytesRead
 	if err != nil {
 		return nil, nil, err
 	} else if bytesRead != ivfFrameHeaderSize {
@@ -87,6 +96,8 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 	} else if bytesRead != int(header.FrameSize) {
 		return nil, nil, fmt.Errorf("incomplete frame data")
 	}
+
+	i.bytesReadSuccesfully += int64(headerBytesRead) + int64(bytesRead)
 	return payload, header, nil
 }
 
@@ -123,5 +134,6 @@ func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
 		return nil, fmt.Errorf(errStr)
 	}
 
+	i.bytesReadSuccesfully += int64(bytesRead)
 	return header, nil
 }
