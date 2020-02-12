@@ -89,6 +89,8 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 			0xDE, 0xAD, 0xBE, 0xEF,
 		},
 		"Payload value should be 0xDEADBEEF")
+	assert.Equal(int64(ivfFrameHeaderSize+ivfFileHeaderSize+header.FrameSize), reader.bytesReadSuccesfully)
+	previousBytesRead := reader.bytesReadSuccesfully
 
 	// Parse Frame #2
 	payload, header, err = reader.ParseNextFrame()
@@ -103,6 +105,7 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 			0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
 		},
 		"Payload value should be 0xDEADBEEFDEADBEEF")
+	assert.Equal(int64(ivfFrameHeaderSize+header.FrameSize)+previousBytesRead, reader.bytesReadSuccesfully)
 }
 
 func TestIVFReader_ParseIncompleteFrameHeader(t *testing.T) {
