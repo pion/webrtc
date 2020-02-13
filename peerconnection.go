@@ -820,6 +820,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	currentTransceivers := pc.GetTransceivers()
 	haveRemoteDescription := pc.currentRemoteDescription != nil
+
 	desc.parsed = &sdp.SessionDescription{}
 	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
 		return err
@@ -834,56 +835,30 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	weOffer := true
-	remoteUfrag := ""
-	remotePwd := ""
 	if desc.Type == SDPTypeOffer {
 		weOffer = false
 	}
+
 	remoteIsLite := false
 	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeyICELite); haveRemoteIs && liteValue == sdp.AttrKeyICELite {
 		remoteIsLite = true
 	}
 
-	fingerprint, haveFingerprint := desc.parsed.Attribute("fingerprint")
-	for _, m := range pc.RemoteDescription().parsed.MediaDescriptions {
-		if !haveFingerprint {
-			fingerprint, haveFingerprint = m.Attribute("fingerprint")
-		}
+	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
+	if err != nil {
+		return err
+	}
 
-		for _, a := range m.Attributes {
-			switch {
-			case a.IsICECandidate():
-				sdpCandidate, err := a.ToICECandidate()
-				if err != nil {
-					return err
-				}
+	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed)
+	if err != nil {
+		return err
+	}
 
-				candidate, err := newICECandidateFromSDP(sdpCandidate)
-				if err != nil {
-					return err
-				}
-
-				if err = pc.iceTransport.AddRemoteCandidate(candidate); err != nil {
-					return err
-				}
-			case strings.HasPrefix(*a.String(), "ice-ufrag"):
-				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
-			case strings.HasPrefix(*a.String(), "ice-pwd"):
-				remotePwd = (*a.String())[len("ice-pwd:"):]
-			}
+	for _, c := range candidates {
+		if err = pc.iceTransport.AddRemoteCandidate(c); err != nil {
+			return err
 		}
 	}
-
-	if !haveFingerprint {
-		return fmt.Errorf("could not find fingerprint")
-	}
-
-	parts := strings.Split(fingerprint, " ")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid fingerprint")
-	}
-	fingerprint = parts[1]
-	fingerprintHash := parts[0]
 
 	iceRole := ICERoleControlled
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
