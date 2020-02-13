@@ -265,3 +265,70 @@ func getPeerDirection(media *sdp.MediaDescription) RTPTransceiverDirection {
 	}
 	return RTPTransceiverDirection(Unknown)
 }
+
+func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
+	fingerprints := []string{}
+
+	if fingerprint, haveFingerprint := desc.Attribute("fingerprint"); haveFingerprint {
+		fingerprints = append(fingerprints, fingerprint)
+	}
+
+	for _, m := range desc.MediaDescriptions {
+		if fingerprint, haveFingerprint := m.Attribute("fingerprint"); haveFingerprint {
+			fingerprints = append(fingerprints, fingerprint)
+		}
+	}
+
+	if len(fingerprints) < 1 {
+		return "", "", ErrSessionDescriptionNoFingerprint
+	}
+
+	for _, m := range fingerprints {
+		if m != fingerprints[0] {
+			return "", "", ErrSessionDescriptionConflictingFingerprints
+		}
+	}
+
+	parts := strings.Split(fingerprints[0], " ")
+	if len(parts) != 2 {
+		return "", "", ErrSessionDescriptionInvalidFingerprint
+	}
+	return parts[1], parts[0], nil
+}
+
+func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandidate, error) {
+	candidates := []ICECandidate{}
+	remotePwd := ""
+	remoteUfrag := ""
+
+	for _, m := range desc.MediaDescriptions {
+		for _, a := range m.Attributes {
+			switch {
+			case a.IsICECandidate():
+				sdpCandidate, err := a.ToICECandidate()
+				if err != nil {
+					return "", "", nil, err
+				}
+
+				candidate, err := newICECandidateFromSDP(sdpCandidate)
+				if err != nil {
+					return "", "", nil, err
+				}
+
+				candidates = append(candidates, candidate)
+			case strings.HasPrefix(*a.String(), "ice-ufrag"):
+				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
+			case strings.HasPrefix(*a.String(), "ice-pwd"):
+				remotePwd = (*a.String())[len("ice-pwd:"):]
+			}
+		}
+	}
+
+	if remoteUfrag == "" {
+		return "", "", nil, ErrSessionDescriptionMissingIceUfrag
+	} else if remotePwd == "" {
+		return "", "", nil, ErrSessionDescriptionMissingIcePwd
+	}
+
+	return remoteUfrag, remotePwd, candidates, nil
+}

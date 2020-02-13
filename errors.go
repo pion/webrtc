@@ -91,4 +91,24 @@ var (
 	// ErrSenderNotCreatedByConnection indicates RemoveTrack was called with a RtpSender not created
 	// by this PeerConnection
 	ErrSenderNotCreatedByConnection = errors.New("RtpSender not created by this PeerConnection")
+
+	// ErrSessionDescriptionNoFingerprint indicates SetRemoteDescription was called with a SessionDescription that has no
+	// fingerprint
+	ErrSessionDescriptionNoFingerprint = errors.New("SetRemoteDescription called with no fingerprint")
+
+	// ErrSessionDescriptionInvalidFingerprint indicates SetRemoteDescription was called with a SessionDescription that
+	// has an invalid fingerprint
+	ErrSessionDescriptionInvalidFingerprint = errors.New("SetRemoteDescription called with an invalid fingerprint")
+
+	// ErrSessionDescriptionConflictingFingerprints indicates SetRemoteDescription was called with a SessionDescription that
+	// has an conflicting fingerprints
+	ErrSessionDescriptionConflictingFingerprints = errors.New("SetRemoteDescription called with multiple conflicting fingerprint")
+
+	// ErrSessionDescriptionMissingIceUfrag indicates SetRemoteDescription was called with a SessionDescription that
+	// is missing an ice-ufrag value
+	ErrSessionDescriptionMissingIceUfrag = errors.New("SetRemoteDescription called with no ice-ufrag")
+
+	// ErrSessionDescriptionMissingIcePwd indicates SetRemoteDescription was called with a SessionDescription that
+	// is missing an ice-pwd value
+	ErrSessionDescriptionMissingIcePwd = errors.New("SetRemoteDescription called with no ice-pwd")
 )
