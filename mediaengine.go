@@ -92,17 +92,16 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 				codec = NewRTPOpusCodec(payloadType, clockRate)
 			case VP8:
 				codec = NewRTPVP8Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
 			case VP9:
 				codec = NewRTPVP9Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
 			case H264:
 				codec = NewRTPH264Codec(payloadType, clockRate)
-				codec.SDPFmtpLine = parameters
 			default:
 				// ignoring other codecs
 				continue
 			}
+			codec.SDPFmtpLine = parameters
+
 			m.RegisterCodec(codec)
 		}
 	}
