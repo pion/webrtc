@@ -69,9 +69,6 @@ a=ssrc:2949882636 msid:pion2 video
 a=ssrc:2949882636 mslabel:pion2
 a=ssrc:2949882636 label:video
 a=msid:pion2 video
-a=rtcp-fb:115 ccm fir
-a=rtcp-fb:115 nack
-a=rtcp-fb:115 nack pli
 m=application 9 DTLS/SCTP 5000
 c=IN IP4 0.0.0.0
 a=mid:2
@@ -86,26 +83,12 @@ a=sctpmap:5000 webrtc-datachannel 1024
 		}
 		t.Fatalf("Failed to find codec(%s) with PayloadType(%d)", name, payloadType)
 	}
-	assertCodecWithRtcpFeedback := func(payloadType uint8, rtcpFeedback []RTCPFeedback) {
-		codec, err := m.getCodec(payloadType)
-		assert.NoError(t, err)
-		assert.Len(t, codec.RTCPFeedback, len(rtcpFeedback))
-		for _, fb := range rtcpFeedback {
-			assert.Contains(t, codec.RTCPFeedback, fb)
-		}
-	}
 
 	m.RegisterDefaultCodecs()
 	assert.NoError(t, m.PopulateFromSDP(SessionDescription{SDP: sdpValue}))
 
 	assertCodecWithPayloadType(Opus, 111)
 	assertCodecWithPayloadType(VP8, 105)
-	assertCodecWithRtcpFeedback(105, []RTCPFeedback{})
 	assertCodecWithPayloadType(H264, 115)
-	assertCodecWithRtcpFeedback(115, []RTCPFeedback{
-		{Type: "ccm", Parameter: "fir"},
-		{Type: "nack"},
-		{Type: "nack", Parameter: "pli"},
-	})
 	assertCodecWithPayloadType(VP9, 135)
 }
