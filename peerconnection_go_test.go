@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"reflect"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -712,16 +713,35 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	offerPC, answerPC, err := api.newPair()
 	assert.NoError(t, err)
 
-	offerPC.OnICECandidate(func(c *ICECandidate) {
-		if c != nil {
-			assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+	addOrCacheCandidate := func(pc *PeerConnection, c *ICECandidate, candidateCache []ICECandidateInit) []ICECandidateInit {
+		if c == nil {
+			return candidateCache
 		}
+
+		if pc.RemoteDescription() == nil {
+			return append(candidateCache, c.ToJSON())
+		}
+
+		assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+		return candidateCache
+	}
+
+	candidateLock := sync.RWMutex{}
+
+	cachedOfferCandidates := []ICECandidateInit{}
+	offerPC.OnICECandidate(func(c *ICECandidate) {
+		candidateLock.Lock()
+		defer candidateLock.Unlock()
+
+		cachedOfferCandidates = addOrCacheCandidate(answerPC, c, cachedOfferCandidates)
 	})
 
+	cachedAnswerCandidates := []ICECandidateInit{}
 	answerPC.OnICECandidate(func(c *ICECandidate) {
-		if c != nil {
-			assert.NoError(t, offerPC.AddICECandidate(c.ToJSON()))
-		}
+		candidateLock.Lock()
+		defer candidateLock.Unlock()
+
+		cachedAnswerCandidates = addOrCacheCandidate(offerPC, c, cachedAnswerCandidates)
 	})
 
 	offerPCConnected, offerPCConnectedCancel := context.WithCancel(context.Background())
@@ -749,6 +769,15 @@ func TestPeerConnectionTrickle(t *testing.T) {
 
 	assert.NoError(t, answerPC.SetLocalDescription(answer))
 	assert.NoError(t, offerPC.SetRemoteDescription(answer))
+
+	candidateLock.Lock()
+	for _, c := range cachedAnswerCandidates {
+		assert.NoError(t, offerPC.AddICECandidate(c))
+	}
+	for _, c := range cachedOfferCandidates {
+		assert.NoError(t, answerPC.AddICECandidate(c))
+	}
+	candidateLock.Unlock()
 
 	<-answerPCConnected.Done()
 	<-offerPCConnected.Done()
