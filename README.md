@@ -138,6 +138,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Luke S](https://github.com/encounter)
 * [Hendrik Hofstadt](https://github.com/hendrikhofstadt)
 * [Clayton McCray](https://github.com/ClaytonMcCray)
+* [lawl](https://github.com/lawl)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
