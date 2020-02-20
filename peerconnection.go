@@ -1578,6 +1578,9 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 // ConnectionState attribute returns the connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
 	return pc.connectionState
 }
 
