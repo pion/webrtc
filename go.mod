@@ -15,5 +15,5 @@ require (
 	github.com/pion/srtp v1.2.7
 	github.com/pion/transport v0.8.10
 	github.com/sclevine/agouti v3.0.0+incompatible
-	github.com/stretchr/testify v1.5.0
+	github.com/stretchr/testify v1.5.1
 )
