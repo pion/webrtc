@@ -127,3 +127,68 @@ func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// OnTrack should only fire once for each SSRC across renegotations
+func TestPeerConnection_Renegotation_OnTrack_FireOnce(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	assert.NoError(t, err)
+
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+
+	seenPacket := &atomicBool{}
+	onTrackFired := atomicBool{}
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+		onTrackFired.set(true)
+
+		for {
+			if _, err = track.ReadRTP(); err == io.EOF {
+				return
+			}
+
+			assert.NoError(t, err)
+			seenPacket.set(true)
+		}
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	for {
+		time.Sleep(20 * time.Millisecond)
+		assert.NoError(t, vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+		if onTrackFired.get() && seenPacket.get() {
+			break
+		}
+	}
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	onTrackFired.set(false)
+	seenPacket.set(false)
+	for {
+		time.Sleep(20 * time.Millisecond)
+		assert.NoError(t, vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+		if seenPacket.get() {
+			break
+		}
+	}
+
+	assert.False(t, onTrackFired.get())
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
