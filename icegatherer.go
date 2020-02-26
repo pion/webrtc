@@ -25,6 +25,7 @@ type ICEGatherer struct {
 
 	onLocalCandidateHdlr func(candidate *ICECandidate)
 	onStateChangeHdlr    func(state ICEGathererState)
+	onFinishHdlr         func()
 
 	api *API
 }
@@ -144,6 +145,11 @@ func (g *ICEGatherer) Gather() error {
 		onLocalCandidateHdlr = func(*ICECandidate) {}
 	}
 
+	onFinishHdlr := g.onFinishHdlr
+	if onFinishHdlr == nil {
+		onFinishHdlr = func() {}
+	}
+
 	isTrickle := g.api.settingEngine.candidates.ICETrickle
 	agent := g.agent
 
@@ -166,6 +172,7 @@ func (g *ICEGatherer) Gather() error {
 			g.lock.Unlock()
 
 			onLocalCandidateHdlr(nil)
+			onFinishHdlr()
 		}
 	}); err != nil {
 		return err
@@ -229,6 +236,14 @@ func (g *ICEGatherer) OnStateChange(f func(ICEGathererState)) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.onStateChangeHdlr = f
+}
+
+// OnFinish fires when the gathering is finished and the OnLocalCandidate
+// handler returns.
+func (g *ICEGatherer) OnFinish(f func()) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.onFinishHdlr = f
 }
 
 // State indicates the current state of the ICE gatherer.
