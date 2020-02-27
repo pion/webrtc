@@ -237,6 +237,8 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
 // candidate is found.
+// Take note that the handler is gonna be called with a nil pointer when
+// gathering is finished.
 func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
 	pc.iceGatherer.OnLocalCandidate(f)
 }

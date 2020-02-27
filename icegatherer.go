@@ -218,6 +218,7 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 }
 
 // OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
+// Take note that the handler is gonna be called with a nil pointer when gathering is finished.
 func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
