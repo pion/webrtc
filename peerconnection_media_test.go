@@ -3,12 +3,13 @@
 package webrtc
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"math/rand"
 	"reflect"
-	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -499,10 +500,25 @@ func TestUndeclaredSSRC(t *testing.T) {
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
 
 	// Filter SSRC lines, and remove SCTP
-	offer.SDP = regexp.MustCompile("a=ssrc.*").ReplaceAllString(offer.SDP, "")
-	offer.SDP = regexp.MustCompile("m=application(?s).*").ReplaceAllString(offer.SDP, "")
-	offer.SDP = regexp.MustCompile("\n\n").ReplaceAllString(offer.SDP, "")
+	filteredSDP := ""
+	scanner := bufio.NewScanner(strings.NewReader(offer.SDP))
+	inApplicationMedia := false
+	for scanner.Scan() {
+		l := scanner.Text()
+		if strings.HasPrefix(l, "m=") {
+			inApplicationMedia = !inApplicationMedia
+		} else if strings.HasPrefix(l, "a=ssrc") {
+			continue
+		}
 
+		if inApplicationMedia {
+			continue
+		}
+
+		filteredSDP += l + "\n"
+	}
+
+	offer.SDP = filteredSDP
 	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
 	answer, err := pcAnswer.CreateAnswer(nil)

@@ -428,16 +428,16 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		if len(video) > 1 {
 			mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
 		}
-
 		if len(audio) > 1 {
 			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
 		}
 		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 	} else {
+		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+
 		for _, t := range pc.GetTransceivers() {
 			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
 		}
-		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
 	}
 
 	if d, err = populateSDP(d, isPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections); err != nil {
