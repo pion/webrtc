@@ -140,6 +140,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Clayton McCray](https://github.com/ClaytonMcCray)
 * [lawl](https://github.com/lawl)
 * [Jorropo](https://github.com/Jorropo)
+* [Akil](https://github.com/akilude)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
