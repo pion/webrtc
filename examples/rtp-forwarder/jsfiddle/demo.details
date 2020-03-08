@@ -1,0 +1,5 @@
+---
+ name: rtp-forwarder
+ description: Example of using Pion WebRTC to forward WebRTC streams via RTP
+ authors:
+   - Quentin Renard
