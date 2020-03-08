@@ -42,7 +42,7 @@ func awaitPromise(promise js.Value) (js.Value, error) {
 }
 
 func valueToUint16Pointer(val js.Value) *uint16 {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return nil
 	}
 	convertedVal := uint16(val.Int())
@@ -50,7 +50,7 @@ func valueToUint16Pointer(val js.Value) *uint16 {
 }
 
 func valueToStringPointer(val js.Value) *string {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return nil
 	}
 	stringVal := val.String()
@@ -79,28 +79,28 @@ func interfaceToValueOrUndefined(val interface{}) js.Value {
 }
 
 func valueToStringOrZero(val js.Value) string {
-	if val == js.Undefined() || val == js.Null() {
+	if jsValueIsUndefined(val) || jsValueIsNull(val) {
 		return ""
 	}
 	return val.String()
 }
 
 func valueToUint8OrZero(val js.Value) uint8 {
-	if val == js.Undefined() || val == js.Null() {
+	if jsValueIsUndefined(val) || jsValueIsNull(val) {
 		return 0
 	}
 	return uint8(val.Int())
 }
 
 func valueToUint16OrZero(val js.Value) uint16 {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return 0
 	}
 	return uint16(val.Int())
 }
 
 func valueToUint32OrZero(val js.Value) uint32 {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return 0
 	}
 	return uint32(val.Int())

@@ -486,7 +486,7 @@ func iceServerToValue(server ICEServer) js.Value {
 }
 
 func valueToConfiguration(configValue js.Value) Configuration {
-	if configValue == js.Null() || configValue == js.Undefined() {
+	if jsValueIsNull(configValue) || jsValueIsUndefined(configValue) {
 		return Configuration{}
 	}
 	return Configuration{
@@ -503,7 +503,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 }
 
 func valueToICEServers(iceServersValue js.Value) []ICEServer {
-	if iceServersValue == js.Null() || iceServersValue == js.Undefined() {
+	if jsValueIsNull(iceServersValue) || jsValueIsUndefined(iceServersValue) {
 		return nil
 	}
 	iceServers := make([]ICEServer, iceServersValue.Length())
@@ -524,7 +524,7 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 }
 
 func valueToICECandidate(val js.Value) *ICECandidate {
-	if val == js.Null() || val == js.Undefined() {
+	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return nil
 	}
 	protocol, _ := NewICEProtocol(val.Get("protocol").String())
@@ -564,7 +564,7 @@ func sessionDescriptionToValue(desc *SessionDescription) js.Value {
 }
 
 func valueToSessionDescription(descValue js.Value) *SessionDescription {
-	if descValue == js.Null() || descValue == js.Undefined() {
+	if jsValueIsNull(descValue) || jsValueIsUndefined(descValue) {
 		return nil
 	}
 	return &SessionDescription{
