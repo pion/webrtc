@@ -30,13 +30,16 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	offerChan := make(chan SessionDescription)
-	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
-		if candidate == nil {
-			offerChan <- *pcOffer.PendingLocalDescription()
-		}
-	})
+	iceGatheringState := pcOffer.ICEGatheringState()
+	offerChan := make(chan SessionDescription, 1)
 
+	if iceGatheringState != ICEGatheringStateComplete {
+		pcOffer.OnICECandidate(func(candidate *ICECandidate) {
+			if candidate == nil {
+				offerChan <- *pcOffer.PendingLocalDescription()
+			}
+		})
+	}
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -53,9 +56,11 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 		return err
 	}
 
-	timeout := time.After(3 * time.Second)
+	if iceGatheringState == ICEGatheringStateComplete {
+		offerChan <- offer
+	}
 	select {
-	case <-timeout:
+	case <-time.After(3 * time.Second):
 		return fmt.Errorf("timed out waiting to receive offer")
 	case offer := <-offerChan:
 		if err := pcAnswer.SetRemoteDescription(offer); err != nil {

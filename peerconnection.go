@@ -41,8 +41,9 @@ type PeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed          *atomicBool
-	negotiationNeeded bool
+	isClosed                     *atomicBool
+	negotiationNeeded            bool
+	nonTrickleCandidatesSignaled *atomicBool
 
 	lastOffer  string
 	lastAnswer string
@@ -89,13 +90,14 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		isClosed:           &atomicBool{},
-		negotiationNeeded:  false,
-		lastOffer:          "",
-		lastAnswer:         "",
-		signalingState:     SignalingStateStable,
-		iceConnectionState: ICEConnectionStateNew,
-		connectionState:    PeerConnectionStateNew,
+		isClosed:                     &atomicBool{},
+		negotiationNeeded:            false,
+		nonTrickleCandidatesSignaled: &atomicBool{},
+		lastOffer:                    "",
+		lastAnswer:                   "",
+		signalingState:               SignalingStateStable,
+		iceConnectionState:           ICEConnectionStateNew,
+		connectionState:              PeerConnectionStateNew,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
@@ -395,52 +397,17 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	d := sdp.NewJSEPSessionDescription(useIdentity)
-	if err := addFingerprints(d, pc.configuration.Certificates[0]); err != nil {
-		return SessionDescription{}, err
-	}
+	var (
+		d   *sdp.SessionDescription
+		err error
+	)
 
-	iceParams, err := pc.iceGatherer.GetLocalParameters()
-	if err != nil {
-		return SessionDescription{}, err
-	}
-
-	candidates, err := pc.iceGatherer.GetLocalCandidates()
-	if err != nil {
-		return SessionDescription{}, err
-	}
-
-	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
-	mediaSections := []mediaSection{}
-
-	if isPlanB {
-		video := make([]*RTPTransceiver, 0)
-		audio := make([]*RTPTransceiver, 0)
-
-		for _, t := range pc.GetTransceivers() {
-			if t.kind == RTPCodecTypeVideo {
-				video = append(video, t)
-			} else if t.kind == RTPCodecTypeAudio {
-				audio = append(audio, t)
-			}
-		}
-
-		if len(video) > 1 {
-			mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
-		}
-		if len(audio) > 1 {
-			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
-		}
-		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
+	if pc.currentRemoteDescription == nil {
+		d, err = pc.generateUnmatchedSDP(useIdentity)
 	} else {
-		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
-
-		for _, t := range pc.GetTransceivers() {
-			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
-		}
+		d, err = pc.generateMatchedSDP(useIdentity, true /*includeUnmatched */, connectionRoleFromDtlsRole(defaultDtlsRoleOffer))
 	}
-
-	if d, err = populateSDP(d, isPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections); err != nil {
+	if err != nil {
 		return SessionDescription{}, err
 	}
 
@@ -558,86 +525,13 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	d := sdp.NewJSEPSessionDescription(useIdentity)
-	if err := addFingerprints(d, pc.configuration.Certificates[0]); err != nil {
-		return SessionDescription{}, err
-	}
-
-	iceParams, err := pc.iceGatherer.GetLocalParameters()
-	if err != nil {
-		return SessionDescription{}, err
-	}
-
-	candidates, err := pc.iceGatherer.GetLocalCandidates()
-	if err != nil {
-		return SessionDescription{}, err
-	}
-
 	connectionRole := connectionRoleFromDtlsRole(pc.api.settingEngine.answeringDTLSRole)
 	if connectionRole == sdp.ConnectionRole(0) {
 		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
 	}
 
-	var t *RTPTransceiver
-	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
-	mediaSections := []mediaSection{}
-
-	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
-		midValue := getMidValue(media)
-		if midValue == "" {
-			return SessionDescription{}, fmt.Errorf("RemoteDescription contained media section without mid value")
-		}
-
-		if media.MediaName.Media == "application" {
-			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true})
-			continue
-		}
-
-		kind := NewRTPCodecType(media.MediaName.Media)
-		direction := getPeerDirection(media)
-		if kind == 0 || direction == RTPTransceiverDirection(Unknown) {
-			continue
-		}
-
-		t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-		mediaTransceivers := []*RTPTransceiver{t}
-		switch pc.configuration.SDPSemantics {
-		case SDPSemanticsUnifiedPlanWithFallback:
-			// If no match, process as unified-plan
-			if !detectedPlanB {
-				break
-			}
-			// If there was a match, fall through to plan-b
-			fallthrough
-		case SDPSemanticsPlanB:
-			if !detectedPlanB {
-				return SessionDescription{}, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
-			}
-			// If we're responding to a plan-b offer, then we should try to fill up this
-			// media entry with all matching local transceivers
-			for {
-				// keep going until we can't get any more
-				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-				if t.Direction() == RTPTransceiverDirectionInactive {
-					break
-				}
-				mediaTransceivers = append(mediaTransceivers, t)
-			}
-		case SDPSemanticsUnifiedPlan:
-			if detectedPlanB {
-				return SessionDescription{}, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
-			}
-		}
-
-		mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
-	}
-
-	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
-		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
-	}
-
-	if d, err = populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections); err != nil {
+	d, err := pc.generateMatchedSDP(useIdentity, false /*includeUnmatched */, connectionRole)
+	if err != nil {
 		return SessionDescription{}, err
 	}
 
@@ -793,10 +687,11 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	// setup while also support the old trickle=false synchronous gathering
 	// process this is necessary to avoid calling Gather() in multiple
 	// places; which causes race conditions. (issue-707)
-	if !pc.api.settingEngine.candidates.ICETrickle {
+	if !pc.api.settingEngine.candidates.ICETrickle && !pc.nonTrickleCandidatesSignaled.get() {
 		if err := pc.iceGatherer.SignalCandidates(); err != nil {
 			return err
 		}
+		pc.nonTrickleCandidatesSignaled.set(true)
 		return nil
 	}
 
@@ -820,7 +715,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	currentTransceivers := pc.GetTransceivers()
+	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	haveRemoteDescription := pc.currentRemoteDescription != nil
 
 	desc.parsed = &sdp.SessionDescription{}
@@ -872,7 +767,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
-	go pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash, currentTransceivers)
+	go pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash, currentTransceivers, trackDetailsFromSDP(pc.log, desc.parsed))
 	return nil
 }
 
@@ -1640,7 +1535,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 }
 
 // Start all transports. PeerConnection now has enough state
-func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string, currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string, currentTransceivers []*RTPTransceiver, incomingTracks map[uint32]trackDetails) {
 	// Start the ice transport
 	err := pc.iceTransport.Start(
 		pc.iceGatherer,
@@ -1667,7 +1562,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		return
 	}
 
-	pc.startRTPReceivers(trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed), currentTransceivers)
+	pc.startRTPReceivers(incomingTracks, currentTransceivers)
 	pc.startRTPSenders(currentTransceivers)
 	pc.drainSRTP()
 	pc.startSCTP()
@@ -1702,4 +1597,142 @@ func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceive
 // GetRegisteredRTPCodecs gets a list of registered RTPCodec from the underlying constructed MediaEngine
 func (pc *PeerConnection) GetRegisteredRTPCodecs(kind RTPCodecType) []*RTPCodec {
 	return pc.api.mediaEngine.GetCodecsByKind(kind)
+}
+
+// generateUnmatchedSDP generates an SDP that doesn't take remote state into account
+// This is used for the initial call for CreateOffer
+func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDescription, error) {
+	d := sdp.NewJSEPSessionDescription(useIdentity)
+	if err := addFingerprints(d, pc.configuration.Certificates[0]); err != nil {
+		return nil, err
+	}
+
+	iceParams, err := pc.iceGatherer.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
+	if err != nil {
+		return nil, err
+	}
+
+	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
+	mediaSections := []mediaSection{}
+
+	if isPlanB {
+		video := make([]*RTPTransceiver, 0)
+		audio := make([]*RTPTransceiver, 0)
+
+		for _, t := range pc.GetTransceivers() {
+			if t.kind == RTPCodecTypeVideo {
+				video = append(video, t)
+			} else if t.kind == RTPCodecTypeAudio {
+				audio = append(audio, t)
+			}
+		}
+
+		if len(video) > 1 {
+			mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
+		}
+		if len(audio) > 1 {
+			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
+		}
+		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
+	} else {
+		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+
+		for _, t := range pc.GetTransceivers() {
+			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
+		}
+	}
+
+	return populateSDP(d, isPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections)
+}
+
+// generateMatchedSDP generates a SDP and takes the remote state into account
+// this is used everytime we have a RemoteDescription
+func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
+	d := sdp.NewJSEPSessionDescription(useIdentity)
+	if err := addFingerprints(d, pc.configuration.Certificates[0]); err != nil {
+		return nil, err
+	}
+
+	iceParams, err := pc.iceGatherer.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
+	if err != nil {
+		return nil, err
+	}
+
+	var t *RTPTransceiver
+	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
+	mediaSections := []mediaSection{}
+
+	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
+		midValue := getMidValue(media)
+		if midValue == "" {
+			return nil, fmt.Errorf("RemoteDescription contained media section without mid value")
+		}
+
+		if media.MediaName.Media == "application" {
+			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true})
+			continue
+		}
+
+		kind := NewRTPCodecType(media.MediaName.Media)
+		direction := getPeerDirection(media)
+		if kind == 0 || direction == RTPTransceiverDirection(Unknown) {
+			continue
+		}
+
+		t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
+		mediaTransceivers := []*RTPTransceiver{t}
+		switch pc.configuration.SDPSemantics {
+		case SDPSemanticsUnifiedPlanWithFallback:
+			// If no match, process as unified-plan
+			if !detectedPlanB {
+				break
+			}
+			// If there was a match, fall through to plan-b
+			fallthrough
+		case SDPSemanticsPlanB:
+			if !detectedPlanB {
+				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
+			}
+			// If we're responding to a plan-b offer, then we should try to fill up this
+			// media entry with all matching local transceivers
+			for {
+				// keep going until we can't get any more
+				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
+				if t.Direction() == RTPTransceiverDirectionInactive {
+					break
+				}
+				mediaTransceivers = append(mediaTransceivers, t)
+			}
+		case SDPSemanticsUnifiedPlan:
+			if detectedPlanB {
+				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
+			}
+		}
+
+		mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
+	}
+
+	// If we are offering also include unmatched local transceivers
+	if !detectedPlanB && includeUnmatched {
+		for _, t := range localTransceivers {
+			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
+		}
+	}
+
+	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
+		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
+	}
+
+	return populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections)
 }
