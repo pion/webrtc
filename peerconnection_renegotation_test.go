@@ -147,4 +147,53 @@ func TestPeerConnection_Renegotation_ApplicationFirst(t *testing.T) {
 
 	addTransceiverAndAssert()
 	addTransceiverAndAssert()
+
+	assert.NoError(t, pc.Close())
+}
+
+func TestPeerConnection_RoleSwitch(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcFirstOfferer, pcSecondOfferer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	pcFirstOfferer.OnTrack(func(track *Track, r *RTPReceiver) {
+		onTrackFiredFunc()
+	})
+
+	connected, connectedFunc := context.WithCancel(context.Background())
+	pcFirstOfferer.OnConnectionStateChange(func(c PeerConnectionState) {
+		if c == PeerConnectionStateConnected {
+			connectedFunc()
+		}
+	})
+
+	assert.NoError(t, signalPair(pcFirstOfferer, pcSecondOfferer))
+	<-connected.Done()
+
+	// Add a new Track to the second offerer
+	// This asserts that it will match the ordering of the last RemoteDescription, but then also add new Transceivers to the end
+	_, err = pcFirstOfferer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	assert.NoError(t, err)
+
+	vp8Track, err := pcSecondOfferer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	assert.NoError(t, err)
+
+	_, err = pcSecondOfferer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcSecondOfferer, pcFirstOfferer))
+	sendVideoUntilDone(onTrackFired, t, vp8Track)
+
+	assert.NoError(t, pcFirstOfferer.Close())
+	assert.NoError(t, pcSecondOfferer.Close())
 }
