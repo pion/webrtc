@@ -959,12 +959,12 @@ func (pc *PeerConnection) drainSRTP() {
 
 			_, ssrc, err := srtpSession.AcceptStream()
 			if err != nil {
-				pc.log.Warnf("Failed to accept RTP %v \n", err)
+				pc.log.Warnf("Failed to accept RTP %v", err)
 				return
 			}
 
 			if !handleUndeclaredSSRC(ssrc) {
-				pc.log.Errorf("Incoming unhandled RTP ssrc(%d)", ssrc)
+				pc.log.Warnf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired", ssrc)
 			}
 		}
 	}()
@@ -979,10 +979,10 @@ func (pc *PeerConnection) drainSRTP() {
 
 			_, ssrc, err := srtcpSession.AcceptStream()
 			if err != nil {
-				pc.log.Warnf("Failed to accept RTCP %v \n", err)
+				pc.log.Warnf("Failed to accept RTCP %v", err)
 				return
 			}
-			pc.log.Errorf("Incoming unhandled RTCP ssrc(%d)", ssrc)
+			pc.log.Warnf("Incoming unhandled RTCP ssrc(%d), OnTrack will not be fired", ssrc)
 		}
 	}()
 }
