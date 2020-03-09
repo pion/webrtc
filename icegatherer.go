@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/pion/ice"
 	"github.com/pion/logging"
@@ -23,8 +24,8 @@ type ICEGatherer struct {
 
 	agent *ice.Agent
 
-	onLocalCandidateHdlr func(candidate *ICECandidate)
-	onStateChangeHdlr    func(state ICEGathererState)
+	onLocalCandidateHdlr atomic.Value // func(candidate *ICECandidate)
+	onStateChangeHdlr    atomic.Value // func(state ICEGathererState)
 
 	api *API
 }
@@ -124,7 +125,7 @@ func (g *ICEGatherer) createAgent() error {
 
 	g.agent = agent
 	if !g.api.settingEngine.candidates.ICETrickle {
-		g.state = ICEGathererStateComplete
+		atomicStoreICEGathererState(&g.state, ICEGathererStateComplete)
 	}
 
 	return nil
@@ -136,16 +137,15 @@ func (g *ICEGatherer) Gather() error {
 		return err
 	}
 
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	onLocalCandidateHdlr := g.onLocalCandidateHdlr
-	if onLocalCandidateHdlr == nil {
-		onLocalCandidateHdlr = func(*ICECandidate) {}
+	onLocalCandidateHdlr := func(*ICECandidate) {}
+	if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
+		onLocalCandidateHdlr = hdlr
 	}
 
+	g.lock.Lock()
 	isTrickle := g.api.settingEngine.candidates.ICETrickle
 	agent := g.agent
+	g.lock.Unlock()
 
 	if !isTrickle {
 		return nil
@@ -161,9 +161,7 @@ func (g *ICEGatherer) Gather() error {
 			}
 			onLocalCandidateHdlr(&c)
 		} else {
-			g.lock.Lock()
 			g.setState(ICEGathererStateComplete)
-			g.lock.Unlock()
 
 			onLocalCandidateHdlr(nil)
 		}
@@ -220,29 +218,24 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 // OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
 // Take note that the handler is gonna be called with a nil pointer when gathering is finished.
 func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	g.onLocalCandidateHdlr = f
+	g.onLocalCandidateHdlr.Store(f)
 }
 
 // OnStateChange fires any time the ICEGatherer changes
 func (g *ICEGatherer) OnStateChange(f func(ICEGathererState)) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	g.onStateChangeHdlr = f
+	g.onStateChangeHdlr.Store(f)
 }
 
 // State indicates the current state of the ICE gatherer.
 func (g *ICEGatherer) State() ICEGathererState {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-	return g.state
+	return atomicLoadICEGathererState(&g.state)
 }
 
 func (g *ICEGatherer) setState(s ICEGathererState) {
-	g.state = s
-	if hdlr := g.onStateChangeHdlr; hdlr != nil {
-		go hdlr(s)
+	atomicStoreICEGathererState(&g.state, s)
+
+	if hdlr, ok := g.onStateChangeHdlr.Load().(func(state ICEGathererState)); ok && hdlr != nil {
+		hdlr(s)
 	}
 }
 
@@ -260,9 +253,10 @@ func (g *ICEGatherer) SignalCandidates() error {
 		return err
 	}
 
-	g.lock.Lock()
-	onLocalCandidateHdlr := g.onLocalCandidateHdlr
-	g.lock.Unlock()
+	var onLocalCandidateHdlr func(*ICECandidate)
+	if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok {
+		onLocalCandidateHdlr = hdlr
+	}
 
 	if onLocalCandidateHdlr != nil {
 		go func() {

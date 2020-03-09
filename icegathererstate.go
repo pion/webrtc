@@ -1,7 +1,11 @@
 package webrtc
 
+import (
+	"sync/atomic"
+)
+
 // ICEGathererState represents the current state of the ICE gatherer.
-type ICEGathererState byte
+type ICEGathererState uint32
 
 const (
 	// ICEGathererStateNew indicates object has been created but
@@ -33,4 +37,12 @@ func (s ICEGathererState) String() string {
 	default:
 		return unknownStr
 	}
+}
+
+func atomicStoreICEGathererState(state *ICEGathererState, newState ICEGathererState) {
+	atomic.StoreUint32((*uint32)(state), uint32(newState))
+}
+
+func atomicLoadICEGathererState(state *ICEGathererState) ICEGathererState {
+	return ICEGathererState(atomic.LoadUint32((*uint32)(state)))
 }

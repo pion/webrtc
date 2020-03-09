@@ -658,14 +658,23 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	peerConn, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	peerConn.OnICEGatheringStateChange(func(s ICEGathererState) {
+	var onStateChange func(s ICEGathererState)
+	onStateChange = func(s ICEGathererState) {
+		// Access to ICEGatherer in the callback must not cause dead lock.
+		peerConn.OnICEGatheringStateChange(onStateChange)
+		if state := peerConn.iceGatherer.State(); state != s {
+			t.Errorf("State change callback argument (%s) and State() (%s) result differs",
+				s, state,
+			)
+		}
+
 		switch s {
 		case ICEGathererStateClosed:
 			close(seenClosed)
 			return
 		case ICEGathererStateGathering:
 			if seenComplete.get() {
-				t.Fatal("Completed before gathering")
+				t.Error("Completed before gathering")
 			}
 			seenGathering.set(true)
 		case ICEGathererStateComplete:
@@ -675,7 +684,8 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 		if seenGathering.get() && seenComplete.get() {
 			close(seenGatheringAndComplete)
 		}
-	})
+	}
+	peerConn.OnICEGatheringStateChange(onStateChange)
 
 	offer, err := peerConn.CreateOffer(nil)
 	assert.NoError(t, err)
