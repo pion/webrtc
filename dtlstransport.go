@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -37,7 +39,8 @@ type DTLSTransport struct {
 
 	onStateChangeHdlr func(DTLSTransportState)
 
-	conn *dtls.Conn
+	conn                 *dtls.Conn
+	cancelInitialization atomic.Value // func()
 
 	srtpSession   *srtp.SessionSRTP
 	srtcpSession  *srtp.SessionSRTCP
@@ -233,12 +236,16 @@ func (t *DTLSTransport) role() DTLSRole {
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.cancelInitialization.Store(cancel)
+	defer cancel()
+
 	// Take lock and prepare connection, we must not hold the lock
 	// when connecting
 	prepareTransport := func() (DTLSRole, *dtls.Config, error) {
-		t.lock.Lock()
-		defer t.lock.Unlock()
-
 		if err := t.ensureICEConn(); err != nil {
 			return DTLSRole(0), nil, err
 		}
@@ -275,17 +282,11 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return err
 	}
 
-	// Connect as DTLS Client/Server, function is blocking and we
-	// must not hold the DTLSTransport lock
 	if role == DTLSRoleClient {
-		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.ClientWithContext(ctx, dtlsEndpoint, dtlsConfig)
 	} else {
-		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.ServerWithContext(ctx, dtlsEndpoint, dtlsConfig)
 	}
-
-	// Re-take the lock, nothing beyond here is blocking
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	if err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
@@ -322,6 +323,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 // Stop stops and closes the DTLSTransport object.
 func (t *DTLSTransport) Stop() error {
+	if cancel, ok := t.cancelInitialization.Load().(context.CancelFunc); ok {
+		cancel()
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -341,7 +346,8 @@ func (t *DTLSTransport) Stop() error {
 	}
 
 	if t.conn != nil {
-		if err := t.conn.Close(); err != nil {
+		// dtls.Conn may be closed by sctp.Close(). Allow dtls.ErrConnClosed.
+		if err := t.conn.Close(); err != nil && err != dtls.ErrConnClosed {
 			closeErrs = append(closeErrs, err)
 		}
 	}

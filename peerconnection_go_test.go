@@ -610,6 +610,9 @@ func TestPeerConnection_OfferingLite(t *testing.T) {
 }
 
 func TestPeerConnection_AnsweringLite(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -625,10 +628,6 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = signalPair(offerPC, answerPC); err != nil {
-		t.Fatal(err)
-	}
-
 	iceComplete := make(chan interface{})
 	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
@@ -639,6 +638,10 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 			}
 		}
 	})
+
+	if err = signalPair(offerPC, answerPC); err != nil {
+		t.Fatal(err)
+	}
 
 	<-iceComplete
 	assert.NoError(t, offerPC.Close())

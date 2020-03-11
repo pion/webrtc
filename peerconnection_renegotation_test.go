@@ -49,7 +49,7 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
 		if !haveRenegotiated.get() {
-			t.Fatal("OnTrack was called before renegotation")
+			t.Error("OnTrack was called before renegotation")
 		}
 		onTrackFiredFunc()
 	})
