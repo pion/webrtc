@@ -170,15 +170,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 		onTrackFiredFunc()
 	})
 
-	connected, connectedFunc := context.WithCancel(context.Background())
-	pcFirstOfferer.OnConnectionStateChange(func(c PeerConnectionState) {
-		if c == PeerConnectionStateConnected {
-			connectedFunc()
-		}
-	})
-
 	assert.NoError(t, signalPair(pcFirstOfferer, pcSecondOfferer))
-	<-connected.Done()
 
 	// Add a new Track to the second offerer
 	// This asserts that it will match the ordering of the last RemoteDescription, but then also add new Transceivers to the end
