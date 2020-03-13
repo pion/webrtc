@@ -337,7 +337,7 @@ func createTrack(offer webrtc.SessionDescription) (*webrtc.PeerConnection, *webr
 	}
 	var payloadType uint8
 	for _, videoCodec := range mediaEngine.GetCodecsByKind(webrtc.RTPCodecTypeAudio) {
-		if videoCodec.Name == "OPUS" {
+		if videoCodec.Name == webrtc.Opus {
 			payloadType = videoCodec.PayloadType
 			break
 		}

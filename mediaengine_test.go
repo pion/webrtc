@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/pion/sdp/v2"
@@ -91,4 +92,19 @@ a=sctpmap:5000 webrtc-datachannel 1024
 	assertCodecWithPayloadType(VP8, 105)
 	assertCodecWithPayloadType(H264, 115)
 	assertCodecWithPayloadType(VP9, 135)
+}
+
+// pion/webrtc#1078
+func TestOpusCase(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.True(t, regexp.MustCompile(`(?m)^a=rtpmap:\d+ opus/48000/2`).MatchString(offer.SDP))
+	assert.NoError(t, pc.Close())
 }
