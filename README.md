@@ -143,6 +143,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Akil](https://github.com/akilude)
 * [Quentin Renard](https://github.com/asticode)
 * [opennota](https://github.com/opennota)
+* [Simon Eisenmann](https://github.com/longsleep)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
