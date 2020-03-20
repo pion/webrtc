@@ -1587,8 +1587,11 @@ func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceive
 		for _, t := range currentTransceivers {
 			if t.Receiver() == nil || t.Receiver().Track() == nil {
 				continue
-			} else if _, ok := trackDetails[t.Receiver().Track().ssrc]; ok {
-				continue
+			} else if trackDetail, ok := trackDetails[t.Receiver().Track().ssrc]; ok {
+				if trackDetail.direction == RTPTransceiverDirectionSendrecv || trackDetail.direction == RTPTransceiverDirectionSendonly {
+					// Keep the receiver only, when the remote track is actually sending
+					continue
+				}
 			}
 
 			if err := t.Receiver().Stop(); err != nil {

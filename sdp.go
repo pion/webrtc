@@ -13,10 +13,11 @@ import (
 )
 
 type trackDetails struct {
-	kind  RTPCodecType
-	label string
-	id    string
-	ssrc  uint32
+	kind      RTPCodecType
+	label     string
+	id        string
+	ssrc      uint32
+	direction RTPTransceiverDirection
 }
 
 // extract all trackDetails from an SDP.
@@ -25,9 +26,15 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
+		var transceiverDirection RTPTransceiverDirection
 		for _, attr := range media.Attributes {
 			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
+				continue
+			}
+
+			if d := NewRTPTransceiverDirection(attr.Key); d != RTPTransceiverDirection(Unknown) {
+				transceiverDirection = d
 				continue
 			}
 
@@ -76,7 +83,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					trackID = split[2]
 				}
 
-				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
+				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc), transceiverDirection}
 			}
 		}
 	}
