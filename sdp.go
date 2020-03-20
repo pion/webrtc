@@ -22,6 +22,7 @@ type trackDetails struct {
 // extract all trackDetails from an SDP.
 func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) map[uint32]trackDetails {
 	incomingTracks := map[uint32]trackDetails{}
+	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
 		for _, attr := range media.Attributes {
@@ -30,12 +31,39 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 				continue
 			}
 
+			if attr.Key == sdp.AttrKeySSRCGroup {
+				split := strings.Split(attr.Value, " ")
+				if split[0] == sdp.SemanticTokenFlowIdentification {
+					// Add rtx ssrcs to blacklist, to avoid adding them as tracks
+					// Essentially lines like `a=ssrc-group:FID 2231627014 632943048` are processed by this section
+					// as this declares that the second SSRC (632943048) is a rtx repair flow (RFC4588) for the first
+					// (2231627014) as specified in RFC5576
+					if len(split) == 3 {
+						_, err := strconv.ParseUint(split[1], 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+							continue
+						}
+						rtxRepairFlow, err := strconv.ParseUint(split[2], 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+							continue
+						}
+						rtxRepairFlows[uint32(rtxRepairFlow)] = true
+						delete(incomingTracks, uint32(rtxRepairFlow)) // Remove if rtx was added as track before
+					}
+				}
+			}
+
 			if attr.Key == sdp.AttrKeySSRC {
 				split := strings.Split(attr.Value, " ")
 				ssrc, err := strconv.ParseUint(split[0], 10, 32)
 				if err != nil {
 					log.Warnf("Failed to parse SSRC: %v", err)
 					continue
+				}
+				if rtxRepairFlow := rtxRepairFlows[uint32(ssrc)]; rtxRepairFlow {
+					continue // This ssrc is a RTX repair flow, ignore
 				}
 				if existingValues, ok := incomingTracks[uint32(ssrc)]; ok && existingValues.label != "" && existingValues.id != "" {
 					continue // This ssrc is already fully defined

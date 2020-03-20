@@ -86,3 +86,61 @@ func TestExtractICEDetails(t *testing.T) {
 		assert.Equal(t, err, ErrSessionDescriptionMissingIceUfrag)
 	})
 }
+
+func TestTrackDetailsFromSDP(t *testing.T) {
+	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "foobar",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "ssrc", Value: "1000 msid:unknown_trk_label unknown_trk_guid"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "ssrc", Value: "2000 msid:audio_trk_label audio_trk_guid"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "ssrc-group", Value: "FID 3000 4000"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:rtx_trk_label rtx_trck_guid"},
+					},
+				},
+			},
+		}
+
+		tracks := trackDetailsFromSDP(nil, s)
+		assert.Equal(t, 2, len(tracks))
+		if _, ok := tracks[1000]; ok {
+			assert.Fail(t, "got the unknown track ssrc:1000 which should have been skipped")
+		}
+		if track, ok := tracks[2000]; !ok {
+			assert.Fail(t, "missing audio track with ssrc:2000")
+		} else {
+			assert.Equal(t, RTPCodecTypeAudio, track.kind)
+			assert.Equal(t, uint32(2000), track.ssrc)
+			assert.Equal(t, "audio_trk_label", track.label)
+		}
+		if track, ok := tracks[3000]; !ok {
+			assert.Fail(t, "missing video track with ssrc:3000")
+		} else {
+			assert.Equal(t, RTPCodecTypeVideo, track.kind)
+			assert.Equal(t, uint32(3000), track.ssrc)
+			assert.Equal(t, "video_trk_label", track.label)
+		}
+		if _, ok := tracks[4000]; ok {
+			assert.Fail(t, "got the rtx track ssrc:3000 which should have been skipped")
+		}
+	})
+}
