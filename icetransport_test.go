@@ -62,6 +62,5 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 		t.Fatalf("Sender ICETransport OnSelectedCandidateChange was never called")
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
