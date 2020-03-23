@@ -292,6 +292,11 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return err
 	}
 
+	// Workaround for the race condition that Stop() is called before here.
+	if t.state == DTLSTransportStateClosed {
+		return dtlsConn.Close()
+	}
+
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 
