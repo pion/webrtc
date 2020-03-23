@@ -830,6 +830,10 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 	}
 
 	for ssrc, incoming := range incomingTracks {
+		if incoming.direction == RTPTransceiverDirectionRecvonly {
+			// Skip recv only tracks, avoid starting a receiver for those.
+			continue
+		}
 		for i := range localTransceivers {
 			t := localTransceivers[i]
 
