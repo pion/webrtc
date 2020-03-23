@@ -341,7 +341,8 @@ func (t *DTLSTransport) Stop() error {
 	}
 
 	if t.conn != nil {
-		if err := t.conn.Close(); err != nil {
+		// dtls connection may be closed on sctp close.
+		if err := t.conn.Close(); err != nil && err != dtls.ErrConnClosed {
 			closeErrs = append(closeErrs, err)
 		}
 	}

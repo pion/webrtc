@@ -15,13 +15,27 @@ import (
 // bindings this is a requirement).
 const expectedLabel = "data"
 
-func closePair(t *testing.T, pc1, pc2 io.Closer, done chan bool) {
+func closePairNow(t *testing.T, pc1, pc2 io.Closer) {
+	var fail bool
+	if err := pc1.Close(); err != nil {
+		t.Errorf("Failed to close PeerConnection: %v", err)
+		fail = true
+	}
+	if err := pc2.Close(); err != nil {
+		t.Errorf("Failed to close PeerConnection: %v", err)
+		fail = true
+	}
+	if fail {
+		t.FailNow()
+	}
+}
+
+func closePair(t *testing.T, pc1, pc2 io.Closer, done <-chan bool) {
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("closePair timed out waiting for done signal")
 	case <-done:
-		assert.NoError(t, pc1.Close())
-		assert.NoError(t, pc2.Close())
+		closePairNow(t, pc1, pc2)
 	}
 }
 

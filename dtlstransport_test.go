@@ -27,6 +27,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer closePairNow(t, pcOffer, pcAnswer)
+
 	offerChan := make(chan SessionDescription)
 	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
 		if candidate == nil {
@@ -84,9 +86,6 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("timed out waiting for connection to fail")
 	}
-
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
