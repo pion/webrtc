@@ -344,8 +344,7 @@ func TestEOF(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		defer func() { assert.NoError(t, pca.Close(), "should succeed") }()
-		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
+		defer closePairNow(t, pca, pcb)
 
 		var wg sync.WaitGroup
 
@@ -448,13 +447,12 @@ func TestEOF(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() { assert.NoError(t, pca.Close(), "should succeed") }()
-
 		pcb, err := api.NewPeerConnection(config)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() { assert.NoError(t, pcb.Close(), "should succeed") }()
+
+		defer closePairNow(t, pca, pcb)
 
 		var dca, dcb *DataChannel
 		dcaClosedCh := make(chan struct{})
