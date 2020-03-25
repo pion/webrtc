@@ -10,7 +10,7 @@ go get github.com/pion/webrtc/examples/broadcast
 ```
 
 ### Open broadcast example page
-[jsfiddle.net](https://jsfiddle.net/zhpya3n9/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
+[jsfiddle.net](https://jsfiddle.net/d2mt13y6/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
 
 ### Run Broadcast
 #### Linux/macOS

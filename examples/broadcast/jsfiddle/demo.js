@@ -27,7 +27,7 @@ window.createSession = isPublisher => {
           .catch(log)
       }).catch(log)
   } else {
-    pc.addTransceiver('video', {'direction': 'recvonly'})
+    pc.addTransceiver('video')
     pc.createOffer()
       .then(d => pc.setLocalDescription(d))
       .catch(log)
