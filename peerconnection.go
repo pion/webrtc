@@ -392,8 +392,6 @@ func (pc *PeerConnection) getStatsID() string {
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
-	case options != nil:
-		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed.get():
@@ -412,6 +410,14 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 	if err != nil {
 		return SessionDescription{}, err
+	}
+
+	if options != nil && options.SDPAttributes != nil {
+		for _, dict := range options.SDPAttributes {
+			for key, value := range dict {
+				d.WithValueAttribute(key, value)
+			}
+		}
 	}
 
 	sdpBytes, err := d.Marshal()
@@ -518,8 +524,6 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
-	case options != nil:
-		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case pc.RemoteDescription() == nil:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
@@ -536,6 +540,14 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	d, err := pc.generateMatchedSDP(useIdentity, false /*includeUnmatched */, connectionRole)
 	if err != nil {
 		return SessionDescription{}, err
+	}
+
+	if options != nil && options.SDPAttributes != nil {
+		for _, dict := range options.SDPAttributes {
+			for key, value := range dict {
+				d.WithValueAttribute(key, value)
+			}
+		}
 	}
 
 	sdpBytes, err := d.Marshal()

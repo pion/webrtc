@@ -3,6 +3,8 @@ package webrtc
 // OfferAnswerOptions is a base structure which describes the options that
 // can be used to control the offer/answer creation process.
 type OfferAnswerOptions struct {
+	SDPAttributes []map[string]string
+
 	// VoiceActivityDetection allows the application to provide information
 	// about whether it wishes voice detection feature to be enabled or disabled.
 	VoiceActivityDetection bool
