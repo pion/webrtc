@@ -19,19 +19,33 @@ func main() {
 	sdpChan := signal.HTTPSDPServer()
 
 	// Everything below is the Pion WebRTC API, thanks for using it ❤️.
-	// Create a MediaEngine object to configure the supported codec
-	m := webrtc.MediaEngine{}
-
-	// Setup the codecs you want to use.
-	// Only support VP8, this makes our proxying code simpler
-	m.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
-
-	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
 
 	offer := webrtc.SessionDescription{}
 	signal.Decode(<-sdpChan, &offer)
 	fmt.Println("")
+
+	// Create a MediaEngine object to configure the supported codec
+	mediaEngine := webrtc.MediaEngine{}
+	err := mediaEngine.PopulateFromSDP(offer)
+	if err != nil {
+		panic(err)
+	}
+
+	// Search for VP8 Payload type. If the offer doesn't support VP8 exit since
+	// since they won't be able to decode anything we send them
+	var payloadType uint8
+	for _, videoCodec := range mediaEngine.GetCodecsByKind(webrtc.RTPCodecTypeVideo) {
+		if videoCodec.Name == "VP8" {
+			payloadType = videoCodec.PayloadType
+			break
+		}
+	}
+	if payloadType == 0 {
+		panic("Remote peer does not support VP8")
+	}
+
+	// Create the API object with the MediaEngine
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
 
 	peerConnectionConfig := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
