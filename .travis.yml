@@ -26,7 +26,7 @@ cache:
   npm: true
   yarn: true
 
-lint_job: &lint_job
+_lint_job: &lint_job
   env: CACHE_NAME=lint
   before_script:
     - |
@@ -39,7 +39,7 @@ lint_job: &lint_job
     - bash .github/lint-commit-message.sh
     - bash .github/lint-filename.sh
     - golangci-lint run ./...
-test_job: &test_job
+_test_job: &test_job
   env: CACHE_NAME=test
   before_install:
     - go mod download
@@ -54,14 +54,10 @@ test_job: &test_job
         -v -race ./...
   after_success:
     - travis_retry bash <(curl -s https://codecov.io/bash) -c -F go
-test_i386_job: &test_i386_job
+_test_i386_job: &test_i386_job
   env: CACHE_NAME=test386
   language: bash
   services: docker
-  install:
-    # i386/golang:1.12-alpine doesn't have git.
-    - echo -e "FROM i386/golang:${GO_VERSION}-alpine\nRUN apk add --no-cache git" > Dockerfile
-    - docker build -t go-tester .
   script:
     - |
       docker run \
@@ -72,11 +68,11 @@ test_i386_job: &test_i386_job
         -v ${HOME}/gopath/pkg/mod:/go/pkg/mod \
         -v ${HOME}/.cache/go-build:/.cache/go-build \
         -w /go/src/github.com/pion/$(basename ${PWD}) \
-        -it go-tester \
+        -it i386/golang:${GO_VERSION}-alpine \
         /usr/local/go/bin/go test \
           -tags quic \
           -v ./...
-test_wasm_job: &test_wasm_job
+_test_wasm_job: &test_wasm_job
   env: CACHE_NAME=wasm
   language: node_js
   node_js: 12
@@ -107,24 +103,26 @@ test_wasm_job: &test_wasm_job
 jobs:
   include:
     - <<: *lint_job
-      name: Lint 1.13
-      go: 1.13
-    - <<: *test_job
-      name: Test 1.12
-      go: 1.12
+      name: Lint 1.14
+      go: 1.14
     - <<: *test_job
       name: Test 1.13
       go: 1.13
-    - <<: *test_i386_job
-      name: Test i386 1.12
-      env: GO_VERSION=1.12
+    - <<: *test_job
+      name: Test 1.14
+      go: 1.14
     - <<: *test_i386_job
       name: Test i386 1.13
       env: GO_VERSION=1.13
+    - <<: *test_i386_job
+      name: Test i386 1.14
+      env: GO_VERSION=1.14
     - <<: *test_wasm_job
       name: Test WASM 1.13
-      # Requires Go1.13 syscall/js
       env: GO_VERSION=1.13
+    - <<: *test_wasm_job
+      name: Test WASM 1.14
+      env: GO_VERSION=1.14
 
 notifications:
   email: false
