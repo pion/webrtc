@@ -339,7 +339,7 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collect(stats.ID, stats)
 }
 
-func (r *SCTPTransport) generateDataChannelID(dtlsRole DTLSRole) (uint16, error) {
+func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
 	isChannelWithID := func(id uint16) bool {
 		for _, d := range r.dataChannels {
 			if d.id != nil && *d.id == id {
@@ -356,14 +356,15 @@ func (r *SCTPTransport) generateDataChannelID(dtlsRole DTLSRole) (uint16, error)
 
 	max := r.MaxChannels()
 
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	for ; id < max-1; id += 2 {
 		if isChannelWithID(id) {
 			continue
 		}
-		return id, nil
+		*idOut = &id
+		return nil
 	}
 
-	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }

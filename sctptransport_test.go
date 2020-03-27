@@ -33,13 +33,14 @@ func TestGenerateDataChannelID(t *testing.T) {
 		{DTLSRoleServer, sctpTransportWithChannels([]uint16{1, 5}), 3},
 	}
 	for _, testCase := range testCases {
-		id, err := testCase.s.generateDataChannelID(testCase.role)
+		idPtr := new(uint16)
+		err := testCase.s.generateAndSetDataChannelID(testCase.role, &idPtr)
 		if err != nil {
 			t.Errorf("failed to generate id: %v", err)
 			return
 		}
-		if id != testCase.result {
-			t.Errorf("Wrong id: %d expected %d", id, testCase.result)
+		if *idPtr != testCase.result {
+			t.Errorf("Wrong id: %d expected %d", *idPtr, testCase.result)
 		}
 	}
 }
