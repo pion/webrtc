@@ -9,8 +9,8 @@ func TestGenerateDataChannelID(t *testing.T) {
 		ret := &SCTPTransport{dataChannels: []*DataChannel{}}
 
 		for i := range ids {
-			id := ids[i]
-			ret.dataChannels = append(ret.dataChannels, &DataChannel{id: &id})
+			ret.dataChannels = append(ret.dataChannels, &DataChannel{})
+			ret.dataChannels[len(ret.dataChannels)-1].id.Store(&ids[i])
 		}
 
 		return ret

@@ -342,7 +342,7 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 func (r *SCTPTransport) generateDataChannelID(dtlsRole DTLSRole) (uint16, error) {
 	isChannelWithID := func(id uint16) bool {
 		for _, d := range r.dataChannels {
-			if d.id != nil && *d.id == id {
+			if d.ID() != nil && *d.ID() == id {
 				return true
 			}
 		}

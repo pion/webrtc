@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/datachannel"
@@ -31,7 +32,7 @@ type DataChannel struct {
 	maxRetransmits             *uint16
 	protocol                   string
 	negotiated                 bool
-	id                         *uint16
+	id                         atomic.Value // *uint16
 	readyState                 DataChannelState
 	bufferedAmountLowThreshold uint64
 	detachCalled               bool
@@ -84,19 +85,21 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
-	return &DataChannel{
+	d := &DataChannel{
 		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
 		label:             params.Label,
 		protocol:          params.Protocol,
 		negotiated:        params.Negotiated,
-		id:                params.ID,
 		ordered:           params.Ordered,
 		maxPacketLifeTime: params.MaxPacketLifeTime,
 		maxRetransmits:    params.MaxRetransmits,
 		readyState:        DataChannelStateConnecting,
 		api:               api,
 		log:               log,
-	}, nil
+	}
+	d.id.Store(params.ID)
+
+	return d, nil
 }
 
 // open opens the datachannel over the sctp transport
@@ -151,16 +154,16 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
 	}
 
-	if d.id == nil {
+	if d.ID() == nil {
 		generatedID, err := d.sctpTransport.generateDataChannelID(d.sctpTransport.dtlsTransport.role())
 		if err != nil {
 			return err
 		}
 
-		d.id = &generatedID
+		d.id.Store(&generatedID)
 	}
 
-	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)
+	dc, err := datachannel.Dial(d.sctpTransport.association, *d.ID(), cfg)
 	if err != nil {
 		d.mu.Unlock()
 		return err
@@ -477,10 +480,11 @@ func (d *DataChannel) Negotiated() bool {
 // selected by the script or generated. After the ID is set to a non-null
 // value, it will not change.
 func (d *DataChannel) ID() *uint16 {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	if v := d.id.Load(); v != nil {
+		return v.(*uint16)
+	}
 
-	return d.id
+	return nil
 }
 
 // ReadyState represents the state of the DataChannel object.
@@ -575,8 +579,8 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		State: d.readyState,
 	}
 
-	if d.id != nil {
-		stats.DataChannelIdentifier = int32(*d.id)
+	if d.ID() != nil {
+		stats.DataChannelIdentifier = int32(*d.ID())
 	}
 
 	if d.dataChannel != nil {

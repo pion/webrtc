@@ -152,13 +152,14 @@ func TestDataChannelParamters_Go(t *testing.T) {
 
 	t.Run("All other property methods", func(t *testing.T) {
 		id := uint16(123)
+
 		dc := &DataChannel{}
-		dc.id = &id
+		dc.id.Store(&id)
 		dc.label = "mylabel"
 		dc.protocol = "myprotocol"
 		dc.negotiated = true
 
-		assert.Equal(t, dc.id, dc.ID(), "should match")
+		assert.Equal(t, id, *dc.ID(), "should match")
 		assert.Equal(t, dc.label, dc.Label(), "should match")
 		assert.Equal(t, dc.protocol, dc.Protocol(), "should match")
 		assert.Equal(t, dc.negotiated, dc.Negotiated(), "should match")
