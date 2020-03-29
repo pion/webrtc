@@ -156,6 +156,18 @@ func (t *DTLSTransport) startSRTP() error {
 		Profile:       srtp.ProtectionProfileAes128CmHmacSha1_80,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
+	if t.api.settingEngine.replayProtection.SRTP != nil {
+		srtpConfig.RemoteOptions = append(
+			srtpConfig.RemoteOptions,
+			srtp.SRTPReplayProtection(*t.api.settingEngine.replayProtection.SRTP),
+		)
+	}
+	if t.api.settingEngine.replayProtection.SRTCP != nil {
+		srtpConfig.RemoteOptions = append(
+			srtpConfig.RemoteOptions,
+			srtp.SRTCPReplayProtection(*t.api.settingEngine.replayProtection.SRTCP),
+		)
+	}
 
 	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.role() == DTLSRoleClient)
 	if err != nil {
@@ -273,6 +285,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	role, dtlsConfig, err := prepareTransport()
 	if err != nil {
 		return err
+	}
+
+	if t.api.settingEngine.replayProtection.DTLS != nil {
+		dtlsConfig.ReplayProtectionWindow = int(*t.api.settingEngine.replayProtection.DTLS)
 	}
 
 	// Connect as DTLS Client/Server, function is blocking and we
