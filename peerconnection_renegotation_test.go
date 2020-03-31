@@ -128,29 +128,6 @@ func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
 	assert.NoError(t, pcAnswer.Close())
 }
 
-// When creating an offer the first media section MUST be SCTP
-// This is to make renegotation easier, instead of having to remember where it
-// is was interleaved
-func TestPeerConnection_Renegotation_ApplicationFirst(t *testing.T) {
-	pc, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	addTransceiverAndAssert := func() {
-		_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
-		assert.NoError(t, err)
-
-		offer, err := pc.CreateOffer(nil)
-		assert.NoError(t, err)
-
-		assert.Equal(t, offer.parsed.MediaDescriptions[0].MediaName.Media, "application")
-	}
-
-	addTransceiverAndAssert()
-	addTransceiverAndAssert()
-
-	assert.NoError(t, pc.Close())
-}
-
 func TestPeerConnection_RoleSwitch(t *testing.T) {
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
