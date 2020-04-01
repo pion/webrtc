@@ -162,10 +162,25 @@ func (t *DTLSTransport) startSRTP() error {
 			srtp.SRTPReplayProtection(*t.api.settingEngine.replayProtection.SRTP),
 		)
 	}
+
+	if t.api.settingEngine.disableSRTPReplayProtection {
+		srtpConfig.RemoteOptions = append(
+			srtpConfig.RemoteOptions,
+			srtp.SRTPNoReplayProtection(),
+		)
+	}
+
 	if t.api.settingEngine.replayProtection.SRTCP != nil {
 		srtpConfig.RemoteOptions = append(
 			srtpConfig.RemoteOptions,
 			srtp.SRTCPReplayProtection(*t.api.settingEngine.replayProtection.SRTCP),
+		)
+	}
+
+	if t.api.settingEngine.disableSRTCPReplayProtection {
+		srtpConfig.RemoteOptions = append(
+			srtpConfig.RemoteOptions,
+			srtp.SRTCPNoReplayProtection(),
 		)
 	}
 
