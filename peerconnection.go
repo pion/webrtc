@@ -117,7 +117,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	}
 
 	if !pc.api.settingEngine.candidates.ICETrickle {
-		if err = pc.iceGatherer.Gather(); err != nil {
+		if err = pc.iceGatherer.createAgent(); err != nil {
 			return nil, err
 		}
 	}
