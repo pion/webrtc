@@ -6,7 +6,7 @@ If you wish to save H264 to disk checkout out [save-to-webm](https://github.com/
 ## Instructions
 ### Download save-to-disk
 ```
-go get github.com/pion/webrtc/examples/save-to-disk
+go get github.com/pion/webrtc/v2/examples/save-to-disk
 ```
 
 ### Open save-to-disk example page

@@ -11,12 +11,12 @@ The `answer` side acts like a HTTP server and should therefore be ran first.
 ## Instructions
 First run `answer`:
 ```sh
-go install github.com/pion/webrtc/examples/pion-to-pion/answer
+go install github.com/pion/webrtc/v2/examples/pion-to-pion/answer
 answer
 ```
 Next, run `offer`:
 ```sh
-go install github.com/pion/webrtc/examples/pion-to-pion/offer
+go install github.com/pion/webrtc/v2/examples/pion-to-pion/offer
 offer
 ```
 

@@ -6,7 +6,7 @@ users to override this and process messages however they want.
 ## Instructions
 ### Download custom-logger
 ```
-go get github.com/pion/webrtc/examples/custom-logger
+go get github.com/pion/webrtc/v2/examples/custom-logger
 ```
 
 ### Run custom-logger
