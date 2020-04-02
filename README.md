@@ -145,6 +145,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [opennota](https://github.com/opennota)
 * [Simon Eisenmann](https://github.com/longsleep)
 * [Ben Weitzman](https://github.com/benweitzman)
+* [Masahiro Nakamura](https://github.com/tsuu32)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

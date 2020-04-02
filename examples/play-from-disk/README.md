@@ -9,7 +9,7 @@ ffmpeg -i $INPUT_FILE -g 30 output.ivf
 
 ### Download play-from-disk
 ```
-go get github.com/pion/webrtc/examples/play-from-disk
+go get github.com/pion/webrtc/v2/examples/play-from-disk
 ```
 
 ### Open play-from-disk example page
