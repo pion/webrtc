@@ -6,20 +6,24 @@ import (
 	"context"
 	"io"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/v2/internal/util"
 	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
 
-func sendVideoUntilDone(c context.Context, t *testing.T, track *Track) {
+func sendVideoUntilDone(done <-chan struct{}, t *testing.T, tracks []*Track) {
 	for {
 		select {
 		case <-time.After(20 * time.Millisecond):
-			assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-		case <-c.Done():
+			for _, track := range tracks {
+				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+			}
+		case <-done:
 			return
 		}
 	}
@@ -74,10 +78,70 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	haveRenegotiated.set(true)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	sendVideoUntilDone(onTrackFired, t, vp8Track)
+	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
+}
+
+// Assert that adding tracks across multiple renegotations performs as expected
+func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
+	addTrackWithLabel := func(trackName string, pcOffer, pcAnswer *PeerConnection) *Track {
+		_, err := pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+		assert.NoError(t, err)
+
+		track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), trackName, trackName)
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(track)
+		assert.NoError(t, err)
+
+		return track
+	}
+
+	trackNames := []string{util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength)}
+	outboundTracks := []*Track{}
+	onTrackCount := map[string]int{}
+	onTrackCountMu := sync.Mutex{}
+	onTrackChan := make(chan struct{}, 1)
+
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+		onTrackChan <- struct{}{}
+
+		onTrackCountMu.Lock()
+		defer onTrackCountMu.Unlock()
+		onTrackCount[track.Label()]++
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	for i := range trackNames {
+		outboundTracks = append(outboundTracks, addTrackWithLabel(trackNames[i], pcOffer, pcAnswer))
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+		sendVideoUntilDone(onTrackChan, t, outboundTracks)
+	}
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+
+	onTrackCountMu.Lock()
+	defer onTrackCountMu.Unlock()
+	assert.Equal(t, onTrackCount[trackNames[0]], 1)
+	assert.Equal(t, onTrackCount[trackNames[1]], 1)
+	assert.Equal(t, onTrackCount[trackNames[2]], 1)
 }
 
 func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
@@ -118,7 +182,7 @@ func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
 	})
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-	sendVideoUntilDone(onTrackFired, t, vp8Track)
+	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
 
 	assert.NoError(t, pcOffer.RemoveTrack(rtpSender))
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
@@ -161,7 +225,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, signalPair(pcSecondOfferer, pcFirstOfferer))
-	sendVideoUntilDone(onTrackFired, t, vp8Track)
+	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
 
 	assert.NoError(t, pcFirstOfferer.Close())
 	assert.NoError(t, pcSecondOfferer.Close())
