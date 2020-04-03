@@ -829,6 +829,17 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
 	}
 
+	// Ensure we haven't already started a transceiver for this ssrc
+	for ssrc := range incomingTracks {
+		for i := range localTransceivers {
+			if t := localTransceivers[i]; (t.Receiver()) == nil || t.Receiver().Track() == nil || t.Receiver().Track().ssrc != ssrc {
+				continue
+			}
+
+			delete(incomingTracks, ssrc)
+		}
+	}
+
 	for ssrc, incoming := range incomingTracks {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
