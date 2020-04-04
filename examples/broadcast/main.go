@@ -48,7 +48,7 @@ func main() {
 	}
 
 	// Allow us to receive 1 video track
-	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+	if _, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
 
