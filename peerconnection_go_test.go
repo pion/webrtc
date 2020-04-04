@@ -732,7 +732,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 			return append(candidateCache, c.ToJSON())
 		}
 
-		assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+		assert.NoError(t, pc.AddICECandidate(c.ToJSON()))
 		return candidateCache
 	}
 
