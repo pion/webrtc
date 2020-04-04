@@ -809,3 +809,45 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
 }
+
+// Issue #1121, assert populateLocalCandidates doesn't mutate
+func TestPopulateLocalCandidates(t *testing.T) {
+	t.Run("PendingLocalDescription shouldn't add extra mutations", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pc.SetLocalDescription(offer))
+		assert.Equal(t, pc.PendingLocalDescription(), pc.PendingLocalDescription())
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("end-of-candidates only when gathering is complete", func(t *testing.T) {
+		s := SettingEngine{}
+		s.SetTrickle(true)
+
+		pc, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		gatherComplete, gatherCompleteCancel := context.WithCancel(context.Background())
+		pc.OnICEGatheringStateChange(func(i ICEGathererState) {
+			if i == ICEGathererStateComplete {
+				gatherCompleteCancel()
+			}
+		})
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+		assert.NotContains(t, offer.SDP, "a=candidate")
+		assert.NotContains(t, offer.SDP, "a=end-of-candidates")
+
+		assert.NoError(t, pc.SetLocalDescription(offer))
+		<-gatherComplete.Done()
+		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=candidate")
+		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=end-of-candidates")
+
+		assert.NoError(t, pc.Close())
+	})
+}
