@@ -475,16 +475,16 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeAudio)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
 	assert.NoError(t, err)
 
-	_, err = pc.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
 	sdp, err := pc.CreateOffer(nil)
