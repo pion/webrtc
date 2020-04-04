@@ -65,7 +65,7 @@ func runAnsweringPeer(offerChan <-chan SessionDescription, answerChan chan<- Ses
 	peerConnection, err := api.NewPeerConnection(Configuration{})
 	check(err)
 
-	_, err = peerConnection.AddTransceiver(RTPCodecTypeAudio)
+	_, err = peerConnection.AddTransceiverFromKind(RTPCodecTypeAudio)
 	check(err)
 
 	peerConnection.OnTrack(func(track *Track, receiver *RTPReceiver) {

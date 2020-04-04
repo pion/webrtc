@@ -57,7 +57,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,12 +227,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcOffer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,7 +480,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	pcOffer, pcAnswer, err := api.newPair()
 	assert.NoError(t, err)
 
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
 	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
@@ -981,7 +981,7 @@ func TestPlanBMultiTrack(t *testing.T) {
 		close(done)
 	}()
 
-	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
 	track1 := addSingleTrack(pcOffer)

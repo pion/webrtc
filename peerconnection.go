@@ -860,7 +860,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 
 	if remoteIsPlanB {
 		for ssrc, incoming := range incomingTracks {
-			t, err := pc.AddTransceiver(incoming.kind, RtpTransceiverInit{
+			t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
@@ -948,7 +948,7 @@ func (pc *PeerConnection) drainSRTP() {
 					incoming.kind = RTPCodecTypeAudio
 				}
 
-				t, err := pc.AddTransceiver(incoming.kind, RtpTransceiverInit{
+				t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
 					Direction: RTPTransceiverDirectionSendrecv,
 				})
 				if err != nil {
