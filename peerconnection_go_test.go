@@ -737,9 +737,17 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	}
 
 	candidateLock := sync.RWMutex{}
+	var offerCandidateDone, answerCandidateDone bool
 
 	cachedOfferCandidates := []ICECandidateInit{}
 	offerPC.OnICECandidate(func(c *ICECandidate) {
+		if offerCandidateDone {
+			t.Error("Received OnICECandidate after finishing gathering")
+		}
+		if c == nil {
+			offerCandidateDone = true
+		}
+
 		candidateLock.Lock()
 		defer candidateLock.Unlock()
 
@@ -748,6 +756,13 @@ func TestPeerConnectionTrickle(t *testing.T) {
 
 	cachedAnswerCandidates := []ICECandidateInit{}
 	answerPC.OnICECandidate(func(c *ICECandidate) {
+		if answerCandidateDone {
+			t.Error("Received OnICECandidate after finishing gathering")
+		}
+		if c == nil {
+			answerCandidateDone = true
+		}
+
 		candidateLock.Lock()
 		defer candidateLock.Unlock()
 
