@@ -264,6 +264,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	})
 	assert.NoError(t, answerDC.Close())
 	waitWithTimeout(t, &dcWait)
+	time.Sleep(10 * time.Millisecond)
 
 	reportPCOffer = offerPC.GetStats()
 	reportPCAnswer = answerPC.GetStats()
