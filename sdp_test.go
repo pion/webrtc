@@ -117,11 +117,20 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						{Key: "ssrc", Value: "4000 msid:rtx_trk_label rtx_trck_guid"},
 					},
 				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "msid", Value: "video_stream_id video_trk_id"},
+						{Key: "ssrc", Value: "5000"},
+					},
+				},
 			},
 		}
 
 		tracks := trackDetailsFromSDP(nil, s)
-		assert.Equal(t, 2, len(tracks))
+		assert.Equal(t, 3, len(tracks))
 		if _, ok := tracks[1000]; ok {
 			assert.Fail(t, "got the unknown track ssrc:1000 which should have been skipped")
 		}
@@ -141,6 +150,14 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		}
 		if _, ok := tracks[4000]; ok {
 			assert.Fail(t, "got the rtx track ssrc:3000 which should have been skipped")
+		}
+		if track, ok := tracks[5000]; !ok {
+			assert.Fail(t, "missing video track with ssrc:5000")
+		} else {
+			assert.Equal(t, RTPCodecTypeVideo, track.kind)
+			assert.Equal(t, uint32(5000), track.ssrc)
+			assert.Equal(t, "video_trk_id", track.id)
+			assert.Equal(t, "video_stream_id", track.label)
 		}
 	})
 }

@@ -25,6 +25,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
+
+		trackID := ""
+		trackLabel := ""
 		for _, attr := range media.Attributes {
 			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
@@ -55,6 +58,16 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 				}
 			}
 
+			// Handle a=msid for Unified plan
+			// TODO make "msid" a constant
+			if attr.Key == "msid" {
+				split := strings.Split(attr.Value, " ")
+				if len(split) == 2 {
+					trackLabel = split[0]
+					trackID = split[1]
+				}
+			}
+
 			if attr.Key == sdp.AttrKeySSRC {
 				split := strings.Split(attr.Value, " ")
 				ssrc, err := strconv.ParseUint(split[0], 10, 32)
@@ -69,8 +82,6 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					continue // This ssrc is already fully defined
 				}
 
-				trackID := ""
-				trackLabel := ""
 				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
 					trackLabel = split[1][len("msid:"):]
 					trackID = split[2]
