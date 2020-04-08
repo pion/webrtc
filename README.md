@@ -148,6 +148,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Masahiro Nakamura](https://github.com/tsuu32)
 * [Tarrence van As](https://github.com/tarrencev)
 * [Yuki Igarashi](https://github.com/bonprosoft)
+* [Egon Elbre](https://github.com/egonelbre)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
