@@ -89,29 +89,32 @@ type testCatchAllLeveledLogger struct {
 	callback func(string)
 }
 
-func (t testCatchAllLeveledLogger) handleMsg(format string, args ...interface{}) {
+func (t testCatchAllLeveledLogger) handleMsg(msg string) {
+	t.callback(msg)
+}
+func (t testCatchAllLeveledLogger) handleMsgf(format string, args ...interface{}) {
 	t.callback(fmt.Sprintf(format, args...))
 }
 
 func (t testCatchAllLeveledLogger) Trace(msg string) { t.handleMsg(msg) }
 func (t testCatchAllLeveledLogger) Tracef(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
+	t.handleMsgf(format, args...)
 }
 func (t testCatchAllLeveledLogger) Debug(msg string) { t.handleMsg(msg) }
 func (t testCatchAllLeveledLogger) Debugf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
+	t.handleMsgf(format, args...)
 }
 func (t testCatchAllLeveledLogger) Info(msg string) { t.handleMsg(msg) }
 func (t testCatchAllLeveledLogger) Infof(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
+	t.handleMsgf(format, args...)
 }
 func (t testCatchAllLeveledLogger) Warn(msg string) { t.handleMsg(msg) }
 func (t testCatchAllLeveledLogger) Warnf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
+	t.handleMsgf(format, args...)
 }
 func (t testCatchAllLeveledLogger) Error(msg string) { t.handleMsg(msg) }
 func (t testCatchAllLeveledLogger) Errorf(format string, args ...interface{}) {
-	t.handleMsg(format, args...)
+	t.handleMsgf(format, args...)
 }
 
 type testCatchAllLoggerFactory struct {
