@@ -784,10 +784,11 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		return
 	}
 
-	if err = receiver.Track().determinePayloadType(); err != nil {
-		pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
-		return
-	}
+	//This step results in the loss of the first RTP package
+// 	if err = receiver.Track().determinePayloadType(); err != nil {
+// 		pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+// 		return
+// 	}
 
 	pc.mu.RLock()
 	defer pc.mu.RUnlock()
@@ -797,17 +798,17 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		return
 	}
 
-	codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
-	if err != nil {
-		pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
+	codecs := pc.api.mediaEngine.GetCodecsByKind(incoming.kind)
+	if codecs[0] == nil {
+		pc.log.Warnf("no codec could be found for kind %d", incoming.kind)
 		return
 	}
 
 	receiver.Track().mu.Lock()
 	receiver.Track().id = incoming.id
 	receiver.Track().label = incoming.label
-	receiver.Track().kind = codec.Type
-	receiver.Track().codec = codec
+	receiver.Track().kind = codecs[0].Type
+	receiver.Track().codec = codecs[0]
 	receiver.Track().mu.Unlock()
 
 	if pc.onTrackHandler != nil {
