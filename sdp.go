@@ -25,7 +25,6 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
-
 		trackID := ""
 		trackLabel := ""
 		for _, attr := range media.Attributes {
