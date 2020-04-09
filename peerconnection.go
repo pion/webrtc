@@ -784,6 +784,13 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		return
 	}
 
+	// set track id and label early so they can be set as new track information
+	// is received from the SDP.
+	receiver.Track().mu.Lock()
+	receiver.Track().id = incoming.id
+	receiver.Track().label = incoming.label
+	receiver.Track().mu.Unlock()
+
 	if err = receiver.Track().determinePayloadType(); err != nil {
 		pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
 		return
@@ -804,8 +811,6 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	receiver.Track().mu.Lock()
-	receiver.Track().id = incoming.id
-	receiver.Track().label = incoming.label
 	receiver.Track().kind = codec.Type
 	receiver.Track().codec = codec
 	receiver.Track().mu.Unlock()
@@ -1602,9 +1607,18 @@ func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceive
 		for _, t := range currentTransceivers {
 			if t.Receiver() == nil || t.Receiver().Track() == nil {
 				continue
-			} else if _, ok := trackDetails[t.Receiver().Track().ssrc]; ok {
+			}
+
+			t.Receiver().Track().mu.Lock()
+			ssrc := t.Receiver().Track().ssrc
+			if _, ok := trackDetails[ssrc]; ok {
+				incoming := trackDetails[ssrc]
+				t.Receiver().Track().id = incoming.id
+				t.Receiver().Track().label = incoming.label
+				t.Receiver().Track().mu.Unlock()
 				continue
 			}
+			t.Receiver().Track().mu.Unlock()
 
 			if err := t.Receiver().Stop(); err != nil {
 				pc.log.Warnf("Failed to stop RtpReceiver: %s", err)

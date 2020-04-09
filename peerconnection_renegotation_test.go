@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/pion/webrtc/v2/internal/util"
 	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func sendVideoUntilDone(done <-chan struct{}, t *testing.T, tracks []*Track) {
@@ -142,6 +144,66 @@ func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
 	assert.Equal(t, onTrackCount[trackNames[0]], 1)
 	assert.Equal(t, onTrackCount[trackNames[1]], 1)
 	assert.Equal(t, onTrackCount[trackNames[2]], 1)
+}
+
+// Assert that renegotiation triggers OnTrack() with correct ID and label from
+// remote side, even when a transceiver was added before the actual track data
+// was received. This happens when we add a transceiver on the server, create
+// an offer on the server and the browser's answer contains the same SSRC, but
+// a track hasn't been added on the browser side yet. The browser can add a
+// track later and renegotiate, and track ID and label will be set by the time
+// first packets are received.
+func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	haveRenegotiated := &atomicBool{}
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	var atomicRemoteTrack atomic.Value
+	pcOffer.OnTrack(func(track *Track, r *RTPReceiver) {
+		if !haveRenegotiated.get() {
+			t.Fatal("OnTrack was called before renegotation")
+		}
+		onTrackFiredFunc()
+		atomicRemoteTrack.Store(track)
+	})
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	assert.NoError(t, err)
+	vp8Track, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo1", "bar1")
+	assert.NoError(t, err)
+	_, err = pcAnswer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	vp8Track.id = "foo2"
+	vp8Track.label = "bar2"
+
+	haveRenegotiated.set(true)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+
+	remoteTrack, ok := atomicRemoteTrack.Load().(*Track)
+	require.True(t, ok)
+	require.NotNil(t, remoteTrack)
+	assert.Equal(t, vp8Track.SSRC(), remoteTrack.SSRC())
+	assert.Equal(t, "foo2", remoteTrack.ID())
+	assert.Equal(t, "bar2", remoteTrack.Label())
 }
 
 func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
