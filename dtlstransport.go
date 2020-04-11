@@ -184,7 +184,8 @@ func (t *DTLSTransport) startSRTP() error {
 		)
 	}
 
-	err := srtpConfig.ExtractSessionKeysFromDTLS(t.conn, t.role() == DTLSRoleClient)
+	connState := t.conn.ConnectionState()
+	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.role() == DTLSRoleClient)
 	if err != nil {
 		return fmt.Errorf("failed to extract sctp session keys: %v", err)
 	}
@@ -331,7 +332,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	}
 
 	// Check the fingerprint if a certificate was exchanged
-	remoteCerts := t.conn.RemoteCertificate()
+	remoteCerts := t.conn.ConnectionState().PeerCertificates
 	if len(remoteCerts) == 0 {
 		t.onStateChange(DTLSTransportStateFailed)
 		return fmt.Errorf("peer didn't provide certificate via DTLS")
