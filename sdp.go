@@ -33,7 +33,8 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 				continue
 			}
 
-			if attr.Key == sdp.AttrKeySSRCGroup {
+			switch attr.Key {
+			case sdp.AttrKeySSRCGroup:
 				split := strings.Split(attr.Value, " ")
 				if split[0] == sdp.SemanticTokenFlowIdentification {
 					// Add rtx ssrcs to blacklist, to avoid adding them as tracks
@@ -55,19 +56,17 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 						delete(incomingTracks, uint32(rtxRepairFlow)) // Remove if rtx was added as track before
 					}
 				}
-			}
 
 			// Handle a=msid for Unified plan
 			// TODO make "msid" a constant
-			if attr.Key == "msid" {
+			case sdp.AttrKeyMsid:
 				split := strings.Split(attr.Value, " ")
 				if len(split) == 2 {
 					trackLabel = split[0]
 					trackID = split[1]
 				}
-			}
 
-			if attr.Key == sdp.AttrKeySSRC {
+			case sdp.AttrKeySSRC:
 				split := strings.Split(attr.Value, " ")
 				ssrc, err := strconv.ParseUint(split[0], 10, 32)
 				if err != nil {
