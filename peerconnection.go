@@ -791,35 +791,37 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	receiver.Track().label = incoming.label
 	receiver.Track().mu.Unlock()
 
-	if err = receiver.Track().determinePayloadType(); err != nil {
-		pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
-		return
-	}
+	go func() {
+		if err = receiver.Track().determinePayloadType(); err != nil {
+			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+			return
+		}
 
-	pc.mu.RLock()
-	defer pc.mu.RUnlock()
+		pc.mu.RLock()
+		defer pc.mu.RUnlock()
 
-	if pc.currentLocalDescription == nil {
-		pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
-		return
-	}
+		if pc.currentLocalDescription == nil {
+			pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
+			return
+		}
 
-	codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
-	if err != nil {
-		pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
-		return
-	}
+		codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
+		if err != nil {
+			pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
+			return
+		}
 
-	receiver.Track().mu.Lock()
-	receiver.Track().kind = codec.Type
-	receiver.Track().codec = codec
-	receiver.Track().mu.Unlock()
+		receiver.Track().mu.Lock()
+		receiver.Track().kind = codec.Type
+		receiver.Track().codec = codec
+		receiver.Track().mu.Unlock()
 
-	if pc.onTrackHandler != nil {
-		pc.onTrack(receiver.Track(), receiver)
-	} else {
-		pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
-	}
+		if pc.onTrackHandler != nil {
+			pc.onTrack(receiver.Track(), receiver)
+		} else {
+			pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
+		}
+	}()
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
@@ -858,7 +860,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 
 			delete(incomingTracks, ssrc)
 			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
-			go pc.startReceiver(incoming, t.Receiver())
+			pc.startReceiver(incoming, t.Receiver())
 			break
 		}
 	}
@@ -872,7 +874,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 				continue
 			}
-			go pc.startReceiver(incoming, t.Receiver())
+			pc.startReceiver(incoming, t.Receiver())
 		}
 	}
 }
@@ -960,7 +962,7 @@ func (pc *PeerConnection) drainSRTP() {
 					pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
 					return false
 				}
-				go pc.startReceiver(incoming, t.Receiver())
+				pc.startReceiver(incoming, t.Receiver())
 				return true
 			}
 		}
