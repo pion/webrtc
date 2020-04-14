@@ -57,8 +57,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					}
 				}
 
-			// Handle a=msid for Unified plan
-			// TODO make "msid" a constant
+			// Handle `a=msid:<stream_id> <track_label>` for Unified plan. The first value is the same as MediaStream.id
+			// in the browser and can be used to figure out which tracks belong to the same stream. The browser should
+			// figure this out automatically when an ontrack event is emitted on RTCPeerConnection.
 			case sdp.AttrKeyMsid:
 				split := strings.Split(attr.Value, " ")
 				if len(split) == 2 {
