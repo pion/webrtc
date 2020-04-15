@@ -150,6 +150,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Yuki Igarashi](https://github.com/bonprosoft)
 * [Egon Elbre](https://github.com/egonelbre)
 * [Jerko Steiner](https://github.com/jeremija)
+* [Roman Romanenko](https://github.com/r-novel)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
