@@ -71,7 +71,9 @@ func (t NetworkType) Protocol() string {
 	}
 }
 
-func newNetworkType(raw string) (NetworkType, error) {
+// NewNetworkType allows create network type from string
+// It will be useful for getting custom network types from external config.
+func NewNetworkType(raw string) (NetworkType, error) {
 	switch raw {
 	case networkTypeUDP4Str:
 		return NetworkTypeUDP4, nil
