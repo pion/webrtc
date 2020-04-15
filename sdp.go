@@ -25,6 +25,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
+		// Plan B can have multiple tracks in a signle media section
+		tracksInCurrentMediaSection := map[uint32]struct{}{}
+		remoteIsSending := false
 		trackID := ""
 		trackLabel := ""
 		for _, attr := range media.Attributes {
@@ -34,6 +37,10 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			}
 
 			switch attr.Key {
+			case sdp.AttrKeySendRecv:
+				remoteIsSending = true
+			case sdp.AttrKeySendOnly:
+				remoteIsSending = true
 			case sdp.AttrKeySSRCGroup:
 				split := strings.Split(attr.Value, " ")
 				if split[0] == sdp.SemanticTokenFlowIdentification {
@@ -86,7 +93,17 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					trackID = split[2]
 				}
 
+				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
+				// is not defined at the top of the loop over s.MediaDescriptions.
 				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
+				tracksInCurrentMediaSection[uint32(ssrc)] = struct{}{}
+			}
+		}
+
+		if !remoteIsSending {
+			for ssrc := range tracksInCurrentMediaSection {
+				// Only include a=sendrecv or a=sendonly track details. In other words, filter out a=recvonly and a=inactive.
+				delete(incomingTracks, ssrc)
 			}
 		}
 	}
