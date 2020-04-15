@@ -25,8 +25,17 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
-		trackID := ""
+		// Plan B can have multiple tracks in a signle media section
 		trackLabel := ""
+		trackID := ""
+
+		// If media section is recvonly or inactive skip
+		if _, ok := media.Attribute(sdp.AttrKeyRecvOnly); ok {
+			continue
+		} else if _, ok := media.Attribute(sdp.AttrKeyInactive); ok {
+			continue
+		}
+
 		for _, attr := range media.Attributes {
 			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
@@ -86,6 +95,8 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					trackID = split[2]
 				}
 
+				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
+				// is not defined at the top of the loop over s.MediaDescriptions.
 				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
 			}
 		}
