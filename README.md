@@ -151,6 +151,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Egon Elbre](https://github.com/egonelbre)
 * [Jerko Steiner](https://github.com/jeremija)
 * [Roman Romanenko](https://github.com/r-novel)
+* [John Berthels](https://github.com/jbert)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
