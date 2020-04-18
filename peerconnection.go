@@ -701,15 +701,15 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	return pc.iceGatherer.Gather()
 }
 
-// LocalDescription returns pendingLocalDescription if it is not null and
-// otherwise it returns currentLocalDescription. This property is used to
-// determine if setLocalDescription has already been called.
+// LocalDescription returns PendingLocalDescription if it is not null and
+// otherwise it returns CurrentLocalDescription. This property is used to
+// determine if SetLocalDescription has already been called.
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-localdescription
 func (pc *PeerConnection) LocalDescription() *SessionDescription {
 	if localDescription := pc.PendingLocalDescription(); localDescription != nil {
 		return localDescription
 	}
-	return pc.currentLocalDescription
+	return pc.CurrentLocalDescription()
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
