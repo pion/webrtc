@@ -1164,7 +1164,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 	}
 
 	switch direction {
-	case RTPTransceiverDirectionSendrecv:
+	case RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionSendonly:
 		codecs := pc.api.mediaEngine.GetCodecsByKind(kind)
 		if len(codecs) == 0 {
 			return nil, fmt.Errorf("no %s codecs found", kind.String())
