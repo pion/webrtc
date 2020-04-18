@@ -101,6 +101,21 @@ func mustSignalViaHTTP(address string) (offerOut chan webrtc.SessionDescription,
 	answerIn = make(chan webrtc.SessionDescription)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Body == nil {
+			http.Error(w, "Please send a request body", 400)
+			return
+		}
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", http.MethodPost)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "Please send a "+http.MethodPost+" request", 400)
+			return
+		}
+
 		var offer webrtc.SessionDescription
 		err := json.NewDecoder(r.Body).Decode(&offer)
 		if err != nil {
