@@ -698,7 +698,10 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return nil
 	}
 
-	return pc.iceGatherer.Gather()
+	if pc.iceGatherer.State() == ICEGathererStateNew {
+		return pc.iceGatherer.Gather()
+	}
+	return nil
 }
 
 // LocalDescription returns PendingLocalDescription if it is not null and

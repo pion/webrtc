@@ -46,7 +46,7 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcFirstOfferer, pcSecondOfferer, err := api.newPair()
+	pcFirstOfferer, pcSecondOfferer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,4 +291,57 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 
 	assert.NoError(t, pcFirstOfferer.Close())
 	assert.NoError(t, pcSecondOfferer.Close())
+}
+
+// Assert that renegotiation doesn't attempt to gather ICE twice
+// Before we would attempt to gather multiple times and would put
+// the PeerConnection into a broken state
+func TestPeerConnection_Renegotation_Trickle(t *testing.T) {
+	settingEngine := SettingEngine{}
+	settingEngine.SetTrickle(true)
+
+	api := NewAPI(WithSettingEngine(settingEngine))
+	api.mediaEngine.RegisterDefaultCodecs()
+
+	// Invalid STUN server on purpose, will stop ICE Gathering from completing in time
+	pcOffer, pcAnswer, err := api.newPair(Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs: []string{"stun:127.0.0.1:5000"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pcOffer.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, pcAnswer.AddICECandidate(c.ToJSON()))
+		}
+	})
+	pcAnswer.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, pcOffer.AddICECandidate(c.ToJSON()))
+		}
+	})
+
+	negotiate := func() {
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	}
+	negotiate()
+	negotiate()
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }

@@ -21,7 +21,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
