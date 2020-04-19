@@ -19,6 +19,7 @@ import (
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
@@ -227,7 +228,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +280,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	<-iceCompleteAnswer
 	<-iceCompleteOffer
 
-	// Each PeerConnection should have one sender, one receiver and two transceivers
+	// Each PeerConnection should have one sender, one receiver and one transceiver
 	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
 		senders := pc.GetSenders()
 		if len(senders) != 1 {
@@ -287,13 +288,13 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 
 		receivers := pc.GetReceivers()
-		if len(receivers) != 2 {
-			t.Errorf("Each PeerConnection should have two RTPReceivers, we have %d", len(receivers))
+		if len(receivers) != 1 {
+			t.Errorf("Each PeerConnection should have one RTPReceivers, we have %d", len(receivers))
 		}
 
 		transceivers := pc.GetTransceivers()
-		if len(transceivers) != 2 {
-			t.Errorf("Each PeerConnection should have two RTPTransceivers, we have %d", len(transceivers))
+		if len(transceivers) != 1 {
+			t.Errorf("Each PeerConnection should have one RTPTransceivers, we have %d", len(transceivers))
 		}
 	}
 
@@ -743,6 +744,75 @@ func TestAddTransceiver(t *testing.T) {
 	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv) {
 		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
 	}
+	assert.NoError(t, pc.Close())
+}
+
+func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
+	mediaEngine := MediaEngine{}
+	mediaEngine.RegisterDefaultCodecs()
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	tr, err := pc.AddTransceiverFromKind(
+		RTPCodecTypeVideo,
+		RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+	)
+	assert.NoError(t, err)
+
+	assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
+
+	addTrack := func() (*Track, *RTPSender) {
+		track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+		assert.NoError(t, err)
+
+		sender, err := pc.AddTrack(track)
+		assert.NoError(t, err)
+
+		return track, sender
+	}
+
+	track1, sender1 := addTrack()
+	assert.Equal(t, 1, len(pc.GetTransceivers()))
+	assert.Equal(t, sender1, tr.Sender())
+	assert.Equal(t, track1, tr.Sender().track)
+	require.NoError(t, pc.RemoveTrack(sender1))
+
+	track2, _ := addTrack()
+	assert.Equal(t, 1, len(pc.GetTransceivers()))
+	assert.Equal(t, track2, tr.Sender().track)
+
+	addTrack()
+	assert.Equal(t, 2, len(pc.GetTransceivers()))
+
+	assert.NoError(t, pc.Close())
+}
+
+func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
+	mediaEngine := MediaEngine{}
+	mediaEngine.RegisterDefaultCodecs()
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiverFromKind(
+		RTPCodecTypeVideo,
+		RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+	)
+	assert.NoError(t, err)
+
+	dtlsTransport := pc.dtlsTransport
+	pc.dtlsTransport = nil
+
+	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	assert.NoError(t, err)
+
+	_, err = pc.AddTrack(track)
+	assert.Error(t, err, "DTLSTransport must not be nil")
+
+	assert.Equal(t, 1, len(pc.GetTransceivers()))
+
+	pc.dtlsTransport = dtlsTransport
 	assert.NoError(t, pc.Close())
 }
 
