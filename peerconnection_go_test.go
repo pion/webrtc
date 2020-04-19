@@ -24,13 +24,13 @@ import (
 
 // newPair creates two new peer connections (an offerer and an answerer) using
 // the api.
-func (api *API) newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
-	pca, err := api.NewPeerConnection(Configuration{})
+func (api *API) newPair(cfg Configuration) (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
+	pca, err := api.NewPeerConnection(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pcb, err := api.NewPeerConnection(Configuration{})
+	pcb, err := api.NewPeerConnection(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -311,7 +311,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	defer report()
 
 	api := NewAPI()
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -720,7 +720,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	s.SetTrickle(true)
 
 	api := NewAPI(WithSettingEngine(s))
-	offerPC, answerPC, err := api.newPair()
+	offerPC, answerPC, err := api.newPair(Configuration{})
 	assert.NoError(t, err)
 
 	addOrCacheCandidate := func(pc *PeerConnection, c *ICECandidate, candidateCache []ICECandidateInit) []ICECandidateInit {

@@ -52,7 +52,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	defer report()
 
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	api := NewAPI(WithSettingEngine(s))
 	api.mediaEngine.RegisterDefaultCodecs()
 
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +400,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +477,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
-	pcOffer, pcAnswer, err := api.newPair()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	assert.NoError(t, err)
 
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
