@@ -228,12 +228,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,13 +288,13 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 
 		receivers := pc.GetReceivers()
-		if len(receivers) != 1 {
-			t.Errorf("Each PeerConnection should have one RTPReceivers, we have %d", len(receivers))
+		if len(receivers) != 2 {
+			t.Errorf("Each PeerConnection should have two RTPReceivers, we have %d", len(receivers))
 		}
 
 		transceivers := pc.GetTransceivers()
-		if len(transceivers) != 1 {
-			t.Errorf("Each PeerConnection should have one RTPTransceivers, we have %d", len(transceivers))
+		if len(transceivers) != 2 {
+			t.Errorf("Each PeerConnection should have two RTPTransceivers, we have %d", len(transceivers))
 		}
 	}
 
