@@ -9,6 +9,7 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
+	mid       atomic.Value // string
 	sender    atomic.Value // *RTPSender
 	receiver  atomic.Value // *RTPReceiver
 	direction atomic.Value // RTPTransceiverDirection
@@ -37,6 +38,28 @@ func (t *RTPTransceiver) Receiver() *RTPReceiver {
 	}
 
 	return nil
+}
+
+// setMid sets the RTPTransceiver's mid. If it was already set, will return an error.
+func (t *RTPTransceiver) setMid(mid string) error {
+	if currentMid := t.Mid(); currentMid != "" {
+		return fmt.Errorf("cannot change transceiver mid from: %s to %s", currentMid, mid)
+	}
+	t.mid.Store(mid)
+	return nil
+}
+
+// Mid gets the Transceiver's mid value. When not already set, this value will be set in CreateOffer or CreateAnswer.
+func (t *RTPTransceiver) Mid() string {
+	if v := t.mid.Load(); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+// Kind returns RTPTransceiver's kind.
+func (t *RTPTransceiver) Kind() RTPCodecType {
+	return t.kind
 }
 
 // Direction returns the RTPTransceiver's current direction
@@ -90,6 +113,16 @@ func (t *RTPTransceiver) setSendingTrack(track *Track) error {
 	return nil
 }
 
+func findByMid(mid string, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
+	for i, t := range localTransceivers {
+		if t.Mid() == mid {
+			return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
+		}
+	}
+
+	return nil, localTransceivers
+}
+
 // Given a direction+type pluck a transceiver from the passed list
 // if no entry satisfies the requested type+direction return a inactive Transceiver
 func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransceiverDirection, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
@@ -109,19 +142,11 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 	for _, possibleDirection := range getPreferredDirections() {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
-			if t.kind != remoteKind || possibleDirection != t.Direction() {
-				continue
+			if t.Mid() == "" && t.kind == remoteKind && possibleDirection == t.Direction() {
+				return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
 			}
-
-			return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
 		}
 	}
 
-	d := atomic.Value{}
-	d.Store(RTPTransceiverDirectionInactive)
-
-	return &RTPTransceiver{
-		kind:      remoteKind,
-		direction: d,
-	}, localTransceivers
+	return nil, localTransceivers
 }

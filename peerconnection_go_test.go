@@ -403,20 +403,20 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			[]RTPCodecType{RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 			[]*RTPTransceiver{createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv)},
-			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive)},
+			[]*RTPTransceiver{nil},
 		},
 		{
-			"No local Transceivers, every remote should get an inactive",
+			"No local Transceivers, every remote should get nil",
 			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeAudio, RTPCodecTypeVideo, RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly, RTPTransceiverDirectionInactive},
 
 			[]*RTPTransceiver{},
 
 			[]*RTPTransceiver{
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
-				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionInactive),
+				nil,
+				nil,
+				nil,
+				nil,
 			},
 		},
 		{

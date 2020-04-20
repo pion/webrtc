@@ -1692,7 +1692,12 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 	} else {
 		for _, t := range pc.GetTransceivers() {
-			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
+			mid := strconv.Itoa(len(mediaSections))
+			err := t.setMid(mid)
+			if err != nil {
+				return nil, err
+			}
+			mediaSections = append(mediaSections, mediaSection{id: mid, transceivers: []*RTPTransceiver{t}})
 		}
 
 		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
@@ -1741,43 +1746,58 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 			continue
 		}
 
-		t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-		mediaTransceivers := []*RTPTransceiver{t}
-		switch pc.configuration.SDPSemantics {
-		case SDPSemanticsUnifiedPlanWithFallback:
-			// If no match, process as unified-plan
-			if !detectedPlanB {
-				break
-			}
-			// If there was a match, fall through to plan-b
-			fallthrough
-		case SDPSemanticsPlanB:
+		sdpSemantics := pc.configuration.SDPSemantics
+
+		switch {
+		case sdpSemantics == SDPSemanticsPlanB || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB:
 			if !detectedPlanB {
 				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
 			}
 			// If we're responding to a plan-b offer, then we should try to fill up this
 			// media entry with all matching local transceivers
+			mediaTransceivers := []*RTPTransceiver{}
 			for {
 				// keep going until we can't get any more
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-				if t.Direction() == RTPTransceiverDirectionInactive {
+				if t == nil {
+					if len(mediaTransceivers) == 0 {
+						t = &RTPTransceiver{kind: kind}
+						t.setDirection(RTPTransceiverDirectionInactive)
+						mediaTransceivers = append(mediaTransceivers, t)
+					}
 					break
 				}
 				mediaTransceivers = append(mediaTransceivers, t)
 			}
-		case SDPSemanticsUnifiedPlan:
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
+		case sdpSemantics == SDPSemanticsUnifiedPlan || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback:
 			if detectedPlanB {
 				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
 			}
+			t, localTransceivers = findByMid(midValue, localTransceivers)
+			if t == nil {
+				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
+			}
+			if t == nil {
+				t = pc.newRTPTransceiver(nil, nil, RTPTransceiverDirectionInactive, kind)
+			}
+			if t.Mid() == "" {
+				_ = t.setMid(midValue)
+			}
+			mediaTransceivers := []*RTPTransceiver{t}
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
 		}
-
-		mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
 	}
 
 	// If we are offering also include unmatched local transceivers
 	if !detectedPlanB && includeUnmatched {
 		for _, t := range localTransceivers {
-			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), transceivers: []*RTPTransceiver{t}})
+			mid := strconv.Itoa(len(mediaSections))
+			err := t.setMid(mid)
+			if err != nil {
+				return nil, err
+			}
+			mediaSections = append(mediaSections, mediaSection{id: mid, transceivers: []*RTPTransceiver{t}})
 		}
 	}
 
