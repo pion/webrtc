@@ -130,24 +130,6 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						{Key: "ssrc", Value: "5000"},
 					},
 				},
-				{
-					MediaName: sdp.MediaName{
-						Media: "video",
-					},
-					Attributes: []sdp.Attribute{
-						{Key: "inactive"},
-						{Key: "ssrc", Value: "6000"},
-					},
-				},
-				{
-					MediaName: sdp.MediaName{
-						Media: "video",
-					},
-					Attributes: []sdp.Attribute{
-						{Key: "recvonly"},
-						{Key: "ssrc", Value: "7000"},
-					},
-				},
 			},
 		}
 
@@ -181,5 +163,32 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Equal(t, "video_trk_id", track.id)
 			assert.Equal(t, "video_stream_id", track.label)
 		}
+	})
+
+	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "inactive"},
+						{Key: "ssrc", Value: "6000"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "recvonly"},
+						{Key: "ssrc", Value: "7000"},
+					},
+				},
+			},
+		}
+
+		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, s)))
 	})
 }
