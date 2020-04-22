@@ -644,3 +644,54 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// Issue #346, don't start the SCTP Subsystem if the RemoteDescription doesn't contain one
+// Before we would always start it, and re-negotations would fail because SCTP was in flight
+func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
+	signalPairExcludeDataChannel := func(pcOffer, pcAnswer *PeerConnection) {
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+		offer.SDP = strings.Split(offer.SDP, "m=application")[0]
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	}
+
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
+	assert.NoError(t, err)
+
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
+	assert.NoError(t, err)
+
+	// Setting SCTPTransport to nil ensures any interaction with it will cause a segafault
+	pcAnswer.sctpTransport = nil
+
+	signalPairExcludeDataChannel(pcOffer, pcAnswer)
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
+
+	signalPairExcludeDataChannel(pcOffer, pcAnswer)
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}

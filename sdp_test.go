@@ -196,3 +196,37 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, s)))
 	})
 }
+
+func TestHaveApplicationMediaSection(t *testing.T) {
+	t.Run("Audio only", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "2000"},
+					},
+				},
+			},
+		}
+
+		assert.False(t, haveApplicationMediaSection(s))
+	})
+
+	t.Run("Application", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: mediaSectionApplication,
+					},
+				},
+			},
+		}
+
+		assert.True(t, haveApplicationMediaSection(s))
+	})
+}

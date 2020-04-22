@@ -148,7 +148,7 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 func addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
-			Media:   "application",
+			Media:   mediaSectionApplication,
 			Port:    sdp.RangedPort{Value: 9},
 			Protos:  []string{"DTLS", "SCTP"},
 			Formats: []string{"5000"},
@@ -403,4 +403,14 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandi
 	}
 
 	return remoteUfrag, remotePwd, candidates, nil
+}
+
+func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {
+	for _, m := range desc.MediaDescriptions {
+		if m.MediaName.Media == mediaSectionApplication {
+			return true
+		}
+	}
+
+	return false
 }
