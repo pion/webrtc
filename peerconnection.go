@@ -799,7 +799,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				return fmt.Errorf("RemoteDescription contained media section without mid value")
 			}
 
-			if media.MediaName.Media == "application" {
+			if media.MediaName.Media == mediaSectionApplication {
 				continue
 			}
 
@@ -1722,7 +1722,9 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 
 	if !isRenegotiation {
 		pc.drainSRTP()
-		pc.startSCTP()
+		if haveApplicationMediaSection(remoteDesc.parsed) {
+			pc.startSCTP()
+		}
 	}
 }
 
@@ -1817,7 +1819,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 			return nil, fmt.Errorf("RemoteDescription contained media section without mid value")
 		}
 
-		if media.MediaName.Media == "application" {
+		if media.MediaName.Media == mediaSectionApplication {
 			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true})
 			continue
 		}
