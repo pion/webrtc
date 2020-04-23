@@ -6,6 +6,8 @@ import (
 	"context"
 	"io"
 	"math/rand"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -29,6 +31,33 @@ func sendVideoUntilDone(done <-chan struct{}, t *testing.T, tracks []*Track) {
 			return
 		}
 	}
+}
+
+func sdpMidHasSsrc(offer SessionDescription, mid string, ssrc uint32) bool {
+	for _, media := range offer.parsed.MediaDescriptions {
+		cmid, ok := media.Attribute("mid")
+		if !ok {
+			continue
+		}
+		if cmid != mid {
+			continue
+		}
+		cssrc, ok := media.Attribute("ssrc")
+		if !ok {
+			continue
+		}
+		parts := strings.Split(cssrc, " ")
+
+		ssrcInt64, err := strconv.ParseUint(parts[0], 10, 32)
+		if err != nil {
+			continue
+		}
+
+		if uint32(ssrcInt64) == ssrc {
+			return true
+		}
+	}
+	return false
 }
 
 /*
@@ -204,6 +233,88 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 	assert.Equal(t, vp8Track.SSRC(), remoteTrack.SSRC())
 	assert.Equal(t, "foo2", remoteTrack.ID())
 	assert.Equal(t, "bar2", remoteTrack.Label())
+}
+
+// TestPeerConnection_Transceiver_Mid tests that we'll provide the same
+// transceiver for a media id on successive offer/answer
+func TestPeerConnection_Transceiver_Mid(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	require.NoError(t, err)
+
+	sender1, err := pcOffer.AddTrack(track1)
+	require.NoError(t, err)
+
+	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	require.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(track2)
+	require.NoError(t, err)
+
+	// this will create the initial offer using generateUnmatchedSDP
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	// apply answer so we'll test generateMatchedSDP
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	// Must have 3 media descriptions (2 video and 1 datachannel)
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+
+	assert.True(t, sdpMidHasSsrc(offer, "0", track1.SSRC()), "Expected mid %q with ssrc %d, offer.SDP: %s", "0", track1.SSRC(), offer.SDP)
+
+	// Remove first track, must keep same number of media
+	// descriptions and same track ssrc for mid 1 as previous
+	err = pcOffer.RemoveTrack(sender1)
+	assert.NoError(t, err)
+
+	offer, err = pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+
+	assert.True(t, sdpMidHasSsrc(offer, "1", track2.SSRC()), "Expected mid %q with ssrc %d, offer.SDP: %s", "1", track2.SSRC(), offer.SDP)
+
+	answer, err = pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	// apply answer so we'll test generateMatchedSDP
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
+	require.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(track3)
+	require.NoError(t, err)
+
+	offer, err = pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	// We reuse the existing non-sending transceiver
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+
+	assert.True(t, sdpMidHasSsrc(offer, "0", track3.SSRC()), "Expected mid %q with ssrc %d, offer.sdp: %s", "0", track3.SSRC(), offer.SDP)
+	assert.True(t, sdpMidHasSsrc(offer, "1", track2.SSRC()), "Expected mid %q with ssrc %d, offer.sdp: %s", "1", track2.SSRC(), offer.SDP)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
