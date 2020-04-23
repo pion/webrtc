@@ -154,6 +154,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [YongXin SHI](https://github.com/a-wing)
 * [Magnus Wahlstrand](https://github.com/kyeett)
 * [Chad Retz](https://github.com/cretz)
+* [Simone Gotti](https://github.com/sgotti)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
