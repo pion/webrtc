@@ -317,6 +317,103 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	assert.NoError(t, pcAnswer.Close())
 }
 
+func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, 123, "video1", "pion1")
+	require.NoError(t, err)
+
+	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP9, 456, "video2", "pion2")
+	require.NoError(t, err)
+
+	sender1, err := pcOffer.AddTrack(track1)
+	require.NoError(t, err)
+
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	require.NoError(t, err)
+
+	tracksCh := make(chan *Track)
+	tracksClosed := make(chan struct{})
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+		tracksCh <- track
+		for {
+			if _, readErr := track.ReadRTP(); readErr == io.EOF {
+				tracksClosed <- struct{}{}
+				return
+			}
+		}
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	require.NoError(t, err)
+
+	transceivers := pcOffer.GetTransceivers()
+	require.Equal(t, 1, len(transceivers))
+	require.Equal(t, "0", transceivers[0].Mid())
+
+	transceivers = pcAnswer.GetTransceivers()
+	require.Equal(t, 1, len(transceivers))
+	require.Equal(t, "0", transceivers[0].Mid())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go sendVideoUntilDone(ctx.Done(), t, []*Track{track1})
+
+	remoteTrack1 := <-tracksCh
+	cancel()
+
+	assert.Equal(t, uint32(123), remoteTrack1.SSRC())
+	assert.Equal(t, "video1", remoteTrack1.ID())
+	assert.Equal(t, "pion1", remoteTrack1.Label())
+
+	err = pcOffer.RemoveTrack(sender1)
+	require.NoError(t, err)
+
+	sender2, err := pcOffer.AddTrack(track2)
+	require.NoError(t, err)
+
+	err = signalPair(pcOffer, pcAnswer)
+	require.NoError(t, err)
+	<-tracksClosed
+
+	transceivers = pcOffer.GetTransceivers()
+	require.Equal(t, 1, len(transceivers))
+	require.Equal(t, "0", transceivers[0].Mid())
+
+	transceivers = pcAnswer.GetTransceivers()
+	require.Equal(t, 1, len(transceivers))
+	require.Equal(t, "0", transceivers[0].Mid())
+
+	ctx, cancel = context.WithCancel(context.Background())
+	go sendVideoUntilDone(ctx.Done(), t, []*Track{track2})
+
+	remoteTrack2 := <-tracksCh
+	cancel()
+
+	err = pcOffer.RemoveTrack(sender2)
+	require.NoError(t, err)
+
+	err = signalPair(pcOffer, pcAnswer)
+	require.NoError(t, err)
+	<-tracksClosed
+
+	assert.Equal(t, uint32(456), remoteTrack2.SSRC())
+	assert.Equal(t, "video2", remoteTrack2.ID())
+	assert.Equal(t, "pion2", remoteTrack2.Label())
+
+	require.NoError(t, pcOffer.Close())
+	require.NoError(t, pcAnswer.Close())
+}
+
 func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
