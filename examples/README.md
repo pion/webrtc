@@ -13,6 +13,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [Broadcast](broadcast): The broadcast example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
 * [RTP Forwarder](rtp-forwarder): The rtp-forwarder example demonstrates how to forward your audio/video streams using RTP.
+* [RTP to WebRTC](rtp-to-webrtc): The rtp-to-webrtc example demonstrates how to take RTP packets sent to a Pion process into your browser.
 
 #### Data Channel API
 * [Data Channels](data-channels): The data-channels example shows how you can send/recv DataChannel messages from a web browser.
