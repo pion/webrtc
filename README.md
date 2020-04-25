@@ -153,6 +153,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Roman Romanenko](https://github.com/r-novel)
 * [YongXin SHI](https://github.com/a-wing)
 * [Magnus Wahlstrand](https://github.com/kyeett)
+* [Chad Retz](https://github.com/cretz)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

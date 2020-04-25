@@ -1,0 +1,26 @@
+Browser base64 Session Description<br />
+<textarea id="localSessionDescription" readonly="true"></textarea> <br />
+
+Golang base64 Session Description<br />
+<textarea id="remoteSessionDescription"></textarea> <br/>
+<button onclick="window.startSession()"> Start Session </button><br />
+
+<br />
+
+<div style="display: flex">
+  <div>
+    Browser stream 1<br />
+    <canvas id="canvasOne" height="200" width="200"></canvas>
+  </div>
+  <div>
+    Browser stream 2<br />
+    <canvas id="canvasTwo" height="200" width="200"></canvas>
+  </div>
+  <div>
+    Browser stream 3<br />
+    <canvas id="canvasThree" height="200" width="200"></canvas>
+  </div>
+</div>
+
+Video from server<br />
+<video id="serverVideo" width="200" height="200" autoplay muted></video> <br />
