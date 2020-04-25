@@ -1,0 +1,5 @@
+---
+ name: swap-tracks
+ description: Example of how to have Pion swap incoming tracks on a single outgoing track
+ authors:
+   - Chad Retz
