@@ -97,7 +97,6 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 		return err
 	}
 
-	// pion/webrtc#753
 	cert := t.certificates[0]
 
 	isClient := true

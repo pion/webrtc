@@ -279,7 +279,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		t.srtcpEndpoint = t.iceTransport.NewEndpoint(mux.MatchSRTCP)
 		t.remoteParameters = remoteParameters
 
-		// pion/webrtc#753
 		cert := t.certificates[0]
 		t.onStateChange(DTLSTransportStateConnecting)
 

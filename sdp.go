@@ -166,7 +166,6 @@ func addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams I
 }
 
 func addFingerprints(d *sdp.SessionDescription, c Certificate) error {
-	// pion/webrtc#753
 	fingerprints, err := c.GetFingerprints()
 	if err != nil {
 		return err
