@@ -57,6 +57,7 @@ func main() {
 		listener.Close()
 	}()
 
+	fmt.Printf("%s\n", "Waiting to receive rtp data")
 	// gst rtpvp8pay mtu default 1400
 	data := make([]byte, 4096)
 	n, _, err := listener.ReadFromUDP(data)

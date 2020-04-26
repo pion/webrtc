@@ -2,10 +2,6 @@
 rtp2webrtc demonstrates how to send video to your browser from a `rtp`.
 
 ## Instructions
-```
-gst-launch-1.0 videotestsrc ! 'video/x-raw, width=640, height=480' ! videoconvert ! video/x-raw,format=I420 ! vp8enc error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5 deadline=1 ! rtpvp8pay ! udpsink host=127.0.0.1 port=5004
-```
-
 ### Download rtp2webrtc
 ```
 go get github.com/pion/webrtc/v2/examples/rtp2webrtc
@@ -20,6 +16,18 @@ Run `echo $BROWSER_SDP | rtp2webrtc`
 #### Windows
 1. Paste the SessionDescription into a file.
 1. Run `rtp2webrtc < my_file`
+
+### Send rtp data
+
+For `gstreamer`
+```
+gst-launch-1.0 videotestsrc ! 'video/x-raw, width=640, height=480' ! videoconvert ! video/x-raw,format=I420 ! vp8enc error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5 deadline=1 ! rtpvp8pay ! udpsink host=127.0.0.1 port=5004
+```
+
+For `ffmpeg`
+```
+ffmpeg -r 30 -f lavfi -i testsrc -vf scale=640:480 -vcodec libvpx -f rtp rtp://127.0.0.1:5004
+```
 
 ### Input rtp2webrtc's SessionDescription into your browser
 Copy the text that `rtp2webrtc` just emitted and copy into second text area
