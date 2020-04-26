@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v2/examples/internal/signal"
 	"github.com/pion/webrtc/v2/pkg/media"
 	"github.com/pion/webrtc/v2/pkg/media/ivfreader"
-
-	"github.com/pion/webrtc/v2/examples/internal/signal"
 )
 
 func main() {
@@ -61,6 +61,7 @@ func main() {
 		panic(err)
 	}
 
+	connectedChan := make(chan struct{})
 	go func() {
 		// Open a IVF file and start reading using our IVFReader
 		file, ivfErr := os.Open("output.ivf")
@@ -73,11 +74,19 @@ func main() {
 			panic(ivfErr)
 		}
 
+		// Wait for connection established
+		<-connectedChan
+
 		// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
 		// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
 		sleepTime := time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000)
 		for {
 			frame, _, ivfErr := ivf.ParseNextFrame()
+			if ivfErr == io.EOF {
+				fmt.Printf("All frames parsed and sent")
+				return
+			}
+
 			if ivfErr != nil {
 				panic(ivfErr)
 			}
@@ -93,6 +102,9 @@ func main() {
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+		if connectionState == webrtc.ICEConnectionStateConnected {
+			connectedChan <- struct{}{}
+		}
 	})
 
 	// Set the remote SessionDescription
