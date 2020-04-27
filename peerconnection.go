@@ -966,7 +966,8 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 // startRTPSenders starts all outbound RTP streams
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
 	for _, transceiver := range currentTransceivers {
-		if transceiver.Sender() != nil && !transceiver.Sender().hasSent() {
+		// TODO(sgotti) when in future we'll avoid replacing a transceiver sender just check the transceiver negotiation status
+		if transceiver.Sender() != nil && transceiver.Sender().isNegotiated() && !transceiver.Sender().hasSent() {
 			err := transceiver.Sender().Send(RTPSendParameters{
 				Encodings: RTPEncodingParameters{
 					RTPCodingParameters{
@@ -1762,6 +1763,9 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 			} else if t.kind == RTPCodecTypeAudio {
 				audio = append(audio, t)
 			}
+			if t.Sender() != nil {
+				t.Sender().setNegotiated()
+			}
 		}
 
 		if len(video) > 1 {
@@ -1773,6 +1777,9 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 	} else {
 		for _, t := range pc.GetTransceivers() {
+			if t.Sender() != nil {
+				t.Sender().setNegotiated()
+			}
 			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 		}
 
@@ -1843,6 +1850,9 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 					}
 					break
 				}
+				if t.Sender() != nil {
+					t.Sender().setNegotiated()
+				}
 				mediaTransceivers = append(mediaTransceivers, t)
 			}
 			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
@@ -1854,6 +1864,9 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 			if t == nil {
 				return nil, fmt.Errorf("cannot find transceiver with mid %q", midValue)
 			}
+			if t.Sender() != nil {
+				t.Sender().setNegotiated()
+			}
 			mediaTransceivers := []*RTPTransceiver{t}
 			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
 		}
@@ -1862,6 +1875,9 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	// If we are offering also include unmatched local transceivers
 	if !detectedPlanB && includeUnmatched {
 		for _, t := range localTransceivers {
+			if t.Sender() != nil {
+				t.Sender().setNegotiated()
+			}
 			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 		}
 	}
