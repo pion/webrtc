@@ -1069,3 +1069,56 @@ func TestPlanBMultiTrack(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// TestPeerConnection_Start_Only_Negotiated_Senders tests that only
+// the current negotiated transceivers senders provided in an
+// offer/answer are started
+func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pcOffer.Close()) }()
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pcAnswer.Close()) }()
+
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	require.NoError(t, err)
+
+	sender1, err := pcOffer.AddTrack(track1)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+
+	// Add a new track between providing the offer and applying the answer
+
+	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	require.NoError(t, err)
+
+	sender2, err := pcOffer.AddTrack(track2)
+	require.NoError(t, err)
+
+	// apply answer so we'll test generateMatchedSDP
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	// Wait for senders to be started by startTransports spawned goroutine
+	pcOffer.negotationLock.Lock()
+	defer pcOffer.negotationLock.Unlock()
+
+	// sender1 should be started but sender2 should not be started
+	assert.True(t, sender1.hasSent(), "sender1 is not started but should be started")
+	assert.False(t, sender2.hasSent(), "sender2 is started but should not be started")
+}

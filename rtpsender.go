@@ -18,6 +18,11 @@ type RTPSender struct {
 
 	transport *DTLSTransport
 
+	// TODO(sgotti) remove this when in future we'll avoid replacing
+	// a transceiver sender since we can just check the
+	// transceiver negotiation status
+	negotiated bool
+
 	// A reference to the associated api object
 	api *API
 
@@ -47,6 +52,18 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 		sendCalled: make(chan interface{}),
 		stopCalled: make(chan interface{}),
 	}, nil
+}
+
+func (r *RTPSender) isNegotiated() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.negotiated
+}
+
+func (r *RTPSender) setNegotiated() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.negotiated = true
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
