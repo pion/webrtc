@@ -58,11 +58,6 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	awaitRTPRecv := make(chan bool)
 	awaitRTPRecvClosed := make(chan bool)
 	awaitRTPSend := make(chan bool)
@@ -130,7 +125,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rtpReceiver, err := pcOffer.AddTrack(vp8Track)
+	rtpSender, err := pcOffer.AddTrack(vp8Track)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +163,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
-		if _, routineErr := rtpReceiver.Read(make([]byte, 1400)); routineErr == nil {
+		if _, routineErr := rtpSender.Read(make([]byte, 1400)); routineErr == nil {
 			close(awaitRTCPSenderRecv)
 		}
 	}()
