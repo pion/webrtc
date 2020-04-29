@@ -884,13 +884,13 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 
 // startRTPSenders starts all outbound RTP streams
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
-	for _, tranceiver := range currentTransceivers {
-		if tranceiver.Sender() != nil && !tranceiver.Sender().hasSent() {
-			err := tranceiver.Sender().Send(RTPSendParameters{
+	for _, transceiver := range currentTransceivers {
+		if transceiver.Sender() != nil && !transceiver.Sender().hasSent() {
+			err := transceiver.Sender().Send(RTPSendParameters{
 				Encodings: RTPEncodingParameters{
 					RTPCodingParameters{
-						SSRC:        tranceiver.Sender().track.SSRC(),
-						PayloadType: tranceiver.Sender().track.PayloadType(),
+						SSRC:        transceiver.Sender().track.SSRC(),
+						PayloadType: transceiver.Sender().track.PayloadType(),
 					},
 				}})
 			if err != nil {
@@ -1062,9 +1062,9 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 	defer pc.mu.Unlock()
 
 	result := []*RTPSender{}
-	for _, tranceiver := range pc.rtpTransceivers {
-		if tranceiver.Sender() != nil {
-			result = append(result, tranceiver.Sender())
+	for _, transceiver := range pc.rtpTransceivers {
+		if transceiver.Sender() != nil {
+			result = append(result, transceiver.Sender())
 		}
 	}
 	return result
@@ -1076,9 +1076,9 @@ func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
 	defer pc.mu.Unlock()
 
 	result := []*RTPReceiver{}
-	for _, tranceiver := range pc.rtpTransceivers {
-		if tranceiver.Receiver() != nil {
-			result = append(result, tranceiver.Receiver())
+	for _, transceiver := range pc.rtpTransceivers {
+		if transceiver.Receiver() != nil {
+			result = append(result, transceiver.Receiver())
 		}
 	}
 	return result
