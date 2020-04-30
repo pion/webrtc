@@ -157,7 +157,7 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 	}
 
 	for _, s := range senders {
-		_, err := s.sendRTP(&p.Header, p.Payload)
+		_, err := s.SendRTP(&p.Header, p.Payload)
 		if err != nil {
 			return err
 		}
