@@ -13,6 +13,7 @@ import (
 )
 
 type trackDetails struct {
+	mid   string
 	kind  RTPCodecType
 	label string
 	id    string
@@ -33,6 +34,11 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 		if _, ok := media.Attribute(sdp.AttrKeyRecvOnly); ok {
 			continue
 		} else if _, ok := media.Attribute(sdp.AttrKeyInactive); ok {
+			continue
+		}
+
+		midValue := getMidValue(media)
+		if midValue == "" {
 			continue
 		}
 
@@ -97,7 +103,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 
 				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
 				// is not defined at the top of the loop over s.MediaDescriptions.
-				incomingTracks[uint32(ssrc)] = trackDetails{codecType, trackLabel, trackID, uint32(ssrc)}
+				incomingTracks[uint32(ssrc)] = trackDetails{midValue, codecType, trackLabel, trackID, uint32(ssrc)}
 			}
 		}
 	}
