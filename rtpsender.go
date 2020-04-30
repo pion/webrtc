@@ -139,8 +139,8 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 	return rtcp.Unmarshal(b[:i])
 }
 
-// sendRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPSender) sendRTP(header *rtp.Header, payload []byte) (int, error) {
+// This is not the right way to do things, but Pion doesn't have a JitterBuffer yet
+func (r *RTPSender) SendRTP(header *rtp.Header, payload []byte) (int, error) {
 	select {
 	case <-r.stopCalled:
 		return 0, fmt.Errorf("RTPSender has been stopped")
