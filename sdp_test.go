@@ -96,6 +96,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						Media: "foobar",
 					},
 					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
 						{Key: "sendrecv"},
 						{Key: "ssrc", Value: "1000 msid:unknown_trk_label unknown_trk_guid"},
 					},
@@ -105,6 +106,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						Media: "audio",
 					},
 					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "1"},
 						{Key: "sendrecv"},
 						{Key: "ssrc", Value: "2000 msid:audio_trk_label audio_trk_guid"},
 					},
@@ -114,6 +116,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "2"},
 						{Key: "sendrecv"},
 						{Key: "ssrc-group", Value: "FID 3000 4000"},
 						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
@@ -125,6 +128,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "3"},
 						{Key: "sendonly"},
 						{Key: "msid", Value: "video_stream_id video_trk_id"},
 						{Key: "ssrc", Value: "5000"},

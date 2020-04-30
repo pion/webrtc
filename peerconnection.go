@@ -30,7 +30,7 @@ type PeerConnection struct {
 	mu      sync.RWMutex
 
 	// Negotiations must be processed serially
-	negotationLock sync.Mutex
+	negotiationLock sync.Mutex
 
 	configuration Configuration
 
@@ -935,6 +935,10 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 		for i := range localTransceivers {
 			t := localTransceivers[i]
 
+			if t.Mid() != incoming.mid {
+				continue
+			}
+
 			if (incomingTracks[ssrc].kind != t.kind) ||
 				(t.Direction() != RTPTransceiverDirectionRecvonly && t.Direction() != RTPTransceiverDirectionSendrecv) ||
 				(t.Receiver()) == nil ||
@@ -1648,10 +1652,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 // Start all transports. PeerConnection now has enough state
 func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string, currentTransceivers []*RTPTransceiver, incomingTracks map[uint32]trackDetails) {
-	pc.negotationLock.Lock()
+	pc.negotiationLock.Lock()
 
 	go func() {
-		defer pc.negotationLock.Unlock()
+		defer pc.negotiationLock.Unlock()
 
 		// Start the ice transport
 		err := pc.iceTransport.Start(
@@ -1687,10 +1691,10 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 }
 
 func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceiver) {
-	pc.negotationLock.Lock()
+	pc.negotiationLock.Lock()
 
 	go func() {
-		defer pc.negotationLock.Unlock()
+		defer pc.negotiationLock.Unlock()
 
 		trackDetails := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
 		for _, t := range currentTransceivers {
