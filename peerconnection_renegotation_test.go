@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -133,7 +132,6 @@ func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
 	trackNames := []string{util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength)}
 	outboundTracks := []*Track{}
 	onTrackCount := map[string]int{}
-	onTrackCountMu := sync.Mutex{}
 	onTrackChan := make(chan struct{}, 1)
 
 	api := NewAPI()
@@ -150,11 +148,8 @@ func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
 	}
 
 	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
-		onTrackChan <- struct{}{}
-
-		onTrackCountMu.Lock()
-		defer onTrackCountMu.Unlock()
 		onTrackCount[track.Label()]++
+		onTrackChan <- struct{}{}
 	})
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
@@ -168,8 +163,6 @@ func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 
-	onTrackCountMu.Lock()
-	defer onTrackCountMu.Unlock()
 	assert.Equal(t, onTrackCount[trackNames[0]], 1)
 	assert.Equal(t, onTrackCount[trackNames[1]], 1)
 	assert.Equal(t, onTrackCount[trackNames[2]], 1)
