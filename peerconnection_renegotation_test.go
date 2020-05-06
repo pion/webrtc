@@ -59,6 +59,13 @@ func sdpMidHasSsrc(offer SessionDescription, mid string, ssrc uint32) bool {
 	return false
 }
 
+func waitForNegotiation(pcs ...*PeerConnection) {
+	for _, pc := range pcs {
+		pc.negotiationLock.Lock()
+		pc.negotiationLock.Unlock() //nolint
+	}
+}
+
 /*
 *  Assert the following behaviors
 * - We are able to call AddTrack after signaling
@@ -268,6 +275,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
+	waitForNegotiation(pcOffer, pcAnswer)
+
 	// Must have 3 media descriptions (2 video and 1 datachannel)
 	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
 
@@ -290,6 +299,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForNegotiation(pcOffer, pcAnswer)
 
 	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
 	require.NoError(t, err)
