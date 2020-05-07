@@ -81,7 +81,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 		return err
 	}
 
-	agent := t.gatherer.agent
+	agent := t.gatherer.getAgent()
 	if agent == nil {
 		return errors.New("ICEAgent does not exist, unable to start ICETransport")
 	}
@@ -208,12 +208,17 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 		return err
 	}
 
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return errors.New("ICEAgent does not exist, unable to set remote candidates")
+	}
+
 	for _, c := range remoteCandidates {
 		i, err := c.toICE()
 		if err != nil {
 			return err
 		}
-		err = t.gatherer.agent.AddRemoteCandidate(i)
+		err = agent.AddRemoteCandidate(i)
 		if err != nil {
 			return err
 		}
@@ -235,7 +240,13 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 	if err != nil {
 		return err
 	}
-	err = t.gatherer.agent.AddRemoteCandidate(c)
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return errors.New("ICEAgent does not exist, unable to add remote candidates")
+	}
+
+	err = agent.AddRemoteCandidate(c)
 	if err != nil {
 		return err
 	}
