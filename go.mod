@@ -3,7 +3,7 @@ module github.com/pion/webrtc/v2
 go 1.12
 
 require (
-	github.com/pion/datachannel v1.4.16
+	github.com/pion/datachannel v1.4.17
 	github.com/pion/dtls/v2 v2.0.0
 	github.com/pion/ice v0.7.14
 	github.com/pion/logging v0.2.2
