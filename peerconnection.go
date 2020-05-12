@@ -29,8 +29,10 @@ type PeerConnection struct {
 	statsID string
 	mu      sync.RWMutex
 
-	// Negotiations must be processed serially
-	negotiationLock sync.Mutex
+	// ops is an operations queue which will ensure the enqueued actions are
+	// executed in order. It is used for asynchronously, but serially processing
+	// remote and local descriptions
+	ops *operations
 
 	configuration Configuration
 
@@ -91,6 +93,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// allow better readability to understand what is happening.
 	pc := &PeerConnection{
 		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
+		ops:     newOperations(),
 		configuration: Configuration{
 			ICEServers:           []ICEServer{},
 			ICETransportPolicy:   ICETransportPolicyAll,
@@ -731,9 +734,11 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	weAnswer := desc.Type == SDPTypeAnswer
-	if weAnswer && haveLocalDescription {
-		currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-		pc.startRenegotiation(currentTransceivers)
+	remoteDesc := pc.RemoteDescription()
+	if weAnswer && remoteDesc != nil {
+		pc.ops.Enqueue(func() {
+			pc.startRTP(haveLocalDescription, remoteDesc)
+		})
 	}
 
 	// To support all unittests which are following the future trickle=true
@@ -821,11 +826,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		}
 	}
 
-	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-
 	if haveRemoteDescription {
 		if weOffer {
-			pc.startRenegotiation(currentTransceivers)
+			pc.ops.Enqueue(func() {
+				pc.startRTP(true, &desc)
+			})
 		}
 		return nil
 	}
@@ -861,7 +866,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
-	pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash, currentTransceivers, trackDetailsFromSDP(pc.log, desc.parsed))
+	pc.ops.Enqueue(func() {
+		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
+		if weOffer {
+			pc.startRTP(false, &desc)
+		}
+	})
 	return nil
 }
 
@@ -890,11 +900,6 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 
 		pc.mu.RLock()
 		defer pc.mu.RUnlock()
-
-		if pc.currentLocalDescription == nil {
-			pc.log.Warnf("SetLocalDescription not called, unable to handle incoming media streams")
-			return
-		}
 
 		codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
 		if err != nil {
@@ -1467,13 +1472,11 @@ func (pc *PeerConnection) Close() error {
 	// 2. A Mux stops this chain. It won't close the underlying
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
-	var closeErrs []error
+	closeErrs := make([]error, 4)
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
 	for _, t := range pc.rtpTransceivers {
-		if err := t.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+		closeErrs = append(closeErrs, t.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
@@ -1487,21 +1490,15 @@ func (pc *PeerConnection) Close() error {
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
 	if pc.sctpTransport != nil {
-		if err := pc.sctpTransport.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+		closeErrs = append(closeErrs, pc.sctpTransport.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8)
-	if err := pc.dtlsTransport.Stop(); err != nil {
-		closeErrs = append(closeErrs, err)
-	}
+	closeErrs = append(closeErrs, pc.dtlsTransport.Stop())
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #9,#10,#11)
 	if pc.iceTransport != nil {
-		if err := pc.iceTransport.Stop(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
@@ -1658,52 +1655,38 @@ func (pc *PeerConnection) GetStats() StatsReport {
 }
 
 // Start all transports. PeerConnection now has enough state
-func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string, currentTransceivers []*RTPTransceiver, incomingTracks map[uint32]trackDetails) {
-	pc.negotiationLock.Lock()
+func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
+	// Start the ice transport
+	err := pc.iceTransport.Start(
+		pc.iceGatherer,
+		ICEParameters{
+			UsernameFragment: remoteUfrag,
+			Password:         remotePwd,
+			ICELite:          false,
+		},
+		&iceRole,
+	)
+	if err != nil {
+		pc.log.Warnf("Failed to start manager: %s", err)
+		return
+	}
 
-	go func() {
-		defer pc.negotiationLock.Unlock()
-
-		// Start the ice transport
-		err := pc.iceTransport.Start(
-			pc.iceGatherer,
-			ICEParameters{
-				UsernameFragment: remoteUfrag,
-				Password:         remotePwd,
-				ICELite:          false,
-			},
-			&iceRole,
-		)
-		if err != nil {
-			pc.log.Warnf("Failed to start manager: %s", err)
-			return
-		}
-
-		// Start the dtls transport
-		err = pc.dtlsTransport.Start(DTLSParameters{
-			Role:         dtlsRole,
-			Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
-		})
-		pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
-		if err != nil {
-			pc.log.Warnf("Failed to start manager: %s", err)
-			return
-		}
-
-		pc.startRTPReceivers(incomingTracks, currentTransceivers)
-		pc.startRTPSenders(currentTransceivers)
-		pc.drainSRTP()
-		pc.startSCTP()
-	}()
+	// Start the dtls transport
+	err = pc.dtlsTransport.Start(DTLSParameters{
+		Role:         dtlsRole,
+		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
+	})
+	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+	if err != nil {
+		pc.log.Warnf("Failed to start manager: %s", err)
+		return
+	}
 }
 
-func (pc *PeerConnection) startRenegotiation(currentTransceivers []*RTPTransceiver) {
-	pc.negotiationLock.Lock()
-
-	go func() {
-		defer pc.negotiationLock.Unlock()
-
-		trackDetails := trackDetailsFromSDP(pc.log, pc.RemoteDescription().parsed)
+func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription) {
+	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	if isRenegotiation {
 		for _, t := range currentTransceivers {
 			if t.Receiver() == nil || t.Receiver().Track() == nil {
 				continue
@@ -1732,10 +1715,15 @@ func (pc *PeerConnection) startRenegotiation(currentTransceivers []*RTPTransceiv
 			}
 			t.setReceiver(receiver)
 		}
+	}
 
-		pc.startRTPSenders(currentTransceivers)
-		pc.startRTPReceivers(trackDetails, currentTransceivers)
-	}()
+	pc.startRTPReceivers(trackDetails, currentTransceivers)
+	pc.startRTPSenders(currentTransceivers)
+
+	if !isRenegotiation {
+		pc.drainSRTP()
+		pc.startSCTP()
+	}
 }
 
 // GetRegisteredRTPCodecs gets a list of registered RTPCodec from the underlying constructed MediaEngine
