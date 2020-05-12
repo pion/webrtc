@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -57,13 +58,6 @@ func sdpMidHasSsrc(offer SessionDescription, mid string, ssrc uint32) bool {
 		}
 	}
 	return false
-}
-
-func waitForNegotiation(pcs ...*PeerConnection) {
-	for _, pc := range pcs {
-		pc.negotiationLock.Lock()
-		pc.negotiationLock.Unlock() //nolint
-	}
 }
 
 /*
@@ -124,15 +118,13 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	pcAnswer.negotiationLock.Lock()
+	<-pcOffer.ops.Done()
 	assert.Equal(t, 0, len(vp8Track.activeSenders))
-	pcAnswer.negotiationLock.Unlock()
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	pcOffer.negotiationLock.Lock()
+	<-pcOffer.ops.Done()
 	assert.Equal(t, 1, len(vp8Track.activeSenders))
-	pcOffer.negotiationLock.Unlock()
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
 
@@ -294,7 +286,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	waitForNegotiation(pcOffer, pcAnswer)
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
 
 	// Must have 3 media descriptions (2 video and 1 datachannel)
 	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
@@ -319,7 +312,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	waitForNegotiation(pcOffer, pcAnswer)
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
 
 	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
 	require.NoError(t, err)
@@ -528,6 +522,12 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 // Before we would attempt to gather multiple times and would put
 // the PeerConnection into a broken state
 func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	settingEngine := SettingEngine{}
 	settingEngine.SetTrickle(true)
 
@@ -546,14 +546,20 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(2)
 	pcOffer.OnICECandidate(func(c *ICECandidate) {
 		if c != nil {
 			assert.NoError(t, pcAnswer.AddICECandidate(c.ToJSON()))
+		} else {
+			wg.Done()
 		}
 	})
 	pcAnswer.OnICECandidate(func(c *ICECandidate) {
 		if c != nil {
 			assert.NoError(t, pcOffer.AddICECandidate(c.ToJSON()))
+		} else {
+			wg.Done()
 		}
 	})
 
@@ -572,6 +578,10 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	}
 	negotiate()
 	negotiate()
+
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
+	wg.Wait()
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
@@ -598,6 +608,9 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
+	<-pcOffer.ops.Done()
+	<-pcAnswer.ops.Done()
+
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
@@ -616,15 +629,13 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, sender.isNegotiated())
 
-	pcAnswer.negotiationLock.Lock()
+	<-pcAnswer.ops.Done()
 	assert.Equal(t, 0, len(localTrack.activeSenders))
-	pcAnswer.negotiationLock.Unlock()
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	pcAnswer.negotiationLock.Lock()
+	<-pcAnswer.ops.Done()
 	assert.Equal(t, 1, len(localTrack.activeSenders))
-	pcAnswer.negotiationLock.Unlock()
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
