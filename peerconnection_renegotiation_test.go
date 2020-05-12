@@ -72,7 +72,7 @@ func waitForNegotiation(pcs ...*PeerConnection) {
 * - OnTrack is NOT called on the other side until after SetRemoteDescription
 * - We are able to re-negotiate and AddTrack is properly called
  */
-func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
+func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -90,7 +90,7 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
 		if !haveRenegotiated.get() {
-			t.Fatal("OnTrack was called before renegotation")
+			t.Fatal("OnTrack was called before renegotiation")
 		}
 		onTrackFiredFunc()
 	})
@@ -103,7 +103,7 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
-	_, err = pcOffer.AddTrack(vp8Track)
+	sender, err := pcOffer.AddTrack(vp8Track)
 	assert.NoError(t, err)
 
 	// Send 10 packets, OnTrack MUST not be fired
@@ -113,7 +113,26 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	}
 
 	haveRenegotiated.set(true)
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	assert.False(t, sender.isNegotiated())
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.True(t, sender.isNegotiated())
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+
+	pcAnswer.negotiationLock.Lock()
+	assert.Equal(t, 0, len(vp8Track.activeSenders))
+	pcAnswer.negotiationLock.Unlock()
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	pcOffer.negotiationLock.Lock()
+	assert.Equal(t, 1, len(vp8Track.activeSenders))
+	pcOffer.negotiationLock.Unlock()
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
 
@@ -121,8 +140,8 @@ func TestPeerConnection_Renegotation_AddTrack(t *testing.T) {
 	assert.NoError(t, pcAnswer.Close())
 }
 
-// Assert that adding tracks across multiple renegotations performs as expected
-func TestPeerConnection_Renegotation_AddTrack_Multiple(t *testing.T) {
+// Assert that adding tracks across multiple renegotiations performs as expected
+func TestPeerConnection_Renegotiation_AddTrack_Multiple(t *testing.T) {
 	addTrackWithLabel := func(trackName string, pcOffer, pcAnswer *PeerConnection) *Track {
 		_, err := pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 		assert.NoError(t, err)
@@ -201,7 +220,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 	var atomicRemoteTrack atomic.Value
 	pcOffer.OnTrack(func(track *Track, r *RTPReceiver) {
 		if !haveRenegotiated.get() {
-			t.Fatal("OnTrack was called before renegotation")
+			t.Fatal("OnTrack was called before renegotiation")
 		}
 		onTrackFiredFunc()
 		atomicRemoteTrack.Store(track)
@@ -418,7 +437,7 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	require.NoError(t, pcAnswer.Close())
 }
 
-func TestPeerConnection_Renegotation_RemoveTrack(t *testing.T) {
+func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
 	api := NewAPI()
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -508,7 +527,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 // Assert that renegotiation doesn't attempt to gather ICE twice
 // Before we would attempt to gather multiple times and would put
 // the PeerConnection into a broken state
-func TestPeerConnection_Renegotation_Trickle(t *testing.T) {
+func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	settingEngine := SettingEngine{}
 	settingEngine.SetTrickle(true)
 
@@ -553,6 +572,63 @@ func TestPeerConnection_Renegotation_Trickle(t *testing.T) {
 	}
 	negotiate()
 	negotiate()
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
+
+func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	pcOffer.OnTrack(func(track *Track, r *RTPReceiver) {
+		onTrackFiredFunc()
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	assert.NoError(t, err)
+
+	localTrack, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	assert.NoError(t, err)
+
+	sender, err := pcAnswer.AddTrack(localTrack)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	assert.False(t, sender.isNegotiated())
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.True(t, sender.isNegotiated())
+
+	pcAnswer.negotiationLock.Lock()
+	assert.Equal(t, 0, len(localTrack.activeSenders))
+	pcAnswer.negotiationLock.Unlock()
+
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+
+	pcAnswer.negotiationLock.Lock()
+	assert.Equal(t, 1, len(localTrack.activeSenders))
+	pcAnswer.negotiationLock.Unlock()
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{localTrack})
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())

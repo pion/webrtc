@@ -706,6 +706,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
+	haveLocalDescription := pc.currentLocalDescription != nil
+
 	// JSEP 5.4
 	if desc.SDP == "" {
 		switch desc.Type {
@@ -726,6 +728,12 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
 		return err
+	}
+
+	weAnswer := desc.Type == SDPTypeAnswer
+	if weAnswer && haveLocalDescription {
+		currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+		pc.startRenegotiation(currentTransceivers)
 	}
 
 	// To support all unittests which are following the future trickle=true
@@ -773,10 +781,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
-	weOffer := true
-	if desc.Type == SDPTypeOffer {
-		weOffer = false
-	}
+	weOffer := desc.Type == SDPTypeAnswer
 
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
@@ -819,7 +824,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
 	if haveRemoteDescription {
-		pc.startRenegotation(currentTransceivers)
+		if weOffer {
+			pc.startRenegotiation(currentTransceivers)
+		}
 		return nil
 	}
 
@@ -1690,7 +1697,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}()
 }
 
-func (pc *PeerConnection) startRenegotation(currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startRenegotiation(currentTransceivers []*RTPTransceiver) {
 	pc.negotiationLock.Lock()
 
 	go func() {
