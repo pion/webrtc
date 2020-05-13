@@ -32,26 +32,23 @@ type RTPSender struct {
 
 // NewRTPSender constructs a new RTPSender
 func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender, error) {
-	if track == nil {
-		return nil, fmt.Errorf("Track must not be nil")
-	} else if transport == nil {
+	if transport == nil {
 		return nil, fmt.Errorf("DTLSTransport must not be nil")
 	}
 
-	track.mu.Lock()
-	defer track.mu.Unlock()
-	if track.receiver != nil {
-		return nil, fmt.Errorf("RTPSender can not be constructed with remote track")
-	}
-	track.totalSenderCount++
-
-	return &RTPSender{
-		track:      track,
+	r := &RTPSender{
 		transport:  transport,
 		api:        api,
 		sendCalled: make(chan interface{}),
 		stopCalled: make(chan interface{}),
-	}, nil
+	}
+
+	err := r.setTrack(track)
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func (r *RTPSender) isNegotiated() bool {
@@ -79,6 +76,69 @@ func (r *RTPSender) Track() *Track {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.track
+}
+
+// ReplaceTrack replaces the track currently being used as the sender's source with a new track
+func (r *RTPSender) ReplaceTrack(newTrack *Track) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	select {
+	case <-r.stopCalled:
+		return fmt.Errorf("RTPSender has been stopped")
+	default:
+	}
+
+	if newTrack == nil {
+		return fmt.Errorf("New track must not be nil")
+	} else if newTrack.Kind() != r.track.Kind() {
+		return fmt.Errorf("New track kind does not match original")
+	}
+
+	err := checkNegotiationTrigger(r.track, newTrack)
+	if err != nil {
+		return err
+	}
+
+	r.removeTrack()
+	return r.setTrack(newTrack)
+}
+
+func (r *RTPSender) setTrack(track *Track) error {
+	if track == nil {
+		return fmt.Errorf("Track must not be nil")
+	}
+
+	track.mu.Lock()
+	defer track.mu.Unlock()
+
+	if track.receiver != nil {
+		return fmt.Errorf("RTPSender can not be constructed with remote track")
+	}
+	track.totalSenderCount++
+
+	if r.hasSent() {
+		track.activeSenders = append(track.activeSenders, r)
+	}
+
+	r.track = track
+	return nil
+}
+
+func (r *RTPSender) removeTrack() {
+	r.track.mu.Lock()
+	defer r.track.mu.Unlock()
+
+	filtered := []*RTPSender{}
+	for _, s := range r.track.activeSenders {
+		if s != r {
+			filtered = append(filtered, s)
+		} else {
+			r.track.totalSenderCount--
+		}
+	}
+	r.track.activeSenders = filtered
+	r.track = nil
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
@@ -119,17 +179,7 @@ func (r *RTPSender) Stop() error {
 	default:
 	}
 
-	r.track.mu.Lock()
-	defer r.track.mu.Unlock()
-	filtered := []*RTPSender{}
-	for _, s := range r.track.activeSenders {
-		if s != r {
-			filtered = append(filtered, s)
-		} else {
-			r.track.totalSenderCount--
-		}
-	}
-	r.track.activeSenders = filtered
+	r.removeTrack()
 	close(r.stopCalled)
 
 	if r.hasSent() {
@@ -189,4 +239,17 @@ func (r *RTPSender) hasSent() bool {
 	default:
 		return false
 	}
+}
+
+func checkNegotiationTrigger(track, newTrack *Track) error {
+	codec := track.Codec()
+	newCodec := newTrack.Codec()
+
+	if codec.Type == RTPCodecTypeAudio && codec.Channels != newCodec.Channels {
+		return fmt.Errorf("New track has different number of channels from original")
+	}
+
+	// TODO: check more triggers
+
+	return nil
 }
