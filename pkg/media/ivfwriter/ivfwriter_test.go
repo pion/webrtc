@@ -31,7 +31,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			Marker:           true,
 			Extension:        true,
 			ExtensionProfile: 1,
-			ExtensionPayload: []byte{0xFF, 0xFF, 0xFF, 0xFF},
 			Version:          2,
 			PayloadOffset:    20,
 			PayloadType:      96,
@@ -43,6 +42,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 		Payload: rawPkt[20:],
 		Raw:     rawPkt,
 	}
+	assert.NoError(t, validPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
 	assert := assert.New(t)
 
