@@ -9,7 +9,7 @@ require (
 	github.com/pion/logging v0.2.2
 	github.com/pion/quic v0.1.1
 	github.com/pion/rtcp v1.2.1
-	github.com/pion/rtp v1.5.0
+	github.com/pion/rtp v1.5.1
 	github.com/pion/sctp v1.7.6
 	github.com/pion/sdp/v2 v2.3.7
 	github.com/pion/srtp v1.3.2
