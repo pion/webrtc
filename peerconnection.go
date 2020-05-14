@@ -896,10 +896,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 }
 
 func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
+	encodings := []RTPDecodingParameters{}
+	for _, stream := range incoming.ssrcStreams {
+		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{SSRC: stream.ssrc}})
+	}
 	err := receiver.Receive(RTPReceiveParameters{
-		Encodings: RTPDecodingParameters{
-			RTPCodingParameters{SSRC: incoming.ssrc},
-		}})
+		Encodings: encodings,
+	})
 	if err != nil {
 		pc.log.Warnf("RTPReceiver Receive failed %s", err)
 		return
@@ -908,8 +911,8 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	// set track id and label early so they can be set as new track information
 	// is received from the SDP.
 	receiver.Track().mu.Lock()
-	receiver.Track().id = incoming.id
-	receiver.Track().label = incoming.label
+	receiver.Track().id = incoming.mstid
+	receiver.Track().label = incoming.msid
 	receiver.Track().mu.Unlock()
 
 	go func() {
@@ -941,7 +944,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetails, currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startRTPReceivers(incomingTracks map[string]trackDetails, currentTransceivers []*RTPTransceiver) {
 	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
 	remoteIsPlanB := false
@@ -952,33 +955,46 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
 	}
 
-	// Ensure we haven't already started a transceiver for this ssrc
-	for ssrc := range incomingTracks {
-		for i := range localTransceivers {
-			if t := localTransceivers[i]; (t.Receiver()) == nil || t.Receiver().Track() == nil || t.Receiver().Track().ssrc != ssrc {
+	// Ensure we haven't already started a transceiver for this trackid
+	for incomingTrackID := range incomingTracks {
+		for _, t := range localTransceivers {
+			if t.Receiver() == nil || t.Receiver().Track() == nil {
 				continue
 			}
 
-			delete(incomingTracks, ssrc)
+			// with unified plan track id is the transceiver mid
+			trackID := t.Mid()
+			if remoteIsPlanB {
+				// with planB trackId is the receiver track id
+				trackID = t.Receiver().Track().id
+			}
+			if trackID != incomingTrackID {
+				continue
+			}
+
+			delete(incomingTracks, incomingTrackID)
 		}
 	}
 
-	for ssrc, incoming := range incomingTracks {
+	for incomingTrackID, incoming := range incomingTracks {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
 
-			if t.Mid() != incoming.mid {
-				continue
+			if !remoteIsPlanB {
+				// for unified plan start only the receiver marked with the matching mid
+				if t.Mid() != incomingTrackID {
+					continue
+				}
 			}
 
-			if (incomingTracks[ssrc].kind != t.kind) ||
+			if (incoming.kind != t.kind) ||
 				(t.Direction() != RTPTransceiverDirectionRecvonly && t.Direction() != RTPTransceiverDirectionSendrecv) ||
 				(t.Receiver()) == nil ||
 				(t.Receiver().haveReceived()) {
 				continue
 			}
 
-			delete(incomingTracks, ssrc)
+			delete(incomingTracks, incomingTrackID)
 			localTransceivers = append(localTransceivers[:i], localTransceivers[i+1:]...)
 			pc.startReceiver(incoming, t.Receiver())
 			break
@@ -986,15 +1002,17 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[uint32]trackDetai
 	}
 
 	if remoteIsPlanB {
-		for ssrc, incoming := range incomingTracks {
-			t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
-				Direction: RTPTransceiverDirectionSendrecv,
-			})
-			if err != nil {
-				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
-				continue
+		for _, incoming := range incomingTracks {
+			for ssrc := range incoming.ssrcStreams {
+				t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
+					Direction: RTPTransceiverDirectionSendrecv,
+				})
+				if err != nil {
+					pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", ssrc, err)
+					continue
+				}
+				pc.startReceiver(incoming, t.Receiver())
 			}
-			pc.startReceiver(incoming, t.Receiver())
 		}
 	}
 }
@@ -1069,8 +1087,9 @@ func (pc *PeerConnection) drainSRTP() {
 				}
 
 				incoming := trackDetails{
-					ssrc: ssrc,
-					kind: RTPCodecTypeVideo,
+					kind:        RTPCodecTypeVideo,
+					useRid:      false,
+					ssrcStreams: map[uint32]*streamDetails{ssrc: {ssrc: ssrc}},
 				}
 				if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
 					incoming.kind = RTPCodecTypeAudio
@@ -1710,24 +1729,62 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 
 func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription) {
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	isPlanB := descriptionIsPlanB(remoteDesc)
+	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed, isPlanB)
+
 	if isRenegotiation {
 		for _, t := range currentTransceivers {
 			if t.Receiver() == nil || t.Receiver().Track() == nil {
 				continue
 			}
 
+			// with unified plan track id is the transceiver mid
+			trackID := t.Mid()
+			if isPlanB {
+				// with planB trackId is the receiver track id
+				trackID = t.Receiver().Track().id
+			}
 			t.Receiver().Track().mu.Lock()
-			ssrc := t.Receiver().Track().ssrc
-			if _, ok := trackDetails[ssrc]; ok {
-				incoming := trackDetails[ssrc]
-				t.Receiver().Track().id = incoming.id
-				t.Receiver().Track().label = incoming.label
-				t.Receiver().Track().mu.Unlock()
-				continue
+
+			matched := false
+			// handle changed ssrc in same transceiver
+			if incoming, ok := trackDetails[trackID]; !ok {
+				// no matching track id
+				// check if there's a track with the same ssrc but different track id
+				for _, incoming := range trackDetails {
+					for ssrc := range incoming.ssrcStreams {
+						if t.Receiver().Track().ssrc == ssrc {
+							matched = true
+							// update receiver track id and label
+							t.Receiver().Track().id = incoming.mstid
+							t.Receiver().Track().label = incoming.msid
+							break
+						}
+					}
+					if matched {
+						break
+					}
+				}
+			} else {
+				// matching track id
+				for ssrc := range incoming.ssrcStreams {
+					// check if the incoming track as the same ssrc
+					if t.Receiver().Track().ssrc == ssrc {
+						matched = true
+						// update receiver track id and label
+						t.Receiver().Track().id = incoming.mstid
+						t.Receiver().Track().label = incoming.msid
+						break
+					}
+				}
 			}
 			t.Receiver().Track().mu.Unlock()
+			if matched {
+				continue
+			}
 
+			// no matching track id or track with different ssrc
+			// remove receiver
 			if err := t.Receiver().Stop(); err != nil {
 				pc.log.Warnf("Failed to stop RtpReceiver: %s", err)
 				continue

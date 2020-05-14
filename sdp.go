@@ -12,23 +12,39 @@ import (
 	"github.com/pion/sdp/v2"
 )
 
+type streamDetails struct {
+	rid  string
+	ssrc uint32
+
+	trackID string
+	msid    string
+	mstid   string
+}
+
 type trackDetails struct {
-	mid   string
-	kind  RTPCodecType
-	label string
-	id    string
-	ssrc  uint32
+	id      string
+	kind    RTPCodecType
+	msid    string
+	mstid   string
+	useRid  bool
+	extMaps map[int]*sdp.ExtMap
+
+	ridStreams  map[string]*streamDetails
+	ssrcStreams map[uint32]*streamDetails
 }
 
 // extract all trackDetails from an SDP.
-func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) map[uint32]trackDetails {
-	incomingTracks := map[uint32]trackDetails{}
+func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription, isPlanB bool) map[string]trackDetails {
+	incomingTracks := map[string]trackDetails{}
 	rtxRepairFlows := map[uint32]bool{}
 
 	for _, media := range s.MediaDescriptions {
-		// Plan B can have multiple tracks in a signle media section
-		trackLabel := ""
-		trackID := ""
+		// Plan B can have multiple tracks in a single media section
+		msid := ""
+		mstid := ""
+		extMaps := map[int]*sdp.ExtMap{}
+		ridStreams := map[string]*streamDetails{}
+		ssrcStreams := map[uint32]*streamDetails{}
 
 		// If media section is recvonly or inactive skip
 		if _, ok := media.Attribute(sdp.AttrKeyRecvOnly); ok {
@@ -37,17 +53,23 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			continue
 		}
 
-		midValue := getMidValue(media)
-		if midValue == "" {
+		var useRid bool
+		var midValue string
+		if !isPlanB {
+			midValue = getMidValue(media)
+			if midValue == "" {
+				continue
+			}
+
+			_, useRid = media.Attribute("rid")
+		}
+
+		codecType := NewRTPCodecType(media.MediaName.Media)
+		if codecType == 0 {
 			continue
 		}
 
 		for _, attr := range media.Attributes {
-			codecType := NewRTPCodecType(media.MediaName.Media)
-			if codecType == 0 {
-				continue
-			}
-
 			switch attr.Key {
 			case sdp.AttrKeySSRCGroup:
 				split := strings.Split(attr.Value, " ")
@@ -68,7 +90,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 							continue
 						}
 						rtxRepairFlows[uint32(rtxRepairFlow)] = true
-						delete(incomingTracks, uint32(rtxRepairFlow)) // Remove if rtx was added as track before
+						//delete(incomingTracks, uint32(rtxRepairFlow)) // Remove if rtx was added as track before
 					}
 				}
 
@@ -78,32 +100,90 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			case sdp.AttrKeyMsid:
 				split := strings.Split(attr.Value, " ")
 				if len(split) == 2 {
-					trackLabel = split[0]
-					trackID = split[1]
+					msid = split[0]
+					mstid = split[1]
 				}
 
+			// TODO(sgotti) define this in pion/sdp
+			case "rid":
+				split := strings.Split(attr.Value, " ")
+				rid := split[0]
+
+				ridStreams[rid] = &streamDetails{rid: rid}
+
 			case sdp.AttrKeySSRC:
+				if useRid {
+					log.Warnf("ignoring provided SSRC since we're using rid attributes")
+					continue
+				}
 				split := strings.Split(attr.Value, " ")
 				ssrc, err := strconv.ParseUint(split[0], 10, 32)
 				if err != nil {
 					log.Warnf("Failed to parse SSRC: %v", err)
 					continue
 				}
-				if rtxRepairFlow := rtxRepairFlows[uint32(ssrc)]; rtxRepairFlow {
-					continue // This ssrc is a RTX repair flow, ignore
-				}
-				if existingValues, ok := incomingTracks[uint32(ssrc)]; ok && existingValues.label != "" && existingValues.id != "" {
-					continue // This ssrc is already fully defined
-				}
-
+				var ssrcMsid string
+				var ssrcMstid string
 				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
-					trackLabel = split[1][len("msid:"):]
-					trackID = split[2]
+					ssrcMsid = split[1][len("msid:"):]
+					ssrcMstid = split[2]
 				}
 
-				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
-				// is not defined at the top of the loop over s.MediaDescriptions.
-				incomingTracks[uint32(ssrc)] = trackDetails{midValue, codecType, trackLabel, trackID, uint32(ssrc)}
+				if isPlanB {
+					if ssrcMsid != "" {
+						ssrcStreams[uint32(ssrc)] = &streamDetails{ssrc: uint32(ssrc), trackID: ssrcMstid, msid: ssrcMsid, mstid: ssrcMstid}
+					}
+				} else {
+					ssrcStreams[uint32(ssrc)] = &streamDetails{ssrc: uint32(ssrc), trackID: midValue}
+				}
+
+			// TODO(sgotti) define this in pion/sdp
+			case "extmap":
+				em := &sdp.ExtMap{}
+				if err := em.Unmarshal("extmap:" + attr.Value); err != nil {
+					log.Warnf("Failed to parse ExtMap: %v", err)
+					continue
+				}
+				extMaps[em.Value] = em
+			}
+		}
+
+		for ssrc := range ssrcStreams {
+			if rtxRepairFlow := rtxRepairFlows[ssrc]; rtxRepairFlow {
+				// This ssrc is a RTX repair flow, ignore
+				delete(ssrcStreams, ssrc)
+			}
+		}
+
+		if isPlanB {
+			// collect ssrcStreams with same trackID
+			for _, ssrcStream := range ssrcStreams {
+				ic, ok := incomingTracks[ssrcStream.trackID]
+				if !ok {
+					// create a new track
+					incomingTracks[ssrcStream.trackID] = trackDetails{
+						id:          ssrcStream.trackID,
+						kind:        codecType,
+						msid:        ssrcStream.msid,
+						mstid:       ssrcStream.mstid,
+						ssrcStreams: ssrcStreams,
+					}
+					continue
+				}
+
+				// add ssrcStream to existing track
+				ic.ssrcStreams[ssrcStream.ssrc] = ssrcStream
+			}
+		} else {
+			incomingTracks[midValue] = trackDetails{
+				id:          midValue,
+				kind:        codecType,
+				msid:        msid,
+				mstid:       mstid,
+				extMaps:     extMaps,
+				useRid:      useRid,
+				ridStreams:  ridStreams,
+				ssrcStreams: ssrcStreams,
 			}
 		}
 	}
