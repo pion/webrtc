@@ -1,0 +1,18 @@
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+Browser base64 Session Description<br />
+<textarea id="localSessionDescription" readonly="true"></textarea> <br />
+
+Golang base64 Session Description<br />
+<textarea id="remoteSessionDescription"></textarea> <br />
+<button onclick="window.startSession()"> Start Session </button><br />
+
+<br />
+
+<div>
+  Browser stream<br />
+  <video id="browserVideo" width="200" height="200" autoplay muted></video>
+</div>
+
+<div id="serverVideos">
+  Video from server<br />
+</div>
