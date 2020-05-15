@@ -12,6 +12,19 @@ import (
 	"github.com/pion/sdp/v2"
 )
 
+const (
+	extMapValueABSSendTime     = 1
+	extMapValueTransportCC     = 2
+	extMapValueSDESMid         = 3
+	extMapValueSDESRTPStreamID = 4
+
+	// TODO(sgotti) add these to pion/sdp
+	ABSSendTimeURI     = "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
+	TransportCCURI     = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
+	SDESMidURI         = "urn:ietf:params:rtp-hdrext:sdes:mid"
+	SDESRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"
+)
+
 type streamDetails struct {
 	rid  string
 	ssrc uint32
