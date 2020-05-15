@@ -300,7 +300,8 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, transceivers ...*RTPTransceiver) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) {
+	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
 	}
@@ -313,15 +314,24 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
+	for _, extMap := range mediaSection.extMaps {
+		media.WithExtMap(*extMap)
+	}
+
+	if mediaSection.recvSimulcast {
+		for _, rid := range mediaSection.recvRids {
+			media.WithValueAttribute("rid", rid+" recv")
+		}
+
+		media.WithValueAttribute("simulcast", "recv "+strings.Join(mediaSection.recvRids, ";"))
+	}
+
 	codecs := mediaEngine.GetCodecsByKind(t.kind)
 	for _, codec := range codecs {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
-			if feedback.Type == TypeRTCPFBTransportCC {
-				media.WithTransportCCExtMap()
-			}
 		}
 	}
 	if len(codecs) == 0 {
@@ -340,7 +350,22 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 	for _, mt := range transceivers {
 		if mt.Sender() != nil && mt.Sender().track != nil {
 			track := mt.Sender().track
-			media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.ID())
+			if len(track.streams) > 1 {
+				rids := []string{}
+				for _, stream := range track.streams {
+					media.WithValueAttribute("rid", fmt.Sprintf("%s send", stream.RID()))
+					rids = append(rids, stream.RID())
+				}
+				media.WithValueAttribute("simulcast", fmt.Sprintf("send %s", strings.Join(rids, ";")))
+			} else {
+				// currently we support only one stream when not using simulcast. TODO(sgotti) support also an additional repair stream
+				if len(track.streams) > 1 {
+					return false, fmt.Errorf("only one stream is supported when not using simulcast")
+				}
+				for _, stream := range track.streams {
+					media = media.WithMediaSource(stream.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.ID())
+				}
+			}
 			if !isPlanB {
 				media = media.WithPropertyAttribute("msid:" + track.Label() + " " + track.ID())
 				break
@@ -357,9 +382,12 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 }
 
 type mediaSection struct {
-	id           string
-	transceivers []*RTPTransceiver
-	data         bool
+	id            string
+	transceivers  []*RTPTransceiver
+	recvSimulcast bool
+	recvRids      []string
+	extMaps       []*sdp.ExtMap
+	data          bool
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
@@ -383,7 +411,7 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, isICELite bool, mediaE
 		shouldAddID := true
 		if m.data {
 			addDataMediaSection(d, m.id, iceParams, candidates, connectionRole, iceGatheringState)
-		} else if shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m.transceivers...); err != nil {
+		} else if shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m); err != nil {
 			return nil, err
 		}
 
@@ -406,6 +434,37 @@ func getMidValue(media *sdp.MediaDescription) string {
 		}
 	}
 	return ""
+}
+
+// TODO(sgotti) add rid parsing
+func getRids(media *sdp.MediaDescription) []string {
+	rids := []string{}
+	for _, attr := range media.Attributes {
+		if attr.Key == "rid" {
+			split := strings.Split(attr.Value, " ")
+			rids = append(rids, split[0])
+		}
+	}
+	return rids
+}
+
+// TODO(sgotti) add simulcast parsing
+func hasSimulcast(media *sdp.MediaDescription) bool {
+	for _, attr := range media.Attributes {
+		if attr.Key == "simulcast" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasExtension(extMaps map[int]*sdp.ExtMap, uri string) bool {
+	for _, extMap := range extMaps {
+		if extMap.URI.String() == uri {
+			return true
+		}
+	}
+	return false
 }
 
 func descriptionIsPlanB(desc *SessionDescription) bool {
