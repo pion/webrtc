@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	mathRand "math/rand"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,6 +60,10 @@ type PeerConnection struct {
 	// should be defined (see JSEP 3.4.1).
 	greaterMid int
 
+	// extmaps
+	remoteExtMaps map[int]*sdp.ExtMap
+	extMaps       map[int]*sdp.ExtMap
+
 	rtpTransceivers []*RTPTransceiver
 
 	onSignalingStateChangeHandler     func(SignalingState)
@@ -108,12 +113,40 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		lastOffer:                    "",
 		lastAnswer:                   "",
 		greaterMid:                   -1,
+		remoteExtMaps:                make(map[int]*sdp.ExtMap),
 		signalingState:               SignalingStateStable,
 		iceConnectionState:           ICEConnectionStateNew,
 		connectionState:              PeerConnectionStateNew,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
+	}
+
+	transportCCURL, _ := url.Parse(TransportCCURI)
+	sdesMidURL, _ := url.Parse(SDESMidURI)
+	sdesRTPStreamIDURL, _ := url.Parse(SDESRTPStreamIDURI)
+
+	// populate with locally supported extmaps
+	pc.extMaps = map[int]*sdp.ExtMap{
+		// use the default value for transportcc
+		extMapValueTransportCC: {
+			Value: extMapValueTransportCC,
+			URI:   transportCCURL,
+			// support both send and recv direction
+			Direction: 0,
+		},
+		extMapValueSDESMid: {
+			Value: extMapValueSDESMid,
+			URI:   sdesMidURL,
+			// support both send and recv direction
+			Direction: 0,
+		},
+		extMapValueSDESRTPStreamID: {
+			Value: extMapValueSDESRTPStreamID,
+			URI:   sdesRTPStreamIDURL,
+			// support both send and recv direction
+			Direction: 0,
+		},
 	}
 
 	var err error
@@ -791,6 +824,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
+
+	if err := pc.updateExtMaps(weOffer); err != nil {
+		return err
+	}
 
 	if !weOffer && !detectedPlanB {
 		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
@@ -1888,4 +1925,71 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	}
 
 	return populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+}
+
+func (pc *PeerConnection) updateExtMaps(weOffer bool) error {
+	remoteExtMaps := map[int]*sdp.ExtMap{}
+
+	// populate the extmaps from the current remote description
+	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
+		// populate known remote extmap and handle conflicts.
+		for _, attr := range media.Attributes {
+			if attr.Key != "extmap" {
+				continue
+			}
+			em := &sdp.ExtMap{}
+			if err := em.Unmarshal("extmap:" + attr.Value); err != nil {
+				pc.log.Warnf("Failed to parse ExtMap: %v", err)
+				continue
+			}
+			if remoteExtMap, ok := remoteExtMaps[em.Value]; ok {
+				if remoteExtMap.Value != em.Value {
+					return fmt.Errorf("RemoteDescription changed some extmaps values")
+				}
+			} else {
+				remoteExtMaps[em.Value] = em
+			}
+		}
+	}
+
+	// update our know remote extmaps from new extmaps from the current remote description
+	for _, curRemoteExtMap := range remoteExtMaps {
+		if remoteExtMap, ok := pc.remoteExtMaps[curRemoteExtMap.Value]; ok {
+			// check that the remote extmaps haven't changed some already known values
+			if remoteExtMap.Value != curRemoteExtMap.Value {
+				return fmt.Errorf("RemoteDescription changed some extmaps values")
+			}
+		} else {
+			// add new extmap
+			pc.remoteExtMaps[curRemoteExtMap.Value] = curRemoteExtMap
+		}
+	}
+
+	// If we are receiving an offer update our extMaps adapting to the remote values
+	if !weOffer {
+		for _, remoteExtMap := range pc.remoteExtMaps {
+			// update existing locally provided value
+			for _, extMap := range pc.extMaps {
+				if extMap.URI.String() == remoteExtMap.URI.String() {
+					extMap.Value = remoteExtMap.Value
+					break
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetExtMapByURI return a copy of the extmap matching the provided
+// URI. Note that the extmap value will change if not yet negotiated
+func (pc *PeerConnection) GetExtMapByURI(uri string) *sdp.ExtMap {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+	for _, extMap := range pc.extMaps {
+		if extMap.URI.String() == uri {
+			return extMap
+		}
+	}
+	return nil
 }
