@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	rtpOutboundMTU          = 1200
 	trackDefaultIDLength    = 16
 	trackDefaultLabelLength = 16
 )
@@ -21,14 +20,13 @@ const (
 type Track struct {
 	mu sync.RWMutex
 
-	id          string
-	payloadType uint8
-	kind        RTPCodecType
-	label       string
-	ssrc        uint32
-	codec       *RTPCodec
+	id    string
+	kind  RTPCodecType
+	label string
 
-	packetizer rtp.Packetizer
+	streams []*TrackRTPStream
+
+	multiStream bool
 
 	receiver         *RTPReceiver
 	activeSenders    []*RTPSender
@@ -46,7 +44,10 @@ func (t *Track) ID() string {
 func (t *Track) PayloadType() uint8 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.payloadType
+	if t.multiStream {
+		return 0
+	}
+	return t.streams[0].PayloadType()
 }
 
 // Kind gets the Kind of the track
@@ -63,56 +64,51 @@ func (t *Track) Label() string {
 	return t.label
 }
 
-// SSRC gets the SSRC of the track
+// Streams return the track streams
+func (t *Track) Streams() []*TrackRTPStream {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	streams := make([]*TrackRTPStream, len(t.streams))
+	copy(streams, t.streams)
+	return streams
+}
+
+// SSRC gets the SSRC of the track. If a track is multistream it'll
+// return a 0 value (use TrackStream.SSRC())
 func (t *Track) SSRC() uint32 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.ssrc
+	if t.multiStream {
+		return 0
+	}
+	return t.streams[0].SSRC()
 }
 
-// Codec gets the Codec of the track
+// Codec gets the Codec of the track. If a track is multistream it'll
+// return a nil value (use TrackStream.Codec())
 func (t *Track) Codec() *RTPCodec {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.codec
+	if t.multiStream {
+		return nil
+	}
+	return t.streams[0].Codec()
 }
 
-// Packetizer gets the Packetizer of the track
+// Packetizer gets the Packetizer of the track. If a track is
+// multistream it'll return a nil value (use TrackStream.Packetizer())
 func (t *Track) Packetizer() rtp.Packetizer {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.packetizer
+	if t.multiStream {
+		return nil
+	}
+	return t.streams[0].Packetizer()
 }
 
-// Read reads data from the track. If this is a local track this will error
-func (t *Track) Read(b []byte) (n int, err error) {
-	t.mu.RLock()
-	if len(t.activeSenders) != 0 {
-		t.mu.RUnlock()
-		return 0, fmt.Errorf("this is a local track and must not be read from")
-	}
-	r := t.receiver
-	t.mu.RUnlock()
-
-	return r.readRTP(b)
-}
-
-// ReadRTP is a convenience method that wraps Read and unmarshals for you
-func (t *Track) ReadRTP() (*rtp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := t.Read(b)
-	if err != nil {
-		return nil, err
-	}
-
-	r := &rtp.Packet{}
-	if err := r.Unmarshal(b[:i]); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-// Write writes data to the track. If this is a remote track this will error
+// Write writes data to the track. If this is a remote track this will
+// error
 func (t *Track) Write(b []byte) (n int, err error) {
 	packet := &rtp.Packet{}
 	err = packet.Unmarshal(b)
@@ -128,9 +124,13 @@ func (t *Track) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// WriteSample packetizes and writes to the track
+// WriteSample packetizes and writes to the track. If a track is
+// multistream it'll return a nil value (use TrackStream.WriteSample())
 func (t *Track) WriteSample(s media.Sample) error {
-	packets := t.packetizer.Packetize(s.Data, s.Samples)
+	if t.multiStream {
+		return fmt.Errorf("track is multistream")
+	}
+	packets := t.streams[0].packetizer.Packetize(s.Data, s.Samples)
 	for _, p := range packets {
 		err := t.WriteRTP(p)
 		if err != nil {
@@ -166,7 +166,7 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 	return nil
 }
 
-// NewTrack initializes a new *Track
+// NewTrack initializes a new *Track. Currently only single stream tracks can be created
 func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec) (*Track, error) {
 	if ssrc == 0 {
 		return nil, fmt.Errorf("SSRC supplied to NewTrack() must be non-zero")
@@ -181,28 +181,54 @@ func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec)
 		codec.ClockRate,
 	)
 
-	return &Track{
-		id:          id,
+	stream := &TrackRTPStream{
 		payloadType: payloadType,
-		kind:        codec.Type,
-		label:       label,
 		ssrc:        ssrc,
 		codec:       codec,
 		packetizer:  packetizer,
+	}
+
+	return &Track{
+		id:      id,
+		kind:    codec.Type,
+		label:   label,
+		streams: []*TrackRTPStream{stream},
 	}, nil
 }
 
-// determinePayloadType blocks and reads a single packet to determine the PayloadType for this Track
-// this is useful if we are dealing with a remote track and we can't announce it to the user until we know the payloadType
-func (t *Track) determinePayloadType() error {
-	r, err := t.ReadRTP()
+func (t *Track) read(b []byte, streamID string) (n int, err error) {
+	t.mu.RLock()
+	if len(t.activeSenders) != 0 {
+		t.mu.RUnlock()
+		return 0, fmt.Errorf("this is a local track and must not be read from")
+	}
+	r := t.receiver
+	t.mu.RUnlock()
+
+	return r.readRTP(b)
+}
+
+// Read reads data from the track. If this is a local track this will
+// error. If a track is multistream it'll return an error (use TrackStream.Read())
+func (t *Track) Read(b []byte) (n int, err error) {
+	if t.multiStream {
+		return 0, fmt.Errorf("track is multistream")
+	}
+	return t.read(b, t.streams[0].id)
+}
+
+// ReadRTP is a convenience method that wraps Read and unmarshals for
+// you. If a track is multistream it'll return an error (use TrackStream.ReadRTP())
+func (t *Track) ReadRTP() (*rtp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := t.Read(b)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	t.mu.Lock()
-	t.payloadType = r.PayloadType
-	defer t.mu.Unlock()
-
-	return nil
+	r := &rtp.Packet{}
+	if err := r.Unmarshal(b[:i]); err != nil {
+		return nil, err
+	}
+	return r, nil
 }

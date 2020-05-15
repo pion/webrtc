@@ -916,7 +916,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	receiver.Track().mu.Unlock()
 
 	go func() {
-		if err = receiver.Track().determinePayloadType(); err != nil {
+		if err = receiver.Track().streams[0].determinePayloadType(); err != nil {
 			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
 			return
 		}
@@ -932,7 +932,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 
 		receiver.Track().mu.Lock()
 		receiver.Track().kind = codec.Type
-		receiver.Track().codec = codec
+		receiver.Track().streams[0].codec = codec
 		receiver.Track().mu.Unlock()
 
 		if pc.onTrackHandler != nil {
@@ -1753,7 +1753,7 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 				// check if there's a track with the same ssrc but different track id
 				for _, incoming := range trackDetails {
 					for ssrc := range incoming.ssrcStreams {
-						if t.Receiver().Track().ssrc == ssrc {
+						if t.Receiver().Track().streams[0].ssrc == ssrc {
 							matched = true
 							// update receiver track id and label
 							t.Receiver().Track().id = incoming.mstid
@@ -1769,7 +1769,7 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 				// matching track id
 				for ssrc := range incoming.ssrcStreams {
 					// check if the incoming track as the same ssrc
-					if t.Receiver().Track().ssrc == ssrc {
+					if t.Receiver().Track().streams[0].ssrc == ssrc {
 						matched = true
 						// update receiver track id and label
 						t.Receiver().Track().id = incoming.mstid

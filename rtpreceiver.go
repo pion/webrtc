@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/pion/rtcp"
@@ -61,6 +62,10 @@ func (r *RTPReceiver) Track() *Track {
 func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if len(parameters.Encodings) == 0 {
+		return fmt.Errorf("no encodings provided")
+	}
 	select {
 	case <-r.received:
 		return fmt.Errorf("Receive has already been called")
@@ -69,12 +74,23 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	defer close(r.received)
 
 	r.track = &Track{
-		kind:     r.kind,
-		receiver: r,
+		kind:        r.kind,
+		streams:     make([]*TrackRTPStream, len(parameters.Encodings)),
+		receiver:    r,
+		multiStream: len(parameters.Encodings) > 1,
 	}
 
-	for _, enc := range parameters.Encodings {
-		r.track.ssrc = enc.SSRC
+	for i, enc := range parameters.Encodings {
+		streamID := strconv.FormatUint(uint64(enc.SSRC), 10)
+
+		r.track.streams[i] = &TrackRTPStream{
+			id:    streamID,
+			rid:   enc.RID,
+			ssrc:  enc.SSRC,
+			track: r.track,
+		}
+
+		r.track.streams[0].ssrc = enc.SSRC
 
 		// only one ssrc is supported
 		break
@@ -99,6 +115,8 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	if err != nil {
 		return err
 	}
+
+	r.track.streams[0].ready = true
 
 	return nil
 }
