@@ -9,10 +9,11 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	mid       atomic.Value // string
-	sender    atomic.Value // *RTPSender
-	receiver  atomic.Value // *RTPReceiver
-	direction atomic.Value // RTPTransceiverDirection
+	mid             atomic.Value // string
+	sender          atomic.Value // *RTPSender
+	receiver        atomic.Value // *RTPReceiver
+	direction       atomic.Value // RTPTransceiverDirection
+	remoteDirection atomic.Value // RTPTransceiverDirection
 
 	stopped bool
 	kind    RTPCodecType
@@ -67,6 +68,13 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 	return t.direction.Load().(RTPTransceiverDirection)
 }
 
+func (t *RTPTransceiver) getRemoteDirection() RTPTransceiverDirection {
+	if v := t.remoteDirection.Load(); v != nil {
+		return v.(RTPTransceiverDirection)
+	}
+	return RTPTransceiverDirection(Unknown)
+}
+
 // Stop irreversibly stops the RTPTransceiver
 func (t *RTPTransceiver) Stop() error {
 	if t.Sender() != nil {
@@ -90,6 +98,10 @@ func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 
 func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
 	t.direction.Store(d)
+}
+
+func (t *RTPTransceiver) setRemoteDirection(d RTPTransceiverDirection) {
+	t.remoteDirection.Store(d)
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {

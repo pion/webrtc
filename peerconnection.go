@@ -1198,7 +1198,12 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 
 	var transceiver *RTPTransceiver
 	for _, t := range pc.GetTransceivers() {
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
+		// use existing transceiver if:
+		// * not stopped
+		// * same kind
+		// * without a sender
+		// * the transceiver has not been negotiated yet or negotiated and remote direction can receive
+		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil && (t.getRemoteDirection() == RTPTransceiverDirection(Unknown) || t.getRemoteDirection() == RTPTransceiverDirectionSendrecv || t.getRemoteDirection() == RTPTransceiverDirectionRecvonly) {
 			transceiver = t
 			break
 		}
