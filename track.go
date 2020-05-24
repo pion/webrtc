@@ -33,6 +33,8 @@ type Track struct {
 	receiver         *RTPReceiver
 	activeSenders    []*RTPSender
 	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
+
+	cachePacket *rtp.Packet
 }
 
 // ID gets the ID of the track
@@ -99,6 +101,12 @@ func (t *Track) Read(b []byte) (n int, err error) {
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
 func (t *Track) ReadRTP() (*rtp.Packet, error) {
+	if t.cachePacket != nil {
+		r := t.cachePacket
+		t.cachePacket = nil
+		return r, nil
+	}
+
 	b := make([]byte, receiveMTU)
 	i, err := t.Read(b)
 	if err != nil {
@@ -202,6 +210,7 @@ func (t *Track) determinePayloadType() error {
 
 	t.mu.Lock()
 	t.payloadType = r.PayloadType
+	t.cachePacket = r
 	defer t.mu.Unlock()
 
 	return nil
