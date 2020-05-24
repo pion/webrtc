@@ -6,6 +6,7 @@ package webrtc
 import (
 	"syscall/js"
 
+	"github.com/pion/sdp/v2"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 )
 
@@ -526,6 +527,19 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 func valueToICECandidate(val js.Value) *ICECandidate {
 	if jsValueIsNull(val) || jsValueIsUndefined(val) {
 		return nil
+	}
+	if jsValueIsUndefined(val.Get("protocol")) && !jsValueIsUndefined(val.Get("candidate")) {
+		// Missing some fields, assume it's Firefox and parse SDP candidate.
+		attribute := sdp.NewAttribute("candidate", val.Get("candidate").String())
+		sdpCandidate, err := attribute.ToICECandidate()
+		if err != nil {
+			return nil
+		}
+		iceCandidate, err := newICECandidateFromSDP(sdpCandidate)
+		if err != nil {
+			return nil
+		}
+		return &iceCandidate
 	}
 	protocol, _ := NewICEProtocol(val.Get("protocol").String())
 	candidateType, _ := NewICECandidateType(val.Get("type").String())
