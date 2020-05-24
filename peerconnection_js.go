@@ -51,6 +51,10 @@ func (api *API) NewPeerConnection(configuration Configuration) (_ *PeerConnectio
 	}, nil
 }
 
+func (pc *PeerConnection) JSValue() js.Value {
+	return pc.underlying
+}
+
 // OnSignalingStateChange sets an event handler which is invoked when the
 // peer connection's signaling state changes
 func (pc *PeerConnection) OnSignalingStateChange(f func(SignalingState)) {
