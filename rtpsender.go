@@ -141,8 +141,12 @@ func (r *RTPSender) Stop() error {
 
 // Read reads incoming RTCP for this RTPReceiver
 func (r *RTPSender) Read(b []byte) (n int, err error) {
-	<-r.sendCalled
-	return r.rtcpReadStream.Read(b)
+	select {
+	case <-r.sendCalled:
+		return r.rtcpReadStream.Read(b)
+	case <-r.stopCalled:
+		return 0, fmt.Errorf("RTPSender has been stopped")
+	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
