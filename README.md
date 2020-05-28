@@ -159,6 +159,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
 * [Josh Bleecher Snyder](https://github.com/josharian)
 * [salmān aljammāz](https://github.com/saljam)
+* [cnderrauber](https://github.com/cnderrauber)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

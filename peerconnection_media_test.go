@@ -811,6 +811,31 @@ func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
+func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
+	mediaEngine := MediaEngine{}
+	mediaEngine.RegisterDefaultCodecs()
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	tr, err := pc.AddTransceiverFromKind(
+		RTPCodecTypeVideo,
+		RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv},
+	)
+	assert.NoError(t, err)
+
+	sender, receiver := tr.Sender(), tr.Receiver()
+	assert.NoError(t, sender.Stop())
+	_, err = sender.Read(make([]byte, 0, 1400))
+	assert.Error(t, err, "RtpSender has been stopped")
+
+	assert.NoError(t, receiver.Stop())
+	_, err = receiver.Read(make([]byte, 0, 1400))
+	assert.Error(t, err, "RTPReceiver has been stopped")
+
+	assert.NoError(t, pc.Close())
+}
+
 // nolint: dupl
 func TestAddTransceiverFromKind(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
