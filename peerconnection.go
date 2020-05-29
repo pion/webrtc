@@ -793,7 +793,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
 
 	if !weOffer && !detectedPlanB {
-		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
+		rdesc := pc.RemoteDescription()
+		if rdesc == nil {
+			return fmt.Errorf("no existing RemoteDescription found; did you mean to call SetRemoteDescription(answer)?")
+		}
+		for _, media := range rdesc.parsed.MediaDescriptions {
 			midValue := getMidValue(media)
 			if midValue == "" {
 				return fmt.Errorf("RemoteDescription contained media section without mid value")

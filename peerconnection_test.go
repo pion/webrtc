@@ -486,3 +486,26 @@ a=end-of-candidates
 		t.Error(err.Error())
 	}
 }
+
+func TestSetRemoteDescriptionDuplicateOffer(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatalf("NewPeerConnection: %v", err)
+	}
+	defer pc.Close()
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Fatalf("CreateOffer: %v", err)
+	}
+
+	err = pc.SetLocalDescription(offer)
+	if err != nil {
+		t.Fatalf("SetLocalDescription: %v", err)
+	}
+
+	err = pc.SetRemoteDescription(offer)
+	if err == nil {
+		t.Fatalf("SetRemoteDescription: got nil")
+	}
+}
