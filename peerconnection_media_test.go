@@ -827,11 +827,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
 	_, err = sender.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, "RtpSender has been stopped")
+	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
 	_, err = receiver.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, "RTPReceiver has been stopped")
+	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
 }
