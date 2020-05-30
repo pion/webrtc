@@ -157,7 +157,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Equal(t, "video_trk_label", track.label)
 		}
 		if _, ok := tracks[4000]; ok {
-			assert.Fail(t, "got the rtx track ssrc:3000 which should have been skipped")
+			assert.Fail(t, "got the rtx track ssrc:4000 which should have been skipped")
 		}
 		if track, ok := tracks[5000]; !ok {
 			assert.Fail(t, "missing video track with ssrc:5000")

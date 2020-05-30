@@ -62,6 +62,7 @@ type PeerConnection struct {
 
 	// extmaps
 	remoteExtMaps map[int]*sdp.ExtMap
+	activeExtMaps []*sdp.ExtMap
 	extMaps       map[int]*sdp.ExtMap
 
 	rtpTransceivers []*RTPTransceiver
@@ -114,6 +115,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		lastAnswer:                   "",
 		greaterMid:                   -1,
 		remoteExtMaps:                make(map[int]*sdp.ExtMap),
+		activeExtMaps:                make([]*sdp.ExtMap, 0),
 		signalingState:               SignalingStateStable,
 		iceConnectionState:           ICEConnectionStateNew,
 		connectionState:              PeerConnectionStateNew,
@@ -122,28 +124,20 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 
-	transportCCURL, _ := url.Parse(TransportCCURI)
-	sdesMidURL, _ := url.Parse(SDESMidURI)
-	sdesRTPStreamIDURL, _ := url.Parse(SDESRTPStreamIDURI)
+	transportCCURL, _ := url.Parse(sdp.TransportCCURI)
+	absSendURL, _ := url.Parse(sdp.ABSSendTimeURI)
 
 	// populate with locally supported extmaps
 	pc.extMaps = map[int]*sdp.ExtMap{
-		// use the default value for transportcc
-		extMapValueTransportCC: {
-			Value: extMapValueTransportCC,
+		sdp.DefExtMapValueTransportCC: {
+			Value: sdp.DefExtMapValueTransportCC,
 			URI:   transportCCURL,
 			// support both send and recv direction
 			Direction: 0,
 		},
-		extMapValueSDESMid: {
-			Value: extMapValueSDESMid,
-			URI:   sdesMidURL,
-			// support both send and recv direction
-			Direction: 0,
-		},
-		extMapValueSDESRTPStreamID: {
-			Value: extMapValueSDESRTPStreamID,
-			URI:   sdesRTPStreamIDURL,
+		sdp.DefExtMapValueABSSendTime: {
+			Value: sdp.DefExtMapValueABSSendTime,
+			URI:   absSendURL,
 			// support both send and recv direction
 			Direction: 0,
 		},
@@ -1906,7 +1900,8 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 				t.Sender().setNegotiated()
 			}
 			mediaTransceivers := []*RTPTransceiver{t}
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
+			extMaps := pc.mediaSectionExtmaps(t)
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, extMaps: extMaps})
 		}
 	}
 
@@ -1916,7 +1911,8 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 			if t.Sender() != nil {
 				t.Sender().setNegotiated()
 			}
-			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
+			extMaps := pc.mediaSectionExtmaps(t)
+			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}, extMaps: extMaps})
 		}
 	}
 
@@ -1964,7 +1960,6 @@ func (pc *PeerConnection) updateExtMaps(weOffer bool) error {
 			pc.remoteExtMaps[curRemoteExtMap.Value] = curRemoteExtMap
 		}
 	}
-
 	// If we are receiving an offer update our extMaps adapting to the remote values
 	if !weOffer {
 		for _, remoteExtMap := range pc.remoteExtMaps {
@@ -1974,6 +1969,16 @@ func (pc *PeerConnection) updateExtMaps(weOffer bool) error {
 					extMap.Value = remoteExtMap.Value
 					break
 				}
+			}
+		}
+	}
+
+	// Intersect extmaps
+	pc.activeExtMaps = pc.activeExtMaps[:0]
+	for _, remoteExtMap := range pc.remoteExtMaps {
+		for _, extMap := range pc.extMaps {
+			if extMap.URI.String() == remoteExtMap.URI.String() {
+				pc.activeExtMaps = append(pc.activeExtMaps, extMap)
 			}
 		}
 	}
@@ -1992,4 +1997,30 @@ func (pc *PeerConnection) GetExtMapByURI(uri string) *sdp.ExtMap {
 		}
 	}
 	return nil
+}
+
+func (pc *PeerConnection) mediaSectionExtmaps(t *RTPTransceiver) []*sdp.ExtMap {
+	extMaps := []*sdp.ExtMap{}
+
+	needsTransportCCExtMap := false
+	codecs := pc.api.mediaEngine.GetCodecsByKind(t.kind)
+	for _, codec := range codecs {
+		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
+			if feedback.Type == TypeRTCPFBTransportCC {
+				needsTransportCCExtMap = true
+				break
+			}
+		}
+	}
+
+	// add abstime and tcc
+	for _, extMap := range pc.activeExtMaps {
+		str := extMap.URI.String()
+		if str == sdp.ABSSendTimeURI && t.kind == RTPCodecTypeVideo ||
+			str == sdp.TransportCCURI && needsTransportCCExtMap {
+			extMaps = append(extMaps, extMap)
+		}
+	}
+
+	return extMaps
 }

@@ -3,6 +3,7 @@ package webrtc
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -484,5 +485,75 @@ a=end-of-candidates
 	err = pc.SetRemoteDescription(desc)
 	if err != nil {
 		t.Error(err.Error())
+	}
+}
+
+const extSDPTestStr = `v=0
+o=- 1722206396224909144 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0 1
+a=msid-semantic: WMS 01e04fc5-a519-47a8-aa20-46766504d933
+m=audio 39687 UDP/TLS/RTP/SAVPF 111 103 104 9 0 8 106 105 13 110 112 113 126
+c=IN IP4 192.168.20.129
+a=rtcp:9 IN IP4 0.0.0.0
+a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=ice-ufrag:asd
+a=ice-pwd:pw
+a=fingerprint:sha-256 27:23:CE:F7:F5:72:E3:F9:8B:BB:21:2F:14:9B:E6:A7:36:93:44:98:D2:2B:76:E7:78:CE:46:07:06:F0:C3:4C
+a=mid:0
+a=sendonly
+a=msid:another msid
+a=rtpmap:111 opus/48000/2
+a=ssrc:1910534542 msid:another msid
+m=video 40031 UDP/TLS/RTP/SAVPF 98
+c=IN IP4 192.168.20.129
+a=rtcp:9 IN IP4 0.0.0.0
+a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=ice-ufrag:asd
+a=ice-pwd:pw
+a=mid:1
+a=sendonly
+a=msid:some msid
+a=rtpmap:98 VP9/90000
+a=rtcp-fb:98 transport-cc
+a=ssrc:1546100577 msid:some msid
+`
+
+func TestSDPIncludesExtIfSet(t *testing.T) {
+	strWith := extSDPTestStr + "a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\n"
+	cfgs := []struct {
+		SDP      string
+		Contains bool
+	}{
+		{SDP: strWith, Contains: true},
+		{SDP: extSDPTestStr, Contains: false},
+	}
+
+	for _, cfg := range cfgs {
+		pc, err := NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Error(err.Error())
+		}
+
+		desc := SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  cfg.SDP,
+		}
+
+		err = pc.SetRemoteDescription(desc)
+		if err != nil {
+			t.Error(err.Error())
+		}
+
+		answer, err := pc.CreateAnswer(nil)
+		if err != nil {
+			t.Errorf("Create Answer: got error: %v", err)
+		}
+
+		//Test answer includes extmap
+		if cfg.Contains != strings.Contains(answer.SDP, "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time") {
+			t.Errorf("Answer contains abs-send-time extension: should be %v", cfg.Contains)
+		}
 	}
 }

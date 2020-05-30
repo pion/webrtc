@@ -12,34 +12,13 @@ import (
 	"github.com/pion/sdp/v2"
 )
 
-const (
-	extMapValueABSSendTime     = 1
-	extMapValueTransportCC     = 2
-	extMapValueSDESMid         = 3
-	extMapValueSDESRTPStreamID = 4
-
-	// TODO(sgotti) add these to pion/sdp
-	ABSSendTimeURI     = "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
-	TransportCCURI     = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
-	SDESMidURI         = "urn:ietf:params:rtp-hdrext:sdes:mid"
-	SDESRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"
-)
-
-type streamDetails struct {
-	rid  string
-	ssrc uint32
-
-	trackID string
-	msid    string
-	mstid   string
-}
-
 type trackDetails struct {
-	mid   string
-	kind  RTPCodecType
-	label string
-	id    string
-	ssrc  uint32
+	id      string
+	kind    RTPCodecType
+	extMaps map[int]*sdp.ExtMap
+	ssrc    uint32
+	label   string
+	mid     string
 }
 
 // extract all trackDetails from an SDP.
@@ -49,8 +28,9 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 
 	for _, media := range s.MediaDescriptions {
 		// Plan B can have multiple tracks in a signle media section
-		trackLabel := ""
-		trackID := ""
+		var trackLabel, trackID string
+		extMaps := map[int]*sdp.ExtMap{}
+		ssrcs := []uint32{}
 
 		// If media section is recvonly or inactive skip
 		if _, ok := media.Attribute(sdp.AttrKeyRecvOnly); ok {
@@ -64,8 +44,8 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			continue
 		}
 
+		codecType := NewRTPCodecType(media.MediaName.Media)
 		for _, attr := range media.Attributes {
-			codecType := NewRTPCodecType(media.MediaName.Media)
 			if codecType == 0 {
 				continue
 			}
@@ -106,15 +86,16 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 
 			case sdp.AttrKeySSRC:
 				split := strings.Split(attr.Value, " ")
-				ssrc, err := strconv.ParseUint(split[0], 10, 32)
+				tmpssrc, err := strconv.ParseUint(split[0], 10, 32)
 				if err != nil {
 					log.Warnf("Failed to parse SSRC: %v", err)
 					continue
 				}
-				if rtxRepairFlow := rtxRepairFlows[uint32(ssrc)]; rtxRepairFlow {
+				ssrc := uint32(tmpssrc)
+				if rtxRepairFlow := rtxRepairFlows[ssrc]; rtxRepairFlow {
 					continue // This ssrc is a RTX repair flow, ignore
 				}
-				if existingValues, ok := incomingTracks[uint32(ssrc)]; ok && existingValues.label != "" && existingValues.id != "" {
+				if existingValues, ok := incomingTracks[ssrc]; ok && existingValues.label != "" && existingValues.id != "" {
 					continue // This ssrc is already fully defined
 				}
 
@@ -125,7 +106,29 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 
 				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
 				// is not defined at the top of the loop over s.MediaDescriptions.
-				incomingTracks[uint32(ssrc)] = trackDetails{midValue, codecType, trackLabel, trackID, uint32(ssrc)}
+
+				incomingTracks[ssrc] = trackDetails{
+					mid:   midValue,
+					kind:  codecType,
+					label: trackLabel,
+					id:    trackID,
+					ssrc:  ssrc,
+				}
+				ssrcs = append(ssrcs, ssrc)
+
+			case sdp.AttrKeyExtMap:
+				em := &sdp.ExtMap{}
+				if err := em.Unmarshal("extmap:" + attr.Value); err != nil {
+					log.Warnf("Failed to parse ExtMap: %v", err)
+					continue
+				}
+				extMaps[em.Value] = em
+			}
+		}
+
+		for _, s := range ssrcs {
+			if trackInfo, ok := incomingTracks[s]; ok {
+				trackInfo.extMaps = extMaps
 			}
 		}
 	}
@@ -229,7 +232,8 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, transceivers ...*RTPTransceiver) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) {
+	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
 	}
@@ -242,15 +246,16 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
+	for _, extMap := range mediaSection.extMaps {
+		media.WithExtMap(*extMap)
+	}
+
 	codecs := mediaEngine.GetCodecsByKind(t.kind)
 	for _, codec := range codecs {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
-			if feedback.Type == TypeRTCPFBTransportCC {
-				media.WithTransportCCExtMap()
-			}
 		}
 	}
 	if len(codecs) == 0 {
@@ -288,6 +293,7 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, mediaEngine *Med
 type mediaSection struct {
 	id           string
 	transceivers []*RTPTransceiver
+	extMaps      []*sdp.ExtMap
 	data         bool
 }
 
@@ -312,7 +318,7 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, isICELite bool, mediaE
 		shouldAddID := true
 		if m.data {
 			addDataMediaSection(d, m.id, iceParams, candidates, connectionRole, iceGatheringState)
-		} else if shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m.transceivers...); err != nil {
+		} else if shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m); err != nil {
 			return nil, err
 		}
 
