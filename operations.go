@@ -9,9 +9,9 @@ type operation func()
 
 // Operations is a task executor.
 type operations struct {
-	ops     []operation
-	mu      sync.Mutex
-	startMu sync.Mutex
+	mu   sync.Mutex
+	busy bool
+	ops  []operation
 }
 
 func newOperations() *operations {
@@ -21,15 +21,18 @@ func newOperations() *operations {
 // Enqueue adds a new action to be executed. If there are no actions scheduled,
 // the execution will start immediately in a new goroutine.
 func (o *operations) Enqueue(op operation) {
+	if op == nil {
+		return
+	}
+
 	o.mu.Lock()
-	defer o.mu.Unlock()
+	running := o.busy
 	o.ops = append(o.ops, op)
-	if len(o.ops) == 1 {
-		go func() {
-			o.startMu.Lock()
-			defer o.startMu.Unlock()
-			o.start()
-		}()
+	o.busy = true
+	o.mu.Unlock()
+
+	if !running {
+		go o.start()
 	}
 }
 
@@ -43,19 +46,34 @@ func (o *operations) Done() {
 	wg.Wait()
 }
 
-func (o *operations) pop() (fn func(), isLast bool) {
+func (o *operations) pop() func() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	fn = o.ops[0]
+	if len(o.ops) == 0 {
+		return nil
+	}
+
+	fn := o.ops[0]
 	o.ops = o.ops[1:]
-	return fn, len(o.ops) == 0
+	return fn
 }
 
 func (o *operations) start() {
-	var fn func()
-	isLast := false
-	for !isLast {
-		fn, isLast = o.pop()
+	defer func() {
+		o.mu.Lock()
+		defer o.mu.Unlock()
+		if len(o.ops) == 0 {
+			o.busy = false
+			return
+		}
+		// either a new operation was enqueued while we
+		// were busy, or an operation panicked
+		go o.start()
+	}()
+
+	fn := o.pop()
+	for fn != nil {
 		fn()
+		fn = o.pop()
 	}
 }
