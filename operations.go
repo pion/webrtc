@@ -9,60 +9,72 @@ type operation func()
 
 // Operations is a task executor.
 type operations struct {
-	ops     []operation
-	mu      sync.Mutex
-	startMu sync.Mutex
-	done    chan struct{}
+	mu   sync.Mutex
+	busy bool
+	ops  []operation
 }
 
 func newOperations() *operations {
-	closed := make(chan struct{})
-	close(closed)
-	return &operations{
-		done: closed,
-	}
+	return &operations{}
 }
 
 // Enqueue adds a new action to be executed. If there are no actions scheduled,
 // the execution will start immediately in a new goroutine.
 func (o *operations) Enqueue(op operation) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.ops = append(o.ops, op)
-	if len(o.ops) == 1 {
-		done := make(chan struct{})
-		o.done = done
+	if op == nil {
+		return
+	}
 
-		go func() {
-			o.startMu.Lock()
-			defer o.startMu.Unlock()
-			o.start()
-			close(done)
-		}()
+	o.mu.Lock()
+	running := o.busy
+	o.ops = append(o.ops, op)
+	o.busy = true
+	o.mu.Unlock()
+
+	if !running {
+		go o.start()
 	}
 }
 
-// Done will return a channel that will be closed as soon as all currently
-// enqueued operations are finished.
-func (o *operations) Done() <-chan struct{} {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.done
+// Done blocks until all currently enqueued operations are finished executing.
+// For more complex synchronization, use Enqueue directly.
+func (o *operations) Done() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	o.Enqueue(func() {
+		wg.Done()
+	})
+	wg.Wait()
 }
 
-func (o *operations) pop() (fn func(), isLast bool) {
+func (o *operations) pop() func() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	fn = o.ops[0]
+	if len(o.ops) == 0 {
+		return nil
+	}
+
+	fn := o.ops[0]
 	o.ops = o.ops[1:]
-	return fn, len(o.ops) == 0
+	return fn
 }
 
 func (o *operations) start() {
-	var fn func()
-	isLast := false
-	for !isLast {
-		fn, isLast = o.pop()
+	defer func() {
+		o.mu.Lock()
+		defer o.mu.Unlock()
+		if len(o.ops) == 0 {
+			o.busy = false
+			return
+		}
+		// either a new operation was enqueued while we
+		// were busy, or an operation panicked
+		go o.start()
+	}()
+
+	fn := o.pop()
+	for fn != nil {
 		fn()
+		fn = o.pop()
 	}
 }

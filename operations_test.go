@@ -18,7 +18,7 @@ func TestOperations_Enqueue(t *testing.T) {
 			}(i)
 		}
 
-		<-ops.Done()
+		ops.Done()
 		expected := []int{0, 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225}
 		assert.Equal(t, len(expected), len(results))
 		assert.Equal(t, expected, results)
@@ -27,5 +27,5 @@ func TestOperations_Enqueue(t *testing.T) {
 
 func TestOperations_Done(t *testing.T) {
 	ops := newOperations()
-	<-ops.Done()
+	ops.Done()
 }

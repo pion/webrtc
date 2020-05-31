@@ -118,12 +118,12 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 	assert.Equal(t, 0, len(vp8Track.activeSenders))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 	assert.Equal(t, 1, len(vp8Track.activeSenders))
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
@@ -286,8 +286,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// Must have 3 media descriptions (2 video and 1 datachannel)
 	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
@@ -312,8 +312,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
 	require.NoError(t, err)
@@ -579,8 +579,8 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	negotiate()
 	negotiate()
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 	wg.Wait()
 
 	assert.NoError(t, pcOffer.Close())
@@ -608,8 +608,8 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
@@ -629,12 +629,12 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, sender.isNegotiated())
 
-	<-pcAnswer.ops.Done()
+	pcAnswer.ops.Done()
 	assert.Equal(t, 0, len(localTrack.activeSenders))
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	<-pcAnswer.ops.Done()
+	pcAnswer.ops.Done()
 	assert.Equal(t, 1, len(localTrack.activeSenders))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
@@ -685,12 +685,12 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	pcAnswer.sctpTransport = nil
 
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
