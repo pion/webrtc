@@ -37,6 +37,7 @@ func (o *operations) Enqueue(op operation) {
 }
 
 // Done blocks until all currently enqueued operations are finished executing.
+// For more complex synchronization, use Enqueue directly.
 func (o *operations) Done() {
 	var wg sync.WaitGroup
 	wg.Add(1)

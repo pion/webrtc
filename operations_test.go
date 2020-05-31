@@ -1,7 +1,9 @@
 package webrtc
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,4 +30,22 @@ func TestOperations_Enqueue(t *testing.T) {
 func TestOperations_Done(t *testing.T) {
 	ops := newOperations()
 	ops.Done()
+}
+
+func Exampleoperations_Done_timeout() {
+	ops := newOperations()
+	ch := make(chan struct{})
+	ops.Enqueue(func() {
+		close(ch)
+	})
+	timer := time.NewTimer(time.Second)
+	select {
+	case <-ch:
+		timer.Stop()
+		fmt.Println("Done!")
+	case <-timer.C:
+		fmt.Println("Timed out!")
+	}
+	//Output:
+	//Done!
 }
