@@ -1140,7 +1140,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
 	// Wait for senders to be started by startTransports spawned goroutine
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 
 	// sender1 should be started but sender2 should not be started
 	assert.True(t, sender1.hasSent(), "sender1 is not started but should be started")
@@ -1183,8 +1183,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should be started
 	started, err := isTransceiverReceiverStarted(pcAnswer, "0")
@@ -1196,8 +1196,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should not be started
 	started, err = isTransceiverReceiverStarted(pcAnswer, "0")
@@ -1213,8 +1213,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should not be started
 	started, err = isTransceiverReceiverStarted(pcAnswer, "0")

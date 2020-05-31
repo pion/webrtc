@@ -12,15 +12,10 @@ type operations struct {
 	ops     []operation
 	mu      sync.Mutex
 	startMu sync.Mutex
-	done    chan struct{}
 }
 
 func newOperations() *operations {
-	closed := make(chan struct{})
-	close(closed)
-	return &operations{
-		done: closed,
-	}
+	return &operations{}
 }
 
 // Enqueue adds a new action to be executed. If there are no actions scheduled,
@@ -30,24 +25,22 @@ func (o *operations) Enqueue(op operation) {
 	defer o.mu.Unlock()
 	o.ops = append(o.ops, op)
 	if len(o.ops) == 1 {
-		done := make(chan struct{})
-		o.done = done
-
 		go func() {
 			o.startMu.Lock()
 			defer o.startMu.Unlock()
 			o.start()
-			close(done)
 		}()
 	}
 }
 
-// Done will return a channel that will be closed as soon as all currently
-// enqueued operations are finished.
-func (o *operations) Done() <-chan struct{} {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.done
+// Done blocks until all currently enqueued operations are finished executing.
+func (o *operations) Done() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	o.Enqueue(func() {
+		wg.Done()
+	})
+	wg.Wait()
 }
 
 func (o *operations) pop() (fn func(), isLast bool) {
