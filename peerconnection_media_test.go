@@ -1036,15 +1036,61 @@ func TestGetRegisteredRTPCodecs(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-func TestPlanBMultiTrack(t *testing.T) {
-	addSingleTrack := func(p *PeerConnection) *Track {
-		track, err := p.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+func TestPlanBMediaExchange(t *testing.T) {
+	runTest := func(trackCount int, t *testing.T) {
+		addSingleTrack := func(p *PeerConnection) *Track {
+			track, err := p.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+			assert.NoError(t, err)
+
+			_, err = p.AddTrack(track)
+			assert.NoError(t, err)
+
+			return track
+		}
+
+		pcOffer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
-		_, err = p.AddTrack(track)
+		pcAnswer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
-		return track
+		var onTrackWaitGroup sync.WaitGroup
+		onTrackWaitGroup.Add(trackCount)
+		pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+			onTrackWaitGroup.Done()
+		})
+
+		done := make(chan struct{})
+		go func() {
+			onTrackWaitGroup.Wait()
+			close(done)
+		}()
+
+		_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		outboundTracks := []*Track{}
+		for i := 0; i < trackCount; i++ {
+			outboundTracks = append(outboundTracks, addSingleTrack(pcOffer))
+		}
+
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+		func() {
+			for {
+				select {
+				case <-time.After(20 * time.Millisecond):
+					for _, track := range outboundTracks {
+						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		assert.NoError(t, pcOffer.Close())
+		assert.NoError(t, pcAnswer.Close())
 	}
 
 	lim := test.TimeOut(time.Second * 30)
@@ -1053,46 +1099,12 @@ func TestPlanBMultiTrack(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
-	assert.NoError(t, err)
-
-	pcAnswer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
-	assert.NoError(t, err)
-
-	var onTrackWaitGroup sync.WaitGroup
-	onTrackWaitGroup.Add(2)
-	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
-		onTrackWaitGroup.Done()
+	t.Run("Single Track", func(t *testing.T) {
+		runTest(1, t)
 	})
-
-	done := make(chan struct{})
-	go func() {
-		onTrackWaitGroup.Wait()
-		close(done)
-	}()
-
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
-	assert.NoError(t, err)
-
-	track1 := addSingleTrack(pcOffer)
-	track2 := addSingleTrack(pcOffer)
-
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
-	func() {
-		for {
-			select {
-			case <-time.After(20 * time.Millisecond):
-				assert.NoError(t, track1.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-				assert.NoError(t, track2.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	t.Run("Multi Track", func(t *testing.T) {
+		runTest(2, t)
+	})
 }
 
 // TestPeerConnection_Start_Only_Negotiated_Senders tests that only
