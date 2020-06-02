@@ -1769,10 +1769,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 			}
 		}
 
-		if len(video) > 1 {
+		if len(video) > 0 {
 			mediaSections = append(mediaSections, mediaSection{id: "video", transceivers: video})
 		}
-		if len(audio) > 1 {
+		if len(audio) > 0 {
 			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
 		}
 		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
