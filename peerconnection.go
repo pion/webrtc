@@ -610,8 +610,6 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		cur := pc.signalingState
 		setLocal := stateChangeOpSetLocal
 		setRemote := stateChangeOpSetRemote
-		newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous offer")}
-		newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous answer")}
 
 		var nextState SignalingState
 		var err error
@@ -620,9 +618,6 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			switch sd.Type {
 			// stable->SetLocal(offer)->have-local-offer
 			case SDPTypeOffer:
-				if sd.SDP != pc.lastOffer {
-					return nextState, newSDPDoesNotMatchOffer
-				}
 				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalOffer, setLocal, sd.Type)
 				if err == nil {
 					pc.pendingLocalDescription = sd
@@ -630,9 +625,6 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			// have-remote-offer->SetLocal(answer)->stable
 			// have-local-pranswer->SetLocal(answer)->stable
 			case SDPTypeAnswer:
-				if sd.SDP != pc.lastAnswer {
-					return nextState, newSDPDoesNotMatchAnswer
-				}
 				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
 				if err == nil {
 					pc.currentLocalDescription = sd
@@ -647,9 +639,6 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				}
 			// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
 			case SDPTypePranswer:
-				if sd.SDP != pc.lastAnswer {
-					return nextState, newSDPDoesNotMatchAnswer
-				}
 				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalPranswer, setLocal, sd.Type)
 				if err == nil {
 					pc.pendingLocalDescription = sd

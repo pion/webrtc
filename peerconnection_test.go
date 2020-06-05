@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
+	"github.com/pion/sdp/v2"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer)
@@ -484,5 +486,70 @@ a=end-of-candidates
 	err = pc.SetRemoteDescription(desc)
 	if err != nil {
 		t.Error(err.Error())
+	}
+}
+
+func mungeSDP(rawSdp string) (string, error) {
+	var sd sdp.SessionDescription
+	err := sd.Unmarshal([]byte(rawSdp))
+	if err != nil {
+		return "", err
+	}
+
+	for _, md := range sd.MediaDescriptions {
+		if md.MediaName.Media == "video" {
+			md.Attributes = append(
+				md.Attributes,
+				sdp.NewAttribute(
+					"extmap:2",
+					"http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time",
+				),
+			)
+		}
+	}
+
+	newsdp, err := sd.Marshal()
+	if err != nil {
+		return "", err
+	}
+
+	if string(newsdp) == rawSdp {
+		return "", errors.New("couldn't munge SDP")
+	}
+
+	return string(newsdp), nil
+}
+
+func TestLocalSDPMunging(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Fatalf("NewPeeronnection: %v", err)
+	}
+	defer pc.Close()
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo,
+		RtpTransceiverInit{
+			Direction: RTPTransceiverDirectionSendrecv,
+		},
+	)
+	if err != nil {
+		t.Fatalf("AddTransceiverFromKind: %v", err)
+	}
+
+	offer, err := pc.CreateOffer(nil)
+	if err != nil {
+		t.Fatalf("CreateOffer: %v", err)
+
+	}
+
+	newsdp, err := mungeSDP(offer.SDP)
+	if err != nil {
+		t.Fatalf("mungeSDP: %v", err)
+	}
+	offer.SDP = newsdp
+
+	err = pc.SetLocalDescription(offer)
+	if err != nil {
+		t.Fatalf("SetLocalDescription: %v", err)
 	}
 }
