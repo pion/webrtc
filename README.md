@@ -157,7 +157,6 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Simone Gotti](https://github.com/sgotti)
 * [Cedric Fung](https://github.com/cedricfung)
 * [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
-* [Josh Bleecher Snyder](https://github.com/josharian)
 * [salmān aljammāz](https://github.com/saljam)
 * [cnderrauber](https://github.com/cnderrauber)
 * [Juliusz Chroboczek](https://github.com/jech)
