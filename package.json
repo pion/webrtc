@@ -6,6 +6,6 @@
     "wrtc": "0.4.5"
   },
   "dependencies": {
-    "request": "^2.88.2"
+    "request": "2.88.2"
   }
 }
