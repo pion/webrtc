@@ -1,4 +1,4 @@
-// Package samplebuilder provides functionality to reconstruct media frame from RTP packets
+// Package samplebuilder provides functionality to reconstruct media frames from RTP packets.
 package samplebuilder
 
 import (
@@ -6,11 +6,9 @@ import (
 	"github.com/pion/webrtc/v2/pkg/media"
 )
 
-// SampleBuilder contains all packets
-// maxLate determines how long we should wait until we get a valid Sample
-// The larger the value the less packet loss you will see, but higher latency
+// SampleBuilder buffers packets until media frames are complete.
 type SampleBuilder struct {
-	maxLate uint16
+	maxLate uint16 // how many packets to wait until we get a valid Sample
 	buffer  [65536]*rtp.Packet
 
 	// Interface that allows us to take RTP packets to samples
@@ -30,7 +28,12 @@ type SampleBuilder struct {
 	partitionHeadChecker rtp.PartitionHeadChecker
 }
 
-// New constructs a new SampleBuilder
+// New constructs a new SampleBuilder.
+// maxLate is how long to wait until we can construct a completed media.Sample.
+// maxLate is measured in RTP packet sequence numbers.
+// A large maxLate will result in less packet loss but higher latency.
+// The depacketizer extracts media samples from RTP packets.
+// Several depacketizers are available in package github.com/pion/rtp/codecs.
 func New(maxLate uint16, depacketizer rtp.Depacketizer, opts ...Option) *SampleBuilder {
 	s := &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer}
 	for _, o := range opts {
@@ -39,7 +42,7 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, opts ...Option) *SampleB
 	return s
 }
 
-// Push adds a RTP Packet to the sample builder
+// Push adds an RTP Packet to s's buffer.
 func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
 	s.lastPush = p.SequenceNumber
@@ -94,14 +97,15 @@ func seqnumDistance(x, y uint16) uint16 {
 	return uint16(diff)
 }
 
-// Pop scans buffer for valid samples, returns nil when no valid samples have been found
+// Pop scans s's buffer for a valid sample.
+// It returns nil if no valid samples have been found.
 func (s *SampleBuilder) Pop() *media.Sample {
 	sample, _ := s.PopWithTimestamp()
 	return sample
 }
 
-// PopWithTimestamp scans buffer for valid samples and its RTP timestamp,
-// returns nil, 0 when no valid samples have been found
+// PopWithTimestamp scans s's buffer for a valid sample and its RTP timestamp.
+// It returns nil, 0 when no valid samples have been found.
 func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	var i uint16
 	if !s.isContiguous {
@@ -142,10 +146,11 @@ func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	return nil, 0
 }
 
-// Option configures SampleBuilder
+// An Option configures a SampleBuilder.
 type Option func(o *SampleBuilder)
 
-// WithPartitionHeadChecker assigns codec specific PartitionHeadChecker to SampleBuilder
+// WithPartitionHeadChecker assigns a codec-specific PartitionHeadChecker to SampleBuilder.
+// Several PartitionHeadCheckers are available in package github.com/pion/rtp/codecs.
 func WithPartitionHeadChecker(checker rtp.PartitionHeadChecker) Option {
 	return func(o *SampleBuilder) {
 		o.partitionHeadChecker = checker
