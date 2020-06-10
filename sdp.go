@@ -370,13 +370,26 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 
 func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandidate, error) {
 	candidates := []ICECandidate{}
-	remotePwd := ""
-	remoteUfrag := ""
+	remotePwds := []string{}
+	remoteUfrags := []string{}
+
+	if ufrag, haveUfrag := desc.Attribute("ice-ufrag"); haveUfrag {
+		remoteUfrags = append(remoteUfrags, ufrag)
+	}
+	if pwd, havePwd := desc.Attribute("ice-pwd"); havePwd {
+		remotePwds = append(remotePwds, pwd)
+	}
 
 	for _, m := range desc.MediaDescriptions {
+		if ufrag, haveUfrag := m.Attribute("ice-ufrag"); haveUfrag {
+			remoteUfrags = append(remoteUfrags, ufrag)
+		}
+		if pwd, havePwd := m.Attribute("ice-pwd"); havePwd {
+			remotePwds = append(remotePwds, pwd)
+		}
+
 		for _, a := range m.Attributes {
-			switch {
-			case a.IsICECandidate():
+			if a.IsICECandidate() {
 				sdpCandidate, err := a.ToICECandidate()
 				if err != nil {
 					return "", "", nil, err
@@ -388,21 +401,29 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandi
 				}
 
 				candidates = append(candidates, candidate)
-			case strings.HasPrefix(*a.String(), "ice-ufrag"):
-				remoteUfrag = (*a.String())[len("ice-ufrag:"):]
-			case strings.HasPrefix(*a.String(), "ice-pwd"):
-				remotePwd = (*a.String())[len("ice-pwd:"):]
 			}
 		}
 	}
 
-	if remoteUfrag == "" {
+	if len(remoteUfrags) == 0 {
 		return "", "", nil, ErrSessionDescriptionMissingIceUfrag
-	} else if remotePwd == "" {
+	} else if len(remotePwds) == 0 {
 		return "", "", nil, ErrSessionDescriptionMissingIcePwd
 	}
 
-	return remoteUfrag, remotePwd, candidates, nil
+	for _, m := range remoteUfrags {
+		if m != remoteUfrags[0] {
+			return "", "", nil, ErrSessionDescriptionConflictingIceUfrag
+		}
+	}
+
+	for _, m := range remotePwds {
+		if m != remotePwds[0] {
+			return "", "", nil, ErrSessionDescriptionConflictingIcePwd
+		}
+	}
+
+	return remoteUfrags[0], remotePwds[0], candidates, nil
 }
 
 func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {
