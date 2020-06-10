@@ -111,4 +111,12 @@ var (
 	// ErrSessionDescriptionMissingIcePwd indicates SetRemoteDescription was called with a SessionDescription that
 	// is missing an ice-pwd value
 	ErrSessionDescriptionMissingIcePwd = errors.New("SetRemoteDescription called with no ice-pwd")
+
+	// ErrSessionDescriptionConflictingIceUfrag  indicates SetRemoteDescription was called with a SessionDescription that
+	// contains multiple conflicting ice-ufrag values
+	ErrSessionDescriptionConflictingIceUfrag = errors.New("SetRemoteDescription called with multiple conflicting ice-ufrag values")
+
+	// ErrSessionDescriptionConflictingIcePwd indicates SetRemoteDescription was called with a SessionDescription that
+	// contains multiple conflicting ice-pwd values
+	ErrSessionDescriptionConflictingIcePwd = errors.New("SetRemoteDescription called with multiple conflicting ice-pwd values")
 )
