@@ -248,6 +248,19 @@ func NewRTPVP9Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 	return c
 }
 
+// NewRTPVP9CodecExt is a helper to create an VP8 codec
+func NewRTPVP9CodecExt(payloadType uint8, clockrate uint32, rtcpfb []RTCPFeedback, fmtp string) *RTPCodec {
+	c := NewRTPCodecExt(RTPCodecTypeVideo,
+		VP9,
+		clockrate,
+		0,
+		fmtp,
+		payloadType,
+		rtcpfb,
+		&codecs.VP9Payloader{})
+	return c
+}
+
 // NewRTPH264Codec is a helper to create an H264 codec
 func NewRTPH264Codec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeVideo,
