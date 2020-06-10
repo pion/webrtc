@@ -18,6 +18,7 @@ import (
 
 	"github.com/pion/ice"
 	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/v2/internal/util"
 	"github.com/pion/webrtc/v2/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
@@ -121,6 +122,34 @@ func TestNew_Go(t *testing.T) {
 				assert.NoError(t, pc.Close())
 			}
 		}
+	})
+	t.Run("ICEServers_Copy", func(t *testing.T) {
+		const expectedURL = "stun:stun.l.google.com:19302?foo=bar"
+		const expectedUsername = "username"
+		const expectedPassword = "password"
+
+		cfg := Configuration{
+			ICEServers: []ICEServer{
+				{
+					URLs:       []string{expectedURL},
+					Username:   expectedUsername,
+					Credential: expectedPassword,
+				},
+			},
+		}
+		pc, err := api.NewPeerConnection(cfg)
+		assert.NoError(t, err)
+		assert.NotNil(t, pc)
+
+		pc.configuration.ICEServers[0].Username = util.RandSeq(15)
+		pc.configuration.ICEServers[0].Credential = util.RandSeq(15)
+		pc.configuration.ICEServers[0].URLs[0] = util.RandSeq(15)
+
+		assert.Equal(t, expectedUsername, cfg.ICEServers[0].Username)
+		assert.Equal(t, expectedPassword, cfg.ICEServers[0].Credential)
+		assert.Equal(t, expectedURL, cfg.ICEServers[0].URLs[0])
+
+		assert.NoError(t, pc.Close())
 	})
 }
 
