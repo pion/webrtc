@@ -1,0 +1,18 @@
+<div id="no-support-banner" style="background-color: red">
+  <h1> Browser does not support insertable streams </h1>
+</div>
+
+Browser base64 Session Description<br />
+<textarea id="localSessionDescription" readonly="true"></textarea> <br />
+
+Golang base64 Session Description<br />
+<textarea id="remoteSessionDescription"> </textarea> <br/>
+<button onclick="window.startSession()"> Start Session </button> Decrypt Video <input type="checkbox" checked="checked" onclick="window.toggleDecryption()"/> <br />
+
+<br />
+
+Video<br />
+<video id="remote-video" playsinline autoplay controls style="width: 640; height: 480"></video> <br />
+
+Logs<br />
+<div id="div"></div>

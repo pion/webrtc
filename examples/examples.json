@@ -42,6 +42,18 @@
 		"type": "browser"
 	},
 	{
+		"title": "Play from Disk Renegotation",
+		"link": "play-from-disk",
+		"description": "The play-from-disk-renegotation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.",
+		"type": "browser"
+	},
+	{
+		"title": "Insertable Streams",
+		"link": "insertable-streams",
+		"description": "The insertable-streams example demonstrates how Pion can be used to send E2E encrypted video and decrypt via insertable streams in the browser.",
+		"type": "browser"
+	},
+	{
 		"title": "Save to Disk",
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
