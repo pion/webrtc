@@ -190,9 +190,6 @@ func (o *OpusReader) parseNextPage() ([]byte, *OpusReader, error) {
 		segmentTable           uint64
 	}
 
-	// pageSegments is always 1 with 1 lacing value fo that segment in the segmentTable from package oggwriter.
-	// segmentTable vaule is page size
-
 
 
 	payload := make([]byte, header.segmentTable)
