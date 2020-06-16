@@ -161,6 +161,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [salmān aljammāz](https://github.com/saljam)
 * [cnderrauber](https://github.com/cnderrauber)
 * [Juliusz Chroboczek](https://github.com/jech)
+* [John Berthels](https://github.com/jbert)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

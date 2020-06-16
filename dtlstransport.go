@@ -254,7 +254,7 @@ func (t *DTLSTransport) role() DTLSRole {
 
 	// Remote was auto and no explicit role was configured via SettingEngine
 	if t.iceTransport.Role() == ICERoleControlling {
-		return DTLSRoleClient
+		return DTLSRoleServer
 	}
 	return defaultDtlsRoleAnswer
 }
