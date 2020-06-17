@@ -162,6 +162,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [cnderrauber](https://github.com/cnderrauber)
 * [Juliusz Chroboczek](https://github.com/jech)
 * [John Berthels](https://github.com/jbert)
+* [Ivan Egorov](https://github.com/vany-egorov)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
