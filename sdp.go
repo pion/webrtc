@@ -42,12 +42,12 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			continue
 		}
 
-		for _, attr := range media.Attributes {
-			codecType := NewRTPCodecType(media.MediaName.Media)
-			if codecType == 0 {
-				continue
-			}
+		codecType := NewRTPCodecType(media.MediaName.Media)
+		if codecType == 0 {
+			continue
+		}
 
+		for _, attr := range media.Attributes {
 			switch attr.Key {
 			case sdp.AttrKeySSRCGroup:
 				split := strings.Split(attr.Value, " ")
