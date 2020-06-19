@@ -87,11 +87,12 @@ func (t *Track) Packetizer() rtp.Packetizer {
 // Read reads data from the track. If this is a local track this will error
 func (t *Track) Read(b []byte) (n int, err error) {
 	t.mu.RLock()
-	if len(t.activeSenders) != 0 {
+	r := t.receiver
+
+	if t.totalSenderCount != 0 || r == nil {
 		t.mu.RUnlock()
 		return 0, fmt.Errorf("this is a local track and must not be read from")
 	}
-	r := t.receiver
 	t.mu.RUnlock()
 
 	return r.readRTP(b)
