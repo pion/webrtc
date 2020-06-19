@@ -5,6 +5,8 @@ package webrtc
 import (
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewVideoTrack(t *testing.T) {
@@ -114,4 +116,15 @@ func TestNewTracksWrite(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to write to audio track")
 	}
+}
+
+func TestTrackReadWhenNotAdded(t *testing.T) {
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := peerConnection.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion")
+	assert.NoError(t, err)
+
+	_, err = track.Read([]byte{})
+	assert.Error(t, err)
 }
