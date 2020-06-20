@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -159,7 +160,7 @@ func (r *RTPReceiver) Stop() error {
 }
 
 // readRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
+func (r *RTPReceiver) readRTP(ctx context.Context, b []byte) (n int, err error) {
 	<-r.received
-	return r.rtpReadStream.Read(b)
+	return r.rtpReadStream.ReadContext(ctx, b)
 }

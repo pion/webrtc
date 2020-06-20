@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -86,6 +87,11 @@ func (t *Track) Packetizer() rtp.Packetizer {
 
 // Read reads data from the track. If this is a local track this will error
 func (t *Track) Read(b []byte) (n int, err error) {
+	return t.ReadContext(context.Background(), b)
+}
+
+// Read reads data from the track. If this is a local track this will error
+func (t *Track) ReadContext(ctx context.Context, b []byte) (n int, err error) {
 	t.mu.RLock()
 	r := t.receiver
 
@@ -95,13 +101,18 @@ func (t *Track) Read(b []byte) (n int, err error) {
 	}
 	t.mu.RUnlock()
 
-	return r.readRTP(b)
+	return r.readRTP(ctx, b)
 }
 
-// ReadRTP is a convenience method that wraps Read and unmarshals for you
+// ReadRTP is a convenience method that wraps Read and unmarshals for you.
 func (t *Track) ReadRTP() (*rtp.Packet, error) {
+	return t.ReadRTPContext(context.Background())
+}
+
+// ReadRTPContext is a convenience method that wraps Read and unmarshals for you.
+func (t *Track) ReadRTPContext(ctx context.Context) (*rtp.Packet, error) {
 	b := make([]byte, receiveMTU)
-	i, err := t.Read(b)
+	i, err := t.ReadContext(ctx, b)
 	if err != nil {
 		return nil, err
 	}
