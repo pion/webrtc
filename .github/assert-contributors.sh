@@ -21,7 +21,7 @@ then
   . ${SCRIPT_PATH}/.ci.conf
 fi
 
-EXCLUDED_CONTRIBUTORS+=('John R. Bradley' 'renovate[bot]' 'Renovate Bot' 'Pion Bot' 'Josh Bleecher Snyder')
+EXCLUDED_CONTRIBUTORS+=('John R. Bradley' 'renovate[bot]' 'Renovate Bot' 'Pion Bot')
 MISSING_CONTRIBUTORS=()
 
 shouldBeIncluded () {
