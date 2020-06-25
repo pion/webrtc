@@ -35,7 +35,7 @@ We've made it easy to run the browser based examples on your local machine.
 
 1. Build and run the example server:
     ``` sh
-    GO111MODULE=on go get github.com/pion/webrtc/v2
+    GO111MODULE=on go get github.com/pion/webrtc/v3
     git clone https://github.com/pion/webrtc.git $GOPATH/src/github.com/pion/webrtc
     cd $GOPATH/src/github.com/pion/webrtc/examples
     go run examples.go
