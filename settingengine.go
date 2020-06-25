@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/pion/ice"
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
 )
@@ -23,8 +23,9 @@ type SettingEngine struct {
 		DataChannels bool
 	}
 	timeout struct {
-		ICEConnection                *time.Duration
-		ICEKeepalive                 *time.Duration
+		ICEDisconnectedTimeout       *time.Duration
+		ICEFailedTimeout             *time.Duration
+		ICEKeepaliveInterval         *time.Duration
 		ICECandidateSelectionTimeout *time.Duration
 		ICEHostAcceptanceMinWait     *time.Duration
 		ICESrflxAcceptanceMinWait    *time.Duration
@@ -33,7 +34,6 @@ type SettingEngine struct {
 	}
 	candidates struct {
 		ICELite                        bool
-		ICETrickle                     bool
 		ICENetworkTypes                []NetworkType
 		InterfaceFilter                func(string) bool
 		NAT1To1IPs                     []string
@@ -63,11 +63,14 @@ func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }
 
-// SetConnectionTimeout sets the amount of silence needed on a given candidate pair
-// before the ICE agent considers the pair timed out.
-func (e *SettingEngine) SetConnectionTimeout(connectionTimeout, keepAlive time.Duration) {
-	e.timeout.ICEConnection = &connectionTimeout
-	e.timeout.ICEKeepalive = &keepAlive
+// SetICETimeouts sets the behavior around ICE Timeouts
+// * disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
+// * failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
+// * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
+func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepAliveInterval time.Duration) {
+	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
+	e.timeout.ICEFailedTimeout = &failedTimeout
+	e.timeout.ICEKeepaliveInterval = &keepAliveInterval
 }
 
 // SetCandidateSelectionTimeout sets the max ICECandidateSelectionTimeout
@@ -111,12 +114,6 @@ func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 // SetLite configures whether or not the ice agent should be a lite agent
 func (e *SettingEngine) SetLite(lite bool) {
 	e.candidates.ICELite = lite
-}
-
-// SetTrickle configures whether or not the ice agent should gather candidates
-// via the trickle method or synchronously.
-func (e *SettingEngine) SetTrickle(trickle bool) {
-	e.candidates.ICETrickle = trickle
 }
 
 // SetNetworkTypes configures what types of candidate networks are supported

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice"
+	"github.com/pion/ice/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
@@ -528,83 +528,12 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-// Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
-// When trickle in on by default we can move this to peerconnection_test.go
-func TestGatherOnSetLocalDescription(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	pcOfferGathered := make(chan SessionDescription)
-	pcAnswerGathered := make(chan SessionDescription)
-
-	s := SettingEngine{}
-	s.SetTrickle(true)
-	api := NewAPI(WithSettingEngine(s))
-
-	pcOffer, err := api.NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
-
-	// We need to create a data channel in order to trigger ICE
-	if _, err = pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
-		t.Error(err.Error())
-	}
-
-	pcOffer.OnICECandidate(func(i *ICECandidate) {
-		if i == nil {
-			close(pcOfferGathered)
-		}
-	})
-
-	offer, err := pcOffer.CreateOffer(nil)
-	if err != nil {
-		t.Error(err.Error())
-	} else if err = pcOffer.SetLocalDescription(offer); err != nil {
-		t.Error(err.Error())
-	}
-
-	<-pcOfferGathered
-
-	pcAnswer, err := api.NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
-
-	pcAnswer.OnICECandidate(func(i *ICECandidate) {
-		if i == nil {
-			close(pcAnswerGathered)
-		}
-	})
-
-	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
-		t.Error(err.Error())
-	}
-
-	select {
-	case <-pcAnswerGathered:
-		t.Fatal("pcAnswer started gathering with no SetLocalDescription")
-	// Gathering is async, not sure of a better way to catch this currently
-	case <-time.After(3 * time.Second):
-	}
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	if err != nil {
-		t.Error(err.Error())
-	} else if err = pcAnswer.SetLocalDescription(answer); err != nil {
-		t.Error(err.Error())
-	}
-	<-pcAnswerGathered
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
-}
-
 func TestPeerConnection_OfferingLite(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
+
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
 
 	s := SettingEngine{}
 	s.SetLite(true)
@@ -641,6 +570,9 @@ func TestPeerConnection_OfferingLite(t *testing.T) {
 func TestPeerConnection_AnsweringLite(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
+
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
 
 	offerPC, err := NewAPI().NewPeerConnection(Configuration{})
 	if err != nil {
@@ -681,10 +613,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	seenGatheringAndComplete := make(chan interface{})
 	seenClosed := make(chan interface{})
 
-	s := SettingEngine{}
-	s.SetTrickle(true)
-
-	peerConn, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	peerConn, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	var onStateChange func(s ICEGathererState)
@@ -737,19 +666,9 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	}
 }
 
-// Assert that when Trickle is enabled two connections can connect
+// Assert Trickle ICE behaviors
 func TestPeerConnectionTrickle(t *testing.T) {
-	lim := test.TimeOut(time.Second * 10)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	s := SettingEngine{}
-	s.SetTrickle(true)
-
-	api := NewAPI(WithSettingEngine(s))
-	offerPC, answerPC, err := api.newPair(Configuration{})
+	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
 	addOrCacheCandidate := func(pc *PeerConnection, c *ICECandidate, candidateCache []ICECandidateInit) []ICECandidateInit {
@@ -854,10 +773,7 @@ func TestPopulateLocalCandidates(t *testing.T) {
 	})
 
 	t.Run("end-of-candidates only when gathering is complete", func(t *testing.T) {
-		s := SettingEngine{}
-		s.SetTrickle(true)
-
-		pc, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
+		pc, err := NewAPI().NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
 		gatherComplete, gatherCompleteCancel := context.WithCancel(context.Background())

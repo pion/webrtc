@@ -55,11 +55,20 @@ func main() {
 		})
 	})
 
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
 	// Gather candidates
 	err = gatherer.Gather()
 	if err != nil {
 		panic(err)
 	}
+
+	<-gatherFinished
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
 	if err != nil {
