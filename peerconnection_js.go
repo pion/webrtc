@@ -26,6 +26,9 @@ type PeerConnection struct {
 	onICECandidateHandler             *js.Func
 	onICEGatheringStateChangeHandler  *js.Func
 
+	// Used by GatheringCompletePromise
+	onGatherCompleteHandler func()
+
 	// A reference to the associated API state used by this connection
 	api *API
 }
@@ -313,6 +316,10 @@ func (pc *PeerConnection) OnICECandidate(f func(candidate *ICECandidate)) {
 	}
 	onICECandidateHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		candidate := valueToICECandidate(args[0].Get("candidate"))
+		if candidate == nil && pc.onGatherCompleteHandler != nil {
+			go pc.onGatherCompleteHandler()
+		}
+
 		go f(candidate)
 		return js.Undefined()
 	})
@@ -450,6 +457,16 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	rawState := pc.underlying.Get("connectionState").String()
 	return newPeerConnectionState(rawState)
+}
+
+func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
+	pc.onGatherCompleteHandler = hdlr
+
+	// If no onIceCandidate handler has been set provide an empty one
+	// otherwise our onGatherCompleteHandler will not be executed
+	if pc.onICECandidateHandler == nil {
+		pc.OnICECandidate(func(i *ICECandidate) {})
+	}
 }
 
 // Converts a Configuration to js.Value so it can be passed

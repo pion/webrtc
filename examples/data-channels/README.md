@@ -24,8 +24,8 @@ Copy the text that `data-channels` just emitted and copy into second text area
 ### Hit 'Start Session' in jsfiddle
 Under Start Session you should see 'Checking' as it starts connecting. If everything worked you should see `New DataChannel foo 1`
 
-Now you can put whatever you want in the `Message` textarea, and when you hit `Send Message` it should appear in your browser!
+Now you can put whatever you want in the `Message` textarea, and when you hit `Send Message` it should appear in your terminal!
 
-You can also type in your terminal, and when you hit enter it will appear in your web browser.
+Pion WebRTC will send random messages every 5 seconds that will appear in your browser.
 
 Congrats, you have used Pion WebRTC! Now start building something cool

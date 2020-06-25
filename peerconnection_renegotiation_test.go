@@ -277,14 +277,21 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+
 	// apply answer so we'll test generateMatchedSDP
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
@@ -529,7 +536,6 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	defer report()
 
 	settingEngine := SettingEngine{}
-	settingEngine.SetTrickle(true)
 
 	api := NewAPI(WithSettingEngine(settingEngine))
 	api.mediaEngine.RegisterDefaultCodecs()
@@ -651,15 +657,22 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	signalPairExcludeDataChannel := func(pcOffer, pcAnswer *PeerConnection) {
 		offer, err := pcOffer.CreateOffer(nil)
 		assert.NoError(t, err)
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
 		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		<-offerGatheringComplete
 
+		offer = *pcOffer.LocalDescription()
 		offer.SDP = strings.Split(offer.SDP, "m=application")[0]
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 	}
 
 	api := NewAPI()

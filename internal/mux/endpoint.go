@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/pion/ice"
+	"github.com/pion/ice/v2"
 	"github.com/pion/transport/packetio"
 )
 

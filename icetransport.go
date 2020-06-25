@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice"
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v3/internal/mux"
 )
@@ -113,7 +113,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 	t.role = *role
 
-	// Drop the lock here to allow trickle-ICE candidates to be
+	// Drop the lock here to allow ICE candidates to be
 	// added so that the agent can complete a connection
 	t.lock.Unlock()
 
@@ -271,8 +271,7 @@ func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil {
 		return errors.New("gatherer not started")
-	} else if t.gatherer.getAgent() == nil && t.gatherer.api.settingEngine.candidates.ICETrickle {
-		// Special case for trickle=true. (issue-707)
+	} else if t.gatherer.getAgent() == nil {
 		if err := t.gatherer.createAgent(); err != nil {
 			return err
 		}

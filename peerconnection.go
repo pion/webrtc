@@ -46,9 +46,8 @@ type PeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed                     *atomicBool
-	negotiationNeeded            bool
-	nonTrickleCandidatesSignaled *atomicBool
+	isClosed          *atomicBool
+	negotiationNeeded bool
 
 	lastOffer  string
 	lastAnswer string
@@ -102,15 +101,14 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		isClosed:                     &atomicBool{},
-		negotiationNeeded:            false,
-		nonTrickleCandidatesSignaled: &atomicBool{},
-		lastOffer:                    "",
-		lastAnswer:                   "",
-		greaterMid:                   -1,
-		signalingState:               SignalingStateStable,
-		iceConnectionState:           ICEConnectionStateNew,
-		connectionState:              PeerConnectionStateNew,
+		isClosed:           &atomicBool{},
+		negotiationNeeded:  false,
+		lastOffer:          "",
+		lastAnswer:         "",
+		greaterMid:         -1,
+		signalingState:     SignalingStateStable,
+		iceConnectionState: ICEConnectionStateNew,
+		connectionState:    PeerConnectionStateNew,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
@@ -124,12 +122,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceGatherer, err = pc.createICEGatherer()
 	if err != nil {
 		return nil, err
-	}
-
-	if !pc.api.settingEngine.candidates.ICETrickle {
-		if err = pc.iceGatherer.Gather(); err != nil {
-			return nil, err
-		}
 	}
 
 	// Create the ice transport
@@ -739,18 +731,6 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		pc.ops.Enqueue(func() {
 			pc.startRTP(haveLocalDescription, remoteDesc)
 		})
-	}
-
-	// To support all unittests which are following the future trickle=true
-	// setup while also support the old trickle=false synchronous gathering
-	// process this is necessary to avoid calling Gather() in multiple
-	// places; which causes race conditions. (issue-707)
-	if !pc.api.settingEngine.candidates.ICETrickle && !pc.nonTrickleCandidatesSignaled.get() {
-		if err := pc.iceGatherer.SignalCandidates(); err != nil {
-			return err
-		}
-		pc.nonTrickleCandidatesSignaled.set(true)
-		return nil
 	}
 
 	if pc.iceGatherer.State() == ICEGathererStateNew {
@@ -1888,4 +1868,8 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	}
 
 	return populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+}
+
+func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
+	pc.iceGatherer.onGatheringCompleteHdlr.Store(hdlr)
 }
