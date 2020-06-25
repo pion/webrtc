@@ -5,7 +5,7 @@ The example mirrors the data-channels-create example.
 
 ## Install
 ```
-go get github.com/pion/webrtc/v2/examples/data-channels-detach-create
+go get github.com/pion/webrtc/v3/examples/data-channels-detach-create
 ```
 
 ## Usage

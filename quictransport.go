@@ -16,8 +16,8 @@ import (
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
 	"github.com/pion/logging"
 	"github.com/pion/quic"
-	"github.com/pion/webrtc/v2/internal/mux"
-	"github.com/pion/webrtc/v2/pkg/rtcerr"
+	"github.com/pion/webrtc/v3/internal/mux"
+	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
 
 // QUICTransport is a specialization of QuicTransportBase focused on

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/pion/rtcp"
-	"github.com/pion/webrtc/v2"
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 func main() {

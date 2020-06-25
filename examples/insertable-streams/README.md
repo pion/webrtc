@@ -14,7 +14,7 @@ ffmpeg -i $INPUT_FILE -g 30 output.ivf
 
 ### Download insertable-streams
 ```
-go get github.com/pion/webrtc/v2/examples/insertable-streams
+go get github.com/pion/webrtc/v3/examples/insertable-streams
 ```
 
 ### Open insertable-streams example page
