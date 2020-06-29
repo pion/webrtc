@@ -1,6 +1,8 @@
 package webrtc
 
-import "context"
+import (
+	"context"
+)
 
 // GatheringCompletePromise is a Pion specific helper function that returns a channel that is closed when gathering is complete.
 // This function may be helpful in cases where you are unable to trickle your ICE Candidates.

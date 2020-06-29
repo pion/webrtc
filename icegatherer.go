@@ -136,22 +136,22 @@ func (g *ICEGatherer) Gather() error {
 		return err
 	}
 
-	onLocalCandidateHdlr := func(*ICECandidate) {}
-	if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
-		onLocalCandidateHdlr = hdlr
-	}
-
-	onGatheringCompleteHdlr := func() {}
-	if hdlr, ok := g.onGatheringCompleteHdlr.Load().(func()); ok && hdlr != nil {
-		onGatheringCompleteHdlr = hdlr
-	}
-
 	g.lock.Lock()
 	agent := g.agent
 	g.lock.Unlock()
 
 	g.setState(ICEGathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {
+		onLocalCandidateHdlr := func(*ICECandidate) {}
+		if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
+			onLocalCandidateHdlr = hdlr
+		}
+
+		onGatheringCompleteHdlr := func() {}
+		if hdlr, ok := g.onGatheringCompleteHdlr.Load().(func()); ok && hdlr != nil {
+			onGatheringCompleteHdlr = hdlr
+		}
+
 		if candidate != nil {
 			c, err := newICECandidateFromICE(candidate)
 			if err != nil {
@@ -194,7 +194,11 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 		return ICEParameters{}, err
 	}
 
-	frag, pwd := g.agent.GetLocalUserCredentials()
+	frag, pwd, err := g.agent.GetLocalUserCredentials()
+	if err != nil {
+		return ICEParameters{}, err
+	}
+
 	return ICEParameters{
 		UsernameFragment: frag,
 		Password:         pwd,
