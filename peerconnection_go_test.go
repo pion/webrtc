@@ -781,20 +781,15 @@ func TestPopulateLocalCandidates(t *testing.T) {
 		pc, err := NewAPI().NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		gatherComplete, gatherCompleteCancel := context.WithCancel(context.Background())
-		pc.OnICEGatheringStateChange(func(i ICEGathererState) {
-			if i == ICEGathererStateComplete {
-				gatherCompleteCancel()
-			}
-		})
-
 		offer, err := pc.CreateOffer(nil)
 		assert.NoError(t, err)
 		assert.NotContains(t, offer.SDP, "a=candidate")
 		assert.NotContains(t, offer.SDP, "a=end-of-candidates")
 
+		offerGatheringComplete := GatheringCompletePromise(pc)
 		assert.NoError(t, pc.SetLocalDescription(offer))
-		<-gatherComplete.Done()
+		<-offerGatheringComplete
+
 		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=candidate")
 		assert.Contains(t, pc.PendingLocalDescription().SDP, "a=end-of-candidates")
 

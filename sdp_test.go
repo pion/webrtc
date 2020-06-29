@@ -3,6 +3,10 @@
 package webrtc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"strings"
 	"testing"
 
 	"github.com/pion/sdp/v2"
@@ -289,4 +293,63 @@ func TestHaveApplicationMediaSection(t *testing.T) {
 
 		assert.True(t, haveApplicationMediaSection(s))
 	})
+}
+
+func TestMediaDescriptionFingerprints(t *testing.T) {
+	engine := &MediaEngine{}
+	engine.RegisterCodec(NewRTPH264Codec(DefaultPayloadTypeH264, 90000))
+	engine.RegisterCodec(NewRTPOpusCodec(DefaultPayloadTypeOpus, 48000))
+
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+
+	certificate, err := GenerateCertificate(sk)
+	assert.NoError(t, err)
+
+	media := []mediaSection{
+		{
+			id: "video",
+			transceivers: []*RTPTransceiver{{
+				kind: RTPCodecTypeVideo,
+			}},
+		},
+		{
+			id: "audio",
+			transceivers: []*RTPTransceiver{{
+				kind: RTPCodecTypeAudio,
+			}},
+		},
+		{
+			id:   "application",
+			data: true,
+		},
+	}
+
+	for i := 0; i < 2; i++ {
+		media[i].transceivers[0].setSender(&RTPSender{})
+		media[i].transceivers[0].setDirection(RTPTransceiverDirectionSendonly)
+	}
+
+	fingerprintTest := func(SDPMediaDescriptionFingerprints bool, expectedFingerprintCount int) func(t *testing.T) {
+		return func(t *testing.T) {
+			s := &sdp.SessionDescription{}
+
+			dtlsFingerprints, err := certificate.GetFingerprints()
+			assert.NoError(t, err)
+
+			s, err = populateSDP(s, false,
+				dtlsFingerprints,
+				SDPMediaDescriptionFingerprints,
+				false, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew)
+			assert.NoError(t, err)
+
+			sdparray, err := s.Marshal()
+			assert.NoError(t, err)
+
+			assert.Equal(t, strings.Count(string(sdparray), "sha-256"), expectedFingerprintCount)
+		}
+	}
+
+	t.Run("Per-Media Description Fingerprints", fingerprintTest(true, 3))
+	t.Run("Per-Session Description Fingerprints", fingerprintTest(false, 1))
 }
