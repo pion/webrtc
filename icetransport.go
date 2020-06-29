@@ -152,6 +152,23 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	return nil
 }
 
+// restart is not exposed currently because ORTC has users create a whole new ICETransport
+// so for now lets keep it private so we don't cause ORTC users to depend on non-standard APIs
+func (t *ICETransport) restart() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return errors.New("ICEAgent does not exist, unable to restart ICETransport")
+	}
+
+	if err := agent.Restart(t.gatherer.api.settingEngine.candidates.UsernameFragment, t.gatherer.api.settingEngine.candidates.Password); err != nil {
+		return err
+	}
+	return t.gatherer.Gather()
+}
+
 // Stop irreversibly stops the ICETransport.
 func (t *ICETransport) Stop() error {
 	t.lock.Lock()
@@ -299,4 +316,33 @@ func (t *ICETransport) collectStats(collector *statsReportCollector) {
 	}
 
 	collector.Collect(stats.ID, stats)
+}
+
+func (t *ICETransport) haveRemoteCredentialsChange(newUfrag, newPwd string) bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return false
+	}
+
+	uFrag, uPwd, err := agent.GetRemoteUserCredentials()
+	if err != nil {
+		return false
+	}
+
+	return uFrag != newUfrag || uPwd != newPwd
+}
+
+func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return errors.New("ICEAgent does not exist, unable to SetRemoteCredentials")
+	}
+
+	return agent.SetRemoteCredentials(newUfrag, newPwd)
 }

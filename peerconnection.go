@@ -394,12 +394,16 @@ func (pc *PeerConnection) getStatsID() string {
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
-	case options != nil:
-		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	if options != nil && options.ICERestart {
+		if err := pc.iceTransport.restart(); err != nil {
+			return SessionDescription{}, err
+		}
 	}
 
 	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
@@ -555,8 +559,6 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
-	case options != nil:
-		return SessionDescription{}, fmt.Errorf("TODO handle options")
 	case pc.RemoteDescription() == nil:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
@@ -751,12 +753,13 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 }
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
+// nolint: gocyclo
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	haveRemoteDescription := pc.currentRemoteDescription != nil
+	isRenegotation := pc.currentRemoteDescription != nil
 
 	desc.parsed = &sdp.SessionDescription{}
 	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
@@ -766,11 +769,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
-	weOffer := desc.Type == SDPTypeAnswer
-
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
+	weOffer := desc.Type == SDPTypeAnswer
 
 	if !weOffer && !detectedPlanB {
 		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
@@ -806,7 +808,31 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		}
 	}
 
-	if haveRemoteDescription {
+	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed)
+	if err != nil {
+		return err
+	}
+
+	if isRenegotation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
+		// An ICE Restart only happens implicitly for a SetRemoteDescription of type offer
+		if !weOffer {
+			if err = pc.iceTransport.restart(); err != nil {
+				return err
+			}
+		}
+
+		if err = pc.iceTransport.setRemoteCredentials(remoteUfrag, remotePwd); err != nil {
+			return err
+		}
+	}
+
+	for _, c := range candidates {
+		if err = pc.iceTransport.AddRemoteCandidate(c); err != nil {
+			return err
+		}
+	}
+
+	if isRenegotation {
 		if weOffer {
 			pc.ops.Enqueue(func() {
 				pc.startRTP(true, &desc)
@@ -823,17 +849,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
 	if err != nil {
 		return err
-	}
-
-	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed)
-	if err != nil {
-		return err
-	}
-
-	for _, c := range candidates {
-		if err = pc.iceTransport.AddRemoteCandidate(c); err != nil {
-			return err
-		}
 	}
 
 	iceRole := ICERoleControlled
