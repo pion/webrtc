@@ -48,6 +48,7 @@ type SettingEngine struct {
 		SRTP  *uint
 		SRTCP *uint
 	}
+	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
 	disableCertificateFingerprintVerification bool
 	disableSRTPReplayProtection               bool
@@ -235,4 +236,12 @@ func (e *SettingEngine) DisableSRTPReplayProtection(isDisabled bool) {
 // DisableSRTCPReplayProtection disables SRTCP replay protection.
 func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
 	e.disableSRTCPReplayProtection = isDisabled
+}
+
+// SetSDPMediaLevelFingerprints configures the logic for DTLS Fingerprint insertion
+// If true, fingerprints will be inserted in the sdp at the fingerprint
+// level, instead of the session level. This helps with compatibility with
+// some webrtc implementations.
+func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
+	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
 }
