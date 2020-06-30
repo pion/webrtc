@@ -31,7 +31,8 @@ type QUICTransport struct {
 	certificates []Certificate
 
 	api *API
-	log logging.LeveledLogger
+
+	loggingFactory logging.LoggerFactory
 }
 
 // NewQUICTransport creates a new QUICTransport.
@@ -42,9 +43,9 @@ type QUICTransport struct {
 // any browsers yet.
 func (api *API) NewQUICTransport(transport *ICETransport, certificates []Certificate) (*QUICTransport, error) {
 	t := &QUICTransport{
-		iceTransport: transport,
-		api:          api,
-		log:          api.settingEngine.LoggerFactory.NewLogger("quic"),
+		iceTransport:   transport,
+		api:            api,
+		loggingFactory: api.settingEngine.LoggerFactory,
 	}
 
 	if len(certificates) > 0 {
@@ -110,11 +111,11 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 			isClient = false
 		}
 	}
-
 	cfg := &quic.Config{
-		Client:      isClient,
-		Certificate: cert.x509Cert,
-		PrivateKey:  cert.privateKey,
+		Client:        isClient,
+		Certificate:   cert.x509Cert,
+		PrivateKey:    cert.privateKey,
+		LoggerFactory: t.loggingFactory,
 	}
 	endpoint := t.iceTransport.NewEndpoint(mux.MatchAll)
 	err := t.TransportBase.StartBase(endpoint, cfg)
@@ -130,7 +131,8 @@ func (t *QUICTransport) Start(remoteParameters QUICParameters) error {
 			return err
 		}
 	} else {
-		t.log.Errorf("Warning: Certificate not checked")
+		log := t.loggingFactory.NewLogger("quic-go")
+		log.Errorf("Warning: Certificate not checked")
 	}
 
 	return nil
