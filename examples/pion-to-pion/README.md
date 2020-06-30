@@ -1,10 +1,6 @@
 # pion-to-pion
 pion-to-pion is an example of two pion instances communicating directly!
 
-To see an example of `pion-to-pion` that uses Trickle ICE see `pion-to-pion-trickle`.
-This may connect faster (and will eventually become the default API) but requires
-more code.
-
 The SDP offer and answer are exchanged automatically over HTTP.
 The `answer` side acts like a HTTP server and should therefore be ran first.
 
