@@ -727,11 +727,13 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return err
 	}
 
+	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
 		pc.ops.Enqueue(func() {
-			pc.startRTP(haveLocalDescription, remoteDesc)
+			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
 		})
 	}
 
@@ -832,10 +834,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		}
 	}
 
+	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+
 	if isRenegotation {
 		if weOffer {
 			pc.ops.Enqueue(func() {
-				pc.startRTP(true, &desc)
+				pc.startRTP(true, &desc, currentTransceivers)
 			})
 		}
 		return nil
@@ -864,7 +868,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	pc.ops.Enqueue(func() {
 		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
 		if weOffer {
-			pc.startRTP(false, &desc)
+			pc.startRTP(false, &desc, currentTransceivers)
 		}
 	})
 	return nil
@@ -1678,8 +1682,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 }
 
-func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription) {
-	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
 	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
 	if isRenegotiation {
 		for _, t := range currentTransceivers {
