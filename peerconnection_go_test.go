@@ -769,7 +769,10 @@ func TestPopulateLocalCandidates(t *testing.T) {
 		offer, err := pc.CreateOffer(nil)
 		assert.NoError(t, err)
 
+		offerGatheringComplete := GatheringCompletePromise(pc)
 		assert.NoError(t, pc.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
 		assert.Equal(t, pc.PendingLocalDescription(), pc.PendingLocalDescription())
 		assert.NoError(t, pc.Close())
 	})
