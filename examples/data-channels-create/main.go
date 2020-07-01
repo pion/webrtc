@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 func main() {
@@ -66,14 +66,22 @@ func main() {
 		panic(err)
 	}
 
+	// Create channel that is blocked until ICE Gathering is complete
+	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(offer)
 	if err != nil {
 		panic(err)
 	}
 
-	// Output the offer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(offer))
+	// Block until ICE Gathering is complete, disabling trickle ICE
+	// we do this because we only can exchange one signaling message
+	// in a production application you should exchange ICE Candidates via OnICECandidate
+	<-gatherComplete
+
+	// Output the answer in base64 so we can paste it in browser
+	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
 	// Wait for the answer to be pasted
 	answer := webrtc.SessionDescription{}

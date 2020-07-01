@@ -8,7 +8,7 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 /* VNet Configuration
@@ -107,6 +107,22 @@ func main() {
 
 	answerPeerConnection, err := answerAPI.NewPeerConnection(webrtc.Configuration{})
 	panicIfError(err)
+
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	answerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			panicIfError(offerPeerConnection.AddICECandidate(i.ToJSON()))
+		}
+	})
+
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	offerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			panicIfError(answerPeerConnection.AddICECandidate(i.ToJSON()))
+		}
+	})
 
 	offerDataChannel, err := offerPeerConnection.CreateDataChannel("label", nil)
 	panicIfError(err)

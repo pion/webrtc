@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/pion/quic"
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 
-	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 const messageSize = 15
@@ -59,11 +59,20 @@ func main() {
 		go WriteLoop(stream)
 	})
 
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
 	// Gather candidates
 	err = gatherer.Gather()
 	if err != nil {
 		panic(err)
 	}
+
+	<-gatherFinished
 
 	iceCandidates, err := gatherer.GetLocalCandidates()
 	if err != nil {

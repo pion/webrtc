@@ -3,7 +3,7 @@ package samplebuilder
 
 import (
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/media"
 )
 
 // SampleBuilder buffers packets until media frames are complete.
@@ -45,8 +45,13 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, opts ...Option) *SampleB
 // Push adds an RTP Packet to s's buffer.
 func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
+
+	// Remove outdated references
+	for i := s.lastPush; i != p.SequenceNumber+1; i++ {
+		s.buffer[i-s.maxLate] = nil
+	}
+
 	s.lastPush = p.SequenceNumber
-	s.buffer[p.SequenceNumber-s.maxLate] = nil
 }
 
 // We have a valid collection of RTP Packets

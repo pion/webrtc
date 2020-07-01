@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -234,6 +234,21 @@ func TestSeqnumDistance(t *testing.T) {
 		if ret := seqnumDistance(data.x, data.y); ret != data.d {
 			t.Errorf("seqnumDistance(%d, %d) returned %d which must be %d",
 				data.x, data.y, ret, data.d)
+		}
+	}
+}
+
+func TestSampleBuilderCleanReference(t *testing.T) {
+	s := New(10, &fakeDepacketizer{})
+
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 0, Timestamp: 0}, Payload: []byte{0x01}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 0}, Payload: []byte{0x02}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 0}, Payload: []byte{0x03}})
+	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 13, Timestamp: 120}, Payload: []byte{0x04}})
+
+	for i := 0; i < 3; i++ {
+		if s.buffer[i] != nil {
+			t.Errorf("Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i)
 		}
 	}
 }

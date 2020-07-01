@@ -1,0 +1,76 @@
+<html>
+  <head>
+    <title>ice-restart</title>
+  </head>
+
+  <body>
+    <button onclick="window.doSignaling(true)"> ICE Restart </button><br />
+
+
+    <h3> ICE Connection States </h3>
+    <div id="iceConnectionStates"></div> <br />
+
+    <h3> ICE Selected Pairs </h3>
+    <div id="iceSelectedPairs"></div> <br />
+
+    <h3> Inbound DataChannel Messages </h3>
+    <div id="inboundDataChannelMessages"></div>
+  </body>
+
+  <script>
+    let pc = new RTCPeerConnection()
+    let dc = pc.createDataChannel('data')
+
+    dc.onopen = () => {
+      setInterval(function() {
+        let el = document.createElement('template')
+        let selectedPair = pc.sctp.transport.iceTransport.getSelectedCandidatePair()
+
+        el.innerHTML = `<div>
+          <ul>
+             <li> <i> Local</i> - ${selectedPair.local.candidate}</li>
+             <li> <i> Remote</i> - ${selectedPair.remote.candidate} </li>
+          </ul>
+        </div>`
+
+        document.getElementById('iceSelectedPairs').appendChild(el.content.firstChild);
+      }, 3000);
+    }
+
+    dc.onmessage = event => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(event.data))
+
+      document.getElementById('inboundDataChannelMessages').appendChild(el);
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(pc.iceConnectionState))
+
+      document.getElementById('iceConnectionStates').appendChild(el);
+    }
+
+
+    window.doSignaling = iceRestart => {
+      pc.createOffer({iceRestart})
+        .then(offer => {
+          pc.setLocalDescription(offer)
+
+          return fetch(`/doSignaling`, {
+            method: 'post',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(offer)
+          })
+        })
+        .then(res => res.json())
+        .then(res => pc.setRemoteDescription(res))
+        .catch(alert)
+    }
+
+    window.doSignaling(false)
+  </script>
+</html>

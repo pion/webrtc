@@ -17,7 +17,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -316,7 +316,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetConnectionTimeout(time.Duration(1)*time.Second, time.Duration(250)*time.Millisecond)
+	s.SetICETimeouts(1*time.Second, 5*time.Second, 250*time.Millisecond)
 
 	api := NewAPI(WithSettingEngine(s))
 	api.mediaEngine.RegisterDefaultCodecs()
@@ -493,7 +493,11 @@ func TestUndeclaredSSRC(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
 
 	// Filter SSRC lines, and remove SCTP
 	filteredSDP := ""
@@ -519,8 +523,12 @@ func TestUndeclaredSSRC(t *testing.T) {
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	<-answerGatheringComplete
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
 	go func() {
 		for {
@@ -1134,11 +1142,15 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	<-offerGatheringComplete
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
 
 	// Add a new track between providing the offer and applying the answer
 
@@ -1149,7 +1161,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	require.NoError(t, err)
 
 	// apply answer so we'll test generateMatchedSDP
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
 	// Wait for senders to be started by startTransports spawned goroutine
 	pcOffer.ops.Done()

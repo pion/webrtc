@@ -1,10 +1,6 @@
 # pion-to-pion
 pion-to-pion is an example of two pion instances communicating directly!
 
-To see an example of `pion-to-pion` that uses Trickle ICE see `pion-to-pion-trickle`.
-This may connect faster (and will eventually become the default API) but requires
-more code.
-
 The SDP offer and answer are exchanged automatically over HTTP.
 The `answer` side acts like a HTTP server and should therefore be ran first.
 
@@ -12,12 +8,12 @@ The `answer` side acts like a HTTP server and should therefore be ran first.
 First run `answer`:
 ```sh
 export GO111MODULE=on
-go install github.com/pion/webrtc/v2/examples/pion-to-pion/answer
+go install github.com/pion/webrtc/v3/examples/pion-to-pion/answer
 answer
 ```
 Next, run `offer`:
 ```sh
-go install github.com/pion/webrtc/v2/examples/pion-to-pion/offer
+go install github.com/pion/webrtc/v3/examples/pion-to-pion/offer
 offer
 ```
 

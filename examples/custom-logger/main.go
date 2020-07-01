@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 // Everything below is the Pion WebRTC API! Thanks for using it ❤️.
@@ -67,6 +67,26 @@ func main() {
 		panic(err)
 	}
 
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	answerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			if iceErr := offerPeerConnection.AddICECandidate(i.ToJSON()); iceErr != nil {
+				panic(iceErr)
+			}
+		}
+	})
+
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	offerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			if iceErr := answerPeerConnection.AddICECandidate(i.ToJSON()); iceErr != nil {
+				panic(iceErr)
+			}
+		}
+	})
+
 	// Create an offer for the other PeerConnection
 	offer, err := offerPeerConnection.CreateOffer(nil)
 	if err != nil {
@@ -87,6 +107,11 @@ func main() {
 	// Create an Answer to send back to our originating PeerConnection
 	answer, err := answerPeerConnection.CreateAnswer(nil)
 	if err != nil {
+		panic(err)
+	}
+
+	// Set the answerer's LocalDescription
+	if err = answerPeerConnection.SetLocalDescription(answer); err != nil {
 		panic(err)
 	}
 

@@ -33,10 +33,18 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		t.Fatalf("Expected gathering state new")
 	}
 
-	err = gatherer.Gather()
-	if err != nil {
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
+	if err = gatherer.Gather(); err != nil {
 		t.Error(err)
 	}
+
+	<-gatherFinished
 
 	params, err := gatherer.GetLocalParameters()
 	if err != nil {
@@ -55,60 +63,6 @@ func TestNewICEGatherer_Success(t *testing.T) {
 
 	if len(candidates) == 0 {
 		t.Fatalf("No candidates gathered")
-	}
-
-	assert.NoError(t, gatherer.Close())
-}
-
-func TestICEGather_LocalCandidateOrder(t *testing.T) {
-	// Limit runtime in case of deadlocks
-	lim := test.TimeOut(time.Second * 20)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	opts := ICEGatherOptions{
-		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
-	}
-
-	gatherer, err := NewAPI().NewICEGatherer(opts)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if gatherer.State() != ICEGathererStateNew {
-		t.Fatalf("Expected gathering state new")
-	}
-
-	for i := 0; i < 10; i++ {
-		candidate := make(chan *ICECandidate)
-		gatherer.OnLocalCandidate(func(c *ICECandidate) {
-			candidate <- c
-		})
-
-		if err := gatherer.SignalCandidates(); err != nil {
-			t.Error(err)
-		}
-		endGathering := false
-
-	L:
-		for {
-			select {
-			case c := <-candidate:
-				if c == nil {
-					endGathering = true
-				} else if endGathering {
-					t.Error("Received a candidate after the last candidate")
-					break L
-				}
-			case <-time.After(100 * time.Millisecond):
-				if !endGathering {
-					t.Error("Timed out before receiving the last candidate")
-				}
-				break L
-			}
-		}
 	}
 
 	assert.NoError(t, gatherer.Close())
@@ -137,9 +91,7 @@ func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 		}
 	})
 
-	if err := gatherer.SignalCandidates(); err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, gatherer.Gather())
 
 	<-gotMulticastDNSCandidate.Done()
 	assert.NoError(t, gatherer.Close())

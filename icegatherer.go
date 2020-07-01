@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/pion/ice"
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 )
 
@@ -26,6 +26,9 @@ type ICEGatherer struct {
 
 	onLocalCandidateHdlr atomic.Value // func(candidate *ICECandidate)
 	onStateChangeHdlr    atomic.Value // func(state ICEGathererState)
+
+	// Used for GatheringCompletePromise
+	onGatheringCompleteHdlr atomic.Value // func()
 
 	api *API
 }
@@ -58,7 +61,7 @@ func (g *ICEGatherer) createAgent() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if g.agent != nil {
+	if g.agent != nil || g.State() != ICEGathererStateNew {
 		return nil
 	}
 
@@ -85,13 +88,13 @@ func (g *ICEGatherer) createAgent() error {
 	}
 
 	config := &ice.AgentConfig{
-		Trickle:                   g.api.settingEngine.candidates.ICETrickle,
 		Lite:                      g.api.settingEngine.candidates.ICELite,
 		Urls:                      g.validatedServers,
 		PortMin:                   g.api.settingEngine.ephemeralUDP.PortMin,
 		PortMax:                   g.api.settingEngine.ephemeralUDP.PortMax,
-		ConnectionTimeout:         g.api.settingEngine.timeout.ICEConnection,
-		KeepaliveInterval:         g.api.settingEngine.timeout.ICEKeepalive,
+		DisconnectedTimeout:       g.api.settingEngine.timeout.ICEDisconnectedTimeout,
+		FailedTimeout:             g.api.settingEngine.timeout.ICEFailedTimeout,
+		KeepaliveInterval:         g.api.settingEngine.timeout.ICEKeepaliveInterval,
 		LoggerFactory:             g.api.settingEngine.LoggerFactory,
 		CandidateTypes:            candidateTypes,
 		CandidateSelectionTimeout: g.api.settingEngine.timeout.ICECandidateSelectionTimeout,
@@ -124,10 +127,6 @@ func (g *ICEGatherer) createAgent() error {
 	}
 
 	g.agent = agent
-	if !g.api.settingEngine.candidates.ICETrickle {
-		atomicStoreICEGathererState(&g.state, ICEGathererStateComplete)
-	}
-
 	return nil
 }
 
@@ -137,22 +136,22 @@ func (g *ICEGatherer) Gather() error {
 		return err
 	}
 
-	onLocalCandidateHdlr := func(*ICECandidate) {}
-	if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
-		onLocalCandidateHdlr = hdlr
-	}
-
 	g.lock.Lock()
-	isTrickle := g.api.settingEngine.candidates.ICETrickle
 	agent := g.agent
 	g.lock.Unlock()
 
-	if !isTrickle {
-		return nil
-	}
-
 	g.setState(ICEGathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {
+		onLocalCandidateHdlr := func(*ICECandidate) {}
+		if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
+			onLocalCandidateHdlr = hdlr
+		}
+
+		onGatheringCompleteHdlr := func() {}
+		if hdlr, ok := g.onGatheringCompleteHdlr.Load().(func()); ok && hdlr != nil {
+			onGatheringCompleteHdlr = hdlr
+		}
+
 		if candidate != nil {
 			c, err := newICECandidateFromICE(candidate)
 			if err != nil {
@@ -163,6 +162,7 @@ func (g *ICEGatherer) Gather() error {
 		} else {
 			g.setState(ICEGathererStateComplete)
 
+			onGatheringCompleteHdlr()
 			onLocalCandidateHdlr(nil)
 		}
 	}); err != nil {
@@ -194,7 +194,11 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 		return ICEParameters{}, err
 	}
 
-	frag, pwd := g.agent.GetLocalUserCredentials()
+	frag, pwd, err := g.agent.GetLocalUserCredentials()
+	if err != nil {
+		return ICEParameters{}, err
+	}
+
 	return ICEParameters{
 		UsernameFragment: frag,
 		Password:         pwd,
@@ -243,32 +247,6 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	return g.agent
-}
-
-// SignalCandidates imitates gathering process to backward support old trickle
-// false behavior.
-func (g *ICEGatherer) SignalCandidates() error {
-	candidates, err := g.GetLocalCandidates()
-	if err != nil {
-		return err
-	}
-
-	var onLocalCandidateHdlr func(*ICECandidate)
-	if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok {
-		onLocalCandidateHdlr = hdlr
-	}
-
-	if onLocalCandidateHdlr != nil {
-		go func() {
-			for i := range candidates {
-				onLocalCandidateHdlr(&candidates[i])
-			}
-			// Call the handler one last time with nil. This is a signal that candidate
-			// gathering is complete.
-			onLocalCandidateHdlr(nil)
-		}()
-	}
-	return nil
 }
 
 func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
