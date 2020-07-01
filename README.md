@@ -13,13 +13,21 @@
   <a href="https://github.com/pion/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <a href="https://travis-ci.org/pion/webrtc"><img src="https://travis-ci.org/pion/webrtc.svg?branch=master" alt="Build Status"></a>
-  <a href="https://pkg.go.dev/github.com/pion/webrtc/v2"><img src="https://godoc.org/github.com/pion/webrtc?status.svg" alt="GoDoc"></a>
+  <a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://godoc.org/github.com/pion/webrtc?status.svg" alt="GoDoc"></a>
   <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
   <a href="https://goreportcard.com/report/github.com/pion/webrtc"><img src="https://goreportcard.com/badge/github.com/pion/webrtc" alt="Go Report Card"></a>
   <a href="https://www.codacy.com/app/Sean-Der/webrtc"><img src="https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d" alt="Codacy Badge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 <br>
+
+### Breaking Changes
+
+Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
+
+Until `v3.0.0` has been tagged using `v2` is suggested. The last `v2` release is [v2.2.17](https://github.com/pion/webrtc/releases/tag/v2.2.17). (Remember to `export GO111MODULE=on` in order to `go get` versions >= v2.)
+
+We are actively planning and would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
 
 Pion WebRTC is a pure Go implementation of WebRTC. It has zero non-Go dependencies and no 3rd party Go dependencies. It is designed to follow **[WebRTC API](https://w3c.github.io/webrtc-pc/)**, but may deviate when required.
 See [DESIGN.md](DESIGN.md) for the guiding principals/inspirations of the project.
@@ -162,6 +170,9 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [cnderrauber](https://github.com/cnderrauber)
 * [Juliusz Chroboczek](https://github.com/jech)
 * [John Berthels](https://github.com/jbert)
+* [Somers Matthews](https://github.com/somersbmatthews)
+* [Vitaliy F](https://github.com/funvit)
+* [Ivan Egorov](https://github.com/vany-egorov)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
