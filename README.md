@@ -27,7 +27,11 @@ Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/pion/
 
 Until `v3.0.0` has been tagged using `v2` is suggested. The last `v2` release is [v2.2.17](https://github.com/pion/webrtc/releases/tag/v2.2.17)
 
+[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
+
 We are actively planning and would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+
+----
 
 Pion WebRTC is a pure Go implementation of WebRTC. It has zero non-Go dependencies and no 3rd party Go dependencies. It is designed to follow **[WebRTC API](https://w3c.github.io/webrtc-pc/)**, but may deviate when required.
 See [DESIGN.md](DESIGN.md) for the guiding principals/inspirations of the project.
@@ -173,6 +177,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Somers Matthews](https://github.com/somersbmatthews)
 * [Vitaliy F](https://github.com/funvit)
 * [Ivan Egorov](https://github.com/vany-egorov)
+* [Nick Mykins](https://github.com/nmyk)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

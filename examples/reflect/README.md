@@ -4,6 +4,7 @@ reflect demonstrates how with one PeerConnection you can send video to Pion and 
 ## Instructions
 ### Download reflect
 ```
+export GO111MODULE=on
 go get github.com/pion/webrtc/v3/examples/reflect
 ```
 

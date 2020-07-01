@@ -4,6 +4,7 @@ swap-tracks demonstrates how to swap multiple incoming tracks on a single outgoi
 ## Instructions
 ### Download swap-tracks
 ```
+export GO111MODULE=on
 go get github.com/pion/webrtc/v3/examples/swap-tracks
 ```
 

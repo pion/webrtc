@@ -7,6 +7,7 @@ The `answer` side acts like a HTTP server and should therefore be ran first.
 ## Instructions
 First run `answer`:
 ```sh
+export GO111MODULE=on
 go install github.com/pion/webrtc/v3/examples/pion-to-pion/answer
 answer
 ```

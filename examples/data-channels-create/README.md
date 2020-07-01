@@ -4,6 +4,7 @@ data-channels-create is a Pion WebRTC application that shows how you can send/re
 ## Instructions
 ### Download data-channels-create
 ```
+export GO111MODULE=on
 go get github.com/pion/webrtc/v3/examples/data-channels-create
 ```
 
