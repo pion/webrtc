@@ -1787,7 +1787,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		return nil, err
 	}
 
-	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState(), pc.api.settingEngine.getSDPExtensions())
 }
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
@@ -1889,7 +1889,12 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 		return nil, err
 	}
 
-	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	matchedSDPMap, err := matchedAnswerExt(pc.RemoteDescription().parsed, pc.api.settingEngine.getSDPExtensions())
+	if err != nil {
+		return nil, err
+	}
+
+	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState(), matchedSDPMap)
 }
 
 func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {

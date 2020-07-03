@@ -20,6 +20,16 @@ type trackDetails struct {
 	ssrc  uint32
 }
 
+// SDPSectionType specifies media type sections
+type SDPSectionType string
+
+// Common SDP sections
+const (
+	SDPSectionGlobal = SDPSectionType("global")
+	SDPSectionVideo  = SDPSectionType("video")
+	SDPSectionAudio  = SDPSectionType("audio")
+)
+
 // extract all trackDetails from an SDP.
 func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) map[uint32]trackDetails {
 	incomingTracks := map[uint32]trackDetails{}
@@ -200,7 +210,7 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, transceivers ...*RTPTransceiver) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, transceivers ...*RTPTransceiver) (bool, error) {
 	if len(transceivers) < 1 {
 		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
 	}
@@ -219,9 +229,6 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
-			if feedback.Type == TypeRTCPFBTransportCC {
-				media.WithTransportCCExtMap()
-			}
 		}
 	}
 	if len(codecs) == 0 {
@@ -235,6 +242,13 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints
 			},
 		})
 		return false, nil
+	}
+
+	// Add extmaps
+	if maps, ok := extMaps[SDPSectionType(t.kind.String())]; ok {
+		for _, m := range maps {
+			media.WithExtMap(m)
+		}
 	}
 
 	for _, mt := range transceivers {
@@ -267,7 +281,7 @@ type mediaSection struct {
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
+func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
 
@@ -293,7 +307,7 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		if m.data {
 			addDataMediaSection(d, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState)
 		} else {
-			shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m.transceivers...)
+			shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, extMaps, m.transceivers...)
 			if err != nil {
 				return nil, err
 			}
@@ -314,6 +328,14 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		// RFC 5245 S15.3
 		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
 	}
+
+	// Add global exts
+	if maps, ok := extMaps[SDPSectionGlobal]; ok {
+		for _, m := range maps {
+			d.WithPropertyAttribute(m.Marshal())
+		}
+	}
+
 	return d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue), nil
 }
 
@@ -445,4 +467,74 @@ func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {
 	}
 
 	return false
+}
+
+func matchedAnswerExt(descriptions *sdp.SessionDescription, localMaps map[SDPSectionType][]sdp.ExtMap) (map[SDPSectionType][]sdp.ExtMap, error) {
+	remoteExtMaps, err := remoteExts(descriptions)
+	if err != nil {
+		return nil, err
+	}
+	return answerExtMaps(remoteExtMaps, localMaps), nil
+}
+
+func answerExtMaps(remoteExtMaps map[SDPSectionType]map[int]sdp.ExtMap, localMaps map[SDPSectionType][]sdp.ExtMap) map[SDPSectionType][]sdp.ExtMap {
+	ret := map[SDPSectionType][]sdp.ExtMap{}
+	for mediaType, remoteExtMap := range remoteExtMaps {
+		if _, ok := ret[mediaType]; !ok {
+			ret[mediaType] = []sdp.ExtMap{}
+		}
+		for _, extItem := range remoteExtMap {
+			// add remote ext that match locally available ones
+			for _, extMap := range localMaps[mediaType] {
+				if extMap.URI.String() == extItem.URI.String() {
+					ret[mediaType] = append(ret[mediaType], extItem)
+				}
+			}
+		}
+	}
+	return ret
+}
+
+func remoteExts(session *sdp.SessionDescription) (map[SDPSectionType]map[int]sdp.ExtMap, error) {
+	remoteExtMaps := map[SDPSectionType]map[int]sdp.ExtMap{}
+
+	maybeAddExt := func(attr sdp.Attribute, mediaType SDPSectionType) error {
+		if attr.Key != "extmap" {
+			return nil
+		}
+		em := &sdp.ExtMap{}
+		if err := em.Unmarshal("extmap:" + attr.Value); err != nil {
+			return fmt.Errorf("failed to parse ExtMap: %v", err)
+		}
+		if remoteExtMap, ok := remoteExtMaps[mediaType][em.Value]; ok {
+			if remoteExtMap.Value != em.Value {
+				return fmt.Errorf("RemoteDescription changed some extmaps values")
+			}
+		} else {
+			remoteExtMaps[mediaType][em.Value] = *em
+		}
+		return nil
+	}
+
+	// populate the extmaps from the current remote description
+	for _, media := range session.MediaDescriptions {
+		mediaType := SDPSectionType(media.MediaName.Media)
+		// populate known remote extmap and handle conflicts.
+		if _, ok := remoteExtMaps[mediaType]; !ok {
+			remoteExtMaps[mediaType] = map[int]sdp.ExtMap{}
+		}
+		for _, attr := range media.Attributes {
+			if err := maybeAddExt(attr, mediaType); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Add global exts
+	for _, attr := range session.Attributes {
+		if err := maybeAddExt(attr, SDPSectionGlobal); err != nil {
+			return nil, err
+		}
+	}
+	return remoteExtMaps, nil
 }
