@@ -166,6 +166,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Vitaliy F](https://github.com/funvit)
 * [Ivan Egorov](https://github.com/vany-egorov)
 * [krishna chiatanya](https://github.com/kittuov)
+* [JacobZwang](https://github.com/JacobZwang)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
