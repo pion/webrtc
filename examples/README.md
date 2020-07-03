@@ -2,7 +2,7 @@
   Examples
 </h1>
 
-We've build an extensive collection of examples covering common use-cases. You can modify and extend these examples to quickly get started.
+We've built an extensive collection of examples covering common use-cases. You can modify and extend these examples to get started quickly.
 
 For more full featured examples that use 3rd party libraries see our **[example-webrtc-applications](https://github.com/pion/example-webrtc-applications)** repo.
 

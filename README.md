@@ -180,6 +180,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Nick Mykins](https://github.com/nmyk)
 * [Jason Brady](https://github.com/jbrady42)
 * [krishna chiatanya](https://github.com/kittuov)
+* [JacobZwang](https://github.com/JacobZwang)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
