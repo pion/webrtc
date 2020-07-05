@@ -17,7 +17,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -316,7 +316,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetConnectionTimeout(time.Duration(1)*time.Second, time.Duration(250)*time.Millisecond)
+	s.SetICETimeouts(1*time.Second, 5*time.Second, 250*time.Millisecond)
 
 	api := NewAPI(WithSettingEngine(s))
 	api.mediaEngine.RegisterDefaultCodecs()
@@ -493,7 +493,11 @@ func TestUndeclaredSSRC(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
 
 	// Filter SSRC lines, and remove SCTP
 	filteredSDP := ""
@@ -519,8 +523,12 @@ func TestUndeclaredSSRC(t *testing.T) {
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	<-answerGatheringComplete
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
 	go func() {
 		for {
@@ -827,11 +835,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
 	_, err = sender.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, "RtpSender has been stopped")
+	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
 	_, err = receiver.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, "RTPReceiver has been stopped")
+	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
 }
@@ -1036,15 +1044,61 @@ func TestGetRegisteredRTPCodecs(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-func TestPlanBMultiTrack(t *testing.T) {
-	addSingleTrack := func(p *PeerConnection) *Track {
-		track, err := p.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+func TestPlanBMediaExchange(t *testing.T) {
+	runTest := func(trackCount int, t *testing.T) {
+		addSingleTrack := func(p *PeerConnection) *Track {
+			track, err := p.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+			assert.NoError(t, err)
+
+			_, err = p.AddTrack(track)
+			assert.NoError(t, err)
+
+			return track
+		}
+
+		pcOffer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
-		_, err = p.AddTrack(track)
+		pcAnswer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
-		return track
+		var onTrackWaitGroup sync.WaitGroup
+		onTrackWaitGroup.Add(trackCount)
+		pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+			onTrackWaitGroup.Done()
+		})
+
+		done := make(chan struct{})
+		go func() {
+			onTrackWaitGroup.Wait()
+			close(done)
+		}()
+
+		_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		outboundTracks := []*Track{}
+		for i := 0; i < trackCount; i++ {
+			outboundTracks = append(outboundTracks, addSingleTrack(pcOffer))
+		}
+
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+		func() {
+			for {
+				select {
+				case <-time.After(20 * time.Millisecond):
+					for _, track := range outboundTracks {
+						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		assert.NoError(t, pcOffer.Close())
+		assert.NoError(t, pcAnswer.Close())
 	}
 
 	lim := test.TimeOut(time.Second * 30)
@@ -1053,46 +1107,12 @@ func TestPlanBMultiTrack(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
-	assert.NoError(t, err)
-
-	pcAnswer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
-	assert.NoError(t, err)
-
-	var onTrackWaitGroup sync.WaitGroup
-	onTrackWaitGroup.Add(2)
-	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
-		onTrackWaitGroup.Done()
+	t.Run("Single Track", func(t *testing.T) {
+		runTest(1, t)
 	})
-
-	done := make(chan struct{})
-	go func() {
-		onTrackWaitGroup.Wait()
-		close(done)
-	}()
-
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
-	assert.NoError(t, err)
-
-	track1 := addSingleTrack(pcOffer)
-	track2 := addSingleTrack(pcOffer)
-
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
-	func() {
-		for {
-			select {
-			case <-time.After(20 * time.Millisecond):
-				assert.NoError(t, track1.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-				assert.NoError(t, track2.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}))
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	t.Run("Multi Track", func(t *testing.T) {
+		runTest(2, t)
+	})
 }
 
 // TestPeerConnection_Start_Only_Negotiated_Senders tests that only
@@ -1122,11 +1142,15 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	<-offerGatheringComplete
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
 
 	// Add a new track between providing the offer and applying the answer
 
@@ -1137,10 +1161,10 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	require.NoError(t, err)
 
 	// apply answer so we'll test generateMatchedSDP
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
 	// Wait for senders to be started by startTransports spawned goroutine
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 
 	// sender1 should be started but sender2 should not be started
 	assert.True(t, sender1.hasSent(), "sender1 is not started but should be started")
@@ -1183,8 +1207,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should be started
 	started, err := isTransceiverReceiverStarted(pcAnswer, "0")
@@ -1196,8 +1220,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should not be started
 	started, err = isTransceiverReceiverStarted(pcAnswer, "0")
@@ -1213,8 +1237,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// transceiver with mid 0 should not be started
 	started, err = isTransceiverReceiverStarted(pcAnswer, "0")

@@ -4,42 +4,14 @@ package webrtc
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/pion/sdp/v2"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCodecRegistration(t *testing.T) {
-	api := NewAPI()
-	const invalidPT = 255
-
-	api.mediaEngine.RegisterDefaultCodecs()
-
-	testCases := []struct {
-		c uint8
-		e error
-	}{
-		{DefaultPayloadTypePCMU, nil},
-		{DefaultPayloadTypePCMA, nil},
-		{DefaultPayloadTypeG722, nil},
-		{DefaultPayloadTypeOpus, nil},
-		{DefaultPayloadTypeVP8, nil},
-		{DefaultPayloadTypeVP9, nil},
-		{DefaultPayloadTypeH264, nil},
-		{invalidPT, ErrCodecNotFound},
-	}
-
-	for _, f := range testCases {
-		_, err := api.mediaEngine.getCodec(f.c)
-		assert.Equal(t, f.e, err)
-	}
-	_, err := api.mediaEngine.getCodecSDP(sdp.Codec{PayloadType: invalidPT})
-	assert.Equal(t, err, ErrCodecNotFound)
-}
-
-func TestPopulateFromSDP(t *testing.T) {
-	const sdpValue = `v=0
+const sdpValue = `v=0
 o=- 884433216 1576829404 IN IP4 0.0.0.0
 s=-
 t=0 0
@@ -75,6 +47,36 @@ c=IN IP4 0.0.0.0
 a=mid:2
 a=sctpmap:5000 webrtc-datachannel 1024
 `
+
+func TestCodecRegistration(t *testing.T) {
+	api := NewAPI()
+	const invalidPT = 255
+
+	api.mediaEngine.RegisterDefaultCodecs()
+
+	testCases := []struct {
+		c uint8
+		e error
+	}{
+		{DefaultPayloadTypePCMU, nil},
+		{DefaultPayloadTypePCMA, nil},
+		{DefaultPayloadTypeG722, nil},
+		{DefaultPayloadTypeOpus, nil},
+		{DefaultPayloadTypeVP8, nil},
+		{DefaultPayloadTypeVP9, nil},
+		{DefaultPayloadTypeH264, nil},
+		{invalidPT, ErrCodecNotFound},
+	}
+
+	for _, f := range testCases {
+		_, err := api.mediaEngine.getCodec(f.c)
+		assert.Equal(t, f.e, err)
+	}
+	_, err := api.mediaEngine.getCodecSDP(sdp.Codec{PayloadType: invalidPT})
+	assert.Equal(t, err, ErrCodecNotFound)
+}
+
+func TestPopulateFromSDP(t *testing.T) {
 	m := MediaEngine{}
 	assertCodecWithPayloadType := func(name string, payloadType uint8) {
 		for _, c := range m.codecs {
@@ -107,4 +109,24 @@ func TestOpusCase(t *testing.T) {
 
 	assert.True(t, regexp.MustCompile(`(?m)^a=rtpmap:\d+ opus/48000/2`).MatchString(offer.SDP))
 	assert.NoError(t, pc.Close())
+}
+
+func TestGetCodecsByName(t *testing.T) {
+	var cdc *RTPCodec
+	m := MediaEngine{}
+	assert.NoError(t, m.PopulateFromSDP(SessionDescription{SDP: sdpValue}))
+
+	assertGetCodecsByName := func(name string) {
+		for _, cdc = range m.GetCodecsByName(name) {
+			if strings.EqualFold(cdc.Name, name) {
+				return
+			}
+		}
+		t.Fatalf("Failed to getting codec(%s) by name (%s)", cdc.Name, name)
+	}
+
+	assertGetCodecsByName(VP8)
+	assertGetCodecsByName(H264)
+	assertGetCodecsByName(VP9)
+	assertGetCodecsByName(Opus)
 }

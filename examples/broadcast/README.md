@@ -6,7 +6,8 @@ This could serve as the building block to building conferencing software, and ot
 ## Instructions
 ### Download broadcast
 ```
-go get github.com/pion/webrtc/v2/examples/broadcast
+export GO111MODULE=on
+go get github.com/pion/webrtc/v3/examples/broadcast
 ```
 
 ### Open broadcast example page

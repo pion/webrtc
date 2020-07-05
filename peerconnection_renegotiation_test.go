@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/v2/internal/util"
-	"github.com/pion/webrtc/v2/pkg/media"
+	"github.com/pion/webrtc/v3/internal/util"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,12 +118,12 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 	assert.Equal(t, 0, len(vp8Track.activeSenders))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
+	pcOffer.ops.Done()
 	assert.Equal(t, 1, len(vp8Track.activeSenders))
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*Track{vp8Track})
@@ -277,17 +277,24 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
-	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	// apply answer so we'll test generateMatchedSDP
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+
+	// apply answer so we'll test generateMatchedSDP
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	// Must have 3 media descriptions (2 video and 1 datachannel)
 	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
@@ -312,8 +319,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	// apply answer so we'll test generateMatchedSDP
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
 	require.NoError(t, err)
@@ -529,7 +536,6 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	defer report()
 
 	settingEngine := SettingEngine{}
-	settingEngine.SetTrickle(true)
 
 	api := NewAPI(WithSettingEngine(settingEngine))
 	api.mediaEngine.RegisterDefaultCodecs()
@@ -579,8 +585,8 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	negotiate()
 	negotiate()
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 	wg.Wait()
 
 	assert.NoError(t, pcOffer.Close())
@@ -608,8 +614,8 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
@@ -629,12 +635,12 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, sender.isNegotiated())
 
-	<-pcAnswer.ops.Done()
+	pcAnswer.ops.Done()
 	assert.Equal(t, 0, len(localTrack.activeSenders))
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	<-pcAnswer.ops.Done()
+	pcAnswer.ops.Done()
 	assert.Equal(t, 1, len(localTrack.activeSenders))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
@@ -651,15 +657,22 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	signalPairExcludeDataChannel := func(pcOffer, pcAnswer *PeerConnection) {
 		offer, err := pcOffer.CreateOffer(nil)
 		assert.NoError(t, err)
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
 		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		<-offerGatheringComplete
 
+		offer = *pcOffer.LocalDescription()
 		offer.SDP = strings.Split(offer.SDP, "m=application")[0]
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 	}
 
 	api := NewAPI()
@@ -685,12 +698,12 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	pcAnswer.sctpTransport = nil
 
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
-	<-pcOffer.ops.Done()
-	<-pcAnswer.ops.Done()
+	pcOffer.ops.Done()
+	pcAnswer.ops.Done()
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())

@@ -2,9 +2,11 @@
 
 package webrtc
 
-// Configuration defines a set of parameters to configure how the
-// peer-to-peer communication via PeerConnection is established or
-// re-established.
+// A Configuration defines how peer-to-peer communication via PeerConnection
+// is established or re-established.
+// Configurations may be set up once and reused across multiple connections.
+// Configurations are treated as readonly. As long as they are unmodified,
+// they are safe for concurrent use.
 type Configuration struct {
 	// ICEServers defines a slice describing servers available to be used by
 	// ICE, such as STUN and TURN servers.

@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/webrtc/v2"
-	"github.com/pion/webrtc/v2/pkg/media"
-	"github.com/pion/webrtc/v2/pkg/media/ivfreader"
+	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
 )
 
 var peerConnection *webrtc.PeerConnection //nolint
@@ -27,6 +27,9 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
+	// Create channel that is blocked until ICE Gathering is complete
+	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
+
 	answer, err := peerConnection.CreateAnswer(nil)
 	if err != nil {
 		panic(err)
@@ -34,7 +37,12 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	response, err := json.Marshal(answer)
+	// Block until ICE Gathering is complete, disabling trickle ICE
+	// we do this because we only can exchange one signaling message
+	// in a production application you should exchange ICE Candidates via OnICECandidate
+	<-gatherComplete
+
+	response, err := json.Marshal(*peerConnection.LocalDescription())
 	if err != nil {
 		panic(err)
 	}
@@ -100,6 +108,8 @@ func main() {
 	http.HandleFunc("/createPeerConnection", createPeerConnection)
 	http.HandleFunc("/addVideo", addVideo)
 	http.HandleFunc("/removeVideo", removeVideo)
+
+	fmt.Println("Open http://localhost:8080 to access this demo")
 	panic(http.ListenAndServe(":8080", nil))
 }
 

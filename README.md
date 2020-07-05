@@ -9,16 +9,29 @@
   <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion webrtc"></a>
   <a href="https://sourcegraph.com/github.com/pion/webrtc?badge"><img src="https://sourcegraph.com/github.com/pion/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
   <a href="https://pion.ly/slack"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a>
+  <a href="https://twitter.com/_pion?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40_pion&style=social&url=https%3A%2F%2Ftwitter.com%2F_pion" alt="Twitter Widget"></a>
   <a href="https://github.com/pion/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <a href="https://travis-ci.org/pion/webrtc"><img src="https://travis-ci.org/pion/webrtc.svg?branch=master" alt="Build Status"></a>
-  <a href="https://pkg.go.dev/github.com/pion/webrtc/v2"><img src="https://godoc.org/github.com/pion/webrtc?status.svg" alt="GoDoc"></a>
+  <a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://godoc.org/github.com/pion/webrtc?status.svg" alt="GoDoc"></a>
   <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
   <a href="https://goreportcard.com/report/github.com/pion/webrtc"><img src="https://goreportcard.com/badge/github.com/pion/webrtc" alt="Go Report Card"></a>
   <a href="https://www.codacy.com/app/Sean-Der/webrtc"><img src="https://api.codacy.com/project/badge/Grade/18f4aec384894e6aac0b94effe51961d" alt="Codacy Badge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 <br>
+
+### Breaking Changes
+
+Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
+
+Until `v3.0.0` has been tagged using `v2` is suggested. The last `v2` release is [v2.2.17](https://github.com/pion/webrtc/releases/tag/v2.2.17)
+
+[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
+
+We are actively planning and would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+
+----
 
 Pion WebRTC is a pure Go implementation of WebRTC. It has zero non-Go dependencies and no 3rd party Go dependencies. It is designed to follow **[WebRTC API](https://w3c.github.io/webrtc-pc/)**, but may deviate when required.
 See [DESIGN.md](DESIGN.md) for the guiding principals/inspirations of the project.
@@ -157,9 +170,15 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Simone Gotti](https://github.com/sgotti)
 * [Cedric Fung](https://github.com/cedricfung)
 * [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
-* [Josh Bleecher Snyder](https://github.com/josharian)
 * [salmān aljammāz](https://github.com/saljam)
 * [cnderrauber](https://github.com/cnderrauber)
+* [Juliusz Chroboczek](https://github.com/jech)
+* [John Berthels](https://github.com/jbert)
+* [Somers Matthews](https://github.com/somersbmatthews)
+* [Vitaliy F](https://github.com/funvit)
+* [Ivan Egorov](https://github.com/vany-egorov)
+* [Nick Mykins](https://github.com/nmyk)
+* [Jason Brady](https://github.com/jbrady42)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

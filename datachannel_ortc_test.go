@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pion/transport/test"
-	"github.com/pion/webrtc/v2/internal/util"
+	"github.com/pion/webrtc/v3/internal/util"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {
@@ -118,12 +118,18 @@ func (s *testORTCStack) setSignal(sig *testORTCSignal, isOffer bool) error {
 }
 
 func (s *testORTCStack) getSignal() (*testORTCSignal, error) {
-	// Gather candidates
-	err := s.gatherer.Gather()
-	if err != nil {
+	gatherFinished := make(chan struct{})
+	s.gatherer.OnLocalCandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		}
+	})
+
+	if err := s.gatherer.Gather(); err != nil {
 		return nil, err
 	}
 
+	<-gatherFinished
 	iceCandidates, err := s.gatherer.GetLocalCandidates()
 	if err != nil {
 		return nil, err

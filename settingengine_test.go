@@ -35,19 +35,15 @@ func TestSetEphemeralUDPPortRange(t *testing.T) {
 func TestSetConnectionTimeout(t *testing.T) {
 	s := SettingEngine{}
 
-	if s.timeout.ICEConnection != nil ||
-		s.timeout.ICEKeepalive != nil {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	var nilDuration *time.Duration
+	assert.Equal(t, s.timeout.ICEDisconnectedTimeout, nilDuration)
+	assert.Equal(t, s.timeout.ICEFailedTimeout, nilDuration)
+	assert.Equal(t, s.timeout.ICEKeepaliveInterval, nilDuration)
 
-	s.SetConnectionTimeout(5*time.Second, 1*time.Second)
-
-	if s.timeout.ICEConnection == nil ||
-		*s.timeout.ICEConnection != 5*time.Second ||
-		s.timeout.ICEKeepalive == nil ||
-		*s.timeout.ICEKeepalive != 1*time.Second {
-		t.Fatalf("ICE Timeouts do not reflect requested values.")
-	}
+	s.SetICETimeouts(1*time.Second, 2*time.Second, 3*time.Second)
+	assert.Equal(t, *s.timeout.ICEDisconnectedTimeout, 1*time.Second)
+	assert.Equal(t, *s.timeout.ICEFailedTimeout, 2*time.Second)
+	assert.Equal(t, *s.timeout.ICEKeepaliveInterval, 3*time.Second)
 }
 
 func TestDetachDataChannels(t *testing.T) {

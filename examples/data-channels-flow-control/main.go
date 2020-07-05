@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 const (
@@ -121,6 +121,22 @@ func createAnswerer() *webrtc.PeerConnection {
 func main() {
 	offerPC := createOfferer()
 	answerPC := createAnswerer()
+
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	answerPC.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			check(offerPC.AddICECandidate(i.ToJSON()))
+		}
+	})
+
+	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
+	// send it to the other peer
+	offerPC.OnICECandidate(func(i *webrtc.ICECandidate) {
+		if i != nil {
+			check(answerPC.AddICECandidate(i.ToJSON()))
+		}
+	})
 
 	// Now, create an offer
 	offer, err := offerPC.CreateOffer(nil)

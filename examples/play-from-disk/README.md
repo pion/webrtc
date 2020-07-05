@@ -1,19 +1,21 @@
 # play-from-disk
-play-from-disk demonstrates how to send video to your browser from a file saved to disk.
+play-from-disk demonstrates how to send video and/or audio to your browser from flise saved to disk.
 
 ## Instructions
-### Create IVF named `output.ivf` that contains a VP8 track
+### Create IVF named `output.ivf` that contains a VP8 track and/or `output.ogg` that contains a Opus track
 ```
 ffmpeg -i $INPUT_FILE -g 30 output.ivf
+ffmpeg -i $INPUT_FILE -c:a libopus -page_duration 20000 -vn output.ogg
 ```
 
 ### Download play-from-disk
 ```
-go get github.com/pion/webrtc/v2/examples/play-from-disk
+export GO111MODULE=on
+go get github.com/pion/webrtc/v3/examples/play-from-disk
 ```
 
 ### Open play-from-disk example page
-[jsfiddle.net](https://jsfiddle.net/z7ms3u5r/) you should see two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/y16Ljznr/) you should see two text-areas and a 'Start Session' button
 
 ### Run play-from-disk with your browsers SessionDescription as stdin
 The `output.ivf` you created should be in the same directory as `play-from-disk`. In the jsfiddle the top textarea is your browser, copy that and:
