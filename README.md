@@ -165,6 +165,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Somers Matthews](https://github.com/somersbmatthews)
 * [Vitaliy F](https://github.com/funvit)
 * [Ivan Egorov](https://github.com/vany-egorov)
+* [krishna chiatanya](https://github.com/kittuov)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
