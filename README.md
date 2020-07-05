@@ -179,6 +179,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Ivan Egorov](https://github.com/vany-egorov)
 * [Nick Mykins](https://github.com/nmyk)
 * [Jason Brady](https://github.com/jbrady42)
+* [Krishna Chaitanya Kornepati](https://github.com/kittuov)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
