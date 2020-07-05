@@ -126,7 +126,7 @@ func (o *OggReader) readHeaders() (*OggHeader, error) {
 func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
 	h := make([]byte, pageHeaderLen)
 
-	n, err := o.stream.Read(h)
+	n, err := io.ReadFull(o.stream, h)
 	if err != nil {
 		return nil, nil, err
 	} else if n < len(h) {
@@ -145,7 +145,7 @@ func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
 	pageHeader.segmentsCount = h[26]
 
 	sizeBuffer := make([]byte, pageHeader.segmentsCount)
-	if _, err = o.stream.Read(sizeBuffer); err != nil {
+	if _, err = io.ReadFull(o.stream, sizeBuffer); err != nil {
 		return nil, nil, err
 	}
 
@@ -155,7 +155,7 @@ func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
 	}
 
 	payload := make([]byte, payloadSize)
-	if _, err = o.stream.Read(payload); err != nil {
+	if _, err = io.ReadFull(o.stream, payload); err != nil {
 		return nil, nil, err
 	}
 
