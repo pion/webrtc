@@ -24,14 +24,13 @@ type SettingEngine struct {
 		DataChannels bool
 	}
 	timeout struct {
-		ICEDisconnectedTimeout       *time.Duration
-		ICEFailedTimeout             *time.Duration
-		ICEKeepaliveInterval         *time.Duration
-		ICECandidateSelectionTimeout *time.Duration
-		ICEHostAcceptanceMinWait     *time.Duration
-		ICESrflxAcceptanceMinWait    *time.Duration
-		ICEPrflxAcceptanceMinWait    *time.Duration
-		ICERelayAcceptanceMinWait    *time.Duration
+		ICEDisconnectedTimeout    *time.Duration
+		ICEFailedTimeout          *time.Duration
+		ICEKeepaliveInterval      *time.Duration
+		ICEHostAcceptanceMinWait  *time.Duration
+		ICESrflxAcceptanceMinWait *time.Duration
+		ICEPrflxAcceptanceMinWait *time.Duration
+		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
 		ICELite                        bool
@@ -74,11 +73,6 @@ func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepA
 	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
 	e.timeout.ICEFailedTimeout = &failedTimeout
 	e.timeout.ICEKeepaliveInterval = &keepAliveInterval
-}
-
-// SetCandidateSelectionTimeout sets the max ICECandidateSelectionTimeout
-func (e *SettingEngine) SetCandidateSelectionTimeout(t time.Duration) {
-	e.timeout.ICECandidateSelectionTimeout = &t
 }
 
 // SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait
