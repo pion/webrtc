@@ -199,6 +199,15 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						{Key: "ssrc", Value: "5000"},
 					},
 				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "sendonly"},
+						{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+					},
+				},
 			},
 		}
 
@@ -257,7 +266,6 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 			},
 		}
-
 		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, s)))
 	})
 }
@@ -356,7 +364,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 }
 
 func TestPopulateSDP(t *testing.T) {
-	t.Run("Offer", func(t *testing.T) {
+	t.Run("Extensions", func(t *testing.T) {
 		transportCCURL, _ := url.Parse(sdp.TransportCCURI)
 		absSendURL, _ := url.Parse(sdp.ABSSendTimeURI)
 
@@ -416,6 +424,42 @@ func TestPopulateSDP(t *testing.T) {
 		// Test video does not contain global
 		assert.Equal(t, false, foundGlobal, "Global extension should not be present in video section")
 	})
+
+	t.Run("Rid", func(t *testing.T) {
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		ridMap := map[string]string{
+			"ridkey": "some",
+		}
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, ridMap: ridMap}}
+
+		se := SettingEngine{}
+
+		m := MediaEngine{}
+		m.RegisterDefaultCodecs()
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, se.getSDPExtensions())
+		assert.Nil(t, err)
+
+		// Test contains rid map keys
+		var found bool
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media != mediaNameVideo {
+				continue
+			}
+			for _, a := range desc.Attributes {
+				if a.Key == "rid" {
+					if strings.Contains(a.Value, "ridkey") {
+						found = true
+						break
+					}
+				}
+			}
+		}
+		assert.Equal(t, true, found, "Rid key should be present")
+	})
 }
 
 func TestMatchedAnswerExt(t *testing.T) {
@@ -464,5 +508,26 @@ func TestMatchedAnswerExt(t *testing.T) {
 		assert.Equal(t, 5, maps[0].Value, "Should use remote ext ID")
 	} else {
 		t.Fatal("No video ext maps found")
+	}
+}
+
+func TestGetRIDs(t *testing.T) {
+	m := []*sdp.MediaDescription{
+		{
+			MediaName: sdp.MediaName{
+				Media: "video",
+			},
+			Attributes: []sdp.Attribute{
+				{Key: "sendonly"},
+				{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+			},
+		},
+	}
+
+	rids := getRids(m[0])
+
+	assert.NotEmpty(t, rids, "Rid mapping should be present")
+	if _, ok := rids["f"]; !ok {
+		assert.Fail(t, "rid values should contain 'f'")
 	}
 }

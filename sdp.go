@@ -113,12 +113,29 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 
 				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
 				// is not defined at the top of the loop over s.MediaDescriptions.
-				incomingTracks[uint32(ssrc)] = trackDetails{midValue, codecType, trackLabel, trackID, uint32(ssrc)}
+				incomingTracks[uint32(ssrc)] = trackDetails{
+					mid:   midValue,
+					kind:  codecType,
+					label: trackLabel,
+					id:    trackID,
+					ssrc:  uint32(ssrc),
+				}
 			}
 		}
 	}
 
 	return incomingTracks
+}
+
+func getRids(media *sdp.MediaDescription) map[string]string {
+	rids := map[string]string{}
+	for _, attr := range media.Attributes {
+		if attr.Key == "rid" {
+			split := strings.Split(attr.Value, " ")
+			rids[split[0]] = attr.Value
+		}
+	}
+	return rids
 }
 
 func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription, iceGatheringState ICEGatheringState) {
@@ -210,7 +227,8 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, transceivers ...*RTPTransceiver) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, mediaSection mediaSection) (bool, error) {
+	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
 	}
@@ -251,6 +269,10 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints
 		}
 	}
 
+	for rid := range mediaSection.ridMap {
+		media.WithValueAttribute("rid", rid+" recv")
+	}
+
 	for _, mt := range transceivers {
 		if mt.Sender() != nil && mt.Sender().track != nil {
 			track := mt.Sender().track
@@ -278,6 +300,7 @@ type mediaSection struct {
 	id           string
 	transceivers []*RTPTransceiver
 	data         bool
+	ridMap       map[string]string
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
@@ -307,7 +330,7 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		if m.data {
 			addDataMediaSection(d, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState)
 		} else {
-			shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, extMaps, m.transceivers...)
+			shouldAddID, err = addTransceiverSDP(d, isPlanB, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, extMaps, m)
 			if err != nil {
 				return nil, err
 			}
