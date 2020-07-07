@@ -19,6 +19,7 @@ type ICECandidate struct {
 	Component      uint16           `json:"component"`
 	RelatedAddress string           `json:"relatedAddress"`
 	RelatedPort    uint16           `json:"relatedPort"`
+	TCPType        string           `json:"tcpType"`
 }
 
 // Conversion for package ice
@@ -56,6 +57,7 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 		Port:       uint16(i.Port()),
 		Component:  i.Component(),
 		Typ:        typ,
+		TCPType:    i.TCPType().String(),
 	}
 
 	if i.RelatedAddress() != nil {
@@ -76,6 +78,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Address:     c.Address,
 			Port:        int(c.Port),
 			Component:   c.Component,
+			TCPType:     ice.NewTCPType(c.TCPType),
 		}
 		return ice.NewCandidateHost(&config)
 	case ICECandidateTypeSrflx:
@@ -140,16 +143,26 @@ func (c ICECandidate) String() string {
 }
 
 func iceCandidateToSDP(c ICECandidate) sdp.ICECandidate {
+	var extensions []sdp.ICECandidateAttribute
+
+	if c.Protocol == ICEProtocolTCP && c.TCPType != "" {
+		extensions = append(extensions, sdp.ICECandidateAttribute{
+			Key:   "tcptype",
+			Value: c.TCPType,
+		})
+	}
+
 	return sdp.ICECandidate{
-		Foundation:     c.Foundation,
-		Priority:       c.Priority,
-		Address:        c.Address,
-		Protocol:       c.Protocol.String(),
-		Port:           c.Port,
-		Component:      c.Component,
-		Typ:            c.Typ.String(),
-		RelatedAddress: c.RelatedAddress,
-		RelatedPort:    c.RelatedPort,
+		Foundation:          c.Foundation,
+		Priority:            c.Priority,
+		Address:             c.Address,
+		Protocol:            c.Protocol.String(),
+		Port:                c.Port,
+		Component:           c.Component,
+		Typ:                 c.Typ.String(),
+		RelatedAddress:      c.RelatedAddress,
+		RelatedPort:         c.RelatedPort,
+		ExtensionAttributes: extensions,
 	}
 }
 
@@ -162,6 +175,17 @@ func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
 	if err != nil {
 		return ICECandidate{}, err
 	}
+
+	var tcpType string
+	if protocol == ICEProtocolTCP {
+		for _, attr := range c.ExtensionAttributes {
+			if attr.Key == "tcptype" {
+				tcpType = attr.Value
+				break
+			}
+		}
+	}
+
 	return ICECandidate{
 		Foundation:     c.Foundation,
 		Priority:       c.Priority,
@@ -172,6 +196,7 @@ func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
 		Typ:            typ,
 		RelatedAddress: c.RelatedAddress,
 		RelatedPort:    c.RelatedPort,
+		TCPType:        tcpType,
 	}, nil
 }
 

@@ -56,6 +56,7 @@ type SettingEngine struct {
 	disableSRTCPReplayProtection              bool
 	vnet                                      *vnet.Net
 	LoggerFactory                             logging.LoggerFactory
+	iceTCPPort                                int
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -240,6 +241,12 @@ func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
 // some webrtc implementations.
 func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
 	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
+}
+
+// SetICETCPPort to a non-zero value enables ICE-TCP listener. This API is experimental and
+// is likely to change in the future.
+func (e *SettingEngine) SetICETCPPort(port int) {
+	e.iceTCPPort = port
 }
 
 // AddSDPExtensions adds available and offered extensions for media type.
