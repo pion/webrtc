@@ -46,9 +46,11 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, opts ...Option) *SampleB
 func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
 
-	// Remove outdated references
-	for i := s.lastPush; i != p.SequenceNumber+1; i++ {
-		s.buffer[i-s.maxLate] = nil
+	// Remove outdated references if SequenceNumber is increased.
+	if int16(p.SequenceNumber-s.lastPush) > 0 {
+		for i := s.lastPush; i != p.SequenceNumber+1; i++ {
+			s.buffer[i-s.maxLate] = nil
+		}
 	}
 
 	s.lastPush = p.SequenceNumber
