@@ -1866,7 +1866,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 				t.Sender().setNegotiated()
 			}
 			mediaTransceivers := []*RTPTransceiver{t}
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, ridMap: getRids(media)})
 		}
 	}
 
