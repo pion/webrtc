@@ -5,8 +5,10 @@ package webrtc
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pion/sdp/v2"
+	"github.com/pion/transport/test"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -58,6 +60,12 @@ func extractSsrcList(md *sdp.MediaDescription) []string {
 }
 
 func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
@@ -121,9 +129,18 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 
 	mdNames = getMdNames(answer.parsed)
 	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
+
+	assert.NoError(t, apc.Close())
+	assert.NoError(t, opc.Close())
 }
 
 func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
@@ -206,9 +223,18 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 			}
 		}
 	}
+
+	assert.NoError(t, apc.Close())
+	assert.NoError(t, opc.Close())
 }
 
 func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
@@ -305,4 +331,7 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 			}
 		}
 	}
+
+	assert.NoError(t, apc.Close())
+	assert.NoError(t, opc.Close())
 }
