@@ -592,8 +592,11 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 // 4.4.1.6 Set the SessionDescription
 func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
-	if pc.isClosed.get() {
+	switch {
+	case pc.isClosed.get():
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	case newSDPType(sd.Type.String()) == SDPType(Unknown):
+		return &rtcerr.TypeError{Err: fmt.Errorf("the provided value '%d' is not a valid enum value of type SDPType", sd.Type)}
 	}
 
 	nextState, err := func() (SignalingState, error) {
