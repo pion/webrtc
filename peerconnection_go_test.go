@@ -143,9 +143,9 @@ func TestNew_Go(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, pc)
 
-		pc.configuration.ICEServers[0].Username = util.RandSeq(15)
-		pc.configuration.ICEServers[0].Credential = util.RandSeq(15)
-		pc.configuration.ICEServers[0].URLs[0] = util.RandSeq(15)
+		pc.configuration.ICEServers[0].Username = util.MathRandAlpha(15) // Tests doesn't need crypto random
+		pc.configuration.ICEServers[0].Credential = util.MathRandAlpha(15)
+		pc.configuration.ICEServers[0].URLs[0] = util.MathRandAlpha(15)
 
 		assert.Equal(t, expectedUsername, cfg.ICEServers[0].Username)
 		assert.Equal(t, expectedPassword, cfg.ICEServers[0].Credential)

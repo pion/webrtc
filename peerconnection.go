@@ -8,7 +8,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	mathRand "math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -1272,7 +1271,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 			return nil, fmt.Errorf("no %s codecs found", kind.String())
 		}
 
-		track, err := pc.NewTrack(codecs[0].PayloadType, mathRand.Uint32(), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultLabelLength))
+		track, err := pc.NewTrack(codecs[0].PayloadType, util.RandUint32(), util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultLabelLength))
 		if err != nil {
 			return nil, err
 		}

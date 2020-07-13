@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-func TestRandSeq(t *testing.T) {
-	if len(RandSeq(10)) != 10 {
-		t.Errorf("RandSeq return invalid length")
+func TestMathRandAlpha(t *testing.T) {
+	if len(MathRandAlpha(10)) != 10 {
+		t.Errorf("MathRandAlpha return invalid length")
 	}
 
 	var isLetter = regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
-	if !isLetter(RandSeq(10)) {
-		t.Errorf("RandSeq should be AlphaNumeric only")
+	if !isLetter(MathRandAlpha(10)) {
+		t.Errorf("MathRandAlpha should be AlphaNumeric only")
 	}
 }
 
