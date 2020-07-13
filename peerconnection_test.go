@@ -253,9 +253,11 @@ a=sctpmap:5000 webrtc-datachannel 1024
 
 func TestSetRemoteDescription(t *testing.T) {
 	testCases := []struct {
-		desc SessionDescription
+		desc        SessionDescription
+		expectError bool
 	}{
-		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}},
+		{SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer}, false},
+		{SessionDescription{Type: 0, SDP: ""}, true},
 	}
 
 	for i, testCase := range testCases {
@@ -264,8 +266,10 @@ func TestSetRemoteDescription(t *testing.T) {
 			t.Errorf("Case %d: got error: %v", i, err)
 		}
 
-		if err = peerConn.SetRemoteDescription(testCase.desc); err != nil {
-			t.Errorf("Case %d: got error: %v", i, err)
+		if testCase.expectError {
+			assert.Error(t, peerConn.SetRemoteDescription(testCase.desc))
+		} else {
+			assert.NoError(t, peerConn.SetRemoteDescription(testCase.desc))
 		}
 
 		assert.NoError(t, peerConn.Close())
