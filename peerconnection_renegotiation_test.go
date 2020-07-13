@@ -147,7 +147,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Multiple(t *testing.T) {
 		return track
 	}
 
-	trackNames := []string{util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength), util.RandSeq(trackDefaultIDLength)}
+	trackNames := []string{util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultIDLength)}
 	outboundTracks := []*Track{}
 	onTrackCount := map[string]int{}
 	onTrackChan := make(chan struct{}, 1)

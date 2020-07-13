@@ -2,20 +2,26 @@
 package util
 
 import (
-	"math/rand"
 	"strings"
-	"time"
+
+	"github.com/pion/randutil"
 )
 
-// RandSeq generates a random alpha numeric sequence of the requested length
-func RandSeq(n int) string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[r.Intn(len(letters))]
-	}
-	return string(b)
+const (
+	runesAlpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+)
+
+// Use global random generator to properly seed by crypto grade random.
+var globalMathRandomGenerator = randutil.NewMathRandomGenerator() // nolint:gochecknoglobals
+
+// MathRandAlpha generates a mathmatical random alphabet sequence of the requested length.
+func MathRandAlpha(n int) string {
+	return globalMathRandomGenerator.GenerateString(n, runesAlpha)
+}
+
+// RandUint32 generates a mathmatical random uint32.
+func RandUint32() uint32 {
+	return globalMathRandomGenerator.Uint32()
 }
 
 // FlattenErrs flattens multiple errors into one
