@@ -1736,7 +1736,10 @@ func (pc *PeerConnection) GetRegisteredRTPCodecs(kind RTPCodecType) []*RTPCodec 
 // generateUnmatchedSDP generates an SDP that doesn't take remote state into account
 // This is used for the initial call for CreateOffer
 func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDescription, error) {
-	d := sdp.NewJSEPSessionDescription(useIdentity)
+	d, err := sdp.NewJSEPSessionDescription(useIdentity)
+	if err != nil {
+		return nil, err
+	}
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -1795,7 +1798,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 // generateMatchedSDP generates a SDP and takes the remote state into account
 // this is used everytime we have a RemoteDescription
 func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
-	d := sdp.NewJSEPSessionDescription(useIdentity)
+	d, err := sdp.NewJSEPSessionDescription(useIdentity)
+	if err != nil {
+		return nil, err
+	}
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
