@@ -8,7 +8,7 @@ require (
 	github.com/pion/ice/v2 v2.0.0-rc.5
 	github.com/pion/logging v0.2.2
 	github.com/pion/quic v0.1.1
-	github.com/pion/randutil v0.0.0
+	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.3
 	github.com/pion/rtp v1.6.0
 	github.com/pion/sctp v1.7.7
