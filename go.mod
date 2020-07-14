@@ -10,7 +10,7 @@ require (
 	github.com/pion/quic v0.1.1
 	github.com/pion/randutil v0.0.0
 	github.com/pion/rtcp v1.2.3
-	github.com/pion/rtp v1.5.5
+	github.com/pion/rtp v1.6.0
 	github.com/pion/sctp v1.7.6
 	github.com/pion/sdp/v2 v2.3.9
 	github.com/pion/srtp v1.4.0
