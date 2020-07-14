@@ -101,6 +101,7 @@ func TestNew(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, pc)
+	assert.NoError(t, pc.Close())
 }
 
 func TestPeerConnection_SetConfiguration(t *testing.T) {
@@ -224,6 +225,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
 			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
+		assert.NoError(t, pc.Close())
 	}
 }
 
@@ -248,6 +250,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
+	assert.NoError(t, pc.Close())
 }
 
 const minimalOffer = `v=0
@@ -290,6 +293,7 @@ func TestSetRemoteDescription(t *testing.T) {
 		} else {
 			assert.NoError(t, peerConn.SetRemoteDescription(testCase.desc))
 		}
+		assert.NoError(t, peerConn.Close())
 	}
 }
 
@@ -324,6 +328,9 @@ func TestCreateOfferAnswer(t *testing.T) {
 	if err != nil {
 		t.Errorf("SetRemoteDescription (Originator): got error: %v", err)
 	}
+
+	assert.NoError(t, answerPeerConn.Close())
+	assert.NoError(t, offerPeerConn.Close())
 }
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
@@ -331,6 +338,11 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	assert.NoError(t, err)
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
+
+	defer func() {
+		assert.NoError(t, pcOffer.Close())
+		assert.NoError(t, pcAnswer.Close())
+	}()
 
 	// wasCalled is a list of event handlers that were called.
 	wasCalled := []string{}
@@ -448,6 +460,9 @@ func TestMultipleOfferAnswer(t *testing.T) {
 	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
+
+	assert.NoError(t, nonTricklePeerConn.Close())
+	assert.NoError(t, secondPeerConn.Close())
 }
 
 func TestNoFingerprintInFirstMediaIfSetRemoteDescription(t *testing.T) {
@@ -489,4 +504,6 @@ a=end-of-candidates
 	if err != nil {
 		t.Error(err.Error())
 	}
+
+	assert.NoError(t, pc.Close())
 }
