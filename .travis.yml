@@ -13,6 +13,7 @@ language: go
 branches:
   only:
   - master
+  - v2
 
 env:
   global:

@@ -3,9 +3,11 @@ on:
   pull_request:
     branches:
       - master
+      - v2
   push:
     branches:
       - master
+      - v2
 
 jobs:
   e2e-test:
