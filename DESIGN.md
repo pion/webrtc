@@ -1,7 +1,7 @@
 <h1 align="center">
   Design
 </h1>
-WebRTC is a powerful, but complicated technology. You can build amazing things with it comes with a steep learning curve though.
+WebRTC is a powerful, but complicated technology you can build amazing things with, it comes with a steep learning curve though.
 Using WebRTC in the browser is easy, but outside the browser is more of a challenge. There are multiple libraries, and they all have
 varying levels of quality. Most are also difficult to build, and depend on libraries that aren't available in repos or portable.
 
