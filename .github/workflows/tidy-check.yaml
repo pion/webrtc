@@ -9,7 +9,7 @@
 # https://github.com/pion/.goassets instead of this repository.
 #
 
-name: tidy check
+name: Go mod tidy check
 on:
   pull_request:
     branches:
@@ -19,7 +19,7 @@ on:
       - master
 
 jobs:
-  go-mod-tidy-check:
+  Check:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -33,5 +33,5 @@ jobs:
           if ! git diff --exit-code
           then
             echo "Not go mod tidied"
-            echo exit 1
+            exit 1
           fi
