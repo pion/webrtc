@@ -182,6 +182,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [krishna chiatanya](https://github.com/kittuov)
 * [JacobZwang](https://github.com/JacobZwang)
 * [박종훈](https://github.com/JonghunBok)
+* [Sam Lancia](https://github.com/nerd2)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
