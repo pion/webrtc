@@ -278,10 +278,10 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 }
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
-	d.setReadyState(DataChannelStateOpen)
 	d.mu.Lock()
 	d.dataChannel = dc
 	d.mu.Unlock()
+	d.setReadyState(DataChannelStateOpen)
 
 	d.onOpen()
 
