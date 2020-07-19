@@ -31,6 +31,8 @@ github.com/pion/datachannel v1.4.19 h1:IcOmm5fdDzJVCMgFYDCMtFC+lrjG78KcMYXH+gOo6
 github.com/pion/datachannel v1.4.19/go.mod h1:JzKF/zzeWgkOYwQ+KFb8JzbrUt8s63um+Qunu8VqTyw=
 github.com/pion/dtls/v2 v2.0.1 h1:ddE7+V0faYRbyh4uPsRZ2vLdRrjVZn+wmCfI7jlBfaA=
 github.com/pion/dtls/v2 v2.0.1/go.mod h1:uMQkz2W0cSqY00xav7WByQ4Hb+18xeQh2oH2fRezr5U=
+github.com/pion/dtls/v2 v2.0.2 h1:FHCHTiM182Y8e15aFTiORroiATUI16ryHiQh8AIOJ1E=
+github.com/pion/dtls/v2 v2.0.2/go.mod h1:27PEO3MDdaCfo21heT59/vsdmZc0zMt9wQPcSlLu/1I=
 github.com/pion/ice/v2 v2.0.0-rc.7 h1:vm45MlRqHWe7WwINi4a7kVsBAaadG7owHr7U/ZCGMyI=
 github.com/pion/ice/v2 v2.0.0-rc.7/go.mod h1:VvpoDXwdierv9sPB8LAV3+T33ncCt0IG2NeI+CZYmTg=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
@@ -64,6 +66,8 @@ github.com/pion/transport v0.10.1 h1:2W+yJT+0mOQ160ThZYUx5Zp2skzshiNgxrNE9GUfhJM
 github.com/pion/transport v0.10.1/go.mod h1:PBis1stIILMiis0PewDw91WJeLJkyIMcEk+DwKOzf4A=
 github.com/pion/turn/v2 v2.0.4 h1:oDguhEv2L/4rxwbL9clGLgtzQPjtuZwCdoM7Te8vQVk=
 github.com/pion/turn/v2 v2.0.4/go.mod h1:1812p4DcGVbYVBTiraUmP50XoKye++AMkbfp+N27mog=
+github.com/pion/udp v0.1.0 h1:uGxQsNyrqG3GLINv36Ff60covYmfrLoxzwnCsIYspXI=
+github.com/pion/udp v0.1.0/go.mod h1:BPELIjbwE9PRbd/zxI/KYBnbo7B6+oA6YuEaNE8lths=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
