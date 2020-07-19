@@ -780,10 +780,10 @@ wrappy@1:
   resolved "https://registry.yarnpkg.com/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-wrtc@0.4.5:
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.5.tgz#6839540904bf38f13e6e3fb27ee1448e8458bbb6"
-  integrity sha512-AEqbxwz8LX9bRrSI8UTn6bFiGj8/28nguYJ0RTk1905HZwM8Rx16D1oX0FfJHWmYHEg5XhODGcVa33d9ORHFyw==
+wrtc@0.4.6:
+  version "0.4.6"
+  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.6.tgz#909ace2cffd34e11633d4e1c20527510a12e7b5b"
+  integrity sha512-4uD+oFoY2yuo3AV9fum3cXUXR6v8YQHZlqBrKkCRGjW1BvKrVHtLNH4UaNLBLiJu9DL89WqUWmbzsQ9RxMzANw==
   dependencies:
     node-pre-gyp "^0.13.0"
   optionalDependencies:
