@@ -629,3 +629,22 @@ func getExtMapByURI(exts map[SDPSectionType][]sdp.ExtMap, uri string) *sdp.ExtMa
 	}
 	return nil
 }
+
+func getByMid(searchMid string, desc *SessionDescription) *sdp.MediaDescription {
+	for _, m := range desc.parsed.MediaDescriptions {
+		if mid, ok := m.Attribute(sdp.AttrKeyMID); ok && mid == searchMid {
+			return m
+		}
+	}
+	return nil
+}
+
+// haveDataChannel return MediaDescription with MediaName equal application
+func haveDataChannel(desc *SessionDescription) *sdp.MediaDescription {
+	for _, d := range desc.parsed.MediaDescriptions {
+		if d.MediaName.Media == mediaSectionApplication {
+			return d
+		}
+	}
+	return nil
+}

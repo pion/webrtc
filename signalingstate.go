@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
@@ -25,7 +26,7 @@ func (op stateChangeOp) String() string {
 }
 
 // SignalingState indicates the signaling state of the offer/answer process.
-type SignalingState int
+type SignalingState int32
 
 const (
 	// SignalingStateStable indicates there is no offer/answer exchange in
@@ -101,6 +102,16 @@ func (t SignalingState) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// Get thread safe read value
+func (t *SignalingState) Get() SignalingState {
+	return SignalingState(atomic.LoadInt32((*int32)(t)))
+}
+
+// Set thread safe write value
+func (t *SignalingState) Set(state SignalingState) {
+	atomic.StoreInt32((*int32)(t), int32(state))
 }
 
 func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) {
