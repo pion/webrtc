@@ -36,6 +36,13 @@ func (o *operations) Enqueue(op operation) {
 	}
 }
 
+// IsEmpty checks if there are tasks in the queue
+func (o *operations) IsEmpty() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return len(o.ops) == 0
+}
+
 // Done blocks until all currently enqueued operations are finished executing.
 // For more complex synchronization, use Enqueue directly.
 func (o *operations) Done() {

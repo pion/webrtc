@@ -21,6 +21,7 @@ type PeerConnection struct {
 	// syscall/js API. Initially nil.
 	onSignalingStateChangeHandler     *js.Func
 	onDataChannelHandler              *js.Func
+	onNegotiationNeededHandler        *js.Func
 	onConnectionStateChangeHandler    *js.Func
 	onICEConnectionStateChangeHandler *js.Func
 	onICECandidateHandler             *js.Func
@@ -97,6 +98,21 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 	})
 	pc.onDataChannelHandler = &onDataChannelHandler
 	pc.underlying.Set("ondatachannel", onDataChannelHandler)
+}
+
+// OnNegotiationNeeded sets an event handler which is invoked when
+// a change has occurred which requires session negotiation
+func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
+	if pc.onNegotiationNeededHandler != nil {
+		oldHandler := pc.onNegotiationNeededHandler
+		defer oldHandler.Release()
+	}
+	onNegotiationNeededHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		go f()
+		return js.Undefined()
+	})
+	pc.onNegotiationNeededHandler = &onNegotiationNeededHandler
+	pc.underlying.Set("onnegotiationneeded", onNegotiationNeededHandler)
 }
 
 // OnICEConnectionStateChange sets an event handler which is called
@@ -385,6 +401,9 @@ func (pc *PeerConnection) Close() (err error) {
 	}
 	if pc.onDataChannelHandler != nil {
 		pc.onDataChannelHandler.Release()
+	}
+	if pc.onNegotiationNeededHandler != nil {
+		pc.onNegotiationNeededHandler.Release()
 	}
 	if pc.onConnectionStateChangeHandler != nil {
 		pc.onConnectionStateChangeHandler.Release()

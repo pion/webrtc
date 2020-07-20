@@ -82,6 +82,11 @@ func (t *Track) SSRC() uint32 {
 	return t.ssrc
 }
 
+// Msid gets the Msid of the track
+func (t *Track) Msid() string {
+	return t.Label() + " " + t.ID()
+}
+
 // Codec gets the Codec of the track
 func (t *Track) Codec() *RTPCodec {
 	t.mu.RLock()
