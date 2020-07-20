@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
 
@@ -485,6 +487,147 @@ a=end-of-candidates
 	}
 
 	assert.NoError(t, pc.Close())
+}
+
+func TestNegotiationNeeded(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	pc, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	pc.OnNegotiationNeeded(wg.Done)
+	pc.CreateDataChannel("initial_data_channel", nil)
+
+	wg.Wait()
+}
+
+func TestMultipleCreateChannel(t *testing.T) {
+	var wg sync.WaitGroup
+	var once sync.Once
+	// Two OnDataChannel
+	// One OnNegotiationNeeded
+	wg.Add(3)
+
+	pcOffer, _ := NewPeerConnection(Configuration{})
+	pcAnswer, _ := NewPeerConnection(Configuration{})
+
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		wg.Done()
+	})
+
+	pcOffer.OnNegotiationNeeded(func() {
+		once.Do(func() {
+			offer, err := pcOffer.CreateOffer(nil)
+			if err != nil {
+				t.Error(err)
+			}
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			if err = pcOffer.SetLocalDescription(offer); err != nil {
+				t.Error(err)
+			}
+			<-offerGatheringComplete
+			if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
+				t.Error(err)
+			}
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			if err != nil {
+				t.Error(err)
+			}
+			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+			if err = pcAnswer.SetLocalDescription(answer); err != nil {
+				t.Error(err)
+			}
+			<-answerGatheringComplete
+			if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		})
+	})
+
+	pcOffer.CreateDataChannel("initial_data_channel_0", nil)
+	pcOffer.CreateDataChannel("initial_data_channel_1", nil)
+
+	wg.Wait()
+
+	// if pcOffer.negotiationStatus != peerConnectionNegotiationDone {
+	// 	t.Error("expected status", peerConnectionNegotiationDone, "met at", pcOffer.negotiationStatus)
+	// }
+}
+
+func TestNegotiationTrackAndChannel(t *testing.T) {
+	// lim := test.TimeOut(time.Second * 30)
+	// defer lim.Stop()
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	isMulti := make(chan bool, 1)
+
+	pcOffer, _ := NewPeerConnection(Configuration{})
+	pcAnswer, _ := NewPeerConnection(Configuration{})
+	track, _ := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+
+	pcAnswer.OnDataChannel(func(*DataChannel) {
+		wg.Done()
+		track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+
+	})
+	pcAnswer.OnTrack(func(*Track, *RTPReceiver) {
+		wg.Done()
+	})
+
+	pcOffer.OnNegotiationNeeded(func() {
+		// fmt.Println("123")
+		<-isMulti
+		offer, err := pcOffer.CreateOffer(nil)
+		if err != nil {
+			t.Error(err.Error())
+		}
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		if err = pcOffer.SetLocalDescription(offer); err != nil {
+			t.Error(err.Error())
+		}
+		<-offerGatheringComplete
+		if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
+			t.Error(err.Error())
+		}
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		if err != nil {
+			t.Error(err.Error())
+		}
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		if err = pcAnswer.SetLocalDescription(answer); err != nil {
+			t.Error(err.Error())
+		}
+		<-answerGatheringComplete
+		if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
+			t.Error(err.Error())
+		}
+		wg.Done()
+
+	})
+
+	if _, err := pcOffer.AddTrack(track); err != nil {
+		t.Error(err.Error())
+	}
+	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+		t.Error(err.Error())
+	}
+	isMulti <- true
+
+	wg.Wait()
+
+	// if pcOffer.negotiationStatus != peerConnectionNegotiationDone {
+	// 	t.Error("expected status", peerConnectionNegotiationDone, "met at", pcOffer.negotiationStatus)
+	// }
 }
 
 // Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription

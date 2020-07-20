@@ -11,6 +11,7 @@ type operation func()
 type operations struct {
 	mu   sync.Mutex
 	busy bool
+	done func()
 	ops  []operation
 }
 
@@ -34,6 +35,10 @@ func (o *operations) Enqueue(op operation) {
 	if !running {
 		go o.start()
 	}
+}
+
+func (o *operations) isEmpty() bool {
+	return len(o.ops) == 0
 }
 
 // Done blocks until all currently enqueued operations are finished executing.
@@ -60,21 +65,22 @@ func (o *operations) pop() func() {
 }
 
 func (o *operations) start() {
-	defer func() {
-		o.mu.Lock()
-		defer o.mu.Unlock()
-		if len(o.ops) == 0 {
-			o.busy = false
-			return
-		}
-		// either a new operation was enqueued while we
-		// were busy, or an operation panicked
-		go o.start()
-	}()
-
 	fn := o.pop()
 	for fn != nil {
 		fn()
 		fn = o.pop()
 	}
+
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if len(o.ops) == 0 {
+		o.busy = false
+		if o.done != nil {
+			go o.done()
+		}
+		return
+	}
+	// either a new operation was enqueued while we
+	// were busy, or an operation panicked
+	go o.start()
 }

@@ -45,8 +45,9 @@ type PeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed          *atomicBool
-	negotiationNeeded bool
+	isClosed                                *atomicBool
+	negotiationNeeded                       bool
+	UpdateNegotiationNeededFlagOnEmptyChain bool
 
 	lastOffer  string
 	lastAnswer string
@@ -64,6 +65,7 @@ type PeerConnection struct {
 	onConnectionStateChangeHandler    func(PeerConnectionState)
 	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
+	onNegotiationNeededHandler        func()
 
 	iceGatherer   *ICEGatherer
 	iceTransport  *ICETransport
@@ -91,7 +93,6 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// allow better readability to understand what is happening.
 	pc := &PeerConnection{
 		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
-		ops:     newOperations(),
 		configuration: Configuration{
 			ICEServers:           []ICEServer{},
 			ICETransportPolicy:   ICETransportPolicyAll,
@@ -112,6 +113,18 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
+
+	ops := newOperations()
+	ops.done = func() {
+		if pc.isClosed.get() {
+			return
+		}
+		if pc.UpdateNegotiationNeededFlagOnEmptyChain {
+			pc.UpdateNegotiationNeededFlagOnEmptyChain = false
+			pc.onNegotiationNeeded()
+		}
+	}
+	pc.ops = ops
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
@@ -239,6 +252,94 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	pc.onDataChannelHandler = f
+}
+
+// OnNegotiationNeeded sets an event handler which is invoked when
+// a change has occurred which requires session negotiation
+func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	pc.onNegotiationNeededHandler = f
+}
+
+func (pc *PeerConnection) onNegotiationNeeded() {
+	// It is mix
+	// https://www.w3.org/TR/webrtc/#updating-the-negotiation-needed-flag
+	// https://w3c.github.io/webrtc-pc/#updating-the-negotiation-needed-flag
+	// Step 1
+	if !pc.ops.isEmpty() {
+		pc.UpdateNegotiationNeededFlagOnEmptyChain = true
+		return
+	}
+
+	pc.ops.Enqueue(func() {
+		// Step 2.1
+		if pc.isClosed.get() {
+			return
+		}
+		// Step 2.2
+		if !pc.ops.isEmpty() {
+			pc.UpdateNegotiationNeededFlagOnEmptyChain = true
+			return
+		}
+		// Step 2.3
+		if pc.signalingState != SignalingStateStable {
+			return
+		}
+
+		// Step 2.4
+		if !pc.checkNegotiationNeeded() {
+			pc.negotiationNeeded = false
+			return
+		}
+
+		// Step 2.5
+		if pc.negotiationNeeded {
+			return
+		}
+
+		// Step 2.6
+		pc.negotiationNeeded = true
+		// Step 2.7
+		if pc.onNegotiationNeededHandler != nil {
+			go pc.onNegotiationNeededHandler()
+		}
+	})
+}
+
+func (pc *PeerConnection) checkNegotiationNeeded() bool {
+	// To check if negotiation is needed for connection, perform the following checks:
+	// Skip 1, 2 steps
+	// Step 3
+	localDesc := pc.currentLocalDescription
+
+	if localDesc == nil {
+		return true
+	}
+
+	if len(pc.sctpTransport.dataChannels) != 0 && len(localDesc.parsed.MediaDescriptions) == 0 {
+		return true
+	}
+
+	midMedia := make(map[string]*sdp.MediaDescription)
+	for _, m := range localDesc.parsed.MediaDescriptions {
+		if mid, ok := m.Attribute("mid"); ok {
+			midMedia[mid] = m
+		}
+	}
+
+	for _, t := range pc.GetTransceivers() {
+		if t.stoping && !t.stopped {
+			return true
+		}
+		if _, ok := midMedia[t.Mid()]; !t.stopped && !ok {
+			return true
+		}
+		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
+		// Ignore step 5.3.1-5.3.3
+		// Ignore step 5.4
+	}
+	return false
 }
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
@@ -694,6 +795,10 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 
 	if err == nil {
 		pc.signalingState = nextState
+		if pc.signalingState == SignalingStateStable {
+			pc.negotiationNeeded = false
+			pc.onNegotiationNeeded()
+		}
 		pc.onSignalingStateChange(nextState)
 	}
 	return err
@@ -1222,6 +1327,8 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, err
 	}
 
+	pc.onNegotiationNeeded()
+
 	return transceiver.Sender(), nil
 }
 
@@ -1422,6 +1529,8 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
+	pc.onNegotiationNeeded()
+
 	return d, nil
 }
 
@@ -1477,7 +1586,9 @@ func (pc *PeerConnection) Close() error {
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
 	for _, t := range pc.rtpTransceivers {
-		closeErrs = append(closeErrs, t.Stop())
+		if !t.stopped {
+			closeErrs = append(closeErrs, t.Stop())
+		}
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
@@ -1532,8 +1643,11 @@ func (pc *PeerConnection) newRTPTransceiver(
 	t.setDirection(direction)
 
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
+	pc.mu.Unlock()
+
+	pc.onNegotiationNeeded()
+
 	return t
 }
 
