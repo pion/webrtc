@@ -29,11 +29,12 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
-	iceTransport      *ICETransport
-	certificates      []Certificate
-	remoteParameters  DTLSParameters
-	remoteCertificate []byte
-	state             DTLSTransportState
+	iceTransport          *ICETransport
+	certificates          []Certificate
+	remoteParameters      DTLSParameters
+	remoteCertificate     []byte
+	state                 DTLSTransportState
+	srtpProtectionProfile srtp.ProtectionProfile
 
 	onStateChangeHdlr func(DTLSTransportState)
 
@@ -153,7 +154,7 @@ func (t *DTLSTransport) startSRTP() error {
 	}
 
 	srtpConfig := &srtp.Config{
-		Profile:       srtp.ProtectionProfileAes128CmHmacSha1_80,
+		Profile:       t.srtpProtectionProfile,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
 	if t.api.settingEngine.replayProtection.SRTP != nil {
@@ -288,7 +289,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 					Certificate: [][]byte{cert.x509Cert.Raw},
 					PrivateKey:  cert.privateKey,
 				}},
-			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
+			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_128_GCM, dtls.SRTP_AES128_CM_HMAC_SHA1_80},
 			ClientAuth:             dtls.RequireAnyClientCert,
 			LoggerFactory:          t.api.settingEngine.LoggerFactory,
 			InsecureSkipVerify:     true,
@@ -321,6 +322,22 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	if err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
 		return err
+	}
+
+	srtpProfile, ok := dtlsConn.SelectedSRTPProtectionProfile()
+	if !ok {
+		t.onStateChange(DTLSTransportStateFailed)
+		return ErrNoSRTPProtectionProfile
+	}
+
+	switch srtpProfile {
+	case dtls.SRTP_AEAD_AES_128_GCM:
+		t.srtpProtectionProfile = srtp.ProtectionProfileAeadAes128Gcm
+	case dtls.SRTP_AES128_CM_HMAC_SHA1_80:
+		t.srtpProtectionProfile = srtp.ProtectionProfileAes128CmHmacSha1_80
+	default:
+		t.onStateChange(DTLSTransportStateFailed)
+		return ErrNoSRTPProtectionProfile
 	}
 
 	t.conn = dtlsConn
