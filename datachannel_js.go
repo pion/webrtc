@@ -72,7 +72,7 @@ func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 		go func() {
 			// valueToDataChannelMessage may block when handling 'Blob' data
 			// so we need to call it from a new routine. See:
-			// https://godoc.org/syscall/js#FuncOf
+			// https://pkg.go.dev/syscall/js#FuncOf
 			msg := valueToDataChannelMessage(data)
 			f(msg)
 		}()
