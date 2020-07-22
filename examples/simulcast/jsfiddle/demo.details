@@ -1,0 +1,5 @@
+---
+ name: simulcast
+ description: Example of how to have Pion handle incoming track with multiple simulcast rtp streams and show all them back.
+ authors:
+   - Simone Gotti
