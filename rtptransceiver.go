@@ -5,6 +5,9 @@ package webrtc
 import (
 	"fmt"
 	"sync/atomic"
+
+	"github.com/pion/rtp"
+	"github.com/pion/sdp/v2"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
@@ -149,4 +152,28 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 	}
 
 	return nil, localTransceivers
+}
+
+// handleUnknownRTPPacket consumes a single RTP Packet and returns information that is helpful
+// for demuxing and handling an unknown SSRC (usually for Simulcast)
+func handleUnknownRTPPacket(buf []byte, sdesMidExtMap, sdesStreamIDExtMap *sdp.ExtMap) (mid, rid string, payloadType uint8, err error) {
+	rp := &rtp.Packet{}
+	if err = rp.Unmarshal(buf); err != nil {
+		return
+	}
+
+	if !rp.Header.Extension {
+		return
+	}
+
+	payloadType = rp.PayloadType
+	if payload := rp.GetExtension(uint8(sdesMidExtMap.Value)); payload != nil {
+		mid = string(payload)
+	}
+
+	if payload := rp.GetExtension(uint8(sdesStreamIDExtMap.Value)); payload != nil {
+		rid = string(payload)
+	}
+
+	return
 }
