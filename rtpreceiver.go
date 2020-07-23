@@ -11,18 +11,23 @@ import (
 	"github.com/pion/srtp"
 )
 
+// trackStreams maintains a mapping of RTP/RTCP streams to a specific track
+// a RTPReceiver may contain multiple streams if we are dealing with Multicast
+type trackStreams struct {
+	track          *Track
+	rtpReadStream  *srtp.ReadStreamSRTP
+	rtcpReadStream *srtp.ReadStreamSRTCP
+}
+
 // RTPReceiver allows an application to inspect the receipt of a Track
 type RTPReceiver struct {
 	kind      RTPCodecType
 	transport *DTLSTransport
 
-	track *Track
+	tracks []trackStreams
 
 	closed, received chan interface{}
 	mu               sync.RWMutex
-
-	rtpReadStream  *srtp.ReadStreamSRTP
-	rtcpReadStream *srtp.ReadStreamSRTCP
 
 	// A reference to the associated api object
 	api *API
@@ -40,6 +45,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		api:       api,
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
+		tracks:    []trackStreams{},
 	}, nil
 }
 
@@ -51,11 +57,28 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 	return r.transport
 }
 
-// Track returns the RTCRtpTransceiver track
+// Track returns the RtpTransceiver track
 func (r *RTPReceiver) Track() *Track {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.track
+
+	if len(r.tracks) != 1 {
+		return nil
+	}
+	return r.tracks[0].track
+}
+
+// Tracks returns the RtpTransceiver tracks
+// A RTPReceiver to support Simulcast may now have multiple tracks
+func (r *RTPReceiver) Tracks() []*Track {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tracks := []*Track{}
+	for i := range r.tracks {
+		tracks = append(tracks, r.tracks[i].track)
+	}
+	return tracks
 }
 
 // Receive initialize the track and starts all the transports
@@ -69,30 +92,32 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	}
 	defer close(r.received)
 
-	r.track = &Track{
-		kind:     r.kind,
-		ssrc:     parameters.Encodings.SSRC,
-		receiver: r,
-	}
+	if len(parameters.Encodings) == 1 && parameters.Encodings[0].SSRC != 0 {
+		t := trackStreams{
+			track: &Track{
+				kind:     r.kind,
+				ssrc:     parameters.Encodings[0].SSRC,
+				receiver: r,
+			},
+		}
 
-	srtpSession, err := r.transport.getSRTPSession()
-	if err != nil {
-		return err
-	}
+		var err error
+		t.rtpReadStream, t.rtcpReadStream, err = r.streamsForSSRC(parameters.Encodings[0].SSRC)
+		if err != nil {
+			return err
+		}
 
-	r.rtpReadStream, err = srtpSession.OpenReadStream(parameters.Encodings.SSRC)
-	if err != nil {
-		return err
-	}
-
-	srtcpSession, err := r.transport.getSRTCPSession()
-	if err != nil {
-		return err
-	}
-
-	r.rtcpReadStream, err = srtcpSession.OpenReadStream(parameters.Encodings.SSRC)
-	if err != nil {
-		return err
+		r.tracks = append(r.tracks, t)
+	} else {
+		for _, encoding := range parameters.Encodings {
+			r.tracks = append(r.tracks, trackStreams{
+				track: &Track{
+					kind:     r.kind,
+					rid:      encoding.RID,
+					receiver: r,
+				},
+			})
+		}
 	}
 
 	return nil
@@ -102,7 +127,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, err error) {
 	select {
 	case <-r.received:
-		return r.rtcpReadStream.Read(b)
+		return r.tracks[0].rtcpReadStream.Read(b)
 	case <-r.closed:
 		return 0, io.ErrClosedPipe
 	}
@@ -141,13 +166,11 @@ func (r *RTPReceiver) Stop() error {
 
 	select {
 	case <-r.received:
-		if r.rtcpReadStream != nil {
-			if err := r.rtcpReadStream.Close(); err != nil {
+		for i := range r.tracks {
+			if err := r.tracks[i].rtcpReadStream.Close(); err != nil {
 				return err
 			}
-		}
-		if r.rtpReadStream != nil {
-			if err := r.rtpReadStream.Close(); err != nil {
+			if err := r.tracks[i].rtpReadStream.Close(); err != nil {
 				return err
 			}
 		}
@@ -158,8 +181,72 @@ func (r *RTPReceiver) Stop() error {
 	return nil
 }
 
+func (r *RTPReceiver) streamsForTrack(t *Track) *trackStreams {
+	for i := range r.tracks {
+		if r.tracks[i].track == t {
+			return &r.tracks[i]
+		}
+	}
+	return nil
+}
+
 // readRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPReceiver) readRTP(b []byte) (n int, err error) {
+func (r *RTPReceiver) readRTP(b []byte, reader *Track) (n int, err error) {
 	<-r.received
-	return r.rtpReadStream.Read(b)
+	if t := r.streamsForTrack(reader); t != nil {
+		return t.rtpReadStream.Read(b)
+	}
+
+	return 0, fmt.Errorf("unable to find stream for Track with SSRC(%d)", reader.SSRC())
+}
+
+// receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
+// It populates all the internal state for the given RID
+func (r *RTPReceiver) receiveForRid(rid string, codec *RTPCodec, ssrc uint32) (*Track, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range r.tracks {
+		if r.tracks[i].track.RID() == rid {
+			r.tracks[i].track.mu.Lock()
+			r.tracks[i].track.kind = codec.Type
+			r.tracks[i].track.codec = codec
+			r.tracks[i].track.ssrc = ssrc
+			r.tracks[i].track.mu.Unlock()
+
+			var err error
+			r.tracks[i].rtpReadStream, r.tracks[i].rtcpReadStream, err = r.streamsForSSRC(ssrc)
+			if err != nil {
+				return nil, err
+			}
+
+			return r.tracks[i].track, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no trackStreams found for SSRC(%d)", ssrc)
+}
+
+func (r *RTPReceiver) streamsForSSRC(ssrc uint32) (*srtp.ReadStreamSRTP, *srtp.ReadStreamSRTCP, error) {
+	srtpSession, err := r.transport.getSRTPSession()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rtpReadStream, err := srtpSession.OpenReadStream(ssrc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	srtcpSession, err := r.transport.getSRTCPSession()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rtcpReadStream, err := srtcpSession.OpenReadStream(ssrc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rtpReadStream, rtcpReadStream, nil
 }

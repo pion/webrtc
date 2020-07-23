@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/url"
 	"time"
@@ -103,17 +102,13 @@ func main() {
 		panic(err)
 	}
 
-	// fmt.Printf("offer: %s\n", offer.SDP)
-	// Set the remote SessionDescription
-	err = peerConnection.SetRemoteDescription(offer)
-	if err != nil {
+	if err = peerConnection.SetRemoteDescription(offer); err != nil {
 		panic(err)
 	}
 
 	// Set a handler for when a new remote track starts
 	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
-		fmt.Printf("Track has started\n")
-		log.Println("Track has started", track)
+		fmt.Println("Track has started")
 
 		// Start reading from all the streams and sending them to the related output track
 		rid := track.RID()
@@ -132,10 +127,9 @@ func main() {
 			}
 		}()
 		for {
-			var readErr error
 			// Read RTP packets being sent to Pion
 			packet, readErr := track.ReadRTP()
-			if err != nil {
+			if readErr != nil {
 				panic(readErr)
 			}
 
@@ -156,8 +150,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Printf("answer: %s\n", answer.SDP)
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerConnection.SetLocalDescription(answer)
