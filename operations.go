@@ -9,10 +9,10 @@ type operation func()
 
 // Operations is a task executor.
 type operations struct {
-	mu   sync.Mutex
-	busy bool
-	done func()
-	ops  []operation
+	mu          sync.Mutex
+	busy        bool
+	busyHandler func()
+	ops         []operation
 }
 
 func newOperations() *operations {
@@ -37,8 +37,18 @@ func (o *operations) Enqueue(op operation) {
 	}
 }
 
-func (o *operations) isEmpty() bool {
+// IsEmpty checks if the queue is empty
+func (o *operations) IsEmpty() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	return len(o.ops) == 0
+}
+
+// OnBusy called when the queue is busy
+func (o *operations) OnBusy(f func()) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.busyHandler = f
 }
 
 // Done blocks until all currently enqueued operations are finished executing.
@@ -75,8 +85,8 @@ func (o *operations) start() {
 	defer o.mu.Unlock()
 	if len(o.ops) == 0 {
 		o.busy = false
-		if o.done != nil {
-			go o.done()
+		if o.busyHandler != nil {
+			go o.busyHandler()
 		}
 		return
 	}

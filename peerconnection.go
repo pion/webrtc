@@ -47,7 +47,7 @@ type PeerConnection struct {
 
 	isClosed                                *atomicBool
 	negotiationNeeded                       bool
-	UpdateNegotiationNeededFlagOnEmptyChain bool
+	updateNegotiationNeededFlagOnEmptyChain bool
 
 	lastOffer  string
 	lastAnswer string
@@ -101,6 +101,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
+		ops:                newOperations(),
 		isClosed:           &atomicBool{},
 		negotiationNeeded:  false,
 		lastOffer:          "",
@@ -114,17 +115,15 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 
-	ops := newOperations()
-	ops.done = func() {
+	pc.ops.OnBusy(func() {
 		if pc.isClosed.get() {
 			return
 		}
-		if pc.UpdateNegotiationNeededFlagOnEmptyChain {
-			pc.UpdateNegotiationNeededFlagOnEmptyChain = false
+		if pc.updateNegotiationNeededFlagOnEmptyChain {
+			pc.updateNegotiationNeededFlagOnEmptyChain = false
 			pc.onNegotiationNeeded()
 		}
-	}
-	pc.ops = ops
+	})
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
@@ -267,8 +266,8 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 	// https://www.w3.org/TR/webrtc/#updating-the-negotiation-needed-flag
 	// https://w3c.github.io/webrtc-pc/#updating-the-negotiation-needed-flag
 	// Step 1
-	if !pc.ops.isEmpty() {
-		pc.UpdateNegotiationNeededFlagOnEmptyChain = true
+	if !pc.ops.IsEmpty() {
+		pc.updateNegotiationNeededFlagOnEmptyChain = true
 		return
 	}
 
@@ -278,8 +277,8 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 			return
 		}
 		// Step 2.2
-		if !pc.ops.isEmpty() {
-			pc.UpdateNegotiationNeededFlagOnEmptyChain = true
+		if !pc.ops.IsEmpty() {
+			pc.updateNegotiationNeededFlagOnEmptyChain = true
 			return
 		}
 		// Step 2.3
@@ -312,8 +311,13 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 	// Skip 1, 2 steps
 	// Step 3
 	localDesc := pc.currentLocalDescription
+	remotDesc := pc.currentRemoteDescription
 
 	if localDesc == nil {
+		return true
+	}
+
+	if pc.sctpTransport == nil {
 		return true
 	}
 
@@ -321,24 +325,82 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 		return true
 	}
 
-	midMedia := make(map[string]*sdp.MediaDescription)
+	localMedia := make(map[string]*sdp.MediaDescription)
 	for _, m := range localDesc.parsed.MediaDescriptions {
-		if mid, ok := m.Attribute("mid"); ok {
-			midMedia[mid] = m
+		if mid, ok := m.Attribute(sdp.AttrKeyMID); ok {
+			localMedia[mid] = m
+		}
+	}
+
+	remotMedia := make(map[string]*sdp.MediaDescription)
+	for _, m := range remotDesc.parsed.MediaDescriptions {
+		if mid, ok := m.Attribute(sdp.AttrKeyMID); ok {
+			remotMedia[mid] = m
 		}
 	}
 
 	for _, t := range pc.GetTransceivers() {
+		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		if t.stoping && !t.stopped {
 			return true
 		}
-		if _, ok := midMedia[t.Mid()]; !t.stopped && !ok {
-			return true
+		m, ok := localMedia[t.Mid()]
+		if !t.stopped && ok {
+			// Step 5.3.1
+			if t.Direction().String() == "sendrecv" || t.Direction().String() == "sendonly" {
+				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
+				currMsid := t.Sender().track.Label() + " " + t.Sender().track.ID()
+				if !okMsid || descMsid != currMsid {
+					return true
+				}
+			}
+			switch localDesc.Type {
+			case SDPTypeOffer:
+				// Step 5.3.2
+				rm, ok := remotMedia[t.Mid()]
+				if !ok {
+					return true
+				}
+				_, localDirOk := m.Attribute(t.Direction().String())
+
+				var tDir RTPTransceiverDirection
+				switch t.Direction() {
+				case RTPTransceiverDirectionSendonly:
+					tDir = RTPTransceiverDirectionRecvonly
+					break
+				case RTPTransceiverDirectionRecvonly:
+					tDir = RTPTransceiverDirectionSendonly
+					break
+				default:
+					tDir = t.Direction()
+					break
+				}
+
+				_, remotDirOk := rm.Attribute(tDir.String())
+
+				if !localDirOk && !remotDirOk {
+					return true
+				}
+				break
+			case SDPTypeAnswer:
+				// Step 5.3.3
+				if _, ok := m.Attribute(t.Direction().String()); !ok {
+					return true
+				}
+				break
+			}
 		}
-		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
-		// Ignore step 5.3.1-5.3.3
-		// Ignore step 5.4
+		// Step 5.4
+		if t.stopped && t.Mid() != "" {
+			if _, ok := localMedia[t.Mid()]; !ok {
+				return true
+			}
+			if _, ok := remotMedia[t.Mid()]; !ok {
+				return true
+			}
+		}
 	}
+	// Step 6
 	return false
 }
 
@@ -1358,7 +1420,13 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) error {
 		return err
 	}
 
-	return transceiver.setSendingTrack(nil)
+	if err := transceiver.setSendingTrack(nil); err != nil {
+		return err
+	}
+
+	pc.onNegotiationNeeded()
+
+	return nil
 }
 
 // AddTransceiverFromKind Create a new RTCRtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
@@ -1394,12 +1462,16 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 			return nil, err
 		}
 
-		return pc.newRTPTransceiver(
+		t := pc.newRTPTransceiver(
 			receiver,
 			nil,
 			RTPTransceiverDirectionRecvonly,
 			kind,
-		), nil
+		)
+
+		pc.onNegotiationNeeded()
+
+		return t, nil
 	default:
 		return nil, fmt.Errorf("AddTransceiverFromKind currently only supports recvonly and sendrecv")
 	}
@@ -1430,12 +1502,14 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 			return nil, err
 		}
 
-		return pc.newRTPTransceiver(
+		t := pc.newRTPTransceiver(
 			receiver,
 			sender,
 			RTPTransceiverDirectionSendrecv,
 			track.Kind(),
-		), nil
+		)
+		pc.onNegotiationNeeded()
+		return t, nil
 
 	case RTPTransceiverDirectionSendonly:
 		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
@@ -1443,12 +1517,14 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 			return nil, err
 		}
 
-		return pc.newRTPTransceiver(
+		t := pc.newRTPTransceiver(
 			nil,
 			sender,
 			RTPTransceiverDirectionSendonly,
 			track.Kind(),
-		), nil
+		)
+		pc.onNegotiationNeeded()
+		return t, nil
 	default:
 		return nil, fmt.Errorf("AddTransceiverFromTrack currently only supports sendonly and sendrecv")
 	}

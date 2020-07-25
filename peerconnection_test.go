@@ -493,6 +493,9 @@ func TestNegotiationNeeded(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
+	report := test.CheckRoutines(t)
+	defer report()
+
 	pc, err := NewPeerConnection(Configuration{})
 	if err != nil {
 		t.Error(err.Error())
@@ -505,11 +508,16 @@ func TestNegotiationNeeded(t *testing.T) {
 	pc.CreateDataChannel("initial_data_channel", nil)
 
 	wg.Wait()
+
+	assert.NoError(t, pc.Close())
 }
 
 func TestMultipleCreateChannel(t *testing.T) {
 	var wg sync.WaitGroup
-	var once sync.Once
+
+	report := test.CheckRoutines(t)
+	defer report()
+
 	// Two OnDataChannel
 	// One OnNegotiationNeeded
 	wg.Add(3)
@@ -522,61 +530,71 @@ func TestMultipleCreateChannel(t *testing.T) {
 	})
 
 	pcOffer.OnNegotiationNeeded(func() {
-		once.Do(func() {
-			offer, err := pcOffer.CreateOffer(nil)
-			if err != nil {
-				t.Error(err)
-			}
-			offerGatheringComplete := GatheringCompletePromise(pcOffer)
-			if err = pcOffer.SetLocalDescription(offer); err != nil {
-				t.Error(err)
-			}
-			<-offerGatheringComplete
-			if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
-				t.Error(err)
-			}
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
 
-			answer, err := pcAnswer.CreateAnswer(nil)
-			if err != nil {
-				t.Error(err)
-			}
-			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-			if err = pcAnswer.SetLocalDescription(answer); err != nil {
-				t.Error(err)
-			}
-			<-answerGatheringComplete
-			if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
-				t.Error(err)
-			}
-			wg.Done()
-		})
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		if err = pcOffer.SetLocalDescription(offer); err != nil {
+			t.Error(err)
+		}
+		<-offerGatheringComplete
+		if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
+			t.Error(err)
+		}
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		if err = pcAnswer.SetLocalDescription(answer); err != nil {
+			t.Error(err)
+		}
+		<-answerGatheringComplete
+		if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
+			t.Error(err)
+		}
+		wg.Done()
 	})
 
-	pcOffer.CreateDataChannel("initial_data_channel_0", nil)
-	pcOffer.CreateDataChannel("initial_data_channel_1", nil)
+	if _, err := pcOffer.CreateDataChannel("initial_data_channel_0", nil); err != nil {
+		t.Error(err)
+	}
+
+	if _, err := pcOffer.CreateDataChannel("initial_data_channel_1", nil); err != nil {
+		t.Error(err)
+	}
 
 	wg.Wait()
 
-	// if pcOffer.negotiationStatus != peerConnectionNegotiationDone {
-	// 	t.Error("expected status", peerConnectionNegotiationDone, "met at", pcOffer.negotiationStatus)
-	// }
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestNegotiationTrackAndChannel(t *testing.T) {
-	// lim := test.TimeOut(time.Second * 30)
-	// defer lim.Stop()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
 
 	var wg sync.WaitGroup
 	wg.Add(3)
 	isMulti := make(chan bool, 1)
 
-	pcOffer, _ := NewPeerConnection(Configuration{})
-	pcAnswer, _ := NewPeerConnection(Configuration{})
-	track, _ := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	assert.NoError(t, err)
 
 	pcAnswer.OnDataChannel(func(*DataChannel) {
 		wg.Done()
-		track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+		if err := track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != nil {
+			t.Error(err.Error())
+		}
 
 	})
 	pcAnswer.OnTrack(func(*Track, *RTPReceiver) {
@@ -584,12 +602,10 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 	})
 
 	pcOffer.OnNegotiationNeeded(func() {
-		// fmt.Println("123")
 		<-isMulti
 		offer, err := pcOffer.CreateOffer(nil)
-		if err != nil {
-			t.Error(err.Error())
-		}
+		assert.NoError(t, err)
+
 		offerGatheringComplete := GatheringCompletePromise(pcOffer)
 		if err = pcOffer.SetLocalDescription(offer); err != nil {
 			t.Error(err.Error())
@@ -600,9 +616,8 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 		}
 
 		answer, err := pcAnswer.CreateAnswer(nil)
-		if err != nil {
-			t.Error(err.Error())
-		}
+		assert.NoError(t, err)
+
 		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 		if err = pcAnswer.SetLocalDescription(answer); err != nil {
 			t.Error(err.Error())
@@ -612,7 +627,6 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 			t.Error(err.Error())
 		}
 		wg.Done()
-
 	})
 
 	if _, err := pcOffer.AddTrack(track); err != nil {
@@ -624,10 +638,65 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 	isMulti <- true
 
 	wg.Wait()
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
 
-	// if pcOffer.negotiationStatus != peerConnectionNegotiationDone {
-	// 	t.Error("expected status", peerConnectionNegotiationDone, "met at", pcOffer.negotiationStatus)
-	// }
+func TestNegotiationNeededRemoveTrack(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	assert.NoError(t, err)
+
+	pcOffer.OnNegotiationNeeded(func() {
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		err = pcOffer.SetLocalDescription(offer)
+		assert.NoError(t, err)
+
+		<-offerGatheringComplete
+		pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription())
+		assert.NoError(t, err)
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		pcAnswer.SetLocalDescription(answer)
+		assert.NoError(t, err)
+
+		<-answerGatheringComplete
+		err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
+		assert.NoError(t, err)
+		wg.Done()
+	})
+
+	sender, err := pcOffer.AddTrack(track)
+	assert.NoError(t, err)
+
+	err = track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+	assert.NoError(t, err)
+
+	wg.Wait()
+
+	wg.Add(1)
+	pcOffer.RemoveTrack(sender)
+
+	wg.Wait()
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 // Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
