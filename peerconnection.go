@@ -361,22 +361,9 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 				if !ok {
 					return true
 				}
+
 				_, localDirOk := m.Attribute(t.Direction().String())
-
-				var tDir RTPTransceiverDirection
-				switch t.Direction() {
-				case RTPTransceiverDirectionSendonly:
-					tDir = RTPTransceiverDirectionRecvonly
-					break
-				case RTPTransceiverDirectionRecvonly:
-					tDir = RTPTransceiverDirectionSendonly
-					break
-				default:
-					tDir = t.Direction()
-					break
-				}
-
-				_, remotDirOk := rm.Attribute(tDir.String())
+				_, remotDirOk := rm.Attribute(t.Direction().Revers().String())
 
 				if !localDirOk && !remotDirOk {
 					return true

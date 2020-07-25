@@ -60,3 +60,14 @@ func (t RTPTransceiverDirection) String() string {
 		return ErrUnknownType.Error()
 	}
 }
+
+// Revers indicate the opposite direction
+func (t RTPTransceiverDirection) Revers() RTPTransceiverDirection {
+	switch t {
+	case RTPTransceiverDirectionSendonly:
+		return RTPTransceiverDirectionRecvonly
+	case RTPTransceiverDirectionRecvonly:
+		return RTPTransceiverDirectionSendonly
+	}
+	return t
+}
