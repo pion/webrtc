@@ -348,10 +348,9 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 		m, ok := localMedia[t.Mid()]
 		if !t.stopped && ok {
 			// Step 5.3.1
-			if t.Direction().String() == "sendrecv" || t.Direction().String() == "sendonly" {
+			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				currMsid := t.Sender().track.Label() + " " + t.Sender().track.ID()
-				if !okMsid || descMsid != currMsid {
+				if !okMsid || descMsid != t.Sender().track.Msid() {
 					return true
 				}
 			}
