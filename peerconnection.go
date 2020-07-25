@@ -961,11 +961,10 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 		}
 	}
 
+	unhandledTracks := incomingTracks[:0]
 	for i := range incomingTracks {
+		trackHandled := false
 		for j := range localTransceivers {
-			if len(incomingTracks) <= i || len(localTransceivers) <= j {
-				break
-			}
 			t := localTransceivers[j]
 			incomingTrack := incomingTracks[i]
 
@@ -980,15 +979,18 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 				continue
 			}
 
-			incomingTracks = append(incomingTracks[:i], incomingTracks[i+1:]...)
-			localTransceivers = append(localTransceivers[:j], localTransceivers[j+1:]...)
 			pc.startReceiver(incomingTrack, t.Receiver())
+			trackHandled = true
 			break
+		}
+
+		if !trackHandled {
+			unhandledTracks = append(unhandledTracks, incomingTracks[i])
 		}
 	}
 
 	if remoteIsPlanB {
-		for _, incoming := range incomingTracks {
+		for _, incoming := range unhandledTracks {
 			t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
