@@ -183,6 +183,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [JacobZwang](https://github.com/JacobZwang)
 * [박종훈](https://github.com/JonghunBok)
 * [Sam Lancia](https://github.com/nerd2)
+* [Kuzmin Vladimir](https://github.com/MrDell61) - *Add OnNegotiationNeeded*
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
