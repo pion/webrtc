@@ -505,7 +505,8 @@ func TestNegotiationNeeded(t *testing.T) {
 	wg.Add(1)
 
 	pc.OnNegotiationNeeded(wg.Done)
-	pc.CreateDataChannel("initial_data_channel", nil)
+	_, err = pc.CreateDataChannel("initial_data_channel", nil)
+	assert.NoError(t, err)
 
 	wg.Wait()
 
@@ -666,14 +667,14 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 		assert.NoError(t, err)
 
 		<-offerGatheringComplete
-		pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription())
+		err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription())
 		assert.NoError(t, err)
 
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
 
 		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-		pcAnswer.SetLocalDescription(answer)
+		err = pcAnswer.SetLocalDescription(answer)
 		assert.NoError(t, err)
 
 		<-answerGatheringComplete
@@ -691,7 +692,8 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	wg.Wait()
 
 	wg.Add(1)
-	pcOffer.RemoveTrack(sender)
+	err = pcOffer.RemoveTrack(sender)
+	assert.NoError(t, err)
 
 	wg.Wait()
 
