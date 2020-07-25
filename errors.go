@@ -119,4 +119,7 @@ var (
 	// ErrSessionDescriptionConflictingIcePwd indicates SetRemoteDescription was called with a SessionDescription that
 	// contains multiple conflicting ice-pwd values
 	ErrSessionDescriptionConflictingIcePwd = errors.New("SetRemoteDescription called with multiple conflicting ice-pwd values")
+
+	// ErrNoSRTPProtectionProfile indicates that the DTLS handshake completed and no SRTP Protection Profile was chosen
+	ErrNoSRTPProtectionProfile = errors.New("DTLS Handshake completed and no SRTP Protection Profile was chosen")
 )

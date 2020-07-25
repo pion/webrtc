@@ -213,27 +213,27 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 		tracks := trackDetailsFromSDP(nil, s)
 		assert.Equal(t, 3, len(tracks))
-		if _, ok := tracks[1000]; ok {
+		if trackDetail := trackDetailsForSSRC(tracks, 1000); trackDetail != nil {
 			assert.Fail(t, "got the unknown track ssrc:1000 which should have been skipped")
 		}
-		if track, ok := tracks[2000]; !ok {
+		if track := trackDetailsForSSRC(tracks, 2000); track == nil {
 			assert.Fail(t, "missing audio track with ssrc:2000")
 		} else {
 			assert.Equal(t, RTPCodecTypeAudio, track.kind)
 			assert.Equal(t, uint32(2000), track.ssrc)
 			assert.Equal(t, "audio_trk_label", track.label)
 		}
-		if track, ok := tracks[3000]; !ok {
+		if track := trackDetailsForSSRC(tracks, 3000); track == nil {
 			assert.Fail(t, "missing video track with ssrc:3000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)
 			assert.Equal(t, uint32(3000), track.ssrc)
 			assert.Equal(t, "video_trk_label", track.label)
 		}
-		if _, ok := tracks[4000]; ok {
+		if track := trackDetailsForSSRC(tracks, 4000); track != nil {
 			assert.Fail(t, "got the rtx track ssrc:3000 which should have been skipped")
 		}
-		if track, ok := tracks[5000]; !ok {
+		if track := trackDetailsForSSRC(tracks, 5000); track == nil {
 			assert.Fail(t, "missing video track with ssrc:5000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)

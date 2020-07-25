@@ -4,6 +4,7 @@ package webrtc
 // This is a subset of the RFC since Pion WebRTC doesn't implement encoding/decoding itself
 // http://draft.ortc.org/#dom-rtcrtpcodingparameters
 type RTPCodingParameters struct {
+	RID         string `json:"rid"`
 	SSRC        uint32 `json:"ssrc"`
 	PayloadType uint8  `json:"payloadType"`
 }

@@ -27,6 +27,7 @@ type Track struct {
 	label       string
 	ssrc        uint32
 	codec       *RTPCodec
+	rid         string
 
 	packetizer rtp.Packetizer
 
@@ -40,6 +41,16 @@ func (t *Track) ID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.id
+}
+
+// RID gets the RTP Stream ID of this Track
+// With Simulcast you will have multiple tracks with the same ID, but different RID values.
+// In many cases a Track will not have an RID, so it is important to assert it is non-zero
+func (t *Track) RID() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.rid
 }
 
 // PayloadType gets the PayloadType of the track
@@ -95,7 +106,7 @@ func (t *Track) Read(b []byte) (n int, err error) {
 	}
 	t.mu.RUnlock()
 
-	return r.readRTP(b)
+	return r.readRTP(b, t)
 }
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you

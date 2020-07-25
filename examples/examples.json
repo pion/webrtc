@@ -82,5 +82,11 @@
 		"link": "#",
 		"description": "Example custom-logger demonstrates how the user can override the logging and process messages instead of printing to stdout. It has no corresponding web page.",
 		"type": "browser"
+	},
+	{
+		"title": "Simulcast",
+		"link": "simulcast",
+		"description": "Example simulcast demonstrates how to accept and demux 1 Track that contains 3 Simulcast streams. It then returns the media as 3 independent Tracks back to the sender.",
+		"type": "browser"
 	}
 ]
