@@ -1856,7 +1856,9 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		if len(audio) > 0 {
 			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
 		}
-		mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
+		for i := uint32(0); i < pc.sctpTransport.dataChannelsRequested; i++ {
+			mediaSections = append(mediaSections, mediaSection{id: pc.sctpTransport.dataChannels[i].label, data: true})
+		}
 	} else {
 		for _, t := range pc.GetTransceivers() {
 			if t.Sender() != nil {
@@ -1865,7 +1867,9 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 		}
 
-		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+		for i := uint32(0); i < pc.sctpTransport.dataChannelsRequested; i++ {
+			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+		}
 	}
 
 	dtlsFingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
