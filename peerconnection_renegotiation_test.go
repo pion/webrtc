@@ -296,8 +296,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
 
-	// Must have 3 media descriptions (2 video and 1 datachannel)
-	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+	// Must have 3 media descriptions (2 video channels)
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 2)
 
 	assert.True(t, sdpMidHasSsrc(offer, "0", track1.SSRC()), "Expected mid %q with ssrc %d, offer.SDP: %s", "0", track1.SSRC(), offer.SDP)
 
@@ -309,7 +309,7 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	offer, err = pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
 
-	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 2)
 
 	assert.True(t, sdpMidHasSsrc(offer, "1", track2.SSRC()), "Expected mid %q with ssrc %d, offer.SDP: %s", "1", track2.SSRC(), offer.SDP)
 
@@ -332,7 +332,7 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	assert.NoError(t, err)
 
 	// We reuse the existing non-sending transceiver
-	assert.Equal(t, len(offer.parsed.MediaDescriptions), 3)
+	assert.Equal(t, len(offer.parsed.MediaDescriptions), 2)
 
 	assert.True(t, sdpMidHasSsrc(offer, "0", track3.SSRC()), "Expected mid %q with ssrc %d, offer.sdp: %s", "0", track3.SSRC(), offer.SDP)
 	assert.True(t, sdpMidHasSsrc(offer, "1", track2.SSRC()), "Expected mid %q with ssrc %d, offer.sdp: %s", "1", track2.SSRC(), offer.SDP)
@@ -552,6 +552,9 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	_, err = pcOffer.CreateDataChannel("test-channel", nil)
+	assert.NoError(t, err)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	pcOffer.OnICECandidate(func(c *ICECandidate) {
@@ -573,14 +576,14 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 		offer, err := pcOffer.CreateOffer(nil)
 		assert.NoError(t, err)
 
-		assert.NoError(t, pcOffer.SetLocalDescription(offer))
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
 
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
 
-		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	}
 	negotiate()
 	negotiate()
