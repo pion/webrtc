@@ -72,6 +72,11 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	_, err = pcOffer.CreateDataChannel("test-channel", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	answer, err := pcOffer.CreateOffer(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -129,15 +134,22 @@ func TestPeerConnection_Close_DuringICE(t *testing.T) {
 		}
 	})
 
+	_, err = pcOffer.CreateDataChannel("test-channel", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	offer, err := pcOffer.CreateOffer(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	if err = pcOffer.SetLocalDescription(offer); err != nil {
 		t.Fatal(err)
 	}
 	<-offerGatheringComplete
+
 	if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
 		t.Fatal(err)
 	}

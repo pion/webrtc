@@ -476,6 +476,9 @@ func TestUndeclaredSSRC(t *testing.T) {
 	pcOffer, pcAnswer, err := api.newPair(Configuration{})
 	assert.NoError(t, err)
 
+	_, err = pcOffer.CreateDataChannel("test-channel", nil)
+	assert.NoError(t, err)
+
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
@@ -519,6 +522,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	}
 
 	offer.SDP = filteredSDP
+
 	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
 	answer, err := pcAnswer.CreateAnswer(nil)
