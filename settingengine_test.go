@@ -3,9 +3,11 @@
 package webrtc
 
 import (
+	"net"
 	"testing"
 	"time"
 
+	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -111,4 +113,29 @@ func TestSetReplayProtection(t *testing.T) {
 		*s.replayProtection.SRTCP != 32 {
 		t.Errorf("Failed to set SRTCP replay protection window")
 	}
+}
+
+func TestSettingEngine_SetICETCP(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{})
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		_ = listener.Close()
+	}()
+
+	tcpMux := NewICETCPMux(nil, listener, 8)
+
+	defer func() {
+		_ = tcpMux.Close()
+	}()
+
+	settingEngine := SettingEngine{}
+	settingEngine.SetICETCPMux(tcpMux)
+
+	assert.Equal(t, tcpMux, settingEngine.iceTCPMux)
 }

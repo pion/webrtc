@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,7 +26,21 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 			webrtc.NetworkTypeTCP4,
 			webrtc.NetworkTypeTCP6,
 		})
-		settingEngine.SetICETCPPort(8443)
+
+		var tcpListener net.Listener
+		tcpListener, err = net.ListenTCP("tcp", &net.TCPAddr{
+			IP:   net.IP{0, 0, 0, 0},
+			Port: 8443,
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("Listening for ICE TCP at %s\n", tcpListener.Addr())
+
+		tcpMux := webrtc.NewICETCPMux(nil, tcpListener, 8)
+		settingEngine.SetICETCPMux(tcpMux)
 
 		api := webrtc.NewAPI(
 			webrtc.WithMediaEngine(m),

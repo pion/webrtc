@@ -56,7 +56,7 @@ type SettingEngine struct {
 	disableSRTCPReplayProtection              bool
 	vnet                                      *vnet.Net
 	LoggerFactory                             logging.LoggerFactory
-	iceTCPPort                                int
+	iceTCPMux                                 ice.TCPMux
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -243,10 +243,10 @@ func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints b
 	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
 }
 
-// SetICETCPPort to a non-zero value enables ICE-TCP listener. This API is experimental and
-// is likely to change in the future.
-func (e *SettingEngine) SetICETCPPort(port int) {
-	e.iceTCPPort = port
+// SetICETCPMux enables ICE-TCP when set to a non-nil value. Make sure that
+// NetworkTypeTCP4 or NetworkTypeTCP6 is enabled as well.
+func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
+	e.iceTCPMux = tcpMux
 }
 
 // AddSDPExtensions adds available and offered extensions for media type.
