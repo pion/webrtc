@@ -1800,12 +1800,12 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 
 	pc.startRTPReceivers(trackDetails, currentTransceivers)
 	pc.startRTPSenders(currentTransceivers)
+	if haveApplicationMediaSection(remoteDesc.parsed) {
+		pc.startSCTP()
+	}
 
 	if !isRenegotiation {
 		pc.undeclaredMediaProcessor()
-		if haveApplicationMediaSection(remoteDesc.parsed) {
-			pc.startSCTP()
-		}
 	}
 }
 
@@ -1856,8 +1856,9 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		if len(audio) > 0 {
 			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
 		}
-		for i := uint32(0); i < pc.sctpTransport.dataChannelsRequested; i++ {
-			mediaSections = append(mediaSections, mediaSection{id: pc.sctpTransport.dataChannels[i].label, data: true})
+
+		if pc.sctpTransport.dataChannelsRequested != 0 {
+			mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 		}
 	} else {
 		for _, t := range pc.GetTransceivers() {
@@ -1867,7 +1868,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 		}
 
-		for i := uint32(0); i < pc.sctpTransport.dataChannelsRequested; i++ {
+		if pc.sctpTransport.dataChannelsRequested != 0 {
 			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
 		}
 	}
@@ -1882,6 +1883,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
 // this is used everytime we have a RemoteDescription
+// nolint: gocyclo
 func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
 	d, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
@@ -1902,6 +1904,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
 	mediaSections := []mediaSection{}
+	alreadyHaveApplicationMediaSection := false
 
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		midValue := getMidValue(media)
@@ -1911,6 +1914,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 
 		if media.MediaName.Media == mediaSectionApplication {
 			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true})
+			alreadyHaveApplicationMediaSection = true
 			continue
 		}
 
@@ -1964,12 +1968,22 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	}
 
 	// If we are offering also include unmatched local transceivers
-	if !detectedPlanB && includeUnmatched {
-		for _, t := range localTransceivers {
-			if t.Sender() != nil {
-				t.Sender().setNegotiated()
+	if includeUnmatched {
+		if !detectedPlanB {
+			for _, t := range localTransceivers {
+				if t.Sender() != nil {
+					t.Sender().setNegotiated()
+				}
+				mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 			}
-			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
+		}
+
+		if pc.sctpTransport.dataChannelsRequested != 0 && !alreadyHaveApplicationMediaSection {
+			if detectedPlanB {
+				mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
+			} else {
+				mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+			}
 		}
 	}
 

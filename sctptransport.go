@@ -26,6 +26,10 @@ type SCTPTransport struct {
 	// State represents the current state of the SCTP transport.
 	state SCTPTransportState
 
+	// SCTPTransportState doesn't have an enum to distinguish between New/Connecting
+	// so we need a dedicated field
+	isStarted bool
+
 	// MaxMessageSize represents the maximum size of data that can be passed to
 	// DataChannel's send() method.
 	maxMessageSize float64
@@ -88,6 +92,11 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
 func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
+	if r.isStarted {
+		return nil
+	}
+	r.isStarted = true
+
 	if err := r.ensureDTLS(); err != nil {
 		return err
 	}
