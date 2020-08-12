@@ -711,3 +711,67 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+func TestAddDataChannelDuringRenegotation(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(track)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+	_, err = pcOffer.CreateDataChannel("data-channel", nil)
+	assert.NoError(t, err)
+
+	// Assert that DataChannel is in offer now
+	offer, err = pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	applicationMediaSectionCount := 0
+	for _, d := range offer.parsed.MediaDescriptions {
+		if d.MediaName.Media == mediaSectionApplication {
+			applicationMediaSectionCount++
+		}
+	}
+	assert.Equal(t, applicationMediaSectionCount, 1)
+
+	onDataChannelFired, onDataChannelFiredFunc := context.WithCancel(context.Background())
+	pcAnswer.OnDataChannel(func(*DataChannel) {
+		onDataChannelFiredFunc()
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	<-onDataChannelFired.Done()
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
