@@ -1378,7 +1378,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 	}
 }
 
-// AddTransceiverFromTrack Creates a new send only transceiver and add it to the set of
+// AddTransceiverFromTrack Get RTPCodecType from track and creates a new RTCRtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
 func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
