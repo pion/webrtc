@@ -107,7 +107,7 @@ func main() {
 	}
 
 	// Set a handler for when a new remote track starts
-	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver, streams []*webrtc.Stream) {
 		fmt.Println("Track has started")
 
 		// Start reading from all the streams and sending them to the related output track

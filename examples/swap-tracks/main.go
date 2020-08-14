@@ -91,7 +91,7 @@ func main() {
 	packets := make(chan *rtp.Packet, 60)
 
 	// Set a handler for when a new remote track starts
-	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver, streams []*webrtc.Stream) {
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().Name)
 		trackNum := trackCount
 		trackCount++

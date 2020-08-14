@@ -70,7 +70,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 	trackMetadataValid := make(chan error)
 
-	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver, streams []*Stream) {
 		if track.ID() != expectedTrackID {
 			trackMetadataValid <- fmt.Errorf("Incoming Track ID is invalid expected(%s) actual(%s)", expectedTrackID, track.ID())
 			return
@@ -100,7 +100,8 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}()
 
 		go func() {
-			_, routineErr := receiver.Read(make([]byte, 1400))
+			t := streams[0].GetTrackByID(expectedTrackID)
+			_, routineErr := t.receiver.Read(make([]byte, 1400))
 			if routineErr != nil {
 				awaitRTCPReceiverRecv <- routineErr
 			} else {
@@ -251,7 +252,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	var onTrackFiredLock sync.Mutex
 	onTrackFired := false
 
-	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver, streams []*Stream) {
 		onTrackFiredLock.Lock()
 		defer onTrackFiredLock.Unlock()
 		onTrackFired = true
@@ -416,7 +417,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	}
 
 	answerChan := make(chan *Track)
-	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
+	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver, s []*Stream) {
 		answerChan <- t
 	})
 
@@ -489,7 +490,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	assert.NoError(t, err)
 
 	onTrackFired := make(chan *Track)
-	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
+	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver, s []*Stream) {
 		close(onTrackFired)
 	})
 
@@ -1068,7 +1069,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 
 		var onTrackWaitGroup sync.WaitGroup
 		onTrackWaitGroup.Add(trackCount)
-		pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+		pcAnswer.OnTrack(func(track *Track, r *RTPReceiver, s []*Stream) {
 			onTrackWaitGroup.Done()
 		})
 
