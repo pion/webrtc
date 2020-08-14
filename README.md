@@ -185,6 +185,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Sam Lancia](https://github.com/nerd2)
 * [Henry](https://github.com/cryptix)
 * [Jeff Tchang](https://github.com/tachang)
+* [JooYoung](https://github.com/DevRockstarZ)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
