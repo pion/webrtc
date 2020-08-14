@@ -25,7 +25,7 @@
 
 Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
 
-Until `v3.0.0` has been tagged using `v2` is suggested. The last `v2` release is [v2.2.17](https://github.com/pion/webrtc/releases/tag/v2.2.17)
+Until `v3.0.0` has been tagged using `v2` is suggested. Check the [tags](https://github.com/pion/webrtc/tags) for the latest `v2` release.
 
 [Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
 
@@ -184,6 +184,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [박종훈](https://github.com/JonghunBok)
 * [Sam Lancia](https://github.com/nerd2)
 * [Henry](https://github.com/cryptix)
+* [Jeff Tchang](https://github.com/tachang)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
