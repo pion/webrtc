@@ -168,14 +168,15 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 		return io.ErrClosedPipe
 	}
 
+	var firstErr error
 	for _, s := range senders {
 		_, err := s.SendRTP(&p.Header, p.Payload)
-		if err != nil {
-			return err
+		if err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
 
-	return nil
+	return firstErr
 }
 
 // NewTrack initializes a new *Track
