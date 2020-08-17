@@ -459,8 +459,8 @@ func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	return newPeerConnectionState(rawState)
 }
 
-func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
-	pc.onGatherCompleteHandler = hdlr
+func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
+	pc.onGatherCompleteHandler = handler
 
 	// If no onIceCandidate handler has been set provide an empty one
 	// otherwise our onGatherCompleteHandler will not be executed

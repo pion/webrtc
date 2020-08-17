@@ -87,10 +87,10 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 			// Change the registered handler a couple of times to make sure
 			// that everything continues to work, we don't lose messages, etc.
 			if i%2 == 0 {
-				hdlr := func(msg DataChannelMessage) {
+				handler := func(msg DataChannelMessage) {
 					inner(msg)
 				}
-				dc.OnMessage(hdlr)
+				dc.OnMessage(handler)
 			}
 		}
 	}()

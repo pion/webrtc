@@ -225,12 +225,12 @@ func (d *DataChannel) OnOpen(f func()) {
 
 func (d *DataChannel) onOpen() {
 	d.mu.RLock()
-	hdlr := d.onOpenHandler
+	handler := d.onOpenHandler
 	d.mu.RUnlock()
 
-	if hdlr != nil {
+	if handler != nil {
 		go d.openHandlerOnce.Do(func() {
-			hdlr()
+			handler()
 			d.checkDetachAfterOpen()
 		})
 	}
@@ -246,11 +246,11 @@ func (d *DataChannel) OnClose(f func()) {
 
 func (d *DataChannel) onClose() {
 	d.mu.RLock()
-	hdlr := d.onCloseHandler
+	handler := d.onCloseHandler
 	d.mu.RUnlock()
 
-	if hdlr != nil {
-		go hdlr()
+	if handler != nil {
+		go handler()
 	}
 }
 
@@ -268,13 +268,13 @@ func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 
 func (d *DataChannel) onMessage(msg DataChannelMessage) {
 	d.mu.RLock()
-	hdlr := d.onMessageHandler
+	handler := d.onMessageHandler
 	d.mu.RUnlock()
 
-	if hdlr == nil {
+	if handler == nil {
 		return
 	}
-	hdlr(msg)
+	handler(msg)
 }
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
@@ -303,11 +303,11 @@ func (d *DataChannel) OnError(f func(err error)) {
 
 func (d *DataChannel) onError(err error) {
 	d.mu.RLock()
-	hdlr := d.onErrorHandler
+	handler := d.onErrorHandler
 	d.mu.RUnlock()
 
-	if hdlr != nil {
-		go hdlr(err)
+	if handler != nil {
+		go handler(err)
 	}
 }
 
