@@ -15,7 +15,7 @@ func GatheringCompletePromise(pc *PeerConnection) (gatherComplete <-chan struct{
 	if pc.ICEGatheringState() == ICEGatheringStateComplete {
 		done()
 	} else {
-		pc.setGatherCompleteHdlr(func() { done() })
+		pc.setGatherCompleteHandler(func() { done() })
 	}
 
 	return gatheringComplete.Done()

@@ -36,7 +36,7 @@ type DTLSTransport struct {
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
 
-	onStateChangeHdlr func(DTLSTransportState)
+	onStateChangeHandler func(DTLSTransportState)
 
 	conn *dtls.Conn
 
@@ -95,9 +95,9 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 // onStateChange requires the caller holds the lock
 func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
 	t.state = state
-	hdlr := t.onStateChangeHdlr
-	if hdlr != nil {
-		hdlr(state)
+	handler := t.onStateChangeHandler
+	if handler != nil {
+		handler(state)
 	}
 }
 
@@ -106,7 +106,7 @@ func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
 func (t *DTLSTransport) OnStateChange(f func(DTLSTransportState)) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.onStateChangeHdlr = f
+	t.onStateChangeHandler = f
 }
 
 // State returns the current dtls transport state.

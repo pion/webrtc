@@ -207,11 +207,11 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 
 		r.lock.Lock()
 		r.dataChannelsOpened++
-		dcOpenedHdlr := r.onDataChannelOpenedHandler
+		handler := r.onDataChannelOpenedHandler
 		r.lock.Unlock()
 
-		if dcOpenedHdlr != nil {
-			dcOpenedHdlr(rtcDC)
+		if handler != nil {
+			handler(rtcDC)
 		}
 	}
 }
@@ -226,11 +226,11 @@ func (r *SCTPTransport) OnError(f func(err error)) {
 
 func (r *SCTPTransport) onError(err error) {
 	r.lock.RLock()
-	hdlr := r.onErrorHandler
+	handler := r.onErrorHandler
 	r.lock.RUnlock()
 
-	if hdlr != nil {
-		go hdlr(err)
+	if handler != nil {
+		go handler(err)
 	}
 }
 
@@ -254,11 +254,11 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.lock.Lock()
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
-	hdlr := r.onDataChannelHandler
+	handler := r.onDataChannelHandler
 	r.lock.Unlock()
 
 	done = make(chan struct{})
-	if hdlr == nil || dc == nil {
+	if handler == nil || dc == nil {
 		close(done)
 		return
 	}
@@ -266,7 +266,7 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	// Run this synchronously to allow setup done in onDataChannelFn()
 	// to complete before datachannel event handlers might be called.
 	go func() {
-		hdlr(dc)
+		handler(dc)
 		close(done)
 	}()
 

@@ -24,11 +24,11 @@ type ICEGatherer struct {
 
 	agent *ice.Agent
 
-	onLocalCandidateHdlr atomic.Value // func(candidate *ICECandidate)
-	onStateChangeHdlr    atomic.Value // func(state ICEGathererState)
+	onLocalCandidateHandler atomic.Value // func(candidate *ICECandidate)
+	onStateChangeHandler    atomic.Value // func(state ICEGathererState)
 
 	// Used for GatheringCompletePromise
-	onGatheringCompleteHdlr atomic.Value // func()
+	onGatheringCompleteHandler atomic.Value // func()
 
 	api *API
 }
@@ -142,14 +142,14 @@ func (g *ICEGatherer) Gather() error {
 
 	g.setState(ICEGathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {
-		onLocalCandidateHdlr := func(*ICECandidate) {}
-		if hdlr, ok := g.onLocalCandidateHdlr.Load().(func(candidate *ICECandidate)); ok && hdlr != nil {
-			onLocalCandidateHdlr = hdlr
+		onLocalCandidateHandler := func(*ICECandidate) {}
+		if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
+			onLocalCandidateHandler = handler
 		}
 
-		onGatheringCompleteHdlr := func() {}
-		if hdlr, ok := g.onGatheringCompleteHdlr.Load().(func()); ok && hdlr != nil {
-			onGatheringCompleteHdlr = hdlr
+		onGatheringCompleteHandler := func() {}
+		if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
+			onGatheringCompleteHandler = handler
 		}
 
 		if candidate != nil {
@@ -158,12 +158,12 @@ func (g *ICEGatherer) Gather() error {
 				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
 				return
 			}
-			onLocalCandidateHdlr(&c)
+			onLocalCandidateHandler(&c)
 		} else {
 			g.setState(ICEGathererStateComplete)
 
-			onGatheringCompleteHdlr()
-			onLocalCandidateHdlr(nil)
+			onGatheringCompleteHandler()
+			onLocalCandidateHandler(nil)
 		}
 	}); err != nil {
 		return err
@@ -222,12 +222,12 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 // OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
 // Take note that the handler is gonna be called with a nil pointer when gathering is finished.
 func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
-	g.onLocalCandidateHdlr.Store(f)
+	g.onLocalCandidateHandler.Store(f)
 }
 
 // OnStateChange fires any time the ICEGatherer changes
 func (g *ICEGatherer) OnStateChange(f func(ICEGathererState)) {
-	g.onStateChangeHdlr.Store(f)
+	g.onStateChangeHandler.Store(f)
 }
 
 // State indicates the current state of the ICE gatherer.
@@ -238,8 +238,8 @@ func (g *ICEGatherer) State() ICEGathererState {
 func (g *ICEGatherer) setState(s ICEGathererState) {
 	atomicStoreICEGathererState(&g.state, s)
 
-	if hdlr, ok := g.onStateChangeHdlr.Load().(func(state ICEGathererState)); ok && hdlr != nil {
-		hdlr(s)
+	if handler, ok := g.onStateChangeHandler.Load().(func(state ICEGathererState)); ok && handler != nil {
+		handler(s)
 	}
 }
 

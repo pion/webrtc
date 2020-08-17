@@ -141,10 +141,10 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// Wire up the on datachannel handler
 	pc.sctpTransport.OnDataChannel(func(d *DataChannel) {
 		pc.mu.RLock()
-		hdlr := pc.onDataChannelHandler
+		handler := pc.onDataChannelHandler
 		pc.mu.RUnlock()
-		if hdlr != nil {
-			hdlr(d)
+		if handler != nil {
+			handler(d)
 		}
 	})
 
@@ -225,12 +225,12 @@ func (pc *PeerConnection) OnSignalingStateChange(f func(SignalingState)) {
 
 func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) {
 	pc.mu.RLock()
-	hdlr := pc.onSignalingStateChangeHandler
+	handler := pc.onSignalingStateChangeHandler
 	pc.mu.RUnlock()
 
 	pc.log.Infof("signaling state changed to %s", newState)
-	if hdlr != nil {
-		go hdlr(newState)
+	if handler != nil {
+		go handler(newState)
 	}
 }
 
@@ -266,12 +266,12 @@ func (pc *PeerConnection) OnTrack(f func(*Track, *RTPReceiver)) {
 
 func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) {
 	pc.mu.RLock()
-	hdlr := pc.onTrackHandler
+	handler := pc.onTrackHandler
 	pc.mu.RUnlock()
 
 	pc.log.Debugf("got new track: %+v", t)
-	if hdlr != nil && t != nil {
-		go hdlr(t, r)
+	if handler != nil && t != nil {
+		go handler(t, r)
 	}
 }
 
@@ -286,12 +286,12 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
 	pc.mu.Lock()
 	pc.iceConnectionState = cs
-	hdlr := pc.onICEConnectionStateChangeHandler
+	handler := pc.onICEConnectionStateChangeHandler
 	pc.mu.Unlock()
 
 	pc.log.Infof("ICE connection state changed: %s", cs)
-	if hdlr != nil {
-		go hdlr(cs)
+	if handler != nil {
+		go handler(cs)
 	}
 }
 
@@ -519,9 +519,9 @@ func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnection
 
 	pc.log.Infof("peer connection state changed: %s", connectionState)
 	pc.connectionState = connectionState
-	hdlr := pc.onConnectionStateChangeHandler
-	if hdlr != nil {
-		go hdlr(connectionState)
+	handler := pc.onConnectionStateChangeHandler
+	if handler != nil {
+		go handler(connectionState)
 	}
 }
 
@@ -2004,6 +2004,6 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState(), matchedSDPMap)
 }
 
-func (pc *PeerConnection) setGatherCompleteHdlr(hdlr func()) {
-	pc.iceGatherer.onGatheringCompleteHdlr.Store(hdlr)
+func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
+	pc.iceGatherer.onGatheringCompleteHandler.Store(handler)
 }

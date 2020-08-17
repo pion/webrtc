@@ -24,8 +24,8 @@ type ICETransport struct {
 	// State ICETransportState
 	// gatheringState ICEGathererState
 
-	onConnectionStateChangeHdlr       atomic.Value // func(ICETransportState)
-	onSelectedCandidatePairChangeHdlr atomic.Value // func(*ICECandidatePair)
+	onConnectionStateChangeHandler       atomic.Value // func(ICETransportState)
+	onSelectedCandidatePairChangeHandler atomic.Value // func(*ICECandidatePair)
 
 	state ICETransportState
 
@@ -185,26 +185,26 @@ func (t *ICETransport) Stop() error {
 // OnSelectedCandidatePairChange sets a handler that is invoked when a new
 // ICE candidate pair is selected
 func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) {
-	t.onSelectedCandidatePairChangeHdlr.Store(f)
+	t.onSelectedCandidatePairChangeHandler.Store(f)
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
-	hdlr := t.onSelectedCandidatePairChangeHdlr.Load()
-	if hdlr != nil {
-		hdlr.(func(*ICECandidatePair))(pair)
+	handler := t.onSelectedCandidatePairChangeHandler.Load()
+	if handler != nil {
+		handler.(func(*ICECandidatePair))(pair)
 	}
 }
 
 // OnConnectionStateChange sets a handler that is fired when the ICE
 // connection state changes.
 func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
-	t.onConnectionStateChangeHdlr.Store(f)
+	t.onConnectionStateChangeHandler.Store(f)
 }
 
 func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
-	hdlr := t.onConnectionStateChangeHdlr.Load()
-	if hdlr != nil {
-		hdlr.(func(ICETransportState))(state)
+	handler := t.onConnectionStateChangeHandler.Load()
+	if handler != nil {
+		handler.(func(ICETransportState))(state)
 	}
 }
 
