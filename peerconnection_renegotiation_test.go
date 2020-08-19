@@ -849,7 +849,6 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 
 func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	var wg sync.WaitGroup
-	wg.Add(1)
 
 	report := test.CheckRoutines(t)
 	defer report()
@@ -863,26 +862,11 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	assert.NoError(t, err)
 
 	pcOffer.OnNegotiationNeeded(func() {
-		offer, createOfferErr := pcOffer.CreateOffer(nil)
-		assert.NoError(t, createOfferErr)
-
-		offerGatheringComplete := GatheringCompletePromise(pcOffer)
-		assert.NoError(t, pcOffer.SetLocalDescription(offer))
-
-		<-offerGatheringComplete
-		assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
-
-		answer, createAnswerErr := pcAnswer.CreateAnswer(nil)
-		assert.NoError(t, createAnswerErr)
-
-		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-
-		<-answerGatheringComplete
-		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
-		wg.Done()
+		defer wg.Done()
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 	})
 
+	wg.Add(1)
 	sender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
 
@@ -899,4 +883,63 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
+}
+
+// Assert that adding multiple tracks triggers OnNegoitationNeeded once and OnTrack on remote is called for each track
+func TestPeerConnection_NegotiationNeeded_AddTrack_Multiple(t *testing.T) {
+	trackNames := []string{util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultIDLength)}
+	onTrackCount := map[string]int{}
+	outboundTracks := []*Track{}
+	var mu sync.RWMutex
+
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+
+	pcAnswer.OnTrack(func(track *Track, r *RTPReceiver) {
+		mu.Lock()
+		defer mu.Unlock()
+		onTrackCount[track.Label()]++
+
+		if onTrackCount[trackNames[0]] == 1 && onTrackCount[trackNames[1]] == 1 {
+			close(done)
+		}
+	})
+
+	once := make(chan struct{})
+	pcOffer.OnNegotiationNeeded(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+		close(once)
+	})
+
+	for i := range trackNames {
+		track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), trackNames[i], trackNames[i])
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(track)
+		assert.NoError(t, err)
+
+		outboundTracks = append(outboundTracks, track)
+	}
+
+	sendVideoUntilDone(done, t, outboundTracks)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+
+	assert.Equal(t, onTrackCount[trackNames[0]], 1)
+	assert.Equal(t, onTrackCount[trackNames[1]], 1)
 }
