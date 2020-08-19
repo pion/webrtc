@@ -16,12 +16,11 @@ func TestICECandidateInit_Serialization(t *testing.T) {
 			Candidate:        "candidate:abc123",
 			SDPMid:           refString("0"),
 			SDPMLineIndex:    refUint16(0),
-			UsernameFragment: "def",
+			UsernameFragment: refString("def"),
 		}, `{"candidate":"candidate:abc123","sdpMid":"0","sdpMLineIndex":0,"usernameFragment":"def"}`},
 		{ICECandidateInit{
-			Candidate:        "candidate:abc123",
-			UsernameFragment: "def",
-		}, `{"candidate":"candidate:abc123","usernameFragment":"def"}`},
+			Candidate: "candidate:abc123",
+		}, `{"candidate":"candidate:abc123","sdpMid":null,"sdpMLineIndex":null,"usernameFragment":null}`},
 	}
 
 	for i, tc := range tt {

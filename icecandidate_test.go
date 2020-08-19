@@ -215,6 +215,7 @@ func TestICECandidate_ToJSON(t *testing.T) {
 
 	candidateInit := candidate.ToJSON()
 
-	assert.Equal(t, uint16(0), *candidateInit.SDPMLineIndex)
+	var nilUint16Ptr *uint16
+	assert.Equal(t, nilUint16Ptr, candidateInit.SDPMLineIndex)
 	assert.Equal(t, "candidate:foundation 1 udp 128 1.0.0.1 1234 typ host", candidateInit.Candidate)
 }

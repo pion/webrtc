@@ -203,9 +203,7 @@ func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
 // ToJSON returns an ICECandidateInit
 // as indicated by the spec https://w3c.github.io/webrtc-pc/#dom-rtcicecandidate-tojson
 func (c ICECandidate) ToJSON() ICECandidateInit {
-	var sdpmLineIndex uint16
 	return ICECandidateInit{
-		Candidate:     fmt.Sprintf("candidate:%s", iceCandidateToSDP(c).Marshal()),
-		SDPMLineIndex: &sdpmLineIndex,
+		Candidate: fmt.Sprintf("candidate:%s", iceCandidateToSDP(c).Marshal()),
 	}
 }

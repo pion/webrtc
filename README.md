@@ -185,7 +185,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Sam Lancia](https://github.com/nerd2)
 * [Henry](https://github.com/cryptix)
 * [Jeff Tchang](https://github.com/tachang)
-* [JooYoung](https://github.com/DevRockstarZ)
+* [JooYoung Lim](https://github.com/DevRockstarZ)
 * [Sidney San Martín](https://github.com/s4y)
 * [soolaugust](https://github.com/soolaugust)
 * [Kuzmin Vladimir](https://github.com/tekig)
