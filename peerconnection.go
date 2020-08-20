@@ -1408,7 +1408,7 @@ func (pc *PeerConnection) GetReceiversFromKind(kind RTPCodecType) (result []*RTP
 		result = pc.GetReceivers()
 	} else {
 		for _, t := range pc.rtpTransceivers {
-			if t.kind == RTPCodecTypeVideo && t.Receiver() != nil {
+			if t.kind == kind && t.Receiver() != nil {
 				result = append(result, t.Receiver())
 			}
 		}
