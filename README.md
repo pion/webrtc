@@ -189,6 +189,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Sidney San Martín](https://github.com/s4y)
 * [soolaugust](https://github.com/soolaugust)
 * [Kuzmin Vladimir](https://github.com/tekig)
+* [Alessandro Ros](https://github.com/aler9)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
