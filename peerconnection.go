@@ -1399,18 +1399,35 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 	return result
 }
 
-// GetReceivers returns the RTPReceivers that are currently attached to this PeerConnection
-func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
+// GetReceiversFromKind returns the RTPReceivers depended on codec type that are currently attached to this PeerConnection
+func (pc *PeerConnection) GetReceiversFromKind(kind RTPCodecType) (result []*RTPReceiver) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	result := []*RTPReceiver{}
+	if kind == RTPCodecType(0) {
+		result = pc.GetReceivers()
+	} else {
+		for _, t := range pc.rtpTransceivers {
+			if t.kind == RTPCodecTypeVideo && t.Receiver() != nil {
+				result = append(result, t.Receiver())
+			}
+		}
+	}
+
+	return
+}
+
+// GetReceivers returns the RTPReceivers that are currently attached to this PeerConnection
+func (pc *PeerConnection) GetReceivers() (result []*RTPReceiver) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Receiver() != nil {
 			result = append(result, transceiver.Receiver())
 		}
 	}
-	return result
+	return
 }
 
 // GetTransceivers returns the RtpTransceiver that are currently attached to this PeerConnection
