@@ -69,7 +69,7 @@ func TestICEServer_validate(t *testing.T) {
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: ICECredentialTypeOauth,
-			}, ice.ErrSTUNQuery},
+			}, &rtcerr.InvalidAccessError{Err: ice.ErrSTUNQuery}},
 		}
 
 		for i, testCase := range testCases {
