@@ -31,7 +31,7 @@ func (s ICEServer) urls() ([]*ice.URL, error) {
 	for i := range s.URLs {
 		url, err := s.parseURL(i)
 		if err != nil {
-			return nil, err
+			return nil, &rtcerr.InvalidAccessError{Err: err}
 		}
 
 		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {

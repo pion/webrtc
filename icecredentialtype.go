@@ -5,7 +5,7 @@ package webrtc
 type ICECredentialType int
 
 const (
-	// ICECredentialTypePassword describes username and pasword based
+	// ICECredentialTypePassword describes username and password based
 	// credentials as described in https://tools.ietf.org/html/rfc5389.
 	ICECredentialTypePassword ICECredentialType = iota
 
