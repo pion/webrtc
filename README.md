@@ -190,6 +190,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [soolaugust](https://github.com/soolaugust)
 * [Kuzmin Vladimir](https://github.com/tekig)
 * [Alessandro Ros](https://github.com/aler9)
+* [Thomas Miller](https://github.com/tmiv)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
