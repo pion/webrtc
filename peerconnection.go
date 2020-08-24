@@ -1400,17 +1400,16 @@ func (pc *PeerConnection) GetSenders() []*RTPSender {
 }
 
 // GetReceivers returns the RTPReceivers that are currently attached to this PeerConnection
-func (pc *PeerConnection) GetReceivers() []*RTPReceiver {
+func (pc *PeerConnection) GetReceivers() (receivers []*RTPReceiver) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	result := []*RTPReceiver{}
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Receiver() != nil {
-			result = append(result, transceiver.Receiver())
+			receivers = append(receivers, transceiver.Receiver())
 		}
 	}
-	return result
+	return
 }
 
 // GetTransceivers returns the RtpTransceiver that are currently attached to this PeerConnection
