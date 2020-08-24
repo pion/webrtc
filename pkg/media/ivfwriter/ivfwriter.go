@@ -79,11 +79,11 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 
 	packetP := vp8Packet.Payload[0] & 0x01
 
-	if (!i.seenKeyFrame && packetP == 1) {
+	if !i.seenKeyFrame && packetP == 1 {
 		return nil
 	}
 
-	if (i.currentFrame == nil && vp8Packet.S != 1) {
+	if i.currentFrame == nil && vp8Packet.S != 1 {
 		return nil
 	}
 

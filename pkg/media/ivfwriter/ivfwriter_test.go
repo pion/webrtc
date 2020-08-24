@@ -49,7 +49,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 	// Construct mid partition packet
 	rawMidPartPkt := []byte{
 		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x88, 0x36, 0xbe, 0x89, 0x9e, 
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x88, 0x36, 0xbe, 0x89, 0x9e,
 	}
 
 	midPartPacket := &rtp.Packet{
@@ -98,24 +98,24 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 
 	// Check valid packet parameters
 	vp8Packet := codecs.VP8Packet{}
-	_, err := vp8Packet.Unmarshal(validPacket.Payload);
+	_, err := vp8Packet.Unmarshal(validPacket.Payload)
 	assert.Nil(err, "Packet did not process")
-	assert.Equal( uint8(1), vp8Packet.S, "Start packet S value should be 1")
-	assert.Equal( uint8(1), uint8(vp8Packet.Payload[0] & 0x01), "Non Keyframe packet P value should be 1")
+	assert.Equal(uint8(1), vp8Packet.S, "Start packet S value should be 1")
+	assert.Equal(uint8(1), vp8Packet.Payload[0]&0x01, "Non Keyframe packet P value should be 1")
 
 	// Check mid partition packet parameters
 	vp8Packet = codecs.VP8Packet{}
-	_, err = vp8Packet.Unmarshal(midPartPacket.Payload);
+	_, err = vp8Packet.Unmarshal(midPartPacket.Payload)
 	assert.Nil(err, "Packet did not process")
-	assert.Equal( uint8(0), vp8Packet.S, "Mid Partition packet S value should be 0")
-	assert.Equal( uint8(1), uint8(vp8Packet.Payload[0] & 0x01), "Non Keyframe packet P value should be 1")
+	assert.Equal(uint8(0), vp8Packet.S, "Mid Partition packet S value should be 0")
+	assert.Equal(uint8(1), vp8Packet.Payload[0]&0x01, "Non Keyframe packet P value should be 1")
 
 	// Check keyframe packet parameters
 	vp8Packet = codecs.VP8Packet{}
-	_, err = vp8Packet.Unmarshal(keyframePacket.Payload);
+	_, err = vp8Packet.Unmarshal(keyframePacket.Payload)
 	assert.Nil(err, "Packet did not process")
-	assert.Equal( uint8(1), vp8Packet.S, "Start packet S value should be 1")
-	assert.Equal( uint8(0), uint8(vp8Packet.Payload[0] & 0x01), "Keyframe packet P value should be 0")
+	assert.Equal(uint8(1), vp8Packet.S, "Start packet S value should be 1")
+	assert.Equal(uint8(0), vp8Packet.Payload[0]&0x01, "Keyframe packet P value should be 0")
 
 	// The linter misbehave and thinks this code is the same as the tests in oggwriter_test
 	// nolint:dupl
