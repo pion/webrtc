@@ -230,5 +230,4 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			assert.Equal(res, t.closeErr, t.messageClose)
 		}
 	}
-
 }
