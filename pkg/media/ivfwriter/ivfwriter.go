@@ -77,6 +77,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 		return err
 	}
 
+	// packetP indicates if the frame is a keyframe
 	packetP := vp8Packet.Payload[0] & 0x01
 
 	if !i.seenKeyFrame && packetP == 1 {
