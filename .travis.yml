@@ -113,30 +113,30 @@ _test_wasm_job: &test_wasm_job
 jobs:
   include:
     - <<: *lint_job
-      name: Lint 1.14
-      go: 1.14
-    - <<: *test_job
-      name: Test 1.13
-      go: 1.13
+      name: Lint 1.15
+      go: 1.15
     - <<: *test_job
       name: Test 1.14
       go: 1.14
-    - <<: *test_i386_job
-      name: Test i386 1.13
-      env: GO_VERSION=1.13
-      go: 1.14  # Go version for host environment only for `go list`.
-                # All tests are done on the version specified by GO_VERSION.
+    - <<: *test_job
+      name: Test 1.15
+      go: 1.15
     - <<: *test_i386_job
       name: Test i386 1.14
       env: GO_VERSION=1.14
-      go: 1.14  # Go version for host environment only for `go list`.
+      go: 1.15  # Go version for host environment only for `go list`.
                 # All tests are done on the version specified by GO_VERSION.
-    - <<: *test_wasm_job
-      name: Test WASM 1.13
-      env: GO_VERSION=1.13
+    - <<: *test_i386_job
+      name: Test i386 1.15
+      env: GO_VERSION=1.15
+      go: 1.15  # Go version for host environment only for `go list`.
+                # All tests are done on the version specified by GO_VERSION.
     - <<: *test_wasm_job
       name: Test WASM 1.14
       env: GO_VERSION=1.14
+    - <<: *test_wasm_job
+      name: Test WASM 1.15
+      env: GO_VERSION=1.15
 
 notifications:
   email: false
