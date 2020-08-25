@@ -19,6 +19,12 @@ issues:
       text: "type RtpTransceiverInit should be RTPTransceiverInit"
       linters:
         - stylecheck
+    - text: "StreamID redeclared"
+      linters:
+        - typecheck
+    - text: "other declaration of StreamID"
+      linters:
+        - typecheck
 
 run:
   skip-dirs-use-default: false
