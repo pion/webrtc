@@ -15,6 +15,7 @@ import (
 type IVFWriter struct {
 	ioWriter     io.Writer
 	count        uint64
+	seenKeyFrame bool
 	currentFrame []byte
 }
 
@@ -39,7 +40,8 @@ func NewWith(out io.Writer) (*IVFWriter, error) {
 	}
 
 	writer := &IVFWriter{
-		ioWriter: out,
+		ioWriter:     out,
+		seenKeyFrame: false,
 	}
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
@@ -75,6 +77,15 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 		return err
 	}
 
+	isKeyFrame := vp8Packet.Payload[0] & 0x01
+	switch {
+	case !i.seenKeyFrame && isKeyFrame == 1:
+		return nil
+	case i.currentFrame == nil && vp8Packet.S != 1:
+		return nil
+	}
+
+	i.seenKeyFrame = true
 	i.currentFrame = append(i.currentFrame, vp8Packet.Payload[0:]...)
 
 	if !packet.Marker {
