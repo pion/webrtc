@@ -54,6 +54,14 @@ Now go build something awesome! Here are some **ideas** to get your creative jui
 * Record your webcam and do special effects server side.
 * Build a conferencing application that processes audio/video and make decisions off of it.
 
+### Want to learn more about WebRTC?
+Check out [WebRTC for the Curious](https://webrtcforthecurious.com). A book about WebRTC in depth, not just about the APIs.
+Learn the full details of ICE, SCTP, DTLS, SRTP, and how they work together to make up the WebRTC stack.
+
+This is also a great resource if you are trying to debug. Leran the tools of the trade and how to approach WebRTC issues.
+
+This book is vendor agnostic and will not have any Pion specific information.
+
 ### WebAssembly
 Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In
 this case the library will act as a wrapper around the JavaScript WebRTC API.
