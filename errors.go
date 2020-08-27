@@ -84,6 +84,9 @@ var (
 	// generate SDP Answers with different SDP Semantics than the received Offer
 	ErrIncorrectSDPSemantics = errors.New("offer SDP semantics does not match configuration")
 
+	// ErrIncorrectSignalingState indicates that the signaling state of PeerConnection is not correct
+	ErrIncorrectSignalingState = errors.New("operation can not be run in current signaling state")
+
 	// ErrProtocolTooLarge indicates that value given for a DataChannelInit protocol is
 	//longer then 65535 bytes
 	ErrProtocolTooLarge = errors.New("protocol is larger then 65535 bytes")

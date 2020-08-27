@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/webrtc/v3/pkg/rtcerr"
+
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -313,11 +315,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 
 	assert.True(t, sdpMidHasSsrc(offer, "1", track2.SSRC()), "Expected mid %q with ssrc %d, offer.SDP: %s", "1", track2.SSRC(), offer.SDP)
 
-	answer, err = pcAnswer.CreateAnswer(nil)
-	assert.NoError(t, err)
-	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	// apply answer so we'll test generateMatchedSDP
-	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	_, err = pcAnswer.CreateAnswer(nil)
+	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
 
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()

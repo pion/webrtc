@@ -412,6 +412,32 @@ func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
+func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerPeerConn, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	answerPeerConn, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = offerPeerConn.CreateDataChannel("test-channel", nil)
+	assert.NoError(t, err)
+
+	offer, err := offerPeerConn.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, offerPeerConn.SetLocalDescription(offer))
+
+	assert.NoError(t, answerPeerConn.SetRemoteDescription(offer))
+
+	assert.NoError(t, offerPeerConn.Close())
+	assert.NoError(t, answerPeerConn.Close())
+
+	_, err = answerPeerConn.CreateAnswer(nil)
+	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrConnectionClosed})
+}
+
 func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 	createTransceiver := func(kind RTPCodecType, direction RTPTransceiverDirection) *RTPTransceiver {
 		r := &RTPTransceiver{kind: kind}
