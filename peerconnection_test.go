@@ -301,7 +301,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	// after setLocalDescription(answer), signaling state should be stable.
 	// so CreateAnswer should return an InvalidStateError
 	assert.Equal(t, answerPeerConn.signalingState, SignalingStateStable)
-	answer, err = answerPeerConn.CreateAnswer(nil)
+	_, err = answerPeerConn.CreateAnswer(nil)
 	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
 
 	assert.NoError(t, offerPeerConn.Close())
