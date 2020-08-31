@@ -277,7 +277,9 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	if pc.isClosed.get() {
 		return
 	}
-	// non-canon step 2.2
+
+	// non-canon step 2.2. Requeue negotiationNeededOp if op chain length != 0.
+	// negotionneeded should only be run when op chain length == 0
 	if !pc.ops.IsEmpty() {
 		pc.ops.Enqueue(pc.negotiationNeededOp)
 		return
@@ -293,19 +295,25 @@ func (pc *PeerConnection) negotiationNeededOp() {
 		pc.mu.Unlock()
 	}()
 
+	// Ensure signaling state doesnt change during op execution
+	pc.mu.RLock()
+
 	// Step 2.3
 	if pc.SignalingState() != SignalingStateStable {
+		pc.mu.RUnlock()
 		return
 	}
 
 	// Step 2.4
 	if !pc.checkNegotiationNeeded() {
 		pc.negotiationNeeded = false
+		pc.mu.RUnlock()
 		return
 	}
 
 	// Step 2.5
 	if pc.negotiationNeeded {
+		pc.mu.RUnlock()
 		return
 	}
 
@@ -313,8 +321,11 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	pc.negotiationNeeded = true
 	// Step 2.7
 	if pc.onNegotiationNeededHandler != nil {
+		pc.mu.RUnlock()
 		pc.onNegotiationNeededHandler()
+		return
 	}
+	pc.mu.RUnlock()
 }
 
 func (pc *PeerConnection) checkNegotiationNeeded() bool {
@@ -340,7 +351,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 		return true
 	}
 
-	for _, t := range pc.GetTransceivers() {
+	for _, t := range pc.rtpTransceivers {
 		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		// Step 5.1
 		// if t.stoping && !t.stopped {
@@ -1414,8 +1425,8 @@ func (pc *PeerConnection) GetReceivers() (receivers []*RTPReceiver) {
 
 // GetTransceivers returns the RtpTransceiver that are currently attached to this PeerConnection
 func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
 
 	return pc.rtpTransceivers
 }
@@ -1484,9 +1495,12 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) error {
 		return err
 	}
 
+	pc.mu.Lock()
 	if err := transceiver.setSendingTrack(nil); err != nil {
+		pc.mu.Unlock()
 		return err
 	}
+	pc.mu.Unlock()
 
 	pc.onNegotiationNeeded()
 
