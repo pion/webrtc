@@ -97,7 +97,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 		return err
 	}
 	if err := agent.OnSelectedCandidatePairChange(func(local, remote ice.Candidate) {
-		candidates, err := newICECandidatesFromICE([]ice.Candidate{local, remote})
+		candidates, err := ice.NewICECandidatesFromICE([]ice.Candidate{local, remote})
 		if err != nil {
 			t.log.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
 			return
@@ -217,7 +217,7 @@ func (t *ICETransport) Role() ICERole {
 }
 
 // SetRemoteCandidates sets the sequence of candidates associated with the remote ICETransport.
-func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) error {
+func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ice.ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -231,7 +231,7 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 	}
 
 	for _, c := range remoteCandidates {
-		i, err := c.toICE()
+		i, err := c.ToICE()
 		if err != nil {
 			return err
 		}
@@ -245,7 +245,7 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 }
 
 // AddRemoteCandidate adds a candidate associated with the remote ICETransport.
-func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
+func (t *ICETransport) AddRemoteCandidate(remoteCandidate ice.ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -253,7 +253,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 		return err
 	}
 
-	c, err := remoteCandidate.toICE()
+	c, err := remoteCandidate.ToICE()
 	if err != nil {
 		return err
 	}

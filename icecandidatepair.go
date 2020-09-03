@@ -1,12 +1,15 @@
 package webrtc
 
-import "fmt"
+import (
+	"fmt"
 
+	"github.com/pion/ice/v2"
+)
 // ICECandidatePair represents an ICE Candidate pair
 type ICECandidatePair struct {
 	statsID string
-	Local   *ICECandidate
-	Remote  *ICECandidate
+	Local   *ice.ICECandidate
+	Remote  *ice.ICECandidate
 }
 
 func newICECandidatePairStatsID(localID, remoteID string) string {
@@ -19,8 +22,8 @@ func (p *ICECandidatePair) String() string {
 
 // NewICECandidatePair returns an initialized *ICECandidatePair
 // for the given pair of ICECandidate instances
-func NewICECandidatePair(local, remote *ICECandidate) *ICECandidatePair {
-	statsID := newICECandidatePairStatsID(local.statsID, remote.statsID)
+func NewICECandidatePair(local, remote *ice.ICECandidate) *ICECandidatePair {
+	statsID := newICECandidatePairStatsID(local.StatsID, remote.StatsID)
 	return &ICECandidatePair{
 		statsID: statsID,
 		Local:   local,

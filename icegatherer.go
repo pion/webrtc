@@ -74,9 +74,9 @@ func (g *ICEGatherer) createAgent() error {
 
 	var nat1To1CandiTyp ice.CandidateType
 	switch g.api.settingEngine.candidates.NAT1To1IPCandidateType {
-	case ICECandidateTypeHost:
+	case ice.ICECandidateTypeHost:
 		nat1To1CandiTyp = ice.CandidateTypeHost
-	case ICECandidateTypeSrflx:
+	case ice.ICECandidateTypeSrflx:
 		nat1To1CandiTyp = ice.CandidateTypeServerReflexive
 	default:
 		nat1To1CandiTyp = ice.CandidateTypeUnspecified
@@ -142,8 +142,8 @@ func (g *ICEGatherer) Gather() error {
 
 	g.setState(ICEGathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {
-		onLocalCandidateHandler := func(*ICECandidate) {}
-		if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
+		onLocalCandidateHandler := func(*ice.ICECandidate) {}
+		if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ice.ICECandidate)); ok && handler != nil {
 			onLocalCandidateHandler = handler
 		}
 
@@ -153,7 +153,7 @@ func (g *ICEGatherer) Gather() error {
 		}
 
 		if candidate != nil {
-			c, err := newICECandidateFromICE(candidate)
+			c, err := ice.NewICECandidateFromICE(candidate)
 			if err != nil {
 				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
 				return
@@ -207,7 +207,7 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 }
 
 // GetLocalCandidates returns the sequence of valid local candidates associated with the ICEGatherer.
-func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
+func (g *ICEGatherer) GetLocalCandidates() ([]ice.ICECandidate, error) {
 	if err := g.createAgent(); err != nil {
 		return nil, err
 	}
@@ -216,12 +216,12 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 		return nil, err
 	}
 
-	return newICECandidatesFromICE(iceCandidates)
+	return ice.NewICECandidatesFromICE(iceCandidates)
 }
 
 // OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
 // Take note that the handler is gonna be called with a nil pointer when gathering is finished.
-func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
+func (g *ICEGatherer) OnLocalCandidate(f func(*ice.ICECandidate)) {
 	g.onLocalCandidateHandler.Store(f)
 }
 
@@ -311,7 +311,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				g.log.Error(err.Error())
 			}
 
-			candidateType, err := getCandidateType(candidateStats.CandidateType)
+			candidateType, err := ice.GetCandidateType(candidateStats.CandidateType)
 			if err != nil {
 				g.log.Error(err.Error())
 			}
@@ -340,7 +340,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				g.log.Error(err.Error())
 			}
 
-			candidateType, err := getCandidateType(candidateStats.CandidateType)
+			candidateType, err := ice.GetCandidateType(candidateStats.CandidateType)
 			if err != nil {
 				g.log.Error(err.Error())
 			}

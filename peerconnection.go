@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
@@ -392,7 +393,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 // candidate is found.
 // Take note that the handler is gonna be called with a nil pointer when
 // gathering is finished.
-func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
+func (pc *PeerConnection) OnICECandidate(f func(*ice.ICECandidate)) {
 	pc.iceGatherer.OnLocalCandidate(f)
 }
 
@@ -1356,19 +1357,14 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates
-func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
+func (pc *PeerConnection) AddICECandidate(candidate ice.ICECandidateInit) error {
 	if pc.RemoteDescription() == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
 	attribute := sdp.NewAttribute("candidate", candidateValue)
-	sdpCandidate, err := attribute.ToICECandidate()
-	if err != nil {
-		return err
-	}
-
-	iceCandidate, err := newICECandidateFromSDP(sdpCandidate)
+	iceCandidate, err := attribute.ToICECandidate()
 	if err != nil {
 		return err
 	}

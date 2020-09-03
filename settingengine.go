@@ -37,7 +37,7 @@ type SettingEngine struct {
 		ICENetworkTypes                []NetworkType
 		InterfaceFilter                func(string) bool
 		NAT1To1IPs                     []string
-		NAT1To1IPCandidateType         ICECandidateType
+		NAT1To1IPCandidateType         ice.ICECandidateType
 		GenerateMulticastDNSCandidates bool
 		MulticastDNSHostName           string
 		UsernameFragment               string
@@ -151,7 +151,7 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 // with the public IP. The host candidate is still available along with mDNS
 // capabilities unaffected. Also, you cannot give STUN server URL at the same time.
 // It will result in an error otherwise.
-func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
+func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ice.ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v2"
 )
@@ -181,8 +182,8 @@ func getRids(media *sdp.MediaDescription) map[string]string {
 	return rids
 }
 
-func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription, iceGatheringState ICEGatheringState) {
-	appendCandidateIfNew := func(c sdp.ICECandidate, attributes []sdp.Attribute) {
+func addCandidatesToMediaDescriptions(candidates []ice.ICECandidate, m *sdp.MediaDescription, iceGatheringState ICEGatheringState) {
+	appendCandidateIfNew := func(c ice.ICECandidate, attributes []sdp.Attribute) {
 		marshaled := c.Marshal()
 		for _, a := range attributes {
 			if marshaled == a.Value {
@@ -194,8 +195,8 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 	}
 
 	for _, c := range candidates {
-		sdpCandidate := iceCandidateToSDP(c)
-		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
+		sdpCandidate := c
+		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, ice.ICECandidateAttribute{Key: "generation", Value: "0"})
 		sdpCandidate.Component = 1
 		appendCandidateIfNew(sdpCandidate, m.Attributes)
 
@@ -215,7 +216,7 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 	m.WithPropertyAttribute("end-of-candidates")
 }
 
-func addDataMediaSection(d *sdp.SessionDescription, dtlsFingerprints []DTLSFingerprint, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState) {
+func addDataMediaSection(d *sdp.SessionDescription, dtlsFingerprints []DTLSFingerprint, midValue string, iceParams ICEParameters, candidates []ice.ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   mediaSectionApplication,
@@ -270,7 +271,7 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, mediaSection mediaSection) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ice.ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, mediaSection mediaSection) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
@@ -354,7 +355,7 @@ type mediaSection struct {
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap) (*sdp.SessionDescription, error) {
+func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ice.ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
 
@@ -474,8 +475,8 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 	return parts[1], parts[0], nil
 }
 
-func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandidate, error) {
-	candidates := []ICECandidate{}
+func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ice.ICECandidate, error) {
+	candidates := []ice.ICECandidate{}
 	remotePwds := []string{}
 	remoteUfrags := []string{}
 
@@ -496,12 +497,7 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandi
 
 		for _, a := range m.Attributes {
 			if a.IsICECandidate() {
-				sdpCandidate, err := a.ToICECandidate()
-				if err != nil {
-					return "", "", nil, err
-				}
-
-				candidate, err := newICECandidateFromSDP(sdpCandidate)
+				candidate, err := a.ToICECandidate()
 				if err != nil {
 					return "", "", nil, err
 				}

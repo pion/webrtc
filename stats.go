@@ -1402,7 +1402,7 @@ type ICECandidateStats struct {
 	Protocol string `json:"protocol"`
 
 	// CandidateType is the "Type" field of the ICECandidate.
-	CandidateType ICECandidateType `json:"candidateType"`
+	CandidateType ice.ICECandidateType `json:"candidateType"`
 
 	// Priority is the "Priority" field of the ICECandidate.
 	Priority int32 `json:"priority"`

@@ -2,6 +2,10 @@
 
 package webrtc
 
+import (
+	"github.com/pion/ice/v2"
+)
+
 // GetConnectionStats is a helper method to return the associated stats for a given PeerConnection
 func (r StatsReport) GetConnectionStats(conn *PeerConnection) (PeerConnectionStats, bool) {
 	statsID := conn.getStatsID()
@@ -33,8 +37,8 @@ func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, boo
 }
 
 // GetICECandidateStats is a helper method to return the associated stats for a given ICECandidate
-func (r StatsReport) GetICECandidateStats(c *ICECandidate) (ICECandidateStats, bool) {
-	statsID := c.statsID
+func (r StatsReport) GetICECandidateStats(c *ice.ICECandidate) (ICECandidateStats, bool) {
+	statsID := c.StatsID
 	stats, ok := r[statsID]
 	if !ok {
 		return ICECandidateStats{}, false
