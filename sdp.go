@@ -190,8 +190,7 @@ func addCandidatesToMediaDescriptions(candidates []ice.ICECandidate, m *sdp.Medi
 				return
 			}
 		}
-
-		m.WithICECandidate(c)
+        	m.WithValueAttribute("candidate", c.Marshal())
 	}
 
 	for _, c := range candidates {
@@ -497,12 +496,14 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ice.ICEC
 
 		for _, a := range m.Attributes {
 			if a.IsICECandidate() {
-				candidate, err := a.ToICECandidate()
-				if err != nil {
-					return "", "", nil, err
-				}
+				var parsed ice.ICECandidate
+				err := parsed.Unmarshal(a.Value)
 
-				candidates = append(candidates, candidate)
+				if err != nil {
+					fmt.Errorf("failed to unmarshal to ICE Candidate: %v", err)
+				} else {
+					candidates = append(candidates, parsed)
+				}
 			}
 		}
 	}

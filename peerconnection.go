@@ -1364,12 +1364,15 @@ func (pc *PeerConnection) AddICECandidate(candidate ice.ICECandidateInit) error 
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
 	attribute := sdp.NewAttribute("candidate", candidateValue)
-	iceCandidate, err := attribute.ToICECandidate()
+
+        var parsed ice.ICECandidate
+        err := parsed.Unmarshal(attribute.Value)
+
 	if err != nil {
 		return err
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
+	return pc.iceTransport.AddRemoteCandidate(parsed)
 }
 
 // ICEConnectionState returns the ICE connection state of the
