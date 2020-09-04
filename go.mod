@@ -18,8 +18,3 @@ require (
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.6.1
 )
-
-replace (
-	github.com/pion/ice/v2 => /home/kory/Desktop/Code/RTC/pion_ice/ice
-	github.com/pion/sdp/v2 => /home/kory/Desktop/Code/RTC/pion_sdp/sdp
-)
