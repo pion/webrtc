@@ -890,11 +890,8 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 
 	wg.Wait()
 
-	wg.Add(1)
 	err = pcOffer.RemoveTrack(sender)
 	assert.NoError(t, err)
-
-	wg.Wait()
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
