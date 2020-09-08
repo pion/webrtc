@@ -1,0 +1,37 @@
+name: Lint
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+jobs:
+  lint-commit-message:
+    name: Metadata
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v2
+
+        - name: Commit Message
+          run: .github/lint-commit-message.sh
+
+        - name: File names
+          run: .github/lint-filename.sh
+
+        - name: Contributors
+          run: .github/assert-contributors.sh
+        
+        - name: Functions
+          run: .github/lint-disallowed-functions-in-library.sh
+
+  lint-go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v1
+        with:
+          version: v1.29
+          args: $GOLANGCI_LINT_EXRA_ARGS
