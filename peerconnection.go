@@ -311,6 +311,7 @@ func (pc *PeerConnection) negotiationNeededOp() {
 
 	// Step 2.6
 	pc.negotiationNeeded = true
+
 	// Step 2.7
 	if pc.onNegotiationNeededHandler != nil {
 		pc.onNegotiationNeededHandler()
@@ -711,7 +712,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	case pc.signalingState != SignalingStateHaveRemoteOffer && pc.signalingState != SignalingStateHaveLocalPranswer:
+	case pc.signalingState.Get() != SignalingStateHaveRemoteOffer && pc.signalingState.Get() != SignalingStateHaveLocalPranswer:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState}
 	}
 
@@ -1727,7 +1728,7 @@ func (pc *PeerConnection) Close() error {
 	closeErrs := make([]error, 4)
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
-	for _, t := range pc.rtpTransceivers {
+	for _, t := range pc.GetTransceivers() {
 		if !t.stopped {
 			closeErrs = append(closeErrs, t.Stop())
 		}
