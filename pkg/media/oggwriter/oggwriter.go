@@ -102,7 +102,7 @@ func (i *OggWriter) writeHeaders() error {
 	// ID Header
 	oggIDHeader := make([]byte, 19)
 
-	copy(oggIDHeader[0:], []byte(idPageSignature))                  // Magic Signature 'OpusHead'
+	copy(oggIDHeader[0:], idPageSignature)                          // Magic Signature 'OpusHead'
 	oggIDHeader[8] = 1                                              // Version
 	oggIDHeader[9] = uint8(i.channelCount)                          // Channel count
 	binary.LittleEndian.PutUint16(oggIDHeader[10:], defaultPreSkip) // pre-skip
@@ -120,10 +120,10 @@ func (i *OggWriter) writeHeaders() error {
 
 	// Comment Header
 	oggCommentHeader := make([]byte, 21)
-	copy(oggCommentHeader[0:], []byte(commentPageSignature)) // Magic Signature 'OpusTags'
-	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)   // Vendor Length
-	copy(oggCommentHeader[12:], []byte("pion"))              // Vendor name 'pion'
-	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0)  // User Comment List Length
+	copy(oggCommentHeader[0:], commentPageSignature)        // Magic Signature 'OpusTags'
+	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)  // Vendor Length
+	copy(oggCommentHeader[12:], "pion")                     // Vendor name 'pion'
+	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0) // User Comment List Length
 
 	// RFC specifies that the page where the CommentHeader completes should have a granule position of 0
 	data = i.createPage(oggCommentHeader, pageHeaderTypeContinuationOfStream, 0, i.pageIndex)
@@ -143,7 +143,7 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 	i.lastPayloadSize = len(payload)
 	page := make([]byte, pageHeaderSize+1+i.lastPayloadSize)
 
-	copy(page[0:], []byte(pageHeaderSignature))         // page headers starts with 'OggS'
+	copy(page[0:], pageHeaderSignature)                 // page headers starts with 'OggS'
 	page[4] = 0                                         // Version
 	page[5] = headerType                                // 1 = continuation, 2 = beginning of stream, 4 = end of stream
 	binary.LittleEndian.PutUint64(page[6:], granulePos) // granule position

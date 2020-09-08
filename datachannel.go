@@ -15,7 +15,7 @@ import (
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
 
-const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
+const dataChannelBufferSize = math.MaxUint16 // message size limit for Chromium
 var errSCTPNotEstablished = errors.New("SCTP not established")
 
 // DataChannel represents a WebRTC DataChannel

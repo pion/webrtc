@@ -51,10 +51,10 @@ func NewWith(out io.Writer) (*IVFWriter, error) {
 
 func (i *IVFWriter) writeHeader() error {
 	header := make([]byte, 32)
-	copy(header[0:], []byte("DKIF"))                // DKIF
+	copy(header[0:], "DKIF")                        // DKIF
 	binary.LittleEndian.PutUint16(header[4:], 0)    // Version
 	binary.LittleEndian.PutUint16(header[6:], 32)   // Header size
-	copy(header[8:], []byte("VP80"))                // FOURCC
+	copy(header[8:], "VP80")                        // FOURCC
 	binary.LittleEndian.PutUint16(header[12:], 640) // Width in pixels
 	binary.LittleEndian.PutUint16(header[14:], 480) // Height in pixels
 	binary.LittleEndian.PutUint32(header[16:], 30)  // Framerate denominator

@@ -88,7 +88,7 @@ var (
 	ErrIncorrectSignalingState = errors.New("operation can not be run in current signaling state")
 
 	// ErrProtocolTooLarge indicates that value given for a DataChannelInit protocol is
-	//longer then 65535 bytes
+	// longer then 65535 bytes
 	ErrProtocolTooLarge = errors.New("protocol is larger then 65535 bytes")
 
 	// ErrSenderNotCreatedByConnection indicates RemoveTrack was called with a RtpSender not created

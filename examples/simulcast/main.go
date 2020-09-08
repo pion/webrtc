@@ -38,7 +38,7 @@ func main() {
 		panic("Offer contained no video codecs")
 	}
 
-	//Configure required extensions
+	// Configure required extensions
 
 	sdes, _ := url.Parse(sdp.SDESRTPStreamIDURI)
 	sdedMid, _ := url.Parse(sdp.SDESMidURI)

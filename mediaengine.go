@@ -216,7 +216,7 @@ func NewRTPOpusCodec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeAudio,
 		Opus,
 		clockrate,
-		2, //According to RFC7587, Opus RTP streams must have exactly 2 channels.
+		2, // According to RFC7587, Opus RTP streams must have exactly 2 channels.
 		"minptime=10;useinbandfec=1",
 		payloadType,
 		&codecs.OpusPayloader{})

@@ -5,26 +5,34 @@ linters-settings:
     locale: US
 
 linters:
-  enable-all: true
-  disable:
-    - funlen
-    - godox
-    - lll
-    - maligned
+  enable:
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - ineffassign
+    - interfacer
+    - misspell
+    - nakedret
+    - prealloc
+    - scopelint
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
 
-issues:
-  exclude-use-default: false
-  exclude-rules:
-    - path: rtptransceiverinit
-      text: "type RtpTransceiverInit should be RTPTransceiverInit"
-      linters:
-        - stylecheck
-    - text: "StreamID redeclared"
-      linters:
-        - typecheck
-    - text: "other declaration of StreamID"
-      linters:
-        - typecheck
 
 run:
   skip-dirs-use-default: false

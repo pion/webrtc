@@ -219,7 +219,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				}
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 
-				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
 
@@ -301,7 +301,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				}
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 
-				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
 
@@ -438,7 +438,7 @@ func TestEOF(t *testing.T) {
 
 		// Use Detach data channels mode
 		s := SettingEngine{}
-		//s.DetachDataChannels()
+		// s.DetachDataChannels()
 		api := NewAPI(WithSettingEngine(s))
 
 		// Set up two peer connections.
