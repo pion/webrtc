@@ -355,7 +355,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 			// Step 5.3.1
 			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				if !okMsid || descMsid != t.Sender().track.Msid() {
+				if !okMsid || descMsid != t.Sender().Track().Msid() {
 					return true
 				}
 			}
@@ -1163,8 +1163,8 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 			err := transceiver.Sender().Send(RTPSendParameters{
 				Encodings: RTPEncodingParameters{
 					RTPCodingParameters{
-						SSRC:        transceiver.Sender().track.SSRC(),
-						PayloadType: transceiver.Sender().track.PayloadType(),
+						SSRC:        transceiver.Sender().Track().SSRC(),
+						PayloadType: transceiver.Sender().Track().PayloadType(),
 					},
 				}})
 			if err != nil {

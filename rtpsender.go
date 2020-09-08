@@ -82,6 +82,12 @@ func (r *RTPSender) Track() *Track {
 	return r.track
 }
 
+func (r *RTPSender) setTrack(track *Track) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.track = track
+}
+
 // Send Attempts to set the parameters controlling the sending of media.
 func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.mu.Lock()
