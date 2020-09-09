@@ -96,7 +96,7 @@ func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
 }
 
 func (t *RTPTransceiver) setSendingTrack(track *Track) error {
-	t.Sender().track = track
+	t.Sender().setTrack(track)
 	if track == nil {
 		t.setSender(nil)
 	}
