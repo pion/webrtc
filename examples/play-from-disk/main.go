@@ -63,7 +63,7 @@ func main() {
 		if addTrackErr != nil {
 			panic(addTrackErr)
 		}
-		if _, addTrackErr = peerConnection.AddTrack(videoTrack); err != nil {
+		if _, addTrackErr = peerConnection.AddTrack(videoTrack); addTrackErr != nil {
 			panic(addTrackErr)
 		}
 
@@ -110,7 +110,7 @@ func main() {
 		if addTrackErr != nil {
 			panic(addTrackErr)
 		}
-		if _, addTrackErr = peerConnection.AddTrack(audioTrack); err != nil {
+		if _, addTrackErr = peerConnection.AddTrack(audioTrack); addTrackErr != nil {
 			panic(addTrackErr)
 		}
 
@@ -144,7 +144,7 @@ func main() {
 				}
 
 				// The amount of samples is the difference between the last and current timestamp
-				sampleCount := float64((pageHeader.GranulePosition - lastGranule))
+				sampleCount := float64(pageHeader.GranulePosition - lastGranule)
 				lastGranule = pageHeader.GranulePosition
 
 				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Samples: uint32(sampleCount)}); oggErr != nil {
