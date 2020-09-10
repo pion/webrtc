@@ -199,6 +199,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Kuzmin Vladimir](https://github.com/tekig)
 * [Alessandro Ros](https://github.com/aler9)
 * [Thomas Miller](https://github.com/tmiv)
+* [yoko(q191201771)](https://github.com/q191201771)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
