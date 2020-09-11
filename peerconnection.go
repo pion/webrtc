@@ -310,7 +310,9 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	}
 
 	// Step 2.6
+	pc.mu.Lock()
 	pc.negotiationNeeded = true
+	pc.mu.Unlock()
 
 	// Step 2.7
 	if pc.onNegotiationNeededHandler != nil {
@@ -322,8 +324,10 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 	// To check if negotiation is needed for connection, perform the following checks:
 	// Skip 1, 2 steps
 	// Step 3
+	pc.mu.RLock()
 	localDesc := pc.currentLocalDescription
 	remoteDesc := pc.currentRemoteDescription
+	pc.mu.RUnlock()
 
 	if localDesc == nil {
 		return true
@@ -344,9 +348,9 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 	for _, t := range pc.GetTransceivers() {
 		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		// Step 5.1
-		// if t.stoping && !t.stopped {
-		// 	return true
-		// }
+		if t.stopping && !t.stopped {
+			return true
+		}
 		m := getByMid(t.Mid(), localDesc)
 		// Step 5.2
 		if !t.stopped && m == nil {
@@ -356,7 +360,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 			// Step 5.3.1
 			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				if !okMsid || descMsid != t.Sender().Track().Msid() {
+				if !okMsid || t.Sender() == nil || descMsid != t.Sender().Track().Msid() {
 					return true
 				}
 			}
@@ -845,7 +849,9 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	if err == nil {
 		pc.signalingState.Set(nextState)
 		if pc.signalingState.Get() == SignalingStateStable {
+			pc.mu.Lock()
 			pc.negotiationNeeded = false
+			pc.mu.Unlock()
 			pc.onNegotiationNeeded()
 		}
 		pc.onSignalingStateChange(nextState)
@@ -1160,16 +1166,23 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
 	for _, transceiver := range currentTransceivers {
 		// TODO(sgotti) when in future we'll avoid replacing a transceiver sender just check the transceiver negotiation status
-		if transceiver.Sender() != nil && transceiver.Sender().isNegotiated() && !transceiver.Sender().hasSent() {
-			err := transceiver.Sender().Send(RTPSendParameters{
-				Encodings: RTPEncodingParameters{
-					RTPCodingParameters{
-						SSRC:        transceiver.Sender().Track().SSRC(),
-						PayloadType: transceiver.Sender().Track().PayloadType(),
-					},
-				}})
-			if err != nil {
-				pc.log.Warnf("Failed to start Sender: %s", err)
+		sender := transceiver.Sender()
+		if sender != nil {
+			sender.mu.RLock()
+			if sender.isNegotiated() && !sender.hasSent() {
+				sender.mu.RUnlock()
+				err := sender.Send(RTPSendParameters{
+					Encodings: RTPEncodingParameters{
+						RTPCodingParameters{
+							SSRC:        sender.Track().SSRC(),
+							PayloadType: sender.Track().PayloadType(),
+						},
+					}})
+				if err != nil {
+					pc.log.Warnf("Failed to start Sender: %s", err)
+				}
+			} else {
+				sender.mu.RUnlock()
 			}
 		}
 	}

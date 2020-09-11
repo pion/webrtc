@@ -324,13 +324,19 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints
 	}
 
 	for _, mt := range transceivers {
-		if mt.Sender() != nil && mt.Sender().Track() != nil {
-			track := mt.Sender().Track()
-			media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.ID())
-			if !isPlanB {
-				media = media.WithPropertyAttribute("msid:" + track.Label() + " " + track.ID())
-				break
+		sender := mt.Sender()
+		if sender != nil {
+			sender.mu.RLock()
+			if mt.Sender().Track() != nil {
+				track := sender.Track()
+				media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.ID())
+				if !isPlanB {
+					media = media.WithPropertyAttribute("msid:" + track.Label() + " " + track.ID())
+					sender.mu.RUnlock()
+					break
+				}
 			}
+			sender.mu.RUnlock()
 		}
 	}
 

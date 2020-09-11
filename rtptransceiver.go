@@ -17,8 +17,9 @@ type RTPTransceiver struct {
 	receiver  atomic.Value // *RTPReceiver
 	direction atomic.Value // RTPTransceiverDirection
 
-	stopped bool
-	kind    RTPCodecType
+	stopped  bool
+	stopping bool
+	kind     RTPCodecType
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one
@@ -71,7 +72,14 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 }
 
 // Stop irreversibly stops the RTPTransceiver
+// https://www.w3.org/TR/webrtc/#methods-8
 func (t *RTPTransceiver) Stop() error {
+	// step 4
+	if t.stopping {
+		return nil
+	}
+
+	// step 5
 	if t.Sender() != nil {
 		if err := t.Sender().Stop(); err != nil {
 			return err
@@ -84,6 +92,7 @@ func (t *RTPTransceiver) Stop() error {
 	}
 
 	t.setDirection(RTPTransceiverDirectionInactive)
+	t.stopping = true
 	return nil
 }
 
@@ -92,6 +101,10 @@ func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 }
 
 func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
+	// https://www.w3.org/TR/webrtc/#ref-for-dfn-stopping-4
+	// if stopping {
+	// 	throw invalid state
+	// }
 	t.direction.Store(d)
 }
 

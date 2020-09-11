@@ -899,3 +899,87 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+func TestNegotiationNeededStress(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcA, pcB, err := api.newPair(Configuration{})
+	assert.NoError(t, err)
+	defer pcA.Close()
+	defer pcB.Close()
+
+	var mu sync.Mutex
+	pcA.OnNegotiationNeeded(func() {
+		mu.Lock()
+		assert.NoError(t, signalPair(pcA, pcB))
+		mu.Unlock()
+	})
+
+	pcB.OnNegotiationNeeded(func() {
+		mu.Lock()
+		assert.NoError(t, signalPair(pcB, pcA))
+		mu.Unlock()
+	})
+
+	done := make(chan bool)
+	go func() {
+		for {
+			time.Sleep(time.Duration(rand.Intn(100))*time.Millisecond + 10)
+
+			select {
+			case <-done:
+				return
+			default:
+				track, err := pcA.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+				assert.NoError(t, err)
+
+				sender, err := pcA.AddTrack(track)
+				assert.NoError(t, err)
+
+				err = track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+				assert.NoError(t, err)
+
+				go func() {
+					time.Sleep(time.Duration(rand.Intn(500))*time.Millisecond + 50)
+					assert.NoError(t, pcA.RemoveTrack(sender))
+				}()
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(time.Duration(rand.Intn(100))*time.Millisecond + 10)
+
+			select {
+			case <-done:
+				return
+			default:
+				track, err := pcB.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+				assert.NoError(t, err)
+
+				sender, err := pcB.AddTrack(track)
+				assert.NoError(t, err)
+
+				err = track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+				assert.NoError(t, err)
+
+				go func() {
+					time.Sleep(time.Duration(rand.Intn(500))*time.Millisecond + 50)
+					assert.NoError(t, pcB.RemoveTrack(sender))
+				}()
+			}
+		}
+	}()
+
+	time.Sleep(time.Duration(10) * time.Second)
+	close(done)
+	// wait for remove tracks to complete
+	time.Sleep(time.Duration(1) * time.Second)
+}
