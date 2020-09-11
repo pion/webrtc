@@ -899,3 +899,39 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+func TestNegotiationNeededStressOneSided(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcA, pcB, err := api.newPair(Configuration{})
+	assert.NoError(t, err)
+	defer pcA.Close()
+	defer pcB.Close()
+
+	pcA.OnNegotiationNeeded(func() {
+		assert.NoError(t, signalPair(pcA, pcB))
+	})
+
+	for i := 0; i < 500; i++ {
+		time.Sleep(10 * time.Millisecond)
+
+		track, err := pcA.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+		assert.NoError(t, err)
+
+		_, err = pcA.AddTrack(track)
+		assert.NoError(t, err)
+
+		err = track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
+		assert.NoError(t, err)
+	}
+
+	// Wait for async to complete otherwise dangling renegotation
+	// will occur on closed connection and throw InvalidStateError: connection closed
+	time.Sleep(time.Duration(2) * time.Second)
+}
