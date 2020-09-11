@@ -348,7 +348,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 	for _, t := range pc.GetTransceivers() {
 		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		// Step 5.1
-		// if t.stoping && !t.stopped {
+		// if t.stopping && !t.stopped {
 		// 	return true
 		// }
 		m := getByMid(t.Mid(), localDesc)
@@ -541,7 +541,23 @@ func (pc *PeerConnection) getStatsID() string {
 	return pc.statsID
 }
 
+func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) bool {
+	for _, t := range pc.GetTransceivers() {
+		m := getByMid(t.Mid(), desc)
+		if m == nil {
+			return true
+		}
+
+		if getPeerDirection(m) != t.Direction() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // CreateOffer starts the PeerConnection and generates the localDescription
+// https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
@@ -557,67 +573,90 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 	}
 
-	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
-	if pc.currentRemoteDescription != nil {
-		isPlanB = descriptionIsPlanB(pc.RemoteDescription())
-	}
-
-	// include unmatched local transceivers
-	if !isPlanB {
-		// update the greater mid if the remote description provides a greater one
-		if pc.currentRemoteDescription != nil {
-			for _, media := range pc.currentRemoteDescription.parsed.MediaDescriptions {
-				mid := getMidValue(media)
-				if mid == "" {
-					continue
-				}
-				numericMid, err := strconv.Atoi(mid)
-				if err != nil {
-					continue
-				}
-				if numericMid > pc.greaterMid {
-					pc.greaterMid = numericMid
-				}
-			}
-		}
-		for _, t := range pc.GetTransceivers() {
-			if t.Mid() != "" {
-				continue
-			}
-			pc.greaterMid++
-			err := t.setMid(strconv.Itoa(pc.greaterMid))
-			if err != nil {
-				return SessionDescription{}, err
-			}
-		}
-	}
-
 	var (
-		d   *sdp.SessionDescription
-		err error
+		d     *sdp.SessionDescription
+		offer SessionDescription
+		err   error
 	)
 
-	if pc.currentRemoteDescription == nil {
-		d, err = pc.generateUnmatchedSDP(useIdentity)
-	} else {
-		d, err = pc.generateMatchedSDP(useIdentity, true /*includeUnmatched */, connectionRoleFromDtlsRole(defaultDtlsRoleOffer))
-	}
-	if err != nil {
-		return SessionDescription{}, err
+	// This may be necessary to recompute if, for example, createOffer was called when only an
+	// audio RTCRtpTransceiver was added to connection, but while performing the in-parallel
+	// steps to create an offer, a video RTCRtpTransceiver was added, requiring additional
+	// inspection of video system resources.
+	for {
+		// We cache current transceivers to ensure they aren't
+		// mutated during offer generation. We later check if they have
+		// been mutated and recompute the offer if necessary.
+		currentTransceivers := pc.GetTransceivers()
+
+		// in-parallel steps to create an offer
+		// https://w3c.github.io/webrtc-pc/#dfn-in-parallel-steps-to-create-an-offer
+		isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
+		if pc.currentRemoteDescription != nil {
+			isPlanB = descriptionIsPlanB(pc.RemoteDescription())
+		}
+
+		// include unmatched local transceivers
+		if !isPlanB {
+			// update the greater mid if the remote description provides a greater one
+			if pc.currentRemoteDescription != nil {
+				var numericMid int
+				for _, media := range pc.currentRemoteDescription.parsed.MediaDescriptions {
+					mid := getMidValue(media)
+					if mid == "" {
+						continue
+					}
+					numericMid, err = strconv.Atoi(mid)
+					if err != nil {
+						continue
+					}
+					if numericMid > pc.greaterMid {
+						pc.greaterMid = numericMid
+					}
+				}
+			}
+			for _, t := range currentTransceivers {
+				if t.Mid() != "" {
+					continue
+				}
+				pc.greaterMid++
+				err = t.setMid(strconv.Itoa(pc.greaterMid))
+				if err != nil {
+					return SessionDescription{}, err
+				}
+			}
+		}
+
+		if pc.currentRemoteDescription == nil {
+			d, err = pc.generateUnmatchedSDP(currentTransceivers, useIdentity)
+		} else {
+			d, err = pc.generateMatchedSDP(currentTransceivers, useIdentity, true /*includeUnmatched */, connectionRoleFromDtlsRole(defaultDtlsRoleOffer))
+		}
+
+		if err != nil {
+			return SessionDescription{}, err
+		}
+
+		sdpBytes, err := d.Marshal()
+		if err != nil {
+			return SessionDescription{}, err
+		}
+
+		offer = SessionDescription{
+			Type:   SDPTypeOffer,
+			SDP:    string(sdpBytes),
+			parsed: d,
+		}
+
+		// Verify local media hasn't changed during offer
+		// generation. Recompute if necessary
+		if isPlanB || !pc.hasLocalDescriptionChanged(&offer) {
+			break
+		}
 	}
 
-	sdpBytes, err := d.Marshal()
-	if err != nil {
-		return SessionDescription{}, err
-	}
-
-	desc := SessionDescription{
-		Type:   SDPTypeOffer,
-		SDP:    string(sdpBytes),
-		parsed: d,
-	}
-	pc.lastOffer = desc.SDP
-	return desc, nil
+	pc.lastOffer = offer.SDP
+	return offer, nil
 }
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
@@ -725,7 +764,8 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
 	}
 
-	d, err := pc.generateMatchedSDP(useIdentity, false /*includeUnmatched */, connectionRole)
+	currentTransceivers := pc.GetTransceivers()
+	d, err := pc.generateMatchedSDP(currentTransceivers, useIdentity, false /*includeUnmatched */, connectionRole)
 	if err != nil {
 		return SessionDescription{}, err
 	}
@@ -1462,8 +1502,6 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, err
 	}
 
-	pc.onNegotiationNeeded()
-
 	return transceiver.Sender(), nil
 }
 
@@ -1999,7 +2037,7 @@ func (pc *PeerConnection) GetRegisteredRTPCodecs(kind RTPCodecType) []*RTPCodec 
 
 // generateUnmatchedSDP generates an SDP that doesn't take remote state into account
 // This is used for the initial call for CreateOffer
-func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDescription, error) {
+func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, useIdentity bool) (*sdp.SessionDescription, error) {
 	d, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
@@ -2022,7 +2060,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 		video := make([]*RTPTransceiver, 0)
 		audio := make([]*RTPTransceiver, 0)
 
-		for _, t := range pc.GetTransceivers() {
+		for _, t := range transceivers {
 			if t.kind == RTPCodecTypeVideo {
 				video = append(video, t)
 			} else if t.kind == RTPCodecTypeAudio {
@@ -2044,7 +2082,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 			mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 		}
 	} else {
-		for _, t := range pc.GetTransceivers() {
+		for _, t := range transceivers {
 			if t.Sender() != nil {
 				t.Sender().setNegotiated()
 			}
@@ -2067,7 +2105,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 // generateMatchedSDP generates a SDP and takes the remote state into account
 // this is used everytime we have a RemoteDescription
 // nolint: gocyclo
-func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
+func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
 	d, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
@@ -2084,7 +2122,7 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 	}
 
 	var t *RTPTransceiver
-	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+	localTransceivers := append([]*RTPTransceiver{}, transceivers...)
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
 	mediaSections := []mediaSection{}
 	alreadyHaveApplicationMediaSection := false
