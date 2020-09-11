@@ -310,7 +310,9 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	}
 
 	// Step 2.6
+	pc.mu.Lock()
 	pc.negotiationNeeded = true
+	pc.mu.Unlock()
 
 	// Step 2.7
 	if pc.onNegotiationNeededHandler != nil {
@@ -322,8 +324,10 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 	// To check if negotiation is needed for connection, perform the following checks:
 	// Skip 1, 2 steps
 	// Step 3
+	pc.mu.RLock()
 	localDesc := pc.currentLocalDescription
 	remoteDesc := pc.currentRemoteDescription
+	pc.mu.RUnlock()
 
 	if localDesc == nil {
 		return true
@@ -845,7 +849,9 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	if err == nil {
 		pc.signalingState.Set(nextState)
 		if pc.signalingState.Get() == SignalingStateStable {
+			pc.mu.Lock()
 			pc.negotiationNeeded = false
+			pc.mu.Unlock()
 			pc.onNegotiationNeeded()
 		}
 		pc.onSignalingStateChange(nextState)
