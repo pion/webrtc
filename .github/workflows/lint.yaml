@@ -34,4 +34,4 @@ jobs:
         uses: golangci/golangci-lint-action@v1
         with:
           version: v1.31
-          args: --build-tags quic
+          args: $GOLANGCI_LINT_EXRA_ARGS
