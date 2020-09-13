@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/rtp"
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.

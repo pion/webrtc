@@ -4,9 +4,7 @@ import (
 	"testing"
 
 	"github.com/pion/ice/v2"
-	"github.com/pion/sdp/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestICECandidate_Convert(t *testing.T) {
@@ -92,31 +90,37 @@ func TestICECandidate_Convert(t *testing.T) {
 		switch testCase.expectedType {
 		case ice.CandidateTypeHost:
 			config := ice.CandidateHostConfig{
-				Network:   testCase.expectedNetwork,
-				Address:   testCase.expectedAddress,
-				Port:      testCase.expectedPort,
-				Component: testCase.expectedComponent,
+				Network:    testCase.expectedNetwork,
+				Address:    testCase.expectedAddress,
+				Port:       testCase.expectedPort,
+				Component:  testCase.expectedComponent,
+				Foundation: "foundation",
+				Priority:   128,
 			}
 			expectedICE, err = ice.NewCandidateHost(&config)
 		case ice.CandidateTypeServerReflexive:
 			config := ice.CandidateServerReflexiveConfig{
-				Network:   testCase.expectedNetwork,
-				Address:   testCase.expectedAddress,
-				Port:      testCase.expectedPort,
-				Component: testCase.expectedComponent,
-				RelAddr:   testCase.expectedRelatedAddress.Address,
-				RelPort:   testCase.expectedRelatedAddress.Port,
+				Network:    testCase.expectedNetwork,
+				Address:    testCase.expectedAddress,
+				Port:       testCase.expectedPort,
+				Component:  testCase.expectedComponent,
+				Foundation: "foundation",
+				Priority:   128,
+				RelAddr:    testCase.expectedRelatedAddress.Address,
+				RelPort:    testCase.expectedRelatedAddress.Port,
 			}
 			expectedICE, err = ice.NewCandidateServerReflexive(&config)
 			assert.NoError(t, err)
 		case ice.CandidateTypePeerReflexive:
 			config := ice.CandidatePeerReflexiveConfig{
-				Network:   testCase.expectedNetwork,
-				Address:   testCase.expectedAddress,
-				Port:      testCase.expectedPort,
-				Component: testCase.expectedComponent,
-				RelAddr:   testCase.expectedRelatedAddress.Address,
-				RelPort:   testCase.expectedRelatedAddress.Port,
+				Network:    testCase.expectedNetwork,
+				Address:    testCase.expectedAddress,
+				Port:       testCase.expectedPort,
+				Component:  testCase.expectedComponent,
+				Foundation: "foundation",
+				Priority:   128,
+				RelAddr:    testCase.expectedRelatedAddress.Address,
+				RelPort:    testCase.expectedRelatedAddress.Port,
 			}
 			expectedICE, err = ice.NewCandidatePeerReflexive(&config)
 		}
@@ -129,47 +133,6 @@ func TestICECandidate_Convert(t *testing.T) {
 
 		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualICE)
 	}
-}
-
-func TestICECandidate_ConvertTCP(t *testing.T) {
-	candidate := ICECandidate{
-		Foundation: "foundation",
-		Priority:   128,
-		Address:    "1.0.0.1",
-		Protocol:   ICEProtocolTCP,
-		Port:       1234,
-		Typ:        ICECandidateTypeHost,
-		Component:  1,
-		TCPType:    "passive",
-	}
-
-	got, err := candidate.toICE()
-	require.NoError(t, err)
-
-	want, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
-		CandidateID: got.ID(),
-		Address:     "1.0.0.1",
-		Component:   1,
-		Network:     "tcp",
-		Port:        1234,
-		TCPType:     ice.TCPTypePassive,
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, want, got)
-
-	sdpCandidate := iceCandidateToSDP(candidate)
-	assert.Equal(t, []sdp.ICECandidateAttribute{
-		{
-			Key:   "tcptype",
-			Value: "passive",
-		},
-	}, sdpCandidate.ExtensionAttributes)
-
-	candidate2, err := newICECandidateFromSDP(sdpCandidate)
-	require.NoError(t, err)
-
-	assert.Equal(t, candidate, candidate2)
 }
 
 func TestConvertTypeFromICE(t *testing.T) {

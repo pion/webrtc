@@ -14,9 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
@@ -1411,13 +1412,12 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
-	attribute := sdp.NewAttribute("candidate", candidateValue)
-	sdpCandidate, err := attribute.ToICECandidate()
+	c, err := ice.UnmarshalCandidate(candidateValue)
 	if err != nil {
 		return err
 	}
 
-	iceCandidate, err := newICECandidateFromSDP(sdpCandidate)
+	iceCandidate, err := newICECandidateFromICE(c)
 	if err != nil {
 		return err
 	}

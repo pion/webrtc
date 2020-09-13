@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 	"github.com/stretchr/testify/assert"
 )
 

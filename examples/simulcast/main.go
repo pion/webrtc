@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pion/rtcp"
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
