@@ -28,6 +28,6 @@ jobs:
         with:
           git_user: Pion Bot
           git_email: 59523206+pionbot@users.noreply.github.com
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.PIONBOT_PRIVATE_KEY }}
           commit_style: squash
           push: force
