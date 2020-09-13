@@ -8,7 +8,7 @@ import (
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/vnet"
 )
 

@@ -828,6 +828,32 @@ func TestPopulateLocalCandidates(t *testing.T) {
 	})
 }
 
+// Assert that two agents that only generate mDNS candidates can connect
+func TestMulticastDNSCandidates(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.GenerateMulticastDNSCandidates(true)
+
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		onDataChannelCancel()
+	})
+	<-onDataChannel.Done()
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
+
 func TestICERestart(t *testing.T) {
 	extractCandidates := func(sdp string) (candidates []string) {
 		sc := bufio.NewScanner(strings.NewReader(sdp))

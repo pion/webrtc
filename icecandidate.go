@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/pion/ice/v2"
-	"github.com/pion/sdp/v2"
 )
 
 // ICECandidate represents a ice candidate
@@ -50,7 +49,7 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 
 	c := ICECandidate{
 		statsID:    i.ID(),
-		Foundation: "foundation",
+		Foundation: i.Foundation(),
 		Priority:   i.Priority(),
 		Address:    i.Address(),
 		Protocol:   protocol,
@@ -79,6 +78,8 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Port:        int(c.Port),
 			Component:   c.Component,
 			TCPType:     ice.NewTCPType(c.TCPType),
+			Foundation:  c.Foundation,
+			Priority:    c.Priority,
 		}
 		return ice.NewCandidateHost(&config)
 	case ICECandidateTypeSrflx:
@@ -88,6 +89,8 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Address:     c.Address,
 			Port:        int(c.Port),
 			Component:   c.Component,
+			Foundation:  c.Foundation,
+			Priority:    c.Priority,
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
@@ -99,6 +102,8 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Address:     c.Address,
 			Port:        int(c.Port),
 			Component:   c.Component,
+			Foundation:  c.Foundation,
+			Priority:    c.Priority,
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
@@ -110,6 +115,8 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Address:     c.Address,
 			Port:        int(c.Port),
 			Component:   c.Component,
+			Foundation:  c.Foundation,
+			Priority:    c.Priority,
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
@@ -142,72 +149,20 @@ func (c ICECandidate) String() string {
 	return ic.String()
 }
 
-func iceCandidateToSDP(c ICECandidate) sdp.ICECandidate {
-	var extensions []sdp.ICECandidateAttribute
-
-	if c.Protocol == ICEProtocolTCP && c.TCPType != "" {
-		extensions = append(extensions, sdp.ICECandidateAttribute{
-			Key:   "tcptype",
-			Value: c.TCPType,
-		})
-	}
-
-	return sdp.ICECandidate{
-		Foundation:          c.Foundation,
-		Priority:            c.Priority,
-		Address:             c.Address,
-		Protocol:            c.Protocol.String(),
-		Port:                c.Port,
-		Component:           c.Component,
-		Typ:                 c.Typ.String(),
-		RelatedAddress:      c.RelatedAddress,
-		RelatedPort:         c.RelatedPort,
-		ExtensionAttributes: extensions,
-	}
-}
-
-func newICECandidateFromSDP(c sdp.ICECandidate) (ICECandidate, error) {
-	typ, err := NewICECandidateType(c.Typ)
-	if err != nil {
-		return ICECandidate{}, err
-	}
-	protocol, err := NewICEProtocol(c.Protocol)
-	if err != nil {
-		return ICECandidate{}, err
-	}
-
-	var tcpType string
-	if protocol == ICEProtocolTCP {
-		for _, attr := range c.ExtensionAttributes {
-			if attr.Key == "tcptype" {
-				tcpType = attr.Value
-				break
-			}
-		}
-	}
-
-	return ICECandidate{
-		Foundation:     c.Foundation,
-		Priority:       c.Priority,
-		Address:        c.Address,
-		Protocol:       protocol,
-		Port:           c.Port,
-		Component:      c.Component,
-		Typ:            typ,
-		RelatedAddress: c.RelatedAddress,
-		RelatedPort:    c.RelatedPort,
-		TCPType:        tcpType,
-	}, nil
-}
-
 // ToJSON returns an ICECandidateInit
 // as indicated by the spec https://w3c.github.io/webrtc-pc/#dom-rtcicecandidate-tojson
 func (c ICECandidate) ToJSON() ICECandidateInit {
 	zeroVal := uint16(0)
 	emptyStr := ""
+	candidateStr := ""
+
+	candidate, err := c.toICE()
+	if err == nil {
+		candidateStr = candidate.Marshal()
+	}
 
 	return ICECandidateInit{
-		Candidate:     fmt.Sprintf("candidate:%s", iceCandidateToSDP(c).Marshal()),
+		Candidate:     fmt.Sprintf("candidate:%s", candidateStr),
 		SDPMid:        &emptyStr,
 		SDPMLineIndex: &zeroVal,
 	}

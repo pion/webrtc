@@ -1,7 +1,7 @@
 package webrtc
 
 import (
-	"github.com/pion/sdp/v2"
+	"github.com/pion/sdp/v3"
 )
 
 // DTLSRole indicates the role of the DTLS transport.
