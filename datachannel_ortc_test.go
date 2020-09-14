@@ -3,6 +3,8 @@
 package webrtc
 
 import (
+	"github.com/stretchr/testify/assert"
+	"io"
 	"testing"
 	"time"
 
@@ -75,6 +77,19 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// attempt to send when channel is closed
+	err = channelA.Send([]byte("ABC"))
+	assert.Error(t, err)
+	assert.Equal(t, io.ErrClosedPipe, err)
+
+	err = channelA.SendText("test")
+	assert.Error(t, err)
+	assert.Equal(t, io.ErrClosedPipe, err)
+
+	err = channelA.ensureOpen()
+	assert.Error(t, err)
+	assert.Equal(t, io.ErrClosedPipe, err)
 }
 
 type testORTCStack struct {

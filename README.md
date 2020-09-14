@@ -200,6 +200,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Alessandro Ros](https://github.com/aler9)
 * [Thomas Miller](https://github.com/tmiv)
 * [yoko(q191201771)](https://github.com/q191201771)
+* [Joshua Obasaju](https://github.com/obasajujoshua31)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
