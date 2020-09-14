@@ -354,7 +354,7 @@ func (d *DataChannel) ensureOpen() error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	if d.readyState != DataChannelStateOpen {
-		return &rtcerr.InvalidStateError{Err: ErrDataChannelNotOpen}
+		return io.ErrClosedPipe
 	}
 	return nil
 }
