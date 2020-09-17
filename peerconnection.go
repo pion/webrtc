@@ -1405,13 +1405,20 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 }
 
 // AddICECandidate accepts an ICE candidate string and adds it
-// to the existing set of candidates
+// to the existing set of candidates.
+// If ICE candiate string is empty, do not adds it to the existing
+// set of candidates
 func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	if pc.RemoteDescription() == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+
+	if candidateValue == "" {
+  	return nil
+	}
+
 	c, err := ice.UnmarshalCandidate(candidateValue)
 	if err != nil {
 		return err
