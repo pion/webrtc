@@ -1416,7 +1416,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
 
 	if candidateValue == "" {
-  	return nil
+		return nil
 	}
 
 	c, err := ice.UnmarshalCandidate(candidateValue)
