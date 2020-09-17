@@ -43,6 +43,9 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, opts ...Option) *SampleB
 }
 
 // Push adds an RTP Packet to s's buffer.
+//
+// Push does not copy the input. If you wish to reuse
+// this memory make sure to copy before calling Push
 func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
 
