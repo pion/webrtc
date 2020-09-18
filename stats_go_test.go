@@ -107,6 +107,13 @@ func getTransportStats(t *testing.T, report StatsReport, statsID string) Transpo
 	return transportStats
 }
 
+func getCertificateStats(t *testing.T, report StatsReport, certificate *Certificate) CertificateStats {
+	certificateStats, ok := report.GetCertificateStats(certificate)
+	assert.True(t, ok)
+	assert.Equal(t, certificateStats.Type, StatsTypeCertificate)
+	return certificateStats
+}
+
 func findLocalCandidateStats(report StatsReport) []ICECandidateStats {
 	result := []ICECandidateStats{}
 	for _, s := range report {
@@ -294,6 +301,13 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	offerSCTPTransportStats := getTransportStats(t, reportPCOffer, "sctpTransport")
 	assert.GreaterOrEqual(t, offerSCTPTransportStats.BytesSent, answerSCTPTransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerSCTPTransportStats.BytesSent, offerSCTPTransportStats.BytesReceived)
+
+	certificates := offerPC.configuration.Certificates
+
+	for _, certificate := range certificates {
+		certificateStats := getCertificateStats(t, reportPCOffer, &certificate)
+		assert.NotEmpty(t, certificateStats)
+	}
 
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())

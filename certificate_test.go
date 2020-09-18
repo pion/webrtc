@@ -65,6 +65,9 @@ func TestGenerateCertificateEqual(t *testing.T) {
 	sk1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.Nil(t, err)
 
+	sk3, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
+
 	cert1, err := GenerateCertificate(sk1)
 	assert.Nil(t, err)
 
@@ -74,8 +77,12 @@ func TestGenerateCertificateEqual(t *testing.T) {
 	cert2, err := GenerateCertificate(sk2)
 	assert.Nil(t, err)
 
+	cert3, err := GenerateCertificate(sk3)
+	assert.NoError(t, err)
+
 	assert.True(t, cert1.Equals(*cert1))
 	assert.False(t, cert1.Equals(*cert2))
+	assert.True(t, cert3.Equals(*cert3))
 }
 
 func TestGenerateCertificateExpires(t *testing.T) {
@@ -87,4 +94,8 @@ func TestGenerateCertificateExpires(t *testing.T) {
 
 	now := time.Now()
 	assert.False(t, cert.Expires().IsZero() || now.After(cert.Expires()))
+
+	x509Cert := CertificateFromX509(sk, &x509.Certificate{})
+	assert.NotNil(t, x509Cert)
+	assert.Contains(t, x509Cert.statsID, "certificate")
 }
