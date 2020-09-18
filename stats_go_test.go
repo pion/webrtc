@@ -5,6 +5,8 @@ package webrtc
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -95,6 +97,13 @@ func getDataChannelStats(t *testing.T, report StatsReport, dc *DataChannel) Data
 	stats, ok := report.GetDataChannelStats(dc)
 	assert.True(t, ok)
 	assert.Equal(t, stats.Type, StatsTypeDataChannel)
+	return stats
+}
+
+func getCodecStats(t *testing.T, report StatsReport, c *RTPCodec) CodecStats {
+	stats, ok := report.GetCodecStats(c)
+	assert.True(t, ok)
+	assert.Equal(t, stats.Type, StatsTypeCodec)
 	return stats
 }
 
@@ -194,6 +203,12 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
+	track1, err := offerPC.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	require.NoError(t, err)
+
+	_, err = offerPC.AddTrack(track1)
+	require.NoError(t, err)
+
 	baseLineReportPCOffer := offerPC.GetStats()
 	baseLineReportPCAnswer := answerPC.GetStats()
 
@@ -262,6 +277,11 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.NotEmpty(t, findLocalCandidateStats(reportPCAnswer))
 	assert.NotEmpty(t, findRemoteCandidateStats(reportPCAnswer))
 	assert.NotEmpty(t, findCandidatePairStats(t, reportPCAnswer))
+	assert.NoError(t, err)
+	for _, codec := range offerPC.api.mediaEngine.codecs {
+		codecStat := getCodecStats(t, reportPCOffer, codec)
+		assert.NotEmpty(t, codecStat)
+	}
 
 	// Close answer DC now
 	dcWait = sync.WaitGroup{}
