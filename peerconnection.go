@@ -1947,9 +1947,17 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		DataChannelsOpened:    dataChannelsOpened,
 		DataChannelsRequested: dataChannelsRequested,
 	}
-	pc.mu.Unlock()
 
 	statsCollector.Collect(stats.ID, stats)
+
+	certificates := pc.configuration.Certificates
+	for _, certificate := range certificates {
+		if err := certificate.collectStats(statsCollector); err != nil {
+			continue
+		}
+	}
+	pc.mu.Unlock()
+
 	return statsCollector.Ready()
 }
 
