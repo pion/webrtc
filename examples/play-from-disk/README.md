@@ -15,7 +15,7 @@ go get github.com/pion/webrtc/v3/examples/play-from-disk
 ```
 
 ### Open play-from-disk example page
-[jsfiddle.net](https://jsfiddle.net/y16Ljznr/) you should see two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/9s10amwL/) you should see two text-areas and a 'Start Session' button
 
 ### Run play-from-disk with your browsers SessionDescription as stdin
 The `output.ivf` you created should be in the same directory as `play-from-disk`. In the jsfiddle the top textarea is your browser, copy that and:
