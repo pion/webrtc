@@ -1958,6 +1958,8 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	}
 	pc.mu.Unlock()
 
+	pc.api.mediaEngine.collectStats(statsCollector)
+
 	return statsCollector.Ready()
 }
 

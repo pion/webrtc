@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
@@ -340,6 +341,7 @@ type RTPCodec struct {
 	Name        string
 	PayloadType uint8
 	Payloader   rtp.Payloader
+	statsID     string
 }
 
 // NewRTPCodec is used to define a new codec
@@ -363,6 +365,7 @@ func NewRTPCodec(
 		Payloader:   payloader,
 		Type:        codecType,
 		Name:        name,
+		statsID:     fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano()),
 	}
 }
 
@@ -410,4 +413,23 @@ type RTPHeaderExtensionCapability struct {
 type RTPCapabilities struct {
 	Codecs           []RTPCodecCapability
 	HeaderExtensions []RTPHeaderExtensionCapability
+}
+
+func (m *MediaEngine) collectStats(collector *statsReportCollector) {
+
+	for _, codec := range m.codecs {
+		collector.Collecting()
+		stats := CodecStats{
+			Timestamp:   statsTimestampFrom(time.Now()),
+			Type:        StatsTypeCodec,
+			ID:          codec.statsID,
+			PayloadType: codec.PayloadType,
+			MimeType:    codec.MimeType,
+			ClockRate:   codec.ClockRate,
+			Channels:    uint8(codec.Channels),
+			SDPFmtpLine: codec.SDPFmtpLine,
+		}
+
+		collector.Collect(stats.ID, stats)
+	}
 }
