@@ -1583,8 +1583,25 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 		pc.onNegotiationNeeded()
 
 		return t, nil
+
+	case RTPTransceiverDirectionSendonly:
+		receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
+		if err != nil {
+			return nil, err
+		}
+
+		t := pc.newRTPTransceiver(
+			receiver,
+			nil,
+			RTPTransceiverDirectionSendonly,
+			kind,
+		)
+
+		pc.onNegotiationNeeded()
+
+		return t, nil
 	default:
-		return nil, fmt.Errorf("AddTransceiverFromKind currently only supports recvonly and sendrecv")
+		return nil, fmt.Errorf("AddTransceiverFromKind currently only supports sendonly, recvonly and sendrecv")
 	}
 }
 
@@ -1824,18 +1841,41 @@ func (pc *PeerConnection) newRTPTransceiver(
 	direction RTPTransceiverDirection,
 	kind RTPCodecType,
 ) *RTPTransceiver {
-	t := &RTPTransceiver{kind: kind}
-	t.setReceiver(receiver)
-	t.setSender(sender)
-	t.setDirection(direction)
+	if direction != RTPTransceiverDirectionSendrecv {
+		t := &RTPTransceiver{kind: kind}
+		t.setReceiver(receiver)
+		t.setSender(sender)
+		t.setDirection(direction)
+
+		pc.mu.Lock()
+		pc.rtpTransceivers = append(pc.rtpTransceivers, t)
+		pc.mu.Unlock()
+
+		pc.onNegotiationNeeded()
+
+		return t
+	}
+
+
+	rtpTransceivers := []*RTPTransceiver{}
+	possibleTranscieversForSendrecv := []RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly}
+
+	for _, possibleDirection := range possibleTranscieversForSendrecv {
+		t := &RTPTransceiver{kind: kind}
+		t.setReceiver(receiver)
+		t.setSender(sender)
+		t.setDirection(possibleDirection)
+
+		rtpTransceivers = append(rtpTransceivers, t)
+	}
 
 	pc.mu.Lock()
-	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
+	pc.rtpTransceivers = append(pc.rtpTransceivers, rtpTransceivers...)
 	pc.mu.Unlock()
 
 	pc.onNegotiationNeeded()
 
-	return t
+	return rtpTransceivers[0]
 }
 
 // CurrentLocalDescription represents the local description that was

@@ -1285,10 +1285,12 @@ func TestPeerConnection_Transceiver_Direction(t *testing.T) {
 		offer, err := pcOffer.CreateOffer(nil)
 		assert.NoError(t, err)
 
-		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
 
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 		assert.Contains(t, answer.SDP, sdpValue)
 
 		assert.NoError(t, pcOffer.Close())
