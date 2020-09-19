@@ -277,8 +277,12 @@ func (pc *PeerConnection) onTrack(t *Track, r *RTPReceiver) {
 	pc.mu.RUnlock()
 
 	pc.log.Debugf("got new track: %+v", t)
-	if hdlr != nil && t != nil {
-		go hdlr(t, r)
+	if t != nil {
+		if hdlr != nil {
+			go hdlr(t, r)
+		} else {
+			pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
+		}
 	}
 }
 
@@ -900,9 +904,6 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 			return
 		}
 
-		pc.mu.RLock()
-		defer pc.mu.RUnlock()
-
 		codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
 		if err != nil {
 			pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
@@ -914,11 +915,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		receiver.Track().codec = codec
 		receiver.Track().mu.Unlock()
 
-		if pc.onTrackHandler != nil {
-			pc.onTrack(receiver.Track(), receiver)
-		} else {
-			pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
-		}
+		pc.onTrack(receiver.Track(), receiver)
 	}()
 }
 
