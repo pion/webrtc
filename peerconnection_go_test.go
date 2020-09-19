@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v2"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
@@ -925,7 +926,125 @@ func TestICERestart(t *testing.T) {
 	// Compare ICE Candidates across each run, fail if they haven't changed
 	assert.NotEqual(t, firstOfferCandidates, extractCandidates(offerPC.LocalDescription().SDP))
 	assert.NotEqual(t, firstAnswerCandidates, extractCandidates(answerPC.LocalDescription().SDP))
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
+}
 
+type trackRecords struct {
+	mu               sync.Mutex
+	trackIDs         map[string]struct{}
+	receivedTrackIDs map[string]struct{}
+}
+
+func (r *trackRecords) newTrackParameter() (uint8, uint32, string, string) {
+	trackID := fmt.Sprintf("pion-track-%d", len(r.trackIDs))
+	r.trackIDs[trackID] = struct{}{}
+	return DefaultPayloadTypeVP8, uint32(len(r.trackIDs)), trackID, "pion"
+}
+
+func (r *trackRecords) handleTrack(t *Track, _ *RTPReceiver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tID := t.ID()
+	if _, exist := r.trackIDs[tID]; exist {
+		r.receivedTrackIDs[tID] = struct{}{}
+	}
+}
+
+func (r *trackRecords) remains() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.trackIDs) - len(r.receivedTrackIDs)
+}
+
+// This test assure that all track events emits.
+func TestPeerConnection_MassiveTracks(t *testing.T) {
+	var (
+		api   = NewAPI()
+		tRecs = &trackRecords{
+			trackIDs:         make(map[string]struct{}),
+			receivedTrackIDs: make(map[string]struct{}),
+		}
+		tracks          = []*Track{}
+		trackCount      = 256
+		pingInterval    = 1 * time.Second
+		noiseInterval   = 100 * time.Microsecond
+		timeoutDuration = 20 * time.Second
+		rawPkt          = []byte{
+			0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+			0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+		}
+		samplePkt = &rtp.Packet{
+			Header: rtp.Header{
+				Marker:           true,
+				Extension:        false,
+				ExtensionProfile: 1,
+				Version:          2,
+				PayloadOffset:    20,
+				PayloadType:      DefaultPayloadTypeVP8,
+				SequenceNumber:   27023,
+				Timestamp:        3653407706,
+				CSRC:             []uint32{},
+			},
+			Payload: rawPkt[20:],
+		}
+		connected = make(chan struct{})
+		stopped   = make(chan struct{})
+	)
+	api.mediaEngine.RegisterDefaultCodecs()
+	offerPC, answerPC, err := api.newPair(Configuration{})
+	assert.NoError(t, err)
+	// Create massive tracks.
+	for range make([]struct{}, trackCount) {
+		track, err := offerPC.NewTrack(tRecs.newTrackParameter())
+		assert.NoError(t, err)
+		_, err = offerPC.AddTrack(track)
+		assert.NoError(t, err)
+		tracks = append(tracks, track)
+	}
+	answerPC.OnTrack(tRecs.handleTrack)
+	offerPC.OnICEConnectionStateChange(func(s ICEConnectionState) {
+		if s == ICEConnectionStateConnected {
+			close(connected)
+		}
+	})
+	// A routine to periodically call GetTransceivers. This action might cause
+	// the deadlock and prevent track event to emit.
+	go func() {
+		for {
+			answerPC.GetTransceivers()
+			time.Sleep(noiseInterval)
+			select {
+			case <-stopped:
+				return
+			default:
+			}
+		}
+	}()
+	assert.NoError(t, signalPair(offerPC, answerPC))
+	// Send a RTP packets to each track to trigger track event after connected.
+	<-connected
+	time.Sleep(1 * time.Second)
+	for _, track := range tracks {
+		samplePkt.SSRC = track.SSRC()
+		assert.NoError(t, track.WriteRTP(samplePkt))
+	}
+	// Ping trackRecords to see if any track event not received yet.
+	tooLong := time.After(timeoutDuration)
+	for {
+		remains := tRecs.remains()
+		if remains == 0 {
+			break
+		}
+		t.Log("remain tracks", remains)
+		time.Sleep(pingInterval)
+		select {
+		case <-tooLong:
+			t.Error("unable to receive all track events in time")
+		default:
+		}
+	}
+	close(stopped)
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
 }
