@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp"
@@ -30,7 +31,8 @@ type RTPReceiver struct {
 	mu               sync.RWMutex
 
 	// A reference to the associated api object
-	api *API
+	api     *API
+	statsID string
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -46,6 +48,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
+		statsID:   fmt.Sprintf("rtp-receiver-%d", time.Now().UnixNano()),
 	}, nil
 }
 
@@ -249,4 +252,47 @@ func (r *RTPReceiver) streamsForSSRC(ssrc uint32) (*srtp.ReadStreamSRTP, *srtp.R
 	}
 
 	return rtpReadStream, rtcpReadStream, nil
+}
+
+func (r *RTPReceiver) collectStats(report *statsReportCollector) {
+	report.Collecting()
+
+	switch r.kind {
+	case RTPCodecTypeVideo:
+		stats := VideoReceiverStats{
+			Timestamp:                 statsTimestampFrom(time.Now()),
+			Type:                      StatsTypeReceiver,
+			ID:                        r.statsID,
+			FrameWidth:                0, // Todo ...
+			FrameHeight:               0, // Todo ...
+			FramesPerSecond:           0, // Todo ...
+			EstimatedPlayoutTimestamp: 0, // Todo ...
+			JitterBufferDelay:         0, // Todo ...
+			JitterBufferEmittedCount:  0, // Todo ...
+			FramesReceived:            0, // Todo ...
+			KeyFramesReceived:         0, // Todo ...
+			FramesDecoded:             0, // Todo ...
+			FramesDropped:             0, // Todo ...
+			PartialFramesLost:         0, // Todo ...
+			FullFramesLost:            0, // Todo ...
+		}
+
+		report.Collect(stats.ID, stats)
+
+	case RTPCodecTypeAudio:
+		stats := AudioReceiverStats{
+			Timestamp:                 statsTimestampFrom(time.Now()),
+			Type:                      StatsTypeReceiver,
+			ID:                        r.statsID,
+			TotalSamplesDuration:      0, // Todo ...
+			EstimatedPlayoutTimestamp: 0, // Todo ...
+			JitterBufferDelay:         0, // Todo ...
+			JitterBufferEmittedCount:  0, // Todo ...
+			TotalSamplesReceived:      0, // Todo ...
+			ConcealedSamples:          0, // Todo ...
+			ConcealmentEvents:         0, // Todo ...
+		}
+
+		report.Collect(stats.ID, stats)
+	}
 }

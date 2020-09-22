@@ -1950,13 +1950,25 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	statsCollector.Collect(stats.ID, stats)
 
+	pc.mu.Unlock()
+
+	transceivers := pc.GetTransceivers()
+	for _, transceiver := range transceivers {
+		if sender := transceiver.Sender(); sender != nil {
+			sender.collectStats(statsCollector)
+		}
+
+		if receiver := transceiver.Receiver(); receiver != nil {
+			receiver.collectStats(statsCollector)
+		}
+	}
+
 	certificates := pc.configuration.Certificates
 	for _, certificate := range certificates {
 		if err := certificate.collectStats(statsCollector); err != nil {
 			continue
 		}
 	}
-	pc.mu.Unlock()
 
 	pc.api.mediaEngine.collectStats(statsCollector)
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -29,6 +30,7 @@ type RTPSender struct {
 
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan interface{}
+	statsID                string
 }
 
 // NewRTPSender constructs a new RTPSender
@@ -52,6 +54,7 @@ func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender
 		api:        api,
 		sendCalled: make(chan interface{}),
 		stopCalled: make(chan interface{}),
+		statsID:    fmt.Sprintf("rtp-sender-%d", time.Now().UnixNano()),
 	}, nil
 }
 
@@ -200,4 +203,57 @@ func (r *RTPSender) hasSent() bool {
 	default:
 		return false
 	}
+}
+
+// collectStats collect rtpsender stats for this instance
+func (r *RTPSender) collectStats(report *statsReportCollector) {
+
+	if r.Track() == nil {
+		return
+	}
+
+	report.Collecting()
+
+	switch r.Track().Kind() {
+	case RTPCodecTypeAudio:
+		totalSamplesDuration := float64(0)
+		totalSamplesSent := uint64(0)
+		samplesDuration, ok := r.track.totalSamplesDuration.Load().(float64)
+		if ok {
+			totalSamplesDuration = samplesDuration
+		}
+
+		samplesSent, ok := r.track.totalSamplesSent.Load().(uint64)
+		if ok {
+			totalSamplesSent = samplesSent
+		}
+
+		stats := AudioSenderStats{
+			Timestamp:            statsTimestampFrom(time.Now()),
+			Type:                 StatsTypeSender,
+			ID:                   r.statsID,
+			TrackIdentifier:      r.track.ID(),
+			Kind:                 r.track.Kind().String(),
+			AudioLevel:           0,     // Todo ...
+			TotalAudioEnergy:     0,     // Todo ...
+			VoiceActivityFlag:    false, // Todo ...
+			TotalSamplesDuration: totalSamplesDuration,
+			TotalSamplesSent:     totalSamplesSent,
+		}
+
+		report.Collect(stats.ID, stats)
+	case RTPCodecTypeVideo:
+		stats := VideoSenderStats{
+			Timestamp:      statsTimestampFrom(time.Now()),
+			Type:           StatsTypeSender,
+			ID:             r.statsID,
+			FramesCaptured: 0, // Todo ...
+			FramesSent:     0, // Todo ...
+			HugeFramesSent: 0, // Todo ...
+			KeyFramesSent:  0, // Todo ...
+		}
+
+		report.Collect(stats.ID, stats)
+	}
+
 }

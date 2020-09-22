@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/internal/util"
@@ -32,9 +34,11 @@ type Track struct {
 
 	packetizer rtp.Packetizer
 
-	receiver         *RTPReceiver
-	activeSenders    []*RTPSender
-	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
+	receiver             *RTPReceiver
+	activeSenders        []*RTPSender
+	totalSenderCount     int // count of all senders (accounts for senders that have not been started yet)
+	totalSamplesSent     atomic.Value
+	totalSamplesDuration atomic.Value
 }
 
 // ID gets the ID of the track
@@ -148,6 +152,10 @@ func (t *Track) Write(b []byte) (n int, err error) {
 
 // WriteSample packetizes and writes to the track
 func (t *Track) WriteSample(s media.Sample) error {
+	now := time.Now()
+	samplesSent := t.totalSamplesSent.Load().(uint32)
+	t.totalSamplesSent.Store(samplesSent + s.Samples)
+
 	packets := t.packetizer.Packetize(s.Data, s.Samples)
 	for _, p := range packets {
 		err := t.WriteRTP(p)
@@ -156,6 +164,9 @@ func (t *Track) WriteSample(s media.Sample) error {
 		}
 	}
 
+	duration := time.Since(now).Seconds()
+	samplesDuration := t.totalSamplesDuration.Load().(float64)
+	t.totalSamplesDuration.Store(duration + samplesDuration)
 	return nil
 }
 
@@ -199,14 +210,21 @@ func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec)
 		codec.ClockRate,
 	)
 
+	totalSamplesSent := atomic.Value{}
+	totalSamplesDuration := atomic.Value{}
+
+	totalSamplesSent.Store(uint32(0))
+	totalSamplesDuration.Store(float64(0))
 	return &Track{
-		id:          id,
-		payloadType: payloadType,
-		kind:        codec.Type,
-		label:       label,
-		ssrc:        ssrc,
-		codec:       codec,
-		packetizer:  packetizer,
+		id:                   id,
+		payloadType:          payloadType,
+		kind:                 codec.Type,
+		label:                label,
+		ssrc:                 ssrc,
+		codec:                codec,
+		packetizer:           packetizer,
+		totalSamplesSent:     totalSamplesSent,
+		totalSamplesDuration: totalSamplesDuration,
 	}, nil
 }
 

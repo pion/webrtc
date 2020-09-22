@@ -91,4 +91,103 @@ func (r StatsReport) GetCodecStats(c *RTPCodec) (CodecStats, bool) {
 		return CodecStats{}, false
 	}
 	return codecStats, true
+
+}
+
+// GetAudioSenderStats is a helper method to return the associated stats for a given AudioSender
+func (r StatsReport) GetAudioSenderStats(s *RTPSender) (AudioSenderStats, bool) {
+	statsID := s.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return AudioSenderStats{}, false
+	}
+
+	audioSenderStats, ok := stats.(AudioSenderStats)
+	if !ok {
+		return AudioSenderStats{}, false
+	}
+	return audioSenderStats, true
+}
+
+// GetVideoSenderStats is a helper method to return the associated stats for a given AudioSender
+func (r StatsReport) GetVideoSenderStats(s *RTPSender) (VideoSenderStats, bool) {
+	statsID := s.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return VideoSenderStats{}, false
+	}
+
+	videoSenderStats, ok := stats.(VideoSenderStats)
+	if !ok {
+		return VideoSenderStats{}, false
+	}
+	return videoSenderStats, true
+}
+
+// GetSenderStats is a helper method to return the associated stats for a given Sender
+func (r StatsReport) GetSenderStats(s *RTPSender) (GetStatsType, bool) {
+	if s.Track().Kind() == RTPCodecTypeAudio {
+		return r.GetAudioSenderStats(s)
+	} else {
+		return r.GetVideoSenderStats(s)
+	}
+}
+
+// GetSenderStats is a helper method to return the associated stats for a given Receiver
+func (r StatsReport) GetReceiverStats(s *RTPReceiver) (GetStatsType, bool) {
+	if s.Track().Kind() == RTPCodecTypeAudio {
+		return r.GetAudioReceiverStats(s)
+	} else {
+		return r.GetVideoReceiverStats(s)
+	}
+}
+
+func (a AudioReceiverStats) getType() StatsType {
+	return a.Type
+}
+
+func (v VideoReceiverStats) getType() StatsType {
+	return v.Type
+}
+
+func (a AudioSenderStats) getType() StatsType {
+	return a.Type
+}
+
+func (v VideoSenderStats) getType() StatsType {
+	return v.Type
+}
+
+type GetStatsType interface {
+	getType() StatsType
+}
+
+// GetAudioReceiverStats is a helper method to return the associated stats for a given AudioReceiver
+func (r StatsReport) GetAudioReceiverStats(receiver *RTPReceiver) (AudioReceiverStats, bool) {
+	statsID := receiver.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return AudioReceiverStats{}, false
+	}
+
+	audioReceiverStats, ok := stats.(AudioReceiverStats)
+	if !ok {
+		return AudioReceiverStats{}, false
+	}
+	return audioReceiverStats, true
+}
+
+// GetVideoReceiverStats is a helper method to return the associated stats for a given VideoReceiver
+func (r StatsReport) GetVideoReceiverStats(receiver *RTPReceiver) (VideoReceiverStats, bool) {
+	statsID := receiver.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return VideoReceiverStats{}, false
+	}
+
+	videoReceiverStats, ok := stats.(VideoReceiverStats)
+	if !ok {
+		return VideoReceiverStats{}, false
+	}
+	return videoReceiverStats, true
 }

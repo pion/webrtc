@@ -123,6 +123,20 @@ func getCertificateStats(t *testing.T, report StatsReport, certificate *Certific
 	return certificateStats
 }
 
+func getSenderStats(t *testing.T, report StatsReport, sender *RTPSender) GetStatsType {
+	senderStats, ok := report.GetSenderStats(sender)
+	assert.True(t, ok)
+	assert.Equal(t, senderStats.getType(), StatsTypeSender)
+	return senderStats
+}
+
+func getReceiverStats(t *testing.T, report StatsReport, receiver *RTPReceiver) GetStatsType {
+	receiverStats, ok := report.GetReceiverStats(receiver)
+	assert.True(t, ok)
+	assert.Equal(t, receiverStats.getType(), StatsTypeReceiver)
+	return receiverStats
+}
+
 func findLocalCandidateStats(report StatsReport) []ICECandidateStats {
 	result := []ICECandidateStats{}
 	for _, s := range report {
@@ -208,6 +222,35 @@ func TestPeerConnection_GetStats(t *testing.T) {
 
 	_, err = offerPC.AddTrack(track1)
 	require.NoError(t, err)
+	trackVideo, err := offerPC.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	assert.NoError(t, err)
+
+	trackAudio, err := offerPC.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion3")
+	assert.NoError(t, err)
+
+	trackAudioAnswer, err := answerPC.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion4")
+	assert.NoError(t, err)
+
+	trackVideoAnswer, err := answerPC.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion5")
+	assert.NoError(t, err)
+
+	_, err = offerPC.AddTrack(trackVideo)
+	assert.NoError(t, err)
+
+	_, err = offerPC.AddTrack(trackAudio)
+	assert.NoError(t, err)
+
+	_, err = answerPC.AddTrack(trackVideoAnswer)
+	assert.NoError(t, err)
+
+	_, err = answerPC.AddTrack(trackAudioAnswer)
+	assert.NoError(t, err)
+
+	_, err = offerPC.AddTransceiverFromTrack(trackVideoAnswer)
+	assert.NoError(t, err)
+
+	_, err = offerPC.AddTransceiverFromTrack(trackAudioAnswer)
+	assert.NoError(t, err)
 
 	baseLineReportPCOffer := offerPC.GetStats()
 	baseLineReportPCAnswer := answerPC.GetStats()
@@ -327,6 +370,21 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	for _, certificate := range certificates {
 		certificateStats := getCertificateStats(t, reportPCOffer, &certificate)
 		assert.NotEmpty(t, certificateStats)
+	}
+
+	transceivers := offerPC.GetTransceivers()
+	for _, transceiver := range transceivers {
+		if sender := transceiver.Sender(); sender != nil {
+			if sender.Track() != nil {
+				assert.NotEmpty(t, getSenderStats(t, reportPCOffer, sender))
+			}
+		}
+
+		if receiver := transceiver.Receiver(); receiver != nil {
+			if receiver.Track() != nil {
+				assert.NotEmpty(t, getReceiverStats(t, reportPCOffer, receiver))
+			}
+		}
 	}
 
 	assert.NoError(t, offerPC.Close())
