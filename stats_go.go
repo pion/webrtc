@@ -92,3 +92,18 @@ func (r StatsReport) GetCodecStats(c *RTPCodec) (CodecStats, bool) {
 	}
 	return codecStats, true
 }
+
+// Get OutboundRTPStats is a helper method to return the associated outbound stats for a given track
+func (r StatsReport) GetOutboundRTPStreamStats(t *Track) (OutboundRTPStreamStats, bool) {
+	statsID := t.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return OutboundRTPStreamStats{}, false
+	}
+
+	outboundRTPStreamStats, ok := stats.(OutboundRTPStreamStats)
+	if !ok {
+		return OutboundRTPStreamStats{}, false
+	}
+	return outboundRTPStreamStats, true
+}

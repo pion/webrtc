@@ -1960,6 +1960,16 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	pc.api.mediaEngine.collectStats(statsCollector)
 
+	for _, transceiver := range pc.GetTransceivers() {
+		if sender := transceiver.Sender(); sender != nil && sender.Track() != nil {
+			sender.Track().collectStats(statsCollector)
+		}
+
+		if receiver := transceiver.Sender(); receiver != nil && receiver.Track() != nil {
+			receiver.Track().collectStats(statsCollector)
+		}
+	}
+
 	return statsCollector.Ready()
 }
 

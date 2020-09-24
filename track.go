@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/internal/util"
@@ -20,7 +22,8 @@ const (
 
 // Track represents a single media track
 type Track struct {
-	mu sync.RWMutex
+	statsID string
+	mu      sync.RWMutex
 
 	id          string
 	payloadType uint8
@@ -32,9 +35,12 @@ type Track struct {
 
 	packetizer rtp.Packetizer
 
-	receiver         *RTPReceiver
-	activeSenders    []*RTPSender
-	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
+	receiver                *RTPReceiver
+	activeSenders           []*RTPSender
+	totalSenderCount        int // count of all senders (accounts for senders that have not been started yet)
+	packetSent              atomic.Value
+	bytesSent               atomic.Value
+	lastPacketSentTimestamp atomic.Value
 }
 
 // ID gets the ID of the track
@@ -143,6 +149,9 @@ func (t *Track) Write(b []byte) (n int, err error) {
 		return 0, err
 	}
 
+	bytesSent := t.bytesSent.Load().(uint64)
+	t.bytesSent.Store(bytesSent + uint64(len(b)))
+
 	return len(b), nil
 }
 
@@ -175,11 +184,16 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 	}
 
 	writeErrs := []error{}
+	totalPacketSent := t.packetSent.Load().(uint32)
 	for _, s := range senders {
 		if _, err := s.SendRTP(&p.Header, p.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
+		totalPacketSent += uint32(len(p.Payload))
 	}
+
+	t.packetSent.Store(totalPacketSent)
+	t.lastPacketSentTimestamp.Store(statsTimestampFrom(time.Now()))
 
 	return util.FlattenErrs(writeErrs)
 }
@@ -199,14 +213,24 @@ func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec)
 		codec.ClockRate,
 	)
 
+	packetSent := atomic.Value{}
+	packetSent.Store(uint32(0))
+
+	bytesSent := atomic.Value{}
+	bytesSent.Store(uint64(0))
+
 	return &Track{
-		id:          id,
-		payloadType: payloadType,
-		kind:        codec.Type,
-		label:       label,
-		ssrc:        ssrc,
-		codec:       codec,
-		packetizer:  packetizer,
+		id:                      id,
+		payloadType:             payloadType,
+		kind:                    codec.Type,
+		label:                   label,
+		ssrc:                    ssrc,
+		codec:                   codec,
+		packetizer:              packetizer,
+		statsID:                 fmt.Sprintf("outbound-rtp-stream-%d", time.Now().UnixNano()),
+		packetSent:              packetSent,
+		bytesSent:               bytesSent,
+		lastPacketSentTimestamp: atomic.Value{},
 	}, nil
 }
 
@@ -223,4 +247,45 @@ func (t *Track) determinePayloadType() error {
 	defer t.mu.Unlock()
 
 	return nil
+}
+
+func (t *Track) collectStats(report *statsReportCollector) {
+	report.Collecting()
+
+	var lastPacketSentTimestamp StatsTimestamp
+
+	lastTimeStamp, ok := t.lastPacketSentTimestamp.Load().(StatsTimestamp)
+	if ok {
+		lastPacketSentTimestamp = lastTimeStamp
+	}
+
+	stats := OutboundRTPStreamStats{
+		Timestamp:               statsTimestampFrom(time.Now()),
+		Type:                    StatsTypeStream,
+		ID:                      t.statsID,
+		SSRC:                    t.SSRC(),
+		Kind:                    t.Kind().String(),
+		TransportID:             "", // Todo ...
+		CodecID:                 t.codec.statsID,
+		FIRCount:                0, // Todo ...
+		PLICount:                0, // Todo ...
+		NACKCount:               0, // Todo ...
+		SLICount:                0, // Todo ...
+		QPSum:                   0, // Todo ...
+		PacketsSent:             t.packetSent.Load().(uint32),
+		PacketsDiscardedOnSend:  0, // Todo ...
+		FECPacketsSent:          0, // Todo ...
+		BytesSent:               t.bytesSent.Load().(uint64),
+		BytesDiscardedOnSend:    0, // Todo ...
+		TrackID:                 t.ID(),
+		SenderID:                "", // Todo ...
+		RemoteID:                "", // Todo ...
+		LastPacketSentTimestamp: lastPacketSentTimestamp,
+		TargetBitrate:           0, // Todo ...
+		FramesEncoded:           0, // Todo ...
+		TotalEncodeTime:         0, // Todo ...
+		AverageRTCPInterval:     0, // Todo ...
+	}
+
+	report.Collect(stats.ID, stats)
 }
