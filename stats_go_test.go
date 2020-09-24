@@ -49,7 +49,6 @@ func TestStatsMarshal(t *testing.T) {
 		ICECandidatePairStats{},
 		ICECandidateStats{},
 		InboundRTPStreamStats{},
-		MediaStreamStats{},
 		OutboundRTPStreamStats{},
 		PeerConnectionStats{},
 		RemoteInboundRTPStreamStats{},

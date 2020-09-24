@@ -4,11 +4,10 @@ package webrtc
 
 import (
 	"fmt"
-	"io"
-	"sync"
-
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp"
+	"io"
+	"sync"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -30,7 +29,7 @@ type RTPReceiver struct {
 	mu               sync.RWMutex
 
 	// A reference to the associated api object
-	api *API
+	api     *API
 }
 
 // NewRTPReceiver constructs a new RTPReceiver

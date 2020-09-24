@@ -781,27 +781,6 @@ type DataChannelStats struct {
 	BytesReceived uint64 `json:"bytesReceived"`
 }
 
-// MediaStreamStats contains statistics related to a specific MediaStream.
-type MediaStreamStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// StreamIdentifier is the "id" property of the MediaStream
-	StreamIdentifier string `json:"streamIdentifier"`
-
-	// TrackIDs is a list of the identifiers of the stats object representing the
-	// stream's tracks, either ReceiverAudioTrackAttachmentStats or ReceiverVideoTrackAttachmentStats.
-	TrackIDs []string `json:"trackIds"`
-}
-
 // AudioSenderStats represents the stats about one audio sender of a PeerConnection
 // object for which one calls GetStats.
 //
