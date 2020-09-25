@@ -92,3 +92,18 @@ func (r StatsReport) GetCodecStats(c *RTPCodec) (CodecStats, bool) {
 	}
 	return codecStats, true
 }
+
+// GetInBoundRTPStats is a helper method to return the associated inboundrtp stats for a given receiver
+func (r StatsReport) GetInboundRTPStats(receiver *RTPReceiver) (InboundRTPStreamStats, bool) {
+	statsID := receiver.statsID
+	stats, ok := r[statsID]
+	if !ok {
+		return InboundRTPStreamStats{}, false
+	}
+
+	streamStats, ok := stats.(InboundRTPStreamStats)
+	if !ok {
+		return InboundRTPStreamStats{}, false
+	}
+	return streamStats, true
+}

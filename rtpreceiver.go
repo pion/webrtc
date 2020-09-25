@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp"
@@ -30,7 +31,12 @@ type RTPReceiver struct {
 	mu               sync.RWMutex
 
 	// A reference to the associated api object
-	api *API
+	api       *API
+	statsID   string
+	pliCount  atomicUint32
+	nackCount atomicUint32
+	sliCount  atomicUint32
+	firCount  atomicUint32
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -46,6 +52,11 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
+		statsID:   fmt.Sprintf("inbound-rtp-stream-stats-%d", time.Now().UnixNano()),
+		firCount:  NewAtomicUint32(),
+		pliCount:  NewAtomicUint32(),
+		nackCount: NewAtomicUint32(),
+		sliCount:  NewAtomicUint32(),
 	}, nil
 }
 
@@ -133,6 +144,24 @@ func (r *RTPReceiver) Read(b []byte) (n int, err error) {
 	}
 }
 
+func (r *RTPReceiver) updateRTCPStats(pkts []rtcp.Packet) {
+	for _, pkt := range pkts {
+		switch pkt.(type) {
+		case *rtcp.TransportLayerNack:
+			r.nackCount.increment()
+
+		case *rtcp.PictureLossIndication:
+			r.pliCount.increment()
+
+		case *rtcp.FullIntraRequest:
+			r.firCount.increment()
+
+		case *rtcp.SliceLossIndication:
+			r.sliCount.increment()
+		}
+	}
+}
+
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
@@ -141,7 +170,14 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 		return nil, err
 	}
 
-	return rtcp.Unmarshal(b[:i])
+	pkt, err := rtcp.Unmarshal(b[:i])
+	if err != nil {
+		return nil, err
+	}
+
+	r.updateRTCPStats(pkt)
+
+	return pkt, nil
 }
 
 func (r *RTPReceiver) haveReceived() bool {
@@ -249,4 +285,66 @@ func (r *RTPReceiver) streamsForSSRC(ssrc uint32) (*srtp.ReadStreamSRTP, *srtp.R
 	}
 
 	return rtpReadStream, rtcpReadStream, nil
+}
+
+func (r *RTPReceiver) collectStats(report *statsReportCollector) {
+	report.Collecting()
+
+	packetReceived := uint32(0)
+	for _, track := range r.Tracks() {
+		packetReceived += track.packetsReceived.value()
+	}
+
+	var lastPacketReceivedTimestamp StatsTimestamp
+	pktReceivedTimestamp, ok := r.Track().lastPacketReceivedTimestamp.Load().(StatsTimestamp)
+	if ok {
+		lastPacketReceivedTimestamp = pktReceivedTimestamp
+	}
+
+	codecStatsID := ""
+	codec := r.Track().Codec()
+	if codec != nil {
+		codecStatsID = codec.statsID
+	}
+
+	stats := InboundRTPStreamStats{
+		Timestamp:                   statsTimestampFrom(time.Now()),
+		Type:                        StatsTypeInboundRTP,
+		ID:                          r.statsID,
+		SSRC:                        r.Track().SSRC(),
+		Kind:                        r.Track().Kind().String(),
+		TransportID:                 "",
+		CodecID:                     codecStatsID,
+		FIRCount:                    r.firCount.value(),
+		PLICount:                    r.pliCount.value(),
+		NACKCount:                   r.nackCount.value(),
+		SLICount:                    r.sliCount.value(),
+		QPSum:                       0, // Todo ...
+		PacketsReceived:             packetReceived,
+		PacketsLost:                 0,  // Todo ... computed after merge of outbound
+		Jitter:                      0,  // Todo ...
+		PacketsDiscarded:            0,  // Todo ...
+		PacketsRepaired:             0,  // Todo ...
+		BurstPacketsLost:            0,  // Todo ...
+		BurstPacketsDiscarded:       0,  // Todo ...
+		BurstLossCount:              0,  // Todo ...
+		BurstDiscardCount:           0,  // Todo ...
+		BurstLossRate:               0,  // Todo ...
+		BurstDiscardRate:            0,  // Todo ...
+		GapLossRate:                 0,  // Todo ...
+		GapDiscardRate:              0,  // Todo ...
+		TrackID:                     "", // Todo ... get after merge of receiver rtp
+		ReceiverID:                  "", // Todo ...
+		RemoteID:                    "", // Todo ...
+		FramesDecoded:               0,  // Todo ...
+		LastPacketReceivedTimestamp: lastPacketReceivedTimestamp,
+		AverageRTCPInterval:         0, // Todo ...
+		FECPacketsReceived:          0, // Todo ...
+		BytesReceived:               uint64(r.Track().bytesReceived.value()),
+		PacketsFailedDecryption:     0,   // Todo ...
+		PacketsDuplicated:           0,   // Todo ...
+		PerDSCPPacketsReceived:      nil, // Todo ...
+	}
+
+	report.Collect(stats.ID, stats)
 }

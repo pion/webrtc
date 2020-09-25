@@ -5,6 +5,7 @@ package webrtc
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/require"
 	"math/rand"
 	"sync"
@@ -121,6 +122,13 @@ func getCertificateStats(t *testing.T, report StatsReport, certificate *Certific
 	assert.True(t, ok)
 	assert.Equal(t, certificateStats.Type, StatsTypeCertificate)
 	return certificateStats
+}
+
+func getInBoundRTPStreamStats(t *testing.T, report StatsReport, receiver *RTPReceiver) InboundRTPStreamStats {
+	streamStats, ok := report.GetInboundRTPStats(receiver)
+	assert.True(t, ok)
+	assert.Equal(t, streamStats.Type, StatsTypeInboundRTP)
+	return streamStats
 }
 
 func findLocalCandidateStats(report StatsReport) []ICECandidateStats {
@@ -247,6 +255,8 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.NoError(t, signalPairForStats(offerPC, answerPC))
 	waitWithTimeout(t, &dcWait)
 
+	assert.NoError(t, track1.WriteSample(media.Sample{Samples: 2, Data: []byte{1, 2}}))
+
 	answerDC := <-answerDCChan
 
 	reportPCOffer := offerPC.GetStats()
@@ -327,6 +337,12 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	for _, certificate := range certificates {
 		certificateStats := getCertificateStats(t, reportPCOffer, &certificate)
 		assert.NotEmpty(t, certificateStats)
+	}
+
+	for _, transceiver := range answerPC.GetTransceivers() {
+		if receiver := transceiver.Receiver(); receiver != nil && receiver.Track() != nil {
+			assert.NotEmpty(t, getInBoundRTPStreamStats(t, reportPCAnswer, receiver))
+		}
 	}
 
 	assert.NoError(t, offerPC.Close())

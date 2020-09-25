@@ -4,12 +4,12 @@ package webrtc
 
 import (
 	"fmt"
-	"io"
-	"sync"
-
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
+	"io"
+	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -32,9 +32,12 @@ type Track struct {
 
 	packetizer rtp.Packetizer
 
-	receiver         *RTPReceiver
-	activeSenders    []*RTPSender
-	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
+	receiver                    *RTPReceiver
+	activeSenders               []*RTPSender
+	totalSenderCount            int // count of all senders (accounts for senders that have not been started yet)
+	packetsReceived             atomicUint32
+	bytesReceived               atomicUint32
+	lastPacketReceivedTimestamp atomic.Value
 }
 
 // ID gets the ID of the track
@@ -127,6 +130,11 @@ func (t *Track) ReadRTP() (*rtp.Packet, error) {
 	if err := r.Unmarshal(b[:i]); err != nil {
 		return nil, err
 	}
+
+	t.packetsReceived.increment()
+	t.bytesReceived.add(uint32(len(r.Raw)))
+	t.lastPacketReceivedTimestamp.Store(statsTimestampNow())
+
 	return r, nil
 }
 
@@ -200,13 +208,16 @@ func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec)
 	)
 
 	return &Track{
-		id:          id,
-		payloadType: payloadType,
-		kind:        codec.Type,
-		label:       label,
-		ssrc:        ssrc,
-		codec:       codec,
-		packetizer:  packetizer,
+		id:                          id,
+		payloadType:                 payloadType,
+		kind:                        codec.Type,
+		label:                       label,
+		ssrc:                        ssrc,
+		codec:                       codec,
+		packetizer:                  packetizer,
+		packetsReceived:             NewAtomicUint32(),
+		bytesReceived:               NewAtomicUint32(),
+		lastPacketReceivedTimestamp: atomic.Value{},
 	}, nil
 }
 
