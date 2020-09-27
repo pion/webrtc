@@ -48,7 +48,7 @@ type PeerConnection struct {
 	idpLoginURL *string
 
 	isClosed               *atomicBool
-	negotiationNeeded      bool
+	isNegotiationNeeded    *atomicBool
 	negotiationNeededState negotiationNeededState
 
 	lastOffer  string
@@ -105,7 +105,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		},
 		ops:                    newOperations(),
 		isClosed:               &atomicBool{},
-		negotiationNeeded:      false,
+		isNegotiationNeeded:    &atomicBool{},
 		negotiationNeededState: negotiationNeededStateEmpty,
 		lastOffer:              "",
 		lastAnswer:             "",
@@ -262,8 +262,7 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 	if pc.negotiationNeededState == negotiationNeededStateRun {
 		pc.negotiationNeededState = negotiationNeededStateQueue
 		return
-	}
-	if pc.negotiationNeededState == negotiationNeededStateQueue {
+	} else if pc.negotiationNeededState == negotiationNeededStateQueue {
 		return
 	}
 
@@ -301,19 +300,17 @@ func (pc *PeerConnection) negotiationNeededOp() {
 
 	// Step 2.4
 	if !pc.checkNegotiationNeeded() {
-		pc.negotiationNeeded = false
+		pc.isNegotiationNeeded.set(false)
 		return
 	}
 
 	// Step 2.5
-	if pc.negotiationNeeded {
+	if pc.isNegotiationNeeded.get() {
 		return
 	}
 
 	// Step 2.6
-	pc.mu.Lock()
-	pc.negotiationNeeded = true
-	pc.mu.Unlock()
+	pc.isNegotiationNeeded.set(true)
 
 	// Step 2.7
 	if pc.onNegotiationNeededHandler != nil {
@@ -894,9 +891,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	if err == nil {
 		pc.signalingState.Set(nextState)
 		if pc.signalingState.Get() == SignalingStateStable {
-			pc.mu.Lock()
-			pc.negotiationNeeded = false
-			pc.mu.Unlock()
+			pc.isNegotiationNeeded.set(false)
 			pc.onNegotiationNeeded()
 		}
 		pc.onSignalingStateChange(nextState)
@@ -1749,15 +1744,15 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() error {
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
 	if pc.isClosed.get() {
 		return nil
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
 	pc.isClosed.set(true)
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.signalingState.Set(SignalingStateClosed)
 
 	// Try closing everything and collect the errors
@@ -1768,14 +1763,14 @@ func (pc *PeerConnection) Close() error {
 	//    continue the chain the Mux has to be closed.
 	closeErrs := make([]error, 4)
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	for _, t := range pc.GetTransceivers() {
 		if !t.stopped {
 			closeErrs = append(closeErrs, t.Stop())
 		}
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
 	if pc.sctpTransport != nil {
 		pc.sctpTransport.lock.Lock()
 		for _, d := range pc.sctpTransport.dataChannels {
@@ -1784,20 +1779,20 @@ func (pc *PeerConnection) Close() error {
 		pc.sctpTransport.lock.Unlock()
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
 	if pc.sctpTransport != nil {
 		closeErrs = append(closeErrs, pc.sctpTransport.Stop())
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
 	closeErrs = append(closeErrs, pc.dtlsTransport.Stop())
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #9,#10,#11)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
 	if pc.iceTransport != nil {
 		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #12)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
 	return util.FlattenErrs(closeErrs)
