@@ -806,6 +806,7 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 	})
 
 	pcOffer.OnNegotiationNeeded(func() {
+		wg.Add(1)
 		<-isMulti
 		offer, err := pcOffer.CreateOffer(nil)
 		assert.NoError(t, err)
@@ -830,6 +831,7 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 		if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
 			t.Error(err.Error())
 		}
+		wg.Done()
 		wg.Done()
 	})
 
@@ -862,6 +864,7 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	assert.NoError(t, err)
 
 	pcOffer.OnNegotiationNeeded(func() {
+		wg.Add(1)
 		offer, createOfferErr := pcOffer.CreateOffer(nil)
 		assert.NoError(t, createOfferErr)
 
@@ -879,6 +882,7 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 
 		<-answerGatheringComplete
 		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+		wg.Done()
 		wg.Done()
 	})
 
@@ -911,16 +915,15 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcA, pcB, err := api.newPair(Configuration{})
 	assert.NoError(t, err)
-	defer pcA.Close()
-	defer pcB.Close()
 
+	var wg sync.WaitGroup
 	pcA.OnNegotiationNeeded(func() {
+		wg.Add(1)
 		assert.NoError(t, signalPair(pcA, pcB))
+		wg.Done()
 	})
 
 	for i := 0; i < 500; i++ {
-		time.Sleep(10 * time.Millisecond)
-
 		track, err := pcA.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
 		assert.NoError(t, err)
 
@@ -929,9 +932,15 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 
 		err = track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1})
 		assert.NoError(t, err)
+
+		time.Sleep(10 * time.Millisecond)
 	}
 
-	// Wait for async to complete otherwise dangling renegotation
-	// will occur on closed connection and throw InvalidStateError: connection closed
-	time.Sleep(time.Duration(2) * time.Second)
+	// Wait for goroutines triggered by `WriteSample` to execute.
+	time.Sleep(100 * time.Millisecond)
+
+	wg.Wait()
+
+	assert.NoError(t, pcA.Close())
+	assert.NoError(t, pcB.Close())
 }
