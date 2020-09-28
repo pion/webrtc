@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -40,8 +41,8 @@ type DTLSTransport struct {
 
 	conn *dtls.Conn
 
-	srtpSession   *srtp.SessionSRTP
-	srtcpSession  *srtp.SessionSRTCP
+	srtpSession   atomic.Value
+	srtcpSession  atomic.Value
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
 
@@ -147,7 +148,7 @@ func (t *DTLSTransport) startSRTP() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if t.srtpSession != nil && t.srtcpSession != nil {
+	if t.srtpSession.Load() != nil && t.srtcpSession.Load() != nil {
 		return nil
 	} else if t.conn == nil {
 		return fmt.Errorf("the DTLS transport has not started yet")
@@ -201,39 +202,32 @@ func (t *DTLSTransport) startSRTP() error {
 		return fmt.Errorf("failed to start srtp: %v", err)
 	}
 
-	t.srtpSession = srtpSession
-	t.srtcpSession = srtcpSession
+	t.srtpSession.Store(srtpSession)
+	t.srtcpSession.Store(srtcpSession)
 	return nil
 }
 
 func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
-	t.lock.RLock()
-	if t.srtpSession != nil {
-		t.lock.RUnlock()
-		return t.srtpSession, nil
+	value := t.srtpSession.Load()
+	if value != nil {
+		return value.(*srtp.SessionSRTP), nil
 	}
-	t.lock.RUnlock()
-
 	if err := t.startSRTP(); err != nil {
 		return nil, err
 	}
 
-	return t.srtpSession, nil
+	return t.srtpSession.Load().(*srtp.SessionSRTP), nil
 }
 
 func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
-	t.lock.RLock()
-	if t.srtcpSession != nil {
-		t.lock.RUnlock()
-		return t.srtcpSession, nil
+	value := t.srtcpSession.Load()
+	if value != nil {
+		return value.(*srtp.SessionSRTCP), nil
 	}
-	t.lock.RUnlock()
-
 	if err := t.startSRTP(); err != nil {
 		return nil, err
 	}
-
-	return t.srtcpSession, nil
+	return t.srtcpSession.Load().(*srtp.SessionSRTCP), nil
 }
 
 func (t *DTLSTransport) role() DTLSRole {
@@ -376,14 +370,16 @@ func (t *DTLSTransport) Stop() error {
 	// Try closing everything and collect the errors
 	var closeErrs []error
 
-	if t.srtpSession != nil {
-		if err := t.srtpSession.Close(); err != nil {
+	srtpSessionValue := t.srtpSession.Load()
+	if srtpSessionValue != nil {
+		if err := srtpSessionValue.(*srtp.SessionSRTP).Close(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
 
-	if t.srtcpSession != nil {
-		if err := t.srtcpSession.Close(); err != nil {
+	srtcpSessionValue := t.srtcpSession.Load()
+	if srtcpSessionValue != nil {
+		if err := srtcpSessionValue.(*srtp.SessionSRTCP).Close(); err != nil {
 			closeErrs = append(closeErrs, err)
 		}
 	}
