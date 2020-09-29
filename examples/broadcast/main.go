@@ -1,13 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
-
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
@@ -15,7 +15,7 @@ const (
 	rtcpPLIInterval = time.Second * 3
 )
 
-func main() {
+func main() { // nolint:gocognit
 	sdpChan := signal.HTTPSDPServer()
 
 	// Everything below is the Pion WebRTC API, thanks for using it ❤️.
@@ -82,7 +82,7 @@ func main() {
 			}
 
 			// ErrClosedPipe means we don't have any subscribers, this is ok if no peers have connected yet
-			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && err != io.ErrClosedPipe {
+			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
 				panic(err)
 			}
 		}

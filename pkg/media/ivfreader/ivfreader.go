@@ -3,6 +3,7 @@ package ivfreader
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -11,6 +12,15 @@ const (
 	ivfFileHeaderSignature = "DKIF"
 	ivfFileHeaderSize      = 32
 	ivfFrameHeaderSize     = 12
+)
+
+var (
+	errNilStream             = errors.New("stream is nil")
+	errIncompleteFrameHeader = errors.New("incomplete frame header")
+	errIncompleteFrameData   = errors.New("incomplete frame data")
+	errIncompleteFileHeader  = errors.New("incomplete file header")
+	errSignatureMismatch     = errors.New("IVF signature mismatch")
+	errUnknownIVFVersion     = errors.New("IVF version unknown, parser may not parse correctly")
 )
 
 // IVFFileHeader 32-byte header for IVF files
@@ -45,7 +55,7 @@ type IVFReader struct {
 // with an io.Reader input
 func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	if in == nil {
-		return nil, nil, fmt.Errorf("stream is nil")
+		return nil, nil, errNilStream
 	}
 
 	reader := &IVFReader{
@@ -76,8 +86,8 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 
 	bytesRead, err := io.ReadFull(i.stream, buffer)
 	headerBytesRead := bytesRead
-	if err == io.ErrUnexpectedEOF {
-		return nil, nil, fmt.Errorf("incomplete frame header")
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, nil, errIncompleteFrameHeader
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -89,8 +99,8 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 
 	payload := make([]byte, header.FrameSize)
 	bytesRead, err = io.ReadFull(i.stream, payload)
-	if err == io.ErrUnexpectedEOF {
-		return nil, nil, fmt.Errorf("incomplete frame data")
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, nil, errIncompleteFrameData
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -105,8 +115,8 @@ func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
 	buffer := make([]byte, ivfFileHeaderSize)
 
 	bytesRead, err := io.ReadFull(i.stream, buffer)
-	if err == io.ErrUnexpectedEOF {
-		return nil, fmt.Errorf("incomplete file header")
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, errIncompleteFileHeader
 	} else if err != nil {
 		return nil, err
 	}
@@ -125,11 +135,9 @@ func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
 	}
 
 	if header.signature != ivfFileHeaderSignature {
-		return nil, fmt.Errorf("IVF signature mismatch")
+		return nil, errSignatureMismatch
 	} else if header.version != uint16(0) {
-		errStr := fmt.Sprintf("IVF version unknown: %d,"+
-			" parser may not parse correctly", header.version)
-		return nil, fmt.Errorf(errStr)
+		return nil, fmt.Errorf("%w: expected(0) got(%d)", errUnknownIVFVersion, header.version)
 	}
 
 	i.bytesReadSuccesfully += int64(bytesRead)

@@ -8,7 +8,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -155,13 +154,13 @@ func (t *QUICTransport) validateFingerPrint(remoteParameters QUICParameters, rem
 		}
 	}
 
-	return errors.New("no matching fingerprint")
+	return errQuickTransportFingerprintNoMatch
 }
 
 func (t *QUICTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
 		t.iceTransport.State() == ICETransportStateNew {
-		return errors.New("ICE connection not started")
+		return errQuickTransportICEConnectionNotStarted
 	}
 
 	return nil

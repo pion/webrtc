@@ -114,16 +114,16 @@ func (t *SignalingState) Set(state SignalingState) {
 	atomic.StoreInt32((*int32)(t), int32(state))
 }
 
-func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) {
+func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) { // nolint:gocognit
 	// Special case for rollbacks
 	if sdpType == SDPTypeRollback && cur == SignalingStateStable {
 		return cur, &rtcerr.InvalidModificationError{
-			Err: fmt.Errorf("can't rollback from stable state"),
+			Err: errSignalingStateCannotRollback,
 		}
 	}
 
 	// 4.3.1 valid state transitions
-	switch cur {
+	switch cur { // nolint:exhaustive
 	case SignalingStateStable:
 		switch op {
 		case stateChangeOpSetLocal:
@@ -139,7 +139,7 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 		}
 	case SignalingStateHaveLocalOffer:
 		if op == stateChangeOpSetRemote {
-			switch sdpType {
+			switch sdpType { // nolint:exhaustive
 			// have-local-offer->SetRemote(answer)->stable
 			case SDPTypeAnswer:
 				if next == SignalingStateStable {
@@ -161,7 +161,7 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 		}
 	case SignalingStateHaveRemoteOffer:
 		if op == stateChangeOpSetLocal {
-			switch sdpType {
+			switch sdpType { // nolint:exhaustive
 			// have-remote-offer->SetLocal(answer)->stable
 			case SDPTypeAnswer:
 				if next == SignalingStateStable {
@@ -182,8 +182,7 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 			}
 		}
 	}
-
 	return cur, &rtcerr.InvalidModificationError{
-		Err: fmt.Errorf("invalid proposed signaling state transition %s->%s(%s)->%s", cur, op, sdpType, next),
+		Err: fmt.Errorf("%w: %s->%s(%s)->%s", errSignalingStateProposedTransitionInvalid, cur, op, sdpType, next),
 	}
 }

@@ -1,6 +1,7 @@
 package rtpdump
 
 import (
+	"errors"
 	"net"
 	"reflect"
 	"testing"
@@ -65,7 +66,7 @@ func TestMarshalHeader(t *testing.T) {
 		},
 	} {
 		data, err := test.Header.Marshal()
-		if got, want := err, test.WantErr; got != want {
+		if got, want := err, test.WantErr; !errors.Is(got, want) {
 			t.Fatalf("Marshal(%q) err=%v, want %v", test.Name, got, want)
 		}
 

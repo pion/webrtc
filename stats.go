@@ -1192,9 +1192,7 @@ func toStatsICECandidatePairState(state ice.CandidatePairState) (StatsICECandida
 		return StatsICECandidatePairStateSucceeded, nil
 	default:
 		// NOTE: this should never happen[tm]
-		err := fmt.Errorf(
-			"cannot convert to StatsICECandidatePairStateSucceeded invalid ice candidate state: %s",
-			state.String())
+		err := fmt.Errorf("%w: %s", errStatsICECandidateStateInvalid, state.String())
 		return StatsICECandidatePairState("Unknown"), err
 	}
 }

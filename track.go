@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"fmt"
 	"io"
 	"sync"
 
@@ -108,7 +107,7 @@ func (t *Track) Read(b []byte) (n int, err error) {
 
 	if t.totalSenderCount != 0 || r == nil {
 		t.mu.RUnlock()
-		return 0, fmt.Errorf("this is a local track and must not be read from")
+		return 0, errTrackLocalTrackRead
 	}
 	t.mu.RUnlock()
 
@@ -164,7 +163,7 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 	t.mu.RLock()
 	if t.receiver != nil {
 		t.mu.RUnlock()
-		return fmt.Errorf("this is a remote track and must not be written to")
+		return errTrackLocalTrackWrite
 	}
 	senders := t.activeSenders
 	totalSenderCount := t.totalSenderCount
@@ -187,7 +186,7 @@ func (t *Track) WriteRTP(p *rtp.Packet) error {
 // NewTrack initializes a new *Track
 func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec) (*Track, error) {
 	if ssrc == 0 {
-		return nil, fmt.Errorf("SSRC supplied to NewTrack() must be non-zero")
+		return nil, errTrackSSRCNewTrackZero
 	}
 
 	packetizer := rtp.NewPacketizer(

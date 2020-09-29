@@ -5,14 +5,16 @@ package webrtc
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+var errReceiveOfferTimeout = fmt.Errorf("timed out waiting to receive offer")
 
 func TestStatsTimestampTime(t *testing.T) {
 	for _, test := range []struct {
@@ -38,7 +40,6 @@ func TestStatsTimestampTime(t *testing.T) {
 	}
 }
 
-// TODO(maxhawkins): replace with a more meaningful test
 func TestStatsMarshal(t *testing.T) {
 	for _, test := range []Stats{
 		AudioReceiverStats{},
@@ -176,7 +177,7 @@ func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error
 	timeout := time.After(3 * time.Second)
 	select {
 	case <-timeout:
-		return fmt.Errorf("timed out waiting to receive offer")
+		return errReceiveOfferTimeout
 	case offer := <-offerChan:
 		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
 			return err
@@ -203,7 +204,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
-	track1, err := offerPC.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	track1, err := offerPC.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion1")
 	require.NoError(t, err)
 
 	_, err = offerPC.AddTrack(track1)
@@ -324,9 +325,8 @@ func TestPeerConnection_GetStats(t *testing.T) {
 
 	certificates := offerPC.configuration.Certificates
 
-	for _, certificate := range certificates {
-		certificateStats := getCertificateStats(t, reportPCOffer, &certificate)
-		assert.NotEmpty(t, certificateStats)
+	for i := range certificates {
+		assert.NotEmpty(t, getCertificateStats(t, reportPCOffer, &certificates[i]))
 	}
 
 	assert.NoError(t, offerPC.Close())

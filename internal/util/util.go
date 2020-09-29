@@ -2,6 +2,7 @@
 package util
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/pion/randutil"
@@ -58,7 +59,7 @@ func (me multiError) Error() string {
 
 func (me multiError) Is(err error) bool {
 	for _, e := range me {
-		if e == err {
+		if errors.Is(e, err) {
 			return true
 		}
 		if me2, ok := e.(multiError); ok {

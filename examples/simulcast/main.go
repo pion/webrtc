@@ -1,12 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/url"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v3"
@@ -38,7 +39,7 @@ func main() {
 		panic("Offer contained no video codecs")
 	}
 
-	//Configure required extensions
+	// Configure required extensions
 
 	sdes, _ := url.Parse(sdp.SDESRTPStreamIDURI)
 	sdedMid, _ := url.Parse(sdp.SDESMidURI)
@@ -73,19 +74,19 @@ func main() {
 	outputTracks := map[string]*webrtc.Track{}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video_q", "pion_q")
+	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, randutil.NewMathRandomGenerator().Uint32(), "video_q", "pion_q")
 	if err != nil {
 		panic(err)
 	}
 	outputTracks["q"] = outputTrack
 
-	outputTrack, err = peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video_h", "pion_h")
+	outputTrack, err = peerConnection.NewTrack(videoCodecs[0].PayloadType, randutil.NewMathRandomGenerator().Uint32(), "video_h", "pion_h")
 	if err != nil {
 		panic(err)
 	}
 	outputTracks["h"] = outputTrack
 
-	outputTrack, err = peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video_f", "pion_f")
+	outputTrack, err = peerConnection.NewTrack(videoCodecs[0].PayloadType, randutil.NewMathRandomGenerator().Uint32(), "video_f", "pion_f")
 	if err != nil {
 		panic(err)
 	}
@@ -135,7 +136,7 @@ func main() {
 
 			packet.SSRC = outputTracks[rid].SSRC()
 
-			if writeErr := outputTracks[rid].WriteRTP(packet); writeErr != nil && writeErr != io.ErrClosedPipe {
+			if writeErr := outputTracks[rid].WriteRTP(packet); writeErr != nil && !errors.Is(writeErr, io.ErrClosedPipe) {
 				panic(writeErr)
 			}
 		}

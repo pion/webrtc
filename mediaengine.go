@@ -40,6 +40,7 @@ type MediaEngine struct {
 // RegisterCodec adds codec to m.
 // RegisterCodec is not safe for concurrent use.
 func (m *MediaEngine) RegisterCodec(codec *RTPCodec) uint8 {
+	// nolint:godox
 	// TODO: dynamically generate a payload type in the range 96-127 if one wasn't provided.
 	// See https://github.com/pion/webrtc/issues/43
 	m.codecs = append(m.codecs, codec)
@@ -81,13 +82,13 @@ func (m *MediaEngine) PopulateFromSDP(sd SessionDescription) error {
 		for _, format := range md.MediaName.Formats {
 			pt, err := strconv.Atoi(format)
 			if err != nil {
-				return fmt.Errorf("format parse error")
+				return errMediaEngineParseError
 			}
 
 			payloadType := uint8(pt)
 			payloadCodec, err := sdp.GetCodecForPayloadType(payloadType)
 			if err != nil {
-				return fmt.Errorf("could not find codec for payload type %d", payloadType)
+				return fmt.Errorf("%w: codec for payload type %d", errMediaEngineCodecNotFound, payloadType)
 			}
 
 			var codec *RTPCodec
@@ -158,7 +159,6 @@ func (m *MediaEngine) GetCodecsByKind(kind RTPCodecType) []*RTPCodec {
 	var codecs []*RTPCodec
 	for _, codec := range m.codecs {
 		if codec.Type == kind {
-			// TODO: clone the codec for safety?
 			codecs = append(codecs, codec)
 		}
 	}
@@ -217,7 +217,7 @@ func NewRTPOpusCodec(payloadType uint8, clockrate uint32) *RTPCodec {
 	c := NewRTPCodec(RTPCodecTypeAudio,
 		Opus,
 		clockrate,
-		2, //According to RFC7587, Opus RTP streams must have exactly 2 channels.
+		2, // According to RFC7587, Opus RTP streams must have exactly 2 channels.
 		"minptime=10;useinbandfec=1",
 		payloadType,
 		&codecs.OpusPayloader{})
@@ -416,7 +416,6 @@ type RTPCapabilities struct {
 }
 
 func (m *MediaEngine) collectStats(collector *statsReportCollector) {
-
 	for _, codec := range m.codecs {
 		collector.Collecting()
 		stats := CodecStats{

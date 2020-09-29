@@ -18,7 +18,6 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
-
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
@@ -318,7 +317,7 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	}
 }
 
-func (pc *PeerConnection) checkNegotiationNeeded() bool {
+func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 	// To check if negotiation is needed for connection, perform the following checks:
 	// Skip 1, 2 steps
 	// Step 3
@@ -378,6 +377,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool {
 				if _, ok := m.Attribute(t.Direction().String()); !ok {
 					return true
 				}
+			default:
 			}
 		}
 		// Step 5.4
@@ -457,7 +457,7 @@ func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 }
 
 // SetConfiguration updates the configuration of this PeerConnection object.
-func (pc *PeerConnection) SetConfiguration(configuration Configuration) error {
+func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { //nolint:gocognit
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -560,11 +560,11 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
-func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
+func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) { //nolint:gocognit
 	useIdentity := pc.idpLoginURL != nil
 	switch {
 	case useIdentity:
-		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
+		return SessionDescription{}, errIdentityProviderNotImplemented
 	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -754,7 +754,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	case pc.RemoteDescription() == nil:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
-		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
+		return SessionDescription{}, errIdentityProviderNotImplemented
 	case pc.isClosed.get():
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	case pc.signalingState.Get() != SignalingStateHaveRemoteOffer && pc.signalingState.Get() != SignalingStateHaveLocalPranswer:
@@ -787,12 +787,12 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 }
 
 // 4.4.1.6 Set the SessionDescription
-func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
+func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error { //nolint:gocognit
 	switch {
 	case pc.isClosed.get():
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	case newSDPType(sd.Type.String()) == SDPType(Unknown):
-		return &rtcerr.TypeError{Err: fmt.Errorf("the provided value '%d' is not a valid enum value of type SDPType", sd.Type)}
+		return &rtcerr.TypeError{Err: fmt.Errorf("%w: '%d' is not a valid enum value of type SDPType", errPeerConnSDPTypeInvalidValue, sd.Type)}
 	}
 
 	nextState, err := func() (SignalingState, error) {
@@ -802,8 +802,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		cur := pc.SignalingState()
 		setLocal := stateChangeOpSetLocal
 		setRemote := stateChangeOpSetRemote
-		newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous offer")}
-		newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: fmt.Errorf("new sdp does not match previous answer")}
+		newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errSDPDoesNotMatchOffer}
+		newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errSDPDoesNotMatchAnswer}
 
 		var nextState SignalingState
 		var err error
@@ -847,7 +847,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 					pc.pendingLocalDescription = sd
 				}
 			default:
-				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
+				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("%w: %s(%s)", errPeerConnStateChangeInvalid, op, sd.Type)}
 			}
 		case setRemote:
 			switch sd.Type {
@@ -879,10 +879,10 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 					pc.pendingRemoteDescription = sd
 				}
 			default:
-				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("invalid state change op: %s(%s)", op, sd.Type)}
+				return nextState, &rtcerr.OperationError{Err: fmt.Errorf("%w: %s(%s)", errPeerConnStateChangeInvalid, op, sd.Type)}
 			}
 		default:
-			return nextState, &rtcerr.OperationError{Err: fmt.Errorf("unhandled state change op: %q", op)}
+			return nextState, &rtcerr.OperationError{Err: fmt.Errorf("%w: %q", errPeerConnStateChangeUnhandled, op)}
 		}
 
 		return nextState, nil
@@ -916,7 +916,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 			desc.SDP = pc.lastOffer
 		default:
 			return &rtcerr.InvalidModificationError{
-				Err: fmt.Errorf("invalid SDP type supplied to SetLocalDescription(): %s", desc.Type),
+				Err: fmt.Errorf("%w: %s", errPeerConnSDPTypeInvalidValueSetLocalDescription, desc.Type),
 			}
 		}
 	}
@@ -958,7 +958,7 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 // nolint: gocyclo
-func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
+func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { //nolint:gocognit
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -982,7 +982,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 			midValue := getMidValue(media)
 			if midValue == "" {
-				return fmt.Errorf("RemoteDescription contained media section without mid value")
+				return errPeerConnRemoteDescriptionWithoutMidValue
 			}
 
 			if media.MediaName.Media == mediaSectionApplication {
@@ -1126,7 +1126,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
 	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
 	remoteIsPlanB := false
@@ -1135,6 +1135,8 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 		remoteIsPlanB = true
 	case SDPSemanticsUnifiedPlanWithFallback:
 		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
+	default:
+		// none
 	}
 
 	// Ensure we haven't already started a transceiver for this ssrc
@@ -1198,7 +1200,6 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 // startRTPSenders starts all outbound RTP streams
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
 	for _, transceiver := range currentTransceivers {
-		// TODO(sgotti) when in future we'll avoid replacing a transceiver sender just check the transceiver negotiation status
 		if transceiver.Sender() != nil && transceiver.Sender().isNegotiated() && !transceiver.Sender().hasSent() {
 			err := transceiver.Sender().Send(RTPSendParameters{
 				Encodings: RTPEncodingParameters{
@@ -1206,7 +1207,8 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 						SSRC:        transceiver.Sender().Track().SSRC(),
 						PayloadType: transceiver.Sender().Track().PayloadType(),
 					},
-				}})
+				},
+			})
 			if err != nil {
 				pc.log.Warnf("Failed to start Sender: %s", err)
 			}
@@ -1251,10 +1253,10 @@ func (pc *PeerConnection) startSCTP() {
 	pc.sctpTransport.lock.Unlock()
 }
 
-func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32) error {
+func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32) error { //nolint:gocognit
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
-		return fmt.Errorf("remote Description has not been set yet")
+		return errPeerConnRemoteDescriptionNil
 	}
 
 	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
@@ -1262,7 +1264,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32)
 		onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
 		for _, a := range onlyMediaSection.Attributes {
 			if a.Key == ssrcStr {
-				return fmt.Errorf("single media section has an explicit SSRC")
+				return errPeerConnSingleMediaSectionHasExplicitSSRC
 			}
 		}
 
@@ -1278,7 +1280,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32)
 			Direction: RTPTransceiverDirectionSendrecv,
 		})
 		if err != nil {
-			return fmt.Errorf("could not add transceiver for remote SSRC %d: %s", ssrc, err)
+			return fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
 		}
 		pc.startReceiver(incoming, t.Receiver())
 		return nil
@@ -1293,7 +1295,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32)
 	sdesMidExtMap := getExtMapByURI(matchedSDPMap, sdp.SDESMidURI)
 	sdesStreamIDExtMap := getExtMapByURI(matchedSDPMap, sdp.SDESRTPStreamIDURI)
 	if sdesMidExtMap == nil || sdesStreamIDExtMap == nil {
-		return fmt.Errorf("mid and rid RTP Extensions required for Simulcast")
+		return errPeerConnSimulcastMidAndRidRTPExtensionRequired
 	}
 
 	b := make([]byte, receiveMTU)
@@ -1339,7 +1341,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc uint32)
 		}
 	}
 
-	return fmt.Errorf("incoming SSRC failed Simulcast probing")
+	return errPeerConnSimulcastIncomingSSRCFailed
 }
 
 // undeclaredMediaProcessor handles RTP/RTCP packets that don't match any a:ssrc lines
@@ -1540,7 +1542,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 
 	direction := RTPTransceiverDirectionSendrecv
 	if len(init) > 1 {
-		return nil, fmt.Errorf("AddTransceiverFromKind only accepts one RtpTransceiverInit")
+		return nil, errPeerConnAddTransceiverFromKindOnlyAcceptsOne
 	} else if len(init) == 1 {
 		direction = init[0].Direction
 	}
@@ -1549,7 +1551,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 	case RTPTransceiverDirectionSendrecv:
 		codecs := pc.api.mediaEngine.GetCodecsByKind(kind)
 		if len(codecs) == 0 {
-			return nil, fmt.Errorf("no %s codecs found", kind.String())
+			return nil, fmt.Errorf("%w: %s", errPeerConnCodecsNotFound, kind.String())
 		}
 
 		track, err := pc.NewTrack(codecs[0].PayloadType, util.RandUint32(), util.MathRandAlpha(trackDefaultIDLength), util.MathRandAlpha(trackDefaultLabelLength))
@@ -1576,7 +1578,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 
 		return t, nil
 	default:
-		return nil, fmt.Errorf("AddTransceiverFromKind currently only supports recvonly and sendrecv")
+		return nil, errPeerConnAddTransceiverFromKindSupport
 	}
 }
 
@@ -1588,7 +1590,7 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 
 	direction := RTPTransceiverDirectionSendrecv
 	if len(init) > 1 {
-		return nil, fmt.Errorf("AddTransceiverFromTrack only accepts one RtpTransceiverInit")
+		return nil, errPeerConnAddTransceiverFromTrackOnlyAcceptsOne
 	} else if len(init) == 1 {
 		direction = init[0].Direction
 	}
@@ -1629,7 +1631,7 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 		pc.onNegotiationNeeded()
 		return t, nil
 	default:
-		return nil, fmt.Errorf("AddTransceiverFromTrack currently only supports sendonly and sendrecv")
+		return nil, errPeerConnAddTransceiverFromTrackOneTransceiver
 	}
 }
 
@@ -1715,7 +1717,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
 func (pc *PeerConnection) SetIdentityProvider(provider string) error {
-	return fmt.Errorf("TODO SetIdentityProvider")
+	return errPeerConnSetIdentityProviderNotImplemented
 }
 
 // WriteRTCP sends a user provided RTCP packet to the connected peer
@@ -1733,7 +1735,7 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 
 	writeStream, err := srtcpSession.OpenWriteStream()
 	if err != nil {
-		return fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
+		return fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
 	}
 
 	if _, err := writeStream.Write(raw); err != nil {
@@ -1804,7 +1806,7 @@ func (pc *PeerConnection) NewTrack(payloadType uint8, ssrc uint32, id, label str
 	if err != nil {
 		return nil, err
 	} else if codec.Payloader == nil {
-		return nil, fmt.Errorf("codec payloader not set")
+		return nil, errPeerConnCodecPayloaderNotSet
 	}
 
 	return NewTrack(payloadType, ssrc, id, label, codec)
@@ -2107,7 +2109,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 // generateMatchedSDP generates a SDP and takes the remote state into account
 // this is used everytime we have a RemoteDescription
 // nolint: gocyclo
-func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) {
+func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) { //nolint:gocognit
 	d, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
@@ -2132,7 +2134,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		midValue := getMidValue(media)
 		if midValue == "" {
-			return nil, fmt.Errorf("RemoteDescription contained media section without mid value")
+			return nil, errPeerConnRemoteDescriptionWithoutMidValue
 		}
 
 		if media.MediaName.Media == mediaSectionApplication {
@@ -2180,7 +2182,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			}
 			t, localTransceivers = findByMid(midValue, localTransceivers)
 			if t == nil {
-				return nil, fmt.Errorf("cannot find transceiver with mid %q", midValue)
+				return nil, fmt.Errorf("%w: %q", errPeerConnTranscieverMidNil, midValue)
 			}
 			if t.Sender() != nil {
 				t.Sender().setNegotiated()

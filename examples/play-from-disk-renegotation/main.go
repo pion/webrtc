@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
@@ -65,7 +66,12 @@ func createPeerConnection(w http.ResponseWriter, r *http.Request) {
 
 // Add a single video track
 func addVideo(w http.ResponseWriter, r *http.Request) {
-	videoTrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+	videoTrack, err := peerConnection.NewTrack(
+		webrtc.DefaultPayloadTypeVP8,
+		randutil.NewMathRandomGenerator().Uint32(),
+		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
+		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
+	)
 	if err != nil {
 		panic(err)
 	}

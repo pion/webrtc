@@ -9,7 +9,6 @@ import (
 
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/test"
-
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"errors"
 	"io"
 	"math"
 	"sync"
@@ -141,7 +140,7 @@ func (r *SCTPTransport) Stop() error {
 func (r *SCTPTransport) ensureDTLS() error {
 	dtlsTransport := r.Transport()
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
-		return errors.New("DTLS not established")
+		return errSCTPTransportDTLS
 	}
 
 	return nil
@@ -160,10 +159,12 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 			return
 		}
 
-		var ordered = true
-		var maxRetransmits *uint16
-		var maxPacketLifeTime *uint16
-		var val = uint16(dc.Config.ReliabilityParameter)
+		var (
+			maxRetransmits    *uint16
+			maxPacketLifeTime *uint16
+		)
+		val := uint16(dc.Config.ReliabilityParameter)
+		ordered := true
 
 		switch dc.Config.ChannelType {
 		case datachannel.ChannelTypeReliable:
@@ -195,7 +196,6 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
 		}, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
-
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)

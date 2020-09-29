@@ -654,7 +654,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 			)
 		}
 
-		switch s {
+		switch s { // nolint:exhaustive
 		case ICEGathererStateClosed:
 			close(seenClosed)
 			return

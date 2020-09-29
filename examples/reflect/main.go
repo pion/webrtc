@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
@@ -52,7 +52,7 @@ func main() {
 	}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video", "pion")
+	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}

@@ -203,11 +203,8 @@ func TestDataChannel_Send(t *testing.T) {
 					dc.OnMessage(func(msg DataChannelMessage) {
 						done <- true
 					})
-					// TODO: currently there is no way of properly subscribing to OnOpen with the js binding,
-					// because CreateDataChannel might return an already open data channel
-					//
-					e := dc.SendText("Ping")
-					if e != nil {
+
+					if e := dc.SendText("Ping"); e != nil {
 						// wasm binding doesn't fire OnOpen (we probably already missed it)
 						dc.OnOpen(func() {
 							e = dc.SendText("Ping")

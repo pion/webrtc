@@ -5,7 +5,6 @@ package webrtc
 import (
 	"context"
 	"io"
-	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
-
+	"github.com/pion/randutil"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v3/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +95,7 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
 	sender, err := pcOffer.AddTrack(vp8Track)
@@ -140,7 +139,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Multiple(t *testing.T) {
 		_, err := pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 		assert.NoError(t, err)
 
-		track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), trackName, trackName)
+		track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), trackName, trackName)
 		assert.NoError(t, err)
 
 		_, err = pcOffer.AddTrack(track)
@@ -222,7 +221,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
-	vp8Track, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo1", "bar1")
+	vp8Track, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo1", "bar1")
 	assert.NoError(t, err)
 	_, err = pcAnswer.AddTrack(vp8Track)
 	assert.NoError(t, err)
@@ -263,13 +262,13 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion1")
 	require.NoError(t, err)
 
 	sender1, err := pcOffer.AddTrack(track1)
 	require.NoError(t, err)
 
-	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	require.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(track2)
@@ -321,7 +320,7 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
 
-	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion3")
+	track3, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion3")
 	require.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(track3)
@@ -454,7 +453,7 @@ func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
 	rtpSender, err := pcOffer.AddTrack(vp8Track)
@@ -511,7 +510,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 	_, err = pcFirstOfferer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	vp8Track, err := pcSecondOfferer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	vp8Track, err := pcSecondOfferer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
 	_, err = pcSecondOfferer.AddTrack(vp8Track)
@@ -622,7 +621,7 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	localTrack, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	localTrack, err := pcAnswer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
 	sender, err := pcAnswer.AddTrack(localTrack)
@@ -724,7 +723,7 @@ func TestAddDataChannelDuringRenegotation(t *testing.T) {
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(track)
@@ -792,7 +791,7 @@ func TestNegotiationTrackAndChannel(t *testing.T) {
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	assert.NoError(t, err)
 
 	pcAnswer.OnDataChannel(func(*DataChannel) {
@@ -860,7 +859,7 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	assert.NoError(t, err)
 
 	pcOffer.OnNegotiationNeeded(func() {
@@ -924,7 +923,7 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	})
 
 	for i := 0; i < 500; i++ {
-		track, err := pcA.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+		track, err := pcA.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 		assert.NoError(t, err)
 
 		_, err = pcA.AddTrack(track)

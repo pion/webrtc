@@ -3,9 +3,9 @@
 package webrtc
 
 import (
-	"math/rand"
 	"testing"
 
+	"github.com/pion/randutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TestNewVideoTrack(t *testing.T) {
 
 	peer, _ := api.NewPeerConnection(peerConfig)
 
-	_, err := peer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	_, err := peer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		t.Error("Failed to new video track")
 	}
@@ -43,7 +43,7 @@ func TestNewAudioTrack(t *testing.T) {
 
 	peer, _ := api.NewPeerConnection(peerConfig)
 
-	_, err := peer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion")
+	_, err := peer.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion")
 	if err != nil {
 		t.Error("Failed to new audio track")
 	}
@@ -64,12 +64,12 @@ func TestNewTracks(t *testing.T) {
 
 	peer, _ := api.NewPeerConnection(peerConfig)
 
-	_, err := peer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion")
+	_, err := peer.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion")
 	if err != nil {
 		t.Error("Failed to new audio track")
 	}
 
-	_, err = peer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	_, err = peer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		t.Error("Failed to new video track")
 	}
@@ -90,12 +90,12 @@ func TestNewTracksWrite(t *testing.T) {
 
 	peer, _ := api.NewPeerConnection(peerConfig)
 
-	videoTrack, err := peer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion")
+	videoTrack, err := peer.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion")
 	if err != nil {
 		t.Error("Failed to new video track")
 	}
 
-	audioTrack, err := peer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion")
+	audioTrack, err := peer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		t.Error("Failed to new audio track")
 	}
@@ -122,7 +122,7 @@ func TestTrackReadWhenNotAdded(t *testing.T) {
 	peerConnection, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := peerConnection.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion")
+	track, err := peerConnection.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion")
 	assert.NoError(t, err)
 
 	_, err = track.Read([]byte{})

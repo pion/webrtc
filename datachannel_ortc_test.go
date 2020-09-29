@@ -3,13 +3,13 @@
 package webrtc
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {

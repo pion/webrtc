@@ -1,6 +1,7 @@
 package mux
 
 import (
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -39,9 +40,9 @@ func (e *Endpoint) Read(p []byte) (int, error) {
 // Write writes len(p) bytes to the underlying conn
 func (e *Endpoint) Write(p []byte) (int, error) {
 	n, err := e.mux.nextConn.Write(p)
-	if err == ice.ErrNoCandidatePairs {
+	if errors.Is(err, ice.ErrNoCandidatePairs) {
 		return 0, nil
-	} else if err == ice.ErrClosed {
+	} else if errors.Is(err, ice.ErrClosed) {
 		return 0, io.ErrClosedPipe
 	}
 

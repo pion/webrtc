@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -14,6 +15,11 @@ import (
 
 // Examples represents the examples loaded from examples.json.
 type Examples []*Example
+
+var (
+	errListExamples  = errors.New("failed to list examples (please run in the examples folder)")
+	errParseExamples = errors.New("failed to parse examples")
+)
 
 // Example represents an example loaded from examples.json.
 type Example struct {
@@ -113,7 +119,7 @@ func serve(addr string) error {
 func getExamples() (*Examples, error) {
 	file, err := os.Open("./examples.json")
 	if err != nil {
-		return nil, fmt.Errorf("failed to list examples (please run in the examples folder): %v", err)
+		return nil, fmt.Errorf("%w: %v", errListExamples, err)
 	}
 	defer func() {
 		closeErr := file.Close()
@@ -125,7 +131,7 @@ func getExamples() (*Examples, error) {
 	var examples Examples
 	err = json.NewDecoder(file).Decode(&examples)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse examples: %v", err)
+		return nil, fmt.Errorf("%w: %v", errParseExamples, err)
 	}
 
 	for _, example := range examples {

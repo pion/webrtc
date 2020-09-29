@@ -1,18 +1,19 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
-func main() {
+func main() { // nolint:gocognit
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Wait for the offer to be pasted
@@ -54,7 +55,7 @@ func main() {
 	}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, rand.Uint32(), "video", "pion")
+	outputTrack, err := peerConnection.NewTrack(videoCodecs[0].PayloadType, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}
@@ -174,7 +175,7 @@ func main() {
 			// Keep an increasing sequence number
 			packet.SequenceNumber = i
 			// Write out the packet, ignoring closed pipe if nobody is listening
-			if err := outputTrack.WriteRTP(packet); err != nil && err != io.ErrClosedPipe {
+			if err := outputTrack.WriteRTP(packet); err != nil && !errors.Is(err, io.ErrClosedPipe) {
 				panic(err)
 			}
 		}

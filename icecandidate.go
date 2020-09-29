@@ -122,7 +122,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 		}
 		return ice.NewCandidateRelay(&config)
 	default:
-		return nil, fmt.Errorf("unknown candidate type: %s", c.Typ)
+		return nil, fmt.Errorf("%w: %s", errICECandidateTypeUnknown, c.Typ)
 	}
 }
 
@@ -137,7 +137,7 @@ func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 	case ice.CandidateTypeRelay:
 		return ICECandidateTypeRelay, nil
 	default:
-		return ICECandidateType(t), fmt.Errorf("unknown ICE candidate type: %s", t)
+		return ICECandidateType(t), fmt.Errorf("%w: %s", errICECandidateTypeUnknown, t)
 	}
 }
 

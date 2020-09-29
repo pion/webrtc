@@ -5,21 +5,28 @@ package webrtc
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	errIncomingTrackIDInvalid    = errors.New("incoming Track ID is invalid")
+	errIncomingTrackLabelInvalid = errors.New("incoming Track Label is invalid")
+	errNoTransceiverwithMid      = errors.New("no transceiver with mid")
 )
 
 func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
@@ -72,12 +79,12 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 	pcAnswer.OnTrack(func(track *Track, receiver *RTPReceiver) {
 		if track.ID() != expectedTrackID {
-			trackMetadataValid <- fmt.Errorf("Incoming Track ID is invalid expected(%s) actual(%s)", expectedTrackID, track.ID())
+			trackMetadataValid <- fmt.Errorf("%w: expected(%s) actual(%s)", errIncomingTrackIDInvalid, expectedTrackID, track.ID())
 			return
 		}
 
 		if track.Label() != expectedTrackLabel {
-			trackMetadataValid <- fmt.Errorf("Incoming Track Label is invalid expected(%s) actual(%s)", expectedTrackLabel, track.Label())
+			trackMetadataValid <- fmt.Errorf("%w: expected(%s) actual(%s)", errIncomingTrackLabelInvalid, expectedTrackLabel, track.Label())
 			return
 		}
 		close(trackMetadataValid)
@@ -121,7 +128,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}
 	})
 
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), expectedTrackID, expectedTrackLabel)
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), expectedTrackID, expectedTrackLabel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,11 +240,11 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
+	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +333,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +413,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,9 +462,9 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 
-	if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != io.ErrClosedPipe {
+	if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatal("Write to Track with no RTPSenders did not return io.ErrClosedPipe")
-	} else if err = pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}}); err != io.ErrClosedPipe {
+	} else if err = pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}}); !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatal("WriteRTCP to closed PeerConnection did not return io.ErrClosedPipe")
 	}
 }
@@ -482,7 +489,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	assert.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(vp8Writer)
@@ -573,7 +580,7 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	track, err := pc.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +629,6 @@ func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
 		"track-id",
 		"track-label",
 	)
-
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -680,7 +686,6 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 		"track-id",
 		"track-label",
 	)
-
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -770,7 +775,7 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 	assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
 
 	addTrack := func() (*Track, *RTPSender) {
-		track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+		track, err := pc.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 		assert.NoError(t, err)
 
 		sender, err := pc.AddTrack(track)
@@ -811,7 +816,7 @@ func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
 	dtlsTransport := pc.dtlsTransport
 	pc.dtlsTransport = nil
 
-	track, err := pc.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "foo", "bar")
+	track, err := pc.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "foo", "bar")
 	assert.NoError(t, err)
 
 	_, err = pc.AddTrack(track)
@@ -929,7 +934,6 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 		"track-id",
 		"track-label",
 	)
-
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -1051,7 +1055,7 @@ func TestGetRegisteredRTPCodecs(t *testing.T) {
 func TestPlanBMediaExchange(t *testing.T) {
 	runTest := func(trackCount int, t *testing.T) {
 		addSingleTrack := func(p *PeerConnection) *Track {
-			track, err := p.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), fmt.Sprintf("video-%d", rand.Uint32()), fmt.Sprintf("video-%d", rand.Uint32()))
+			track, err := p.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()), fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()))
 			assert.NoError(t, err)
 
 			_, err = p.AddTrack(track)
@@ -1137,7 +1141,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { assert.NoError(t, pcAnswer.Close()) }()
 
-	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion1")
 	require.NoError(t, err)
 
 	sender1, err := pcOffer.AddTrack(track1)
@@ -1158,7 +1162,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 
 	// Add a new track between providing the offer and applying the answer
 
-	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	track2, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion2")
 	require.NoError(t, err)
 
 	sender2, err := pcOffer.AddTrack(track2)
@@ -1186,7 +1190,7 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 			}
 			return transceiver.Receiver() != nil && transceiver.Receiver().haveReceived(), nil
 		}
-		return false, fmt.Errorf("no transceiver with mid %q", mid)
+		return false, fmt.Errorf("%w: %q", errNoTransceiverwithMid, mid)
 	}
 
 	api := NewAPI()
@@ -1203,7 +1207,7 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion1")
+	track1, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion1")
 	require.NoError(t, err)
 
 	sender1, err := pcOffer.AddTrack(track1)

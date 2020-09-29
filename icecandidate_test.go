@@ -87,7 +87,7 @@ func TestICECandidate_Convert(t *testing.T) {
 	for i, testCase := range testCases {
 		var expectedICE ice.Candidate
 		var err error
-		switch testCase.expectedType {
+		switch testCase.expectedType { // nolint:exhaustive
 		case ice.CandidateTypeHost:
 			config := ice.CandidateHostConfig{
 				Network:    testCase.expectedNetwork,
@@ -110,7 +110,6 @@ func TestICECandidate_Convert(t *testing.T) {
 				RelPort:    testCase.expectedRelatedAddress.Port,
 			}
 			expectedICE, err = ice.NewCandidateServerReflexive(&config)
-			assert.NoError(t, err)
 		case ice.CandidateTypePeerReflexive:
 			config := ice.CandidatePeerReflexiveConfig{
 				Network:    testCase.expectedNetwork,

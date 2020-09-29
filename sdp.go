@@ -54,7 +54,7 @@ const (
 )
 
 // extract all trackDetails from an SDP.
-func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) []trackDetails {
+func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) []trackDetails { // nolint:gocognit
 	incomingTracks := []trackDetails{}
 	rtxRepairFlows := map[uint32]bool{}
 
@@ -285,7 +285,7 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 func addTransceiverSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, extMaps map[SDPSectionType][]sdp.ExtMap, mediaSection mediaSection) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
-		return false, fmt.Errorf("addTransceiverSDP() called with 0 transceivers")
+		return false, errSDPZeroTransceivers
 	}
 	// Use the first transceiver to generate the section attributes
 	t := transceivers[0]
@@ -385,9 +385,9 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 
 	for _, m := range mediaSections {
 		if m.data && len(m.transceivers) != 0 {
-			return nil, fmt.Errorf("invalid Media Section. Media + DataChannel both enabled")
+			return nil, errSDPMediaSectionMediaDataChanInvalid
 		} else if !isPlanB && len(m.transceivers) > 1 {
-			return nil, fmt.Errorf("invalid Media Section. Can not have multiple tracks in one MediaSection in UnifiedPlan")
+			return nil, errSDPMediaSectionMultipleTrackInvalid
 		}
 
 		shouldAddID := true
@@ -593,11 +593,11 @@ func remoteExts(session *sdp.SessionDescription) (map[SDPSectionType]map[int]sdp
 		}
 		em := &sdp.ExtMap{}
 		if err := em.Unmarshal("extmap:" + attr.Value); err != nil {
-			return fmt.Errorf("failed to parse ExtMap: %v", err)
+			return fmt.Errorf("%w: %v", errSDPParseExtMap, err)
 		}
 		if remoteExtMap, ok := remoteExtMaps[mediaType][em.Value]; ok {
 			if remoteExtMap.Value != em.Value {
-				return fmt.Errorf("RemoteDescription changed some extmaps values")
+				return errSDPRemoteDescriptionChangedExtMap
 			}
 		} else {
 			remoteExtMaps[mediaType][em.Value] = *em
