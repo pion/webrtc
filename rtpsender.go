@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"fmt"
 	"io"
 	"sync"
 
@@ -19,6 +18,7 @@ type RTPSender struct {
 
 	transport *DTLSTransport
 
+	// nolint:godox
 	// TODO(sgotti) remove this when in future we'll avoid replacing
 	// a transceiver sender since we can just check the
 	// transceiver negotiation status
@@ -34,15 +34,15 @@ type RTPSender struct {
 // NewRTPSender constructs a new RTPSender
 func (api *API) NewRTPSender(track *Track, transport *DTLSTransport) (*RTPSender, error) {
 	if track == nil {
-		return nil, fmt.Errorf("Track must not be nil")
+		return nil, errRTPSenderTrackNil
 	} else if transport == nil {
-		return nil, fmt.Errorf("DTLSTransport must not be nil")
+		return nil, errRTPSenderDTLSTransportNil
 	}
 
 	track.mu.Lock()
 	defer track.mu.Unlock()
 	if track.receiver != nil {
-		return nil, fmt.Errorf("RTPSender can not be constructed with remote track")
+		return nil, errRTPSenderCannotConstructRemoteTrack
 	}
 	track.totalSenderCount++
 
@@ -94,7 +94,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	defer r.mu.Unlock()
 
 	if r.hasSent() {
-		return fmt.Errorf("Send has already been called")
+		return errRTPSenderSendAlreadyCalled
 	}
 
 	srtcpSession, err := r.transport.getSRTCPSession()
@@ -176,7 +176,7 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 func (r *RTPSender) SendRTP(header *rtp.Header, payload []byte) (int, error) {
 	select {
 	case <-r.stopCalled:
-		return 0, fmt.Errorf("RTPSender has been stopped")
+		return 0, errRTPSenderStopped
 	case <-r.sendCalled:
 		srtpSession, err := r.transport.getSRTPSession()
 		if err != nil {

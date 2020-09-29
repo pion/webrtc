@@ -84,7 +84,7 @@ func NewNetworkType(raw string) (NetworkType, error) {
 	case networkTypeTCP6Str:
 		return NetworkTypeTCP6, nil
 	default:
-		return NetworkType(Unknown), fmt.Errorf("unknown network type: %s", raw)
+		return NetworkType(Unknown), fmt.Errorf("%w: %s", errNetworkTypeUnknown, raw)
 	}
 }
 
@@ -99,6 +99,6 @@ func getNetworkType(iceNetworkType ice.NetworkType) (NetworkType, error) {
 	case ice.NetworkTypeTCP6:
 		return NetworkTypeTCP6, nil
 	default:
-		return NetworkType(Unknown), fmt.Errorf("unknown network type: %s", iceNetworkType.String())
+		return NetworkType(Unknown), fmt.Errorf("%w: %s", errNetworkTypeUnknown, iceNetworkType.String())
 	}
 }

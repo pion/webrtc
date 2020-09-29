@@ -103,11 +103,11 @@ func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
 	for _, algo := range fingerprintAlgorithms {
 		name, err := fingerprint.StringFromHash(algo)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create fingerprint: %v", err)
+			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		value, err := fingerprint.Fingerprint(c.x509Cert, algo)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create fingerprint: %v", err)
+			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		res[i] = DTLSFingerprint{
 			Algorithm: name,
@@ -164,7 +164,7 @@ func (c Certificate) collectStats(report *statsReportCollector) error {
 	report.Collecting()
 
 	fingerPrintAlgo, err := c.GetFingerprints()
-	if err  != nil {
+	if err != nil {
 		return err
 	}
 

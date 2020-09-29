@@ -75,7 +75,6 @@ func (r StatsReport) GetCertificateStats(c *Certificate) (CertificateStats, bool
 		return CertificateStats{}, false
 	}
 	return certificateStats, true
-
 }
 
 // GetCodecStats is a helper method to return the associated stats for a given Codec

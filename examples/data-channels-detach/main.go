@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v3"
-
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 

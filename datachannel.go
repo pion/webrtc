@@ -15,7 +15,7 @@ import (
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
 
-const dataChannelBufferSize = math.MaxUint16 //message size limit for Chromium
+const dataChannelBufferSize = math.MaxUint16 // message size limit for Chromium
 var errSCTPNotEstablished = errors.New("SCTP not established")
 
 // DataChannel represents a WebRTC DataChannel
@@ -372,11 +372,11 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	defer d.mu.Unlock()
 
 	if !d.api.settingEngine.detach.DataChannels {
-		return nil, fmt.Errorf("enable detaching by calling webrtc.DetachDataChannels()")
+		return nil, errDetachNotEnabled
 	}
 
 	if d.dataChannel == nil {
-		return nil, fmt.Errorf("datachannel not opened yet, try calling Detach from OnOpen")
+		return nil, errDetachBeforeOpened
 	}
 
 	d.detachCalled = true

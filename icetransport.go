@@ -4,7 +4,7 @@ package webrtc
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -83,7 +83,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to start ICETransport")
+		return fmt.Errorf("%w: unable to start ICETransport", errICEAgentNotExist)
 	}
 
 	if err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
@@ -99,7 +99,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	if err := agent.OnSelectedCandidatePairChange(func(local, remote ice.Candidate) {
 		candidates, err := newICECandidatesFromICE([]ice.Candidate{local, remote})
 		if err != nil {
-			t.log.Warnf("Unable to convert ICE candidates to ICECandidates: %s", err)
+			t.log.Warnf("%w: %s", errICECandiatesCoversionFailed, err)
 			return
 		}
 		t.onSelectedCandidatePairChange(NewICECandidatePair(&candidates[0], &candidates[1]))
@@ -131,7 +131,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 			params.Password)
 
 	default:
-		err = errors.New("unknown ICE Role")
+		err = errICERoleUnknown
 	}
 
 	// Reacquire the lock to set the connection/mux
@@ -160,7 +160,7 @@ func (t *ICETransport) restart() error {
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to restart ICETransport")
+		return fmt.Errorf("%w: unable to restart ICETransport", errICEAgentNotExist)
 	}
 
 	if err := agent.Restart(t.gatherer.api.settingEngine.candidates.UsernameFragment, t.gatherer.api.settingEngine.candidates.Password); err != nil {
@@ -227,7 +227,7 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to set remote candidates")
+		return fmt.Errorf("%w: unable to set remote candidates", errICEAgentNotExist)
 	}
 
 	for _, c := range remoteCandidates {
@@ -260,7 +260,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to add remote candidates")
+		return fmt.Errorf("%w: unable to add remote candidates", errICEAgentNotExist)
 	}
 
 	err = agent.AddRemoteCandidate(c)
@@ -287,7 +287,7 @@ func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
 
 func (t *ICETransport) ensureGatherer() error {
 	if t.gatherer == nil {
-		return errors.New("gatherer not started")
+		return errICEGathererNotStarted
 	} else if t.gatherer.getAgent() == nil {
 		if err := t.gatherer.createAgent(); err != nil {
 			return err
@@ -341,7 +341,7 @@ func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
-		return errors.New("ICEAgent does not exist, unable to SetRemoteCredentials")
+		return fmt.Errorf("%w: unable to SetRemoteCredentials", errICEAgentNotExist)
 	}
 
 	return agent.SetRemoteCredentials(newUfrag, newPwd)

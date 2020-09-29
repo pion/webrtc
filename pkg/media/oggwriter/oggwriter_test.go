@@ -2,7 +2,6 @@ package oggwriter
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 
@@ -54,7 +53,7 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OggWriter shouldn't be able to write something to a closed file",
 			messageClose: "OggWriter should be able to close an already closed file",
 			packet:       validPacket,
-			err:          fmt.Errorf("file not opened"),
+			err:          errFileNotOpened,
 			closeErr:     nil,
 		},
 		{
@@ -62,7 +61,7 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OggWriter shouldn't be able to write an empty packet",
 			messageClose: "OggWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          fmt.Errorf("invalid nil packet"),
+			err:          errInvalidNilPacket,
 			closeErr:     nil,
 		},
 		{
@@ -78,7 +77,7 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			message:      "OggWriter shouldn't be able to write something to a closed file",
 			messageClose: "OggWriter should be able to close an already closed file",
 			packet:       nil,
-			err:          fmt.Errorf("file not opened"),
+			err:          errFileNotOpened,
 			closeErr:     nil,
 		},
 	}

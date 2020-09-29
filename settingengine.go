@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"errors"
 	"time"
 
 	"github.com/pion/ice/v2"
@@ -166,7 +165,7 @@ func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateTy
 // 		Act as DTLS Server, wait for ClientHello
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
-		return errors.New("SetAnsweringDTLSRole must DTLSRoleClient or DTLSRoleServer")
+		return errSettingEngineSetAnsweringDTLSRole
 	}
 
 	e.answeringDTLSRole = role

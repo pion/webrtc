@@ -67,8 +67,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 		// math/rand a weak RNG, but this does not need to be secure. Ignore with #nosec
 		/* #nosec */
 		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
-		/* #nosec */
-		if err != nil {
+		/* #nosec */ if err != nil {
 			t.Fatalf("Failed to get random sleep duration: %s", err)
 		}
 		time.Sleep(time.Duration(randInt.Int64()) * time.Microsecond)
@@ -117,7 +116,7 @@ func TestDataChannelParamters_Go(t *testing.T) {
 	defer report()
 
 	t.Run("MaxPacketLifeTime exchange", func(t *testing.T) {
-		var ordered = true
+		ordered := true
 		var maxPacketLifeTime uint16 = 3
 		options := &DataChannelInit{
 			Ordered:           &ordered,
@@ -218,8 +217,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 					t.Fatalf("Failed to send string on data channel")
 				}
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
-
-				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
 
@@ -300,8 +298,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 					t.Fatalf("Failed to send string on data channel")
 				}
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
-
-				//assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
 
@@ -436,18 +433,13 @@ func TestEOF(t *testing.T) {
 		lim := test.TimeOut(time.Second * 5)
 		defer lim.Stop()
 
-		// Use Detach data channels mode
-		s := SettingEngine{}
-		//s.DetachDataChannels()
-		api := NewAPI(WithSettingEngine(s))
-
 		// Set up two peer connections.
 		config := Configuration{}
-		pca, err := api.NewPeerConnection(config)
+		pca, err := NewPeerConnection(config)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pcb, err := api.NewPeerConnection(config)
+		pcb, err := NewPeerConnection(config)
 		if err != nil {
 			t.Fatal(err)
 		}

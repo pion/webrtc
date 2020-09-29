@@ -2,6 +2,7 @@ package rtpdump
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"regexp"
 	"sync"
@@ -30,7 +31,7 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 	}
 
 	// The file starts with #!rtpplay1.0 address/port\n
-	var preambleRegexp = regexp.MustCompile(`#\!rtpplay1\.0 \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,5}\n`)
+	preambleRegexp := regexp.MustCompile(`#\!rtpplay1\.0 \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,5}\n`)
 	if !preambleRegexp.Match(peek) {
 		return nil, hdr, errMalformed
 	}
@@ -46,7 +47,7 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 
 	hBuf := make([]byte, headerLen)
 	_, err = io.ReadFull(bio, hBuf)
-	if err == io.ErrUnexpectedEOF || err == io.EOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
 		return nil, hdr, errMalformed
 	}
 	if err != nil {
@@ -70,7 +71,7 @@ func (r *Reader) Next() (Packet, error) {
 	hBuf := make([]byte, pktHeaderLen)
 
 	_, err := io.ReadFull(r.reader, hBuf)
-	if err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return Packet{}, errMalformed
 	}
 	if err != nil {
@@ -88,7 +89,7 @@ func (r *Reader) Next() (Packet, error) {
 
 	payload := make([]byte, h.Length-pktHeaderLen)
 	_, err = io.ReadFull(r.reader, payload)
-	if err == io.ErrUnexpectedEOF {
+	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return Packet{}, errMalformed
 	}
 	if err != nil {

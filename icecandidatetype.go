@@ -57,7 +57,7 @@ func NewICECandidateType(raw string) (ICECandidateType, error) {
 	case iceCandidateTypeRelayStr:
 		return ICECandidateTypeRelay, nil
 	default:
-		return ICECandidateType(Unknown), fmt.Errorf("unknown ICE candidate type: %s", raw)
+		return ICECandidateType(Unknown), fmt.Errorf("%w: %s", errICECandidateTypeUnknown, raw)
 	}
 }
 
@@ -88,9 +88,7 @@ func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error)
 		return ICECandidateTypeRelay, nil
 	default:
 		// NOTE: this should never happen[tm]
-		err := fmt.Errorf(
-			"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type: %s",
-			candidateType.String())
+		err := fmt.Errorf("%w: %s", errICEInvalidConvertCandidateType, candidateType.String())
 		return ICECandidateType(Unknown), err
 	}
 }

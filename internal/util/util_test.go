@@ -11,7 +11,7 @@ func TestMathRandAlpha(t *testing.T) {
 		t.Errorf("MathRandAlpha return invalid length")
 	}
 
-	var isLetter = regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
+	isLetter := regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
 	if !isLetter(MathRandAlpha(10)) {
 		t.Errorf("MathRandAlpha should be AlphaNumeric only")
 	}
@@ -19,10 +19,10 @@ func TestMathRandAlpha(t *testing.T) {
 
 func TestMultiError(t *testing.T) {
 	rawErrs := []error{
-		errors.New("err1"),
-		errors.New("err2"),
-		errors.New("err3"),
-		errors.New("err4"),
+		errors.New("err1"), //nolint
+		errors.New("err2"), //nolint
+		errors.New("err3"), //nolint
+		errors.New("err4"), //nolint
 	}
 	errs := FlattenErrs([]error{
 		rawErrs[0],

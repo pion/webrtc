@@ -68,6 +68,7 @@ func (t RTPTransceiverDirection) Revers() RTPTransceiverDirection {
 		return RTPTransceiverDirectionRecvonly
 	case RTPTransceiverDirectionRecvonly:
 		return RTPTransceiverDirectionSendonly
+	default:
+		return t
 	}
-	return t
 }

@@ -2,7 +2,7 @@ package ivfreader
 
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -127,7 +127,7 @@ func TestIVFReader_ParseIncompleteFrameHeader(t *testing.T) {
 
 	assert.Nil(payload, "Payload should be nil")
 	assert.Nil(header, "Incomplete header should be nil")
-	assert.Equal(fmt.Errorf("incomplete frame header"), err)
+	assert.Equal(errIncompleteFrameHeader, err)
 }
 
 func TestIVFReader_ParseIncompleteFramePayload(t *testing.T) {
@@ -150,7 +150,7 @@ func TestIVFReader_ParseIncompleteFramePayload(t *testing.T) {
 
 	assert.Nil(payload, "Incomplete payload should be nil")
 	assert.Nil(header, "Header should be nil")
-	assert.Equal(fmt.Errorf("incomplete frame data"), err)
+	assert.Equal(errIncompleteFrameData, err)
 }
 
 func TestIVFReader_EOFWhenNoFramesLeft(t *testing.T) {
@@ -163,5 +163,5 @@ func TestIVFReader_EOFWhenNoFramesLeft(t *testing.T) {
 
 	_, _, err = reader.ParseNextFrame()
 
-	assert.Equal(fmt.Errorf("EOF"), err)
+	assert.Equal(io.EOF, err)
 }

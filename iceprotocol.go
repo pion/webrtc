@@ -31,7 +31,7 @@ func NewICEProtocol(raw string) (ICEProtocol, error) {
 	case strings.EqualFold(iceProtocolTCPStr, raw):
 		return ICEProtocolTCP, nil
 	default:
-		return ICEProtocol(Unknown), fmt.Errorf("unknown protocol: %s", raw)
+		return ICEProtocol(Unknown), fmt.Errorf("%w: %s", errICEProtocolUnknown, raw)
 	}
 }
 

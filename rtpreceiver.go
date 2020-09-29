@@ -36,7 +36,7 @@ type RTPReceiver struct {
 // NewRTPReceiver constructs a new RTPReceiver
 func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RTPReceiver, error) {
 	if transport == nil {
-		return nil, fmt.Errorf("DTLSTransport must not be nil")
+		return nil, errRTPReceiverDTLSTransportNil
 	}
 
 	return &RTPReceiver{
@@ -87,7 +87,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	defer r.mu.Unlock()
 	select {
 	case <-r.received:
-		return fmt.Errorf("Receive has already been called")
+		return errRTPReceiverReceiveAlreadyCalled
 	default:
 	}
 	defer close(r.received)
@@ -197,7 +197,7 @@ func (r *RTPReceiver) readRTP(b []byte, reader *Track) (n int, err error) {
 		return t.rtpReadStream.Read(b)
 	}
 
-	return 0, fmt.Errorf("unable to find stream for Track with SSRC(%d)", reader.SSRC())
+	return 0, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
 }
 
 // receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
@@ -224,7 +224,7 @@ func (r *RTPReceiver) receiveForRid(rid string, codec *RTPCodec, ssrc uint32) (*
 		}
 	}
 
-	return nil, fmt.Errorf("no trackStreams found for SSRC(%d)", ssrc)
+	return nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
 }
 
 func (r *RTPReceiver) streamsForSSRC(ssrc uint32) (*srtp.ReadStreamSRTP, *srtp.ReadStreamSRTCP, error) {

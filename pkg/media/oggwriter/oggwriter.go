@@ -3,11 +3,11 @@ package oggwriter
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"io"
-	"math/rand"
 	"os"
 
+	"github.com/pion/randutil"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 )
@@ -20,6 +20,11 @@ const (
 	idPageSignature                    = "OpusHead"
 	commentPageSignature               = "OpusTags"
 	pageHeaderSignature                = "OggS"
+)
+
+var (
+	errFileNotOpened    = errors.New("file not opened")
+	errInvalidNilPacket = errors.New("invalid nil packet")
 )
 
 // OggWriter is used to take RTP packets and write them to an OGG on disk
@@ -53,14 +58,14 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, e
 // NewWith initialize a new OGG Opus writer with an io.Writer output
 func NewWith(out io.Writer, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
 	if out == nil {
-		return nil, fmt.Errorf("file not opened")
+		return nil, errFileNotOpened
 	}
 
 	writer := &OggWriter{
 		stream:        out,
 		sampleRate:    sampleRate,
 		channelCount:  channelCount,
-		serial:        rand.Uint32(),
+		serial:        randutil.NewMathRandomGenerator().Uint32(),
 		checksumTable: generateChecksumTable(),
 
 		// Timestamp and Granule MUST start from 1
@@ -102,7 +107,7 @@ func (i *OggWriter) writeHeaders() error {
 	// ID Header
 	oggIDHeader := make([]byte, 19)
 
-	copy(oggIDHeader[0:], []byte(idPageSignature))                  // Magic Signature 'OpusHead'
+	copy(oggIDHeader[0:], idPageSignature)                          // Magic Signature 'OpusHead'
 	oggIDHeader[8] = 1                                              // Version
 	oggIDHeader[9] = uint8(i.channelCount)                          // Channel count
 	binary.LittleEndian.PutUint16(oggIDHeader[10:], defaultPreSkip) // pre-skip
@@ -120,10 +125,10 @@ func (i *OggWriter) writeHeaders() error {
 
 	// Comment Header
 	oggCommentHeader := make([]byte, 21)
-	copy(oggCommentHeader[0:], []byte(commentPageSignature)) // Magic Signature 'OpusTags'
-	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)   // Vendor Length
-	copy(oggCommentHeader[12:], []byte("pion"))              // Vendor name 'pion'
-	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0)  // User Comment List Length
+	copy(oggCommentHeader[0:], commentPageSignature)        // Magic Signature 'OpusTags'
+	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)  // Vendor Length
+	copy(oggCommentHeader[12:], "pion")                     // Vendor name 'pion'
+	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0) // User Comment List Length
 
 	// RFC specifies that the page where the CommentHeader completes should have a granule position of 0
 	data = i.createPage(oggCommentHeader, pageHeaderTypeContinuationOfStream, 0, i.pageIndex)
@@ -143,7 +148,7 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 	i.lastPayloadSize = len(payload)
 	page := make([]byte, pageHeaderSize+1+i.lastPayloadSize)
 
-	copy(page[0:], []byte(pageHeaderSignature))         // page headers starts with 'OggS'
+	copy(page[0:], pageHeaderSignature)                 // page headers starts with 'OggS'
 	page[4] = 0                                         // Version
 	page[5] = headerType                                // 1 = continuation, 2 = beginning of stream, 4 = end of stream
 	binary.LittleEndian.PutUint64(page[6:], granulePos) // granule position
@@ -165,7 +170,7 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 // WriteRTP adds a new packet and writes the appropriate headers for it
 func (i *OggWriter) WriteRTP(packet *rtp.Packet) error {
 	if packet == nil {
-		return fmt.Errorf("packet must not be nil")
+		return errInvalidNilPacket
 	}
 
 	opusPacket := codecs.OpusPacket{}
@@ -230,7 +235,7 @@ func (i *OggWriter) Close() error {
 // so we can set values for EOS
 func (i *OggWriter) writeToStream(p []byte) error {
 	if i.stream == nil {
-		return fmt.Errorf("file not opened")
+		return errFileNotOpened
 	}
 
 	_, err := i.stream.Write(p)

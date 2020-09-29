@@ -2,7 +2,6 @@ package ivfwriter
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 
@@ -125,7 +124,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			message:      "IVFWriter shouldn't be able to write something to a closed file",
 			messageClose: "IVFWriter should be able to close an already closed file",
 			packet:       nil,
-			err:          fmt.Errorf("file not opened"),
+			err:          errFileNotOpened,
 			closeErr:     nil,
 		},
 		{
@@ -133,7 +132,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			message:      "IVFWriter shouldn't be able to write something an empty packet",
 			messageClose: "IVFWriter should be able to close the file",
 			packet:       &rtp.Packet{},
-			err:          fmt.Errorf("invalid nil packet"),
+			err:          errInvalidNilPacket,
 			closeErr:     nil,
 		},
 		{
@@ -149,7 +148,7 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			message:      "IVFWriter shouldn't be able to write something to a closed file",
 			messageClose: "IVFWriter should be able to close an already closed file",
 			packet:       nil,
-			err:          fmt.Errorf("file not opened"),
+			err:          errFileNotOpened,
 			closeErr:     nil,
 		},
 		{

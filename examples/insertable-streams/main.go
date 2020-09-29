@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// Create a video track
-	videoTrack, err := peerConnection.NewTrack(payloadType, rand.Uint32(), "video", "pion")
+	videoTrack, err := peerConnection.NewTrack(payloadType, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
 	if err != nil {
 		panic(err)
 	}

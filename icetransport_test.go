@@ -3,11 +3,11 @@
 package webrtc
 
 import (
-	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
+	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, randutil.NewMathRandomGenerator().Uint32(), "audio", "pion1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	iceComplete := make(chan bool)
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
-			time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
+			time.Sleep(3 * time.Second)
 			close(iceComplete)
 		}
 	})
