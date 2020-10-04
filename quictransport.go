@@ -8,6 +8,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,11 @@ type QUICTransport struct {
 
 	loggingFactory logging.LoggerFactory
 }
+
+var (
+	errQuicTransportFingerprintNoMatch      = errors.New("no matching fingerprint")
+	errQuicTransportICEConnectionNotStarted = errors.New("ICE connection not started")
+)
 
 // NewQUICTransport creates a new QUICTransport.
 // This constructor is part of the ORTC API. It is not
@@ -154,13 +160,13 @@ func (t *QUICTransport) validateFingerPrint(remoteParameters QUICParameters, rem
 		}
 	}
 
-	return errQuickTransportFingerprintNoMatch
+	return errQuicTransportFingerprintNoMatch
 }
 
 func (t *QUICTransport) ensureICEConn() error {
 	if t.iceTransport == nil ||
 		t.iceTransport.State() == ICETransportStateNew {
-		return errQuickTransportICEConnectionNotStarted
+		return errQuicTransportICEConnectionNotStarted
 	}
 
 	return nil
