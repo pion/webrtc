@@ -207,7 +207,4 @@ var (
 	errTrackLocalTrackRead   = errors.New("this is a local track and must not be read from")
 	errTrackLocalTrackWrite  = errors.New("this is a remote track and must not be written to")
 	errTrackSSRCNewTrackZero = errors.New("SSRC supplied to NewTrack() must be non-zero")
-
-	errQuickTransportFingerprintNoMatch      = errors.New("no matching fingerprint")
-	errQuickTransportICEConnectionNotStarted = errors.New("ICE connection not started")
 )
