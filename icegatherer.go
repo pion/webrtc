@@ -82,9 +82,10 @@ func (g *ICEGatherer) createAgent() error {
 		nat1To1CandiTyp = ice.CandidateTypeUnspecified
 	}
 
-	var multicastDNSMode ice.MulticastDNSMode
-	if g.api.settingEngine.candidates.GenerateMulticastDNSCandidates {
-		multicastDNSMode = ice.MulticastDNSModeQueryAndGather
+	mDNSMode := g.api.settingEngine.candidates.MulticastDNSMode
+	if mDNSMode != ice.MulticastDNSModeDisabled && mDNSMode != ice.MulticastDNSModeQueryAndGather {
+		// If enum is in state we don't recognized default to MulticastDNSModeQueryOnly
+		mDNSMode = ice.MulticastDNSModeQueryOnly
 	}
 
 	config := &ice.AgentConfig{
@@ -105,7 +106,7 @@ func (g *ICEGatherer) createAgent() error {
 		NAT1To1IPs:             g.api.settingEngine.candidates.NAT1To1IPs,
 		NAT1To1IPCandidateType: nat1To1CandiTyp,
 		Net:                    g.api.settingEngine.vnet,
-		MulticastDNSMode:       multicastDNSMode,
+		MulticastDNSMode:       mDNSMode,
 		MulticastDNSHostName:   g.api.settingEngine.candidates.MulticastDNSHostName,
 		LocalUfrag:             g.api.settingEngine.candidates.UsernameFragment,
 		LocalPwd:               g.api.settingEngine.candidates.Password,

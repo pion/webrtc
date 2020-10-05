@@ -838,7 +838,7 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.GenerateMulticastDNSCandidates(true)
+	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
 
 	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
 	assert.NoError(t, err)

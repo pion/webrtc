@@ -32,15 +32,15 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
-		ICELite                        bool
-		ICENetworkTypes                []NetworkType
-		InterfaceFilter                func(string) bool
-		NAT1To1IPs                     []string
-		NAT1To1IPCandidateType         ICECandidateType
-		GenerateMulticastDNSCandidates bool
-		MulticastDNSHostName           string
-		UsernameFragment               string
-		Password                       string
+		ICELite                bool
+		ICENetworkTypes        []NetworkType
+		InterfaceFilter        func(string) bool
+		NAT1To1IPs             []string
+		NAT1To1IPCandidateType ICECandidateType
+		MulticastDNSMode       ice.MulticastDNSMode
+		MulticastDNSHostName   string
+		UsernameFragment       string
+		Password               string
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -181,9 +181,9 @@ func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
 	e.vnet = vnet
 }
 
-// GenerateMulticastDNSCandidates instructs pion/ice to generate host candidates with mDNS hostnames instead of IP Addresses
-func (e *SettingEngine) GenerateMulticastDNSCandidates(generateMulticastDNSCandidates bool) {
-	e.candidates.GenerateMulticastDNSCandidates = generateMulticastDNSCandidates
+// SetICEMulticastDNSMode controls if pion/ice queries and generates mDNS ICE Candidates
+func (e *SettingEngine) SetICEMulticastDNSMode(multicastDNSMode ice.MulticastDNSMode) {
+	e.candidates.MulticastDNSMode = multicastDNSMode
 }
 
 // SetMulticastDNSHostName sets a static HostName to be used by pion/ice instead of generating one on startup
