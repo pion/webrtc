@@ -5,6 +5,12 @@ linters-settings:
     locale: US
   exhaustive:
     default-signifies-exhaustive: true
+  gomodguard:
+    blocked:
+      modules:
+        - github.com/pkg/errors:
+            recommendations:
+            - errors
 
 linters:
   enable:
