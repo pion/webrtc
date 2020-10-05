@@ -142,7 +142,7 @@ func (m *MediaEngine) getCodec(payloadType uint8) (*RTPCodec, error) {
 
 func (m *MediaEngine) getCodecSDP(sdpCodec sdp.Codec) (*RTPCodec, error) {
 	for _, codec := range m.codecs {
-		if codec.Name == sdpCodec.Name &&
+		if strings.EqualFold(codec.Name, sdpCodec.Name) &&
 			codec.ClockRate == sdpCodec.ClockRate &&
 			(sdpCodec.EncodingParameters == "" ||
 				strconv.Itoa(int(codec.Channels)) == sdpCodec.EncodingParameters) &&
