@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -77,7 +78,7 @@ func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.GenerateMulticastDNSCandidates(true)
+	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
 
 	gatherer, err := NewAPI(WithSettingEngine(s)).NewICEGatherer(ICEGatherOptions{})
 	if err != nil {
