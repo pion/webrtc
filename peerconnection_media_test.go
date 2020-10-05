@@ -427,10 +427,7 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		answerChan <- t
 	})
 
-	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	vp8Reader := func() *Track {
 		for {
@@ -440,8 +437,8 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 			time.Sleep(time.Millisecond * 25)
 
 			select {
-			case t := <-answerChan:
-				return t
+			case track := <-answerChan:
+				return track
 			default:
 				continue
 			}
@@ -453,11 +450,16 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 		time.Sleep(time.Second)
 		closeChan <- pcAnswer.Close()
 	}()
-	if _, err = vp8Reader.Read(make([]byte, 1)); err != io.EOF {
-		t.Fatal("Reading from closed Track did not return io.EOF")
-	} else if err = <-closeChan; err != nil {
-		t.Fatal(err)
-	}
+
+	// First read will succeed because first packet is cached
+	// for Payload probing
+	_, err = vp8Reader.Read(make([]byte, 1))
+	assert.NoError(t, err)
+
+	_, err = vp8Reader.Read(make([]byte, 1))
+	assert.True(t, errors.Is(err, io.EOF))
+
+	assert.NoError(t, <-closeChan)
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())

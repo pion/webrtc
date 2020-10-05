@@ -34,6 +34,7 @@ type Track struct {
 	receiver         *RTPReceiver
 	activeSenders    []*RTPSender
 	totalSenderCount int // count of all senders (accounts for senders that have not been started yet)
+	peeked           []byte
 }
 
 // ID gets the ID of the track
@@ -109,9 +110,41 @@ func (t *Track) Read(b []byte) (n int, err error) {
 		t.mu.RUnlock()
 		return 0, errTrackLocalTrackRead
 	}
+	peeked := t.peeked != nil
 	t.mu.RUnlock()
 
+	if peeked {
+		t.mu.Lock()
+		data := t.peeked
+		t.peeked = nil
+		t.mu.Unlock()
+		// someone else may have stolen our packet when we
+		// released the lock.  Deal with it.
+		if data != nil {
+			n = copy(b, data)
+			return
+		}
+	}
+
 	return r.readRTP(b, t)
+}
+
+// peek is like Read, but it doesn't discard the packet read
+func (t *Track) peek(b []byte) (n int, err error) {
+	n, err = t.Read(b)
+	if err != nil {
+		return
+	}
+
+	t.mu.Lock()
+	// this might overwrite data if somebody peeked between the Read
+	// and us getting the lock.  Oh well, we'll just drop a packet in
+	// that case.
+	data := make([]byte, n)
+	n = copy(data, b[:n])
+	t.peeked = data
+	t.mu.Unlock()
+	return
 }
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you
@@ -212,8 +245,13 @@ func NewTrack(payloadType uint8, ssrc uint32, id, label string, codec *RTPCodec)
 // determinePayloadType blocks and reads a single packet to determine the PayloadType for this Track
 // this is useful if we are dealing with a remote track and we can't announce it to the user until we know the payloadType
 func (t *Track) determinePayloadType() error {
-	r, err := t.ReadRTP()
+	b := make([]byte, receiveMTU)
+	n, err := t.peek(b)
 	if err != nil {
+		return err
+	}
+	r := rtp.Packet{}
+	if err := r.Unmarshal(b[:n]); err != nil {
 		return err
 	}
 
