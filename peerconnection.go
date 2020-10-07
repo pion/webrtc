@@ -330,10 +330,6 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 		return true
 	}
 
-	if pc.sctpTransport == nil {
-		return true
-	}
-
 	pc.sctpTransport.lock.Lock()
 	lenDataChannel := len(pc.sctpTransport.dataChannels)
 	pc.sctpTransport.lock.Unlock()
@@ -1773,13 +1769,11 @@ func (pc *PeerConnection) Close() error {
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
-	if pc.sctpTransport != nil {
-		pc.sctpTransport.lock.Lock()
-		for _, d := range pc.sctpTransport.dataChannels {
-			d.setReadyState(DataChannelStateClosed)
-		}
-		pc.sctpTransport.lock.Unlock()
+	pc.sctpTransport.lock.Lock()
+	for _, d := range pc.sctpTransport.dataChannels {
+		d.setReadyState(DataChannelStateClosed)
 	}
+	pc.sctpTransport.lock.Unlock()
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
 	if pc.sctpTransport != nil {
@@ -1916,24 +1910,22 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		pc.iceTransport.collectStats(statsCollector)
 	}
 
-	if pc.sctpTransport != nil {
-		pc.sctpTransport.lock.Lock()
-		dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-		dataChannelsAccepted = pc.sctpTransport.dataChannelsAccepted
-		dataChannelsOpened = pc.sctpTransport.dataChannelsOpened
-		dataChannelsRequested = pc.sctpTransport.dataChannelsRequested
-		pc.sctpTransport.lock.Unlock()
+	pc.sctpTransport.lock.Lock()
+	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
+	dataChannelsAccepted = pc.sctpTransport.dataChannelsAccepted
+	dataChannelsOpened = pc.sctpTransport.dataChannelsOpened
+	dataChannelsRequested = pc.sctpTransport.dataChannelsRequested
+	pc.sctpTransport.lock.Unlock()
 
-		for _, d := range dataChannels {
-			state := d.ReadyState()
-			if state != DataChannelStateConnecting && state != DataChannelStateOpen {
-				dataChannelsClosed++
-			}
-
-			d.collectStats(statsCollector)
+	for _, d := range dataChannels {
+		state := d.ReadyState()
+		if state != DataChannelStateConnecting && state != DataChannelStateOpen {
+			dataChannelsClosed++
 		}
-		pc.sctpTransport.collectStats(statsCollector)
+
+		d.collectStats(statsCollector)
 	}
+	pc.sctpTransport.collectStats(statsCollector)
 
 	stats := PeerConnectionStats{
 		Timestamp:             statsTimestampNow(),
@@ -2231,4 +2223,12 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 
 func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
 	pc.iceGatherer.onGatheringCompleteHandler.Store(handler)
+}
+
+// SCTP returns the SCTPTransport for this PeerConnection
+//
+// The SCTP transport over which SCTP data is sent and received. If SCTP has not been negotiated, the value is nil.
+// https://www.w3.org/TR/webrtc/#attributes-15
+func (pc *PeerConnection) SCTP() *SCTPTransport {
+	return pc.sctpTransport
 }

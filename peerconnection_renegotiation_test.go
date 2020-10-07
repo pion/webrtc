@@ -662,9 +662,7 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 		assert.NoError(t, pcOffer.SetLocalDescription(offer))
 		<-offerGatheringComplete
 
-		offer = *pcOffer.LocalDescription()
-		offer.SDP = strings.Split(offer.SDP, "m=application")[0]
-		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+		assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
 
 		answer, err := pcAnswer.CreateAnswer(nil)
 		assert.NoError(t, err)
@@ -689,15 +687,26 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	pcOfferConnected, pcOfferConnectedCancel := context.WithCancel(context.Background())
+	pcOffer.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateConnected {
+			pcOfferConnectedCancel()
+		}
+	})
+
+	pcAnswerConnected, pcAnswerConnectedCancel := context.WithCancel(context.Background())
+	pcAnswer.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateConnected {
+			pcAnswerConnectedCancel()
+		}
+	})
+
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
-	// Setting SCTPTransport to nil ensures any interaction with it will cause a segafault
-	pcAnswer.sctpTransport = nil
-
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
@@ -705,6 +714,12 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	signalPairExcludeDataChannel(pcOffer, pcAnswer)
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
+
+	<-pcAnswerConnected.Done()
+	<-pcOfferConnected.Done()
+
+	assert.Equal(t, pcOffer.SCTP().State(), SCTPTransportStateConnecting)
+	assert.Equal(t, pcAnswer.SCTP().State(), SCTPTransportStateConnecting)
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
