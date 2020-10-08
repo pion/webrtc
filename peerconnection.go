@@ -994,7 +994,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			t, localTransceivers = findByMid(midValue, localTransceivers)
 			if t == nil {
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
+			} else if direction == RTPTransceiverDirectionInactive {
+				if err := t.Stop(); err != nil {
+					return err
+				}
 			}
+
 			if t == nil {
 				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
 				if err != nil {
@@ -1003,7 +1008,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
 			}
 			if t.Mid() == "" {
-				_ = t.setMid(midValue)
+				if err := t.setMid(midValue); err != nil {
+					return err
+				}
 			}
 		}
 	}

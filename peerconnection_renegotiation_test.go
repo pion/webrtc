@@ -958,3 +958,50 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	assert.NoError(t, pcA.Close())
 	assert.NoError(t, pcB.Close())
 }
+
+// TestPeerConnection_Renegotiation_DisableTrack asserts that if a remote track is set inactive
+// that locally it goes inactive as well
+func TestPeerConnection_Renegotiation_DisableTrack(t *testing.T) {
+	api := NewAPI()
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
+	assert.NoError(t, err)
+
+	// Create two transceivers
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	transceiver, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	// Assert we have three active transceivers
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.Count(offer.SDP, "a=sendrecv"), 3)
+
+	// Assert we have two active transceivers, one inactive
+	assert.NoError(t, transceiver.Stop())
+	offer, err = pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.Count(offer.SDP, "a=sendrecv"), 2)
+	assert.Equal(t, strings.Count(offer.SDP, "a=inactive"), 1)
+
+	// Assert that the offer disabled one of our transceivers
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, strings.Count(answer.SDP, "a=sendrecv"), 1) // DataChannel
+	assert.Equal(t, strings.Count(answer.SDP, "a=recvonly"), 1)
+	assert.Equal(t, strings.Count(answer.SDP, "a=inactive"), 1)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
