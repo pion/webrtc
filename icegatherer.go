@@ -111,6 +111,7 @@ func (g *ICEGatherer) createAgent() error {
 		LocalUfrag:             g.api.settingEngine.candidates.UsernameFragment,
 		LocalPwd:               g.api.settingEngine.candidates.Password,
 		TCPMux:                 g.api.settingEngine.iceTCPMux,
+		ProxyDialer:            g.api.settingEngine.iceProxyDialer,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes

@@ -9,6 +9,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/vnet"
+	"golang.org/x/net/proxy"
 )
 
 // SettingEngine allows influencing behavior in ways that are not
@@ -56,6 +57,7 @@ type SettingEngine struct {
 	vnet                                      *vnet.Net
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
+	iceProxyDialer                            proxy.Dialer
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -308,4 +310,9 @@ func (e *SettingEngine) getSDPExtensions() map[SDPSectionType][]sdp.ExtMap {
 		}
 	}
 	return e.sdpExtensions
+}
+
+// SetProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
+func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
+	e.iceProxyDialer = d
 }
