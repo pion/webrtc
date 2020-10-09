@@ -205,6 +205,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Hanjun Kim](https://github.com/hallazzang)
 * [ZHENK](https://github.com/scorpionknifes)
 * [Rahul Nakre](https://github.com/rahulnakre)
+* [OrlandoCo](https://github.com/OrlandoCo)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
