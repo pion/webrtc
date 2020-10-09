@@ -992,7 +992,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			}
 
 			t, localTransceivers = findByMid(midValue, localTransceivers)
-			// Fix simulcast tracks removing
 			if t != nil && t.Receiver() != nil && len(t.Receiver().Tracks()) > 1 {
 				switch direction {
 				case RTPTransceiverDirectionInactive:
@@ -1000,10 +999,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 						return err
 					}
 				case RTPTransceiverDirectionRecvonly:
-					if recv := t.Receiver(); recv != nil {
-						if err := recv.Stop(); err != nil {
-							return err
-						}
+					if err := t.Receiver().Stop(); err != nil {
+						return err
 					}
 				case RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv:
 					t.setDirection(RTPTransceiverDirectionRecvonly)
