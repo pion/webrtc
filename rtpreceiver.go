@@ -167,11 +167,15 @@ func (r *RTPReceiver) Stop() error {
 	select {
 	case <-r.received:
 		for i := range r.tracks {
-			if err := r.tracks[i].rtcpReadStream.Close(); err != nil {
-				return err
+			if r.tracks[i].rtcpReadStream != nil {
+				if err := r.tracks[i].rtcpReadStream.Close(); err != nil {
+					return err
+				}
 			}
-			if err := r.tracks[i].rtpReadStream.Close(); err != nil {
-				return err
+			if r.tracks[i].rtpReadStream != nil {
+				if err := r.tracks[i].rtpReadStream.Close(); err != nil {
+					return err
+				}
 			}
 		}
 	default:
