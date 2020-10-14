@@ -74,7 +74,7 @@ func (r *RTPReceiver) Tracks() []*Track {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	tracks := []*Track{}
+	var tracks []*Track
 	for i := range r.tracks {
 		tracks = append(tracks, r.tracks[i].track)
 	}
@@ -133,10 +133,36 @@ func (r *RTPReceiver) Read(b []byte) (n int, err error) {
 	}
 }
 
-// ReadRTCP is a convenience method that wraps Read and unmarshals for you
+// ReadSimulcast reads incoming RTCP for this RTPReceiver for given rid
+func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, err error) {
+	select {
+	case <-r.received:
+		for _, t := range r.tracks {
+			if t.track != nil && t.track.rid == rid {
+				return t.rtcpReadStream.Read(b)
+			}
+		}
+		return 0, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+	case <-r.closed:
+		return 0, io.ErrClosedPipe
+	}
+}
+
+// ReadRTCP is a convenience method that wraps Read and unmarshal for you
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
 	i, err := r.Read(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return rtcp.Unmarshal(b[:i])
+}
+
+// ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you
+func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, error) {
+	b := make([]byte, receiveMTU)
+	i, err := r.ReadSimulcast(b, rid)
 	if err != nil {
 		return nil, err
 	}
