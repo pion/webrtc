@@ -881,7 +881,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			return nextState, &rtcerr.OperationError{Err: fmt.Errorf("%w: %q", errPeerConnStateChangeUnhandled, op)}
 		}
 
-		return nextState, nil
+		return nextState, err
 	}()
 
 	if err == nil {

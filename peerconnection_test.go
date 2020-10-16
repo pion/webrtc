@@ -636,3 +636,19 @@ func TestGatherOnSetLocalDescription(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// Assert that SetRemoteDescription handles invalid states
+func TestSetRemoteDescriptionInvalid(t *testing.T) {
+	t.Run("local-offer+SetRemoteDescription(Offer)", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pc.SetLocalDescription(offer))
+		assert.Error(t, pc.SetRemoteDescription(offer))
+
+		assert.NoError(t, pc.Close())
+	})
+}
