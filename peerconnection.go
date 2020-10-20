@@ -353,7 +353,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 			// Step 5.3.1
 			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				if !okMsid || descMsid != t.Sender().Track().Msid() {
+				if !okMsid || (t.Sender() != nil && descMsid != t.Sender().Track().Msid()) {
 					return true
 				}
 			}
