@@ -353,7 +353,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 			// Step 5.3.1
 			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				if !okMsid || (t.Sender() != nil && descMsid != t.Sender().Track().Msid()) {
+				if !okMsid || descMsid != t.Sender().Track().Msid() {
 					return true
 				}
 			}
@@ -1006,6 +1006,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 					return err
 				}
 				t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
+
+				pc.onNegotiationNeeded()
 			}
 			if t.Mid() == "" {
 				if err := t.setMid(midValue); err != nil {
@@ -1616,7 +1618,9 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 			RTPTransceiverDirectionSendrecv,
 			track.Kind(),
 		)
+
 		pc.onNegotiationNeeded()
+
 		return t, nil
 
 	case RTPTransceiverDirectionSendonly:
@@ -1631,7 +1635,9 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track *Track, init ...RtpTrans
 			RTPTransceiverDirectionSendonly,
 			track.Kind(),
 		)
+
 		pc.onNegotiationNeeded()
+
 		return t, nil
 	default:
 		return nil, errPeerConnAddTransceiverFromTrackOneTransceiver
@@ -1827,8 +1833,6 @@ func (pc *PeerConnection) newRTPTransceiver(
 	pc.mu.Lock()
 	pc.rtpTransceivers = append(pc.rtpTransceivers, t)
 	pc.mu.Unlock()
-
-	pc.onNegotiationNeeded()
 
 	return t
 }
