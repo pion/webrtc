@@ -652,7 +652,7 @@ func iceCandidateInitToValue(candidate ICECandidateInit) js.Value {
 		"candidate":        candidate.Candidate,
 		"sdpMid":           stringPointerToValue(candidate.SDPMid),
 		"sdpMLineIndex":    uint16PointerToValue(candidate.SDPMLineIndex),
-		"usernameFragment": candidate.UsernameFragment,
+		"usernameFragment": stringPointerToValue(candidate.UsernameFragment),
 	})
 }
 
