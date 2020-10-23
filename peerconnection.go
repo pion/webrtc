@@ -1079,6 +1079,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	return nil
 }
 
+func (pc *PeerConnection) SignalingState() SignalingState {
+	return pc.signalingState.Get()
+}
+
 func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
 	encodings := []RTPDecodingParameters{}
 	if incoming.ssrc != 0 {
