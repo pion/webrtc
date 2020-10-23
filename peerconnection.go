@@ -338,7 +338,10 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 		return true
 	}
 
-	for _, t := range pc.GetTransceivers() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	for _, t := range pc.rtpTransceivers {
 		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		// Step 5.1
 		// if t.stopping && !t.stopped {
