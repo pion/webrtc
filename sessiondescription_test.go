@@ -57,3 +57,23 @@ func TestSessionDescription_JSON(t *testing.T) {
 		)
 	}
 }
+
+func TestSessionDescription_Unmarshal(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+	desc := SessionDescription{
+		Type: offer.Type,
+		SDP:  offer.SDP,
+	}
+	assert.Nil(t, desc.parsed)
+	parsed, err := desc.Unmarshal()
+	assert.NotNil(t, parsed)
+	assert.NotNil(t, desc.parsed)
+	assert.NoError(t, err)
+	parsed, err = desc.Unmarshal()
+	assert.NotNil(t, parsed)
+	assert.NoError(t, err)
+	pc.Close()
+}
