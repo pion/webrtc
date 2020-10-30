@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/ice/v2"
@@ -66,7 +67,7 @@ type PeerConnection struct {
 	onConnectionStateChangeHandler    func(PeerConnectionState)
 	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
-	onNegotiationNeededHandler        func()
+	onNegotiationNeededHandler        atomic.Value // func()
 
 	iceGatherer   *ICEGatherer
 	iceTransport  *ICETransport
@@ -248,9 +249,7 @@ func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 // OnNegotiationNeeded sets an event handler which is invoked when
 // a change has occurred which requires session negotiation
 func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	pc.onNegotiationNeededHandler = f
+	pc.onNegotiationNeededHandler.Store(f)
 }
 
 func (pc *PeerConnection) onNegotiationNeeded() {
@@ -312,8 +311,8 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	pc.isNegotiationNeeded.set(true)
 
 	// Step 2.7
-	if pc.onNegotiationNeededHandler != nil {
-		pc.onNegotiationNeededHandler()
+	if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); ok && handler != nil {
+		handler()
 	}
 }
 
