@@ -11,12 +11,6 @@
 
 set -e
 
-# Unshallow the repo, this check doesn't work with this enabled
-# https://github.com/travis-ci/travis-ci/issues/3412
-if [ -f $(git rev-parse --git-dir)/shallow ]; then
-	git fetch --unshallow || true
-fi
-
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 
 if [ -f ${SCRIPT_PATH}/.ci.conf ]

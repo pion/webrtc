@@ -58,13 +58,7 @@ if [ "$#" -eq 1 ]; then
    fi
    lint_commit_message "$(sed -n '/# Please enter the commit message for your changes. Lines starting/q;p' "$1")"
 else
-    # TRAVIS_COMMIT_RANGE is empty for initial branch commit
-    if [[ "${TRAVIS_COMMIT_RANGE}" != *"..."* ]]; then
-        parent=$(git log -n 1 --format="%P" ${TRAVIS_COMMIT_RANGE})
-        TRAVIS_COMMIT_RANGE="${TRAVIS_COMMIT_RANGE}...$parent"
-    fi
-
-    for commit in $(git rev-list ${TRAVIS_COMMIT_RANGE}); do
+    for commit in $(git rev-list --no-merges origin/master..); do
       lint_commit_message "$(git log --format="%B" -n 1 $commit)"
     done
 fi
