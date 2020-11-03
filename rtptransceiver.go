@@ -30,6 +30,12 @@ func (t *RTPTransceiver) Sender() *RTPSender {
 	return nil
 }
 
+// SetSender sets the RTPSender and Track to current transceiver
+func (t *RTPTransceiver) SetSender(s *RTPSender, track *Track) error {
+	t.setSender(s)
+	return t.setSendingTrack(track)
+}
+
 func (t *RTPTransceiver) setSender(s *RTPSender) {
 	t.sender.Store(s)
 }
