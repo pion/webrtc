@@ -349,7 +349,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			s, err = populateSDP(s, false,
 				dtlsFingerprints,
 				SDPMediaDescriptionFingerprints,
-				false, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil)
+				false, false, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil)
 			assert.NoError(t, err)
 
 			sdparray, err := s.Marshal()
@@ -391,7 +391,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, se.getSDPExtensions())
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.sdpExcludeCandidates, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, se.getSDPExtensions())
 		assert.Nil(t, err)
 
 		// Check global extensions
@@ -440,7 +440,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, se.getSDPExtensions())
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.sdpExcludeCandidates, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, se.getSDPExtensions())
 		assert.Nil(t, err)
 
 		// Test contains rid map keys

@@ -49,6 +49,7 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	sdpMediaLevelFingerprints                 bool
+	sdpExcludeCandidates                      bool
 	sdpExtensions                             map[SDPSectionType][]sdp.ExtMap
 	answeringDTLSRole                         DTLSRole
 	disableCertificateFingerprintVerification bool
@@ -242,6 +243,12 @@ func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
 // some webrtc implementations.
 func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
 	e.sdpMediaLevelFingerprints = sdpMediaLevelFingerprints
+}
+
+// SetSDPExcludeCandidates configures the logic for ICE candidate inclusion.
+// If true, candidates will be excluded from the sdp
+func (e *SettingEngine) SetSDPExcludeCandidates(sdpExcludeCandidates bool) {
+	e.sdpExcludeCandidates = sdpExcludeCandidates
 }
 
 // SetICETCPMux enables ICE-TCP when set to a non-nil value. Make sure that
