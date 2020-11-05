@@ -16,9 +16,7 @@ type H264Reader struct {
 
 var (
 	errNilReader           = errors.New("stream is nil")
-	errReadData            = errors.New("error on data read")
 	errDataIsNotH264Stream = errors.New("data is not a H264 bitstream")
-	errNotEnoughData       = errors.New("not enough data")
 )
 
 // NewReader creates new H264Reader
@@ -57,7 +55,7 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 	n, err := reader.stream.Read(prefixBuffer)
 
 	if err != nil || n == 0 {
-		return 0, errReadData
+		return 0, err
 	}
 
 	if n < 3 {
@@ -67,7 +65,7 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 	nalPrefix3BytesFound := bytes.Equal(nalPrefix3Bytes, prefixBuffer[:3])
 	if n == 3 {
 		if nalPrefix3BytesFound {
-			return 0, errNotEnoughData
+			return 0, io.EOF
 		}
 		return 0, errDataIsNotH264Stream
 	}
@@ -119,7 +117,7 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 	}
 
 	if len(reader.nalBuffer) == 0 {
-		return nil, errNotEnoughData
+		return nil, io.EOF
 	}
 
 	nal := newNal(reader.nalBuffer)
