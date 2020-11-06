@@ -312,7 +312,7 @@ func (e *SettingEngine) getSDPExtensions() map[SDPSectionType][]sdp.ExtMap {
 	return e.sdpExtensions
 }
 
-// SetProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
+// SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
 func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
 	e.iceProxyDialer = d
 }

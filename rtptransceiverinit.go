@@ -7,4 +7,4 @@ type RTPTransceiverInit struct {
 	// Streams       []*Track
 }
 
-type RtpTransceiverInit = RTPTransceiverInit //nolint: stylecheck
+type RtpTransceiverInit = RTPTransceiverInit //nolint: stylecheck,golint

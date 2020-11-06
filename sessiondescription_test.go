@@ -75,5 +75,5 @@ func TestSessionDescription_Unmarshal(t *testing.T) {
 	parsed, err = desc.Unmarshal()
 	assert.NotNil(t, parsed)
 	assert.NoError(t, err)
-	pc.Close()
+	assert.NoError(t, pc.Close())
 }

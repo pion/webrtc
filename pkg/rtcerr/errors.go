@@ -15,6 +15,8 @@ func (e *UnknownError) Error() string {
 	return fmt.Sprintf("UnknownError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *UnknownError) Unwrap() error {
 	return e.Err
 }
@@ -28,6 +30,8 @@ func (e *InvalidStateError) Error() string {
 	return fmt.Sprintf("InvalidStateError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *InvalidStateError) Unwrap() error {
 	return e.Err
 }
@@ -42,6 +46,8 @@ func (e *InvalidAccessError) Error() string {
 	return fmt.Sprintf("InvalidAccessError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *InvalidAccessError) Unwrap() error {
 	return e.Err
 }
@@ -55,6 +61,8 @@ func (e *NotSupportedError) Error() string {
 	return fmt.Sprintf("NotSupportedError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *NotSupportedError) Unwrap() error {
 	return e.Err
 }
@@ -68,6 +76,8 @@ func (e *InvalidModificationError) Error() string {
 	return fmt.Sprintf("InvalidModificationError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *InvalidModificationError) Unwrap() error {
 	return e.Err
 }
@@ -81,6 +91,8 @@ func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("SyntaxError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *SyntaxError) Unwrap() error {
 	return e.Err
 }
@@ -94,6 +106,8 @@ func (e *TypeError) Error() string {
 	return fmt.Sprintf("TypeError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *TypeError) Unwrap() error {
 	return e.Err
 }
@@ -108,6 +122,8 @@ func (e *OperationError) Error() string {
 	return fmt.Sprintf("OperationError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *OperationError) Unwrap() error {
 	return e.Err
 }
@@ -121,6 +137,8 @@ func (e *NotReadableError) Error() string {
 	return fmt.Sprintf("NotReadableError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *NotReadableError) Unwrap() error {
 	return e.Err
 }
@@ -135,6 +153,8 @@ func (e *RangeError) Error() string {
 	return fmt.Sprintf("RangeError: %v", e.Err)
 }
 
+// Unwrap returns the result of calling the Unwrap method on err, if err's type contains
+// an Unwrap method returning error. Otherwise, Unwrap returns nil.
 func (e *RangeError) Unwrap() error {
 	return e.Err
 }

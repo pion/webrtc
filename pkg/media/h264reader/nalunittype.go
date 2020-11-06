@@ -2,8 +2,10 @@ package h264reader
 
 import "strconv"
 
+// NalUnitType is the type of a NAL
 type NalUnitType uint8
 
+// Enums for NalUnitTypes
 const (
 	NalUnitTypeUnspecified              NalUnitType = 0  // Unspecified
 	NalUnitTypeCodedSliceNonIdr         NalUnitType = 1  // Coded slice of a non-IDR picture
