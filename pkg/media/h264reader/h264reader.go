@@ -1,3 +1,4 @@
+// Package h264reader implements a H264 Annex-B Reader
 package h264reader
 
 import (
@@ -83,6 +84,9 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 	return 0, errDataIsNotH264Stream
 }
 
+// NextNAL reads from stream and returns then next NAL,
+// and an error if there is incomplete frame data.
+// Returns all nil values when no more NALs are available.
 func (reader *H264Reader) NextNAL() (*NAL, error) {
 	if !reader.nalPrefixParsed {
 		_, err := reader.bitStreamStartsWithH264Prefix()

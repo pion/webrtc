@@ -72,6 +72,7 @@ linters:
     - wsl              # Whitespace Linter - Forces you to use empty lines!
 
 issues:
+  exclude-use-default: false
   exclude-rules:
     # Allow complex tests, better to be self contained
     - path: _test\.go
