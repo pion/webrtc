@@ -72,6 +72,27 @@ linters:
     - wsl              # Whitespace Linter - Forces you to use empty lines!
 
 issues:
+  exclude-use-default: false
+  exclude:
+    # errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
+    - Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv). is not checked
+    # golint: False positive when tests are defined in package 'test'
+    - func name will be used as test\.Test.* by other packages, and that stutters; consider calling this
+    # govet: Common false positives
+    - (possible misuse of unsafe.Pointer|should have signature)
+    # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+    - ineffective break statement. Did you mean to break out of the outer loop
+    # gosec: Too many false-positives on 'unsafe' usage
+    - Use of unsafe calls should be audited
+    # gosec: Too many false-positives for parametrized shell calls
+    - Subprocess launch(ed with variable|ing should be audited)
+    # gosec: Duplicated errcheck checks
+    - G104
+    # gosec: Too many issues in popular repos
+    - (Expect directory permissions to be 0750 or less|Expect file permissions to be 0600 or less)
+    # gosec: False positive is triggered by 'src, err := ioutil.ReadFile(filename)'
+    - Potential file inclusion via variable
+
   exclude-rules:
     # Allow complex tests, better to be self contained
     - path: _test\.go

@@ -28,7 +28,7 @@ jobs:
         run: |
           go test \
           -coverprofile=cover.out -covermode=atomic \
-          -tags quic \
+          ${TEST_EXTRA_ARGS:-} \
           -v -race ${TEST_PACKAGES}
 
       - uses: codecov/codecov-action@v1
@@ -71,7 +71,7 @@ jobs:
           -w /go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
           i386/golang:${{matrix.go}}-alpine \
           /usr/local/go/bin/go test \
-            -tags quic \
+            ${TEST_EXTRA_ARGS:-} \
             -v ${TEST_PACKAGES}
 
   test-wasm:
@@ -112,7 +112,7 @@ jobs:
         run: echo ::set-env name=PATH::${GOROOT}/bin:${PATH}
 
       - name: Set Go WASM Exec
-        run: echo ::set-env name=GO_JS_WASM_EXEC::${PWD}/test-wasm/go_js_wasm_exec
+        run: echo ::set-env name=GO_JS_WASM_EXEC::${GOROOT}/misc/wasm/go_js_wasm_exec
 
       - name: Insall NPM modules
         run: yarn install
