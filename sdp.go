@@ -583,7 +583,11 @@ func answerExtMaps(remoteExtMaps map[SDPSectionType]map[int]sdp.ExtMap, localMap
 			// add remote ext that match locally available ones
 			for _, extMap := range localMaps[mediaType] {
 				if extMap.URI.String() == extItem.URI.String() {
-					ret[mediaType] = append(ret[mediaType], extItem)
+					if extMap.Value == 0 {
+						ret[mediaType] = append(ret[mediaType], extItem)
+					} else {
+						ret[mediaType] = append(ret[mediaType], extMap)
+					}
 				}
 			}
 		}
