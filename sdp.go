@@ -321,7 +321,11 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 	}
 
 	// Add extmaps
-	if maps, ok := extMaps[SDPSectionType(t.kind.String())]; ok {
+	if maps, ok := extMaps[SDPSectionType(t.Mid())]; ok {
+		for _, m := range maps {
+			media.WithExtMap(m)
+		}
+	} else if maps, ok := extMaps[SDPSectionType(t.kind.String())]; ok {
 		for _, m := range maps {
 			media.WithExtMap(m)
 		}

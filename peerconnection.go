@@ -68,6 +68,7 @@ type PeerConnection struct {
 	onTrackHandler                    func(*Track, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
 	onNegotiationNeededHandler        atomic.Value // func()
+	getMapExt                         func() map[SDPSectionType][]sdp.ExtMap
 
 	iceGatherer   *ICEGatherer
 	iceTransport  *ICETransport
@@ -217,6 +218,13 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 	}
 
 	return nil
+}
+
+// GetMapExtension fires a function to get custom extension map
+func (pc *PeerConnection) GetMapExtension(fn func() map[SDPSectionType][]sdp.ExtMap) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	pc.getMapExt = fn
 }
 
 // OnSignalingStateChange sets an event handler which is invoked when the
@@ -2227,9 +2235,14 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		return nil, err
 	}
 
-	matchedSDPMap, err := matchedAnswerExt(pc.RemoteDescription().parsed, pc.api.settingEngine.getSDPExtensions())
-	if err != nil {
-		return nil, err
+	var matchedSDPMap map[SDPSectionType][]sdp.ExtMap
+	if pc.getMapExt != nil {
+		matchedSDPMap = pc.getMapExt()
+	} else {
+		matchedSDPMap, err = matchedAnswerExt(pc.RemoteDescription().parsed, pc.api.settingEngine.getSDPExtensions())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState(), matchedSDPMap)
