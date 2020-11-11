@@ -153,7 +153,7 @@ type CodecStats struct {
 	ID string `json:"id"`
 
 	// PayloadType as used in RTP encoding or decoding
-	PayloadType uint8 `json:"payloadType"`
+	PayloadType PayloadType `json:"payloadType"`
 
 	// CodecType of this CodecStats
 	CodecType CodecType `json:"codecType"`
@@ -196,7 +196,7 @@ type InboundRTPStreamStats struct {
 
 	// SSRC is the 32-bit unsigned integer value used to identify the source of the
 	// stream of RTP packets that this stats object concerns.
-	SSRC uint32 `json:"ssrc"`
+	SSRC SSRC `json:"ssrc"`
 
 	// Kind is either "audio" or "video"
 	Kind string `json:"kind"`
@@ -363,7 +363,7 @@ type OutboundRTPStreamStats struct {
 
 	// SSRC is the 32-bit unsigned integer value used to identify the source of the
 	// stream of RTP packets that this stats object concerns.
-	SSRC uint32 `json:"ssrc"`
+	SSRC SSRC `json:"ssrc"`
 
 	// Kind is either "audio" or "video"
 	Kind string `json:"kind"`
@@ -492,7 +492,7 @@ type RemoteInboundRTPStreamStats struct {
 
 	// SSRC is the 32-bit unsigned integer value used to identify the source of the
 	// stream of RTP packets that this stats object concerns.
-	SSRC uint32 `json:"ssrc"`
+	SSRC SSRC `json:"ssrc"`
 
 	// Kind is either "audio" or "video"
 	Kind string `json:"kind"`
@@ -600,7 +600,7 @@ type RemoteOutboundRTPStreamStats struct {
 
 	// SSRC is the 32-bit unsigned integer value used to identify the source of the
 	// stream of RTP packets that this stats object concerns.
-	SSRC uint32 `json:"ssrc"`
+	SSRC SSRC `json:"ssrc"`
 
 	// Kind is either "audio" or "video"
 	Kind string `json:"kind"`
@@ -685,7 +685,7 @@ type RTPContributingSourceStats struct {
 	// ContributorSSRC is the SSRC identifier of the contributing source represented
 	// by this stats object. It is a 32-bit unsigned integer that appears in the CSRC
 	// list of any packets the relevant source contributed to.
-	ContributorSSRC uint32 `json:"contributorSsrc"`
+	ContributorSSRC SSRC `json:"contributorSsrc"`
 
 	// InboundRTPStreamID is the ID of the InboundRTPStreamStats object representing
 	// the inbound RTP stream that this contributing source is contributing to.

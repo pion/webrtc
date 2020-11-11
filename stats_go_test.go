@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/randutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +100,7 @@ func getDataChannelStats(t *testing.T, report StatsReport, dc *DataChannel) Data
 	return stats
 }
 
-func getCodecStats(t *testing.T, report StatsReport, c *RTPCodec) CodecStats {
+func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) CodecStats {
 	stats, ok := report.GetCodecStats(c)
 	assert.True(t, ok)
 	assert.Equal(t, stats.Type, StatsTypeCodec)
@@ -204,7 +203,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
-	track1, err := offerPC.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion1")
+	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion1")
 	require.NoError(t, err)
 
 	_, err = offerPC.AddTrack(track1)
@@ -279,8 +278,12 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.NotEmpty(t, findRemoteCandidateStats(reportPCAnswer))
 	assert.NotEmpty(t, findCandidatePairStats(t, reportPCAnswer))
 	assert.NoError(t, err)
-	for _, codec := range offerPC.api.mediaEngine.codecs {
-		codecStat := getCodecStats(t, reportPCOffer, codec)
+	for i := range offerPC.api.mediaEngine.videoCodecs {
+		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.videoCodecs[i]))
+		assert.NotEmpty(t, codecStat)
+	}
+	for i := range offerPC.api.mediaEngine.audioCodecs {
+		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.audioCodecs[i]))
 		assert.NotEmpty(t, codecStat)
 	}
 
