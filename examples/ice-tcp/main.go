@@ -17,7 +17,9 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 
 	if peerConnection == nil {
 		m := webrtc.MediaEngine{}
-		m.RegisterDefaultCodecs()
+		if err = m.RegisterDefaultCodecs(); err != nil {
+			panic(err)
+		}
 
 		settingEngine := webrtc.SettingEngine{}
 

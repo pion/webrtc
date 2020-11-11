@@ -61,6 +61,11 @@ func main() {
 		panic(err)
 	}
 
+	// We need a DataChannel so we can have ICE Candidates
+	if _, err = offerPeerConnection.CreateDataChannel("custom-logger", nil); err != nil {
+		panic(err)
+	}
+
 	// Create a new RTCPeerConnection
 	answerPeerConnection, err := api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {

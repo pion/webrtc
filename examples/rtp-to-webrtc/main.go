@@ -10,34 +10,7 @@ import (
 )
 
 func main() {
-	// Wait for the offer to be pasted
-	offer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &offer)
-
-	// We make our own mediaEngine so we can place the sender's codecs in it.  This because we must use the
-	// dynamic media type from the sender in our answer. This is not required if we are the offerer
-	mediaEngine := webrtc.MediaEngine{}
-	err := mediaEngine.PopulateFromSDP(offer)
-	if err != nil {
-		panic(err)
-	}
-
-	// Search for VP8 Payload type. If the offer doesn't support VP8 exit since
-	// since they won't be able to decode anything we send them
-	var payloadType uint8
-	for _, videoCodec := range mediaEngine.GetCodecsByKind(webrtc.RTPCodecTypeVideo) {
-		if videoCodec.Name == "VP8" {
-			payloadType = videoCodec.PayloadType
-			break
-		}
-	}
-	if payloadType == 0 {
-		panic("Remote peer does not support VP8")
-	}
-
-	// Create a new RTCPeerConnection
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
-	peerConnection, err := api.NewPeerConnection(webrtc.Configuration{
+	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
@@ -74,8 +47,8 @@ func main() {
 		panic(err)
 	}
 
-	// Create a video track, using the same SSRC as the incoming RTP Packet
-	videoTrack, err := peerConnection.NewTrack(payloadType, packet.SSRC, "video", "pion")
+	// Create a video track
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
 	if err != nil {
 		panic(err)
 	}
@@ -88,6 +61,10 @@ func main() {
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
+
+	// Wait for the offer to be pasted
+	offer := webrtc.SessionDescription{}
+	signal.Decode(signal.MustReadStdin(), &offer)
 
 	// Set the remote SessionDescription
 	if err = peerConnection.SetRemoteDescription(offer); err != nil {
@@ -124,13 +101,7 @@ func main() {
 			panic(err)
 		}
 
-		packet := &rtp.Packet{}
-		if err := packet.Unmarshal(inboundRTPPacket[:n]); err != nil {
-			panic(err)
-		}
-		packet.Header.PayloadType = payloadType
-
-		if writeErr := videoTrack.WriteRTP(packet); writeErr != nil {
+		if _, writeErr := videoTrack.Write(inboundRTPPacket[:n]); writeErr != nil {
 			panic(writeErr)
 		}
 	}

@@ -4,97 +4,11 @@ package webrtc
 
 import (
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/pion/sdp/v3"
 	"github.com/stretchr/testify/assert"
 )
-
-const sdpValue = `v=0
-o=- 884433216 1576829404 IN IP4 0.0.0.0
-s=-
-t=0 0
-a=fingerprint:sha-256 1D:6B:6D:18:95:41:F9:BC:E4:AC:25:6A:26:A3:C8:09:D2:8C:EE:1B:7D:54:53:33:F7:E3:2C:0D:FE:7A:9D:6B
-a=group:BUNDLE 0 1 2
-m=audio 9 UDP/TLS/RTP/SAVPF 0 8 111 9
-c=IN IP4 0.0.0.0
-a=mid:0
-a=rtpmap:0 PCMU/8000
-a=rtpmap:8 PCMA/8000
-a=rtpmap:111 opus/48000/2
-a=fmtp:111 minptime=10;useinbandfec=1
-a=rtpmap:9 G722/8000
-a=ssrc:1823804162 cname:pion1
-a=ssrc:1823804162 msid:pion1 audio
-a=ssrc:1823804162 mslabel:pion1
-a=ssrc:1823804162 label:audio
-a=msid:pion1 audio
-m=video 9 UDP/TLS/RTP/SAVPF 105 115 135
-c=IN IP4 0.0.0.0
-a=mid:1
-a=rtpmap:105 VP8/90000
-a=rtpmap:115 H264/90000
-a=fmtp:115 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
-a=rtpmap:135 VP9/90000
-a=ssrc:2949882636 cname:pion2
-a=ssrc:2949882636 msid:pion2 video
-a=ssrc:2949882636 mslabel:pion2
-a=ssrc:2949882636 label:video
-a=msid:pion2 video
-m=application 9 DTLS/SCTP 5000
-c=IN IP4 0.0.0.0
-a=mid:2
-a=sctpmap:5000 webrtc-datachannel 1024
-`
-
-func TestCodecRegistration(t *testing.T) {
-	api := NewAPI()
-	const invalidPT = 255
-
-	api.mediaEngine.RegisterDefaultCodecs()
-
-	testCases := []struct {
-		c uint8
-		e error
-	}{
-		{DefaultPayloadTypePCMU, nil},
-		{DefaultPayloadTypePCMA, nil},
-		{DefaultPayloadTypeG722, nil},
-		{DefaultPayloadTypeOpus, nil},
-		{DefaultPayloadTypeVP8, nil},
-		{DefaultPayloadTypeVP9, nil},
-		{DefaultPayloadTypeH264, nil},
-		{invalidPT, ErrCodecNotFound},
-	}
-
-	for _, f := range testCases {
-		_, err := api.mediaEngine.getCodec(f.c)
-		assert.Equal(t, f.e, err)
-	}
-	_, err := api.mediaEngine.getCodecSDP(sdp.Codec{PayloadType: invalidPT})
-	assert.Equal(t, err, ErrCodecNotFound)
-}
-
-func TestPopulateFromSDP(t *testing.T) {
-	m := MediaEngine{}
-	assertCodecWithPayloadType := func(name string, payloadType uint8) {
-		for _, c := range m.codecs {
-			if c.PayloadType == payloadType && c.Name == name {
-				return
-			}
-		}
-		t.Fatalf("Failed to find codec(%s) with PayloadType(%d)", name, payloadType)
-	}
-
-	m.RegisterDefaultCodecs()
-	assert.NoError(t, m.PopulateFromSDP(SessionDescription{SDP: sdpValue}))
-
-	assertCodecWithPayloadType(Opus, 111)
-	assertCodecWithPayloadType(VP8, 105)
-	assertCodecWithPayloadType(H264, 115)
-	assertCodecWithPayloadType(VP9, 135)
-}
 
 // pion/webrtc#1078
 func TestOpusCase(t *testing.T) {
@@ -111,61 +25,143 @@ func TestOpusCase(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-// pion/webrtc#1442
-func TestCaseInsensitive(t *testing.T) {
-	m := MediaEngine{}
-	m.RegisterDefaultCodecs()
-
-	testCases := []struct {
-		nameUpperCase string
-		nameLowerCase string
-		clockrate     uint32
-		fmtp          string
-	}{
-		{strings.ToUpper(Opus), strings.ToLower(Opus), 48000, "minptime=10;useinbandfec=1"},
-		{strings.ToUpper(PCMU), strings.ToLower(PCMU), 8000, ""},
-		{strings.ToUpper(PCMA), strings.ToLower(PCMA), 8000, ""},
-		{strings.ToUpper(G722), strings.ToLower(G722), 8000, ""},
-		{strings.ToUpper(VP8), strings.ToLower(VP8), 90000, ""},
-		{strings.ToUpper(VP9), strings.ToLower(VP9), 90000, ""},
-		{strings.ToUpper(H264), strings.ToLower(H264), 90000, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"},
+func TestMediaEngineRemoteDescription(t *testing.T) {
+	mustParse := func(raw string) sdp.SessionDescription {
+		s := sdp.SessionDescription{}
+		assert.NoError(t, s.Unmarshal([]byte(raw)))
+		return s
 	}
 
-	for _, f := range testCases {
-		upperCase, err := m.getCodecSDP(sdp.Codec{
-			Name:      f.nameUpperCase,
-			ClockRate: f.clockrate,
-			Fmtp:      f.fmtp,
-		})
+	t.Run("No Media", func(t *testing.T) {
+		const noMedia = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(noMedia)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.False(t, m.negotiatedAudio)
+	})
+
+	t.Run("Enable Opus", func(t *testing.T) {
+		const opusSamePayload = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=rtpmap:111 opus/48000/2
+a=fmtp:111 minptime=10; useinbandfec=1
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(opusSamePayload)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		opusCodec, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
+		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+	})
 
-		lowerCase, err := m.getCodecSDP(sdp.Codec{
-			Name:      f.nameLowerCase,
-			ClockRate: f.clockrate,
-			Fmtp:      f.fmtp,
-		})
+	t.Run("Change Payload Type", func(t *testing.T) {
+		const opusSamePayload = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 112
+a=rtpmap:112 opus/48000/2
+a=fmtp:112 minptime=10; useinbandfec=1
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(opusSamePayload)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		_, err := m.getCodecByPayload(111)
+		assert.Error(t, err)
+
+		opusCodec, err := m.getCodecByPayload(112)
 		assert.NoError(t, err)
+		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+	})
 
-		assert.Equal(t, upperCase, lowerCase)
-	}
-}
+	t.Run("Case Insensitive", func(t *testing.T) {
+		const opusUpcase = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=rtpmap:111 OPUS/48000/2
+a=fmtp:111 minptime=10; useinbandfec=1
+`
 
-func TestGetCodecsByName(t *testing.T) {
-	var cdc *RTPCodec
-	m := MediaEngine{}
-	assert.NoError(t, m.PopulateFromSDP(SessionDescription{SDP: sdpValue}))
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(opusUpcase)))
 
-	assertGetCodecsByName := func(name string) {
-		for _, cdc = range m.GetCodecsByName(name) {
-			if strings.EqualFold(cdc.Name, name) {
-				return
-			}
-		}
-		t.Fatalf("Failed to getting codec(%s) by name (%s)", cdc.Name, name)
-	}
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
 
-	assertGetCodecsByName(VP8)
-	assertGetCodecsByName(H264)
-	assertGetCodecsByName(VP9)
-	assertGetCodecsByName(Opus)
+		opusCodec, err := m.getCodecByPayload(111)
+		assert.NoError(t, err)
+		assert.Equal(t, opusCodec.MimeType, "audio/OPUS")
+	})
+
+	t.Run("Handle different fmtp", func(t *testing.T) {
+		const opusNoFmtp = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=rtpmap:111 opus/48000/2
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(opusNoFmtp)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		opusCodec, err := m.getCodecByPayload(111)
+		assert.NoError(t, err)
+		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+	})
+
+	t.Run("Header Extensions", func(t *testing.T) {
+		const headerExtensions = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=extmap:7 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=rtpmap:111 opus/48000/2
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		absID, absAudioEnabled, absVideoEnabled := m.GetHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
+		assert.Equal(t, absID, 0)
+		assert.False(t, absAudioEnabled)
+		assert.False(t, absVideoEnabled)
+
+		midID, midAudioEnabled, midVideoEnabled := m.GetHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
+		assert.Equal(t, midID, 7)
+		assert.True(t, midAudioEnabled)
+		assert.False(t, midVideoEnabled)
+	})
 }

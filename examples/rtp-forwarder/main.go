@@ -17,21 +17,28 @@ type udpConn struct {
 }
 
 func main() {
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
+	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Create a MediaEngine object to configure the supported codec
 	m := webrtc.MediaEngine{}
 
 	// Setup the codecs you want to use.
-	// We'll use a VP8 codec but you can also define your own
-	m.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000))
-	m.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	// We'll use a VP8 and Opus but you can also define your own
+	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
+		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        96,
+	}, webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	}
+	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
+		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/opus", ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        111,
+	}, webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	}
 
 	// Create the API object with the MediaEngine
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
-
-	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -87,7 +94,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler will forward data to
 	// our UDP listeners.
 	// In your application this is where you would handle/process audio/video
-	peerConnection.OnTrack(func(track *webrtc.Track, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		// Retrieve udp connection
 		c, ok := udpConns[track.Kind().String()]
 		if !ok {
@@ -98,7 +105,7 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 2)
 			for range ticker.C {
-				if rtcpErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()}}); rtcpErr != nil {
+				if rtcpErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
 					fmt.Println(rtcpErr)
 				}
 			}
@@ -127,6 +134,9 @@ func main() {
 			}
 		}
 	})
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
