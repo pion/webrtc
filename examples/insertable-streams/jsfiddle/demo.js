@@ -22,8 +22,8 @@ window.toggleDecryption = () => {
 }
 
 // Loop that is called for each video frame
-const reader = receiverStreams.readableStream.getReader()
-const writer = receiverStreams.writableStream.getWriter()
+const reader = receiverStreams.readable.getReader()
+const writer = receiverStreams.writable.getWriter()
 reader.read().then(function processVideo({ done, value }) {
   let decrypted = new DataView(value.data)
 
