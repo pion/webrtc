@@ -311,11 +311,18 @@ func (d *DataChannel) onError(err error) {
 	}
 }
 
+// See https://github.com/pion/webrtc/issues/1516
+// nolint:gochecknoglobals
+var rlBufPool = sync.Pool{New: func() interface{} {
+	return make([]byte, dataChannelBufferSize)
+}}
+
 func (d *DataChannel) readLoop() {
 	for {
-		buffer := make([]byte, dataChannelBufferSize)
+		buffer := rlBufPool.Get().([]byte)
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
+			rlBufPool.Put(buffer) // nolint:staticcheck
 			d.setReadyState(DataChannelStateClosed)
 			if err != io.EOF {
 				d.onError(err)
@@ -324,7 +331,13 @@ func (d *DataChannel) readLoop() {
 			return
 		}
 
-		d.onMessage(DataChannelMessage{Data: buffer[:n], IsString: isString})
+		m := DataChannelMessage{Data: make([]byte, n), IsString: isString}
+		copy(m.Data, buffer[:n])
+
+		// NB: Why was DataChannelMessage not passed as a pointer value?  The
+		// pragma for Put() is a false positive on the part of the CI linter.
+		d.onMessage(m)        // nolint:staticcheck
+		rlBufPool.Put(buffer) // nolint:staticcheck
 	}
 }
 
