@@ -211,6 +211,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Artur Shellunts](https://github.com/ashellunts)
 * [Sean Knight](https://github.com/SeanKnight)
 * [o0olele](https://github.com/o0olele)
+* [Bo Shi](https://github.com/bshimc)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
