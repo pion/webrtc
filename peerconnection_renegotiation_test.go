@@ -789,77 +789,34 @@ func TestAddDataChannelDuringRenegotation(t *testing.T) {
 	assert.NoError(t, pcAnswer.Close())
 }
 
-func TestNegotiationTrackAndChannel(t *testing.T) {
+// Assert that CreateDataChannel fires OnNegotiationNeeded
+func TestNegotiationCreateDataChannel(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
 	defer report()
 
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
 	var wg sync.WaitGroup
-	wg.Add(3)
-	isMulti := make(chan bool, 1)
+	wg.Add(1)
 
-	pcOffer, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	pcAnswer, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, randutil.NewMathRandomGenerator().Uint32(), "video", "pion")
-	assert.NoError(t, err)
-
-	pcAnswer.OnDataChannel(func(*DataChannel) {
-		wg.Done()
-		if err := track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != nil {
-			t.Error(err.Error())
-		}
-	})
-	pcAnswer.OnTrack(func(*Track, *RTPReceiver) {
-		wg.Done()
+	pc.OnNegotiationNeeded(func() {
+		defer func() {
+			wg.Done()
+		}()
 	})
 
-	pcOffer.OnNegotiationNeeded(func() {
-		wg.Add(1)
-		<-isMulti
-		offer, err := pcOffer.CreateOffer(nil)
-		assert.NoError(t, err)
-
-		offerGatheringComplete := GatheringCompletePromise(pcOffer)
-		if err = pcOffer.SetLocalDescription(offer); err != nil {
-			t.Error(err.Error())
-		}
-		<-offerGatheringComplete
-		if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
-			t.Error(err.Error())
-		}
-
-		answer, err := pcAnswer.CreateAnswer(nil)
-		assert.NoError(t, err)
-
-		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-		if err = pcAnswer.SetLocalDescription(answer); err != nil {
-			t.Error(err.Error())
-		}
-		<-answerGatheringComplete
-		if err = pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()); err != nil {
-			t.Error(err.Error())
-		}
-		wg.Done()
-		wg.Done()
-	})
-
-	if _, err := pcOffer.AddTrack(track); err != nil {
+	// Create DataChannel, wait until OnNegotiationNeeded is fired
+	if _, err = pc.CreateDataChannel("testChannel", nil); err != nil {
 		t.Error(err.Error())
 	}
-	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
-		t.Error(err.Error())
-	}
-	isMulti <- true
 
+	// Wait until OnNegotiationNeeded is fired
 	wg.Wait()
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	assert.NoError(t, pc.Close())
 }
 
 func TestNegotiationNeededRemoveTrack(t *testing.T) {
