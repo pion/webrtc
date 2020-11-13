@@ -21,6 +21,7 @@ import (
 	"github.com/pion/ice/v2"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
+	"github.com/pion/transport/vnet"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -928,6 +929,103 @@ func TestICERestart(t *testing.T) {
 	assert.NotEqual(t, firstAnswerCandidates, extractCandidates(answerPC.LocalDescription().SDP))
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
+}
+
+// Assert error handling when an Agent is restart
+func TestICERestart_Error_Handling(t *testing.T) {
+	iceStates := make(chan ICEConnectionState, 100)
+	blockUntilICEState := func(wantedState ICEConnectionState) {
+		stateCount := 0
+		for i := range iceStates {
+			if i == wantedState {
+				stateCount++
+			}
+
+			if stateCount == 2 {
+				return
+			}
+		}
+	}
+
+	connectWithICERestart := func(offerPeerConnection, answerPeerConnection *PeerConnection) {
+		offer, err := offerPeerConnection.CreateOffer(&OfferOptions{ICERestart: true})
+		assert.NoError(t, err)
+
+		offerGatheringComplete := GatheringCompletePromise(offerPeerConnection)
+		assert.NoError(t, offerPeerConnection.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
+		assert.NoError(t, answerPeerConnection.SetRemoteDescription(*offerPeerConnection.LocalDescription()))
+
+		answer, err := answerPeerConnection.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(answerPeerConnection)
+		assert.NoError(t, answerPeerConnection.SetLocalDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, offerPeerConnection.SetRemoteDescription(*answerPeerConnection.LocalDescription()))
+	}
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerPeerConnection, answerPeerConnection, wan := createVNetPair(t)
+
+	pushICEState := func(i ICEConnectionState) { iceStates <- i }
+	offerPeerConnection.OnICEConnectionStateChange(pushICEState)
+	answerPeerConnection.OnICEConnectionStateChange(pushICEState)
+
+	keepPackets := &atomicBool{}
+	keepPackets.set(true)
+
+	// Add a filter that monitors the traffic on the router
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		return keepPackets.get()
+	})
+
+	const testMessage = "testMessage"
+
+	d, err := answerPeerConnection.CreateDataChannel("foo", nil)
+	assert.NoError(t, err)
+
+	dataChannelMessages := make(chan string, 100)
+	d.OnMessage(func(m DataChannelMessage) {
+		dataChannelMessages <- string(m.Data)
+	})
+
+	dataChannelAnswerer := make(chan *DataChannel)
+	offerPeerConnection.OnDataChannel(func(d *DataChannel) {
+		dataChannelAnswerer <- d
+	})
+
+	// Connect and Assert we have connected
+	assert.NoError(t, signalPair(offerPeerConnection, answerPeerConnection))
+	blockUntilICEState(ICEConnectionStateConnected)
+
+	dataChannel := <-dataChannelAnswerer
+	assert.NoError(t, dataChannel.SendText(testMessage))
+	assert.Equal(t, testMessage, <-dataChannelMessages)
+
+	// Drop all packets, assert we have disconnected
+	// and send a DataChannel message when disconnected
+	keepPackets.set(false)
+	blockUntilICEState(ICEConnectionStateFailed)
+	assert.NoError(t, dataChannel.SendText(testMessage))
+
+	// ICE Restart and assert we have reconnected
+	// block until our DataChannel message is delivered
+	keepPackets.set(true)
+	connectWithICERestart(offerPeerConnection, answerPeerConnection)
+	blockUntilICEState(ICEConnectionStateConnected)
+	assert.Equal(t, testMessage, <-dataChannelMessages)
+
+	assert.NoError(t, wan.Stop())
+	assert.NoError(t, offerPeerConnection.Close())
+	assert.NoError(t, answerPeerConnection.Close())
 }
 
 type trackRecords struct {
