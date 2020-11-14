@@ -2117,7 +2117,14 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 		return nil, err
 	}
 
-	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState(), pc.api.settingEngine.getSDPExtensions())
+	var unmatchedSDPMap map[SDPSectionType][]sdp.ExtMap
+	if pc.getMapExt != nil {
+		unmatchedSDPMap = pc.getMapExt()
+	} else {
+		unmatchedSDPMap = pc.api.settingEngine.sdpExtensions
+	}
+
+	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState(), unmatchedSDPMap)
 }
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
