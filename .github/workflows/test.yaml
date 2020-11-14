@@ -28,6 +28,7 @@ jobs:
         run: |
           go test \
           -coverprofile=cover.out -covermode=atomic \
+          -bench=. \
           -tags quic \
           -v -race ${TEST_PACKAGES}
 
