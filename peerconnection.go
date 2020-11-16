@@ -2045,6 +2045,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
 	mediaSections := []mediaSection{}
 
+	// Needed for pc.sctpTransport.dataChannelsRequested
+	pc.sctpTransport.lock.Lock()
+	defer pc.sctpTransport.lock.Unlock()
+
 	if isPlanB {
 		video := make([]*RTPTransceiver, 0)
 		audio := make([]*RTPTransceiver, 0)
