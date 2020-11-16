@@ -22,14 +22,14 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
+        run: echo "TEST_PACKAGES=$(go list ./... | grep -v examples)" >> $GITHUB_ENV
 
       - name: Run test
         run: |
           go test \
           -coverprofile=cover.out -covermode=atomic \
           -bench=. \
-          -tags quic \
+          ${TEST_EXTRA_ARGS:-} \
           -v -race ${TEST_PACKAGES}
 
       - uses: codecov/codecov-action@v1
@@ -58,7 +58,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
+        run: echo "TEST_PACKAGES=$(go list ./... | grep -v examples)" >> $GITHUB_ENV
 
       - name: Run test
         run: |
@@ -72,7 +72,7 @@ jobs:
           -w /go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
           i386/golang:${{matrix.go}}-alpine \
           /usr/local/go/bin/go test \
-            -tags quic \
+            ${TEST_EXTRA_ARGS:-} \
             -v ${TEST_PACKAGES}
 
   test-wasm:
@@ -96,7 +96,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
+        run: echo "TEST_PACKAGES=$(go list ./... | grep -v examples)" >> $GITHUB_ENV
 
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
@@ -104,23 +104,20 @@ jobs:
           GO_VERSION: 1.15
 
       - name: Set Go Root
-        run: echo ::set-env name=GOROOT::${HOME}/go
+        run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
 
       - name: Set Go Path
-        run: echo ::set-env name=GOPATH::${HOME}/go
+        run: echo "GOPATH=${HOME}/go" >> $GITHUB_ENV
 
-      - name: Update Path
-        run: echo ::set-env name=PATH::${GOROOT}/bin:${PATH}
-
-      - name: Set Go WASM Exec
-        run: echo ::set-env name=GO_JS_WASM_EXEC::${PWD}/test-wasm/go_js_wasm_exec
+      - name: Set Go Path
+        run: echo "GO_JS_WASM_EXEC=${GOROOT}/misc/wasm/go_js_wasm_exec" >> $GITHUB_ENV
 
       - name: Insall NPM modules
         run: yarn install
 
       - name: Run Tests
         run: |
-          GOOS=js GOARCH=wasm go test \
+          GOOS=js GOARCH=wasm $GOPATH/bin/go test \
           -coverprofile=cover.out -covermode=atomic \
           -exec="${GO_JS_WASM_EXEC}" \
           -v ${TEST_PACKAGES}
