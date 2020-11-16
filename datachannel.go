@@ -335,11 +335,11 @@ func (d *DataChannel) readLoop() {
 
 		m := DataChannelMessage{Data: make([]byte, n), IsString: isString}
 		copy(m.Data, buffer[:n])
-
-		// NB: Why was DataChannelMessage not passed as a pointer value?  The
-		// pragma for Put() is a false positive on the part of the CI linter.
-		d.onMessage(m)        // nolint:staticcheck
+		// The 'staticcheck' pragma is a false positive on the part of the CI linter.
 		rlBufPool.Put(buffer) // nolint:staticcheck
+
+		// NB: Why was DataChannelMessage not passed as a pointer value?
+		d.onMessage(m) // nolint:staticcheck
 	}
 }
 
