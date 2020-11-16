@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/datachannel"
@@ -32,7 +33,7 @@ type DataChannel struct {
 	protocol                   string
 	negotiated                 bool
 	id                         *uint16
-	readyState                 DataChannelState
+	readyState                 atomic.Value // DataChannelState
 	bufferedAmountLowThreshold uint64
 	detachCalled               bool
 
@@ -84,7 +85,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
-	return &DataChannel{
+	d := &DataChannel{
 		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
 		label:             params.Label,
 		protocol:          params.Protocol,
@@ -93,10 +94,12 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 		ordered:           params.Ordered,
 		maxPacketLifeTime: params.MaxPacketLifeTime,
 		maxRetransmits:    params.MaxRetransmits,
-		readyState:        DataChannelStateConnecting,
 		api:               api,
 		log:               log,
-	}, nil
+	}
+
+	d.setReadyState(DataChannelStateConnecting)
+	return d, nil
 }
 
 // open opens the datachannel over the sctp transport
@@ -211,10 +214,9 @@ func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
 	d.openHandlerOnce = sync.Once{}
 	d.onOpenHandler = f
-	readyState := d.readyState
 	d.mu.Unlock()
 
-	if readyState == DataChannelStateOpen {
+	if d.ReadyState() == DataChannelStateOpen {
 		// If the data channel is already open, call the handler immediately.
 		go d.openHandlerOnce.Do(func() {
 			f()
@@ -366,7 +368,7 @@ func (d *DataChannel) SendText(s string) error {
 func (d *DataChannel) ensureOpen() error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	if d.readyState != DataChannelStateOpen {
+	if d.ReadyState() != DataChannelStateOpen {
 		return io.ErrClosedPipe
 	}
 	return nil
@@ -401,11 +403,10 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
 	d.mu.Lock()
-	isClosed := d.readyState == DataChannelStateClosed
 	haveSctpTransport := d.dataChannel != nil
 	d.mu.Unlock()
 
-	if isClosed {
+	if d.ReadyState() == DataChannelStateClosed {
 		return nil
 	}
 
@@ -487,10 +488,10 @@ func (d *DataChannel) ID() *uint16 {
 
 // ReadyState represents the state of the DataChannel object.
 func (d *DataChannel) ReadyState() DataChannelState {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	return d.readyState
+	if v := d.readyState.Load(); v != nil {
+		return v.(DataChannelState)
+	}
+	return DataChannelState(0)
 }
 
 // BufferedAmount represents the number of bytes of application data
@@ -574,7 +575,7 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		Label:     d.label,
 		Protocol:  d.protocol,
 		// TransportID string `json:"transportId"`
-		State: d.readyState,
+		State: d.ReadyState(),
 	}
 
 	if d.id != nil {
@@ -592,8 +593,5 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 }
 
 func (d *DataChannel) setReadyState(r DataChannelState) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.readyState = r
+	d.readyState.Store(r)
 }

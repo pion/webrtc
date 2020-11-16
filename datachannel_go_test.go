@@ -161,7 +161,6 @@ func TestDataChannelParamters_Go(t *testing.T) {
 		assert.Equal(t, dc.label, dc.Label(), "should match")
 		assert.Equal(t, dc.protocol, dc.Protocol(), "should match")
 		assert.Equal(t, dc.negotiated, dc.Negotiated(), "should match")
-		assert.Equal(t, dc.readyState, dc.ReadyState(), "should match")
 		assert.Equal(t, uint64(0), dc.BufferedAmount(), "should match")
 		dc.SetBufferedAmountLowThreshold(1500)
 		assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "should match")
