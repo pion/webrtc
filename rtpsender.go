@@ -13,13 +13,16 @@ import (
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
 type RTPSender struct {
-	track          TrackLocal
+	track TrackLocal
+
 	rtcpReadStream *srtp.ReadStreamSRTCP
+	rtpWriteStream *srtp.WriteStreamSRTP
 
 	transport *DTLSTransport
 
 	payloadType PayloadType
 	ssrc        SSRC
+	codec       RTPCodecParameters
 
 	// nolint:godox
 	// TODO(sgotti) remove this when in future we'll avoid replacing
@@ -86,10 +89,39 @@ func (r *RTPSender) Track() TrackLocal {
 	return r.track
 }
 
-func (r *RTPSender) setTrack(track TrackLocal) {
+// ReplaceTrack replaces the track currently being used as the sender's source with a new TrackLocal.
+// The new track must be of the same media kind (audio, video, etc) and switching the track should not
+// require negotiation.
+func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.hasSent() {
+		if err := r.track.Unbind(TrackLocalContext{
+			id:          r.id,
+			ssrc:        r.ssrc,
+			writeStream: r.rtpWriteStream,
+		}); err != nil {
+			return err
+		}
+	}
+
+	if !r.hasSent() || track == nil {
+		r.track = track
+		return nil
+	}
+
+	if _, err := track.Bind(TrackLocalContext{
+		id:          r.id,
+		codecs:      []RTPCodecParameters{r.codec},
+		ssrc:        r.ssrc,
+		writeStream: r.rtpWriteStream,
+	}); err != nil {
+		return err
+	}
+
 	r.track = track
+	return nil
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
@@ -116,16 +148,15 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return err
 	}
 
-	rtpWriteStream, err := srtpSession.OpenWriteStream()
-	if err != nil {
+	if r.rtpWriteStream, err = srtpSession.OpenWriteStream(); err != nil {
 		return err
 	}
 
-	if err = r.track.Bind(TrackLocalContext{
+	if r.codec, err = r.track.Bind(TrackLocalContext{
 		id:          r.id,
 		codecs:      r.api.mediaEngine.getCodecsByKind(r.track.Kind()),
 		ssrc:        parameters.Encodings.SSRC,
-		writeStream: rtpWriteStream,
+		writeStream: r.rtpWriteStream,
 	}); err != nil {
 		return err
 	}
@@ -148,14 +179,6 @@ func (r *RTPSender) Stop() error {
 
 	if !r.hasSent() {
 		return nil
-	}
-
-	if err := r.track.Unbind(TrackLocalContext{
-		id:     r.id,
-		codecs: r.api.mediaEngine.getCodecsByKind(r.track.Kind()),
-		ssrc:   r.ssrc,
-	}); err != nil {
-		return err
 	}
 
 	return r.rtcpReadStream.Close()
