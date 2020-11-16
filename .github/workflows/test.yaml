@@ -21,16 +21,13 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
-
       - name: Run test
         run: |
           go test \
           -coverprofile=cover.out -covermode=atomic \
           -bench=. \
           -tags quic \
-          -v -race ${TEST_PACKAGES}
+          -v -race ./...
 
       - uses: codecov/codecov-action@v1
         with:
@@ -57,9 +54,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
-
       - name: Run test
         run: |
           docker run \
@@ -73,7 +67,7 @@ jobs:
           i386/golang:${{matrix.go}}-alpine \
           /usr/local/go/bin/go test \
             -tags quic \
-            -v ${TEST_PACKAGES}
+            -v ./...
 
   test-wasm:
     runs-on: ubuntu-latest
@@ -95,35 +89,29 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Set test packages
-        run: echo ::set-env name=TEST_PACKAGES::$(go list ./... | grep -v examples)
-
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
         env:
           GO_VERSION: 1.15
 
       - name: Set Go Root
-        run: echo ::set-env name=GOROOT::${HOME}/go
+        run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
 
       - name: Set Go Path
-        run: echo ::set-env name=GOPATH::${HOME}/go
+        run: echo "GOPATH=${HOME}/go" >> $GITHUB_ENV
 
-      - name: Update Path
-        run: echo ::set-env name=PATH::${GOROOT}/bin:${PATH}
-
-      - name: Set Go WASM Exec
-        run: echo ::set-env name=GO_JS_WASM_EXEC::${PWD}/test-wasm/go_js_wasm_exec
+      - name: Set Go Path
+        run: echo "GO_JS_WASM_EXEC=${PWD}/test-wasm/go_js_wasm_exec" >> $GITHUB_ENV
 
       - name: Insall NPM modules
         run: yarn install
 
       - name: Run Tests
         run: |
-          GOOS=js GOARCH=wasm go test \
+          GOOS=js GOARCH=wasm $GOPATH/bin/go test \
           -coverprofile=cover.out -covermode=atomic \
           -exec="${GO_JS_WASM_EXEC}" \
-          -v ${TEST_PACKAGES}
+          -v ./...
 
       - uses: codecov/codecov-action@v1
         with:
