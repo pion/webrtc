@@ -49,7 +49,7 @@ type TrackLocal interface {
 	// Bind should implement the way how the media data flows from the Track to the PeerConnection
 	// This will be called internally after signaling is complete and the list of available
 	// codecs has been determined
-	Bind(TrackLocalContext) error
+	Bind(TrackLocalContext) (RTPCodecParameters, error)
 
 	// Unbind should implement the teardown logic when the track is no longer needed. This happens
 	// because a track has been stopped.

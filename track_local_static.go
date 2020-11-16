@@ -43,7 +43,7 @@ func NewTrackLocalStaticRTP(c RTPCodecCapability, id, streamID string) (*TrackLo
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.
 // If so it setups all the state (SSRC and PayloadType) to have a call
-func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) error {
+func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) (RTPCodecParameters, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -55,10 +55,10 @@ func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) error {
 			writeStream: t.WriteStream(),
 			id:          t.ID(),
 		})
-		return nil
+		return codec, nil
 	}
 
-	return ErrUnsupportedCodec
+	return RTPCodecParameters{}, ErrUnsupportedCodec
 }
 
 // Unbind implements the teardown logic when the track is no longer needed. This happens
@@ -165,9 +165,10 @@ func (s *TrackLocalStaticSample) Kind() RTPCodecType { return s.rtpTrack.Kind() 
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.
 // If so it setups all the state (SSRC and PayloadType) to have a call
-func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) error {
-	if err := s.rtpTrack.Bind(t); err != nil {
-		return err
+func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, error) {
+	codec, err := s.rtpTrack.Bind(t)
+	if err != nil {
+		return codec, err
 	}
 
 	s.rtpTrack.mu.Lock()
@@ -175,18 +176,12 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) error {
 
 	// We only need one packetizer
 	if s.packetizer != nil {
-		return nil
+		return codec, nil
 	}
 
-	parameters := RTPCodecParameters{RTPCodecCapability: s.rtpTrack.codec}
-	codec, err := codecParametersFuzzySearch(parameters, t.CodecParameters())
+	payloader, err := payloaderForCodec(codec.RTPCodecCapability)
 	if err != nil {
-		return err
-	}
-
-	payloader, err := payloaderForCodec(s.rtpTrack.codec)
-	if err != nil {
-		return err
+		return codec, err
 	}
 
 	s.packetizer = rtp.NewPacketizer(
@@ -198,7 +193,7 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) error {
 		codec.ClockRate,
 	)
 	s.clockRate = float64(codec.RTPCodecCapability.ClockRate)
-	return nil
+	return codec, nil
 }
 
 // Unbind implements the teardown logic when the track is no longer needed. This happens
