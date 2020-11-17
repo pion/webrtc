@@ -182,7 +182,7 @@ func (i *OggWriter) WriteRTP(packet *rtp.Packet) error {
 	payload := opusPacket.Payload[0:]
 
 	// Should be equivalent to sampleRate * duration
-	if i.previousTimestamp != 0 {
+	if i.previousTimestamp != 1 {
 		increment := packet.Timestamp - i.previousTimestamp
 		i.previousGranulePosition += uint64(increment)
 	}
