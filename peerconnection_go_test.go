@@ -951,19 +951,13 @@ func TestICERestart_Error_Handling(t *testing.T) {
 		offer, err := offerPeerConnection.CreateOffer(&OfferOptions{ICERestart: true})
 		assert.NoError(t, err)
 
-		offerGatheringComplete := GatheringCompletePromise(offerPeerConnection)
 		assert.NoError(t, offerPeerConnection.SetLocalDescription(offer))
-		<-offerGatheringComplete
-
 		assert.NoError(t, answerPeerConnection.SetRemoteDescription(*offerPeerConnection.LocalDescription()))
 
 		answer, err := answerPeerConnection.CreateAnswer(nil)
 		assert.NoError(t, err)
 
-		answerGatheringComplete := GatheringCompletePromise(answerPeerConnection)
 		assert.NoError(t, answerPeerConnection.SetLocalDescription(answer))
-		<-answerGatheringComplete
-
 		assert.NoError(t, offerPeerConnection.SetRemoteDescription(*answerPeerConnection.LocalDescription()))
 	}
 
@@ -1007,6 +1001,18 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	// Connect and Assert we have connected
 	assert.NoError(t, signalPair(offerPeerConnection, answerPeerConnection))
 	blockUntilICEState(ICEConnectionStateConnected)
+
+	offerPeerConnection.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, answerPeerConnection.AddICECandidate(c.ToJSON()))
+		}
+	})
+
+	answerPeerConnection.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, offerPeerConnection.AddICECandidate(c.ToJSON()))
+		}
+	})
 
 	dataChannel := <-dataChannelAnswerer
 	assert.NoError(t, dataChannel.SendText(testMessage))

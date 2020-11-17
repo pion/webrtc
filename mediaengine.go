@@ -206,6 +206,10 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 // RegisterHeaderExtension adds a header extension to the MediaEngine
 // To determine the negotiated value use `GetHeaderExtensionID` after signaling is complete
 func (m *MediaEngine) RegisterHeaderExtension(extension RTPHeaderExtensionCapability, typ RTPCodecType) error {
+	if m.negotiatedHeaderExtensions == nil {
+		m.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
+	}
+
 	extensionIndex := -1
 	for i := range m.headerExtensions {
 		if extension.URI == m.headerExtensions[i].uri {
@@ -233,7 +237,7 @@ func (m *MediaEngine) RegisterHeaderExtension(extension RTPHeaderExtensionCapabi
 // If the Header Extension isn't enabled ok will be false
 func (m *MediaEngine) GetHeaderExtensionID(extension RTPHeaderExtensionCapability) (val int, audioNegotiated, videoNegotiated bool) {
 	if m.negotiatedHeaderExtensions == nil {
-		m.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
+		return 0, false, false
 	}
 
 	for id, h := range m.negotiatedHeaderExtensions {
@@ -320,7 +324,7 @@ func (m *MediaEngine) updateCodecParameters(remoteCodec RTPCodecParameters, typ 
 // Look up a header extension and enable if it exists
 func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCodecType) error {
 	if m.negotiatedHeaderExtensions == nil {
-		m.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
+		return nil
 	}
 
 	for _, localExtension := range m.headerExtensions {
