@@ -862,18 +862,9 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	assert.NoError(t, err)
 
 	pcA.OnNegotiationNeeded(func() {
-		// If we do get an error ErrConnectionClosed is the only acceptable one
-		if err := signalPair(pcA, pcB); err != nil {
-			assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrConnectionClosed})
-		}
+		assert.NoError(t, signalPair(pcA, pcB))
 	})
 
-	var onTracksFired uint64
-	pcB.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
-		atomic.AddUint64(&onTracksFired, 1)
-	})
-
-	outboundTracks := []*TrackLocalStaticSample{}
 	const expectedTrackCount = 500
 	for i := 0; i < expectedTrackCount; i++ {
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
@@ -881,30 +872,11 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 
 		_, err = pcA.AddTrack(track)
 		assert.NoError(t, err)
-
-		outboundTracks = append(outboundTracks, track)
-	}
-
-	ssrcMap := map[SSRC]bool{}
-	for _, transceiver := range pcA.GetTransceivers() {
-		if _, ok := ssrcMap[transceiver.Sender().ssrc]; ok {
-			t.Skip("RTPSender with dupe SSRC")
-		}
-
-		ssrcMap[transceiver.Sender().ssrc] = true
-	}
-
-	for range time.Tick(time.Millisecond * 20) {
-		if atomic.LoadUint64(&onTracksFired) == expectedTrackCount {
-			break
-		}
-
-		for _, track := range outboundTracks {
-			assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
-		}
 	}
 
 	pcA.ops.Done()
+
+	assert.Equal(t, expectedTrackCount, len(pcB.GetTransceivers()))
 	assert.NoError(t, pcA.Close())
 	assert.NoError(t, pcB.Close())
 }
