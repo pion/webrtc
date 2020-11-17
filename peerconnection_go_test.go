@@ -899,27 +899,32 @@ func TestICERestart(t *testing.T) {
 	firstOfferCandidates := extractCandidates(offerPC.LocalDescription().SDP)
 	firstAnswerCandidates := extractCandidates(answerPC.LocalDescription().SDP)
 
+	// Use Trickle ICE for ICE Restart
+	offerPC.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
+		}
+	})
+
+	answerPC.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			assert.NoError(t, offerPC.AddICECandidate(c.ToJSON()))
+		}
+	})
+
 	// Re-signal with ICE Restart, block until ICEConnectionStateConnected
 	connectedWaitGroup.Add(2)
 	offer, err := offerPC.CreateOffer(&OfferOptions{ICERestart: true})
 	assert.NoError(t, err)
 
-	// Block until Gathering is Complete
-	offerGatheringComplete := GatheringCompletePromise(offerPC)
 	assert.NoError(t, offerPC.SetLocalDescription(offer))
-	<-offerGatheringComplete
-
-	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
 
 	answer, err := answerPC.CreateAnswer(nil)
 	assert.NoError(t, err)
 
-	// Block until Gathering is Complete
-	answerGatheringComplete := GatheringCompletePromise(answerPC)
 	assert.NoError(t, answerPC.SetLocalDescription(answer))
-	<-answerGatheringComplete
-
-	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+	assert.NoError(t, offerPC.SetRemoteDescription(answer))
 
 	// Block until we have connected again
 	connectedWaitGroup.Wait()
