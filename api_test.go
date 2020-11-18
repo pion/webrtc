@@ -28,7 +28,7 @@ func TestNewAPI_Options(t *testing.T) {
 
 	api := NewAPI(
 		WithSettingEngine(s),
-		WithMediaEngine(m),
+		WithMediaEngine(&m),
 	)
 
 	if !api.settingEngine.detach.DataChannels {

@@ -85,7 +85,7 @@ func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 	if err := m.RegisterDefaultCodecs(); err != nil {
 		return nil, err
 	}
-	api := NewAPI(WithMediaEngine(m))
+	api := NewAPI(WithMediaEngine(&m))
 	return api.NewPeerConnection(configuration)
 }
 

@@ -39,10 +39,14 @@ func NewAPI(options ...func(*API)) *API {
 }
 
 // WithMediaEngine allows providing a MediaEngine to the API.
-// Settings should not be changed after passing the engine to an API.
-func WithMediaEngine(m MediaEngine) func(a *API) {
+// Settings can be changed after passing the engine to an API.
+func WithMediaEngine(m *MediaEngine) func(a *API) {
 	return func(a *API) {
-		a.mediaEngine = &m
+		if m != nil {
+			a.mediaEngine = m
+		} else {
+			a.mediaEngine = &MediaEngine{}
+		}
 	}
 }
 

@@ -47,7 +47,7 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		settingEngine.SetICETCPMux(tcpMux)
 
 		api := webrtc.NewAPI(
-			webrtc.WithMediaEngine(m),
+			webrtc.WithMediaEngine(&m),
 			webrtc.WithSettingEngine(settingEngine),
 		)
 		if peerConnection, err = api.NewPeerConnection(webrtc.Configuration{}); err != nil {
