@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
