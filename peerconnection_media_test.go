@@ -590,7 +590,7 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 	}
 
 	if got, want := videoDesc.MediaName.Formats, []string{"0"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", *videoDesc.MediaName.String())
+		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", videoDesc.MediaName.String())
 	}
 
 	assert.NoError(t, noCodecPC.Close())
