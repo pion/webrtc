@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp"
 )
@@ -31,6 +32,8 @@ type RTPReceiver struct {
 
 	// A reference to the associated api object
 	api *API
+
+	interceptorRTCPReader interceptor.RTCPReader
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -39,14 +42,17 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		return nil, errRTPReceiverDTLSTransportNil
 	}
 
-	return &RTPReceiver{
+	r := &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 		api:       api,
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
-	}, nil
+	}
+	r.interceptorRTCPReader = api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(r.readRTCP))
+
+	return r, nil
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -94,11 +100,12 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 
 	if len(parameters.Encodings) == 1 && parameters.Encodings[0].SSRC != 0 {
 		t := trackStreams{
-			track: &TrackRemote{
-				kind:     r.kind,
-				ssrc:     parameters.Encodings[0].SSRC,
-				receiver: r,
-			},
+			track: newTrackRemote(
+				r.kind,
+				parameters.Encodings[0].SSRC,
+				"",
+				r,
+			),
 		}
 
 		var err error
@@ -111,11 +118,12 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	} else {
 		for _, encoding := range parameters.Encodings {
 			r.tracks = append(r.tracks, trackStreams{
-				track: &TrackRemote{
-					kind:     r.kind,
-					rid:      encoding.RID,
-					receiver: r,
-				},
+				track: newTrackRemote(
+					r.kind,
+					0,
+					encoding.RID,
+					r,
+				),
 			})
 		}
 	}
@@ -148,15 +156,27 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, err error) {
 	}
 }
 
-// ReadRTCP is a convenience method that wraps Read and unmarshal for you
+// ReadRTCP is a convenience method that wraps Read and unmarshal for you.
+// It also runs any configured interceptors.
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
+	pkts, _, err := r.interceptorRTCPReader.Read()
+	return pkts, err
+}
+
+// ReadRTCP is a convenience method that wraps Read and unmarshal for you
+func (r *RTPReceiver) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
 	i, err := r.Read(b)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return rtcp.Unmarshal(b[:i])
+	pkts, err := rtcp.Unmarshal(b[:i])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pkts, make(interceptor.Attributes), nil
 }
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you
@@ -232,7 +252,7 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, err error) 
 
 // receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
 // It populates all the internal state for the given RID
-func (r *RTPReceiver) receiveForRid(rid string, codec RTPCodecParameters, ssrc SSRC) (*TrackRemote, error) {
+func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC) (*TrackRemote, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -240,8 +260,10 @@ func (r *RTPReceiver) receiveForRid(rid string, codec RTPCodecParameters, ssrc S
 		if r.tracks[i].track.RID() == rid {
 			r.tracks[i].track.mu.Lock()
 			r.tracks[i].track.kind = r.kind
-			r.tracks[i].track.codec = codec
+			r.tracks[i].track.codec = params.Codecs[0]
+			r.tracks[i].track.params = params
 			r.tracks[i].track.ssrc = ssrc
+			r.tracks[i].track.bindInterceptor()
 			r.tracks[i].track.mu.Unlock()
 
 			var err error
