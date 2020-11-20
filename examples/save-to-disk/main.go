@@ -54,8 +54,13 @@ func main() {
 		panic(err)
 	}
 
+	ir := &webrtc.InterceptorRegistry{}
+	if err := webrtc.RegisterDefaultInterceptors(&m, ir); err != nil {
+		panic(err)
+	}
+
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m), webrtc.WithInterceptorRegistry(ir))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
