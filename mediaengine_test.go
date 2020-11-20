@@ -63,7 +63,7 @@ a=fmtp:111 minptime=10; useinbandfec=1
 		assert.False(t, m.negotiatedVideo)
 		assert.True(t, m.negotiatedAudio)
 
-		opusCodec, err := m.getCodecByPayload(111)
+		opusCodec, _, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
 		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
 	})
@@ -85,10 +85,10 @@ a=fmtp:112 minptime=10; useinbandfec=1
 		assert.False(t, m.negotiatedVideo)
 		assert.True(t, m.negotiatedAudio)
 
-		_, err := m.getCodecByPayload(111)
+		_, _, err := m.getCodecByPayload(111)
 		assert.Error(t, err)
 
-		opusCodec, err := m.getCodecByPayload(112)
+		opusCodec, _, err := m.getCodecByPayload(112)
 		assert.NoError(t, err)
 		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
 	})
@@ -110,7 +110,7 @@ a=fmtp:111 minptime=10; useinbandfec=1
 		assert.False(t, m.negotiatedVideo)
 		assert.True(t, m.negotiatedAudio)
 
-		opusCodec, err := m.getCodecByPayload(111)
+		opusCodec, _, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
 		assert.Equal(t, opusCodec.MimeType, "audio/OPUS")
 	})
@@ -131,7 +131,7 @@ a=rtpmap:111 opus/48000/2
 		assert.False(t, m.negotiatedVideo)
 		assert.True(t, m.negotiatedAudio)
 
-		opusCodec, err := m.getCodecByPayload(111)
+		opusCodec, _, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
 		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
 	})

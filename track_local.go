@@ -11,10 +11,11 @@ type TrackLocalWriter interface {
 	Write(b []byte) (int, error)
 }
 
-// TrackLocalContext is the Context passed when a TrackLocal has been Binded/Unbinded from a PeerConnection
+// TrackLocalContext is the Context passed when a TrackLocal has been Binded/Unbinded from a PeerConnection, and used
+// in Interceptors.
 type TrackLocalContext struct {
 	id          string
-	codecs      []RTPCodecParameters
+	params      RTPParameters
 	ssrc        SSRC
 	writeStream TrackLocalWriter
 }
@@ -22,7 +23,13 @@ type TrackLocalContext struct {
 // CodecParameters returns the negotiated RTPCodecParameters. These are the codecs supported by both
 // PeerConnections and the SSRC/PayloadTypes
 func (t *TrackLocalContext) CodecParameters() []RTPCodecParameters {
-	return t.codecs
+	return t.params.Codecs
+}
+
+// HeaderExtensions returns the negotiated RTPHeaderExtensionParameters. These are the header extensions supported by
+// both PeerConnections and the SSRC/PayloadTypes
+func (t *TrackLocalContext) HeaderExtensions() []RTPHeaderExtensionParameter {
+	return t.params.HeaderExtensions
 }
 
 // SSRC requires the negotiated SSRC of this track

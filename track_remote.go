@@ -5,6 +5,7 @@ package webrtc
 import (
 	"sync"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/rtp"
 )
 
@@ -19,10 +20,49 @@ type TrackRemote struct {
 	kind        RTPCodecType
 	ssrc        SSRC
 	codec       RTPCodecParameters
+	params      RTPParameters
 	rid         string
 
 	receiver *RTPReceiver
 	peeked   []byte
+
+	interceptorRTPReader interceptor.RTPReader
+}
+
+func newTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
+	t := &TrackRemote{
+		kind:     kind,
+		ssrc:     ssrc,
+		rid:      rid,
+		receiver: receiver,
+	}
+	t.interceptorRTPReader = interceptor.RTPReaderFunc(t.readRTP)
+
+	return t
+}
+
+func (t *TrackRemote) bindInterceptor() {
+	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(t.params.HeaderExtensions))
+	for _, h := range t.params.HeaderExtensions {
+		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
+	}
+	feedbacks := make([]interceptor.RTCPFeedback, 0, len(t.codec.RTCPFeedback))
+	for _, f := range t.codec.RTCPFeedback {
+		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+	}
+	info := &interceptor.StreamInfo{
+		ID:                  t.id,
+		Attributes:          interceptor.Attributes{},
+		SSRC:                uint32(t.ssrc),
+		PayloadType:         uint8(t.payloadType),
+		RTPHeaderExtensions: headerExtensions,
+		MimeType:            t.codec.MimeType,
+		ClockRate:           t.codec.ClockRate,
+		Channels:            t.codec.Channels,
+		SDPFmtpLine:         t.codec.SDPFmtpLine,
+		RTCPFeedback:        feedbacks,
+	}
+	t.interceptorRTPReader = t.receiver.api.interceptor.BindRemoteStream(info, interceptor.RTPReaderFunc(t.readRTP))
 }
 
 // ID is the unique identifier for this Track. This should be unique for the
@@ -125,19 +165,25 @@ func (t *TrackRemote) peek(b []byte) (n int, err error) {
 	return
 }
 
-// ReadRTP is a convenience method that wraps Read and unmarshals for you
+// ReadRTP is a convenience method that wraps Read and unmarshals for you.
+// It also runs any configured interceptors.
 func (t *TrackRemote) ReadRTP() (*rtp.Packet, error) {
+	p, _, err := t.interceptorRTPReader.Read()
+	return p, err
+}
+
+func (t *TrackRemote) readRTP() (*rtp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
 	i, err := t.Read(b)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	r := &rtp.Packet{}
 	if err := r.Unmarshal(b[:i]); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return r, nil
+	return r, interceptor.Attributes{}, nil
 }
 
 // determinePayloadType blocks and reads a single packet to determine the PayloadType for this Track
