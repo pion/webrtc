@@ -10,15 +10,14 @@ import (
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/srtp"
 )
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
 type RTPSender struct {
 	track TrackLocal
 
-	rtcpReadStream *srtp.ReadStreamSRTCP
-	context        TrackLocalContext
+	srtpStream *srtpWriterFuture
+	context    TrackLocalContext
 
 	transport *DTLSTransport
 
@@ -36,7 +35,7 @@ type RTPSender struct {
 	id  string
 
 	mu                     sync.RWMutex
-	sendCalled, stopCalled chan interface{}
+	sendCalled, stopCalled chan struct{}
 
 	interceptorRTCPReader interceptor.RTCPReader
 }
@@ -58,12 +57,15 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 		track:      track,
 		transport:  transport,
 		api:        api,
-		sendCalled: make(chan interface{}),
-		stopCalled: make(chan interface{}),
+		sendCalled: make(chan struct{}),
+		stopCalled: make(chan struct{}),
 		ssrc:       SSRC(randutil.NewMathRandomGenerator().Uint32()),
 		id:         id,
+		srtpStream: &srtpWriterFuture{},
 	}
+
 	r.interceptorRTCPReader = api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(r.readRTCP))
+	r.srtpStream.rtpSender = r
 
 	return r, nil
 }
@@ -102,7 +104,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.hasSent() {
+	if r.hasSent() && r.track != nil {
 		if err := r.track.Unbind(r.context); err != nil {
 			return err
 		}
@@ -114,6 +116,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	}
 
 	if _, err := track.Bind(r.context); err != nil {
+		// Re-bind the original track
+		if _, reBindErr := r.track.Bind(r.context); reBindErr != nil {
+			return reBindErr
+		}
+
 		return err
 	}
 
@@ -130,27 +137,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderSendAlreadyCalled
 	}
 
-	srtcpSession, err := r.transport.getSRTCPSession()
-	if err != nil {
-		return err
-	}
-
-	r.rtcpReadStream, err = srtcpSession.OpenReadStream(uint32(parameters.Encodings.SSRC))
-	if err != nil {
-		return err
-	}
-
-	srtpSession, err := r.transport.getSRTPSession()
-	if err != nil {
-		return err
-	}
-
-	rtpWriteStream, err := srtpSession.OpenWriteStream()
-	if err != nil {
-		return err
-	}
-
-	writeStream := &interceptorTrackLocalWriter{TrackLocalWriter: rtpWriteStream}
+	writeStream := &interceptorTrackLocalWriter{TrackLocalWriter: r.srtpStream}
 
 	r.context = TrackLocalContext{
 		id:          r.id,
@@ -189,7 +176,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		r.api.interceptor.BindLocalStream(
 			info,
 			interceptor.RTPWriterFunc(func(p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
-				return rtpWriteStream.WriteRTP(&p.Header, p.Payload)
+				return r.srtpStream.WriteRTP(&p.Header, p.Payload)
 			}),
 		))
 
@@ -200,27 +187,31 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 // Stop irreversibly stops the RTPSender
 func (r *RTPSender) Stop() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
-	select {
-	case <-r.stopCalled:
+	if stopped := r.hasStopped(); stopped {
+		r.mu.Unlock()
 		return nil
-	default:
 	}
+
 	close(r.stopCalled)
+	r.mu.Unlock()
 
 	if !r.hasSent() {
 		return nil
 	}
 
-	return r.rtcpReadStream.Close()
+	if err := r.ReplaceTrack(nil); err != nil {
+		return err
+	}
+
+	return r.srtpStream.Close()
 }
 
 // Read reads incoming RTCP for this RTPReceiver
 func (r *RTPSender) Read(b []byte) (n int, err error) {
 	select {
 	case <-r.sendCalled:
-		return r.rtcpReadStream.Read(b)
+		return r.srtpStream.Read(b)
 	case <-r.stopCalled:
 		return 0, io.ErrClosedPipe
 	}
@@ -252,6 +243,16 @@ func (r *RTPSender) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 func (r *RTPSender) hasSent() bool {
 	select {
 	case <-r.sendCalled:
+		return true
+	default:
+		return false
+	}
+}
+
+// hasStopped tells if stop has been called
+func (r *RTPSender) hasStopped() bool {
+	select {
+	case <-r.stopCalled:
 		return true
 	default:
 		return false

@@ -942,6 +942,9 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
+		if err := pc.startRTPSenders(currentTransceivers); err != nil {
+			return err
+		}
 		pc.ops.Enqueue(func() {
 			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
 		})
@@ -1060,6 +1063,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	if isRenegotation {
 		if weOffer {
+			if err = pc.startRTPSenders(currentTransceivers); err != nil {
+				return err
+			}
 			pc.ops.Enqueue(func() {
 				pc.startRTP(true, &desc, currentTransceivers)
 			})
@@ -1087,6 +1093,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
+	if weOffer {
+		if err := pc.startRTPSenders(currentTransceivers); err != nil {
+			return err
+		}
+	}
+
 	pc.ops.Enqueue(func() {
 		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
 		if weOffer {
@@ -1220,7 +1232,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 }
 
 // startRTPSenders starts all outbound RTP streams
-func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
 	for _, transceiver := range currentTransceivers {
 		if transceiver.Sender() != nil && transceiver.Sender().isNegotiated() && !transceiver.Sender().hasSent() {
 			err := transceiver.Sender().Send(RTPSendParameters{
@@ -1232,10 +1244,12 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 				},
 			})
 			if err != nil {
-				pc.log.Warnf("Failed to start Sender: %s", err)
+				return err
 			}
 		}
 	}
+
+	return nil
 }
 
 // Start SCTP subsystem
@@ -2034,7 +2048,6 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 	}
 
 	pc.startRTPReceivers(trackDetails, currentTransceivers)
-	pc.startRTPSenders(currentTransceivers)
 	if haveApplicationMediaSection(remoteDesc.parsed) {
 		pc.startSCTP()
 	}
