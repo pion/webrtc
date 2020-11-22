@@ -45,6 +45,7 @@ type DTLSTransport struct {
 	srtcpSession  atomic.Value
 	srtpEndpoint  *mux.Endpoint
 	srtcpEndpoint *mux.Endpoint
+	srtpReady     chan struct{}
 
 	dtlsMatcher mux.MatchFunc
 
@@ -60,6 +61,7 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 		api:          api,
 		state:        DTLSTransportStateNew,
 		dtlsMatcher:  mux.MatchDTLS,
+		srtpReady:    make(chan struct{}),
 	}
 
 	if len(certificates) > 0 {
@@ -145,15 +147,6 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 }
 
 func (t *DTLSTransport) startSRTP() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if t.srtpSession.Load() != nil && t.srtcpSession.Load() != nil {
-		return nil
-	} else if t.conn == nil {
-		return errDtlsTransportNotStarted
-	}
-
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
@@ -204,30 +197,24 @@ func (t *DTLSTransport) startSRTP() error {
 
 	t.srtpSession.Store(srtpSession)
 	t.srtcpSession.Store(srtcpSession)
+	close(t.srtpReady)
 	return nil
 }
 
 func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
-	value := t.srtpSession.Load()
-	if value != nil {
+	if value := t.srtpSession.Load(); value != nil {
 		return value.(*srtp.SessionSRTP), nil
 	}
-	if err := t.startSRTP(); err != nil {
-		return nil, err
-	}
 
-	return t.srtpSession.Load().(*srtp.SessionSRTP), nil
+	return nil, errDtlsTransportNotStarted
 }
 
 func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
-	value := t.srtcpSession.Load()
-	if value != nil {
+	if value := t.srtcpSession.Load(); value != nil {
 		return value.(*srtp.SessionSRTCP), nil
 	}
-	if err := t.startSRTP(); err != nil {
-		return nil, err
-	}
-	return t.srtcpSession.Load().(*srtp.SessionSRTCP), nil
+
+	return nil, errDtlsTransportNotStarted
 }
 
 func (t *DTLSTransport) role() DTLSRole {
@@ -358,11 +345,12 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return err
 	}
 
-	err = t.validateFingerPrint(parsedRemoteCert)
-	if err != nil {
+	if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
+		return err
 	}
-	return err
+
+	return t.startSRTP()
 }
 
 // Stop stops and closes the DTLSTransport object.
