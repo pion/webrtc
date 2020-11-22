@@ -57,6 +57,15 @@ type RTPHeaderExtensionCapability struct {
 	URI string
 }
 
+// RTPHeaderExtensionParameters enables an application to determine whether a header extension is configured for
+// use within an RTCRtpSender or RTCRtpReceiver.
+//
+// https://w3c.github.io/webrtc-pc/#rtcrtpheaderextensionparameters
+type RTPHeaderExtensionParameters struct {
+	URI string
+	ID  uint8
+}
+
 // RTPCodecParameters is a sequence containing the media codecs that an RtpSender
 // will choose from, as well as entries for RTX, RED and FEC mechanisms. This also
 // includes the PayloadType that has been negotiated

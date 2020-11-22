@@ -276,7 +276,7 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) {
+func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) { //nolint:gocognit
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, errSDPZeroTransceivers
@@ -290,35 +290,83 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
-	codecs := mediaEngine.getCodecsByKind(t.kind)
-	for _, codec := range codecs {
-		name := strings.TrimPrefix(codec.MimeType, "audio/")
-		name = strings.TrimPrefix(name, "video/")
-		media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
+	if isPlanB {
+		codecs := mediaEngine.getCodecsByKind(t.kind)
+		for _, codec := range codecs {
+			name := strings.TrimPrefix(codec.MimeType, "audio/")
+			name = strings.TrimPrefix(name, "video/")
+			media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
-		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
-			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			}
 		}
-	}
-	if len(codecs) == 0 {
-		// Explicitly reject track if we don't have the codec
-		d.WithMedia(&sdp.MediaDescription{
-			MediaName: sdp.MediaName{
-				Media:   t.kind.String(),
-				Port:    sdp.RangedPort{Value: 0},
-				Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
-				Formats: []string{"0"},
-			},
-		})
-		return false, nil
-	}
+		if len(codecs) == 0 {
+			// Explicitly reject track if we don't have the codec
+			d.WithMedia(&sdp.MediaDescription{
+				MediaName: sdp.MediaName{
+					Media:   t.kind.String(),
+					Port:    sdp.RangedPort{Value: 0},
+					Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
+					Formats: []string{"0"},
+				},
+			})
+			return false, nil
+		}
+		for id, rtpExtension := range mediaEngine.negotiatedHeaderExtensionsForType(t.kind) {
+			extURL, err := url.Parse(rtpExtension.uri)
+			if err != nil {
+				return false, err
+			}
+			media.WithExtMap(sdp.ExtMap{Value: id, URI: extURL})
+		}
+	} else {
+		var extHeaders []RTPHeaderExtensionParameters
+		var codecs []RTPCodecParameters
+		switch t.Direction() {
+		case RTPTransceiverDirectionSendrecv:
+			if t.Receiver() != nil {
+				extHeaders = t.Receiver().GetParameters().HeaderExtensions
+				codecs = t.Receiver().codecs
+			} else if t.Sender() != nil {
+				params := t.Sender().GetParameters()
+				extHeaders = params.HeaderExtensions
+				codecs = params.Codecs
+			}
+		case RTPTransceiverDirectionSendonly:
+			if t.Sender() != nil {
+				params := t.Sender().GetParameters()
+				extHeaders = params.HeaderExtensions
+				codecs = params.Codecs
+			}
+		case RTPTransceiverDirectionRecvonly:
+			if t.Receiver() != nil {
+				extHeaders = t.Receiver().GetParameters().HeaderExtensions
+				codecs = t.Receiver().codecs
+			}
+		case RTPTransceiverDirectionInactive:
+			if t.Sender() != nil {
+				params := t.Sender().GetParameters()
+				extHeaders = params.HeaderExtensions
+				codecs = params.Codecs
+			}
+		}
+		for _, codec := range codecs {
+			name := strings.TrimPrefix(codec.MimeType, "audio/")
+			name = strings.TrimPrefix(name, "video/")
+			media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
-	for id, rtpExtension := range mediaEngine.negotiatedHeaderExtensionsForType(t.kind) {
-		extURL, err := url.Parse(rtpExtension.uri)
-		if err != nil {
-			return false, err
+			for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			}
 		}
-		media.WithExtMap(sdp.ExtMap{Value: id, URI: extURL})
+		for _, rtpExtension := range extHeaders {
+			extURL, err := url.Parse(rtpExtension.URI)
+			if err != nil {
+				return false, err
+			}
+			media.WithExtMap(sdp.ExtMap{Value: int(rtpExtension.ID), URI: extURL})
+		}
 	}
 
 	if len(mediaSection.ridMap) > 0 {
@@ -391,13 +439,13 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		}
 
 		shouldAddID := true
-		shouldAddCanidates := i == 0
+		shouldAddCandidates := i == 0
 		if m.data {
-			if err = addDataMediaSection(d, shouldAddCanidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState); err != nil {
+			if err = addDataMediaSection(d, shouldAddCandidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState); err != nil {
 				return nil, err
 			}
 		} else {
-			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCanidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m)
+			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCandidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m)
 			if err != nil {
 				return nil, err
 			}

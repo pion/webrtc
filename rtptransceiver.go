@@ -11,10 +11,11 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	mid       atomic.Value // string
-	sender    atomic.Value // *RTPSender
-	receiver  atomic.Value // *RTPReceiver
-	direction atomic.Value // RTPTransceiverDirection
+	mid        atomic.Value // string
+	sender     atomic.Value // *RTPSender
+	receiver   atomic.Value // *RTPReceiver
+	direction  atomic.Value // RTPTransceiverDirection
+	negotiated atomicBool
 
 	stopped bool
 	kind    RTPCodecType

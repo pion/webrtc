@@ -212,7 +212,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 		atomicRemoteTrack.Store(track)
 	})
 
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "foo1", "bar1")
 	assert.NoError(t, err)
@@ -331,8 +331,8 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 }
 
 func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
+	// lim := test.TimeOut(time.Second * 30)
+	// defer lim.Stop()
 
 	report := test.CheckRoutines(t)
 	defer report()
@@ -352,7 +352,7 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	sender1, err := pcOffer.AddTrack(track1)
 	require.NoError(t, err)
 
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	require.NoError(t, err)
 
 	tracksCh := make(chan *TrackRemote)
@@ -388,7 +388,6 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	assert.Equal(t, "pion1", remoteTrack1.StreamID())
 
 	require.NoError(t, pcOffer.RemoveTrack(sender1))
-
 	sender2, err := pcOffer.AddTrack(track2)
 	require.NoError(t, err)
 

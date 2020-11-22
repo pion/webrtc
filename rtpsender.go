@@ -20,15 +20,18 @@ type RTPSender struct {
 
 	transport *DTLSTransport
 
-	payloadType PayloadType
-	ssrc        SSRC
-	codec       RTPCodecParameters
+	payloadType        PayloadType
+	ssrc               SSRC
+	headerExtensions   []RTPHeaderExtensionParameters
+	codecs             []RTPCodecParameters
+	encodingParameters RTPEncodingParameters
 
 	// nolint:godox
 	// TODO(sgotti) remove this when in future we'll avoid replacing
 	// a transceiver sender since we can just check the
 	// transceiver negotiation status
 	negotiated bool
+	stopped    bool
 
 	// A reference to the associated api object
 	api *API
@@ -113,7 +116,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 
 	if _, err := track.Bind(TrackLocalContext{
 		id:          r.id,
-		codecs:      []RTPCodecParameters{r.codec},
+		codecs:      r.codecs[:1],
 		ssrc:        r.ssrc,
 		writeStream: r.rtpWriteStream,
 	}); err != nil {
@@ -125,7 +128,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 }
 
 // Send Attempts to set the parameters controlling the sending of media.
-func (r *RTPSender) Send(parameters RTPSendParameters) error {
+func (r *RTPSender) Send() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -138,7 +141,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return err
 	}
 
-	r.rtcpReadStream, err = srtcpSession.OpenReadStream(uint32(parameters.Encodings.SSRC))
+	r.rtcpReadStream, err = srtcpSession.OpenReadStream(uint32(r.ssrc))
 	if err != nil {
 		return err
 	}
@@ -152,13 +155,20 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return err
 	}
 
-	if r.codec, err = r.track.Bind(TrackLocalContext{
+	if _, err = r.track.Bind(TrackLocalContext{
 		id:          r.id,
-		codecs:      r.api.mediaEngine.getCodecsByKind(r.track.Kind()),
-		ssrc:        parameters.Encodings.SSRC,
+		codecs:      r.codecs,
+		ssrc:        r.ssrc,
 		writeStream: r.rtpWriteStream,
 	}); err != nil {
 		return err
+	}
+
+	r.encodingParameters = RTPEncodingParameters{
+		RTPCodingParameters{
+			SSRC:        r.ssrc,
+			PayloadType: r.payloadType,
+		},
 	}
 
 	close(r.sendCalled)
@@ -170,6 +180,7 @@ func (r *RTPSender) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.stopped = true
 	select {
 	case <-r.stopCalled:
 		return nil
@@ -203,6 +214,30 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
 	}
 
 	return rtcp.Unmarshal(b[:i])
+}
+
+// GetParameters returns the RTPSender current parameters for how track is encoded
+// and transmitted to a remote RTPReceiver.
+func (r *RTPSender) GetParameters() RTPSendParameters {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return RTPSendParameters{
+		Encodings:        r.encodingParameters,
+		HeaderExtensions: r.headerExtensions,
+		Codecs:           r.codecs,
+	}
+}
+
+func (r *RTPSender) setExtensionHeaders(e []RTPHeaderExtensionParameters) {
+	r.mu.Lock()
+	r.headerExtensions = e
+	r.mu.Unlock()
+}
+
+func (r *RTPSender) setCodecParameters(e []RTPCodecParameters) {
+	r.mu.Lock()
+	r.codecs = e
+	r.mu.Unlock()
 }
 
 // hasSent tells if data has been ever sent for this instance

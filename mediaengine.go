@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -135,7 +136,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=125", nil},
 			PayloadType:        107,
 		},
-
 		{
 			RTPCodecCapability: RTPCodecCapability{mimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f", videoRTCPFeedback},
 			PayloadType:        108,
@@ -144,7 +144,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=108", nil},
 			PayloadType:        109,
 		},
-
 		{
 			RTPCodecCapability: RTPCodecCapability{mimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
 			PayloadType:        127,
@@ -247,6 +246,21 @@ func (m *MediaEngine) GetHeaderExtensionID(extension RTPHeaderExtensionCapabilit
 	}
 
 	return
+}
+
+func (m *MediaEngine) getExtMapFromKind(kind RTPCodecType) []RTPHeaderExtensionParameters {
+	var extMap []RTPHeaderExtensionParameters
+	id := uint8(1)
+	for _, ext := range m.headerExtensions {
+		if ext.isVideo && kind == RTPCodecTypeVideo || ext.isAudio && kind == RTPCodecTypeAudio {
+			extMap = append(extMap, RTPHeaderExtensionParameters{
+				URI: ext.uri,
+				ID:  id,
+			})
+			id++
+		}
+	}
+	return extMap
 }
 
 func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, error) {
@@ -378,12 +392,115 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			return err
 		}
 
-		for id, extension := range extensions {
-			if err = m.updateHeaderExtension(extension, id, typ); err != nil {
+		for extension, id := range extensions {
+			if err = m.updateHeaderExtension(id, extension, typ); err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
+
+func (m *MediaEngine) updateFromMediaDescription(media *sdp.MediaDescription, t *RTPTransceiver) error { //nolint:gocognit
+	if t.negotiated.get() {
+		return nil
+	}
+
+	remoteCodecs, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return err
+	}
+
+	negotiate := func(localCodecs []RTPCodecParameters) ([]RTPCodecParameters, error) {
+		if len(localCodecs) == 0 {
+			localCodecs = m.getCodecsByKind(t.kind)
+		}
+
+		var negotiatedCodecs []RTPCodecParameters
+		for _, codec := range remoteCodecs {
+			if _, err = codecParametersFuzzySearch(codec, localCodecs); err == nil {
+				negotiatedCodecs = append(negotiatedCodecs, codec)
+			}
+		}
+		if len(negotiatedCodecs) == 0 {
+			return nil, ErrCodecNotFound
+		}
+
+		return negotiatedCodecs, nil
+	}
+
+	extensions, err := rtpExtensionsFromMediaDescription(media)
+	if err != nil {
+		return err
+	}
+
+	var extHeaders []RTPHeaderExtensionParameters
+	for extension, id := range extensions {
+		for _, localExtension := range m.headerExtensions {
+			if localExtension.uri == extension &&
+				(localExtension.isAudio && t.kind == RTPCodecTypeAudio ||
+					localExtension.isVideo && t.kind == RTPCodecTypeVideo) {
+				extHeaders = append(extHeaders, RTPHeaderExtensionParameters{
+					URI: extension,
+					ID:  uint8(id),
+				})
+			}
+		}
+	}
+
+	switch t.Direction() {
+	case RTPTransceiverDirectionInactive:
+		return nil
+	case RTPTransceiverDirectionSendrecv:
+		if t.Receiver() != nil {
+			t.Receiver().setExtensionHeaders(extHeaders)
+			negotiatedCodecs, err := negotiate(t.Receiver().codecs)
+			if err != nil {
+				if errors.Is(err, ErrCodecNotFound) {
+					return t.Stop()
+				}
+				return err
+			}
+			t.Receiver().setCodecParameters(negotiatedCodecs)
+		}
+		if t.Sender() != nil {
+			t.Sender().setExtensionHeaders(extHeaders)
+			negotiatedCodecs, err := negotiate(t.Sender().GetParameters().Codecs)
+			if err != nil {
+				if errors.Is(err, ErrCodecNotFound) {
+					return t.Stop()
+				}
+				return err
+			}
+			t.Sender().setCodecParameters(negotiatedCodecs)
+		}
+	case RTPTransceiverDirectionSendonly:
+		if t.Sender() != nil {
+			t.Sender().setExtensionHeaders(extHeaders)
+			negotiatedCodecs, err := negotiate(t.Sender().GetParameters().Codecs)
+			if err != nil {
+				if errors.Is(err, ErrCodecNotFound) {
+					return t.Stop()
+				}
+				return err
+			}
+			t.Sender().setCodecParameters(negotiatedCodecs)
+		}
+	case RTPTransceiverDirectionRecvonly:
+		if t.Receiver() != nil {
+			t.Receiver().setExtensionHeaders(extHeaders)
+			negotiatedCodecs, err := negotiate(t.Receiver().codecs)
+			if err != nil {
+				if errors.Is(err, ErrCodecNotFound) {
+					return t.Stop()
+				}
+				return err
+			}
+			t.Receiver().setCodecParameters(negotiatedCodecs)
+		}
+	}
+	t.negotiated.set(true)
+
 	return nil
 }
 

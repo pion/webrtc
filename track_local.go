@@ -65,4 +65,8 @@ type TrackLocal interface {
 
 	// Kind controls if this TrackLocal is audio or video
 	Kind() RTPCodecType
+
+	// Codec provides information about codec capabilities of current track. The list of media codecs
+	// supported for current PeerConnection is described in MediaEngine
+	Codec() RTPCodecCapability
 }

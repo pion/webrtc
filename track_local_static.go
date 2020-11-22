@@ -86,6 +86,9 @@ func (s *TrackLocalStaticRTP) ID() string { return s.id }
 // StreamID is the group this track belongs too. This must be unique
 func (s *TrackLocalStaticRTP) StreamID() string { return s.streamID }
 
+// Codec returns current track codec capability
+func (s *TrackLocalStaticRTP) Codec() RTPCodecCapability { return s.codec }
+
 // Kind controls if this TrackLocal is audio or video
 func (s *TrackLocalStaticRTP) Kind() RTPCodecType {
 	switch {
@@ -136,6 +139,7 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 type TrackLocalStaticSample struct {
 	packetizer rtp.Packetizer
 	rtpTrack   *TrackLocalStaticRTP
+	codec      RTPCodecCapability
 	clockRate  float64
 }
 
@@ -148,6 +152,7 @@ func NewTrackLocalStaticSample(c RTPCodecCapability, id, streamID string) (*Trac
 
 	return &TrackLocalStaticSample{
 		rtpTrack: rtpTrack,
+		codec:    c,
 	}, nil
 }
 
@@ -161,6 +166,9 @@ func (s *TrackLocalStaticSample) StreamID() string { return s.rtpTrack.StreamID(
 
 // Kind controls if this TrackLocal is audio or video
 func (s *TrackLocalStaticSample) Kind() RTPCodecType { return s.rtpTrack.Kind() }
+
+// Codec returns current track codec capability
+func (s *TrackLocalStaticSample) Codec() RTPCodecCapability { return s.codec }
 
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.

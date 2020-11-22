@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -589,9 +588,8 @@ func TestOfferRejectionMissingCodec(t *testing.T) {
 		}
 	}
 
-	if got, want := videoDesc.MediaName.Formats, []string{"0"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("rejecting unknown codec: sdp m=%s, want trailing 0", videoDesc.MediaName.String())
-	}
+	_, ok := videoDesc.Attribute(sdp.AttrKeyInactive)
+	assert.Equal(t, true, ok, "Must be inactive")
 
 	assert.NoError(t, noCodecPC.Close())
 	assert.NoError(t, pc.Close())
@@ -749,7 +747,7 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 
 	tr, err := pc.AddTransceiverFromKind(
 		RTPCodecTypeVideo,
-		RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
 	)
 	assert.NoError(t, err)
 
@@ -787,7 +785,7 @@ func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
 
 	_, err = pc.AddTransceiverFromKind(
 		RTPCodecTypeVideo,
-		RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
 	)
 	assert.NoError(t, err)
 

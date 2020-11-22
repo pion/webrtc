@@ -30,7 +30,10 @@ type RTPReceiver struct {
 	mu               sync.RWMutex
 
 	// A reference to the associated api object
-	api *API
+	api                *API
+	codecs             []RTPCodecParameters
+	headerExtensions   []RTPHeaderExtensionParameters
+	encodingParameters []RTPDecodingParameters
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -119,8 +122,18 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 			})
 		}
 	}
-
+	r.encodingParameters = parameters.Encodings
 	return nil
+}
+
+// GetParameters returns the RTPReceiver current parameters for how track is decoded.
+func (r *RTPReceiver) GetParameters() RTPReceiveParameters {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return RTPReceiveParameters{
+		Encodings:        r.encodingParameters,
+		HeaderExtensions: r.headerExtensions,
+	}
 }
 
 // Read reads incoming RTCP for this RTPReceiver
@@ -255,6 +268,18 @@ func (r *RTPReceiver) receiveForRid(rid string, codec RTPCodecParameters, ssrc S
 	}
 
 	return nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+}
+
+func (r *RTPReceiver) setExtensionHeaders(e []RTPHeaderExtensionParameters) {
+	r.mu.Lock()
+	r.headerExtensions = e
+	r.mu.Unlock()
+}
+
+func (r *RTPReceiver) setCodecParameters(e []RTPCodecParameters) {
+	r.mu.Lock()
+	r.codecs = e
+	r.mu.Unlock()
 }
 
 func (r *RTPReceiver) streamsForSSRC(ssrc SSRC) (*srtp.ReadStreamSRTP, *srtp.ReadStreamSRTCP, error) {

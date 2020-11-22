@@ -173,8 +173,6 @@ var (
 	errPeerConnRemoteDescriptionNil                   = errors.New("remoteDescription has not been set yet")
 	errPeerConnSingleMediaSectionHasExplicitSSRC      = errors.New("single media section has an explicit SSRC")
 	errPeerConnRemoteSSRCAddTransceiver               = errors.New("could not add transceiver for remote SSRC")
-	errPeerConnSimulcastMidRTPExtensionRequired       = errors.New("mid RTP Extensions required for Simulcast")
-	errPeerConnSimulcastStreamIDRTPExtensionRequired  = errors.New("stream id RTP Extensions required for Simulcast")
 	errPeerConnSimulcastIncomingSSRCFailed            = errors.New("incoming SSRC failed Simulcast probing")
 	errPeerConnAddTransceiverFromKindOnlyAcceptsOne   = errors.New("AddTransceiverFromKind only accepts one RtpTransceiverInit")
 	errPeerConnAddTransceiverFromTrackOnlyAcceptsOne  = errors.New("AddTransceiverFromTrack only accepts one RtpTransceiverInit")
