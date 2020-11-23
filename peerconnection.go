@@ -271,6 +271,11 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 }
 
 func (pc *PeerConnection) negotiationNeededOp() {
+	// Don't run NegotiatedNeeded checks if OnNegotiationNeeded is not set
+	if handler := pc.onNegotiationNeededHandler.Load(); handler == nil {
+		return
+	}
+
 	// https://www.w3.org/TR/webrtc/#updating-the-negotiation-needed-flag
 	// Step 2.1
 	if pc.isClosed.get() {
