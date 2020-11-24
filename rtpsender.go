@@ -166,9 +166,9 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.context.params.Codecs = []RTPCodecParameters{codec}
 
 	info := &interceptor.StreamInfo{
-		ID:     r.context.id,
-		Params: convertRTPParameters(r.context.params),
-		SSRC:   convertSSRC(r.context.ssrc),
+		ID:         r.context.id,
+		Attributes: interceptor.Attributes{},
+		SSRC:       uint32(r.context.ssrc),
 	}
 	writeStream.setRTPWriter(
 		r.api.interceptor.BindLocalStream(

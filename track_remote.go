@@ -38,9 +38,9 @@ func NewTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPRecei
 		receiver: receiver,
 	}
 	t.interceptorRTPReader = t.receiver.api.interceptor.BindRemoteStream(&interceptor.StreamInfo{
-		ID:     t.id,
-		Params: convertRTPParameters(t.params),
-		SSRC:   convertSSRC(t.ssrc),
+		ID:         t.id,
+		Attributes: interceptor.Attributes{},
+		SSRC:       uint32(t.ssrc),
 	}, interceptor.RTPReaderFunc(t.readRTP))
 
 	return t

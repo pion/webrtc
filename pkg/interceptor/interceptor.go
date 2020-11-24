@@ -9,7 +9,6 @@ import (
 
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3/pkg/interceptor/movetopionrtp"
 )
 
 // Interceptor can be used to add functionality to you PeerConnections by modifying any incoming/outgoing rtp/rtcp
@@ -39,14 +38,6 @@ type Interceptor interface {
 	UnbindRemoteStream(info *StreamInfo)
 
 	io.Closer
-}
-
-// StreamInfo is the Context passed when a StreamLocal has been Binded/Unbinded from a PeerConnection, and used
-// in Interceptors.
-type StreamInfo struct {
-	ID     string
-	Params movetopionrtp.RTPParameters
-	SSRC   movetopionrtp.SSRC
 }
 
 // RTPWriter is used by Interceptor.BindLocalStream.

@@ -48,7 +48,7 @@ func (t *testInterceptor) BindRemoteStream(info *interceptor.StreamInfo, reader 
 
 		// write back a pli
 		rtcpWriter := t.rtcpWriter.Load().(interceptor.RTCPWriter)
-		pli := &rtcp.PictureLossIndication{SenderSSRC: uint32(info.SSRC), MediaSSRC: uint32(info.SSRC)}
+		pli := &rtcp.PictureLossIndication{SenderSSRC: info.SSRC, MediaSSRC: info.SSRC}
 		_, err = rtcpWriter.Write([]rtcp.Packet{pli}, make(interceptor.Attributes))
 		assert.NoError(t.t, err)
 
