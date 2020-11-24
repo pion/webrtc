@@ -263,6 +263,7 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC)
 			r.tracks[i].track.codec = params.Codecs[0]
 			r.tracks[i].track.params = params
 			r.tracks[i].track.ssrc = ssrc
+			r.tracks[i].track.bindInterceptor()
 			r.tracks[i].track.mu.Unlock()
 
 			var err error

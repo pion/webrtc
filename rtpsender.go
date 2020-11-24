@@ -165,10 +165,25 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	}
 	r.context.params.Codecs = []RTPCodecParameters{codec}
 
+	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(r.context.params.HeaderExtensions))
+	for _, h := range r.context.params.HeaderExtensions {
+		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
+	}
+	feedbacks := make([]interceptor.RTCPFeedback, 0, len(codec.RTCPFeedback))
+	for _, f := range codec.RTCPFeedback {
+		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+	}
 	info := &interceptor.StreamInfo{
-		ID:         r.context.id,
-		Attributes: interceptor.Attributes{},
-		SSRC:       uint32(r.context.ssrc),
+		ID:                  r.context.id,
+		Attributes:          interceptor.Attributes{},
+		SSRC:                uint32(r.context.ssrc),
+		PayloadType:         uint8(codec.PayloadType),
+		RTPHeaderExtensions: headerExtensions,
+		MimeType:            codec.MimeType,
+		ClockRate:           codec.ClockRate,
+		Channels:            codec.Channels,
+		SDPFmtpLine:         codec.SDPFmtpLine,
+		RTCPFeedback:        feedbacks,
 	}
 	writeStream.setRTPWriter(
 		r.api.interceptor.BindLocalStream(

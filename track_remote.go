@@ -37,13 +37,33 @@ func NewTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPRecei
 		rid:      rid,
 		receiver: receiver,
 	}
-	t.interceptorRTPReader = t.receiver.api.interceptor.BindRemoteStream(&interceptor.StreamInfo{
-		ID:         t.id,
-		Attributes: interceptor.Attributes{},
-		SSRC:       uint32(t.ssrc),
-	}, interceptor.RTPReaderFunc(t.readRTP))
+	t.interceptorRTPReader = interceptor.RTPReaderFunc(t.readRTP)
 
 	return t
+}
+
+func (t *TrackRemote) bindInterceptor() {
+	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(t.params.HeaderExtensions))
+	for _, h := range t.params.HeaderExtensions {
+		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
+	}
+	feedbacks := make([]interceptor.RTCPFeedback, 0, len(t.codec.RTCPFeedback))
+	for _, f := range t.codec.RTCPFeedback {
+		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+	}
+	info := &interceptor.StreamInfo{
+		ID:                  t.id,
+		Attributes:          interceptor.Attributes{},
+		SSRC:                uint32(t.ssrc),
+		PayloadType:         uint8(t.payloadType),
+		RTPHeaderExtensions: headerExtensions,
+		MimeType:            t.codec.MimeType,
+		ClockRate:           t.codec.ClockRate,
+		Channels:            t.codec.Channels,
+		SDPFmtpLine:         t.codec.SDPFmtpLine,
+		RTCPFeedback:        feedbacks,
+	}
+	t.interceptorRTPReader = t.receiver.api.interceptor.BindRemoteStream(info, interceptor.RTPReaderFunc(t.readRTP))
 }
 
 // ID is the unique identifier for this Track. This should be unique for the

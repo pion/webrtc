@@ -1140,6 +1140,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		receiver.Track().kind = receiver.kind
 		receiver.Track().codec = params.Codecs[0]
 		receiver.Track().params = params
+		receiver.Track().bindInterceptor()
 		receiver.Track().mu.Unlock()
 
 		pc.onTrack(receiver.Track(), receiver)
