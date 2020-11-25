@@ -54,13 +54,15 @@ func main() {
 		panic(err)
 	}
 
+	s := webrtc.SettingEngine{}
+	s.SetSRTPReplayProtectionWindow(8192) // this is needed for nack for now
 	ir := &webrtc.InterceptorRegistry{}
-	if err := webrtc.RegisterDefaultInterceptors(&m, ir); err != nil {
+	if err := webrtc.RegisterDefaultInterceptors(&s, &m, ir); err != nil {
 		panic(err)
 	}
 
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m), webrtc.WithInterceptorRegistry(ir))
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(s), webrtc.WithMediaEngine(&m), webrtc.WithInterceptorRegistry(ir))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

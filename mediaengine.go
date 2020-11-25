@@ -80,7 +80,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		}
 	}
 
-	videoRTCPFeedback := []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}
+	videoRTCPFeedback := []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", "pli"}}
 	for _, codec := range []RTPCodecParameters{
 		{
 			RTPCodecCapability: RTPCodecCapability{mimeTypeVP8, 90000, 0, "", videoRTCPFeedback},

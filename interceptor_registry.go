@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"github.com/pion/logging"
 	"github.com/pion/webrtc/v3/pkg/interceptor"
 )
 
@@ -26,8 +27,13 @@ func (i *InterceptorRegistry) build() interceptor.Interceptor {
 
 // RegisterDefaultInterceptors will register some useful interceptors. If you want to customize which interceptors are loaded,
 // you should copy the code from this method and remove unwanted interceptors.
-func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *InterceptorRegistry) error {
-	err := ConfigureNack(mediaEngine, interceptorRegistry)
+func RegisterDefaultInterceptors(settingEngine *SettingEngine, mediaEngine *MediaEngine, interceptorRegistry *InterceptorRegistry) error {
+	loggerFactory := settingEngine.LoggerFactory
+	if loggerFactory == nil {
+		loggerFactory = logging.NewDefaultLoggerFactory()
+	}
+
+	err := ConfigureNack(loggerFactory, mediaEngine, interceptorRegistry)
 	if err != nil {
 		return err
 	}
@@ -36,9 +42,18 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 }
 
 // ConfigureNack will setup everything necessary for handling generating/responding to nack messages.
-func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *InterceptorRegistry) error {
+func ConfigureNack(loggerFactory logging.LoggerFactory, mediaEngine *MediaEngine, interceptorRegistry *InterceptorRegistry) error {
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack"}, RTPCodecTypeVideo)
-	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack", Parameter: "pli"}, RTPCodecTypeVideo)
-	interceptorRegistry.Add(&interceptor.NACK{})
+	receiverNack, err := interceptor.NewReceiverNack(8192, loggerFactory.NewLogger("receiver_nack"))
+	if err != nil {
+		return err
+	}
+	interceptorRegistry.Add(receiverNack)
+	senderNack, err := interceptor.NewSenderNack(8192, loggerFactory.NewLogger("sender_nack"))
+	if err != nil {
+		return err
+	}
+	interceptorRegistry.Add(senderNack)
+
 	return nil
 }
