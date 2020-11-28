@@ -12,9 +12,19 @@ jobs:
     strategy:
       matrix:
         go: ["1.14", "1.15"]
+      fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
       - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache
+          key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-go-
 
       - name: Setup Go
         uses: actions/setup-go@v2
@@ -41,6 +51,7 @@ jobs:
     strategy:
       matrix:
         go: ["1.14", "1.15"]
+      fail-fast: false
     name: Go i386 ${{ matrix.go }}
     steps:
       - uses: actions/checkout@v2
@@ -50,12 +61,13 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-i386-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-i386-go-
 
       - name: Run test
         run: |
+          mkdir -p $HOME/go/pkg/mod $HOME/.cache
           docker run \
           -u $(id -u):$(id -g) \
           -e "GO111MODULE=on" \
@@ -71,6 +83,8 @@ jobs:
 
   test-wasm:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     name: WASM
     steps:
       - uses: actions/checkout@v2
@@ -85,9 +99,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-wasm-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-wasm-go-
 
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
