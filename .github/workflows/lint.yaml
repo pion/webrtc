@@ -9,6 +9,8 @@ jobs:
   lint-commit-message:
     name: Metadata
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     steps:
         - uses: actions/checkout@v2
           with:
@@ -29,6 +31,8 @@ jobs:
   lint-go:
     name: Go
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
 
