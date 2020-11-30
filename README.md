@@ -213,6 +213,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [o0olele](https://github.com/o0olele)
 * [Bo Shi](https://github.com/bshimc)
 * [Suzuki Takeo](https://github.com/BambooTuna)
+* [baiyufei](https://github.com/baiyufei)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
