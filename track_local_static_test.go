@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -161,4 +162,34 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 
 	assert.NoError(t, offerer.Close())
 	assert.NoError(t, answerer.Close())
+}
+
+// Assert that writing to a Track doesn't modify the input
+// Even though we can pass a pointer we shouldn't modify the incoming value
+func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(vp8Writer)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	pkt := &rtp.Packet{Header: rtp.Header{SSRC: 1, PayloadType: 1}}
+	assert.NoError(t, vp8Writer.WriteRTP(pkt))
+
+	assert.Equal(t, pkt.Header.SSRC, uint32(1))
+	assert.Equal(t, pkt.Header.PayloadType, uint8(1))
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
