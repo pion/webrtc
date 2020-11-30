@@ -3,11 +3,12 @@
 package webrtc
 
 import (
+	"context"
 	"io"
 	"sync/atomic"
 
 	"github.com/pion/rtp"
-	"github.com/pion/srtp"
+	"github.com/pion/srtp/v2"
 )
 
 // srtpWriterFuture blocks Read/Write calls until
@@ -18,11 +19,13 @@ type srtpWriterFuture struct {
 	rtpWriteStream atomic.Value // *srtp.WriteStreamSRTP
 }
 
-func (s *srtpWriterFuture) init() error {
+func (s *srtpWriterFuture) init(ctx context.Context) error {
 	select {
 	case <-s.rtpSender.stopCalled:
 		return io.ErrClosedPipe
 	case <-s.rtpSender.transport.srtpReady:
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 
 	srtcpSession, err := s.rtpSender.transport.getSRTCPSession()
@@ -58,38 +61,38 @@ func (s *srtpWriterFuture) Close() error {
 	return nil
 }
 
-func (s *srtpWriterFuture) Read(b []byte) (n int, err error) {
+func (s *srtpWriterFuture) ReadContext(ctx context.Context, b []byte) (n int, err error) {
 	if value := s.rtcpReadStream.Load(); value != nil {
-		return value.(*srtp.ReadStreamSRTCP).Read(b)
+		return value.(*srtp.ReadStreamSRTCP).ReadContext(ctx, b)
 	}
 
-	if err := s.init(); err != nil || s.rtcpReadStream.Load() == nil {
+	if err := s.init(ctx); err != nil || s.rtcpReadStream.Load() == nil {
 		return 0, err
 	}
 
-	return s.Read(b)
+	return s.ReadContext(ctx, b)
 }
 
-func (s *srtpWriterFuture) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
+func (s *srtpWriterFuture) WriteRTP(ctx context.Context, header *rtp.Header, payload []byte) (int, error) {
 	if value := s.rtpWriteStream.Load(); value != nil {
-		return value.(*srtp.WriteStreamSRTP).WriteRTP(header, payload)
+		return value.(*srtp.WriteStreamSRTP).WriteRTP(ctx, header, payload)
 	}
 
-	if err := s.init(); err != nil || s.rtpWriteStream.Load() == nil {
+	if err := s.init(ctx); err != nil || s.rtpWriteStream.Load() == nil {
 		return 0, err
 	}
 
-	return s.WriteRTP(header, payload)
+	return s.WriteRTP(ctx, header, payload)
 }
 
-func (s *srtpWriterFuture) Write(b []byte) (int, error) {
+func (s *srtpWriterFuture) Write(ctx context.Context, b []byte) (int, error) {
 	if value := s.rtpWriteStream.Load(); value != nil {
-		return value.(*srtp.WriteStreamSRTP).Write(b)
+		return value.(*srtp.WriteStreamSRTP).WriteContext(ctx, b)
 	}
 
-	if err := s.init(); err != nil || s.rtpWriteStream.Load() == nil {
+	if err := s.init(ctx); err != nil || s.rtpWriteStream.Load() == nil {
 		return 0, err
 	}
 
-	return s.Write(b)
+	return s.Write(ctx, b)
 }

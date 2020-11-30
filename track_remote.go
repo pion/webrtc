@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"sync"
 
 	"github.com/pion/interceptor"
@@ -125,7 +126,7 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 }
 
 // Read reads data from the track.
-func (t *TrackRemote) Read(b []byte) (n int, err error) {
+func (t *TrackRemote) Read(ctx context.Context, b []byte) (n int, err error) {
 	t.mu.RLock()
 	r := t.receiver
 	peeked := t.peeked != nil
@@ -144,12 +145,12 @@ func (t *TrackRemote) Read(b []byte) (n int, err error) {
 		}
 	}
 
-	return r.readRTP(b, t)
+	return r.readRTP(ctx, b, t)
 }
 
 // peek is like Read, but it doesn't discard the packet read
-func (t *TrackRemote) peek(b []byte) (n int, err error) {
-	n, err = t.Read(b)
+func (t *TrackRemote) peek(ctx context.Context, b []byte) (n int, err error) {
+	n, err = t.Read(ctx, b)
 	if err != nil {
 		return
 	}
@@ -167,14 +168,14 @@ func (t *TrackRemote) peek(b []byte) (n int, err error) {
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you.
 // It also runs any configured interceptors.
-func (t *TrackRemote) ReadRTP() (*rtp.Packet, error) {
-	p, _, err := t.interceptorRTPReader.Read()
+func (t *TrackRemote) ReadRTP(ctx context.Context) (*rtp.Packet, error) {
+	p, _, err := t.interceptorRTPReader.Read(ctx)
 	return p, err
 }
 
-func (t *TrackRemote) readRTP() (*rtp.Packet, interceptor.Attributes, error) {
+func (t *TrackRemote) readRTP(ctx context.Context) (*rtp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := t.Read(b)
+	i, err := t.Read(ctx, b)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,9 +189,9 @@ func (t *TrackRemote) readRTP() (*rtp.Packet, interceptor.Attributes, error) {
 
 // determinePayloadType blocks and reads a single packet to determine the PayloadType for this Track
 // this is useful because we can't announce it to the user until we know the payloadType
-func (t *TrackRemote) determinePayloadType() error {
+func (t *TrackRemote) determinePayloadType(ctx context.Context) error {
 	b := make([]byte, receiveMTU)
-	n, err := t.peek(b)
+	n, err := t.peek(ctx, b)
 	if err != nil {
 		return err
 	}

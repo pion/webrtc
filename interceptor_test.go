@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -25,19 +26,19 @@ type testInterceptor struct {
 }
 
 func (t *testInterceptor) BindLocalStream(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
-	return interceptor.RTPWriterFunc(func(p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
+	return interceptor.RTPWriterFunc(func(ctx context.Context, p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
 		// set extension on outgoing packet
 		p.Header.Extension = true
 		p.Header.ExtensionProfile = 0xBEDE
 		assert.NoError(t.t, p.Header.SetExtension(t.extensionID, []byte("write")))
 
-		return writer.Write(p, attributes)
+		return writer.Write(ctx, p, attributes)
 	})
 }
 
 func (t *testInterceptor) BindRemoteStream(info *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
-	return interceptor.RTPReaderFunc(func() (*rtp.Packet, interceptor.Attributes, error) {
-		p, attributes, err := reader.Read()
+	return interceptor.RTPReaderFunc(func(ctx context.Context) (*rtp.Packet, interceptor.Attributes, error) {
+		p, attributes, err := reader.Read(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -49,7 +50,7 @@ func (t *testInterceptor) BindRemoteStream(info *interceptor.StreamInfo, reader 
 		// write back a pli
 		rtcpWriter := t.rtcpWriter.Load().(interceptor.RTCPWriter)
 		pli := &rtcp.PictureLossIndication{SenderSSRC: info.SSRC, MediaSSRC: info.SSRC}
-		_, err = rtcpWriter.Write([]rtcp.Packet{pli}, make(interceptor.Attributes))
+		_, err = rtcpWriter.Write(ctx, []rtcp.Packet{pli}, make(interceptor.Attributes))
 		assert.NoError(t.t, err)
 
 		return p, attributes, nil
@@ -57,8 +58,8 @@ func (t *testInterceptor) BindRemoteStream(info *interceptor.StreamInfo, reader 
 }
 
 func (t *testInterceptor) BindRTCPReader(reader interceptor.RTCPReader) interceptor.RTCPReader {
-	return interceptor.RTCPReaderFunc(func() ([]rtcp.Packet, interceptor.Attributes, error) {
-		pkts, attributes, err := reader.Read()
+	return interceptor.RTCPReaderFunc(func(ctx context.Context) ([]rtcp.Packet, interceptor.Attributes, error) {
+		pkts, attributes, err := reader.Read(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -122,7 +123,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	wg.Add(1)
 	*pending++
 	receiverPC.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
-		p, readErr := track.ReadRTP()
+		p, readErr := track.ReadRTP(context.Background())
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
@@ -133,7 +134,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		wg.Done()
 
 		for {
-			_, readErr = track.ReadRTP()
+			_, readErr = track.ReadRTP(context.Background())
 			if readErr != nil {
 				return
 			}
@@ -143,13 +144,13 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	wg.Add(1)
 	*pending++
 	go func() {
-		_, readErr := sender.ReadRTCP()
+		_, readErr := sender.ReadRTCP(context.Background())
 		assert.NoError(t, readErr)
 		atomic.AddInt32(pending, -1)
 		wg.Done()
 
 		for {
-			_, readErr = sender.ReadRTCP()
+			_, readErr = sender.ReadRTCP(context.Background())
 			if readErr != nil {
 				return
 			}
@@ -166,7 +167,9 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		defer wg.Done()
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+			if routineErr := track.WriteSample(
+				context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+			); routineErr != nil {
 				t.Error(routineErr)
 				return
 			}

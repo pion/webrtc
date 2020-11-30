@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"io"
 	"sync"
 
@@ -175,8 +176,8 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	writeStream.setRTPWriter(
 		r.api.interceptor.BindLocalStream(
 			info,
-			interceptor.RTPWriterFunc(func(p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
-				return r.srtpStream.WriteRTP(&p.Header, p.Payload)
+			interceptor.RTPWriterFunc(func(ctx context.Context, p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
+				return r.srtpStream.WriteRTP(ctx, &p.Header, p.Payload)
 			}),
 		))
 
@@ -208,25 +209,27 @@ func (r *RTPSender) Stop() error {
 }
 
 // Read reads incoming RTCP for this RTPReceiver
-func (r *RTPSender) Read(b []byte) (n int, err error) {
+func (r *RTPSender) Read(ctx context.Context, b []byte) (n int, err error) {
 	select {
 	case <-r.sendCalled:
-		return r.srtpStream.Read(b)
+		return r.srtpStream.ReadContext(ctx, b)
 	case <-r.stopCalled:
 		return 0, io.ErrClosedPipe
+	case <-ctx.Done():
+		return 0, ctx.Err()
 	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you.
 // It also runs any configured interceptors.
-func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
-	pkts, _, err := r.interceptorRTCPReader.Read()
+func (r *RTPSender) ReadRTCP(ctx context.Context) ([]rtcp.Packet, error) {
+	pkts, _, err := r.interceptorRTCPReader.Read(ctx)
 	return pkts, err
 }
 
-func (r *RTPSender) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
+func (r *RTPSender) readRTCP(ctx context.Context) ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.Read(b)
+	i, err := r.Read(ctx, b)
 	if err != nil {
 		return nil, nil, err
 	}

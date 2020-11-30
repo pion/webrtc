@@ -5,6 +5,7 @@ package webrtc
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -88,7 +89,10 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: uint32(track.SSRC()), MediaSSRC: uint32(track.SSRC())}}); routineErr != nil {
+				if routineErr := pcAnswer.WriteRTCP(
+					context.Background(),
+					[]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: uint32(track.SSRC()), MediaSSRC: uint32(track.SSRC())}},
+				); routineErr != nil {
 					awaitRTCPReceiverSend <- routineErr
 					return
 				}
@@ -103,7 +107,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}()
 
 		go func() {
-			_, routineErr := receiver.Read(make([]byte, 1400))
+			_, routineErr := receiver.Read(context.Background(), make([]byte, 1400))
 			if routineErr != nil {
 				awaitRTCPReceiverRecv <- routineErr
 			} else {
@@ -113,7 +117,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 		haveClosedAwaitRTPRecv := false
 		for {
-			p, routineErr := track.ReadRTP()
+			p, routineErr := track.ReadRTP(context.Background())
 			if routineErr != nil {
 				close(awaitRTPRecvClosed)
 				return
@@ -136,7 +140,9 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+			if routineErr := vp8Track.WriteSample(
+				context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+			); routineErr != nil {
 				fmt.Println(routineErr)
 			}
 
@@ -152,7 +158,10 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: uint32(sender.ssrc), MediaSSRC: uint32(sender.ssrc)}}); routineErr != nil {
+			if routineErr := pcOffer.WriteRTCP(
+				context.Background(),
+				[]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: uint32(sender.ssrc), MediaSSRC: uint32(sender.ssrc)}},
+			); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 
@@ -166,7 +175,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
-		if _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
+		if _, routineErr := sender.Read(context.Background(), make([]byte, 1400)); routineErr == nil {
 			close(awaitRTCPSenderRecv)
 		}
 	}()
@@ -366,9 +375,13 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i <= 5; i++ {
-		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); rtpErr != nil {
+		if rtpErr := vp8Track.WriteSample(
+			context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+		); rtpErr != nil {
 			t.Fatal(rtpErr)
-		} else if rtcpErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}}); rtcpErr != nil {
+		} else if rtcpErr := pcOffer.WriteRTCP(
+			context.Background(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}},
+		); rtcpErr != nil {
 			t.Fatal(rtcpErr)
 		}
 	}
@@ -448,7 +461,9 @@ func TestUndeclaredSSRC(t *testing.T) {
 
 	go func() {
 		for {
-			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+			assert.NoError(t, vp8Writer.WriteSample(
+				context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+			))
 			time.Sleep(time.Millisecond * 25)
 
 			select {
@@ -686,11 +701,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
-	_, err = sender.Read(make([]byte, 0, 1400))
+	_, err = sender.Read(context.Background(), make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
-	_, err = receiver.Read(make([]byte, 0, 1400))
+	_, err = receiver.Read(context.Background(), make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
@@ -837,7 +852,9 @@ func TestPlanBMediaExchange(t *testing.T) {
 				select {
 				case <-time.After(20 * time.Millisecond):
 					for _, track := range outboundTracks {
-						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+						assert.NoError(t, track.WriteSample(
+							context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+						))
 					}
 				case <-done:
 					return

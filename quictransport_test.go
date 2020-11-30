@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"testing"
 	"time"
@@ -142,7 +143,7 @@ func (s *testQuicStack) setSignal(sig *testQuicSignal, isOffer bool) error {
 	}
 
 	// Start the ICE transport
-	err = s.ice.Start(nil, sig.ICEParameters, &iceRole)
+	err = s.ice.Start(context.Background(), nil, sig.ICEParameters, &iceRole)
 	if err != nil {
 		return err
 	}

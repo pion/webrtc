@@ -1,14 +1,18 @@
 package webrtc
 
-import "github.com/pion/rtp"
+import (
+	"context"
+
+	"github.com/pion/rtp"
+)
 
 // TrackLocalWriter is the Writer for outbound RTP Packets
 type TrackLocalWriter interface {
 	// WriteRTP encrypts a RTP packet and writes to the connection
-	WriteRTP(header *rtp.Header, payload []byte) (int, error)
+	WriteRTP(ctx context.Context, header *rtp.Header, payload []byte) (int, error)
 
 	// Write encrypts and writes a full RTP packet
-	Write(b []byte) (int, error)
+	Write(ctx context.Context, b []byte) (int, error)
 }
 
 // TrackLocalContext is the Context passed when a TrackLocal has been Binded/Unbinded from a PeerConnection, and used

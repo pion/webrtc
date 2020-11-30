@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -72,7 +73,9 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				errSend := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
+				errSend := peerConnection.WriteRTCP(
+					context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
+				)
 				if errSend != nil {
 					fmt.Println(errSend)
 				}
@@ -82,12 +85,12 @@ func main() {
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().MimeType)
 		for {
 			// Read RTP packets being sent to Pion
-			rtp, readErr := track.ReadRTP()
+			rtp, readErr := track.ReadRTP(context.TODO())
 			if readErr != nil {
 				panic(readErr)
 			}
 
-			if writeErr := outputTrack.WriteRTP(rtp); writeErr != nil {
+			if writeErr := outputTrack.WriteRTP(context.TODO(), rtp); writeErr != nil {
 				panic(writeErr)
 			}
 		}
