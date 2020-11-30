@@ -107,10 +107,12 @@ func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 	defer s.mu.RUnlock()
 
 	writeErrs := []error{}
+	outboundPacket := *p
+
 	for _, b := range s.bindings {
-		p.Header.SSRC = uint32(b.ssrc)
-		p.Header.PayloadType = uint8(b.payloadType)
-		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
+		outboundPacket.Header.SSRC = uint32(b.ssrc)
+		outboundPacket.Header.PayloadType = uint8(b.payloadType)
+		if _, err := b.writeStream.WriteRTP(&outboundPacket.Header, outboundPacket.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
 	}
