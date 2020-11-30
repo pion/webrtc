@@ -13,6 +13,7 @@ type H264Reader struct {
 	nalBuffer                   []byte
 	countOfConsecutiveZeroBytes int
 	nalPrefixParsed             bool
+	readBuffer                  []byte
 }
 
 var (
@@ -30,6 +31,7 @@ func NewReader(in io.Reader) (*H264Reader, error) {
 		stream:          in,
 		nalBuffer:       make([]byte, 0),
 		nalPrefixParsed: false,
+		readBuffer:      make([]byte, 0),
 	}
 
 	return reader, nil
@@ -47,16 +49,37 @@ type NAL struct {
 	Data []byte // header byte + rbsp
 }
 
+func (reader *H264Reader) read(numToRead int) (data []byte) {
+	for len(reader.readBuffer) < numToRead {
+		buf := make([]byte, 4096)
+		n, err := reader.stream.Read(buf)
+		if n == 0 || err != nil {
+			break
+		}
+		buf = buf[0:n]
+		reader.readBuffer = append(reader.readBuffer, buf...)
+	}
+	var numShouldRead int
+	if numToRead <= len(reader.readBuffer) {
+		numShouldRead = numToRead
+	} else {
+		numShouldRead = len(reader.readBuffer)
+	}
+	data = reader.readBuffer[0:numShouldRead]
+	reader.readBuffer = reader.readBuffer[numShouldRead:]
+	return data
+}
+
 func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e error) {
 	nalPrefix3Bytes := []byte{0, 0, 1}
 	nalPrefix4Bytes := []byte{0, 0, 0, 1}
 
-	prefixBuffer := make([]byte, 4)
+	prefixBuffer := reader.read(4)
 
-	n, err := reader.stream.Read(prefixBuffer)
+	n := len(prefixBuffer)
 
-	if err != nil || n == 0 {
-		return 0, err
+	if n == 0 {
+		return 0, io.EOF
 	}
 
 	if n < 3 {
@@ -98,10 +121,10 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 	}
 
 	for {
-		buffer := make([]byte, 1)
-		n, err := reader.stream.Read(buffer)
+		buffer := reader.read(1)
+		n := len(buffer)
 
-		if err != nil || n != 1 {
+		if n != 1 {
 			break
 		}
 		readByte := buffer[0]
