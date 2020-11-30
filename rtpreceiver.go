@@ -3,13 +3,14 @@
 package webrtc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
-	"github.com/pion/srtp"
+	"github.com/pion/srtp/v2"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -132,41 +133,45 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 }
 
 // Read reads incoming RTCP for this RTPReceiver
-func (r *RTPReceiver) Read(b []byte) (n int, err error) {
+func (r *RTPReceiver) Read(ctx context.Context, b []byte) (n int, err error) {
 	select {
 	case <-r.received:
-		return r.tracks[0].rtcpReadStream.Read(b)
+		return r.tracks[0].rtcpReadStream.ReadContext(ctx, b)
 	case <-r.closed:
 		return 0, io.ErrClosedPipe
+	case <-ctx.Done():
+		return 0, ctx.Err()
 	}
 }
 
 // ReadSimulcast reads incoming RTCP for this RTPReceiver for given rid
-func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, err error) {
+func (r *RTPReceiver) ReadSimulcast(ctx context.Context, b []byte, rid string) (n int, err error) {
 	select {
 	case <-r.received:
 		for _, t := range r.tracks {
 			if t.track != nil && t.track.rid == rid {
-				return t.rtcpReadStream.Read(b)
+				return t.rtcpReadStream.ReadContext(ctx, b)
 			}
 		}
 		return 0, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 	case <-r.closed:
 		return 0, io.ErrClosedPipe
+	case <-ctx.Done():
+		return 0, ctx.Err()
 	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshal for you.
 // It also runs any configured interceptors.
-func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
-	pkts, _, err := r.interceptorRTCPReader.Read()
+func (r *RTPReceiver) ReadRTCP(ctx context.Context) ([]rtcp.Packet, error) {
+	pkts, _, err := r.interceptorRTCPReader.Read(ctx)
 	return pkts, err
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshal for you
-func (r *RTPReceiver) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
+func (r *RTPReceiver) readRTCP(ctx context.Context) ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.Read(b)
+	i, err := r.Read(ctx, b)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -180,9 +185,9 @@ func (r *RTPReceiver) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) 
 }
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you
-func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, error) {
+func (r *RTPReceiver) ReadSimulcastRTCP(ctx context.Context, rid string) ([]rtcp.Packet, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.ReadSimulcast(b, rid)
+	i, err := r.ReadSimulcast(ctx, b, rid)
 	if err != nil {
 		return nil, err
 	}
@@ -241,10 +246,10 @@ func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
 }
 
 // readRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, err error) {
+func (r *RTPReceiver) readRTP(ctx context.Context, b []byte, reader *TrackRemote) (n int, err error) {
 	<-r.received
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpReadStream.Read(b)
+		return t.rtpReadStream.ReadContext(ctx, b)
 	}
 
 	return 0, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())

@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -112,19 +113,19 @@ func (s *testORTCStack) setSignal(sig *testORTCSignal, isOffer bool) error {
 	}
 
 	// Start the ICE transport
-	err = s.ice.Start(nil, sig.ICEParameters, &iceRole)
+	err = s.ice.Start(context.Background(), nil, sig.ICEParameters, &iceRole)
 	if err != nil {
 		return err
 	}
 
 	// Start the DTLS transport
-	err = s.dtls.Start(sig.DTLSParameters)
+	err = s.dtls.Start(context.Background(), sig.DTLSParameters)
 	if err != nil {
 		return err
 	}
 
 	// Start the SCTP transport
-	err = s.sctp.Start(sig.SCTPCapabilities)
+	err = s.sctp.Start(context.Background(), sig.SCTPCapabilities)
 	if err != nil {
 		return err
 	}

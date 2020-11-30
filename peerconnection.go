@@ -3,11 +3,11 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +19,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/transport/connctx"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
@@ -275,7 +276,7 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 	pc.ops.Enqueue(pc.negotiationNeededOp)
 }
 
-func (pc *PeerConnection) negotiationNeededOp() {
+func (pc *PeerConnection) negotiationNeededOp(ctx context.Context) {
 	// Don't run NegotiatedNeeded checks if OnNegotiationNeeded is not set
 	if handler := pc.onNegotiationNeededHandler.Load(); handler == nil {
 		return
@@ -945,8 +946,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
-		pc.ops.Enqueue(func() {
-			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
+		pc.ops.Enqueue(func(ctx context.Context) {
+			pc.startRTP(ctx, haveLocalDescription, remoteDesc, currentTransceivers)
 		})
 	}
 
@@ -1066,8 +1067,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
 				return err
 			}
-			pc.ops.Enqueue(func() {
-				pc.startRTP(true, &desc, currentTransceivers)
+			pc.ops.Enqueue(func(ctx context.Context) {
+				pc.startRTP(ctx, true, &desc, currentTransceivers)
 			})
 		}
 		return nil
@@ -1099,16 +1100,16 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	pc.ops.Enqueue(func() {
-		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
+	pc.ops.Enqueue(func(ctx context.Context) {
+		pc.startTransports(ctx, iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
 		if weOffer {
-			pc.startRTP(false, &desc, currentTransceivers)
+			pc.startRTP(ctx, false, &desc, currentTransceivers)
 		}
 	})
 	return nil
 }
 
-func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
+func (pc *PeerConnection) startReceiver(ctx context.Context, incoming trackDetails, receiver *RTPReceiver) {
 	encodings := []RTPDecodingParameters{}
 	if incoming.ssrc != 0 {
 		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{SSRC: incoming.ssrc}})
@@ -1137,7 +1138,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	go func() {
-		if err := receiver.Track().determinePayloadType(); err != nil {
+		if err := receiver.Track().determinePayloadType(ctx); err != nil {
 			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
 			return
 		}
@@ -1160,7 +1161,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
+func (pc *PeerConnection) startRTPReceivers(ctx context.Context, incomingTracks []trackDetails, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
 	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
 	remoteIsPlanB := false
@@ -1207,7 +1208,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 				continue
 			}
 
-			pc.startReceiver(incomingTrack, t.Receiver())
+			pc.startReceiver(ctx, incomingTrack, t.Receiver())
 			trackHandled = true
 			break
 		}
@@ -1226,7 +1227,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incoming.ssrc, err)
 				continue
 			}
-			pc.startReceiver(incoming, t.Receiver())
+			pc.startReceiver(ctx, incoming, t.Receiver())
 		}
 	}
 }
@@ -1253,9 +1254,9 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 }
 
 // Start SCTP subsystem
-func (pc *PeerConnection) startSCTP() {
+func (pc *PeerConnection) startSCTP(ctx context.Context) {
 	// Start sctp
-	if err := pc.sctpTransport.Start(SCTPCapabilities{
+	if err := pc.sctpTransport.Start(ctx, SCTPCapabilities{
 		MaxMessageSize: 0,
 	}); err != nil {
 		pc.log.Warnf("Failed to start SCTP: %s", err)
@@ -1289,7 +1290,7 @@ func (pc *PeerConnection) startSCTP() {
 	pc.sctpTransport.lock.Unlock()
 }
 
-func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit
+func (pc *PeerConnection) handleUndeclaredSSRC(ctx context.Context, rtpStream connctx.Reader, ssrc SSRC) error { //nolint:gocognit
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -1318,7 +1319,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 		if err != nil {
 			return fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
 		}
-		pc.startReceiver(incoming, t.Receiver())
+		pc.startReceiver(ctx, incoming, t.Receiver())
 		return nil
 	}
 
@@ -1335,7 +1336,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 	b := make([]byte, receiveMTU)
 	var mid, rid string
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
-		i, err := rtpStream.Read(b)
+		i, err := rtpStream.ReadContext(ctx, b)
 		if err != nil {
 			return err
 		}
@@ -1379,7 +1380,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 }
 
 // undeclaredMediaProcessor handles RTP/RTCP packets that don't match any a:ssrc lines
-func (pc *PeerConnection) undeclaredMediaProcessor() {
+func (pc *PeerConnection) undeclaredMediaProcessor(ctx context.Context) {
 	go func() {
 		for {
 			srtpSession, err := pc.dtlsTransport.getSRTPSession()
@@ -1394,7 +1395,7 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 				return
 			}
 
-			if err := pc.handleUndeclaredSSRC(stream, SSRC(ssrc)); err != nil {
+			if err := pc.handleUndeclaredSSRC(ctx, stream, SSRC(ssrc)); err != nil {
 				pc.log.Errorf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v", ssrc, err)
 			}
 		}
@@ -1753,12 +1754,12 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) error {
 
 // WriteRTCP sends a user provided RTCP packet to the connected peer. If no peer is connected the
 // packet is discarded. It also runs any configured interceptors.
-func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
-	_, err := pc.interceptorRTCPWriter.Write(pkts, make(interceptor.Attributes))
+func (pc *PeerConnection) WriteRTCP(ctx context.Context, pkts []rtcp.Packet) error {
+	_, err := pc.interceptorRTCPWriter.Write(ctx, pkts, make(interceptor.Attributes))
 	return err
 }
 
-func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes) (int, error) {
+func (pc *PeerConnection) writeRTCP(ctx context.Context, pkts []rtcp.Packet, _ interceptor.Attributes) (int, error) {
 	raw, err := rtcp.Marshal(pkts)
 	if err != nil {
 		return 0, err
@@ -1774,7 +1775,7 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 		return 0, fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
 	}
 
-	if n, err := writeStream.Write(raw); err != nil {
+	if n, err := writeStream.WriteContext(ctx, raw); err != nil {
 		return n, err
 	}
 	return 0, nil
@@ -1985,9 +1986,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 }
 
 // Start all transports. PeerConnection now has enough state
-func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
+func (pc *PeerConnection) startTransports(ctx context.Context, iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
 	// Start the ice transport
 	err := pc.iceTransport.Start(
+		ctx,
 		pc.iceGatherer,
 		ICEParameters{
 			UsernameFragment: remoteUfrag,
@@ -2002,7 +2004,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 
 	// Start the dtls transport
-	err = pc.dtlsTransport.Start(DTLSParameters{
+	err = pc.dtlsTransport.Start(ctx, DTLSParameters{
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
@@ -2013,7 +2015,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 }
 
-func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
+func (pc *PeerConnection) startRTP(ctx context.Context, isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
 	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
 	if isRenegotiation {
 		for _, t := range currentTransceivers {
@@ -2047,13 +2049,13 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 		}
 	}
 
-	pc.startRTPReceivers(trackDetails, currentTransceivers)
+	pc.startRTPReceivers(ctx, trackDetails, currentTransceivers)
 	if haveApplicationMediaSection(remoteDesc.parsed) {
-		pc.startSCTP()
+		pc.startSCTP(ctx)
 	}
 
 	if !isRenegotiation {
-		pc.undeclaredMediaProcessor()
+		pc.undeclaredMediaProcessor(ctx)
 	}
 }
 

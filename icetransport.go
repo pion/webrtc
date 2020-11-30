@@ -11,6 +11,7 @@ import (
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
+	"github.com/pion/transport/connctx"
 	"github.com/pion/webrtc/v3/internal/mux"
 )
 
@@ -70,7 +71,7 @@ func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory)
 }
 
 // Start incoming connectivity checks based on its configured role.
-func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
+func (t *ICETransport) Start(ctx context.Context, gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -142,11 +143,11 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	t.conn = iceConn
 
 	config := mux.Config{
-		Conn:          t.conn,
+		Conn:          connctx.New(t.conn),
 		BufferSize:    receiveMTU,
 		LoggerFactory: t.loggerFactory,
 	}
-	t.mux = mux.NewMux(config)
+	t.mux = mux.NewMux(ctx, config)
 
 	return nil
 }

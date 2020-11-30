@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"time"
@@ -111,19 +112,19 @@ func main() {
 	}
 
 	// Start the ICE transport
-	err = ice.Start(nil, remoteSignal.ICEParameters, &iceRole)
+	err = ice.Start(context.TODO(), nil, remoteSignal.ICEParameters, &iceRole)
 	if err != nil {
 		panic(err)
 	}
 
 	// Start the DTLS transport
-	err = dtls.Start(remoteSignal.DTLSParameters)
+	err = dtls.Start(context.TODO(), remoteSignal.DTLSParameters)
 	if err != nil {
 		panic(err)
 	}
 
 	// Start the SCTP transport
-	err = sctp.Start(remoteSignal.SCTPCapabilities)
+	err = sctp.Start(context.TODO(), remoteSignal.SCTPCapabilities)
 	if err != nil {
 		panic(err)
 	}

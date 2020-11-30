@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -53,7 +54,9 @@ func main() { // nolint:gocognit
 		go func() {
 			ticker := time.NewTicker(rtcpPLIInterval)
 			for range ticker.C {
-				if rtcpSendErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())}}); rtcpSendErr != nil {
+				if rtcpSendErr := peerConnection.WriteRTCP(
+					context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())}},
+				); rtcpSendErr != nil {
 					fmt.Println(rtcpSendErr)
 				}
 			}
@@ -68,13 +71,13 @@ func main() { // nolint:gocognit
 
 		rtpBuf := make([]byte, 1400)
 		for {
-			i, readErr := remoteTrack.Read(rtpBuf)
+			i, readErr := remoteTrack.Read(context.TODO(), rtpBuf)
 			if readErr != nil {
 				panic(readErr)
 			}
 
 			// ErrClosedPipe means we don't have any subscribers, this is ok if no peers have connected yet
-			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+			if _, err = localTrack.Write(context.TODO(), rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
 				panic(err)
 			}
 		}

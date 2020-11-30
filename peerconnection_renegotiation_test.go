@@ -25,7 +25,9 @@ func sendVideoUntilDone(done <-chan struct{}, t *testing.T, tracks []*TrackLocal
 		select {
 		case <-time.After(20 * time.Millisecond):
 			for _, track := range tracks {
-				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+				assert.NoError(t, track.WriteSample(
+					context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+				))
 			}
 		case <-done:
 			return
@@ -100,7 +102,9 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	// Send 10 packets, OnTrack MUST not be fired
 	for i := 0; i <= 10; i++ {
-		assert.NoError(t, vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+		assert.NoError(t, vp8Track.WriteSample(
+			context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+		))
 		time.Sleep(20 * time.Millisecond)
 	}
 
@@ -360,7 +364,7 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	pcAnswer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
 		tracksCh <- track
 		for {
-			if _, readErr := track.ReadRTP(); readErr == io.EOF {
+			if _, readErr := track.ReadRTP(context.Background()); readErr == io.EOF {
 				tracksClosed <- struct{}{}
 				return
 			}
@@ -450,7 +454,7 @@ func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
 		onTrackFiredFunc()
 
 		for {
-			if _, err := track.ReadRTP(); err == io.EOF {
+			if _, err := track.ReadRTP(context.Background()); err == io.EOF {
 				trackClosedFunc()
 				return
 			}
@@ -838,7 +842,9 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	sender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
 
-	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+	assert.NoError(t, track.WriteSample(
+		context.Background(), media.Sample{Data: []byte{0x00}, Duration: time.Second},
+	))
 
 	wg.Wait()
 

@@ -107,7 +107,9 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 2)
 			for range ticker.C {
-				if rtcpErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
+				if rtcpErr := peerConnection.WriteRTCP(
+					context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
+				); rtcpErr != nil {
 					fmt.Println(rtcpErr)
 				}
 			}
@@ -116,7 +118,7 @@ func main() {
 		b := make([]byte, 1500)
 		for {
 			// Read
-			n, readErr := track.Read(b)
+			n, readErr := track.Read(context.TODO(), b)
 			if readErr != nil {
 				panic(readErr)
 			}

@@ -50,7 +50,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 			assert.Equal(t, uint64(1), atomic.AddUint64(&onTrackCount, 1))
 
 			for {
-				pkt, err := track.ReadRTP()
+				pkt, err := track.ReadRTP(context.Background())
 				if err != nil {
 					assert.True(t, errors.Is(io.EOF, err))
 					return
@@ -74,7 +74,9 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 				case <-seenPacketA.Done():
 					return
 				default:
-					assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+					assert.NoError(t, trackA.WriteSample(
+						context.Background(), media.Sample{Data: []byte{0xAA}, Duration: time.Second},
+					))
 				}
 			}
 		}()
@@ -88,7 +90,9 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 				case <-seenPacketB.Done():
 					return
 				default:
-					assert.NoError(t, trackB.WriteSample(media.Sample{Data: []byte{0xBB}, Duration: time.Second}))
+					assert.NoError(t, trackB.WriteSample(
+						context.Background(), media.Sample{Data: []byte{0xBB}, Duration: time.Second},
+					))
 				}
 			}
 		}()
@@ -123,7 +127,9 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 				case <-seenPacket.Done():
 					return
 				default:
-					assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+					assert.NoError(t, trackA.WriteSample(
+						context.Background(), media.Sample{Data: []byte{0xAA}, Duration: time.Second},
+					))
 				}
 			}
 		}()
@@ -133,4 +139,15 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 		assert.NoError(t, sender.Close())
 		assert.NoError(t, receiver.Close())
 	})
+}
+
+func Test_RTPSender_ContextCancel(t *testing.T) {
+	sender := &RTPSender{
+		sendCalled: make(chan struct{}),
+		stopCalled: make(chan struct{}),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := sender.Read(ctx, []byte{})
+	assert.Equal(t, context.Canceled, err)
 }

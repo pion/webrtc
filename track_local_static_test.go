@@ -185,7 +185,7 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	pkt := &rtp.Packet{Header: rtp.Header{SSRC: 1, PayloadType: 1}}
-	assert.NoError(t, vp8Writer.WriteRTP(pkt))
+	assert.NoError(t, vp8Writer.WriteRTP(context.Background(), pkt))
 
 	assert.Equal(t, pkt.Header.SSRC, uint32(1))
 	assert.Equal(t, pkt.Header.PayloadType, uint8(1))
