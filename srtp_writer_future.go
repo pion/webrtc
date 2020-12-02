@@ -19,13 +19,25 @@ type srtpWriterFuture struct {
 	rtpWriteStream atomic.Value // *srtp.WriteStreamSRTP
 }
 
-func (s *srtpWriterFuture) init(ctx context.Context) error {
-	select {
-	case <-s.rtpSender.stopCalled:
-		return io.ErrClosedPipe
-	case <-s.rtpSender.transport.srtpReady:
-	case <-ctx.Done():
-		return ctx.Err()
+func (s *srtpWriterFuture) init(ctx context.Context, returnWhenNoSRTP bool) error {
+	if returnWhenNoSRTP {
+		select {
+		case <-s.rtpSender.stopCalled:
+			return io.ErrClosedPipe
+		case <-s.rtpSender.transport.srtpReady:
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return nil
+		}
+	} else {
+		select {
+		case <-s.rtpSender.stopCalled:
+			return io.ErrClosedPipe
+		case <-s.rtpSender.transport.srtpReady:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	srtcpSession, err := s.rtpSender.transport.getSRTCPSession()
@@ -66,7 +78,7 @@ func (s *srtpWriterFuture) ReadContext(ctx context.Context, b []byte) (n int, er
 		return value.(*srtp.ReadStreamSRTCP).ReadContext(ctx, b)
 	}
 
-	if err := s.init(ctx); err != nil || s.rtcpReadStream.Load() == nil {
+	if err := s.init(ctx, false); err != nil || s.rtcpReadStream.Load() == nil {
 		return 0, err
 	}
 
@@ -78,7 +90,7 @@ func (s *srtpWriterFuture) WriteRTP(ctx context.Context, header *rtp.Header, pay
 		return value.(*srtp.WriteStreamSRTP).WriteRTP(ctx, header, payload)
 	}
 
-	if err := s.init(ctx); err != nil || s.rtpWriteStream.Load() == nil {
+	if err := s.init(ctx, true); err != nil || s.rtpWriteStream.Load() == nil {
 		return 0, err
 	}
 
@@ -90,7 +102,7 @@ func (s *srtpWriterFuture) Write(ctx context.Context, b []byte) (int, error) {
 		return value.(*srtp.WriteStreamSRTP).WriteContext(ctx, b)
 	}
 
-	if err := s.init(ctx); err != nil || s.rtpWriteStream.Load() == nil {
+	if err := s.init(ctx, true); err != nil || s.rtpWriteStream.Load() == nil {
 		return 0, err
 	}
 

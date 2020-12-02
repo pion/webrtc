@@ -193,3 +193,40 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// Assert that writing to a Track that has Binded (but not connected)
+// does not block
+func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pcAnswer.AddTrack(vp8Writer)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+
+	_, err = vp8Writer.Write(context.Background(), make([]byte, 20))
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
