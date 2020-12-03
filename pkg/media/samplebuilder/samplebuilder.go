@@ -90,7 +90,7 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) 
 				s.buffer[j] = nil
 			}
 
-			return &media.Sample{Data: data, Duration: time.Duration((samples/s.sampleRate)*1000) * time.Millisecond}, s.lastPopTimestamp
+			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
