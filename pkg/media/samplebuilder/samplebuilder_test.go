@@ -272,3 +272,39 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 		})
 	}
 }
+
+func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
+	var released []*rtp.Packet
+	fakePacketReleaseHandler := func(p *rtp.Packet) {
+		released = append(released, p)
+	}
+
+	// Test packets released via 'maxLate'.
+	pkts := []rtp.Packet{
+		{Header: rtp.Header{SequenceNumber: 0, Timestamp: 0}, Payload: []byte{0x01}},
+		{Header: rtp.Header{SequenceNumber: 11, Timestamp: 120}, Payload: []byte{0x02}},
+		{Header: rtp.Header{SequenceNumber: 12, Timestamp: 121}, Payload: []byte{0x03}},
+		{Header: rtp.Header{SequenceNumber: 13, Timestamp: 122}, Payload: []byte{0x04}},
+	}
+	s := New(10, &fakeDepacketizer{}, 1, WithPacketReleaseHandler(fakePacketReleaseHandler))
+	s.Push(&pkts[0])
+	s.Push(&pkts[1])
+	if len(released) == 0 {
+		t.Errorf("Old packet is not released")
+	}
+	if len(released) > 0 && released[0].SequenceNumber != pkts[0].SequenceNumber {
+		t.Errorf("Unexpected packet released by maxLate")
+	}
+	// Test packets released after samples built.
+	s.Push(&pkts[2])
+	s.Push(&pkts[3])
+	if s.Pop() == nil {
+		t.Errorf("Should have some sample here.")
+	}
+	if len(released) != 2 {
+		t.Errorf("packet built with sample is not released")
+	}
+	if len(released) >= 2 && released[1].SequenceNumber != pkts[2].SequenceNumber {
+		t.Errorf("Unexpected packet released by samples built")
+	}
+}
