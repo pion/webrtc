@@ -9,7 +9,7 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
-	"github.com/pion/srtp"
+	"github.com/pion/srtp/v2"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track

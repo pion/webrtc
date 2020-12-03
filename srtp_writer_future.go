@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/rtp"
-	"github.com/pion/srtp"
+	"github.com/pion/srtp/v2"
 )
 
 // srtpWriterFuture blocks Read/Write calls until
