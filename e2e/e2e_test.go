@@ -100,7 +100,6 @@ func TestE2E_Audio(t *testing.T) {
 			go func() {
 				for {
 					if err := track.WriteSample(
-						context.Background(),
 						media.Sample{Data: silentOpusFrame, Duration: time.Millisecond * 20},
 					); err != nil {
 						t.Errorf("Failed to WriteSample: %v", err)

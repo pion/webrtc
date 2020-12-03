@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net"
 
@@ -104,7 +103,7 @@ func main() {
 			panic(err)
 		}
 
-		if _, writeErr := videoTrack.Write(context.TODO(), inboundRTPPacket[:n]); writeErr != nil {
+		if _, writeErr := videoTrack.Write(inboundRTPPacket[:n]); writeErr != nil {
 			panic(writeErr)
 		}
 	}

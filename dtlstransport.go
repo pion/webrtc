@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -18,7 +17,7 @@ import (
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
-	"github.com/pion/srtp/v2"
+	"github.com/pion/srtp"
 	"github.com/pion/webrtc/v3/internal/mux"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
@@ -147,7 +146,7 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	return t.remoteCertificate
 }
 
-func (t *DTLSTransport) startSRTP(ctx context.Context) error {
+func (t *DTLSTransport) startSRTP() error {
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
@@ -186,12 +185,12 @@ func (t *DTLSTransport) startSRTP(ctx context.Context) error {
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
 	}
 
-	srtpSession, err := srtp.NewSessionSRTP(ctx, t.srtpEndpoint, srtpConfig)
+	srtpSession, err := srtp.NewSessionSRTP(t.srtpEndpoint, srtpConfig)
 	if err != nil {
 		return fmt.Errorf("%w: %v", errFailedToStartSRTP, err)
 	}
 
-	srtcpSession, err := srtp.NewSessionSRTCP(ctx, t.srtcpEndpoint, srtpConfig)
+	srtcpSession, err := srtp.NewSessionSRTCP(t.srtcpEndpoint, srtpConfig)
 	if err != nil {
 		return fmt.Errorf("%w: %v", errFailedToStartSRTCP, err)
 	}
@@ -245,7 +244,7 @@ func (t *DTLSTransport) role() DTLSRole {
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
-func (t *DTLSTransport) Start(ctx context.Context, remoteParameters DTLSParameters) error {
+func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Take lock and prepare connection, we must not hold the lock
 	// when connecting
 	prepareTransport := func() (DTLSRole, *dtls.Config, error) {
@@ -351,7 +350,7 @@ func (t *DTLSTransport) Start(ctx context.Context, remoteParameters DTLSParamete
 		return err
 	}
 
-	return t.startSRTP(ctx)
+	return t.startSRTP()
 }
 
 // Stop stops and closes the DTLSTransport object.

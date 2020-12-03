@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -24,7 +23,7 @@ func saveToDisk(i media.Writer, track *webrtc.TrackRemote) {
 	}()
 
 	for {
-		rtpPacket, err := track.ReadRTP(context.TODO())
+		rtpPacket, err := track.ReadRTP()
 		if err != nil {
 			panic(err)
 		}
@@ -97,9 +96,7 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				errSend := peerConnection.WriteRTCP(
-					context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
-				)
+				errSend := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
 				if errSend != nil {
 					fmt.Println(errSend)
 				}

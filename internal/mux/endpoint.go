@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net"
@@ -35,23 +34,12 @@ func (e *Endpoint) close() error {
 // Read reads a packet of len(p) bytes from the underlying conn
 // that are matched by the associated MuxFunc
 func (e *Endpoint) Read(p []byte) (int, error) {
-	return e.buffer.ReadContext(context.Background(), p)
-}
-
-// ReadContext reads a packet of len(p) bytes from the underlying conn
-// that are matched by the associated MuxFunc
-func (e *Endpoint) ReadContext(ctx context.Context, p []byte) (int, error) {
-	return e.buffer.ReadContext(ctx, p)
+	return e.buffer.Read(p)
 }
 
 // Write writes len(p) bytes to the underlying conn
 func (e *Endpoint) Write(p []byte) (int, error) {
-	return e.WriteContext(context.Background(), p)
-}
-
-// WriteContext writes len(p) bytes to the underlying conn
-func (e *Endpoint) WriteContext(ctx context.Context, p []byte) (int, error) {
-	n, err := e.mux.nextConn.WriteContext(ctx, p)
+	n, err := e.mux.nextConn.Write(p)
 	if errors.Is(err, ice.ErrNoCandidatePairs) {
 		return 0, nil
 	} else if errors.Is(err, ice.ErrClosed) {

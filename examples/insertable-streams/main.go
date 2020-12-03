@@ -74,7 +74,7 @@ func main() {
 			}
 
 			time.Sleep(sleepTime)
-			if ivfErr = videoTrack.WriteSample(context.TODO(), media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
+			if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
 				panic(ivfErr)
 			}
 		}

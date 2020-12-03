@@ -1,7 +1,6 @@
 package webrtc
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +12,7 @@ func TestOperations_Enqueue(t *testing.T) {
 		results := make([]int, 16)
 		for i := range results {
 			func(j int) {
-				ops.Enqueue(func(_ context.Context) {
+				ops.Enqueue(func() {
 					results[j] = j * j
 				})
 			}(i)

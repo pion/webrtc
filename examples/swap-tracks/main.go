@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -86,7 +85,7 @@ func main() { // nolint:gocognit
 		var isCurrTrack bool
 		for {
 			// Read RTP packets being sent to Pion
-			rtp, readErr := track.ReadRTP(context.TODO())
+			rtp, readErr := track.ReadRTP()
 			if readErr != nil {
 				panic(readErr)
 			}
@@ -105,9 +104,7 @@ func main() { // nolint:gocognit
 				// If just switched to this track, send PLI to get picture refresh
 				if !isCurrTrack {
 					isCurrTrack = true
-					if writeErr := peerConnection.WriteRTCP(
-						context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
-					); writeErr != nil {
+					if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
 						fmt.Println(writeErr)
 					}
 				}
@@ -157,7 +154,7 @@ func main() { // nolint:gocognit
 			// Keep an increasing sequence number
 			packet.SequenceNumber = i
 			// Write out the packet, ignoring closed pipe if nobody is listening
-			if err := outputTrack.WriteRTP(context.TODO(), packet); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+			if err := outputTrack.WriteRTP(packet); err != nil && !errors.Is(err, io.ErrClosedPipe) {
 				panic(err)
 			}
 		}

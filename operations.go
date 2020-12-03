@@ -1,12 +1,11 @@
 package webrtc
 
 import (
-	"context"
 	"sync"
 )
 
 // Operation is a function
-type operation func(ctx context.Context)
+type operation func()
 
 // Operations is a task executor.
 type operations struct {
@@ -33,7 +32,7 @@ func (o *operations) Enqueue(op operation) {
 	o.mu.Unlock()
 
 	if !running {
-		go o.start(context.Background())
+		go o.start()
 	}
 }
 
@@ -49,13 +48,13 @@ func (o *operations) IsEmpty() bool {
 func (o *operations) Done() {
 	var wg sync.WaitGroup
 	wg.Add(1)
-	o.Enqueue(func(_ context.Context) {
+	o.Enqueue(func() {
 		wg.Done()
 	})
 	wg.Wait()
 }
 
-func (o *operations) pop() func(context.Context) {
+func (o *operations) pop() func() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if len(o.ops) == 0 {
@@ -67,7 +66,7 @@ func (o *operations) pop() func(context.Context) {
 	return fn
 }
 
-func (o *operations) start(ctx context.Context) {
+func (o *operations) start() {
 	defer func() {
 		o.mu.Lock()
 		defer o.mu.Unlock()
@@ -77,12 +76,12 @@ func (o *operations) start(ctx context.Context) {
 		}
 		// either a new operation was enqueued while we
 		// were busy, or an operation panicked
-		go o.start(ctx)
+		go o.start()
 	}()
 
 	fn := o.pop()
 	for fn != nil {
-		fn(ctx)
+		fn()
 		fn = o.pop()
 	}
 }

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -146,7 +145,7 @@ func writeVideoToTrack(t *webrtc.TrackLocalStaticSample) {
 		}
 
 		time.Sleep(sleepTime)
-		if err = t.WriteSample(context.TODO(), media.Sample{Data: frame, Duration: time.Second}); err != nil {
+		if err = t.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
 			fmt.Printf("Finish writing video track: %s ", err)
 			return
 		}
