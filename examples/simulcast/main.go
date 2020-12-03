@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -81,28 +80,24 @@ func main() {
 			ticker := time.NewTicker(3 * time.Second)
 			for range ticker.C {
 				fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
-				if writeErr := peerConnection.WriteRTCP(
-					context.TODO(), []rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
-				); writeErr != nil {
+				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
 					fmt.Println(writeErr)
 				}
 				// Send a remb message with a very high bandwidth to trigger chrome to send also the high bitrate stream
 				fmt.Printf("Sending remb for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
-				if writeErr := peerConnection.WriteRTCP(
-					context.TODO(), []rtcp.Packet{&rtcp.ReceiverEstimatedMaximumBitrate{Bitrate: 10000000, SenderSSRC: uint32(track.SSRC())}},
-				); writeErr != nil {
+				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.ReceiverEstimatedMaximumBitrate{Bitrate: 10000000, SenderSSRC: uint32(track.SSRC())}}); writeErr != nil {
 					fmt.Println(writeErr)
 				}
 			}
 		}()
 		for {
 			// Read RTP packets being sent to Pion
-			packet, readErr := track.ReadRTP(context.TODO())
+			packet, readErr := track.ReadRTP()
 			if readErr != nil {
 				panic(readErr)
 			}
 
-			if writeErr := outputTracks[rid].WriteRTP(context.TODO(), packet); writeErr != nil && !errors.Is(writeErr, io.ErrClosedPipe) {
+			if writeErr := outputTracks[rid].WriteRTP(packet); writeErr != nil && !errors.Is(writeErr, io.ErrClosedPipe) {
 				panic(writeErr)
 			}
 		}

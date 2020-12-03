@@ -185,7 +185,7 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	pkt := &rtp.Packet{Header: rtp.Header{SSRC: 1, PayloadType: 1}}
-	assert.NoError(t, vp8Writer.WriteRTP(context.Background(), pkt))
+	assert.NoError(t, vp8Writer.WriteRTP(pkt))
 
 	assert.Equal(t, pkt.Header.SSRC, uint32(1))
 	assert.Equal(t, pkt.Header.PayloadType, uint8(1))
@@ -224,7 +224,7 @@ func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-	_, err = vp8Writer.Write(context.Background(), make([]byte, 20))
+	_, err = vp8Writer.Write(make([]byte, 20))
 	assert.NoError(t, err)
 
 	assert.NoError(t, pcOffer.Close())

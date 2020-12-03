@@ -1137,7 +1137,7 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 	<-connected
 	time.Sleep(1 * time.Second)
 	for _, track := range tracks {
-		assert.NoError(t, track.WriteRTP(context.Background(), samplePkt))
+		assert.NoError(t, track.WriteRTP(samplePkt))
 	}
 	// Ping trackRecords to see if any track event not received yet.
 	tooLong := time.After(timeoutDuration)

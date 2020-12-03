@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"context"
 	"strings"
 	"sync"
 
@@ -103,7 +102,7 @@ func (s *TrackLocalStaticRTP) Kind() RTPCodecType {
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
-func (s *TrackLocalStaticRTP) WriteRTP(ctx context.Context, p *rtp.Packet) error {
+func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -113,7 +112,7 @@ func (s *TrackLocalStaticRTP) WriteRTP(ctx context.Context, p *rtp.Packet) error
 	for _, b := range s.bindings {
 		outboundPacket.Header.SSRC = uint32(b.ssrc)
 		outboundPacket.Header.PayloadType = uint8(b.payloadType)
-		if _, err := b.writeStream.WriteRTP(ctx, &outboundPacket.Header, outboundPacket.Payload); err != nil {
+		if _, err := b.writeStream.WriteRTP(&outboundPacket.Header, outboundPacket.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
 	}
@@ -125,13 +124,13 @@ func (s *TrackLocalStaticRTP) WriteRTP(ctx context.Context, p *rtp.Packet) error
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
-func (s *TrackLocalStaticRTP) Write(ctx context.Context, b []byte) (n int, err error) {
+func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 	packet := &rtp.Packet{}
 	if err = packet.Unmarshal(b); err != nil {
 		return 0, err
 	}
 
-	return len(b), s.WriteRTP(ctx, packet)
+	return len(b), s.WriteRTP(packet)
 }
 
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
@@ -209,7 +208,7 @@ func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
-func (s *TrackLocalStaticSample) WriteSample(ctx context.Context, sample media.Sample) error {
+func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 	s.rtpTrack.mu.RLock()
 	p := s.packetizer
 	clockRate := s.clockRate
@@ -224,7 +223,7 @@ func (s *TrackLocalStaticSample) WriteSample(ctx context.Context, sample media.S
 
 	writeErrs := []error{}
 	for _, p := range packets {
-		if err := s.rtpTrack.WriteRTP(ctx, p); err != nil {
+		if err := s.rtpTrack.WriteRTP(p); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
 	}

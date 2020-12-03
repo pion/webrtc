@@ -6,7 +6,7 @@ require (
 	github.com/pion/datachannel v1.4.21
 	github.com/pion/dtls/v2 v2.0.4
 	github.com/pion/ice/v2 v2.0.13
-	github.com/pion/interceptor v0.0.4
+	github.com/pion/interceptor v0.0.3
 	github.com/pion/logging v0.2.2
 	github.com/pion/quic v0.1.4
 	github.com/pion/randutil v0.1.0
@@ -14,7 +14,7 @@ require (
 	github.com/pion/rtp v1.6.1
 	github.com/pion/sctp v1.7.11
 	github.com/pion/sdp/v3 v3.0.3
-	github.com/pion/srtp/v2 v2.0.0-rc.1
+	github.com/pion/srtp v1.5.2
 	github.com/pion/transport v0.11.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.6.1

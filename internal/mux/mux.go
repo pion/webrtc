@@ -2,11 +2,10 @@
 package mux
 
 import (
-	"context"
+	"net"
 	"sync"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/connctx"
 	"github.com/pion/transport/packetio"
 )
 
@@ -16,7 +15,7 @@ const maxBufferSize = 1000 * 1000 // 1MB
 // Config collects the arguments to mux.Mux construction into
 // a single structure
 type Config struct {
-	Conn          connctx.ConnCtx
+	Conn          net.Conn
 	BufferSize    int
 	LoggerFactory logging.LoggerFactory
 }
@@ -24,7 +23,7 @@ type Config struct {
 // Mux allows multiplexing
 type Mux struct {
 	lock       sync.RWMutex
-	nextConn   connctx.ConnCtx
+	nextConn   net.Conn
 	endpoints  map[*Endpoint]MatchFunc
 	bufferSize int
 	closedCh   chan struct{}
@@ -33,7 +32,7 @@ type Mux struct {
 }
 
 // NewMux creates a new Mux
-func NewMux(ctx context.Context, config Config) *Mux {
+func NewMux(config Config) *Mux {
 	m := &Mux{
 		nextConn:   config.Conn,
 		endpoints:  make(map[*Endpoint]MatchFunc),
@@ -42,7 +41,7 @@ func NewMux(ctx context.Context, config Config) *Mux {
 		log:        config.LoggerFactory.NewLogger("mux"),
 	}
 
-	go m.readLoop(ctx)
+	go m.readLoop()
 
 	return m
 }
@@ -97,26 +96,26 @@ func (m *Mux) Close() error {
 	return nil
 }
 
-func (m *Mux) readLoop(ctx context.Context) {
+func (m *Mux) readLoop() {
 	defer func() {
 		close(m.closedCh)
 	}()
 
 	buf := make([]byte, m.bufferSize)
 	for {
-		n, err := m.nextConn.ReadContext(ctx, buf)
+		n, err := m.nextConn.Read(buf)
 		if err != nil {
 			return
 		}
 
-		err = m.dispatch(ctx, buf[:n])
+		err = m.dispatch(buf[:n])
 		if err != nil {
 			return
 		}
 	}
 }
 
-func (m *Mux) dispatch(ctx context.Context, buf []byte) error {
+func (m *Mux) dispatch(buf []byte) error {
 	var endpoint *Endpoint
 
 	m.lock.Lock()
@@ -137,7 +136,7 @@ func (m *Mux) dispatch(ctx context.Context, buf []byte) error {
 		return nil
 	}
 
-	_, err := endpoint.buffer.WriteContext(ctx, buf)
+	_, err := endpoint.buffer.Write(buf)
 	if err != nil {
 		return err
 	}

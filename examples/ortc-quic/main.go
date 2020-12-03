@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"time"
@@ -111,7 +110,7 @@ func main() {
 	}
 
 	// Start the ICE transport
-	err = ice.Start(context.TODO(), nil, remoteSignal.ICEParameters, &iceRole)
+	err = ice.Start(nil, remoteSignal.ICEParameters, &iceRole)
 	if err != nil {
 		panic(err)
 	}

@@ -87,7 +87,7 @@ func main() {
 				}
 
 				time.Sleep(sleepTime)
-				if ivfErr = videoTrack.WriteSample(context.TODO(), media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
+				if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
 					panic(ivfErr)
 				}
 			}
@@ -138,7 +138,7 @@ func main() {
 				lastGranule = pageHeader.GranulePosition
 				sampleDuration := time.Duration((sampleCount/48000)*1000) * time.Millisecond
 
-				if oggErr = audioTrack.WriteSample(context.TODO(), media.Sample{Data: pageData, Duration: sampleDuration}); oggErr != nil {
+				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Duration: sampleDuration}); oggErr != nil {
 					panic(oggErr)
 				}
 

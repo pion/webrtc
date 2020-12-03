@@ -1,33 +1,29 @@
 package mux
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/connctx"
 	"github.com/pion/transport/test"
 )
 
 func TestStressDuplex(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
 
 	// Check for leaking routines
 	report := test.CheckRoutines(t)
 	defer report()
 
 	// Run the test
-	stressDuplex(ctx, t)
+	stressDuplex(t)
 }
 
-func stressDuplex(ctx context.Context, t *testing.T) {
-	ca, cb, stop := pipeMemory(ctx)
+func stressDuplex(t *testing.T) {
+	ca, cb, stop := pipeMemory()
 
 	defer func() {
 		stop(t)
@@ -38,21 +34,13 @@ func stressDuplex(ctx context.Context, t *testing.T) {
 		MsgCount: 100,
 	}
 
-	t.Run("WithoutContext", func(t *testing.T) {
-		err := test.StressDuplex(ca, cb.Conn(), opt)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("WithContext", func(t *testing.T) {
-		err := test.StressDuplexContext(context.Background(), ca, cb, opt)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
+	err := test.StressDuplex(ca, cb, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
-func pipeMemory(ctx context.Context) (*Endpoint, connctx.ConnCtx, func(*testing.T)) {
+func pipeMemory() (*Endpoint, net.Conn, func(*testing.T)) {
 	// In memory pipe
 	ca, cb := net.Pipe()
 
@@ -61,12 +49,12 @@ func pipeMemory(ctx context.Context) (*Endpoint, connctx.ConnCtx, func(*testing.
 	}
 
 	config := Config{
-		Conn:          connctx.New(ca),
+		Conn:          ca,
 		BufferSize:    8192,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 	}
 
-	m := NewMux(ctx, config)
+	m := NewMux(config)
 	e := m.NewEndpoint(matchAll)
 	m.RemoveEndpoint(e)
 	e = m.NewEndpoint(matchAll)
@@ -82,7 +70,7 @@ func pipeMemory(ctx context.Context) (*Endpoint, connctx.ConnCtx, func(*testing.
 		}
 	}
 
-	return e, connctx.New(cb), stop
+	return e, cb, stop
 }
 
 func TestNoEndpoints(t *testing.T) {
@@ -94,16 +82,13 @@ func TestNoEndpoints(t *testing.T) {
 	}
 
 	config := Config{
-		Conn:          connctx.New(ca),
+		Conn:          ca,
 		BufferSize:    8192,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	m := NewMux(ctx, config)
-	err = m.dispatch(ctx, make([]byte, 1))
+	m := NewMux(config)
+	err = m.dispatch(make([]byte, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
