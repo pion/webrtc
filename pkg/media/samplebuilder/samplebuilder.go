@@ -31,6 +31,10 @@ type SampleBuilder struct {
 
 	// Interface that checks whether the packet is the first fragment of the frame or not
 	partitionHeadChecker rtp.PartitionHeadChecker
+
+	// the handler to be called when the builder is about to remove the
+	// reference to some packet.
+	packetReleaseHandler func(*rtp.Packet)
 }
 
 // New constructs a new SampleBuilder.
@@ -47,6 +51,14 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts 
 	return s
 }
 
+func (s *SampleBuilder) releasePacket(i uint16) {
+	var p *rtp.Packet
+	p, s.buffer[i] = s.buffer[i], nil
+	if p != nil && s.packetReleaseHandler != nil {
+		s.packetReleaseHandler(p)
+	}
+}
+
 // Push adds an RTP Packet to s's buffer.
 //
 // Push does not copy the input. If you wish to reuse
@@ -57,7 +69,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 	// Remove outdated references if SequenceNumber is increased.
 	if int16(p.SequenceNumber-s.lastPush) > 0 {
 		for i := s.lastPush; i != p.SequenceNumber+1; i++ {
-			s.buffer[i-s.maxLate] = nil
+			s.releasePacket(i - s.maxLate)
 		}
 	}
 
@@ -87,7 +99,7 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) 
 			s.isContiguous = true
 			s.lastPopTimestamp = s.buffer[i-1].Timestamp
 			for j := firstBuffer; j < i; j++ {
-				s.buffer[j] = nil
+				s.releasePacket(j)
 			}
 
 			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp
@@ -170,5 +182,13 @@ type Option func(o *SampleBuilder)
 func WithPartitionHeadChecker(checker rtp.PartitionHeadChecker) Option {
 	return func(o *SampleBuilder) {
 		o.partitionHeadChecker = checker
+	}
+}
+
+// WithPacketReleaseHandler set a callback when the builder is about to release
+// some packet.
+func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
+	return func(o *SampleBuilder) {
+		o.packetReleaseHandler = h
 	}
 }
