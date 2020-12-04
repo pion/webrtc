@@ -63,6 +63,12 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 	return r.transport
 }
 
+// GetParameters describes the current configuration for the encoding and
+// transmission of media on the receiver's track.
+func (r *RTPReceiver) GetParameters() RTPParameters {
+	return r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+}
+
 // Track returns the RtpTransceiver TrackRemote
 func (r *RTPReceiver) Track() *TrackRemote {
 	r.mu.RLock()

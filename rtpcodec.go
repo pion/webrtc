@@ -77,14 +77,6 @@ type RTPCodecParameters struct {
 	statsID string
 }
 
-// RTCRtpCapabilities is a list of supported codecs and header extensions
-//
-// https://w3c.github.io/webrtc-pc/#rtcrtpcapabilities
-type RTCRtpCapabilities struct {
-	HeaderExtensions []RTPHeaderExtensionCapability
-	Codecs           []RTPCodecCapability
-}
-
 // RTPParameters is a list of negotiated codecs and header extensions
 //
 // https://w3c.github.io/webrtc-pc/#dictionary-rtcrtpparameters-members

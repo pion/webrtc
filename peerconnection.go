@@ -1322,12 +1322,12 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 		return nil
 	}
 
-	midExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.GetHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
+	midExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
 	if !audioSupported && !videoSupported {
 		return errPeerConnSimulcastMidRTPExtensionRequired
 	}
 
-	streamIDExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.GetHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESRTPStreamIDURI})
+	streamIDExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESRTPStreamIDURI})
 	if !audioSupported && !videoSupported {
 		return errPeerConnSimulcastStreamIDRTPExtensionRequired
 	}

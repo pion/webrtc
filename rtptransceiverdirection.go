@@ -72,3 +72,14 @@ func (t RTPTransceiverDirection) Revers() RTPTransceiverDirection {
 		return t
 	}
 }
+
+func haveRTPTransceiverDirectionIntersection(haystack []RTPTransceiverDirection, needle []RTPTransceiverDirection) bool {
+	for _, n := range needle {
+		for _, h := range haystack {
+			if n == h {
+				return true
+			}
+		}
+	}
+	return false
+}
