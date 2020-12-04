@@ -141,6 +141,9 @@ var (
 	// ErrNoPayloaderForCodec indicates that the requested codec does not have a payloader
 	ErrNoPayloaderForCodec = errors.New("the requested codec does not have a payloader")
 
+	// ErrRegisterHeaderExtensionInvalidDirection indicates that a extension was registered with a direction besides `sendonly` or `recvonly`
+	ErrRegisterHeaderExtensionInvalidDirection = errors.New("a header extension must be registered as 'recvonly', 'sendonly' or both")
+
 	errDetachNotEnabled                 = errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	errDetachBeforeOpened               = errors.New("datachannel not opened yet, try calling Detach from OnOpen")
 	errDtlsTransportNotStarted          = errors.New("the DTLS transport has not started yet")
