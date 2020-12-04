@@ -88,16 +88,13 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 
 	createPC := func(i interceptor.Interceptor) *PeerConnection {
 		m := &MediaEngine{}
-		err := m.RegisterDefaultCodecs()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
 		ir := &interceptor.Registry{}
 		ir.Add(i)
+
 		pc, err := NewAPI(WithMediaEngine(m), WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		return pc
 	}
@@ -107,14 +104,10 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	receiverPC := createPC(&testInterceptor{t: t, extensionID: 2})
 
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	sender, err := senderPC.AddTrack(track)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	pending := new(int32)
 	wg := &sync.WaitGroup{}
@@ -123,9 +116,8 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	*pending++
 	receiverPC.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
 		p, readErr := track.ReadRTP()
-		if readErr != nil {
-			t.Fatal(readErr)
-		}
+		assert.NoError(t, readErr)
+
 		assert.Equal(t, p.Extension, true)
 		assert.Equal(t, "write", string(p.GetExtension(1)))
 		assert.Equal(t, "read", string(p.GetExtension(2)))
@@ -133,8 +125,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		wg.Done()
 
 		for {
-			_, readErr = track.ReadRTP()
-			if readErr != nil {
+			if _, readErr = track.ReadRTP(); readErr != nil {
 				return
 			}
 		}
@@ -149,27 +140,21 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		wg.Done()
 
 		for {
-			_, readErr = sender.ReadRTCP()
-			if readErr != nil {
+			if _, readErr = sender.ReadRTCP(); readErr != nil {
 				return
 			}
 		}
 	}()
 
-	err = signalPair(senderPC, receiverPC)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(senderPC, receiverPC))
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
-				t.Error(routineErr)
-				return
-			}
+
+			assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
 
 			if atomic.LoadInt32(pending) == 0 {
 				return
