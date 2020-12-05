@@ -1236,10 +1236,12 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 	for _, transceiver := range currentTransceivers {
 		if transceiver.Sender() != nil && transceiver.Sender().isNegotiated() && !transceiver.Sender().hasSent() {
 			err := transceiver.Sender().Send(RTPSendParameters{
-				Encodings: RTPEncodingParameters{
-					RTPCodingParameters{
-						SSRC:        transceiver.Sender().ssrc,
-						PayloadType: transceiver.Sender().payloadType,
+				Encodings: []RTPEncodingParameters{
+					{
+						RTPCodingParameters{
+							SSRC:        transceiver.Sender().ssrc,
+							PayloadType: transceiver.Sender().payloadType,
+						},
 					},
 				},
 			})
