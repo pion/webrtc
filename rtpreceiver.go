@@ -69,6 +69,19 @@ func (r *RTPReceiver) GetParameters() RTPParameters {
 	return r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 }
 
+// SSRC returns the SSRC used by the receiver.  If the receiver is doing
+// simulcast, then this returns 0.
+// This is not available in WASM.
+func (r *RTPReceiver) SSRC() SSRC {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(r.tracks) != 1 {
+		return 0
+	}
+	return r.tracks[0].track.ssrc
+}
+
 // Track returns the RtpTransceiver TrackRemote
 func (r *RTPReceiver) Track() *TrackRemote {
 	r.mu.RLock()

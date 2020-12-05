@@ -96,6 +96,12 @@ func (r *RTPSender) GetParameters() RTPParameters {
 	return r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
 }
 
+// SSRC returns the SSRC used by the sender.
+// This is not available in WASM.
+func (r *RTPSender) SSRC() SSRC {
+	return r.ssrc
+}
+
 // Track returns the RTCRtpTransceiver track, or nil
 func (r *RTPSender) Track() TrackLocal {
 	r.mu.RLock()
