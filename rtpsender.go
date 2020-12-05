@@ -92,8 +92,21 @@ func (r *RTPSender) Transport() *DTLSTransport {
 
 // GetParameters describes the current configuration for the encoding and
 // transmission of media on the sender's track.
-func (r *RTPSender) GetParameters() RTPParameters {
-	return r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
+func (r *RTPSender) GetParameters() RTPSendParameters {
+	return RTPSendParameters{
+		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
+			r.track.Kind(),
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		),
+		Encodings: []RTPEncodingParameters{
+			{
+				RTPCodingParameters: RTPCodingParameters{
+					SSRC:        r.ssrc,
+					PayloadType: r.payloadType,
+				},
+			},
+		},
+	}
 }
 
 // Track returns the RTCRtpTransceiver track, or nil
@@ -148,7 +161,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.context = TrackLocalContext{
 		id:          r.id,
 		params:      r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
-		ssrc:        parameters.Encodings.SSRC,
+		ssrc:        parameters.Encodings[0].SSRC,
 		writeStream: writeStream,
 	}
 

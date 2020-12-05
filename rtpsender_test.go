@@ -134,3 +134,27 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 		assert.NoError(t, receiver.Close())
 	})
 }
+
+func Test_RTPSender_GetParameters(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	rtpTransceiver, err := offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	parameters := rtpTransceiver.Sender().GetParameters()
+	assert.NotEqual(t, 0, len(parameters.Codecs))
+	assert.Equal(t, 1, len(parameters.Encodings))
+	assert.Equal(t, rtpTransceiver.Sender().ssrc, parameters.Encodings[0].SSRC)
+
+	assert.NoError(t, offerer.Close())
+	assert.NoError(t, answerer.Close())
+}
