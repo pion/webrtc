@@ -98,6 +98,11 @@ func (s *TrackLocalStaticRTP) Kind() RTPCodecType {
 	}
 }
 
+// Codec gets the Codec of the track
+func (s *TrackLocalStaticRTP) Codec() RTPCodecCapability {
+	return s.codec
+}
+
 // WriteRTP writes a RTP Packet to the TrackLocalStaticRTP
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
@@ -163,6 +168,11 @@ func (s *TrackLocalStaticSample) StreamID() string { return s.rtpTrack.StreamID(
 
 // Kind controls if this TrackLocal is audio or video
 func (s *TrackLocalStaticSample) Kind() RTPCodecType { return s.rtpTrack.Kind() }
+
+// Codec gets the Codec of the track
+func (s *TrackLocalStaticSample) Codec() RTPCodecCapability {
+	return s.rtpTrack.Codec()
+}
 
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.
