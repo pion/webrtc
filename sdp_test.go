@@ -434,7 +434,7 @@ func TestCodecsFromMediaDescription(t *testing.T) {
 
 		assert.Equal(t, codecs, []RTPCodecParameters{
 			{
-				RTPCodecCapability: RTPCodecCapability{mimeTypeOpus, 48000, 2, "", []RTCPFeedback{}},
+				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "", []RTCPFeedback{}},
 				PayloadType:        111,
 			},
 		})
@@ -457,7 +457,7 @@ func TestCodecsFromMediaDescription(t *testing.T) {
 
 		assert.Equal(t, codecs, []RTPCodecParameters{
 			{
-				RTPCodecCapability: RTPCodecCapability{mimeTypeOpus, 48000, 2, "minptime=10;useinbandfec=1", []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}}},
+				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "minptime=10;useinbandfec=1", []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}}},
 				PayloadType:        111,
 			},
 		})

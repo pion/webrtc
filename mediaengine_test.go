@@ -66,7 +66,7 @@ a=fmtp:111 minptime=10; useinbandfec=1
 
 		opusCodec, _, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
-		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+		assert.Equal(t, opusCodec.MimeType, MimeTypeOpus)
 	})
 
 	t.Run("Change Payload Type", func(t *testing.T) {
@@ -91,7 +91,7 @@ a=fmtp:112 minptime=10; useinbandfec=1
 
 		opusCodec, _, err := m.getCodecByPayload(112)
 		assert.NoError(t, err)
-		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+		assert.Equal(t, opusCodec.MimeType, MimeTypeOpus)
 	})
 
 	t.Run("Case Insensitive", func(t *testing.T) {
@@ -134,7 +134,7 @@ a=rtpmap:111 opus/48000/2
 
 		opusCodec, _, err := m.getCodecByPayload(111)
 		assert.NoError(t, err)
-		assert.Equal(t, opusCodec.MimeType, mimeTypeOpus)
+		assert.Equal(t, opusCodec.MimeType, MimeTypeOpus)
 	})
 
 	t.Run("Header Extensions", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 	registerCodec := func(m *MediaEngine) {
 		assert.NoError(t, m.RegisterCodec(
 			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{mimeTypeOpus, 48000, 0, "", nil},
+				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
 				PayloadType:        111,
 			}, RTPCodecTypeAudio))
 	}
