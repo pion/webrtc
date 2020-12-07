@@ -27,6 +27,7 @@ type TrackRemote struct {
 	peeked   []byte
 
 	interceptorRTPReader interceptor.RTPReader
+	interceptorRawReader interceptor.RTPRawReader
 }
 
 func newTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
@@ -37,6 +38,7 @@ func newTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPRecei
 		receiver: receiver,
 	}
 	t.interceptorRTPReader = interceptor.RTPReaderFunc(t.readRTP)
+	t.interceptorRawReader = interceptor.RTPRawReaderFunc(t.read)
 
 	return t
 }
@@ -126,6 +128,11 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 
 // Read reads data from the track.
 func (t *TrackRemote) Read(b []byte) (n int, err error) {
+	n, _, err = t.interceptorRawReader.Read(b)
+	return
+}
+
+func (t *TrackRemote) read(b []byte) (n int, att interceptor.Attributes, err error) {
 	t.mu.RLock()
 	r := t.receiver
 	peeked := t.peeked != nil
@@ -144,7 +151,8 @@ func (t *TrackRemote) Read(b []byte) (n int, err error) {
 		}
 	}
 
-	return r.readRTP(b, t)
+	n, err = r.readRTP(b, t)
+	return
 }
 
 // peek is like Read, but it doesn't discard the packet read
