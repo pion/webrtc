@@ -144,6 +144,9 @@ var (
 	// ErrRegisterHeaderExtensionInvalidDirection indicates that a extension was registered with a direction besides `sendonly` or `recvonly`
 	ErrRegisterHeaderExtensionInvalidDirection = errors.New("a header extension must be registered as 'recvonly', 'sendonly' or both")
 
+	// ErrSimulcastProbeOverflow indicates that too many Simulcast probe streams are in flight and the requested SSRC was ignored
+	ErrSimulcastProbeOverflow = errors.New("simulcast probe limit has been reached, new SSRC has been discarded")
+
 	errDetachNotEnabled                 = errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	errDetachBeforeOpened               = errors.New("datachannel not opened yet, try calling Detach from OnOpen")
 	errDtlsTransportNotStarted          = errors.New("the DTLS transport has not started yet")
