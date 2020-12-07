@@ -15,7 +15,3 @@ type SSRC uint32
 //
 // https://tools.ietf.org/html/rfc3550#section-3
 type PayloadType uint8
-
-const (
-	rtpOutboundMTU = 1200
-)

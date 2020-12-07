@@ -1383,6 +1383,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 // undeclaredMediaProcessor handles RTP/RTCP packets that don't match any a:ssrc lines
 func (pc *PeerConnection) undeclaredMediaProcessor() {
 	go func() {
+		var simulcastRoutineCount uint64
 		for {
 			srtpSession, err := pc.dtlsTransport.getSRTPSession()
 			if err != nil {
@@ -1396,9 +1397,19 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 				return
 			}
 
-			if err := pc.handleUndeclaredSSRC(stream, SSRC(ssrc)); err != nil {
-				pc.log.Errorf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v", ssrc, err)
+			if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
+				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
+				pc.log.Warn(ErrSimulcastProbeOverflow.Error())
+				continue
 			}
+
+			pc.dtlsTransport.storeSimulcastStream(stream)
+			go func(rtpStream io.Reader, ssrc SSRC) {
+				if err := pc.handleUndeclaredSSRC(rtpStream, ssrc); err != nil {
+					pc.log.Errorf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v", ssrc, err)
+				}
+				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
+			}(stream, SSRC(ssrc))
 		}
 	}()
 

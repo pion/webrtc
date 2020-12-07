@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -997,4 +998,52 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
+}
+
+// Assert that failed Simulcast probing doesn't cause
+// the handleUndeclaredSSRC to be leaked
+func TestPeerConnection_Simulcast_Probe(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = offerer.AddTrack(track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	peerConnectionConnected := sync.WaitGroup{}
+	peerConnectionConnected.Add(2)
+
+	connectionStateHandler := func(connectionState PeerConnectionState) {
+		if connectionState == PeerConnectionStateConnected {
+			peerConnectionConnected.Done()
+		}
+	}
+
+	offerer.OnConnectionStateChange(connectionStateHandler)
+	answerer.OnConnectionStateChange(connectionStateHandler)
+	peerConnectionConnected.Wait()
+
+	for i := 0; i <= 5; i++ {
+		_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
+			Version: 2,
+			SSRC:    randutil.NewMathRandomGenerator().Uint32(),
+		}, []byte{0, 1, 2, 3, 4, 5})
+		assert.NoError(t, err)
+		time.Sleep(time.Millisecond * 200)
+	}
+
+	assert.NoError(t, offerer.Close())
+
+	fmt.Println("close")
+	assert.NoError(t, answerer.Close())
 }

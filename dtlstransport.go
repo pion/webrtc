@@ -41,11 +41,10 @@ type DTLSTransport struct {
 
 	conn *dtls.Conn
 
-	srtpSession   atomic.Value
-	srtcpSession  atomic.Value
-	srtpEndpoint  *mux.Endpoint
-	srtcpEndpoint *mux.Endpoint
-	srtpReady     chan struct{}
+	srtpSession, srtcpSession   atomic.Value
+	srtpEndpoint, srtcpEndpoint *mux.Endpoint
+	simulcastStreams            []*srtp.ReadStreamSRTP
+	srtpReady                   chan struct{}
 
 	dtlsMatcher mux.MatchFunc
 
@@ -361,18 +360,16 @@ func (t *DTLSTransport) Stop() error {
 	// Try closing everything and collect the errors
 	var closeErrs []error
 
-	srtpSessionValue := t.srtpSession.Load()
-	if srtpSessionValue != nil {
-		if err := srtpSessionValue.(*srtp.SessionSRTP).Close(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+	if srtpSessionValue := t.srtpSession.Load(); srtpSessionValue != nil {
+		closeErrs = append(closeErrs, srtpSessionValue.(*srtp.SessionSRTP).Close())
 	}
 
-	srtcpSessionValue := t.srtcpSession.Load()
-	if srtcpSessionValue != nil {
-		if err := srtcpSessionValue.(*srtp.SessionSRTCP).Close(); err != nil {
-			closeErrs = append(closeErrs, err)
-		}
+	if srtcpSessionValue := t.srtcpSession.Load(); srtcpSessionValue != nil {
+		closeErrs = append(closeErrs, srtcpSessionValue.(*srtp.SessionSRTCP).Close())
+	}
+
+	for i := range t.simulcastStreams {
+		closeErrs = append(closeErrs, t.simulcastStreams[i].Close())
 	}
 
 	if t.conn != nil {
@@ -411,4 +408,11 @@ func (t *DTLSTransport) ensureICEConn() error {
 	}
 
 	return nil
+}
+
+func (t *DTLSTransport) storeSimulcastStream(s *srtp.ReadStreamSRTP) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.simulcastStreams = append(t.simulcastStreams, s)
 }
