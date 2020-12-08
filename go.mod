@@ -3,12 +3,13 @@ module github.com/pion/webrtc/v3
 go 1.12
 
 require (
+	github.com/onsi/ginkgo v1.14.2 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/pion/datachannel v1.4.21
 	github.com/pion/dtls/v2 v2.0.4
 	github.com/pion/ice/v2 v2.0.13
 	github.com/pion/interceptor v0.0.5
 	github.com/pion/logging v0.2.2
-	github.com/pion/quic v0.1.4
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.6
 	github.com/pion/rtp v1.6.1
