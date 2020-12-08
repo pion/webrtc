@@ -19,11 +19,9 @@ func (i *interceptorTrackLocalWriter) setRTPWriter(writer interceptor.RTPWriter)
 }
 
 func (i *interceptorTrackLocalWriter) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
-	writer := i.rtpWriter.Load().(interceptor.RTPWriter)
-
-	if writer == nil {
-		return 0, nil
+	if writer, ok := i.rtpWriter.Load().(interceptor.RTPWriter); ok && writer != nil {
+		return writer.Write(&rtp.Packet{Header: *header, Payload: payload}, make(interceptor.Attributes))
 	}
 
-	return writer.Write(&rtp.Packet{Header: *header, Payload: payload}, make(interceptor.Attributes))
+	return 0, nil
 }
