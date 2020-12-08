@@ -1397,14 +1397,22 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 				return
 			}
 
+			if pc.isClosed.get() {
+				if err = stream.Close(); err != nil {
+					pc.log.Warnf("Failed to close RTP stream %v", err)
+				}
+				continue
+			}
+
 			if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 				pc.log.Warn(ErrSimulcastProbeOverflow.Error())
 				continue
 			}
 
-			pc.dtlsTransport.storeSimulcastStream(stream)
 			go func(rtpStream io.Reader, ssrc SSRC) {
+				pc.dtlsTransport.storeSimulcastStream(stream)
+
 				if err := pc.handleUndeclaredSSRC(rtpStream, ssrc); err != nil {
 					pc.log.Errorf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v", ssrc, err)
 				}

@@ -5,6 +5,7 @@ package webrtc
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -1018,6 +1019,35 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	_, err = offerer.AddTrack(track)
 	assert.NoError(t, err)
 
+	ticker := time.NewTicker(time.Millisecond * 20)
+	testFinished := make(chan struct{})
+	seenFiveStreams, seenFiveStreamsCancel := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <-testFinished:
+				return
+			case <-ticker.C:
+				answerer.dtlsTransport.lock.Lock()
+				if len(answerer.dtlsTransport.simulcastStreams) >= 5 {
+					seenFiveStreamsCancel()
+				}
+				answerer.dtlsTransport.lock.Unlock()
+
+				track.mu.Lock()
+				if len(track.bindings) == 1 {
+					_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
+						Version: 2,
+						SSRC:    randutil.NewMathRandomGenerator().Uint32(),
+					}, []byte{0, 1, 2, 3, 4, 5})
+					assert.NoError(t, err)
+				}
+				track.mu.Unlock()
+			}
+		}
+	}()
+
 	assert.NoError(t, signalPair(offerer, answerer))
 
 	peerConnectionConnected := sync.WaitGroup{}
@@ -1033,17 +1063,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	answerer.OnConnectionStateChange(connectionStateHandler)
 	peerConnectionConnected.Wait()
 
-	for i := 0; i <= 5; i++ {
-		_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
-			Version: 2,
-			SSRC:    randutil.NewMathRandomGenerator().Uint32(),
-		}, []byte{0, 1, 2, 3, 4, 5})
-		assert.NoError(t, err)
-		time.Sleep(time.Millisecond * 200)
-	}
+	<-seenFiveStreams.Done()
 
-	assert.NoError(t, offerer.Close())
-
-	fmt.Println("close")
 	assert.NoError(t, answerer.Close())
+	assert.NoError(t, offerer.Close())
+	close(testFinished)
 }
