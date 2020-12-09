@@ -244,7 +244,7 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 }
 
 // AddRemoteCandidate adds a candidate associated with the remote ICETransport.
-func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
+func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 

@@ -1053,8 +1053,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	for _, c := range candidates {
-		if err = pc.iceTransport.AddRemoteCandidate(c); err != nil {
+	for i := range candidates {
+		if err = pc.iceTransport.AddRemoteCandidate(&candidates[i]); err != nil {
 			return err
 		}
 	}
@@ -1454,13 +1454,28 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 }
 
 // AddICECandidate accepts an ICE candidate string and adds it
-// to the existing set of candidates
+// to the existing set of candidates.
+// If ICE candidate string is empty, do not adds it to the existing
+// set of candidates
 func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	if pc.RemoteDescription() == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+
+	if candidateValue == "" {
+		pc.iceTransport.lock.RLock()
+		defer pc.iceTransport.lock.RUnlock()
+
+		agent := pc.iceTransport.gatherer.getAgent()
+		if agent == nil {
+			return fmt.Errorf("%w: unable to add remote candidates", errICEAgentNotExist)
+		}
+
+		return agent.AddRemoteCandidate(nil)
+	}
+
 	c, err := ice.UnmarshalCandidate(candidateValue)
 	if err != nil {
 		return err
@@ -1471,7 +1486,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 		return err
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
+	return pc.iceTransport.AddRemoteCandidate(&iceCandidate)
 }
 
 // ICEConnectionState returns the ICE connection state of the
