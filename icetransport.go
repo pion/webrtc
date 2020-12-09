@@ -234,8 +234,8 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 		if err != nil {
 			return err
 		}
-		err = agent.AddRemoteCandidate(i)
-		if err != nil {
+
+		if err = agent.AddRemoteCandidate(i); err != nil {
 			return err
 		}
 	}
@@ -244,17 +244,23 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 }
 
 // AddRemoteCandidate adds a candidate associated with the remote ICETransport.
-func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
+func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if err := t.ensureGatherer(); err != nil {
+	var (
+		c   ice.Candidate
+		err error
+	)
+
+	if err = t.ensureGatherer(); err != nil {
 		return err
 	}
 
-	c, err := remoteCandidate.toICE()
-	if err != nil {
-		return err
+	if remoteCandidate != nil {
+		if c, err = remoteCandidate.toICE(); err != nil {
+			return err
+		}
 	}
 
 	agent := t.gatherer.getAgent()
@@ -262,12 +268,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate ICECandidate) error {
 		return fmt.Errorf("%w: unable to add remote candidates", errICEAgentNotExist)
 	}
 
-	err = agent.AddRemoteCandidate(c)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return agent.AddRemoteCandidate(c)
 }
 
 // State returns the current ice transport state.

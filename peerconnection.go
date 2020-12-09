@@ -1053,8 +1053,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	for _, c := range candidates {
-		if err = pc.iceTransport.AddRemoteCandidate(c); err != nil {
+	for i := range candidates {
+		if err = pc.iceTransport.AddRemoteCandidate(&candidates[i]); err != nil {
 			return err
 		}
 	}
@@ -1454,21 +1454,26 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 }
 
 // AddICECandidate accepts an ICE candidate string and adds it
-// to the existing set of candidates
+// to the existing set of candidates.
 func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	if pc.RemoteDescription() == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
-	c, err := ice.UnmarshalCandidate(candidateValue)
-	if err != nil {
-		return err
-	}
 
-	iceCandidate, err := newICECandidateFromICE(c)
-	if err != nil {
-		return err
+	var iceCandidate *ICECandidate
+	if candidateValue != "" {
+		candidate, err := ice.UnmarshalCandidate(candidateValue)
+		if err != nil {
+			return err
+		}
+
+		c, err := newICECandidateFromICE(candidate)
+		if err != nil {
+			return err
+		}
+		iceCandidate = &c
 	}
 
 	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
