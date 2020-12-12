@@ -48,6 +48,11 @@ We've made it easy to run the browser based examples on your local machine.
     ```
 
 ### WebAssembly
+Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In
+this case the library will act as a wrapper around the JavaScript WebRTC API.
+This allows you to use WebRTC from Go in both server and browser side code with
+little to no changes
+
 Some of our examples have support for WebAssembly. The same examples server documented above can be used to run the WebAssembly examples. However, you have to compile them first. This is done as follows:
 
 1. If the example supports WebAssembly it will contain a `main.go` file under the `jsfiddle` folder.
