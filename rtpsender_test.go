@@ -50,7 +50,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 			assert.Equal(t, uint64(1), atomic.AddUint64(&onTrackCount, 1))
 
 			for {
-				pkt, err := track.ReadRTP()
+				pkt, _, err := track.ReadRTP()
 				if err != nil {
 					assert.True(t, errors.Is(io.EOF, err))
 					return

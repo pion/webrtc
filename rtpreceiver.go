@@ -10,14 +10,19 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v2"
+	"github.com/pion/webrtc/v3/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
 // a RTPReceiver may contain multiple streams if we are dealing with Multicast
 type trackStreams struct {
-	track          *TrackRemote
+	track *TrackRemote
+
 	rtpReadStream  *srtp.ReadStreamSRTP
-	rtcpReadStream *srtp.ReadStreamSRTCP
+	rtpInterceptor interceptor.RTPReader
+
+	rtcpReadStream  *srtp.ReadStreamSRTCP
+	rtcpInterceptor interceptor.RTCPReader
 }
 
 // RTPReceiver allows an application to inspect the receipt of a TrackRemote
@@ -32,8 +37,6 @@ type RTPReceiver struct {
 
 	// A reference to the associated api object
 	api *API
-
-	interceptorRTCPReader interceptor.RTCPReader
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -50,7 +53,6 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
 	}
-	r.interceptorRTCPReader = api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(r.readRTCP))
 
 	return r, nil
 }
@@ -115,8 +117,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		}
 
 		var err error
-		t.rtpReadStream, t.rtcpReadStream, err = r.streamsForSSRC(parameters.Encodings[0].SSRC)
-		if err != nil {
+		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[0].SSRC, interceptor.StreamInfo{}); err != nil {
 			return err
 		}
 
@@ -138,41 +139,35 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 }
 
 // Read reads incoming RTCP for this RTPReceiver
-func (r *RTPReceiver) Read(b []byte) (n int, err error) {
+func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-		return r.tracks[0].rtcpReadStream.Read(b)
+		return r.tracks[0].rtcpInterceptor.Read(b, a)
 	case <-r.closed:
-		return 0, io.ErrClosedPipe
+		return 0, nil, io.ErrClosedPipe
 	}
 }
 
 // ReadSimulcast reads incoming RTCP for this RTPReceiver for given rid
-func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, err error) {
+func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
 		for _, t := range r.tracks {
 			if t.track != nil && t.track.rid == rid {
-				return t.rtcpReadStream.Read(b)
+				return t.rtcpInterceptor.Read(b, a)
 			}
 		}
-		return 0, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+		return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 	case <-r.closed:
-		return 0, io.ErrClosedPipe
+		return 0, nil, io.ErrClosedPipe
 	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshal for you.
 // It also runs any configured interceptors.
-func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
-	pkts, _, err := r.interceptorRTCPReader.Read()
-	return pkts, err
-}
-
-// ReadRTCP is a convenience method that wraps Read and unmarshal for you
-func (r *RTPReceiver) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
+func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.Read(b)
+	i, attributes, err := r.Read(b)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -182,18 +177,19 @@ func (r *RTPReceiver) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) 
 		return nil, nil, err
 	}
 
-	return pkts, make(interceptor.Attributes), nil
+	return pkts, attributes, nil
 }
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you
-func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, error) {
+func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.ReadSimulcast(b, rid)
+	i, attributes, err := r.ReadSimulcast(b, rid)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return rtcp.Unmarshal(b[:i])
+	pkts, err := rtcp.Unmarshal(b[:i])
+	return pkts, attributes, err
 }
 
 func (r *RTPReceiver) haveReceived() bool {
@@ -209,32 +205,34 @@ func (r *RTPReceiver) haveReceived() bool {
 func (r *RTPReceiver) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var err error
 
 	select {
 	case <-r.closed:
-		return nil
+		return err
 	default:
 	}
 
 	select {
 	case <-r.received:
 		for i := range r.tracks {
+			errs := []error{}
+
 			if r.tracks[i].rtcpReadStream != nil {
-				if err := r.tracks[i].rtcpReadStream.Close(); err != nil {
-					return err
-				}
+				errs = append(errs, r.tracks[i].rtcpReadStream.Close())
 			}
+
 			if r.tracks[i].rtpReadStream != nil {
-				if err := r.tracks[i].rtpReadStream.Close(); err != nil {
-					return err
-				}
+				errs = append(errs, r.tracks[i].rtpReadStream.Close())
 			}
+
+			err = util.FlattenErrs(errs)
 		}
 	default:
 	}
 
 	close(r.closed)
-	return nil
+	return err
 }
 
 func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
@@ -247,13 +245,13 @@ func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
 }
 
 // readRTP should only be called by a track, this only exists so we can keep state in one place
-func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, err error) {
+func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a interceptor.Attributes, err error) {
 	<-r.received
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpReadStream.Read(b)
+		return t.rtpInterceptor.Read(b, a)
 	}
 
-	return 0, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
+	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
 }
 
 // receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
@@ -269,12 +267,11 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC)
 			r.tracks[i].track.codec = params.Codecs[0]
 			r.tracks[i].track.params = params
 			r.tracks[i].track.ssrc = ssrc
-			r.tracks[i].track.bindInterceptor()
+			streamInfo := createStreamInfo("", ssrc, params.Codecs[0].PayloadType, params.Codecs[0].RTPCodecCapability, params.HeaderExtensions)
 			r.tracks[i].track.mu.Unlock()
 
 			var err error
-			r.tracks[i].rtpReadStream, r.tracks[i].rtcpReadStream, err = r.streamsForSSRC(ssrc)
-			if err != nil {
+			if r.tracks[0].rtpReadStream, r.tracks[0].rtpInterceptor, r.tracks[0].rtcpReadStream, r.tracks[0].rtcpInterceptor, err = r.streamsForSSRC(ssrc, streamInfo); err != nil {
 				return nil, err
 			}
 
@@ -285,26 +282,36 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC)
 	return nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
 }
 
-func (r *RTPReceiver) streamsForSSRC(ssrc SSRC) (*srtp.ReadStreamSRTP, *srtp.ReadStreamSRTCP, error) {
+func (r *RTPReceiver) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
 	srtpSession, err := r.transport.getSRTPSession()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	rtpReadStream, err := srtpSession.OpenReadStream(uint32(ssrc))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
+
+	rtpInterceptor := r.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+		n, err = rtpReadStream.Read(in)
+		return n, a, err
+	}))
 
 	srtcpSession, err := r.transport.getSRTCPSession()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(ssrc))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return rtpReadStream, rtcpReadStream, nil
+	rtcpInterceptor := r.api.interceptor.BindRTCPReader(interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+		n, err = rtcpReadStream.Read(in)
+		return n, a, err
+	}))
+
+	return rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, nil
 }

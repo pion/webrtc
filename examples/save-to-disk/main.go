@@ -23,7 +23,7 @@ func saveToDisk(i media.Writer, track *webrtc.TrackRemote) {
 	}()
 
 	for {
-		rtpPacket, err := track.ReadRTP()
+		rtpPacket, _, err := track.ReadRTP()
 		if err != nil {
 			panic(err)
 		}
