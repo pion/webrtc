@@ -85,7 +85,7 @@ func main() { // nolint:gocognit
 		var isCurrTrack bool
 		for {
 			// Read RTP packets being sent to Pion
-			rtp, readErr := track.ReadRTP()
+			rtp, _, readErr := track.ReadRTP()
 			if readErr != nil {
 				panic(readErr)
 			}

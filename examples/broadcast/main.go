@@ -68,7 +68,7 @@ func main() { // nolint:gocognit
 
 		rtpBuf := make([]byte, 1400)
 		for {
-			i, readErr := remoteTrack.Read(rtpBuf)
+			i, _, readErr := remoteTrack.Read(rtpBuf)
 			if readErr != nil {
 				panic(readErr)
 			}

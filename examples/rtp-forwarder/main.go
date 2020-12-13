@@ -116,7 +116,7 @@ func main() {
 		b := make([]byte, 1500)
 		for {
 			// Read
-			n, readErr := track.Read(b)
+			n, _, readErr := track.Read(b)
 			if readErr != nil {
 				panic(readErr)
 			}

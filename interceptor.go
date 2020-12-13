@@ -3,14 +3,16 @@
 package webrtc
 
 import (
+	"sync/atomic"
+
 	"github.com/pion/interceptor"
+	"github.com/pion/rtp"
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors. If you want to customize which interceptors are loaded,
 // you should copy the code from this method and remove unwanted interceptors.
 func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
-	err := ConfigureNack(mediaEngine, interceptorRegistry)
-	if err != nil {
+	if err := ConfigureNack(mediaEngine, interceptorRegistry); err != nil {
 		return err
 	}
 
@@ -23,4 +25,48 @@ func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Re
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack", Parameter: "pli"}, RTPCodecTypeVideo)
 	interceptorRegistry.Add(&interceptor.NACK{})
 	return nil
+}
+
+type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }
+
+func (i *interceptorToTrackLocalWriter) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
+	if writer, ok := i.interceptor.Load().(interceptor.RTPWriter); ok && writer != nil {
+		return writer.Write(header, payload, interceptor.Attributes{})
+	}
+
+	return 0, nil
+}
+
+func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
+	packet := &rtp.Packet{}
+	if err := packet.Unmarshal(b); err != nil {
+		return 0, err
+	}
+
+	return i.WriteRTP(&packet.Header, packet.Payload)
+}
+
+func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) interceptor.StreamInfo {
+	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
+	for _, h := range webrtcHeaderExtensions {
+		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
+	}
+
+	feedbacks := make([]interceptor.RTCPFeedback, 0, len(codec.RTCPFeedback))
+	for _, f := range codec.RTCPFeedback {
+		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+	}
+
+	return interceptor.StreamInfo{
+		ID:                  id,
+		Attributes:          interceptor.Attributes{},
+		SSRC:                uint32(ssrc),
+		PayloadType:         uint8(payloadType),
+		RTPHeaderExtensions: headerExtensions,
+		MimeType:            codec.MimeType,
+		ClockRate:           codec.ClockRate,
+		Channels:            codec.Channels,
+		SDPFmtpLine:         codec.SDPFmtpLine,
+		RTCPFeedback:        feedbacks,
+	}
 }

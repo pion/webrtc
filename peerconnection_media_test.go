@@ -105,7 +105,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}()
 
 		go func() {
-			_, routineErr := receiver.Read(make([]byte, 1400))
+			_, _, routineErr := receiver.Read(make([]byte, 1400))
 			if routineErr != nil {
 				awaitRTCPReceiverRecv <- routineErr
 			} else {
@@ -115,7 +115,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 		haveClosedAwaitRTPRecv := false
 		for {
-			p, routineErr := track.ReadRTP()
+			p, _, routineErr := track.ReadRTP()
 			if routineErr != nil {
 				close(awaitRTPRecvClosed)
 				return
@@ -168,7 +168,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
-		if _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
+		if _, _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
 			close(awaitRTCPSenderRecv)
 		}
 	}()
@@ -688,11 +688,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
-	_, err = sender.Read(make([]byte, 0, 1400))
+	_, _, err = sender.Read(make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
-	_, err = receiver.Read(make([]byte, 0, 1400))
+	_, _, err = receiver.Read(make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
