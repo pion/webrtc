@@ -418,11 +418,15 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	offerPeerConn, err := NewPeerConnection(Configuration{})
+	offerPeerConn, answerPeerConn, err := newPair()
 	assert.NoError(t, err)
 
-	answerPeerConn, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
+	inChecking, inCheckingCancel := context.WithCancel(context.Background())
+	answerPeerConn.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateChecking {
+			inCheckingCancel()
+		}
+	})
 
 	_, err = offerPeerConn.CreateDataChannel("test-channel", nil)
 	assert.NoError(t, err)
@@ -431,9 +435,11 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, offerPeerConn.SetLocalDescription(offer))
 
+	assert.NoError(t, offerPeerConn.Close())
+
 	assert.NoError(t, answerPeerConn.SetRemoteDescription(offer))
 
-	assert.NoError(t, offerPeerConn.Close())
+	<-inChecking.Done()
 	assert.NoError(t, answerPeerConn.Close())
 
 	_, err = answerPeerConn.CreateAnswer(nil)
