@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/rtp"
 )
 
@@ -21,9 +22,20 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 
 // ConfigureNack will setup everything necessary for handling generating/responding to nack messages.
 func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	generator, err := nack.NewGeneratorInterceptor()
+	if err != nil {
+		return err
+	}
+
+	responder, err := nack.NewResponderInterceptor()
+	if err != nil {
+		return err
+	}
+
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack"}, RTPCodecTypeVideo)
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack", Parameter: "pli"}, RTPCodecTypeVideo)
-	interceptorRegistry.Add(&interceptor.NACK{})
+	interceptorRegistry.Add(responder)
+	interceptorRegistry.Add(generator)
 	return nil
 }
 

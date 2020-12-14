@@ -116,8 +116,15 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 			),
 		}
 
+		globalParams := r.GetParameters()
+		codec := RTPCodecCapability{}
+		if len(globalParams.Codecs) != 0 {
+			codec = globalParams.Codecs[0].RTPCodecCapability
+		}
+
+		streamInfo := createStreamInfo("", parameters.Encodings[0].SSRC, 0, codec, globalParams.HeaderExtensions)
 		var err error
-		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[0].SSRC, interceptor.StreamInfo{}); err != nil {
+		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[0].SSRC, streamInfo); err != nil {
 			return err
 		}
 
@@ -271,7 +278,7 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC)
 			r.tracks[i].track.mu.Unlock()
 
 			var err error
-			if r.tracks[0].rtpReadStream, r.tracks[0].rtpInterceptor, r.tracks[0].rtcpReadStream, r.tracks[0].rtcpInterceptor, err = r.streamsForSSRC(ssrc, streamInfo); err != nil {
+			if r.tracks[i].rtpReadStream, r.tracks[i].rtpInterceptor, r.tracks[i].rtcpReadStream, r.tracks[i].rtcpInterceptor, err = r.streamsForSSRC(ssrc, streamInfo); err != nil {
 				return nil, err
 			}
 
