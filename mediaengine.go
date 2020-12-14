@@ -504,7 +504,7 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 		return &codecs.VP9Payloader{}, nil
 	case strings.ToLower(MimeTypeG722):
 		return &codecs.G722Payloader{}, nil
-	case strings.ToLower(MimeTypePCMU, MimeTypePCMA):
+		case strings.ToLower(MimeTypePCMU), strings.ToLower(MimeTypePCMA):
 		return &codecs.G711Payloader{}, nil
 	default:
 		return nil, ErrNoPayloaderForCodec
