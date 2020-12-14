@@ -494,17 +494,17 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	switch strings.ToLower(codec.MimeType) {
-	case MimeTypeH264:
+	case  strings.ToLower(MimeTypeH264):
 		return &codecs.H264Payloader{}, nil
-	case MimeTypeOpus:
+	case strings.ToLower(MimeTypeOpus):
 		return &codecs.OpusPayloader{}, nil
-	case MimeTypeVP8:
+	case strings.ToLower(MimeTypeVP8):
 		return &codecs.VP8Payloader{}, nil
-	case MimeTypeVP9:
+	case strings.ToLower(MimeTypeVP9):
 		return &codecs.VP9Payloader{}, nil
-	case MimeTypeG722:
+	case strings.ToLower(MimeTypeG722):
 		return &codecs.G722Payloader{}, nil
-	case MimeTypePCMU, MimeTypePCMA:
+	case strings.ToLower(MimeTypePCMU), strings.ToLower(MimeTypePCMA):
 		return &codecs.G711Payloader{}, nil
 	default:
 		return nil, ErrNoPayloaderForCodec

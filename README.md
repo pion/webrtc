@@ -254,6 +254,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Bo Shi](https://github.com/bshimc)
 * [Suzuki Takeo](https://github.com/BambooTuna)
 * [baiyufei](https://github.com/baiyufei)
+* [pascal-ace](https://github.com/pascal-ace)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
