@@ -123,10 +123,22 @@ func main() { // nolint:gocognit
 			panic(err)
 		}
 
-		_, err = peerConnection.AddTrack(localTrack)
+		rtpSender, err := peerConnection.AddTrack(localTrack)
 		if err != nil {
 			panic(err)
 		}
+
+		// Read incoming RTCP packets
+		// Before these packets are retuned they are processed by interceptors. For things
+		// like NACK this needs to be called.
+		go func() {
+			rtcpBuf := make([]byte, 1500)
+			for {
+				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+					return
+				}
+			}
+		}()
 
 		// Set the remote SessionDescription
 		err = peerConnection.SetRemoteDescription(recvOnlyOffer)

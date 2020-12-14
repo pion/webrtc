@@ -53,9 +53,22 @@ func main() {
 			panic(videoTrackErr)
 		}
 
-		if _, videoTrackErr = peerConnection.AddTrack(videoTrack); videoTrackErr != nil {
+		rtpSender, videoTrackErr := peerConnection.AddTrack(videoTrack)
+		if videoTrackErr != nil {
 			panic(videoTrackErr)
 		}
+
+		// Read incoming RTCP packets
+		// Before these packets are retuned they are processed by interceptors. For things
+		// like NACK this needs to be called.
+		go func() {
+			rtcpBuf := make([]byte, 1500)
+			for {
+				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+					return
+				}
+			}
+		}()
 
 		go func() {
 			// Open a IVF file and start reading using our IVFReader
@@ -100,9 +113,23 @@ func main() {
 		if audioTrackErr != nil {
 			panic(audioTrackErr)
 		}
-		if _, audioTrackErr = peerConnection.AddTrack(audioTrack); audioTrackErr != nil {
+
+		rtpSender, audioTrackErr := peerConnection.AddTrack(audioTrack)
+		if audioTrackErr != nil {
 			panic(audioTrackErr)
 		}
+
+		// Read incoming RTCP packets
+		// Before these packets are retuned they are processed by interceptors. For things
+		// like NACK this needs to be called.
+		go func() {
+			rtcpBuf := make([]byte, 1500)
+			for {
+				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+					return
+				}
+			}
+		}()
 
 		go func() {
 			// Open a IVF file and start reading using our IVFReader

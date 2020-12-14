@@ -79,6 +79,7 @@ func TestNew(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, pc)
+	assert.NoError(t, pc.Close())
 }
 
 func TestPeerConnection_SetConfiguration(t *testing.T) {
@@ -229,6 +230,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
+	assert.NoError(t, pc.Close())
 }
 
 const minimalOffer = `v=0
