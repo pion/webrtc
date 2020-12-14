@@ -215,4 +215,6 @@ var (
 	errSignalingStateProposedTransitionInvalid = errors.New("invalid proposed signaling state transition")
 
 	errStatsICECandidateStateInvalid = errors.New("cannot convert to StatsICECandidatePairStateSucceeded invalid ice candidate state")
+
+	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
 )

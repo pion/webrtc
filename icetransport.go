@@ -33,6 +33,9 @@ type ICETransport struct {
 	conn     *ice.Conn
 	mux      *mux.Mux
 
+	ctx       context.Context
+	ctxCancel func()
+
 	loggerFactory logging.LoggerFactory
 
 	log logging.LeveledLogger
@@ -74,6 +77,10 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	if t.State() != ICETransportStateNew {
+		return errICETransportNotInNew
+	}
+
 	if gatherer != nil {
 		t.gatherer = gatherer
 	}
@@ -112,6 +119,8 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 	t.role = *role
 
+	t.ctx, t.ctxCancel = context.WithCancel(context.Background())
+
 	// Drop the lock here to allow ICE candidates to be
 	// added so that the agent can complete a connection
 	t.lock.Unlock()
@@ -120,12 +129,12 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(context.TODO(),
+		iceConn, err = agent.Dial(t.ctx,
 			params.UsernameFragment,
 			params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(context.TODO(),
+		iceConn, err = agent.Accept(t.ctx,
 			params.UsernameFragment,
 			params.Password)
 
@@ -172,6 +181,12 @@ func (t *ICETransport) restart() error {
 func (t *ICETransport) Stop() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	t.setState(ICETransportStateClosed)
+
+	if t.ctxCancel != nil {
+		t.ctxCancel()
+	}
 
 	if t.mux != nil {
 		return t.mux.Close()
