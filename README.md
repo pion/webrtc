@@ -21,19 +21,20 @@
 </p>
 <br>
 
-### Breaking Changes
+### New Release
 
-Pion WebRTC v3.0.0 has started! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
+Pion WebRTC v3.0.0 has been released! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
 
-Until `v3.0.0` has been tagged using `v2` is suggested. Check the [tags](https://github.com/pion/webrtc/tags) for the latest `v2` release.
+If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v2` release.
 
-[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
-
-We are actively planning and would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+We would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
 
 ----
 
 ### Usage
+[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
+
+
 **[example applications](examples/README.md)** contains code samples of common things people build with Pion WebRTC.
 
 **[example-webrtc-applications](https://github.com/pion/example-webrtc-applications)** contains more full featured examples that use 3rd party libraries.
@@ -50,6 +51,7 @@ Now go build something awesome! Here are some **ideas** to get your creative jui
 * Securely send data between two servers, without using pub/sub.
 * Record your webcam and do special effects server side.
 * Build a conferencing application that processes audio/video and make decisions off of it.
+* Remotely control a robots and stream its cameras in realtime.
 
 ### Want to learn more about WebRTC?
 Check out [WebRTC for the Curious](https://webrtcforthecurious.com). A book about WebRTC in depth, not just about the APIs.
