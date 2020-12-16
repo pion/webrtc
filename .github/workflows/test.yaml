@@ -36,7 +36,7 @@ jobs:
           go test \
           -coverprofile=cover.out -covermode=atomic \
           -bench=. \
-          -tags quic \
+          ${TEST_EXTRA_ARGS:-} \
           -v -race ./...
 
       - uses: codecov/codecov-action@v1
@@ -78,7 +78,7 @@ jobs:
           -w /go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
           i386/golang:${{matrix.go}}-alpine \
           /usr/local/go/bin/go test \
-            -tags quic \
+            ${TEST_EXTRA_ARGS:-} \
             -v ./...
 
   test-wasm:
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Use Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
         with:
           node-version: '12.x'
 
