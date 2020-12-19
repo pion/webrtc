@@ -148,6 +148,7 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 func (t *DTLSTransport) startSRTP() error {
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
+		BufferFactory: t.api.settingEngine.BufferFactory,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
 	if t.api.settingEngine.replayProtection.SRTP != nil {
