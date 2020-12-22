@@ -10,8 +10,8 @@ import (
 	"github.com/pion/rtp"
 )
 
-// RegisterDefaultInterceptors will register some useful interceptors. If you want to customize which interceptors are loaded,
-// you should copy the code from this method and remove unwanted interceptors.
+// RegisterDefaultInterceptors will register some useful interceptors.
+// This is currently limited to sending and responding to NACKs.
 func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	if err := ConfigureNack(mediaEngine, interceptorRegistry); err != nil {
 		return err
