@@ -257,6 +257,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Suzuki Takeo](https://github.com/BambooTuna)
 * [baiyufei](https://github.com/baiyufei)
 * [pascal-ace](https://github.com/pascal-ace)
+* [Threadnaught](https://github.com/Threadnaught)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
@@ -321,4 +322,31 @@ func (r *RTPReceiver) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInf
 	}))
 
 	return rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, nil
+}
+
+// SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.
+func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for i := range r.tracks {
+		if err := r.tracks[i].rtcpReadStream.SetReadDeadline(t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setRTPReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
+// This should be fired by calling SetReadDeadline on the TrackRemote
+func (r *RTPReceiver) setRTPReadDeadline(t time.Time) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for i := range r.tracks {
+		if err := r.tracks[i].rtpReadStream.SetReadDeadline(t); err != nil {
+			return err
+		}
+	}
+	return nil
 }
