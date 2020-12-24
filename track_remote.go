@@ -4,6 +4,7 @@ package webrtc
 
 import (
 	"sync"
+	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtp"
@@ -174,4 +175,9 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 	t.peekedAttributes = a
 	t.mu.Unlock()
 	return
+}
+
+// SetReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
+func (t *TrackRemote) SetReadDeadline(deadline time.Time) error {
+	return t.receiver.setRTPReadDeadline(deadline)
 }
