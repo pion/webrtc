@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"reflect"
+	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -518,4 +520,61 @@ func TestEOF(t *testing.T) {
 		<-dcaClosedCh // (1)
 		<-dcbClosedCh // (2)
 	})
+}
+
+// Assert that a Session Description that doesn't follow
+// draft-ietf-mmusic-sctp-sdp is still accepted
+func TestDataChannel_NonStandardSessionDescription(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = offerPC.CreateDataChannel("foo", nil)
+	assert.NoError(t, err)
+
+	onDataChannelCalled := make(chan struct{})
+	answerPC.OnDataChannel(func(_ *DataChannel) {
+		close(onDataChannelCalled)
+	})
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	offer = *offerPC.LocalDescription()
+
+	// Replace with old values
+	const (
+		oldApplication = "m=application 63743 DTLS/SCTP 5000\r"
+		oldAttribute   = "a=sctpmap:5000 webrtc-datachannel 256\r"
+	)
+
+	offer.SDP = regexp.MustCompile(`m=application (.*?)\r`).ReplaceAllString(offer.SDP, oldApplication)
+	offer.SDP = regexp.MustCompile(`a=sctp-port(.*?)\r`).ReplaceAllString(offer.SDP, oldAttribute)
+
+	// Assert that replace worked
+	assert.True(t, strings.Contains(offer.SDP, oldApplication))
+	assert.True(t, strings.Contains(offer.SDP, oldAttribute))
+
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	<-onDataChannelCalled
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
 }
