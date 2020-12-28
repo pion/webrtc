@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"encoding/json"
+)
+
 // BundlePolicy affects which media tracks are negotiated if the remote
 // endpoint is not bundle-aware, and what ICE candidates are gathered. If the
 // remote endpoint is bundle-aware, all media tracks and data channels are
@@ -55,4 +59,20 @@ func (t BundlePolicy) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// UnmarshalJSON parses the JSON-encoded data and stores the result
+func (t *BundlePolicy) UnmarshalJSON(b []byte) error {
+	var val string
+	if err := json.Unmarshal(b, &val); err != nil {
+		return err
+	}
+
+	*t = newBundlePolicy(val)
+	return nil
+}
+
+// MarshalJSON returns the JSON encoding
+func (t BundlePolicy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
 }
