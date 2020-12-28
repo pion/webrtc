@@ -329,24 +329,33 @@ func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for i := range r.tracks {
-		if err := r.tracks[i].rtcpReadStream.SetReadDeadline(t); err != nil {
-			return err
-		}
+	if err := r.tracks[0].rtcpReadStream.SetReadDeadline(t); err != nil {
+		return err
 	}
 	return nil
 }
 
-// setRTPReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
-// This should be fired by calling SetReadDeadline on the TrackRemote
-func (r *RTPReceiver) setRTPReadDeadline(t time.Time) error {
+// SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid will block before returning. 0 is forever.
+func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for i := range r.tracks {
-		if err := r.tracks[i].rtpReadStream.SetReadDeadline(t); err != nil {
-			return err
+	for _, t := range r.tracks {
+		if t.track != nil && t.track.rid == rid {
+			return t.rtcpReadStream.SetReadDeadline(deadline)
 		}
 	}
-	return nil
+	return fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+}
+
+// setRTPReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
+// This should be fired by calling SetReadDeadline on the TrackRemote
+func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if t := r.streamsForTrack(reader); t != nil {
+		return t.rtpReadStream.SetReadDeadline(deadline)
+	}
+	return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
 }

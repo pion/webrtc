@@ -179,5 +179,5 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 
 // SetReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
 func (t *TrackRemote) SetReadDeadline(deadline time.Time) error {
-	return t.receiver.setRTPReadDeadline(deadline)
+	return t.receiver.setRTPReadDeadline(deadline, t)
 }
