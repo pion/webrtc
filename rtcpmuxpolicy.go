@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"encoding/json"
+)
+
 // RTCPMuxPolicy affects what ICE candidates are gathered to support
 // non-multiplexed RTCP.
 type RTCPMuxPolicy int
@@ -43,4 +47,18 @@ func (t RTCPMuxPolicy) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+func (t *RTCPMuxPolicy) UnmarshalJSON(b []byte) error {
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	*t = newRTCPMuxPolicy(s)
+	return nil
+}
+
+func (t RTCPMuxPolicy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
 }

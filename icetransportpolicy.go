@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"encoding/json"
+)
+
 // ICETransportPolicy defines the ICE candidate policy surface the
 // permitted candidates. Only these candidates are used for connectivity checks.
 type ICETransportPolicy int
@@ -43,4 +47,18 @@ func (t ICETransportPolicy) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+func (t *ICETransportPolicy) UnmarshalJSON(b []byte) error {
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+	*t = NewICETransportPolicy(s)
+	return nil
+}
+
+func (t ICETransportPolicy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
 }

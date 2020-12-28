@@ -1,5 +1,10 @@
 package webrtc
 
+import (
+	"encoding/json"
+	"errors"
+)
+
 // SDPSemantics determines which style of SDP offers and answers
 // can be used
 type SDPSemantics int
@@ -38,4 +43,12 @@ func (s SDPSemantics) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+func (ss *SDPSemantics) UnmarshalJSON(b []byte) error {
+	return errors.New("not implemented")
+}
+
+func (ss SDPSemantics) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ss.String())
 }

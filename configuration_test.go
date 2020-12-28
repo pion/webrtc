@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,4 +37,42 @@ func TestConfiguration_getICEServers(t *testing.T) {
 		parsedURLs := cfg.getICEServers()
 		assert.Equal(t, expectedServerStr, parsedURLs[0].URLs[0])
 	})
+}
+
+func TestConfigurationJSON(t *testing.T) {
+	j := `{
+    "iceServers": [{"URLs": ["turn:turn.example.org"],
+                    "username": "jch",
+                    "credential": "topsecret"
+                  }],
+    "iceTransportPolicy": "relay",
+    "bundlePolicy": "balanced",
+    "rtcpMuxPolicy": "require"
+}`
+
+	conf := Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs:       []string{"turn:turn.example.org"},
+				Username:   "jch",
+				Credential: "topsecret",
+			},
+		},
+		ICETransportPolicy: ICETransportPolicyRelay,
+		BundlePolicy:       BundlePolicyBalanced,
+		RTCPMuxPolicy:      RTCPMuxPolicyRequire,
+	}
+
+	var conf2 Configuration
+	err := json.Unmarshal([]byte(j), &conf2)
+	assert.NoError(t, err)
+	assert.Equal(t, conf, conf2)
+
+	j2, err := json.Marshal(conf2)
+	assert.NoError(t, err)
+
+	var conf3 Configuration
+	err = json.Unmarshal([]byte(j2), &conf3)
+	assert.NoError(t, err)
+	assert.Equal(t, conf2, conf3)
 }
