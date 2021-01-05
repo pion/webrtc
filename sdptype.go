@@ -41,7 +41,8 @@ const (
 	sdpTypeRollbackStr = "rollback"
 )
 
-func newSDPType(raw string) SDPType {
+// NewSDPType creates an SDPType from a string
+func NewSDPType(raw string) SDPType {
 	switch raw {
 	case sdpTypeOfferStr:
 		return SDPTypeOffer
