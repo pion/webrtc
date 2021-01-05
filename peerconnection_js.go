@@ -623,7 +623,7 @@ func valueToSessionDescription(descValue js.Value) *SessionDescription {
 		return nil
 	}
 	return &SessionDescription{
-		Type: newSDPType(descValue.Get("type").String()),
+		Type: NewSDPType(descValue.Get("type").String()),
 		SDP:  descValue.Get("sdp").String(),
 	}
 }
