@@ -23,6 +23,7 @@ type TrackRemote struct {
 	codec       RTPCodecParameters
 	params      RTPParameters
 	rid         string
+	mid         string
 
 	receiver         *RTPReceiver
 	peeked           []byte
@@ -55,6 +56,15 @@ func (t *TrackRemote) RID() string {
 	defer t.mu.RUnlock()
 
 	return t.rid
+}
+
+// Mid gets the Media Stream Id of this Track
+// Not required inside m=video section, but may be present
+func (t *TrackRemote) Mid() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.mid
 }
 
 // PayloadType gets the PayloadType of the track
