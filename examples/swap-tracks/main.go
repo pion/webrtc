@@ -139,8 +139,7 @@ func main() { // nolint:gocognit
 	// in a production application you should exchange ICE Candidates via OnICECandidate
 	<-gatherComplete
 
-	// Output the answer in base64 so we can paste it in browser
-	fmt.Printf("Paste below base64 in browser:\n%v\n", signal.Encode(*peerConnection.LocalDescription()))
+	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
 	// Asynchronously take all packets in the channel and write them out to our
 	// track

@@ -3,10 +3,12 @@
 package webrtc
 
 import (
+	"io"
 	"time"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
+	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/vnet"
 	"golang.org/x/net/proxy"
 )
@@ -53,6 +55,7 @@ type SettingEngine struct {
 	disableSRTPReplayProtection               bool
 	disableSRTCPReplayProtection              bool
 	vnet                                      *vnet.Net
+	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceProxyDialer                            proxy.Dialer

@@ -44,10 +44,14 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	// Start the virtual network by calling Start() on the root router
 	assert.NoError(t, wan.Start())
 
-	offerPeerConnection, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
+	offerMediaEngine := &MediaEngine{}
+	assert.NoError(t, offerMediaEngine.RegisterDefaultCodecs())
+	offerPeerConnection, err := NewAPI(WithSettingEngine(offerSettingEngine), WithMediaEngine(offerMediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	answerPeerConnection, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
+	answerMediaEngine := &MediaEngine{}
+	assert.NoError(t, answerMediaEngine.RegisterDefaultCodecs())
+	answerPeerConnection, err := NewAPI(WithSettingEngine(answerSettingEngine), WithMediaEngine(answerMediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	return offerPeerConnection, answerPeerConnection, wan
