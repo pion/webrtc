@@ -29,6 +29,9 @@ type SampleBuilder struct {
 	lastPopSeq       uint16
 	lastPopTimestamp uint32
 
+	hasPoppedSample  bool
+	lastPoppedSeqNum uint16
+
 	// Interface that checks whether the packet is the first fragment of the frame or not
 	partitionHeadChecker rtp.PartitionHeadChecker
 
@@ -78,7 +81,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) {
+func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32, uint16) {
 	data := []byte{}
 
 	for i := firstBuffer; s.buffer[i] != nil; i++ {
@@ -102,17 +105,25 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) 
 				s.releasePacket(j)
 			}
 
-			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp
+			var droppedPackets uint16
+			if s.hasPoppedSample {
+				droppedPackets = seqnumDistance(s.lastPoppedSeqNum, firstBuffer-1)
+			}
+
+			s.hasPoppedSample = true
+			s.lastPoppedSeqNum = i - 1
+
+			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp, droppedPackets
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
-			return nil, 0
+			return nil, 0, 0
 		}
 
 		data = append(data, p...)
 	}
-	return nil, 0
+	return nil, 0, 0
 }
 
 // Distance between two seqnums
@@ -128,13 +139,13 @@ func seqnumDistance(x, y uint16) uint16 {
 // Pop scans s's buffer for a valid sample.
 // It returns nil if no valid samples have been found.
 func (s *SampleBuilder) Pop() *media.Sample {
-	sample, _ := s.PopWithTimestamp()
+	sample, _, _ := s.PopWithTimestampAndDroppedPackets()
 	return sample
 }
 
-// PopWithTimestamp scans s's buffer for a valid sample and its RTP timestamp.
+// PopWithTimestampAndDroppedPackets scans s's buffer for a valid sample and its RTP timestamp.
 // It returns nil, 0 when no valid samples have been found.
-func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
+func (s *SampleBuilder) PopWithTimestampAndDroppedPackets() (*media.Sample, uint32, uint16) {
 	var i uint16
 	if !s.isContiguous {
 		i = s.lastPush - s.maxLate
@@ -171,7 +182,7 @@ func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 		// Initial validity checks have passed, walk forward
 		return s.buildSample(i)
 	}
-	return nil, 0
+	return nil, 0, 0
 }
 
 // An Option configures a SampleBuilder.

@@ -9,9 +9,10 @@ import (
 
 // A Sample contains encoded media and timing information
 type Sample struct {
-	Data      []byte
-	Timestamp time.Time
-	Duration  time.Duration
+	Data               []byte
+	Timestamp          time.Time
+	Duration           time.Duration
+	PrevDroppedPackets uint16
 }
 
 // Writer defines an interface to handle
