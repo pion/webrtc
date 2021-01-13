@@ -81,7 +81,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32, uint16) {
+func (s *SampleBuilder) buildSample(firstBuffer uint16) *media.Sample {
 	data := []byte{}
 
 	for i := firstBuffer; s.buffer[i] != nil; i++ {
@@ -113,17 +113,24 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32, 
 			s.hasPoppedSample = true
 			s.lastPoppedSeqNum = i - 1
 
-			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp, droppedPackets
+			return &media.Sample{
+				Data:     data,
+				Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond,
+				SourceMetadata: media.SampleSourceMetadata{
+					Timestamp:          s.lastPopTimestamp,
+					PrevDroppedPackets: droppedPackets,
+				},
+			}
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
-			return nil, 0, 0
+			return nil
 		}
 
 		data = append(data, p...)
 	}
-	return nil, 0, 0
+	return nil
 }
 
 // Distance between two seqnums
@@ -139,13 +146,6 @@ func seqnumDistance(x, y uint16) uint16 {
 // Pop scans s's buffer for a valid sample.
 // It returns nil if no valid samples have been found.
 func (s *SampleBuilder) Pop() *media.Sample {
-	sample, _, _ := s.PopWithTimestampAndDroppedPackets()
-	return sample
-}
-
-// PopWithTimestampAndDroppedPackets scans s's buffer for a valid sample and its RTP timestamp.
-// It returns nil, 0 when no valid samples have been found.
-func (s *SampleBuilder) PopWithTimestampAndDroppedPackets() (*media.Sample, uint32, uint16) {
 	var i uint16
 	if !s.isContiguous {
 		i = s.lastPush - s.maxLate
@@ -182,7 +182,7 @@ func (s *SampleBuilder) PopWithTimestampAndDroppedPackets() (*media.Sample, uint
 		// Initial validity checks have passed, walk forward
 		return s.buildSample(i)
 	}
-	return nil, 0, 0
+	return nil
 }
 
 // An Option configures a SampleBuilder.

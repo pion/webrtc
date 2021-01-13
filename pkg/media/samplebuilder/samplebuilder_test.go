@@ -191,9 +191,9 @@ func TestSampleBuilder(t *testing.T) {
 			for _, p := range t.packets {
 				s.Push(p)
 			}
-			for sample, timestamp := s.PopWithTimestamp(); sample != nil; sample, timestamp = s.PopWithTimestamp() {
+			for sample := s.Pop(); sample != nil; sample = s.Pop() {
 				samples = append(samples, sample)
-				timestamps = append(timestamps, timestamp)
+				timestamps = append(timestamps, sample.SourceMetadata.Timestamp)
 			}
 
 			assert.Equal(samples, t.samples, t.message)
