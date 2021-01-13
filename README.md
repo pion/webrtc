@@ -30,6 +30,11 @@ Have any questions? Join [the Slack channel](https://pion.ly/slack) to follow de
 
 We are actively planning [v2.1.0](https://github.com/pion/webrtc/projects/11) and would love your feedback! Anyone can add issues, and anything that you think can empower Pion users.
 
+### Installation
+```
+go get github.com/pion/webrtc/v2
+```
+
 ### Usage
 Check out the **[example applications](examples/README.md)** to help you along your Pion WebRTC journey.
 
