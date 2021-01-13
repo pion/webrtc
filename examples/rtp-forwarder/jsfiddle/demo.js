@@ -13,8 +13,8 @@ var log = msg => {
 
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
   .then(stream => {
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
+    stream.getTracks().forEach(track => pc.addTrack(track, stream))
+    document.getElementById('video1').srcObject = stream
     pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
   }).catch(log)
 
