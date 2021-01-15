@@ -43,7 +43,7 @@ func TestWriter(t *testing.T) {
 	)
 
 	if got, want := buf.Bytes(), expected; !reflect.DeepEqual(got, want) {
-		t.Fatalf("wrote %v, want %v", string(got), want)
+		t.Fatalf("wrote %v, want %v", got, want)
 	}
 }
 
