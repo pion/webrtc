@@ -55,8 +55,8 @@ github.com/pion/rtp v1.6.2/go.mod h1:bDb5n+BFZxXx0Ea7E5qe+klMuqiBrP+w8XSjiWtCUko
 github.com/pion/sctp v1.7.10/go.mod h1:EhpTUQu1/lcK3xI+eriS6/96fWetHGCvBi9MSsnaBN0=
 github.com/pion/sctp v1.7.11 h1:UCnj7MsobLKLuP/Hh+JMiI/6W5Bs/VF45lWKgHFjSIE=
 github.com/pion/sctp v1.7.11/go.mod h1:EhpTUQu1/lcK3xI+eriS6/96fWetHGCvBi9MSsnaBN0=
-github.com/pion/sdp/v3 v3.0.3 h1:gJK9hk+JFD2NGIM1nXmqNCq1DkVaIZ9dlA3u3otnkaw=
-github.com/pion/sdp/v3 v3.0.3/go.mod h1:bNiSknmJE0HYBprTHXKPQ3+JjacTv5uap92ueJZKsRk=
+github.com/pion/sdp/v3 v3.0.4 h1:2Kf+dgrzJflNCSw3TV5v2VLeI0s/qkzy2r5jlR0wzf8=
+github.com/pion/sdp/v3 v3.0.4/go.mod h1:bNiSknmJE0HYBprTHXKPQ3+JjacTv5uap92ueJZKsRk=
 github.com/pion/srtp/v2 v2.0.1 h1:kgfh65ob3EcnFYA4kUBvU/menCp9u7qaJLXwWgpobzs=
 github.com/pion/srtp/v2 v2.0.1/go.mod h1:c8NWHhhkFf/drmHTAblkdu8++lsISEBBdAuiyxgqIsE=
 github.com/pion/stun v0.3.5 h1:uLUCBCkQby4S1cf6CGuR9QrVOKcvUwFeemaC865QHDg=
