@@ -231,7 +231,7 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 	}
 
 	// skip packets by the number of previously dropped packets
-	for i := uint16(0); i < sample.SourceMetadata.PrevDroppedPackets; i++ {
+	for i := uint16(0); i < sample.PrevDroppedPackets; i++ {
 		s.sequencer.NextSequenceNumber()
 	}
 

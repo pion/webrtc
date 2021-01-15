@@ -258,6 +258,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [baiyufei](https://github.com/baiyufei)
 * [pascal-ace](https://github.com/pascal-ace)
 * [Threadnaught](https://github.com/Threadnaught)
+* [Robin Raymond](https://github.com/robin-raymond)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

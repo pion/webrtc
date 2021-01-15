@@ -9,15 +9,10 @@ import (
 
 // A Sample contains encoded media and timing information
 type Sample struct {
-	Data           []byte
-	Timestamp      time.Time
-	Duration       time.Duration
-	SourceMetadata SampleSourceMetadata
-}
-
-// A SampleSourceMetadata contains information about the original packets prior to converting to a sample
-type SampleSourceMetadata struct {
-	Timestamp          uint32
+	Data               []byte
+	Timestamp          time.Time
+	Duration           time.Duration
+	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
 }
 
