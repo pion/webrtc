@@ -76,6 +76,8 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.lastPush = p.SequenceNumber
 }
 
+const secondToNanoseconds = 1000000000
+
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
 func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) {
@@ -102,7 +104,7 @@ func (s *SampleBuilder) buildSample(firstBuffer uint16) (*media.Sample, uint32) 
 				s.releasePacket(j)
 			}
 
-			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond}, s.lastPopTimestamp
+			return &media.Sample{Data: data, Duration: time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond}, s.lastPopTimestamp
 		}
 
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
