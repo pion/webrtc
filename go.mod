@@ -12,7 +12,7 @@ require (
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.6
-	github.com/pion/rtp v1.6.2-x-20200114-robin-seqnum
+	github.com/pion/rtp v1.6.3-0.20210115141156-37a568a6961c // go get -u github.com/pion/rtp@robin-20210119-seqnum
 	github.com/pion/sctp v1.7.11
 	github.com/pion/sdp/v3 v3.0.3
 	github.com/pion/srtp/v2 v2.0.1
