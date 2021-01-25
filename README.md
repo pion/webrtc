@@ -259,6 +259,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [pascal-ace](https://github.com/pascal-ace)
 * [Threadnaught](https://github.com/Threadnaught)
 * [Robin Raymond](https://github.com/robin-raymond)
+* [Dean Eigenmann](https://github.com/decanus)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

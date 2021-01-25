@@ -127,6 +127,8 @@ func (s *SampleBuilder) Insert(p *rtp.Packet) {
 	s.purgeBuffers()
 }
 
+const secondToNanoseconds = 1000000000
+
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
 func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
@@ -208,7 +210,7 @@ func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
 
 	sample := &media.Sample{
 		Data:               data,
-		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*1000) * time.Millisecond,
+		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
 	}

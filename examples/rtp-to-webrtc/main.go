@@ -7,8 +7,10 @@ import (
 	"net"
 
 	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v3/pkg/media/samplebuilder"
 )
 
 func main() {
@@ -37,7 +39,7 @@ func main() {
 	fmt.Println("Waiting for RTP Packets, please run GStreamer or ffmpeg now")
 
 	// Listen for a single RTP Packet, we need this to determine the SSRC
-	inboundRTPPacket := make([]byte, 4096) // UDP MTU
+	inboundRTPPacket := make([]byte, 1500) // UDP MTU
 	n, _, err := listener.ReadFromUDP(inboundRTPPacket)
 	if err != nil {
 		panic(err)
@@ -50,7 +52,7 @@ func main() {
 	}
 
 	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
 	if err != nil {
 		panic(err)
 	}
@@ -108,16 +110,32 @@ func main() {
 	// Output the answer in base64 so we can paste it in browser
 	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
+	videoBuilder := samplebuilder.New(10, &codecs.VP8Packet{}, 90000)
+
 	// Read RTP packets forever and send them to the WebRTC Client
 	for {
+		inboundRTPPacket = make([]byte, 1500) // UDP MTU
+		packet = &rtp.Packet{}
+
 		n, _, err := listener.ReadFrom(inboundRTPPacket)
 		if err != nil {
-			fmt.Printf("error during read: %s", err)
+			panic(fmt.Sprintf("error during read: %s", err))
+		}
+
+		if err = packet.Unmarshal(inboundRTPPacket[:n]); err != nil {
 			panic(err)
 		}
 
-		if _, writeErr := videoTrack.Write(inboundRTPPacket[:n]); writeErr != nil {
-			panic(writeErr)
+		videoBuilder.Push(packet)
+		for {
+			sample := videoBuilder.Pop()
+			if sample == nil {
+				break
+			}
+
+			if writeErr := videoTrack.WriteSample(*sample); writeErr != nil {
+				panic(writeErr)
+			}
 		}
 	}
 }

@@ -809,7 +809,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	switch {
 	case pc.isClosed.get():
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	case newSDPType(sd.Type.String()) == SDPType(Unknown):
+	case NewSDPType(sd.Type.String()) == SDPType(Unknown):
 		return &rtcerr.TypeError{Err: fmt.Errorf("%w: '%d' is not a valid enum value of type SDPType", errPeerConnSDPTypeInvalidValue, sd.Type)}
 	}
 

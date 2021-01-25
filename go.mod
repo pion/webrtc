@@ -14,10 +14,10 @@ require (
 	github.com/pion/rtcp v1.2.6
 	github.com/pion/rtp v1.6.3-0.20210115141156-37a568a6961c // go get -u github.com/pion/rtp@robin-20210119-seqnum
 	github.com/pion/sctp v1.7.11
-	github.com/pion/sdp/v3 v3.0.3
+	github.com/pion/sdp/v3 v3.0.4
 	github.com/pion/srtp/v2 v2.0.1
 	github.com/pion/transport v0.12.2
 	github.com/sclevine/agouti v3.0.0+incompatible
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.0.0-20201201195509-5d6afe98e0b7
 )

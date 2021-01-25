@@ -21,7 +21,7 @@ func TestNewSDPType(t *testing.T) {
 	for i, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedSDPType,
-			newSDPType(testCase.sdpTypeString),
+			NewSDPType(testCase.sdpTypeString),
 			"testCase: %d %v", i, testCase,
 		)
 	}
