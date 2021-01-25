@@ -241,6 +241,7 @@ a=msid-semantic: WMS
 m=application 47299 DTLS/SCTP 5000
 c=IN IP4 192.168.20.129
 a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=candidate:1966762134 1 udp 2122262783 2001:db8::1 47199 typ host generation 0
 a=candidate:211962667 1 udp 2122194687 10.0.3.1 40864 typ host generation 0
 a=candidate:1002017894 1 tcp 1518280447 192.168.20.129 0 typ host tcptype active generation 0
 a=candidate:1109506011 1 tcp 1518214911 10.0.3.1 0 typ host tcptype active generation 0
