@@ -23,11 +23,15 @@ Run `echo $BROWSER_SDP | rtp-forwarder`
 Copy the text that `rtp-forwarder` just emitted and copy into second text area
 
 ### Hit 'Start Session' in jsfiddle and enjoy your RTP forwarded stream!
+You can run any of these commands at anytime. The media is live/stateless, you can switch commands without restarting Pion.
+
 #### VLC
 Open `rtp-forwarder.sdp` with VLC and enjoy your live video!
 
-### ffmpeg/ffprobe
+#### ffmpeg/ffprobe
 Run `ffprobe -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to get more details about your streams
 
 Run `ffplay -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to play your streams
 
+#### Twitch/RTMP
+`ffmpeg -protocol_whitelist file,udp,rtp -i rtp-forwarder.sdp -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -g 50 -c:a aac -b:a 160k -ac 2 -ar 44100 -f flv rtmp://live.twitch.tv/app/$STREAM_KEY` Make sure to replace `$STREAM_KEY` at the end of the URL first.
