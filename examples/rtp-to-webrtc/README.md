@@ -25,7 +25,7 @@ Run `echo $BROWSER_SDP | rtp-to-webrtc`
 1. Run `rtp-to-webrtc < my_file`
 
 ### Send RTP to listening socket
-On startup you will get a message `Waiting for RTP Packets`, you can use any software to send VP8 packets to port 5004. We also have the pre made examples below
+You can use any software to send VP8 packets to port 5004. We also have the pre made examples below
 
 
 #### GStreamer
