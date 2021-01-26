@@ -76,11 +76,15 @@ func (s *SampleBuilder) releasePacket(i uint16) {
 	}
 }
 
-func (s *SampleBuilder) purgeBuffers() {
+func (s *SampleBuilder) purgeConsumedBuffers() {
 	for s.active.compare(s.filled.head) == slCompareBefore && s.filled.hasData() {
 		s.releasePacket(s.filled.head)
 		s.filled.head++
 	}
+}
+
+func (s *SampleBuilder) purgeBuffers() {
+	s.purgeConsumedBuffers()
 
 	for (s.filled.count() > s.maxLate) && s.filled.hasData() {
 
@@ -131,7 +135,7 @@ const secondToNanoseconds = 1000000000
 
 // We have a valid collection of RTP Packets
 // walk forwards building a sample if everything looks good clear and update buffer+values
-func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
+func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	if s.active.empty() {
 		s.active = s.filled
@@ -165,7 +169,7 @@ func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
 		return nil
 	}
 
-	if !forcePrepare && s.buffer[consume.tail] == nil {
+	if !purgingBuffers && s.buffer[consume.tail] == nil {
 		// wait for the next packet after this set of packets to arrive
 		// to ensure at least one post sample timestamp is known
 		// (unless we have to release right now)
@@ -189,9 +193,9 @@ func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
 	// prior to decoding all the packets, check if this packet
 	// would end being disposed anyway
 	if s.partitionHeadChecker != nil {
-		if !s.partitionHeadChecker.IsPartitionHead(s.buffer[consume.tail].Payload) {
+		if !s.partitionHeadChecker.IsPartitionHead(s.buffer[consume.head].Payload) {
 			s.droppedPackets += consume.count()
-			s.purgeBuffers()
+			s.purgeConsumedBuffers()
 			return nil
 		}
 	}
@@ -220,7 +224,7 @@ func (s *SampleBuilder) buildSample(forcePrepare bool) *media.Sample {
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
 
-	s.purgeBuffers()
+	s.purgeConsumedBuffers()
 
 	return sample
 }
