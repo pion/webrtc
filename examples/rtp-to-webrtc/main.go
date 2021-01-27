@@ -36,21 +36,6 @@ func main() {
 		}
 	}()
 
-	fmt.Println("Waiting for RTP Packets, please run GStreamer or ffmpeg now")
-
-	// Listen for a single RTP Packet, we need this to determine the SSRC
-	inboundRTPPacket := make([]byte, 1500) // UDP MTU
-	n, _, err := listener.ReadFromUDP(inboundRTPPacket)
-	if err != nil {
-		panic(err)
-	}
-
-	// Unmarshal the incoming packet
-	packet := &rtp.Packet{}
-	if err = packet.Unmarshal(inboundRTPPacket[:n]); err != nil {
-		panic(err)
-	}
-
 	// Create a video track
 	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
 	if err != nil {
@@ -114,8 +99,8 @@ func main() {
 
 	// Read RTP packets forever and send them to the WebRTC Client
 	for {
-		inboundRTPPacket = make([]byte, 1500) // UDP MTU
-		packet = &rtp.Packet{}
+		inboundRTPPacket := make([]byte, 1500) // UDP MTU
+		packet := &rtp.Packet{}
 
 		n, _, err := listener.ReadFrom(inboundRTPPacket)
 		if err != nil {
