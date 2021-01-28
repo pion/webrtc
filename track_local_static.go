@@ -235,8 +235,8 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 		s.sequencer.NextSequenceNumber()
 	}
 
-	samples := sample.Duration.Seconds() * clockRate
-	packets := p.(rtp.Packetizer).Packetize(sample.Data, uint32(samples))
+	samples := uint32(sample.Duration.Seconds() * clockRate)
+	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples, samples*uint32(sample.PrevDroppedPackets))
 
 	writeErrs := []error{}
 	for _, p := range packets {
