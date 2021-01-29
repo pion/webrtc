@@ -21,6 +21,7 @@ jobs:
         with:
           path: |
             ~/go/pkg/mod
+            ~/go/bin
             ~/.cache
           key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
@@ -31,13 +32,15 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
+      - name: Setup go-acc
+        run: |
+          go get -u github.com/ory/go-acc
+
       - name: Run test
         run: |
-          go test \
-          -coverprofile=cover.out -covermode=atomic \
+          go-acc -o cover.out ./... -- \
           -bench=. \
-          ${TEST_EXTRA_ARGS:-} \
-          -v -race ./...
+          -v -race
 
       - uses: codecov/codecov-action@v1
         with:
