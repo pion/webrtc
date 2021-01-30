@@ -51,3 +51,9 @@ Copy the text that `rtp-to-webrtc` just emitted and copy into second text area
 A video should start playing in your browser above the input boxes.
 
 Congrats, you have used Pion WebRTC! Now start building something cool
+
+## Dealing with broken/lossy inputs
+Pion WebRTC also provides a [SampleBuilder](https://pkg.go.dev/github.com/pion/webrtc/v3@v3.0.4/pkg/media/samplebuilder). This consumes RTP packets and returns samples.
+It can be used to re-order and delay for lossy streams. You can see its usage in this example in [e4da70](https://github.com/pion/webrtc/commit/e4da709754639871266ca5e2cc2f945178caeb12).
+
+Currently it isn't working with H264, but is useful for VP8 and Opus. See [#1652](https://github.com/pion/webrtc/issues/1652) for the status of fixing for H264.
