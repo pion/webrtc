@@ -365,6 +365,17 @@ func (d *DataChannel) SendText(s string) error {
 	return err
 }
 
+// SendBytesText sends the text message in bytes to the DataChannel peer
+func (d *DataChannel) SendBytesText(s []byte) error {
+	err := d.ensureOpen()
+	if err != nil {
+		return err
+	}
+
+	_, err = d.dataChannel.WriteDataChannel(s, true)
+	return err
+}
+
 func (d *DataChannel) ensureOpen() error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
