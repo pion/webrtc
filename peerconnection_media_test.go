@@ -1069,3 +1069,31 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	assert.NoError(t, offerer.Close())
 	close(testFinished)
 }
+
+// Assert that CreateOffer can't enter infinite loop
+// We attempt to generate an offer multiple times in case a user
+// has edited the PeerConnection. We can assert this broken behavior with an
+// empty MediaEngine. See pion/webrtc#1656 for full behavior
+func TestPeerConnection_CreateOffer_InfiniteLoop(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	m := &MediaEngine{}
+
+	pc, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pc.AddTrack(track)
+	assert.NoError(t, err)
+
+	_, err = pc.CreateOffer(nil)
+	assert.Error(t, err, errExcessiveRetries)
+
+	assert.NoError(t, pc.Close())
+}
