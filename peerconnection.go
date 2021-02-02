@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -576,6 +577,8 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 	return false
 }
 
+var errExcessiveRetries = errors.New("excessive retries in CreateOffer")
+
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) { //nolint:gocognit
@@ -603,6 +606,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	// audio RTCRtpTransceiver was added to connection, but while performing the in-parallel
 	// steps to create an offer, a video RTCRtpTransceiver was added, requiring additional
 	// inspection of video system resources.
+	count := 0
 	for {
 		// We cache current transceivers to ensure they aren't
 		// mutated during offer generation. We later check if they have
@@ -672,6 +676,10 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		// generation. Recompute if necessary
 		if isPlanB || !pc.hasLocalDescriptionChanged(&offer) {
 			break
+		}
+		count++
+		if count >= 128 {
+			return SessionDescription{}, errExcessiveRetries
 		}
 	}
 
