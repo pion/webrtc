@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"context"
 	"regexp"
 	"testing"
 	"time"
@@ -14,6 +13,9 @@ import (
 
 // An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
 func TestInvalidFingerprintCausesFailed(t *testing.T) {
+	lim := test.TimeOut(time.Second * 40)
+	defer lim.Stop()
+
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -36,12 +38,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		}
 	})
 
-	connectionHasFailed, closeFunc := context.WithCancel(context.Background())
-	pcAnswer.OnConnectionStateChange(func(connectionState PeerConnectionState) {
-		if connectionState == PeerConnectionStateFailed {
-			closeFunc()
-		}
-	})
+	connectionHasFailed := untilConnectionState(PeerConnectionStateFailed, pcAnswer)
 
 	if _, err = pcOffer.CreateDataChannel("unusedDataChannel", nil); err != nil {
 		t.Fatal(err)
@@ -81,11 +78,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal("timed out waiting to receive offer")
 	}
 
-	select {
-	case <-connectionHasFailed.Done():
-	case <-time.After(30 * time.Second):
-		t.Fatal("timed out waiting for connection to fail")
-	}
+	connectionHasFailed.Wait()
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
@@ -107,18 +100,8 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		connectionComplete := make(chan interface{})
-		answerPC.OnConnectionStateChange(func(connectionState PeerConnectionState) {
-			if connectionState == PeerConnectionStateConnected {
-				select {
-				case <-connectionComplete:
-				default:
-					close(connectionComplete)
-				}
-			}
-		})
-
-		<-connectionComplete
+		connectionComplete := untilConnectionState(PeerConnectionStateConnected, answerPC)
+		connectionComplete.Wait()
 		assert.NoError(t, offerPC.Close())
 		assert.NoError(t, answerPC.Close())
 	}

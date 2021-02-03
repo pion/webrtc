@@ -7,14 +7,31 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
+
+func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *sync.WaitGroup {
+	var triggered sync.WaitGroup
+	triggered.Add(len(peers))
+
+	hdlr := func(p PeerConnectionState) {
+		if p == state {
+			triggered.Done()
+		}
+	}
+	for _, p := range peers {
+		p.OnConnectionStateChange(hdlr)
+	}
+	return &triggered
+}
 
 func Test_RTPSender_ReplaceTrack(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
@@ -157,4 +174,34 @@ func Test_RTPSender_GetParameters(t *testing.T) {
 
 	assert.NoError(t, offerer.Close())
 	assert.NoError(t, answerer.Close())
+}
+
+func Test_RTPSender_SetReadDeadline(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, wan := createVNetPair(t)
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(track)
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, sender, receiver)
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	peerConnectionsConnected.Wait()
+
+	assert.NoError(t, rtpSender.SetReadDeadline(time.Now().Add(1*time.Second)))
+	_, _, err = rtpSender.ReadRTCP()
+	assert.Error(t, err, packetio.ErrTimeout)
+
+	assert.NoError(t, wan.Stop())
+	assert.NoError(t, sender.Close())
+	assert.NoError(t, receiver.Close())
 }

@@ -4,7 +4,6 @@ package webrtc
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 
 // Assert that SetReadDeadline works as expected
 // This test uses VNet since we must have zero loss
-func Test_RTPSender_SetReadDeadline(t *testing.T) {
+func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -50,16 +49,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 		seenPacketCancel()
 	})
 
-	var peerConnectionsConnected sync.WaitGroup
-	peerConnectionsConnected.Add(2)
-
-	hdlr := func(p PeerConnectionState) {
-		if p == PeerConnectionStateConnected {
-			peerConnectionsConnected.Done()
-		}
-	}
-	sender.OnConnectionStateChange(hdlr)
-	receiver.OnConnectionStateChange(hdlr)
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, sender, receiver)
 
 	assert.NoError(t, signalPair(sender, receiver))
 
