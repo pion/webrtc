@@ -23,6 +23,12 @@ func TestICEServer_validate(t *testing.T) {
 				CredentialType: ICECredentialTypePassword,
 			}, true},
 			{ICEServer{
+				URLs:           []string{"turn:[2001:db8:1234:5678::1]?transport=udp"},
+				Username:       "unittest",
+				Credential:     "placeholder",
+				CredentialType: ICECredentialTypePassword,
+			}, true},
+			{ICEServer{
 				URLs:     []string{"turn:192.158.29.39?transport=udp"},
 				Username: "unittest",
 				Credential: OAuthCredential{
