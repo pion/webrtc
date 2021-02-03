@@ -1050,17 +1050,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerer, answerer))
 
-	peerConnectionConnected := sync.WaitGroup{}
-	peerConnectionConnected.Add(2)
-
-	connectionStateHandler := func(connectionState PeerConnectionState) {
-		if connectionState == PeerConnectionStateConnected {
-			peerConnectionConnected.Done()
-		}
-	}
-
-	offerer.OnConnectionStateChange(connectionStateHandler)
-	answerer.OnConnectionStateChange(connectionStateHandler)
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 	peerConnectionConnected.Wait()
 
 	<-seenFiveStreams.Done()
