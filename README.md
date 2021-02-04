@@ -260,6 +260,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Threadnaught](https://github.com/Threadnaught)
 * [Dean Eigenmann](https://github.com/decanus)
 * [Cameron Elliott](https://github.com/cameronelliott)
+* [Pascal Benoit](https://github.com/pascal-ace)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
