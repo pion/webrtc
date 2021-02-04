@@ -104,10 +104,10 @@ func main() {
 		}()
 
 		codec := track.Codec()
-		if codec.MimeType == webrtc.MimeTypeOpus {
+		if strings.EqualFold(codec.MimeType,webrtc.MimeTypeOpus) {
 			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")
 			saveToDisk(oggFile, track)
-		} else if codec.MimeType == webrtc.MimeTypeVP8 {
+		} else if strings.EqualFold(codec.MimeType,webrtc.MimeTypeVP8) {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			saveToDisk(ivfFile, track)
 		}
