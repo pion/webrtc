@@ -1030,9 +1030,21 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			t, localTransceivers = findByMid(midValue, localTransceivers)
 			if t == nil {
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-			} else if direction == RTPTransceiverDirectionInactive {
-				if err := t.Stop(); err != nil {
-					return err
+			} else {
+				switch direction {
+				case RTPTransceiverDirectionSendrecv: // remove go-lint warning
+				case RTPTransceiverDirectionInactive:
+					if err := t.Stop(); err != nil {
+						return err
+					}
+				case RTPTransceiverDirectionRecvonly:
+					if t.Direction() == RTPTransceiverDirectionRecvonly {
+						t.setDirection(RTPTransceiverDirectionInactive)
+					}
+				case RTPTransceiverDirectionSendonly:
+					if t.Direction() == RTPTransceiverDirectionSendonly {
+						t.setDirection(RTPTransceiverDirectionInactive)
+					}
 				}
 			}
 
