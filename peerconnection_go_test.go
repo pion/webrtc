@@ -1228,3 +1228,125 @@ func TestICELite(t *testing.T) {
 
 	assert.NoError(t, peerConnection.Close())
 }
+
+func TestPeerConnection_TransceiverDirection(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	createTransceiver := func(pc *PeerConnection, dir RTPTransceiverDirection) error {
+		// AddTransceiverFromKind() can't be used with sendonly
+		if dir == RTPTransceiverDirectionSendonly {
+			codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+
+			track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+			if err != nil {
+				return err
+			}
+
+			_, err = pc.AddTransceiverFromTrack(track, []RtpTransceiverInit{
+				{Direction: dir},
+			}...)
+			return err
+		}
+
+		_, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RtpTransceiverInit{Direction: dir},
+		)
+		return err
+	}
+
+	for _, test := range []struct {
+		name                  string
+		offerDirection        RTPTransceiverDirection
+		answerStartDirection  RTPTransceiverDirection
+		answerFinalDirections []RTPTransceiverDirection
+	}{
+		{
+			"offer sendrecv answer sendrecv",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
+		},
+		{
+			"offer sendonly answer sendrecv",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer sendrecv",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		},
+		{
+			"offer sendrecv answer sendonly",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer sendonly answer sendonly",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer sendonly",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		},
+		{
+			"offer sendrecv answer recvonly",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer sendonly answer recvonly",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer recvonly",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly},
+		},
+	} {
+		offerDirection := test.offerDirection
+		answerStartDirection := test.answerStartDirection
+		answerFinalDirections := test.answerFinalDirections
+
+		t.Run(test.name, func(t *testing.T) {
+			pcOffer, pcAnswer, err := newPair()
+			assert.NoError(t, err)
+
+			err = createTransceiver(pcOffer, offerDirection)
+			assert.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+
+			err = createTransceiver(pcAnswer, answerStartDirection)
+			assert.NoError(t, err)
+
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			assert.Equal(t, len(answerFinalDirections), len(pcAnswer.GetTransceivers()))
+
+			for i, tr := range pcAnswer.GetTransceivers() {
+				assert.Equal(t, answerFinalDirections[i], tr.Direction())
+			}
+
+			assert.NoError(t, pcOffer.Close())
+			assert.NoError(t, pcAnswer.Close())
+		})
+	}
+}
