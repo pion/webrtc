@@ -1049,10 +1049,21 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				if err != nil {
 					return err
 				}
-				t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
+
+				localDirection := RTPTransceiverDirectionRecvonly
+				if direction == RTPTransceiverDirectionRecvonly {
+					localDirection = RTPTransceiverDirectionSendonly
+				}
+
+				t = pc.newRTPTransceiver(receiver, nil, localDirection, kind)
 
 				pc.onNegotiationNeeded()
+			} else if direction == RTPTransceiverDirectionRecvonly {
+				if t.Direction() == RTPTransceiverDirectionSendrecv {
+					t.setDirection(RTPTransceiverDirectionSendonly)
+				}
 			}
+
 			if t.Mid() == "" {
 				if err := t.setMid(midValue); err != nil {
 					return err
