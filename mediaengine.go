@@ -86,17 +86,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		}
 	}
 
-	// Default Pion Audio Header Extensions
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{extension}, RTPCodecTypeAudio); err != nil {
-			return err
-		}
-	}
-
 	videoRTCPFeedback := []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}
 	for _, codec := range []RTPCodecParameters{
 		{
@@ -186,17 +175,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
-			return err
-		}
-	}
-
-	// Default Pion Video Header Extensions
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{extension}, RTPCodecTypeVideo); err != nil {
 			return err
 		}
 	}
