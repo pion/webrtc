@@ -150,6 +150,13 @@ a=rtpmap:111 opus/48000/2
 
 		m := MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
+		for _, extension := range []string{
+			"urn:ietf:params:rtp-hdrext:sdes:mid",
+			"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
+		} {
+			assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeAudio))
+		}
+
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, m.negotiatedVideo)

@@ -24,8 +24,24 @@ func main() {
 			},
 		},
 	}
+
+	// Enable Extension Headers needed for Simulcast
+	m := &webrtc.MediaEngine{}
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	for _, extension := range []string{
+		"urn:ietf:params:rtp-hdrext:sdes:mid",
+		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
+		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
+	} {
+		if err := m.RegisterHeaderExtension(webrtc.RTPHeaderExtensionCapability{URI: extension}, webrtc.RTPCodecTypeVideo); err != nil {
+			panic(err)
+		}
+	}
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m)).NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
