@@ -105,6 +105,10 @@ func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
 func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+	if !api.settingEngine.disableMediaEngineCopy {
+		api.mediaEngine = api.mediaEngine.copy()
+	}
+
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
