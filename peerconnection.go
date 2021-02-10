@@ -105,10 +105,6 @@ func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
 func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
-	if !api.settingEngine.disableMediaEngineCopy {
-		api.mediaEngine = api.mediaEngine.copy()
-	}
-
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -137,7 +133,13 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 
-	pc.interceptorRTCPWriter = api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
+	if !api.settingEngine.disableMediaEngineCopy {
+		pc.api = &API{
+			settingEngine: api.settingEngine,
+			mediaEngine:   api.mediaEngine.copy(),
+			interceptor:   api.interceptor,
+		}
+	}
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
@@ -172,6 +174,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			handler(d)
 		}
 	})
+
+	pc.interceptorRTCPWriter = api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
 }
