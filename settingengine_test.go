@@ -139,3 +139,46 @@ func TestSettingEngine_SetICETCP(t *testing.T) {
 
 	assert.Equal(t, tcpMux, settingEngine.iceTCPMux)
 }
+
+func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
+	t.Run("Copy", func(t *testing.T) {
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		offerer, answerer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerer, answerer))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.Empty(t, m.negotiatedVideoCodecs)
+
+		assert.NoError(t, offerer.Close())
+		assert.NoError(t, answerer.Close())
+	})
+
+	t.Run("No Copy", func(t *testing.T) {
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		s := SettingEngine{}
+		s.DisableMediaEngineCopy(true)
+
+		offerer, answerer, err := NewAPI(WithMediaEngine(m), WithSettingEngine(s)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerer, answerer))
+
+		assert.True(t, m.negotiatedVideo)
+		assert.NotEmpty(t, m.negotiatedVideoCodecs)
+
+		assert.NoError(t, offerer.Close())
+		assert.NoError(t, answerer.Close())
+	})
+}
