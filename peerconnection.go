@@ -133,7 +133,13 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 
-	pc.interceptorRTCPWriter = api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
+	if !api.settingEngine.disableMediaEngineCopy {
+		pc.api = &API{
+			settingEngine: api.settingEngine,
+			mediaEngine:   api.mediaEngine.copy(),
+			interceptor:   api.interceptor,
+		}
+	}
 
 	var err error
 	if err = pc.initConfiguration(configuration); err != nil {
@@ -168,6 +174,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			handler(d)
 		}
 	})
+
+	pc.interceptorRTCPWriter = api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
 }

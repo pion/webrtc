@@ -16,16 +16,16 @@ import (
 const (
 	// MimeTypeH264 H264 MIME type.
 	// Note: Matching should be case insensitive.
-	MimeTypeH264 = "video/h264"
+	MimeTypeH264 = "video/H264"
 	// MimeTypeOpus Opus MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeOpus = "audio/opus"
 	// MimeTypeVP8 VP8 MIME type
 	// Note: Matching should be case insensitive.
-	MimeTypeVP8 = "video/vp8"
+	MimeTypeVP8 = "video/VP8"
 	// MimeTypeVP9 VP9 MIME type
 	// Note: Matching should be case insensitive.
-	MimeTypeVP9 = "video/vp9"
+	MimeTypeVP9 = "video/VP9"
 	// MimeTypeG722 G722 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeG722 = "audio/G722"
@@ -82,17 +82,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeAudio); err != nil {
-			return err
-		}
-	}
-
-	// Default Pion Audio Header Extensions
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{extension}, RTPCodecTypeAudio); err != nil {
 			return err
 		}
 	}
@@ -190,17 +179,6 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		}
 	}
 
-	// Default Pion Video Header Extensions
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{extension}, RTPCodecTypeVideo); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -291,6 +269,16 @@ func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapabilit
 	}
 
 	return
+}
+
+// copy copies any user modifiable state of the MediaEngine
+// all internal state is reset
+func (m *MediaEngine) copy() *MediaEngine {
+	return &MediaEngine{
+		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
+		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
+		headerExtensions: append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
+	}
 }
 
 func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
