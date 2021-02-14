@@ -230,3 +230,28 @@ func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+func BenchmarkTrackLocalWrite(b *testing.B) {
+	offerPC, answerPC, err := newPair()
+	defer closePairNow(b, offerPC, answerPC)
+	if err != nil {
+		b.Fatalf("Failed to create a PC pair for testing")
+	}
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(b, err)
+
+	_, err = offerPC.AddTrack(track)
+	assert.NoError(b, err)
+
+	_, err = answerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(b, err)
+
+	b.SetBytes(1024)
+
+	buf := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		_, err := track.Write(buf)
+		assert.NoError(b, err)
+	}
+}
