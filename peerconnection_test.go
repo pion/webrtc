@@ -655,3 +655,54 @@ func TestSetRemoteDescriptionInvalid(t *testing.T) {
 		assert.NoError(t, pc.Close())
 	})
 }
+
+// TestPeerConnection_Transceiver_Direction asserts that after
+// matching transceivers are matched we return the proper direction
+func TestPeerConnection_Transceiver_Direction(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	assertTransceiverDirections := func(offerDirection, answerDirection RTPTransceiverDirection, sdpValue string) {
+		pcOffer, pcAnswer, err := newPair()
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RtpTransceiverInit{Direction: offerDirection},
+		)
+		assert.NoError(t, err)
+
+		_, err = pcAnswer.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RtpTransceiverInit{Direction: answerDirection},
+		)
+		assert.NoError(t, err)
+
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		assert.Contains(t, answer.SDP, sdpValue)
+
+		assert.NoError(t, pcOffer.Close())
+		assert.NoError(t, pcAnswer.Close())
+	}
+
+	t.Run("offer sendrecv/answer sendrecv", func(t *testing.T) {
+		assertTransceiverDirections(RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionSendrecv, "a=sendrecv\r\n")
+	})
+
+	t.Run("offer send/answer sendrecv", func(t *testing.T) {
+		assertTransceiverDirections(RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv, "a=recvonly\r\n")
+	})
+
+	t.Run("offer recv/answer sendrecv", func(t *testing.T) {
+		assertTransceiverDirections(RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv, "a=sendonly\r\n")
+	})
+}
