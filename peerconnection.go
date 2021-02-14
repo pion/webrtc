@@ -1062,6 +1062,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 					return err
 				}
 				switch direction {
+				case RTPTransceiverDirectionRecvonly:
+					t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionSendonly, kind)
 				case RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv:
 					t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
 				default:
