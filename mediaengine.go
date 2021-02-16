@@ -182,6 +182,16 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 	return nil
 }
 
+// addCodec will append codec if it not exists
+func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) []RTPCodecParameters {
+	for _, c := range codecs {
+		if c.MimeType == codec.MimeType && c.PayloadType == codec.PayloadType {
+			return codecs
+		}
+	}
+	return append(codecs, codec)
+}
+
 // RegisterCodec adds codec to the MediaEngine
 // These are the list of codecs supported by this PeerConnection.
 // RegisterCodec is not safe for concurrent use.
@@ -189,9 +199,9 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
-		m.audioCodecs = append(m.audioCodecs, codec)
+		m.audioCodecs = m.addCodec(m.audioCodecs, codec)
 	case RTPCodecTypeVideo:
-		m.videoCodecs = append(m.videoCodecs, codec)
+		m.videoCodecs = m.addCodec(m.videoCodecs, codec)
 	default:
 		return ErrUnknownType
 	}
@@ -328,9 +338,9 @@ func (m *MediaEngine) updateCodecParameters(remoteCodec RTPCodecParameters, typ 
 
 	pushCodec := func(codec RTPCodecParameters) error {
 		if typ == RTPCodecTypeAudio {
-			m.negotiatedAudioCodecs = append(m.negotiatedAudioCodecs, codec)
+			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
 		} else if typ == RTPCodecTypeVideo {
-			m.negotiatedVideoCodecs = append(m.negotiatedVideoCodecs, codec)
+			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
 		}
 		return nil
 	}
