@@ -102,8 +102,7 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 
 		connectionComplete := untilConnectionState(PeerConnectionStateConnected, answerPC)
 		connectionComplete.Wait()
-		assert.NoError(t, offerPC.Close())
-		assert.NoError(t, answerPC.Close())
+		closePairNow(t, offerPC, answerPC)
 	}
 
 	report := test.CheckRoutines(t)

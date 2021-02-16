@@ -110,8 +110,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 			}
 		}()
 
-		assert.NoError(t, sender.Close())
-		assert.NoError(t, receiver.Close())
+		closePairNow(t, sender, receiver)
 	})
 
 	t.Run("Invalid Codec Change", func(t *testing.T) {
@@ -147,8 +146,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 
 		assert.True(t, errors.Is(rtpSender.ReplaceTrack(trackB), ErrUnsupportedCodec))
 
-		assert.NoError(t, sender.Close())
-		assert.NoError(t, receiver.Close())
+		closePairNow(t, sender, receiver)
 	})
 }
 
@@ -172,8 +170,7 @@ func Test_RTPSender_GetParameters(t *testing.T) {
 	assert.Equal(t, 1, len(parameters.Encodings))
 	assert.Equal(t, rtpTransceiver.Sender().ssrc, parameters.Encodings[0].SSRC)
 
-	assert.NoError(t, offerer.Close())
-	assert.NoError(t, answerer.Close())
+	closePairNow(t, offerer, answerer)
 }
 
 func Test_RTPSender_SetReadDeadline(t *testing.T) {
@@ -202,6 +199,5 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 	assert.Error(t, err, packetio.ErrTimeout)
 
 	assert.NoError(t, wan.Stop())
-	assert.NoError(t, sender.Close())
-	assert.NoError(t, receiver.Close())
+	closePairNow(t, sender, receiver)
 }

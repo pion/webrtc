@@ -58,6 +58,5 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	<-seenPacket.Done()
 	assert.NoError(t, wan.Stop())
-	assert.NoError(t, sender.Close())
-	assert.NoError(t, receiver.Close())
+	closePairNow(t, sender, receiver)
 }

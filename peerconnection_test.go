@@ -307,8 +307,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	_, err = answerPeerConn.CreateAnswer(nil)
 	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
 
-	assert.NoError(t, offerPeerConn.Close())
-	assert.NoError(t, answerPeerConn.Close())
+	closePairNow(t, offerPeerConn, answerPeerConn)
 }
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
@@ -406,8 +405,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestMultipleOfferAnswer(t *testing.T) {
@@ -437,8 +435,7 @@ func TestMultipleOfferAnswer(t *testing.T) {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
 
-	assert.NoError(t, firstPeerConn.Close())
-	assert.NoError(t, secondPeerConn.Close())
+	closePairNow(t, firstPeerConn, secondPeerConn)
 }
 
 func TestNoFingerprintInFirstMediaIfSetRemoteDescription(t *testing.T) {
@@ -564,8 +561,7 @@ func TestMultipleCreateChannel(t *testing.T) {
 
 	wg.Wait()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
@@ -636,8 +632,7 @@ func TestGatherOnSetLocalDescription(t *testing.T) {
 		t.Error(err.Error())
 	}
 	<-pcAnswerGathered
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that SetRemoteDescription handles invalid states

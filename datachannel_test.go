@@ -284,8 +284,7 @@ func TestDataChannel_Close(t *testing.T) {
 		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		assert.NoError(t, err)
 
-		assert.NoError(t, offerPC.Close())
-		assert.NoError(t, answerPC.Close())
+		closePairNow(t, offerPC, answerPC)
 		assert.NoError(t, dc.Close())
 	})
 
@@ -297,8 +296,7 @@ func TestDataChannel_Close(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.NoError(t, dc.Close())
-		assert.NoError(t, offerPC.Close())
-		assert.NoError(t, answerPC.Close())
+		closePairNow(t, offerPC, answerPC)
 	})
 }
 

@@ -193,8 +193,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 	<-awaitRTPRecvClosed
 }
 
@@ -292,8 +291,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	onTrackFiredLock.Lock()
 	if onTrackFired {
@@ -463,8 +461,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	}()
 
 	<-onTrackFired
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
@@ -847,8 +844,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 			}
 		}()
 
-		assert.NoError(t, pcOffer.Close())
-		assert.NoError(t, pcAnswer.Close())
+		closePairNow(t, pcOffer, pcAnswer)
 	}
 
 	lim := test.TimeOut(time.Second * 30)
@@ -997,8 +993,7 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, started, "transceiver with mid 2 should be started")
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that failed Simulcast probing doesn't cause
@@ -1055,8 +1050,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 	<-seenFiveStreams.Done()
 
-	assert.NoError(t, answerer.Close())
-	assert.NoError(t, offerer.Close())
+	closePairNow(t, offerer, answerer)
 	close(testFinished)
 }
 

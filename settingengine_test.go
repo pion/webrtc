@@ -163,8 +163,7 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
 		assert.NotEmpty(t, offerer.api.mediaEngine.negotiatedVideoCodecs)
 
-		assert.NoError(t, offerer.Close())
-		assert.NoError(t, answerer.Close())
+		closePairNow(t, offerer, answerer)
 
 		newOfferer, newAnswerer, err := api.newPair(Configuration{})
 		assert.NoError(t, err)
@@ -177,8 +176,7 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.False(t, newOfferer.api.mediaEngine.negotiatedVideo)
 		assert.Empty(t, newAnswerer.api.mediaEngine.negotiatedVideoCodecs)
 
-		assert.NoError(t, newOfferer.Close())
-		assert.NoError(t, newAnswerer.Close())
+		closePairNow(t, newOfferer, newAnswerer)
 	})
 
 	t.Run("No Copy", func(t *testing.T) {
@@ -202,8 +200,7 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.True(t, m.negotiatedVideo)
 		assert.NotEmpty(t, m.negotiatedVideoCodecs)
 
-		assert.NoError(t, offerer.Close())
-		assert.NoError(t, answerer.Close())
+		closePairNow(t, offerer, answerer)
 
 		offerer, answerer, err = api.newPair(Configuration{})
 		assert.NoError(t, err)
@@ -212,7 +209,6 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
 		assert.NotEmpty(t, offerer.api.mediaEngine.negotiatedVideoCodecs)
 
-		assert.NoError(t, offerer.Close())
-		assert.NoError(t, answerer.Close())
+		closePairNow(t, offerer, answerer)
 	})
 }

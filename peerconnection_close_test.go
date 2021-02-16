@@ -52,8 +52,7 @@ func TestPeerConnection_Close(t *testing.T) {
 
 	<-awaitSetup
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	<-awaitICEClosed
 }

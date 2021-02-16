@@ -332,8 +332,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 		assert.NotEmpty(t, getCertificateStats(t, reportPCOffer, &certificates[i]))
 	}
 
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_GetStats_Closed(t *testing.T) {
