@@ -129,8 +129,7 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 	mdNames = getMdNames(answer.parsed)
 	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
 
-	assert.NoError(t, apc.Close())
-	assert.NoError(t, opc.Close())
+	closePairNow(t, apc, opc)
 }
 
 func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
@@ -223,8 +222,7 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, apc.Close())
-	assert.NoError(t, opc.Close())
+	closePairNow(t, apc, opc)
 }
 
 func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
@@ -331,6 +329,5 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, apc.Close())
-	assert.NoError(t, opc.Close())
+	closePairNow(t, apc, opc)
 }

@@ -102,6 +102,5 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		}
 	}()
 
-	assert.NoError(t, offerer.Close())
-	assert.NoError(t, answerer.Close())
+	closePairNow(t, offerer, answerer)
 }

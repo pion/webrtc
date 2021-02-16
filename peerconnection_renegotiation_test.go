@@ -126,8 +126,7 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{vp8Track})
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that adding tracks across multiple renegotiations performs as expected
@@ -174,8 +173,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Multiple(t *testing.T) {
 		sendVideoUntilDone(onTrackChan, t, outboundTracks)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	assert.Equal(t, onTrackCount[trackIDs[0]], 1)
 	assert.Equal(t, onTrackCount[trackIDs[1]], 1)
@@ -229,8 +227,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{vp8Track})
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	remoteTrack, ok := atomicRemoteTrack.Load().(*TrackRemote)
 	require.True(t, ok)
@@ -326,8 +323,7 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 	assert.True(t, sdpMidHasSsrc(offer, "0", sender3.ssrc), "Expected mid %q with ssrc %d, offer.sdp: %s", "0", sender3.ssrc, offer.SDP)
 	assert.True(t, sdpMidHasSsrc(offer, "1", sender2.ssrc), "Expected mid %q with ssrc %d, offer.sdp: %s", "1", sender2.ssrc, offer.SDP)
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
@@ -418,8 +414,7 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	assert.Equal(t, "video2", remoteTrack2.ID())
 	assert.Equal(t, "pion2", remoteTrack2.StreamID())
 
-	require.NoError(t, pcOffer.Close())
-	require.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
@@ -464,8 +459,7 @@ func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	<-trackClosed.Done()
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestPeerConnection_RoleSwitch(t *testing.T) {
@@ -501,8 +495,7 @@ func TestPeerConnection_RoleSwitch(t *testing.T) {
 	assert.NoError(t, signalPair(pcSecondOfferer, pcFirstOfferer))
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{vp8Track})
 
-	assert.NoError(t, pcFirstOfferer.Close())
-	assert.NoError(t, pcSecondOfferer.Close())
+	closePairNow(t, pcFirstOfferer, pcSecondOfferer)
 }
 
 // Assert that renegotiation doesn't attempt to gather ICE twice
@@ -572,8 +565,7 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	pcAnswer.ops.Done()
 	wg.Wait()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
@@ -628,8 +620,7 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{localTrack})
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Issue #346, don't start the SCTP Subsystem if the RemoteDescription doesn't contain one
@@ -699,8 +690,7 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	assert.Equal(t, pcOffer.SCTP().State(), SCTPTransportStateConnecting)
 	assert.Equal(t, pcAnswer.SCTP().State(), SCTPTransportStateConnecting)
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestAddDataChannelDuringRenegotation(t *testing.T) {
@@ -763,8 +753,7 @@ func TestAddDataChannelDuringRenegotation(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	<-onDataChannelFired.Done()
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that CreateDataChannel fires OnNegotiationNeeded
@@ -847,8 +836,7 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 
 	wg.Wait()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestNegotiationNeededStressOneSided(t *testing.T) {
@@ -877,8 +865,7 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	pcA.ops.Done()
 
 	assert.Equal(t, expectedTrackCount, len(pcB.GetTransceivers()))
-	assert.NoError(t, pcA.Close())
-	assert.NoError(t, pcB.Close())
+	closePairNow(t, pcA, pcB)
 }
 
 // TestPeerConnection_Renegotiation_DisableTrack asserts that if a remote track is set inactive
@@ -922,6 +909,5 @@ func TestPeerConnection_Renegotiation_DisableTrack(t *testing.T) {
 	assert.Equal(t, strings.Count(answer.SDP, "a=recvonly"), 1)
 	assert.Equal(t, strings.Count(answer.SDP, "a=inactive"), 1)
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }

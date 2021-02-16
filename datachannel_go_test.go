@@ -575,6 +575,5 @@ func TestDataChannel_NonStandardSessionDescription(t *testing.T) {
 	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
 
 	<-onDataChannelCalled
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
