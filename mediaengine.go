@@ -284,11 +284,15 @@ func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapabilit
 // copy copies any user modifiable state of the MediaEngine
 // all internal state is reset
 func (m *MediaEngine) copy() *MediaEngine {
-	return &MediaEngine{
+	cloned := &MediaEngine{
 		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
 		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
 		headerExtensions: append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
 	}
+	if len(m.headerExtensions) > 0 {
+		cloned.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
+	}
+	return cloned
 }
 
 func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
