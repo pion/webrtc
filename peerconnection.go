@@ -1100,8 +1100,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	}
 
 	remoteIsLite := false
-	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeyICELite); haveRemoteIs && liteValue == sdp.AttrKeyICELite {
-		remoteIsLite = true
+	for _, a := range desc.parsed.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyICELite {
+			remoteIsLite = true
+		}
 	}
 
 	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
