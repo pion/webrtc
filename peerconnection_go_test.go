@@ -1193,3 +1193,38 @@ func TestEmptyCandidate(t *testing.T) {
 		assert.NoError(t, peerConn.Close())
 	}
 }
+
+const liteOffer = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=msid-semantic: WMS
+a=ice-lite
+m=application 47299 DTLS/SCTP 5000
+c=IN IP4 192.168.20.129
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:data
+`
+
+// this test asserts that if an ice-lite offer is received,
+// pion will take the ICE-CONTROLLING role
+func TestICELite(t *testing.T) {
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetRemoteDescription(
+		SessionDescription{SDP: liteOffer, Type: SDPTypeOffer},
+	))
+
+	SDPAnswer, err := peerConnection.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetLocalDescription(SDPAnswer))
+
+	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.role,
+		"pion did not set state to ICE-CONTROLLED against ice-light offer")
+
+	assert.NoError(t, peerConnection.Close())
+}
