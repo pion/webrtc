@@ -374,8 +374,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_PropertyGetters(t *testing.T) {
@@ -598,8 +597,7 @@ func TestPeerConnection_OfferingLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_AnsweringLite(t *testing.T) {
@@ -637,8 +635,7 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestOnICEGatheringStateChange(t *testing.T) {
@@ -792,8 +789,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 
 	<-answerPCConnected.Done()
 	<-offerPCConnected.Done()
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 // Issue #1121, assert populateLocalCandidates doesn't mutate
@@ -858,8 +854,7 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	})
 	<-onDataChannel.Done()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestICERestart(t *testing.T) {
@@ -938,8 +933,7 @@ func TestICERestart(t *testing.T) {
 	// Compare ICE Candidates across each run, fail if they haven't changed
 	assert.NotEqual(t, firstOfferCandidates, extractCandidates(offerPC.LocalDescription().SDP))
 	assert.NotEqual(t, firstAnswerCandidates, extractCandidates(answerPC.LocalDescription().SDP))
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 // Assert error handling when an Agent is restart
@@ -1043,8 +1037,7 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	assert.Equal(t, testMessage, <-dataChannelMessages)
 
 	assert.NoError(t, wan.Stop())
-	assert.NoError(t, offerPeerConnection.Close())
-	assert.NoError(t, answerPeerConnection.Close())
+	closePairNow(t, offerPeerConnection, answerPeerConnection)
 }
 
 type trackRecords struct {
@@ -1161,8 +1154,7 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		}
 	}
 	close(stopped)
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestEmptyCandidate(t *testing.T) {

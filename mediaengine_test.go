@@ -26,6 +26,23 @@ func TestOpusCase(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
+// pion/example-webrtc-applications#89
+func TestVideoCase(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.True(t, regexp.MustCompile(`(?m)^a=rtpmap:\d+ H264/90000`).MatchString(offer.SDP))
+	assert.True(t, regexp.MustCompile(`(?m)^a=rtpmap:\d+ VP8/90000`).MatchString(offer.SDP))
+	assert.True(t, regexp.MustCompile(`(?m)^a=rtpmap:\d+ VP9/90000`).MatchString(offer.SDP))
+	assert.NoError(t, pc.Close())
+}
+
 func TestMediaEngineRemoteDescription(t *testing.T) {
 	mustParse := func(raw string) sdp.SessionDescription {
 		s := sdp.SessionDescription{}
@@ -150,6 +167,13 @@ a=rtpmap:111 opus/48000/2
 
 		m := MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
+		for _, extension := range []string{
+			"urn:ietf:params:rtp-hdrext:sdes:mid",
+			"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
+		} {
+			assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeAudio))
+		}
+
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, m.negotiatedVideo)
@@ -217,4 +241,48 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 		assert.Error(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionInactive), ErrRegisterHeaderExtensionInvalidDirection)
 		assert.Error(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirection(0)), ErrRegisterHeaderExtensionInvalidDirection)
 	})
+}
+
+// If a user attempts to register a codec twice we should just discard duplicate calls
+func TestMediaEngineDoubleRegister(t *testing.T) {
+	m := MediaEngine{}
+
+	assert.NoError(t, m.RegisterCodec(
+		RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
+			PayloadType:        111,
+		}, RTPCodecTypeAudio))
+
+	assert.NoError(t, m.RegisterCodec(
+		RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
+			PayloadType:        111,
+		}, RTPCodecTypeAudio))
+
+	assert.Equal(t, len(m.audioCodecs), 1)
+}
+
+// The cloned MediaEngine instance should be able to update negotiated header extensions.
+func TestUpdateHeaderExtenstionToClonedMediaEngine(t *testing.T) {
+	src := MediaEngine{}
+
+	assert.NoError(t, src.RegisterCodec(
+		RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
+			PayloadType:        111,
+		}, RTPCodecTypeAudio))
+
+	assert.NoError(t, src.RegisterHeaderExtension(RTPHeaderExtensionCapability{"test-extension"}, RTPCodecTypeAudio))
+
+	validate := func(m *MediaEngine) {
+		assert.NoError(t, m.updateHeaderExtension(2, "test-extension", RTPCodecTypeAudio))
+
+		id, audioNegotiated, videoNegotiated := m.getHeaderExtensionID(RTPHeaderExtensionCapability{URI: "test-extension"})
+		assert.Equal(t, 2, id)
+		assert.True(t, audioNegotiated)
+		assert.False(t, videoNegotiated)
+	}
+
+	validate(&src)
+	validate(src.copy())
 }

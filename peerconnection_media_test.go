@@ -193,8 +193,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 	<-awaitRTPRecvClosed
 }
 
@@ -292,8 +291,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	onTrackFiredLock.Lock()
 	if onTrackFired {
@@ -463,8 +461,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	}()
 
 	<-onTrackFired
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
@@ -847,8 +844,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 			}
 		}()
 
-		assert.NoError(t, pcOffer.Close())
-		assert.NoError(t, pcAnswer.Close())
+		closePairNow(t, pcOffer, pcAnswer)
 	}
 
 	lim := test.TimeOut(time.Second * 30)
@@ -997,8 +993,7 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, started, "transceiver with mid 2 should be started")
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that failed Simulcast probing doesn't cause
@@ -1050,22 +1045,39 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerer, answerer))
 
-	peerConnectionConnected := sync.WaitGroup{}
-	peerConnectionConnected.Add(2)
-
-	connectionStateHandler := func(connectionState PeerConnectionState) {
-		if connectionState == PeerConnectionStateConnected {
-			peerConnectionConnected.Done()
-		}
-	}
-
-	offerer.OnConnectionStateChange(connectionStateHandler)
-	answerer.OnConnectionStateChange(connectionStateHandler)
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 	peerConnectionConnected.Wait()
 
 	<-seenFiveStreams.Done()
 
-	assert.NoError(t, answerer.Close())
-	assert.NoError(t, offerer.Close())
+	closePairNow(t, offerer, answerer)
 	close(testFinished)
+}
+
+// Assert that CreateOffer can't enter infinite loop
+// We attempt to generate an offer multiple times in case a user
+// has edited the PeerConnection. We can assert this broken behavior with an
+// empty MediaEngine. See pion/webrtc#1656 for full behavior
+func TestPeerConnection_CreateOffer_InfiniteLoop(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	m := &MediaEngine{}
+
+	pc, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pc.AddTrack(track)
+	assert.NoError(t, err)
+
+	_, err = pc.CreateOffer(nil)
+	assert.Error(t, err, errExcessiveRetries)
+
+	assert.NoError(t, pc.Close())
 }

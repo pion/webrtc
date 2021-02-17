@@ -139,3 +139,76 @@ func TestSettingEngine_SetICETCP(t *testing.T) {
 
 	assert.Equal(t, tcpMux, settingEngine.iceTCPMux)
 }
+
+func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
+	t.Run("Copy", func(t *testing.T) {
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		api := NewAPI(WithMediaEngine(m))
+
+		offerer, answerer, err := api.newPair(Configuration{})
+		assert.NoError(t, err)
+
+		_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerer, answerer))
+
+		// Assert that the MediaEngine the user created isn't modified
+		assert.False(t, m.negotiatedVideo)
+		assert.Empty(t, m.negotiatedVideoCodecs)
+
+		// Assert that the internal MediaEngine is modified
+		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
+		assert.NotEmpty(t, offerer.api.mediaEngine.negotiatedVideoCodecs)
+
+		closePairNow(t, offerer, answerer)
+
+		newOfferer, newAnswerer, err := api.newPair(Configuration{})
+		assert.NoError(t, err)
+
+		// Assert that the first internal MediaEngine hasn't been cleared
+		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
+		assert.NotEmpty(t, offerer.api.mediaEngine.negotiatedVideoCodecs)
+
+		// Assert that the new internal MediaEngine isn't modified
+		assert.False(t, newOfferer.api.mediaEngine.negotiatedVideo)
+		assert.Empty(t, newAnswerer.api.mediaEngine.negotiatedVideoCodecs)
+
+		closePairNow(t, newOfferer, newAnswerer)
+	})
+
+	t.Run("No Copy", func(t *testing.T) {
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		s := SettingEngine{}
+		s.DisableMediaEngineCopy(true)
+
+		api := NewAPI(WithMediaEngine(m), WithSettingEngine(s))
+
+		offerer, answerer, err := api.newPair(Configuration{})
+		assert.NoError(t, err)
+
+		_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerer, answerer))
+
+		// Assert that the user MediaEngine was modified, so no copy happened
+		assert.True(t, m.negotiatedVideo)
+		assert.NotEmpty(t, m.negotiatedVideoCodecs)
+
+		closePairNow(t, offerer, answerer)
+
+		offerer, answerer, err = api.newPair(Configuration{})
+		assert.NoError(t, err)
+
+		// Assert that the new internal MediaEngine was modified, so no copy happened
+		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
+		assert.NotEmpty(t, offerer.api.mediaEngine.negotiatedVideoCodecs)
+
+		closePairNow(t, offerer, answerer)
+	})
+}

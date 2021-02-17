@@ -85,7 +85,7 @@ type Packet struct {
 
 // Marshal encodes the Packet as binary.
 func (p Packet) Marshal() ([]byte, error) {
-	packetLength := len(p.Payload) + 8
+	packetLength := len(p.Payload)
 	if p.IsRTCP {
 		packetLength = 0
 	}
