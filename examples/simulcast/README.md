@@ -1,9 +1,14 @@
 # simulcast
 demonstrates of how to handle incoming track with multiple simulcast rtp streams and show all them back.
 
+The browser will not send higher quality streams unless it has the available bandwidth. You can look at
+the bandwidth estimation in `chrome://webrtc-internals`. It is under `VideoBwe` when `Read Stats From: Legacy non-Standard`
+is selected.
+
 ## Instructions
 ### Download simulcast
 ```
+export GO111MODULE=on
 go get github.com/pion/webrtc/v3/examples/simulcast
 ```
 
