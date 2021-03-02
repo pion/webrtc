@@ -88,9 +88,9 @@ type RTPParameters struct {
 type codecMatchType int
 
 const (
-	codecMatchNone codecMatchType = 0
+	codecMatchNone    codecMatchType = 0
 	codecMatchPartial codecMatchType = 1
-	codecMatchExact codecMatchType = 2
+	codecMatchExact   codecMatchType = 2
 )
 
 // Do a fuzzy find for a codec in the list of codecs
