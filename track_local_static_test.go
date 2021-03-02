@@ -35,7 +35,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		_, err = pc.AddTrack(track)
 		assert.NoError(t, err)
 
-		assert.True(t, errors.Is(signalPair(pc, noCodecPC), ErrUnsupportedCodec))
+		assert.ErrorIs(t, signalPair(pc, noCodecPC), ErrUnsupportedCodec)
 
 		closePairNow(t, noCodecPC, pc)
 	})

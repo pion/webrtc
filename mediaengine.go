@@ -334,37 +334,25 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 }
 
 // Look up a codec and enable if it exists
-func (m *MediaEngine) updateCodecParameters(remoteCodec RTPCodecParameters, typ RTPCodecType) error {
+func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType) (codecMatchType, error) {
 	codecs := m.videoCodecs
 	if typ == RTPCodecTypeAudio {
 		codecs = m.audioCodecs
 	}
 
-	pushCodec := func(codec RTPCodecParameters) error {
-		if typ == RTPCodecTypeAudio {
-			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
-		} else if typ == RTPCodecTypeVideo {
-			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
-		}
-		return nil
-	}
-
 	if strings.HasPrefix(remoteCodec.RTPCodecCapability.SDPFmtpLine, "apt=") {
 		payloadType, err := strconv.Atoi(strings.TrimPrefix(remoteCodec.RTPCodecCapability.SDPFmtpLine, "apt="))
 		if err != nil {
-			return err
+			return codecMatchNone, err
 		}
 
 		if _, _, err = m.getCodecByPayload(PayloadType(payloadType)); err != nil {
-			return nil // not an error, we just ignore this codec we don't support
+			return codecMatchNone, nil // not an error, we just ignore this codec we don't support
 		}
 	}
 
-	if _, err := codecParametersFuzzySearch(remoteCodec, codecs); err == nil {
-		return pushCodec(remoteCodec)
-	}
-
-	return nil
+	_, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
+	return matchType, nil
 }
 
 // Look up a header extension and enable if it exists
@@ -393,6 +381,16 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 	return nil
 }
 
+func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) {
+	for _, codec := range codecs {
+		if typ == RTPCodecTypeAudio {
+			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
+		} else if typ == RTPCodecTypeVideo {
+			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+		}
+	}
+}
+
 // Update the MediaEngine from a remote description
 func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error {
 	for _, media := range desc.MediaDescriptions {
@@ -413,10 +411,31 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			return err
 		}
 
+		exactMatches := make([]RTPCodecParameters, 0, len(codecs))
+		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
+
 		for _, codec := range codecs {
-			if err = m.updateCodecParameters(codec, typ); err != nil {
-				return err
+			matchType, mErr := m.matchRemoteCodec(codec, typ)
+			if mErr != nil {
+				return mErr
 			}
+
+			if matchType == codecMatchExact {
+				exactMatches = append(exactMatches, codec)
+			} else if matchType == codecMatchPartial {
+				partialMatches = append(partialMatches, codec)
+			}
+		}
+
+		// use exact matches when they exist, otherwise fall back to partial
+		switch {
+		case len(exactMatches) > 0:
+			m.pushCodecs(exactMatches, typ)
+		case len(partialMatches) > 0:
+			m.pushCodecs(partialMatches, typ)
+		default:
+			// no match, not negotiated
+			continue
 		}
 
 		extensions, err := rtpExtensionsFromMediaDescription(media)
