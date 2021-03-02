@@ -48,7 +48,7 @@ func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) (RTPCodecParameters, err
 	defer s.mu.Unlock()
 
 	parameters := RTPCodecParameters{RTPCodecCapability: s.codec}
-	if codec, err := codecParametersFuzzySearch(parameters, t.CodecParameters()); err == nil {
+	if codec, matchType := codecParametersFuzzySearch(parameters, t.CodecParameters()); matchType != codecMatchNone {
 		s.bindings = append(s.bindings, trackBinding{
 			ssrc:        t.SSRC(),
 			payloadType: codec.PayloadType,
