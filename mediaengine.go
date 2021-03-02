@@ -360,8 +360,9 @@ func (m *MediaEngine) updateCodecParameters(remoteCodec RTPCodecParameters, typ 
 		}
 	}
 
-	if _, err := codecParametersFuzzySearch(remoteCodec, codecs); err == nil {
-		return pushCodec(remoteCodec)
+	// push the local codec that matches remote
+	if codec, err := codecParametersFuzzySearch(remoteCodec, codecs); err == nil {
+		return pushCodec(codec)
 	}
 
 	return nil
