@@ -405,9 +405,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
 
 		for _, codec := range codecs {
-			matchType, err := m.matchRemoteCodec(codec, typ)
-			if err != nil {
-				return err
+			matchType, mErr := m.matchRemoteCodec(codec, typ)
+			if mErr != nil {
+				return mErr
 			}
 
 			if matchType == codecMatchExact {
@@ -417,24 +417,21 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			}
 		}
 
-		pushCodec := func(codec RTPCodecParameters) error {
-			if typ == RTPCodecTypeAudio {
-				m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
-			} else if typ == RTPCodecTypeVideo {
-				m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+		pushCodecs := func(codecs []RTPCodecParameters) {
+			for _, codec := range codecs {
+				if typ == RTPCodecTypeAudio {
+					m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
+				} else if typ == RTPCodecTypeVideo {
+					m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+				}
 			}
-			return nil
 		}
 
 		// use exact matches when they exist, otherwise fall back to partial
 		if len(exactMatches) > 0 {
-			for _, codec := range exactMatches {
-				pushCodec(codec)
-			}
+			pushCodecs(exactMatches)
 		} else {
-			for _, codec := range partialMatches {
-				pushCodec(codec)
-			}
+			pushCodecs(partialMatches)
 		}
 
 		extensions, err := rtpExtensionsFromMediaDescription(media)
