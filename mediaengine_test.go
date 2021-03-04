@@ -197,22 +197,15 @@ s=-
 t=0 0
 m=video 60323 UDP/TLS/RTP/SAVPF 96 98
 a=rtpmap:96 H264/90000
-a=rtcp-fb:96 goog-remb
-a=rtcp-fb:96 transport-cc
-a=rtcp-fb:96 ccm fir
-a=rtcp-fb:96 nack
-a=rtcp-fb:96 nack pli
 a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 a=rtpmap:98 H264/90000
-a=rtcp-fb:98 goog-remb
-a=rtcp-fb:98 transport-cc
-a=rtcp-fb:98 ccm fir
-a=rtcp-fb:98 nack
-a=rtcp-fb:98 nack pli
 a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
 `
 		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
+			PayloadType:        127,
+		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, m.negotiatedVideo)
@@ -233,22 +226,59 @@ s=-
 t=0 0
 m=video 60323 UDP/TLS/RTP/SAVPF 96 98
 a=rtpmap:96 H264/90000
-a=rtcp-fb:96 goog-remb
-a=rtcp-fb:96 transport-cc
-a=rtcp-fb:96 ccm fir
-a=rtcp-fb:96 nack
-a=rtcp-fb:96 nack pli
 a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 `
 		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
+			PayloadType:        127,
+		}, RTPCodecTypeVideo))
 		assert.Error(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
-
-		assert.False(t, m.negotiatedVideo)
-		assert.False(t, m.negotiatedAudio)
 
 		_, _, err := m.getCodecByPayload(96)
 		assert.Error(t, err)
+	})
+
+	t.Run("Matches when fmtpline is not set in offer, but exists in mediaengine", func(t *testing.T) {
+		const profileLevels = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 96
+a=rtpmap:96 VP9/90000
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", nil},
+			PayloadType:        98,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
+
+		assert.True(t, m.negotiatedVideo)
+
+		_, _, err := m.getCodecByPayload(96)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Matches when fmtpline exists in neither", func(t *testing.T) {
+		const profileLevels = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 96
+a=rtpmap:96 VP8/90000
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
+
+		assert.True(t, m.negotiatedVideo)
+
+		_, _, err := m.getCodecByPayload(96)
+		assert.NoError(t, err)
 	})
 }
 

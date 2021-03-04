@@ -101,8 +101,7 @@ func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecPa
 	// Exact matches means fmtp line cannot be empty
 	for _, c := range haystack {
 		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
-			c.RTPCodecCapability.SDPFmtpLine == needle.RTPCodecCapability.SDPFmtpLine &&
-			c.RTPCodecCapability.SDPFmtpLine != "" {
+			c.RTPCodecCapability.SDPFmtpLine == needle.RTPCodecCapability.SDPFmtpLine {
 			return c, codecMatchExact
 		}
 	}
