@@ -98,16 +98,19 @@ const (
 // Returns codecMatchExact, codecMatchPartial, or codecMatchNone
 func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecParameters) (RTPCodecParameters, codecMatchType) {
 	// First attempt to match on MimeType + SDPFmtpLine
+	// Exact matches means fmtp line cannot be empty
 	for _, c := range haystack {
 		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
-			c.RTPCodecCapability.SDPFmtpLine == needle.RTPCodecCapability.SDPFmtpLine {
+			c.RTPCodecCapability.SDPFmtpLine == needle.RTPCodecCapability.SDPFmtpLine &&
+			c.RTPCodecCapability.SDPFmtpLine != "" {
 			return c, codecMatchExact
 		}
 	}
 
-	// Fallback to just MimeType
+	// Fallback to just MimeType if either haystack or needle does not have fmtpline set
 	for _, c := range haystack {
-		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) {
+		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
+			(c.RTPCodecCapability.SDPFmtpLine == "" || needle.RTPCodecCapability.SDPFmtpLine == "") {
 			return c, codecMatchPartial
 		}
 	}

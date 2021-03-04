@@ -225,6 +225,31 @@ a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
 		_, _, err = m.getCodecByPayload(96)
 		assert.Error(t, err)
 	})
+
+	t.Run("Does not match when fmtpline is set and does not match", func(t *testing.T) {
+		const profileLevels = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 96 98
+a=rtpmap:96 H264/90000
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 transport-cc
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.Error(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.False(t, m.negotiatedAudio)
+
+		_, _, err := m.getCodecByPayload(96)
+		assert.Error(t, err)
+	})
 }
 
 func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
