@@ -1317,7 +1317,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			"offer recvonly answer recvonly",
 			RTPTransceiverDirectionRecvonly,
 			RTPTransceiverDirectionRecvonly,
-			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionInactive},
 		},
 	} {
 		offerDirection := test.offerDirection
@@ -1349,4 +1349,40 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			assert.NoError(t, pcAnswer.Close())
 		})
 	}
+}
+
+func TestPeerConnection_AddTrack(t *testing.T) {
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	codecs := pcOffer.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+	track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability,
+		util.MathRandAlpha(16), util.MathRandAlpha(16))
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromTrack(track, []RtpTransceiverInit{
+		{Direction: RTPTransceiverDirectionSendonly},
+	}...)
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo,
+		RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+	)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	assert.Equal(t, 2, len(pcAnswer.GetTransceivers()))
+	assert.Equal(t, RTPTransceiverDirectionRecvonly, pcAnswer.GetTransceivers()[0].Direction())
+	assert.Equal(t, RTPTransceiverDirectionInactive, pcAnswer.GetTransceivers()[1].Direction())
+
+	_, err = pcAnswer.AddTrack(track) // adding to `Recvonly' transceiver
+	assert.NoError(t, err)
+	_, err = pcAnswer.AddTrack(track) // adding to `Sendonly' transceiver
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }

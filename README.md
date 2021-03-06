@@ -265,6 +265,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [donotanswer](https://github.com/f-viktor)
 * [Reese](https://github.com/figadore)
 * [David Zhao](https://github.com/davidzhao)
+* [Markus Tzoe](https://github.com/zyxar)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

@@ -1052,7 +1052,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 				localDirection := RTPTransceiverDirectionRecvonly
 				if direction == RTPTransceiverDirectionRecvonly {
-					localDirection = RTPTransceiverDirectionSendonly
+					// new transceiver: set to inactive instead of sendonly since no track added
+					localDirection = RTPTransceiverDirectionInactive
 				}
 
 				t = pc.newRTPTransceiver(receiver, nil, localDirection, kind)
@@ -1060,7 +1061,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				pc.onNegotiationNeeded()
 			} else if direction == RTPTransceiverDirectionRecvonly {
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
-					t.setDirection(RTPTransceiverDirectionSendonly)
+					if t.Sender() != nil { // set to sendonly since track added already
+						t.setDirection(RTPTransceiverDirectionSendonly)
+					} else { // otherwise set to inactive
+						t.setDirection(RTPTransceiverDirectionInactive)
+					}
 				}
 			}
 
