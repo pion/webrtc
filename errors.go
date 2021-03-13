@@ -147,6 +147,9 @@ var (
 	// ErrSimulcastProbeOverflow indicates that too many Simulcast probe streams are in flight and the requested SSRC was ignored
 	ErrSimulcastProbeOverflow = errors.New("simulcast probe limit has been reached, new SSRC has been discarded")
 
+	// ErrRTCPPacketEmpty indicates that provided rtcp packet array is empty
+	ErrRTCPPacketEmpty = errors.New("rtcp packet is empty")
+
 	errDetachNotEnabled                 = errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	errDetachBeforeOpened               = errors.New("datachannel not opened yet, try calling Detach from OnOpen")
 	errDtlsTransportNotStarted          = errors.New("the DTLS transport has not started yet")
