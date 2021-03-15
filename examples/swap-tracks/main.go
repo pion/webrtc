@@ -44,7 +44,7 @@ func main() { // nolint:gocognit
 	}
 
 	// Read incoming RTCP packets
-	// Before these packets are retuned they are processed by interceptors. For things
+	// Before these packets are returned they are processed by interceptors. For things
 	// like NACK this needs to be called.
 	go func() {
 		rtcpBuf := make([]byte, 1500)
