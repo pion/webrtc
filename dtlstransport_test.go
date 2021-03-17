@@ -29,6 +29,10 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	pcAnswer.OnDataChannel(func(_ *DataChannel) {
+		t.Fatal("A DataChannel must not be created when Fingerprint verification fails")
+	})
+
 	defer closePairNow(t, pcOffer, pcAnswer)
 
 	offerChan := make(chan SessionDescription)
@@ -83,6 +87,12 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 
 	offerConnectionHasFailed.Wait()
 	answerConnectionHasFailed.Wait()
+
+	assert.Equal(t, pcOffer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	assert.Nil(t, pcOffer.SCTP().Transport().conn)
+
+	assert.Equal(t, pcAnswer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
