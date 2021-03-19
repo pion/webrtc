@@ -65,7 +65,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 	// Default Pion Audio Codecs
 	for _, codec := range []RTPCodecParameters{
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "minptime=10;useinbandfec=1", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "", nil},
 			PayloadType:        111,
 		},
 		{

@@ -71,7 +71,6 @@ s=-
 t=0 0
 m=audio 9 UDP/TLS/RTP/SAVPF 111
 a=rtpmap:111 opus/48000/2
-a=fmtp:111 minptime=10; useinbandfec=1
 `
 
 		m := MediaEngine{}
@@ -93,7 +92,6 @@ s=-
 t=0 0
 m=audio 9 UDP/TLS/RTP/SAVPF 112
 a=rtpmap:112 opus/48000/2
-a=fmtp:112 minptime=10; useinbandfec=1
 `
 
 		m := MediaEngine{}
@@ -118,7 +116,6 @@ s=-
 t=0 0
 m=audio 9 UDP/TLS/RTP/SAVPF 111
 a=rtpmap:111 OPUS/48000/2
-a=fmtp:111 minptime=10; useinbandfec=1
 `
 
 		m := MediaEngine{}
