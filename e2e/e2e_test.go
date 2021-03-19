@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/sclevine/agouti"
@@ -328,7 +329,24 @@ func parseLog(log agouti.Log) (string, string, bool) {
 }
 
 func createTrack(offer webrtc.SessionDescription) (*webrtc.PeerConnection, *webrtc.SessionDescription, *webrtc.TrackLocalStaticSample, error) {
-	pc, errPc := webrtc.NewPeerConnection(webrtc.Configuration{})
+	m := &webrtc.MediaEngine{}
+	// Explicitly request OPUS codec.
+	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: "audio/opus", ClockRate: 48000,
+		},
+		PayloadType: 100,
+	}, webrtc.RTPCodecTypeAudio); err != nil {
+		return nil, nil, nil, err
+	}
+
+	i := &interceptor.Registry{}
+	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+		return nil, nil, nil, err
+	}
+
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
+	pc, errPc := api.NewPeerConnection(webrtc.Configuration{})
 	if errPc != nil {
 		return nil, nil, nil, errPc
 	}
