@@ -128,12 +128,14 @@ func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 
 // writeRTP is like WriteRTP, except that it may modify the packet p
 func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
+	bindings := make([]trackBinding, len(s.bindings))
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	copy(bindings, s.bindings)
+	s.mu.RUnlock()
 
 	writeErrs := []error{}
 
-	for _, b := range s.bindings {
+	for _, b := range bindings {
 		p.Header.SSRC = uint32(b.ssrc)
 		p.Header.PayloadType = uint8(b.payloadType)
 		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
