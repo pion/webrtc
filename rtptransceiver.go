@@ -115,6 +115,12 @@ func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error {
 		t.setDirection(RTPTransceiverDirectionSendonly)
 	case track == nil && t.Direction() == RTPTransceiverDirectionSendrecv:
 		t.setDirection(RTPTransceiverDirectionRecvonly)
+	case track != nil && t.Direction() == RTPTransceiverDirectionSendonly:
+		// Handle the case where a sendonly transceiver was added by a negotiation
+		// initiated by remote peer. For example a remote peer added a transceiver
+		// with direction recvonly.
+	case track != nil && t.Direction() == RTPTransceiverDirectionSendrecv:
+		// Similar to above, but for sendrecv transceiver.
 	case track == nil && t.Direction() == RTPTransceiverDirectionSendonly:
 		t.setDirection(RTPTransceiverDirectionInactive)
 	default:
