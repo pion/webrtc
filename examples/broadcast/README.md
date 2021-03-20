@@ -20,11 +20,19 @@ Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 ### Start a publisher
 
 * Click `Publish a Broadcast`
-* `curl localhost:8080/sdp -d "YOUR SDP"`.  The `broadcast` application will respond with an offer, paste this into the second input field. Then press `Start Session`
+* Copy the string in the first input labelled `Browser base64 Session Description`
+* Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
+* The `broadcast` terminal application will respond with an answer, paste this into the second input field in your browser.
+* Press `Start Session`
+* The connection state will be printed in the terminal and under `logs` in the browser.
 
 ### Join the broadcast
 * Click `Join a Broadcast`
-* `curl localhost:8080/sdp -d "YOUR SDP"`. The `broadcast` application will respond with an offer, paste this into the second input field. Then press `Start Session`
+* Copy the string in the first input labelled `Browser base64 Session Description`
+* Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
+* The `broadcast` terminal application will respond with an answer, paste this into the second input field in your browser.
+* Press `Start Session`
+* The connection state will be printed in the terminal and under `logs` in the browser.
 
 You can change the listening port using `-port 8011`
 
