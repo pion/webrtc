@@ -340,8 +340,9 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		codecs = m.audioCodecs
 	}
 
-	if strings.HasPrefix(remoteCodec.RTPCodecCapability.SDPFmtpLine, "apt=") {
-		payloadType, err := strconv.Atoi(strings.TrimPrefix(remoteCodec.RTPCodecCapability.SDPFmtpLine, "apt="))
+	remoteFmtp := parseFmtp(remoteCodec.RTPCodecCapability.SDPFmtpLine)
+	if apt, hasApt := remoteFmtp["apt"]; hasApt {
+		payloadType, err := strconv.Atoi(apt)
 		if err != nil {
 			return codecMatchNone, err
 		}
