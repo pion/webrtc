@@ -1044,7 +1044,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				}
 			}
 
-			if t == nil {
+			switch {
+			case t == nil:
 				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
 				if err != nil {
 					return err
@@ -1058,9 +1059,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				t = pc.newRTPTransceiver(receiver, nil, localDirection, kind)
 
 				pc.onNegotiationNeeded()
-			} else if direction == RTPTransceiverDirectionRecvonly {
+			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
+				}
+			case direction == RTPTransceiverDirectionSendrecv:
+				if t.Direction() == RTPTransceiverDirectionSendonly {
+					t.setDirection(RTPTransceiverDirectionSendrecv)
 				}
 			}
 
