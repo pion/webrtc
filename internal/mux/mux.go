@@ -2,9 +2,12 @@
 package mux
 
 import (
+	"errors"
+	"io"
 	"net"
 	"sync"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/transport/packetio"
 )
@@ -104,11 +107,19 @@ func (m *Mux) readLoop() {
 	buf := make([]byte, m.bufferSize)
 	for {
 		n, err := m.nextConn.Read(buf)
-		if err != nil {
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, ice.ErrClosed):
+			return
+		case errors.Is(err, io.ErrShortBuffer), errors.Is(err, packetio.ErrTimeout):
+			m.log.Errorf("mux: failed to read from packetio.Buffer %s\n", err.Error())
+			continue
+		case err != nil:
+			m.log.Errorf("mux: ending readLoop packetio.Buffer error %s\n", err.Error())
 			return
 		}
 
 		if err = m.dispatch(buf[:n]); err != nil {
+			m.log.Errorf("mux: ending readLoop dispatch error %s\n", err.Error())
 			return
 		}
 	}
