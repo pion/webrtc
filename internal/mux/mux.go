@@ -108,8 +108,7 @@ func (m *Mux) readLoop() {
 			return
 		}
 
-		err = m.dispatch(buf[:n])
-		if err != nil {
+		if err = m.dispatch(buf[:n]); err != nil {
 			return
 		}
 	}

@@ -13,11 +13,6 @@ func MatchAll(b []byte) bool {
 	return true
 }
 
-// MatchNone always returns false
-func MatchNone(b []byte) bool {
-	return false
-}
-
 // MatchRange is a MatchFunc that accepts packets with the first byte in [lower..upper]
 func MatchRange(lower, upper byte) MatchFunc {
 	return func(buf []byte) bool {
@@ -43,28 +38,10 @@ func MatchRange(lower, upper byte) MatchFunc {
 //              |    [128..191] -+--> forward to RTP/RTCP
 //              +----------------+
 
-// MatchSTUN is a MatchFunc that accepts packets with the first byte in [0..3]
-// as defied in RFC7983
-func MatchSTUN(b []byte) bool {
-	return MatchRange(0, 3)(b)
-}
-
-// MatchZRTP is a MatchFunc that accepts packets with the first byte in [16..19]
-// as defied in RFC7983
-func MatchZRTP(b []byte) bool {
-	return MatchRange(16, 19)(b)
-}
-
 // MatchDTLS is a MatchFunc that accepts packets with the first byte in [20..63]
 // as defied in RFC7983
 func MatchDTLS(b []byte) bool {
 	return MatchRange(20, 63)(b)
-}
-
-// MatchTURN is a MatchFunc that accepts packets with the first byte in [64..79]
-// as defied in RFC7983
-func MatchTURN(b []byte) bool {
-	return MatchRange(64, 79)(b)
 }
 
 // MatchSRTPOrSRTCP is a MatchFunc that accepts packets with the first byte in [128..191]
