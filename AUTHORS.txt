@@ -111,6 +111,7 @@ Pascal Benoit <pascal.benoit@acemediastools.fr>
 pascal-ace <47424881+pascal-ace@users.noreply.github.com>
 Patrick Lange <mail@langep.com>
 Patryk Rogalski <digitalix4@gmail.com>
+Pieere Pi <pihuibin@hotmail.com>
 q191201771 <191201771@qq.com>
 Quentin Renard <contact@asticode.com>
 Rafael Viscarra <rafael@viscarra.dev>
