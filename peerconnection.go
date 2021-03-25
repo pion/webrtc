@@ -1904,6 +1904,11 @@ func (pc *PeerConnection) NewRTPSender(track TrackLocal) (*RTPSender, error) {
 	return pc.api.NewRTPSender(track, pc.dtlsTransport)
 }
 
+// NewRTPReceiver creates a new RTPReceiver for kind
+func (pc *PeerConnection) NewRTPReceiver(kind RTPCodecType) (*RTPReceiver, error) {
+	return pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
+}
+
 func (pc *PeerConnection) newRTPTransceiver(
 	receiver *RTPReceiver,
 	sender *RTPSender,
