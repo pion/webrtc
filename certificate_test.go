@@ -9,7 +9,10 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -98,4 +101,19 @@ func TestGenerateCertificateExpires(t *testing.T) {
 	x509Cert := CertificateFromX509(sk, &x509.Certificate{})
 	assert.NotNil(t, x509Cert)
 	assert.Contains(t, x509Cert.statsID, "certificate")
+}
+
+func TestGetOrCreateCertificate(t *testing.T) {
+	randBytes := make([]byte, 16)
+	n, err := rand.Read(randBytes)
+	assert.NoError(t, err)
+	assert.Equal(t, n, 16)
+	fn := filepath.Join(os.TempDir(), hex.EncodeToString(randBytes))
+	cert1, err := GetOrCreateCertificate(fn)
+	assert.NoError(t, err)
+	cert2, err := GetOrCreateCertificate(fn)
+	assert.NoError(t, err)
+	assert.True(t, cert1.privateKeyEquals(*cert2))
+	assert.True(t, cert1.Equals(*cert2))
+	_ = os.Remove(fn)
 }

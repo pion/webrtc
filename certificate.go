@@ -5,14 +5,19 @@ package webrtc
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
@@ -24,6 +29,56 @@ type Certificate struct {
 	privateKey crypto.PrivateKey
 	x509Cert   *x509.Certificate
 	statsID    string
+}
+
+// GetOrCreateCertificate is used to preserve certificate consistency using
+// a .pem file. The function will first try to read the certificate from the
+// the file. If it fails, it will create a new certificate and save it in
+// the file.
+func GetOrCreateCertificate(filename string) (*Certificate, error) {
+	pb, err := ioutil.ReadFile(filepath.Clean(filename))
+	if err != nil {
+		var sk *ecdsa.PrivateKey
+		var c *Certificate
+		sk, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate private key: %w", err)
+		}
+		c, err = GenerateCertificate(sk)
+		if err != nil {
+			return nil, err
+		}
+		err = c.Save(filename)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to save certificate to %q: %w", filename, err)
+		}
+		return c, nil
+	}
+	// decode & parse the certificate
+	block, pb := pem.Decode(pb)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, errCertificateFileFormatError
+	}
+	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
+	n, err := base64.StdEncoding.Decode(certBytes, block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode ceritifcate: %w", err)
+	}
+	cert, err := x509.ParseCertificate(certBytes[:n])
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing ceritifcate: %w", err)
+	}
+	// decode & parse the private key
+	block, _ = pem.Decode(pb)
+	if block == nil || block.Type != "PRIVATE KEY" {
+		return nil, errCertificateFileFormatError
+	}
+	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse private key: %w", err)
+	}
+	return NewCertificate(privateKey, *cert)
 }
 
 // NewCertificate generates a new x509 compliant Certificate to be used
@@ -60,29 +115,58 @@ func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, 
 	return &Certificate{privateKey: key, x509Cert: cert, statsID: fmt.Sprintf("certificate-%d", time.Now().UnixNano())}, nil
 }
 
-// Equals determines if two certificates are identical by comparing both the
-// secretKeys and x509Certificates.
-func (c Certificate) Equals(o Certificate) bool {
+// Save saves a certificate to a pem encoded file named `name`
+func (c Certificate) Save(name string) error {
+	o, err := os.Create(name)
+	if err != nil {
+		return fmt.Errorf("failed to create private key file: %w", err)
+	}
+	defer func() {
+		_ = o.Close()
+	}()
+	// First write the X509 certificate
+	xcertBytes := make(
+		[]byte, base64.StdEncoding.EncodedLen(len(c.x509Cert.Raw)))
+	base64.StdEncoding.Encode(xcertBytes, c.x509Cert.Raw)
+	err = pem.Encode(o, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
+	if err != nil {
+		return fmt.Errorf("failed to pem encode the X certificate: %w", err)
+	}
+	// Next write the private key
+	privBytes, err := x509.MarshalPKCS8PrivateKey(c.privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to marshal private key: %w", err)
+	}
+	err = pem.Encode(o, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	if err != nil {
+		return fmt.Errorf("failed to encode private key: %w", err)
+	}
+	return nil
+}
+
+func (c Certificate) privateKeyEquals(o Certificate) bool {
 	switch cSK := c.privateKey.(type) {
 	case *rsa.PrivateKey:
 		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
-			if cSK.N.Cmp(oSK.N) != 0 {
-				return false
-			}
-			return c.x509Cert.Equal(o.x509Cert)
+			return cSK.N.Cmp(oSK.N) == 0
 		}
 		return false
 	case *ecdsa.PrivateKey:
 		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
-			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
-				return false
-			}
-			return c.x509Cert.Equal(o.x509Cert)
+			return cSK.X.Cmp(oSK.X) == 0 && cSK.Y.Cmp(oSK.Y) == 0
 		}
 		return false
-	default:
-		return false
 	}
+	return false
+}
+
+// Equals determines if two certificates are identical by comparing both the
+// secretKeys and x509Certificates.
+func (c Certificate) Equals(o Certificate) bool {
+	if c.privateKeyEquals(o) {
+		return c.x509Cert.Equal(o.x509Cert)
+	}
+	return false
 }
 
 // Expires returns the timestamp after which this certificate is no longer valid.
@@ -145,7 +229,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 		BasicConstraintsValid: true,
 		NotBefore:             time.Now(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		NotAfter:              time.Now().AddDate(0, 1, 0),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
 		SerialNumber:          serialNumber,
 		Version:               2,
 		Subject:               pkix.Name{CommonName: hex.EncodeToString(origin)},
