@@ -78,7 +78,8 @@ func GetOrCreateCertificate(filename string) (*Certificate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse private key: %w", err)
 	}
-	return NewCertificate(privateKey, *cert)
+	r := CertificateFromX509(privateKey, cert)
+	return &r, nil
 }
 
 // NewCertificate generates a new x509 compliant Certificate to be used
