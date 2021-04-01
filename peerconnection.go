@@ -1828,25 +1828,7 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 }
 
 func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes) (int, error) {
-	raw, err := rtcp.Marshal(pkts)
-	if err != nil {
-		return 0, err
-	}
-
-	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
-	if err != nil {
-		return 0, nil
-	}
-
-	writeStream, err := srtcpSession.OpenWriteStream()
-	if err != nil {
-		return 0, fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
-	}
-
-	if n, err := writeStream.Write(raw); err != nil {
-		return n, err
-	}
-	return 0, nil
+	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
 // Close ends the PeerConnection
