@@ -191,7 +191,7 @@ func CertificateFromPEM(pems string) (*Certificate, error) {
 	// decode & parse the certificate
 	block, more := pem.Decode([]byte(pems))
 	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errCertificateFileFormatError
+		return nil, errCertificatePEMFormatError
 	}
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
 	n, err := base64.StdEncoding.Decode(certBytes, block.Bytes)
@@ -205,7 +205,7 @@ func CertificateFromPEM(pems string) (*Certificate, error) {
 	// decode & parse the private key
 	block, _ = pem.Decode(more)
 	if block == nil || block.Type != "PRIVATE KEY" {
-		return nil, errCertificateFileFormatError
+		return nil, errCertificatePEMFormatError
 	}
 	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {

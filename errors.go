@@ -218,5 +218,5 @@ var (
 
 	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
 
-	errCertificateFileFormatError = errors.New("Certificate file format error")
+	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
 )
