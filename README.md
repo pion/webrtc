@@ -271,6 +271,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Nam V. Do](https://github.com/namvdo)
 * [Markus Tzoe](https://github.com/zyxar)
 * [Benny Daon](https://github.com/daonb)
+* [Tomek](https://github.com/trojek)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
