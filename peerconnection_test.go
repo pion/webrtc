@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -59,6 +60,21 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	}
 	<-answerGatheringComplete
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
+}
+
+func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
+	parsed := &sdp.SessionDescription{}
+	if err := parsed.Unmarshal([]byte(offer.SDP)); err != nil {
+		return false
+	}
+
+	for _, media := range parsed.MediaDescriptions {
+		if media.MediaName.Media == kind.String() {
+			_, exists := media.Attribute(direction.String())
+			return exists
+		}
+	}
+	return false
 }
 
 func TestNew(t *testing.T) {
@@ -649,4 +665,48 @@ func TestSetRemoteDescriptionInvalid(t *testing.T) {
 
 		assert.NoError(t, pc.Close())
 	})
+}
+
+func TestAddTransceiver(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	for _, testCase := range []struct {
+		expectSender, expectReceiver bool
+		direction                    RTPTransceiverDirection
+	}{
+		{true, true, RTPTransceiverDirectionSendrecv},
+		// Go and WASM diverge
+		// {true, false, RTPTransceiverDirectionSendonly},
+		// {false, true, RTPTransceiverDirectionRecvonly},
+	} {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+			Direction: testCase.direction,
+		})
+		assert.NoError(t, err)
+
+		if testCase.expectReceiver {
+			assert.NotNil(t, transceiver.Receiver())
+		} else {
+			assert.Nil(t, transceiver.Receiver())
+		}
+
+		if testCase.expectSender {
+			assert.NotNil(t, transceiver.Sender())
+		} else {
+			assert.Nil(t, transceiver.Sender())
+		}
+
+		offer, err := pc.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		assert.True(t, offerMediaHasDirection(offer, RTPCodecTypeVideo, testCase.direction))
+		assert.NoError(t, pc.Close())
+	}
 }

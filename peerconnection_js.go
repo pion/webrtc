@@ -488,6 +488,40 @@ func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
 	}
 }
 
+// AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
+func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (transceiver *RTPTransceiver, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = recoveryToError(e)
+		}
+	}()
+
+	if len(init) == 1 {
+		return &RTPTransceiver{
+			underlying: pc.underlying.Call("addTransceiver", kind.String(), rtpTransceiverInitInitToValue(init[0])),
+		}, err
+
+	}
+
+	return &RTPTransceiver{
+		underlying: pc.underlying.Call("addTransceiver", kind.String()),
+	}, err
+}
+
+// GetTransceivers returns the RtpTransceiver that are currently attached to this PeerConnection
+func (pc *PeerConnection) GetTransceivers() (transceivers []*RTPTransceiver) {
+	rawTransceivers := pc.underlying.Call("getTransceivers")
+	transceivers = make([]*RTPTransceiver, rawTransceivers.Length())
+
+	for i := 0; i < rawTransceivers.Length(); i++ {
+		transceivers[i] = &RTPTransceiver{
+			underlying: rawTransceivers.Index(i),
+		}
+	}
+
+	return
+}
+
 // Converts a Configuration to js.Value so it can be passed
 // through to the JavaScript WebRTC API. Any zero values are converted to
 // js.Undefined(), which will result in the default value being used.
@@ -672,5 +706,11 @@ func dataChannelInitToValue(options *DataChannelInit) js.Value {
 		"protocol":          stringPointerToValue(options.Protocol),
 		"negotiated":        boolPointerToValue(options.Negotiated),
 		"id":                uint16PointerToValue(options.ID),
+	})
+}
+
+func rtpTransceiverInitInitToValue(init RtpTransceiverInit) js.Value {
+	return js.ValueOf(map[string]interface{}{
+		"direction": init.Direction.String(),
 	})
 }

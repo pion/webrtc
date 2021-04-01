@@ -1637,7 +1637,7 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) (err error) {
 	return nil
 }
 
-// AddTransceiverFromKind Create a new RtpTransceiver(SendRecv or RecvOnly) and add it to the set of transceivers.
+// AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
 func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -1651,7 +1651,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 	}
 
 	switch direction {
-	case RTPTransceiverDirectionSendrecv:
+	case RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv:
 		codecs := pc.api.mediaEngine.getCodecsByKind(kind)
 		if len(codecs) == 0 {
 			return nil, ErrNoCodecsAvailable
