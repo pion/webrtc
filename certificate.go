@@ -61,29 +61,30 @@ func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, 
 
 	return &Certificate{privateKey: key, x509Cert: cert, statsID: fmt.Sprintf("certificate-%d", time.Now().UnixNano())}, nil
 }
-func (c Certificate) privateKeyEquals(o Certificate) bool {
-	switch cSK := c.privateKey.(type) {
-	case *rsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
-			return cSK.N.Cmp(oSK.N) == 0
-		}
-		return false
-	case *ecdsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
-			return cSK.X.Cmp(oSK.X) == 0 && cSK.Y.Cmp(oSK.Y) == 0
-		}
-		return false
-	}
-	return false
-}
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
 func (c Certificate) Equals(o Certificate) bool {
-	if c.privateKeyEquals(o) {
-		return c.x509Cert.Equal(o.x509Cert)
+	switch cSK := c.privateKey.(type) {
+	case *rsa.PrivateKey:
+		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
+			if cSK.N.Cmp(oSK.N) != 0 {
+				return false
+			}
+			return c.x509Cert.Equal(o.x509Cert)
+		}
+		return false
+	case *ecdsa.PrivateKey:
+		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
+			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
+				return false
+			}
+			return c.x509Cert.Equal(o.x509Cert)
+		}
+		return false
+	default:
+		return false
 	}
-	return false
 }
 
 // Expires returns the timestamp after which this certificate is no longer valid.
