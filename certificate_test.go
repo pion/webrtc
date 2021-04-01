@@ -9,10 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -103,17 +100,17 @@ func TestGenerateCertificateExpires(t *testing.T) {
 	assert.Contains(t, x509Cert.statsID, "certificate")
 }
 
-func TestGetOrCreateCertificate(t *testing.T) {
-	randBytes := make([]byte, 16)
-	n, err := rand.Read(randBytes)
-	assert.NoError(t, err)
-	assert.Equal(t, n, 16)
-	fn := filepath.Join(os.TempDir(), hex.EncodeToString(randBytes))
-	cert1, err := GetOrCreateCertificate(fn)
-	assert.NoError(t, err)
-	cert2, err := GetOrCreateCertificate(fn)
-	assert.NoError(t, err)
-	assert.True(t, cert1.privateKeyEquals(*cert2))
-	assert.True(t, cert1.Equals(*cert2))
-	_ = os.Remove(fn)
+func TestPEM(t *testing.T) {
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
+	cert, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	pem, err := cert.PEM()
+	assert.Nil(t, err)
+	cert2, err := CertificateFromPEM(pem)
+	assert.Nil(t, err)
+	pem2, err := cert2.PEM()
+	assert.Nil(t, err)
+	assert.Equal(t, pem, pem2)
 }
