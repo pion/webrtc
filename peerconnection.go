@@ -571,7 +571,10 @@ func (pc *PeerConnection) getStatsID() string {
 }
 
 func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) bool {
-	for _, t := range pc.GetTransceivers() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	for _, t := range pc.rtpTransceivers {
 		m := getByMid(t.Mid(), desc)
 		if m == nil {
 			return true
@@ -1532,11 +1535,10 @@ func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 }
 
 // GetSenders returns the RTPSender that are currently attached to this PeerConnection
-func (pc *PeerConnection) GetSenders() []*RTPSender {
+func (pc *PeerConnection) GetSenders() (result []*RTPSender) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	result := []*RTPSender{}
 	for _, transceiver := range pc.rtpTransceivers {
 		if transceiver.Sender() != nil {
 			result = append(result, transceiver.Sender())
@@ -1573,7 +1575,8 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	}
 
 	var transceiver *RTPTransceiver
-	for _, t := range pc.GetTransceivers() {
+	pc.mu.Lock()
+	for _, t := range pc.rtpTransceivers {
 		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
 			transceiver = t
 			break
@@ -1581,19 +1584,23 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	}
 	if transceiver != nil {
 		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err == nil {
+			err = transceiver.SetSender(sender, track)
+			if err != nil {
+				_ = sender.Stop()
+				transceiver.setSender(nil)
+			}
+		}
+		pc.mu.Unlock()
 		if err != nil {
 			return nil, err
 		}
-		transceiver.setSender(sender)
-		// we still need to call setSendingTrack to ensure direction has changed
-		if err := transceiver.setSendingTrack(track); err != nil {
-			return nil, err
-		}
-		pc.onNegotiationNeeded()
 
+		pc.onNegotiationNeeded()
 		return sender, nil
 	}
 
+	pc.mu.Unlock()
 	transceiver, err := pc.AddTransceiverFromTrack(track)
 	if err != nil {
 		return nil, err
@@ -1603,31 +1610,30 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 }
 
 // RemoveTrack removes a Track from the PeerConnection
-func (pc *PeerConnection) RemoveTrack(sender *RTPSender) error {
+func (pc *PeerConnection) RemoveTrack(sender *RTPSender) (err error) {
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
 	var transceiver *RTPTransceiver
-	for _, t := range pc.GetTransceivers() {
+	pc.mu.Lock()
+	for _, t := range pc.rtpTransceivers {
 		if t.Sender() == sender {
 			transceiver = t
 			break
 		}
 	}
-
 	if transceiver == nil {
-		return &rtcerr.InvalidAccessError{Err: ErrSenderNotCreatedByConnection}
-	} else if err := sender.Stop(); err != nil {
-		return err
+		err = &rtcerr.InvalidAccessError{Err: ErrSenderNotCreatedByConnection}
+	} else if err = sender.Stop(); err == nil {
+		err = transceiver.setSendingTrack(nil)
 	}
-
-	if err := transceiver.setSendingTrack(nil); err != nil {
+	pc.mu.Unlock()
+	if err != nil {
 		return err
 	}
 
 	pc.onNegotiationNeeded()
-
 	return nil
 }
 
@@ -1855,11 +1861,13 @@ func (pc *PeerConnection) Close() error {
 	closeErrs = append(closeErrs, pc.api.interceptor.Close())
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
-	for _, t := range pc.GetTransceivers() {
+	pc.mu.Lock()
+	for _, t := range pc.rtpTransceivers {
 		if !t.stopped {
 			closeErrs = append(closeErrs, t.Stop())
 		}
 	}
+	pc.mu.Unlock()
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
 	pc.sctpTransport.lock.Lock()
