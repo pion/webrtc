@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
@@ -15,7 +16,7 @@ func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Create a MediaEngine object to configure the supported codec
-	m := webrtc.MediaEngine{}
+	m := &webrtc.MediaEngine{}
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 and Opus but you can also define your own
@@ -26,8 +27,19 @@ func main() {
 		panic(err)
 	}
 
+	// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
+	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
+	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
+	// for each PeerConnection.
+	i := &interceptor.Registry{}
+
+	// Use the default set of Interceptors
+	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+		panic(err)
+	}
+
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -50,9 +62,22 @@ func main() {
 	}
 
 	// Add this newly created track to the PeerConnection
-	if _, err = peerConnection.AddTrack(outputTrack); err != nil {
+	rtpSender, err := peerConnection.AddTrack(outputTrack)
+	if err != nil {
 		panic(err)
 	}
+
+	// Read incoming RTCP packets
+	// Before these packets are returned they are processed by interceptors. For things
+	// like NACK this needs to be called.
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
 
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
@@ -82,7 +107,7 @@ func main() {
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().MimeType)
 		for {
 			// Read RTP packets being sent to Pion
-			rtp, readErr := track.ReadRTP()
+			rtp, _, readErr := track.ReadRTP()
 			if readErr != nil {
 				panic(readErr)
 			}

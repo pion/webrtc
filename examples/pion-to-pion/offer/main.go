@@ -66,7 +66,7 @@ func main() { //nolint:gocognit
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
 			pendingCandidates = append(pendingCandidates, c)
-		} else if onICECandidateErr := signalCandidate(*answerAddr, c); err != nil {
+		} else if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
 			panic(onICECandidateErr)
 		}
 	})

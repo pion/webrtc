@@ -374,8 +374,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_PropertyGetters(t *testing.T) {
@@ -418,11 +417,15 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	offerPeerConn, err := NewPeerConnection(Configuration{})
+	offerPeerConn, answerPeerConn, err := newPair()
 	assert.NoError(t, err)
 
-	answerPeerConn, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
+	inChecking, inCheckingCancel := context.WithCancel(context.Background())
+	answerPeerConn.OnICEConnectionStateChange(func(i ICEConnectionState) {
+		if i == ICEConnectionStateChecking {
+			inCheckingCancel()
+		}
+	})
 
 	_, err = offerPeerConn.CreateDataChannel("test-channel", nil)
 	assert.NoError(t, err)
@@ -431,9 +434,11 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, offerPeerConn.SetLocalDescription(offer))
 
+	assert.NoError(t, offerPeerConn.Close())
+
 	assert.NoError(t, answerPeerConn.SetRemoteDescription(offer))
 
-	assert.NoError(t, offerPeerConn.Close())
+	<-inChecking.Done()
 	assert.NoError(t, answerPeerConn.Close())
 
 	_, err = answerPeerConn.CreateAnswer(nil)
@@ -592,8 +597,7 @@ func TestPeerConnection_OfferingLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_AnsweringLite(t *testing.T) {
@@ -631,8 +635,7 @@ func TestPeerConnection_AnsweringLite(t *testing.T) {
 	})
 
 	<-iceComplete
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestOnICEGatheringStateChange(t *testing.T) {
@@ -786,8 +789,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 
 	<-answerPCConnected.Done()
 	<-offerPCConnected.Done()
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 // Issue #1121, assert populateLocalCandidates doesn't mutate
@@ -852,8 +854,7 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	})
 	<-onDataChannel.Done()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestICERestart(t *testing.T) {
@@ -932,8 +933,7 @@ func TestICERestart(t *testing.T) {
 	// Compare ICE Candidates across each run, fail if they haven't changed
 	assert.NotEqual(t, firstOfferCandidates, extractCandidates(offerPC.LocalDescription().SDP))
 	assert.NotEqual(t, firstAnswerCandidates, extractCandidates(answerPC.LocalDescription().SDP))
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
 }
 
 // Assert error handling when an Agent is restart
@@ -1037,8 +1037,7 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	assert.Equal(t, testMessage, <-dataChannelMessages)
 
 	assert.NoError(t, wan.Stop())
-	assert.NoError(t, offerPeerConnection.Close())
-	assert.NoError(t, answerPeerConnection.Close())
+	closePairNow(t, offerPeerConnection, answerPeerConnection)
 }
 
 type trackRecords struct {
@@ -1155,6 +1154,199 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		}
 	}
 	close(stopped)
-	assert.NoError(t, offerPC.Close())
-	assert.NoError(t, answerPC.Close())
+	closePairNow(t, offerPC, answerPC)
+}
+
+func TestEmptyCandidate(t *testing.T) {
+	testCases := []struct {
+		ICECandidate ICECandidateInit
+		expectError  bool
+	}{
+		{ICECandidateInit{"", nil, nil, nil}, false},
+		{ICECandidateInit{
+			"211962667 1 udp 2122194687 10.0.3.1 40864 typ host generation 0",
+			nil, nil, nil,
+		}, false},
+		{ICECandidateInit{
+			"1234567",
+			nil, nil, nil,
+		}, true},
+	}
+
+	for i, testCase := range testCases {
+		peerConn, err := NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Errorf("Case %d: got error: %v", i, err)
+		}
+
+		err = peerConn.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer})
+		if err != nil {
+			t.Errorf("Case %d: got error: %v", i, err)
+		}
+
+		if testCase.expectError {
+			assert.Error(t, peerConn.AddICECandidate(testCase.ICECandidate))
+		} else {
+			assert.NoError(t, peerConn.AddICECandidate(testCase.ICECandidate))
+		}
+
+		assert.NoError(t, peerConn.Close())
+	}
+}
+
+const liteOffer = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=msid-semantic: WMS
+a=ice-lite
+m=application 47299 DTLS/SCTP 5000
+c=IN IP4 192.168.20.129
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:data
+`
+
+// this test asserts that if an ice-lite offer is received,
+// pion will take the ICE-CONTROLLING role
+func TestICELite(t *testing.T) {
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetRemoteDescription(
+		SessionDescription{SDP: liteOffer, Type: SDPTypeOffer},
+	))
+
+	SDPAnswer, err := peerConnection.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetLocalDescription(SDPAnswer))
+
+	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.role,
+		"pion did not set state to ICE-CONTROLLED against ice-light offer")
+
+	assert.NoError(t, peerConnection.Close())
+}
+
+func TestPeerConnection_TransceiverDirection(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	createTransceiver := func(pc *PeerConnection, dir RTPTransceiverDirection) error {
+		// AddTransceiverFromKind() can't be used with sendonly
+		if dir == RTPTransceiverDirectionSendonly {
+			codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+
+			track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+			if err != nil {
+				return err
+			}
+
+			_, err = pc.AddTransceiverFromTrack(track, []RtpTransceiverInit{
+				{Direction: dir},
+			}...)
+			return err
+		}
+
+		_, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RtpTransceiverInit{Direction: dir},
+		)
+		return err
+	}
+
+	for _, test := range []struct {
+		name                  string
+		offerDirection        RTPTransceiverDirection
+		answerStartDirection  RTPTransceiverDirection
+		answerFinalDirections []RTPTransceiverDirection
+	}{
+		{
+			"offer sendrecv answer sendrecv",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
+		},
+		{
+			"offer sendonly answer sendrecv",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer sendrecv",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionSendrecv,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		},
+		{
+			"offer sendrecv answer sendonly",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer sendonly answer sendonly",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer sendonly",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionSendonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		},
+		{
+			"offer sendrecv answer recvonly",
+			RTPTransceiverDirectionSendrecv,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer sendonly answer recvonly",
+			RTPTransceiverDirectionSendonly,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
+		},
+		{
+			"offer recvonly answer recvonly",
+			RTPTransceiverDirectionRecvonly,
+			RTPTransceiverDirectionRecvonly,
+			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly},
+		},
+	} {
+		offerDirection := test.offerDirection
+		answerStartDirection := test.answerStartDirection
+		answerFinalDirections := test.answerFinalDirections
+
+		t.Run(test.name, func(t *testing.T) {
+			pcOffer, pcAnswer, err := newPair()
+			assert.NoError(t, err)
+
+			err = createTransceiver(pcOffer, offerDirection)
+			assert.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+
+			err = createTransceiver(pcAnswer, answerStartDirection)
+			assert.NoError(t, err)
+
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			assert.Equal(t, len(answerFinalDirections), len(pcAnswer.GetTransceivers()))
+
+			for i, tr := range pcAnswer.GetTransceivers() {
+				assert.Equal(t, answerFinalDirections[i], tr.Direction())
+			}
+
+			assert.NoError(t, pcOffer.Close())
+			assert.NoError(t, pcAnswer.Close())
+		})
+	}
 }

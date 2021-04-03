@@ -25,7 +25,7 @@ Run `echo $BROWSER_SDP | rtp-to-webrtc`
 1. Run `rtp-to-webrtc < my_file`
 
 ### Send RTP to listening socket
-On startup you will get a message `Waiting for RTP Packets`, you can use any software to send VP8 packets to port 5004. We also have the pre made examples below
+You can use any software to send VP8 packets to port 5004. We also have the pre made examples below
 
 
 #### GStreamer
@@ -35,7 +35,13 @@ gst-launch-1.0 videotestsrc ! video/x-raw,width=640,height=480,format=I420 ! vp8
 
 #### ffmpeg
 ```
-ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libvpx -cpu-used 5 -deadline 1 -g 10 -error-resilient 1 -auto-alt-ref 1 -f rtp rtp://127.0.0.1:5004
+ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libvpx -cpu-used 5 -deadline 1 -g 10 -error-resilient 1 -auto-alt-ref 1 -f rtp rtp://127.0.0.1:5004?pkt_size=1200
+```
+
+If you wish to send audio replace both occurrences of `vp8` in `main.go` then run
+
+```
+ffmpeg -f lavfi -i "sine=frequency=1000" -c:a libopus -b:a 48000 -sample_fmt s16p -ssrc 1 -payload_type 111 -f rtp -max_delay 0 -application lowdelay rtp:/127.0.0.1:5004?pkt_size=1200
 ```
 
 ### Input rtp-to-webrtc's SessionDescription into your browser
@@ -45,3 +51,9 @@ Copy the text that `rtp-to-webrtc` just emitted and copy into second text area
 A video should start playing in your browser above the input boxes.
 
 Congrats, you have used Pion WebRTC! Now start building something cool
+
+## Dealing with broken/lossy inputs
+Pion WebRTC also provides a [SampleBuilder](https://pkg.go.dev/github.com/pion/webrtc/v3@v3.0.4/pkg/media/samplebuilder). This consumes RTP packets and returns samples.
+It can be used to re-order and delay for lossy streams. You can see its usage in this example in [daf27b](https://github.com/pion/webrtc/commit/daf27bd0598233b57428b7809587ec3c09510413).
+
+Currently it isn't working with H264, but is useful for VP8 and Opus. See [#1652](https://github.com/pion/webrtc/issues/1652) for the status of fixing for H264.

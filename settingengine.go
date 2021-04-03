@@ -3,10 +3,12 @@
 package webrtc
 
 import (
+	"io"
 	"time"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
+	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/vnet"
 	"golang.org/x/net/proxy"
 )
@@ -53,9 +55,11 @@ type SettingEngine struct {
 	disableSRTPReplayProtection               bool
 	disableSRTCPReplayProtection              bool
 	vnet                                      *vnet.Net
+	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceProxyDialer                            proxy.Dialer
+	disableMediaEngineCopy                    bool
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -251,4 +255,11 @@ func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
 func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
 	e.iceProxyDialer = d
+}
+
+// DisableMediaEngineCopy stops the MediaEngine from being copied. This allows a user to modify
+// the MediaEngine after the PeerConnection has been constructed. This is useful if you wish to
+// modify codecs after signaling. Make sure not to share MediaEngines between PeerConnections.
+func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
+	e.disableMediaEngineCopy = isDisabled
 }

@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"context"
 	"regexp"
 	"testing"
 	"time"
@@ -14,6 +13,9 @@ import (
 
 // An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
 func TestInvalidFingerprintCausesFailed(t *testing.T) {
+	lim := test.TimeOut(time.Second * 40)
+	defer lim.Stop()
+
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -27,6 +29,10 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	pcAnswer.OnDataChannel(func(_ *DataChannel) {
+		t.Fatal("A DataChannel must not be created when Fingerprint verification fails")
+	})
+
 	defer closePairNow(t, pcOffer, pcAnswer)
 
 	offerChan := make(chan SessionDescription)
@@ -36,12 +42,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		}
 	})
 
-	connectionHasFailed, closeFunc := context.WithCancel(context.Background())
-	pcAnswer.OnConnectionStateChange(func(connectionState PeerConnectionState) {
-		if connectionState == PeerConnectionStateFailed {
-			closeFunc()
-		}
-	})
+	offerConnectionHasFailed := untilConnectionState(PeerConnectionStateFailed, pcOffer)
+	answerConnectionHasFailed := untilConnectionState(PeerConnectionStateFailed, pcAnswer)
 
 	if _, err = pcOffer.CreateDataChannel("unusedDataChannel", nil); err != nil {
 		t.Fatal(err)
@@ -73,6 +75,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		answer.SDP = re.ReplaceAllString(answer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
+
 		err = pcOffer.SetRemoteDescription(answer)
 		if err != nil {
 			t.Fatal(err)
@@ -81,11 +85,14 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal("timed out waiting to receive offer")
 	}
 
-	select {
-	case <-connectionHasFailed.Done():
-	case <-time.After(30 * time.Second):
-		t.Fatal("timed out waiting for connection to fail")
-	}
+	offerConnectionHasFailed.Wait()
+	answerConnectionHasFailed.Wait()
+
+	assert.Equal(t, pcOffer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	assert.Nil(t, pcOffer.SCTP().Transport().conn)
+
+	assert.Equal(t, pcAnswer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
@@ -107,20 +114,9 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		connectionComplete := make(chan interface{})
-		answerPC.OnConnectionStateChange(func(connectionState PeerConnectionState) {
-			if connectionState == PeerConnectionStateConnected {
-				select {
-				case <-connectionComplete:
-				default:
-					close(connectionComplete)
-				}
-			}
-		})
-
-		<-connectionComplete
-		assert.NoError(t, offerPC.Close())
-		assert.NoError(t, answerPC.Close())
+		connectionComplete := untilConnectionState(PeerConnectionStateConnected, answerPC)
+		connectionComplete.Wait()
+		closePairNow(t, offerPC, answerPC)
 	}
 
 	report := test.CheckRoutines(t)

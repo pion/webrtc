@@ -5,6 +5,7 @@ package webrtc
 import (
 	"io"
 	"sync"
+	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/randutil"
@@ -16,8 +17,11 @@ import (
 type RTPSender struct {
 	track TrackLocal
 
-	srtpStream *srtpWriterFuture
-	context    TrackLocalContext
+	srtpStream      *srtpWriterFuture
+	rtcpInterceptor interceptor.RTCPReader
+	streamInfo      interceptor.StreamInfo
+
+	context TrackLocalContext
 
 	transport *DTLSTransport
 
@@ -36,8 +40,6 @@ type RTPSender struct {
 
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan struct{}
-
-	interceptorRTCPReader interceptor.RTCPReader
 }
 
 // NewRTPSender constructs a new RTPSender
@@ -64,8 +66,12 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 		srtpStream: &srtpWriterFuture{},
 	}
 
-	r.interceptorRTCPReader = api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(r.readRTCP))
 	r.srtpStream.rtpSender = r
+
+	r.rtcpInterceptor = r.api.interceptor.BindRTCPReader(interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+		n, err = r.srtpStream.Read(in)
+		return n, a, err
+	}))
 
 	return r, nil
 }
@@ -92,8 +98,21 @@ func (r *RTPSender) Transport() *DTLSTransport {
 
 // GetParameters describes the current configuration for the encoding and
 // transmission of media on the sender's track.
-func (r *RTPSender) GetParameters() RTPParameters {
-	return r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
+func (r *RTPSender) GetParameters() RTPSendParameters {
+	return RTPSendParameters{
+		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
+			r.track.Kind(),
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		),
+		Encodings: []RTPEncodingParameters{
+			{
+				RTPCodingParameters: RTPCodingParameters{
+					SSRC:        r.ssrc,
+					PayloadType: r.payloadType,
+				},
+			},
+		},
+	}
 }
 
 // Track returns the RTCRtpTransceiver track, or nil
@@ -143,12 +162,11 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderSendAlreadyCalled
 	}
 
-	writeStream := &interceptorTrackLocalWriter{TrackLocalWriter: r.srtpStream}
-
+	writeStream := &interceptorToTrackLocalWriter{}
 	r.context = TrackLocalContext{
 		id:          r.id,
 		params:      r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
-		ssrc:        parameters.Encodings.SSRC,
+		ssrc:        parameters.Encodings[0].SSRC,
 		writeStream: writeStream,
 	}
 
@@ -158,33 +176,11 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	}
 	r.context.params.Codecs = []RTPCodecParameters{codec}
 
-	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(r.context.params.HeaderExtensions))
-	for _, h := range r.context.params.HeaderExtensions {
-		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
-	}
-	feedbacks := make([]interceptor.RTCPFeedback, 0, len(codec.RTCPFeedback))
-	for _, f := range codec.RTCPFeedback {
-		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
-	}
-	info := &interceptor.StreamInfo{
-		ID:                  r.context.id,
-		Attributes:          interceptor.Attributes{},
-		SSRC:                uint32(r.context.ssrc),
-		PayloadType:         uint8(codec.PayloadType),
-		RTPHeaderExtensions: headerExtensions,
-		MimeType:            codec.MimeType,
-		ClockRate:           codec.ClockRate,
-		Channels:            codec.Channels,
-		SDPFmtpLine:         codec.SDPFmtpLine,
-		RTCPFeedback:        feedbacks,
-	}
-	writeStream.setRTPWriter(
-		r.api.interceptor.BindLocalStream(
-			info,
-			interceptor.RTPWriterFunc(func(p *rtp.Packet, attributes interceptor.Attributes) (int, error) {
-				return r.srtpStream.WriteRTP(&p.Header, p.Payload)
-			}),
-		))
+	r.streamInfo = createStreamInfo(r.id, parameters.Encodings[0].SSRC, codec.PayloadType, codec.RTPCodecCapability, parameters.HeaderExtensions)
+	rtpInterceptor := r.api.interceptor.BindLocalStream(&r.streamInfo, interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+		return r.srtpStream.WriteRTP(header, payload)
+	}))
+	writeStream.interceptor.Store(rtpInterceptor)
 
 	close(r.sendCalled)
 	return nil
@@ -210,29 +206,25 @@ func (r *RTPSender) Stop() error {
 		return err
 	}
 
+	r.api.interceptor.UnbindLocalStream(&r.streamInfo)
+
 	return r.srtpStream.Close()
 }
 
 // Read reads incoming RTCP for this RTPReceiver
-func (r *RTPSender) Read(b []byte) (n int, err error) {
+func (r *RTPSender) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.sendCalled:
-		return r.srtpStream.Read(b)
+		return r.rtcpInterceptor.Read(b, a)
 	case <-r.stopCalled:
-		return 0, io.ErrClosedPipe
+		return 0, nil, io.ErrClosedPipe
 	}
 }
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you.
-// It also runs any configured interceptors.
-func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, error) {
-	pkts, _, err := r.interceptorRTCPReader.Read()
-	return pkts, err
-}
-
-func (r *RTPSender) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
+func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, receiveMTU)
-	i, err := r.Read(b)
+	i, attributes, err := r.Read(b)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -242,7 +234,13 @@ func (r *RTPSender) readRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 		return nil, nil, err
 	}
 
-	return pkts, make(interceptor.Attributes), nil
+	return pkts, attributes, nil
+}
+
+// SetReadDeadline sets the deadline for the Read operation.
+// Setting to zero means no deadline.
+func (r *RTPSender) SetReadDeadline(t time.Time) error {
+	return r.srtpStream.SetReadDeadline(t)
 }
 
 // hasSent tells if data has been ever sent for this instance

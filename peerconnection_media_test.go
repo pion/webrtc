@@ -5,6 +5,7 @@ package webrtc
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -103,7 +105,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}()
 
 		go func() {
-			_, routineErr := receiver.Read(make([]byte, 1400))
+			_, _, routineErr := receiver.Read(make([]byte, 1400))
 			if routineErr != nil {
 				awaitRTCPReceiverRecv <- routineErr
 			} else {
@@ -113,7 +115,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 		haveClosedAwaitRTPRecv := false
 		for {
-			p, routineErr := track.ReadRTP()
+			p, _, routineErr := track.ReadRTP()
 			if routineErr != nil {
 				close(awaitRTPRecvClosed)
 				return
@@ -166,7 +168,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
-		if _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
+		if _, _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
 			close(awaitRTCPSenderRecv)
 		}
 	}()
@@ -191,8 +193,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 	<-awaitRTPRecvClosed
 }
 
@@ -290,8 +291,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	onTrackFiredLock.Lock()
 	if onTrackFired {
@@ -461,8 +461,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 	}()
 
 	<-onTrackFired
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
@@ -686,11 +685,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
-	_, err = sender.Read(make([]byte, 0, 1400))
+	_, _, err = sender.Read(make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
-	_, err = receiver.Read(make([]byte, 0, 1400))
+	_, _, err = receiver.Read(make([]byte, 0, 1400))
 	assert.Error(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
@@ -845,8 +844,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 			}
 		}()
 
-		assert.NoError(t, pcOffer.Close())
-		assert.NoError(t, pcAnswer.Close())
+		closePairNow(t, pcOffer, pcAnswer)
 	}
 
 	lim := test.TimeOut(time.Second * 30)
@@ -995,6 +993,139 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, started, "transceiver with mid 2 should be started")
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
+// Assert that failed Simulcast probing doesn't cause
+// the handleUndeclaredSSRC to be leaked
+func TestPeerConnection_Simulcast_Probe(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = offerer.AddTrack(track)
+	assert.NoError(t, err)
+
+	ticker := time.NewTicker(time.Millisecond * 20)
+	testFinished := make(chan struct{})
+	seenFiveStreams, seenFiveStreamsCancel := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <-testFinished:
+				return
+			case <-ticker.C:
+				answerer.dtlsTransport.lock.Lock()
+				if len(answerer.dtlsTransport.simulcastStreams) >= 5 {
+					seenFiveStreamsCancel()
+				}
+				answerer.dtlsTransport.lock.Unlock()
+
+				track.mu.Lock()
+				if len(track.bindings) == 1 {
+					_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
+						Version: 2,
+						SSRC:    randutil.NewMathRandomGenerator().Uint32(),
+					}, []byte{0, 1, 2, 3, 4, 5})
+					assert.NoError(t, err)
+				}
+				track.mu.Unlock()
+			}
+		}
+	}()
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
+	peerConnectionConnected.Wait()
+
+	<-seenFiveStreams.Done()
+
+	closePairNow(t, offerer, answerer)
+	close(testFinished)
+}
+
+// Assert that CreateOffer can't enter infinite loop
+// We attempt to generate an offer multiple times in case a user
+// has edited the PeerConnection. We can assert this broken behavior with an
+// empty MediaEngine. See pion/webrtc#1656 for full behavior
+func TestPeerConnection_CreateOffer_InfiniteLoop(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	m := &MediaEngine{}
+
+	pc, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = pc.AddTrack(track)
+	assert.NoError(t, err)
+
+	_, err = pc.CreateOffer(nil)
+	assert.Error(t, err, errExcessiveRetries)
+
+	assert.NoError(t, pc.Close())
+}
+
+// Assert that AddTrack is thread-safe
+func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	addTrack := func() *TrackLocalStaticSample {
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "foo", "bar")
+		assert.NoError(t, err)
+		_, err = pc.AddTrack(track)
+		assert.NoError(t, err)
+		return track
+	}
+
+	for i := 0; i < 10; i++ {
+		addTrack()
+	}
+	for _, tr := range pc.GetTransceivers() {
+		assert.NoError(t, pc.RemoveTrack(tr.Sender()))
+	}
+
+	var wg sync.WaitGroup
+	tracks := make([]*TrackLocalStaticSample, 10)
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func(j int) {
+			tracks[j] = addTrack()
+			wg.Done()
+		}(i)
+	}
+
+	wg.Wait()
+
+	for _, track := range tracks {
+		have := false
+		for _, t := range pc.GetTransceivers() {
+			if t.Sender() != nil && t.Sender().Track() == track {
+				have = true
+				break
+			}
+		}
+		if !have {
+			t.Errorf("track was added but not found on senders")
+		}
+	}
+
+	assert.NoError(t, pc.Close())
 }

@@ -38,22 +38,22 @@ func main() { // nolint:gocognit
 	}
 
 	// Add this newly created track to the PeerConnection
-	if _, err = peerConnection.AddTrack(outputTrack); err != nil {
+	rtpSender, err := peerConnection.AddTrack(outputTrack)
+	if err != nil {
 		panic(err)
 	}
 
-	// In addition to the implicit transceiver added by the track, we add two more
-	// for the other tracks
-	_, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo,
-		webrtc.RtpTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly})
-	if err != nil {
-		panic(err)
-	}
-	_, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo,
-		webrtc.RtpTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly})
-	if err != nil {
-		panic(err)
-	}
+	// Read incoming RTCP packets
+	// Before these packets are returned they are processed by interceptors. For things
+	// like NACK this needs to be called.
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
 
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
@@ -85,7 +85,7 @@ func main() { // nolint:gocognit
 		var isCurrTrack bool
 		for {
 			// Read RTP packets being sent to Pion
-			rtp, readErr := track.ReadRTP()
+			rtp, _, readErr := track.ReadRTP()
 			if readErr != nil {
 				panic(readErr)
 			}
@@ -139,8 +139,7 @@ func main() { // nolint:gocognit
 	// in a production application you should exchange ICE Candidates via OnICECandidate
 	<-gatherComplete
 
-	// Output the answer in base64 so we can paste it in browser
-	fmt.Printf("Paste below base64 in browser:\n%v\n", signal.Encode(*peerConnection.LocalDescription()))
+	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
 	// Asynchronously take all packets in the channel and write them out to our
 	// track

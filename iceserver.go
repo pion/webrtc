@@ -10,10 +10,10 @@ import (
 // ICEServer describes a single STUN and TURN server that can be used by
 // the ICEAgent to establish a connection with a peer.
 type ICEServer struct {
-	URLs           []string
-	Username       string
-	Credential     interface{}
-	CredentialType ICECredentialType
+	URLs           []string          `json:"urls"`
+	Username       string            `json:"username,omitempty"`
+	Credential     interface{}       `json:"credential,omitempty"`
+	CredentialType ICECredentialType `json:"credentialType,omitempty"`
 }
 
 func (s ICEServer) parseURL(i int) (*ice.URL, error) {

@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,12 +69,15 @@ func TestSessionDescription_Unmarshal(t *testing.T) {
 		SDP:  offer.SDP,
 	}
 	assert.Nil(t, desc.parsed)
-	parsed, err := desc.Unmarshal()
-	assert.NotNil(t, parsed)
+	parsed1, err := desc.Unmarshal()
+	assert.NotNil(t, parsed1)
 	assert.NotNil(t, desc.parsed)
 	assert.NoError(t, err)
-	parsed, err = desc.Unmarshal()
-	assert.NotNil(t, parsed)
-	assert.NoError(t, err)
+	parsed2, err2 := desc.Unmarshal()
+	assert.NotNil(t, parsed2)
+	assert.NoError(t, err2)
 	assert.NoError(t, pc.Close())
+
+	// check if the two parsed results _really_ match, could be affected by internal caching
+	assert.True(t, reflect.DeepEqual(parsed1, parsed2))
 }

@@ -35,10 +35,9 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		_, err = pc.AddTrack(track)
 		assert.NoError(t, err)
 
-		assert.True(t, errors.Is(signalPair(pc, noCodecPC), ErrUnsupportedCodec))
+		assert.ErrorIs(t, signalPair(pc, noCodecPC), ErrUnsupportedCodec)
 
-		assert.NoError(t, noCodecPC.Close())
-		assert.NoError(t, pc.Close())
+		closePairNow(t, noCodecPC, pc)
 	})
 
 	t.Run("Answerer", func(t *testing.T) {
@@ -62,8 +61,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 
 		assert.True(t, errors.Is(signalPair(vp9OnlyPC, pc), ErrUnsupportedCodec))
 
-		assert.NoError(t, vp9OnlyPC.Close())
-		assert.NoError(t, pc.Close())
+		closePairNow(t, vp9OnlyPC, pc)
 	})
 
 	t.Run("Local", func(t *testing.T) {
@@ -77,8 +75,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.True(t, errors.Is(signalPair(offerer, answerer), ErrUnsupportedCodec))
-		assert.NoError(t, offerer.Close())
-		assert.NoError(t, answerer.Close())
+		closePairNow(t, offerer, answerer)
 	})
 }
 
@@ -108,8 +105,7 @@ func Test_TrackLocalStatic_Closed(t *testing.T) {
 
 	assert.Equal(t, len(vp8Writer.bindings), 1, "binding should exist after signaling")
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 
 	assert.Equal(t, len(vp8Writer.bindings), 0, "No binding should exist after close")
 }
@@ -160,8 +156,7 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
 
-	assert.NoError(t, offerer.Close())
-	assert.NoError(t, answerer.Close())
+	closePairNow(t, offerer, answerer)
 }
 
 // Assert that writing to a Track doesn't modify the input
@@ -190,8 +185,7 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	assert.Equal(t, pkt.Header.SSRC, uint32(1))
 	assert.Equal(t, pkt.Header.PayloadType, uint8(1))
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that writing to a Track that has Binded (but not connected)
@@ -227,6 +221,30 @@ func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
 	_, err = vp8Writer.Write(make([]byte, 20))
 	assert.NoError(t, err)
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func BenchmarkTrackLocalWrite(b *testing.B) {
+	offerPC, answerPC, err := newPair()
+	defer closePairNow(b, offerPC, answerPC)
+	if err != nil {
+		b.Fatalf("Failed to create a PC pair for testing")
+	}
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	assert.NoError(b, err)
+
+	_, err = offerPC.AddTrack(track)
+	assert.NoError(b, err)
+
+	_, err = answerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(b, err)
+
+	b.SetBytes(1024)
+
+	buf := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		_, err := track.Write(buf)
+		assert.NoError(b, err)
+	}
 }

@@ -8,39 +8,51 @@ import (
 	"net"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
 type udpConn struct {
-	conn *net.UDPConn
-	port int
+	conn        *net.UDPConn
+	port        int
+	payloadType uint8
 }
 
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Create a MediaEngine object to configure the supported codec
-	m := webrtc.MediaEngine{}
+	m := &webrtc.MediaEngine{}
 
 	// Setup the codecs you want to use.
 	// We'll use a VP8 and Opus but you can also define your own
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        96,
 	}, webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/opus", ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        111,
 	}, webrtc.RTPCodecTypeAudio); err != nil {
 		panic(err)
 	}
 
+	// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
+	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
+	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
+	// for each PeerConnection.
+	i := &interceptor.Registry{}
+
+	// Use the default set of Interceptors
+	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+		panic(err)
+	}
+
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -71,9 +83,11 @@ func main() {
 	}
 
 	// Prepare udp conns
+	// Also update incoming packets with expected PayloadType, the browser may use
+	// a different value. We have to modify so our stream matches what rtp-forwarder.sdp expects
 	udpConns := map[string]*udpConn{
-		"audio": {port: 4000},
-		"video": {port: 4002},
+		"audio": {port: 4000, payloadType: 111},
+		"video": {port: 4002, payloadType: 96},
 	}
 	for _, c := range udpConns {
 		// Create remote addr
@@ -114,11 +128,23 @@ func main() {
 		}()
 
 		b := make([]byte, 1500)
+		rtpPacket := &rtp.Packet{}
 		for {
 			// Read
-			n, readErr := track.Read(b)
+			n, _, readErr := track.Read(b)
 			if readErr != nil {
 				panic(readErr)
+			}
+
+			// Unmarshal the packet and update the PayloadType
+			if err = rtpPacket.Unmarshal(b[:n]); err != nil {
+				panic(err)
+			}
+			rtpPacket.PayloadType = c.payloadType
+
+			// Marshal into original buffer with updated PayloadType
+			if n, err = rtpPacket.MarshalTo(b); err != nil {
+				panic(err)
 			}
 
 			// Write

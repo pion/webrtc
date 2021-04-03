@@ -79,6 +79,7 @@ func TestNew(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, pc)
+	assert.NoError(t, pc.Close())
 }
 
 func TestPeerConnection_SetConfiguration(t *testing.T) {
@@ -229,6 +230,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
+	assert.NoError(t, pc.Close())
 }
 
 const minimalOffer = `v=0
@@ -239,6 +241,7 @@ a=msid-semantic: WMS
 m=application 47299 DTLS/SCTP 5000
 c=IN IP4 192.168.20.129
 a=candidate:1966762134 1 udp 2122260223 192.168.20.129 47299 typ host generation 0
+a=candidate:1966762134 1 udp 2122262783 2001:db8::1 47199 typ host generation 0
 a=candidate:211962667 1 udp 2122194687 10.0.3.1 40864 typ host generation 0
 a=candidate:1002017894 1 tcp 1518280447 192.168.20.129 0 typ host tcptype active generation 0
 a=candidate:1109506011 1 tcp 1518214911 10.0.3.1 0 typ host tcptype active generation 0
@@ -304,8 +307,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	_, err = answerPeerConn.CreateAnswer(nil)
 	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
 
-	assert.NoError(t, offerPeerConn.Close())
-	assert.NoError(t, answerPeerConn.Close())
+	closePairNow(t, offerPeerConn, answerPeerConn)
 }
 
 func TestPeerConnection_EventHandlers(t *testing.T) {
@@ -403,8 +405,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 		t.Fatalf("timed out waiting for one or more events handlers to be called (these *were* called: %+v)", wasCalled)
 	}
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 func TestMultipleOfferAnswer(t *testing.T) {
@@ -434,8 +435,7 @@ func TestMultipleOfferAnswer(t *testing.T) {
 		t.Errorf("Second Offer: got error: %v", err)
 	}
 
-	assert.NoError(t, firstPeerConn.Close())
-	assert.NoError(t, secondPeerConn.Close())
+	closePairNow(t, firstPeerConn, secondPeerConn)
 }
 
 func TestNoFingerprintInFirstMediaIfSetRemoteDescription(t *testing.T) {
@@ -561,8 +561,7 @@ func TestMultipleCreateChannel(t *testing.T) {
 
 	wg.Wait()
 
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
@@ -633,8 +632,7 @@ func TestGatherOnSetLocalDescription(t *testing.T) {
 		t.Error(err.Error())
 	}
 	<-pcAnswerGathered
-	assert.NoError(t, pcOffer.Close())
-	assert.NoError(t, pcAnswer.Close())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 // Assert that SetRemoteDescription handles invalid states

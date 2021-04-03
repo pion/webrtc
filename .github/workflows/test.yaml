@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.14", "1.15"]
+        go: ["1.15", "1.16"]
       fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
@@ -21,6 +21,7 @@ jobs:
         with:
           path: |
             ~/go/pkg/mod
+            ~/go/bin
             ~/.cache
           key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
@@ -31,13 +32,16 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
+      - name: Setup go-acc
+        run: |
+          go get github.com/ory/go-acc
+          git checkout go.mod go.sum
+
       - name: Run test
         run: |
-          go test \
-          -coverprofile=cover.out -covermode=atomic \
+          go-acc -o cover.out ./... -- \
           -bench=. \
-          -tags quic \
-          -v -race ./...
+          -v -race
 
       - uses: codecov/codecov-action@v1
         with:
@@ -50,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.14", "1.15"]
+        go: ["1.15", "1.16"]
       fail-fast: false
     name: Go i386 ${{ matrix.go }}
     steps:
@@ -78,7 +82,7 @@ jobs:
           -w /go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
           i386/golang:${{matrix.go}}-alpine \
           /usr/local/go/bin/go test \
-            -tags quic \
+            ${TEST_EXTRA_ARGS:-} \
             -v ./...
 
   test-wasm:
@@ -90,7 +94,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Use Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
         with:
           node-version: '12.x'
 
@@ -106,7 +110,7 @@ jobs:
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
         env:
-          GO_VERSION: 1.15
+          GO_VERSION: 1.16
 
       - name: Set Go Root
         run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV

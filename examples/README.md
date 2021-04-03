@@ -25,7 +25,6 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [Data Channels Detach](data-channels-detach): The data-channels-detach example shows how you can send/recv DataChannel messages using the underlying DataChannel implementation directly. This provides a more idiomatic way of interacting with Data Channels.
 * [Data Channels Detach Create](data-channels-detach-create): Example data-channels-detach-create shows how you can send/recv DataChannel messages using the underlying DataChannel implementation directly. This provides a more idiomatic way of interacting with Data Channels. The difference with the data-channels-detach example is that the data channel is initialized in this example.
 * [ORTC](ortc): Example ortc shows how you an use the ORTC API for DataChannel communication.
-* [ORTC QUIC](ortc-quic): Example ortc-quic shows how you an use the ORTC API for QUIC DataChannel communication.
 * [Pion to Pion](pion-to-pion): Example pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.
 
 #### Miscellaneous
@@ -49,6 +48,11 @@ We've made it easy to run the browser based examples on your local machine.
     ```
 
 ### WebAssembly
+Pion WebRTC can be used when compiled to WebAssembly, also known as WASM. In
+this case the library will act as a wrapper around the JavaScript WebRTC API.
+This allows you to use WebRTC from Go in both server and browser side code with
+little to no changes
+
 Some of our examples have support for WebAssembly. The same examples server documented above can be used to run the WebAssembly examples. However, you have to compile them first. This is done as follows:
 
 1. If the example supports WebAssembly it will contain a `main.go` file under the `jsfiddle` folder.

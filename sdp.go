@@ -216,8 +216,8 @@ func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dt
 		MediaName: sdp.MediaName{
 			Media:   mediaSectionApplication,
 			Port:    sdp.RangedPort{Value: 9},
-			Protos:  []string{"DTLS", "SCTP"},
-			Formats: []string{"5000"},
+			Protos:  []string{"UDP", "DTLS", "SCTP"},
+			Formats: []string{"webrtc-datachannel"},
 		},
 		ConnectionInformation: &sdp.ConnectionInformation{
 			NetworkType: "IN",
@@ -230,7 +230,7 @@ func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dt
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
-		WithPropertyAttribute("sctpmap:5000 webrtc-datachannel 1024").
+		WithPropertyAttribute("sctp-port:5000").
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
 	for _, f := range dtlsFingerprints {
@@ -400,13 +400,13 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		}
 
 		shouldAddID := true
-		shouldAddCanidates := i == 0
+		shouldAddCandidates := i == 0
 		if m.data {
-			if err = addDataMediaSection(d, shouldAddCanidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState); err != nil {
+			if err = addDataMediaSection(d, shouldAddCandidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState); err != nil {
 				return nil, err
 			}
 		} else {
-			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCanidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m)
+			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCandidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m)
 			if err != nil {
 				return nil, err
 			}

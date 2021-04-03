@@ -12,10 +12,12 @@ import (
 func GatheringCompletePromise(pc *PeerConnection) (gatherComplete <-chan struct{}) {
 	gatheringComplete, done := context.WithCancel(context.Background())
 
+	// It's possible to miss the GatherComplete event since setGatherCompleteHandler is an atomic operation and the
+	// promise might have been created after the gathering is finished. Therefore, we need to check if the ICE gathering
+	// state has changed to complete so that we don't block the caller forever.
+	pc.setGatherCompleteHandler(func() { done() })
 	if pc.ICEGatheringState() == ICEGatheringStateComplete {
 		done()
-	} else {
-		pc.setGatherCompleteHandler(func() { done() })
 	}
 
 	return gatheringComplete.Done()

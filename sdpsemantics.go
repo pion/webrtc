@@ -1,5 +1,9 @@
 package webrtc
 
+import (
+	"encoding/json"
+)
+
 // SDPSemantics determines which style of SDP offers and answers
 // can be used
 type SDPSemantics int
@@ -27,6 +31,19 @@ const (
 	sdpSemanticsPlanB                   = "plan-b"
 )
 
+func newSDPSemantics(raw string) SDPSemantics {
+	switch raw {
+	case sdpSemanticsUnifiedPlan:
+		return SDPSemanticsUnifiedPlan
+	case sdpSemanticsPlanB:
+		return SDPSemanticsPlanB
+	case sdpSemanticsUnifiedPlanWithFallback:
+		return SDPSemanticsUnifiedPlanWithFallback
+	default:
+		return SDPSemantics(Unknown)
+	}
+}
+
 func (s SDPSemantics) String() string {
 	switch s {
 	case SDPSemanticsUnifiedPlanWithFallback:
@@ -38,4 +55,20 @@ func (s SDPSemantics) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// UnmarshalJSON parses the JSON-encoded data and stores the result
+func (s *SDPSemantics) UnmarshalJSON(b []byte) error {
+	var val string
+	if err := json.Unmarshal(b, &val); err != nil {
+		return err
+	}
+
+	*s = newSDPSemantics(val)
+	return nil
+}
+
+// MarshalJSON returns the JSON encoding
+func (s SDPSemantics) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
 }

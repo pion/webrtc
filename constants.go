@@ -15,5 +15,11 @@ const (
 	// mid and rid values
 	simulcastProbeCount = 10
 
+	// simulcastMaxProbeRoutines is how many active routines can be used to probe
+	// If the total amount of incoming SSRCes exceeds this new requests will be ignored
+	simulcastMaxProbeRoutines = 25
+
 	mediaSectionApplication = "application"
+
+	rtpOutboundMTU = 1200
 )
