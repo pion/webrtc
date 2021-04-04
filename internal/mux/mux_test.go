@@ -1,13 +1,18 @@
 package mux
 
 import (
+	"io"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/pion/logging"
+	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
+	"github.com/stretchr/testify/assert"
 )
+
+const testPipeBufferSize = 8192
 
 func TestStressDuplex(t *testing.T) {
 	// Limit runtime in case of deadlocks
@@ -34,40 +39,26 @@ func stressDuplex(t *testing.T) {
 		MsgCount: 100,
 	}
 
-	err := test.StressDuplex(ca, cb, opt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, test.StressDuplex(ca, cb, opt))
 }
 
 func pipeMemory() (*Endpoint, net.Conn, func(*testing.T)) {
 	// In memory pipe
 	ca, cb := net.Pipe()
 
-	matchAll := func([]byte) bool {
-		return true
-	}
-
-	config := Config{
+	m := NewMux(Config{
 		Conn:          ca,
-		BufferSize:    8192,
+		BufferSize:    testPipeBufferSize,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	}
+	})
 
-	m := NewMux(config)
-	e := m.NewEndpoint(matchAll)
+	e := m.NewEndpoint(MatchAll)
 	m.RemoveEndpoint(e)
-	e = m.NewEndpoint(matchAll)
+	e = m.NewEndpoint(MatchAll)
 
 	stop := func(t *testing.T) {
-		err := cb.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = m.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, cb.Close())
+		assert.NoError(t, m.Close())
 	}
 
 	return e, cb, stop
@@ -76,28 +67,78 @@ func pipeMemory() (*Endpoint, net.Conn, func(*testing.T)) {
 func TestNoEndpoints(t *testing.T) {
 	// In memory pipe
 	ca, cb := net.Pipe()
-	err := cb.Close()
-	if err != nil {
-		panic("Failed to close network pipe")
-	}
+	assert.NoError(t, cb.Close())
 
-	config := Config{
+	m := NewMux(Config{
 		Conn:          ca,
-		BufferSize:    8192,
+		BufferSize:    testPipeBufferSize,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	}
+	})
+	assert.NoError(t, m.dispatch(make([]byte, 1)))
+	assert.NoError(t, m.Close())
+	assert.NoError(t, ca.Close())
+}
 
-	m := NewMux(config)
-	err = m.dispatch(make([]byte, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = m.Close()
-	if err != nil {
-		t.Fatalf("Failed to close empty mux")
-	}
-	err = ca.Close()
-	if err != nil {
-		panic("Failed to close network pipe")
-	}
+type muxErrorConnReadResult struct {
+	err  error
+	data []byte
+}
+
+// muxErrorConn
+type muxErrorConn struct {
+	net.Conn
+	readResults []muxErrorConnReadResult
+}
+
+func (m *muxErrorConn) Read(b []byte) (n int, err error) {
+	err = m.readResults[0].err
+	copy(b, m.readResults[0].data)
+	n = len(m.readResults[0].data)
+
+	m.readResults = m.readResults[1:]
+	return
+}
+
+/* Don't end the mux readLoop for packetio.ErrTimeout or io.ErrShortBuffer, assert the following
+   * io.ErrShortBuffer and packetio.ErrTimeout don't end the read loop
+   * io.EOF ends the loop
+
+   pion/webrtc#1720
+*/
+func TestNonFatalRead(t *testing.T) {
+	expectedData := []byte("expectedData")
+
+	// In memory pipe
+	ca, cb := net.Pipe()
+	assert.NoError(t, cb.Close())
+
+	conn := &muxErrorConn{ca, []muxErrorConnReadResult{
+		// Non-fatal timeout error
+		{packetio.ErrTimeout, nil},
+		{nil, expectedData},
+		{io.ErrShortBuffer, nil},
+		{nil, expectedData},
+		{io.EOF, nil},
+	}}
+
+	m := NewMux(Config{
+		Conn:          conn,
+		BufferSize:    testPipeBufferSize,
+		LoggerFactory: logging.NewDefaultLoggerFactory(),
+	})
+
+	e := m.NewEndpoint(MatchAll)
+
+	buff := make([]byte, testPipeBufferSize)
+	n, err := e.Read(buff)
+	assert.NoError(t, err)
+	assert.Equal(t, buff[:n], expectedData)
+
+	n, err = e.Read(buff)
+	assert.NoError(t, err)
+	assert.Equal(t, buff[:n], expectedData)
+
+	<-m.closedCh
+	assert.NoError(t, m.Close())
+	assert.NoError(t, ca.Close())
 }

@@ -85,23 +85,34 @@ type RTPParameters struct {
 	Codecs           []RTPCodecParameters
 }
 
+type codecMatchType int
+
+const (
+	codecMatchNone    codecMatchType = 0
+	codecMatchPartial codecMatchType = 1
+	codecMatchExact   codecMatchType = 2
+)
+
 // Do a fuzzy find for a codec in the list of codecs
 // Used for lookup up a codec in an existing list to find a match
-func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecParameters) (RTPCodecParameters, error) {
+// Returns codecMatchExact, codecMatchPartial, or codecMatchNone
+func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecParameters) (RTPCodecParameters, codecMatchType) {
+	needleFmtp := parseFmtp(needle.RTPCodecCapability.SDPFmtpLine)
+
 	// First attempt to match on MimeType + SDPFmtpLine
 	for _, c := range haystack {
 		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
-			c.RTPCodecCapability.SDPFmtpLine == needle.RTPCodecCapability.SDPFmtpLine {
-			return c, nil
+			fmtpConsist(needleFmtp, parseFmtp(c.RTPCodecCapability.SDPFmtpLine)) {
+			return c, codecMatchExact
 		}
 	}
 
 	// Fallback to just MimeType
 	for _, c := range haystack {
 		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) {
-			return c, nil
+			return c, codecMatchPartial
 		}
 	}
 
-	return RTPCodecParameters{}, ErrCodecNotFound
+	return RTPCodecParameters{}, codecMatchNone
 }

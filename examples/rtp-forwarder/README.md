@@ -33,5 +33,7 @@ Run `ffprobe -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to get more 
 
 Run `ffplay -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to play your streams
 
+You can add `-fflags nobuffer` to lower the latency. You will have worse playback in networks with jitter.
+
 #### Twitch/RTMP
 `ffmpeg -protocol_whitelist file,udp,rtp -i rtp-forwarder.sdp -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -g 50 -c:a aac -b:a 160k -ac 2 -ar 44100 -f flv rtmp://live.twitch.tv/app/$STREAM_KEY` Make sure to replace `$STREAM_KEY` at the end of the URL first.

@@ -19,6 +19,7 @@ type RTPSender struct {
 
 	srtpStream      *srtpWriterFuture
 	rtcpInterceptor interceptor.RTCPReader
+	streamInfo      interceptor.StreamInfo
 
 	context TrackLocalContext
 
@@ -175,8 +176,8 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	}
 	r.context.params.Codecs = []RTPCodecParameters{codec}
 
-	streamInfo := createStreamInfo(r.id, parameters.Encodings[0].SSRC, codec.PayloadType, codec.RTPCodecCapability, parameters.HeaderExtensions)
-	rtpInterceptor := r.api.interceptor.BindLocalStream(&streamInfo, interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+	r.streamInfo = createStreamInfo(r.id, parameters.Encodings[0].SSRC, codec.PayloadType, codec.RTPCodecCapability, parameters.HeaderExtensions)
+	rtpInterceptor := r.api.interceptor.BindLocalStream(&r.streamInfo, interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
 		return r.srtpStream.WriteRTP(header, payload)
 	}))
 	writeStream.interceptor.Store(rtpInterceptor)
@@ -204,6 +205,8 @@ func (r *RTPSender) Stop() error {
 	if err := r.ReplaceTrack(nil); err != nil {
 		return err
 	}
+
+	r.api.interceptor.UnbindLocalStream(&r.streamInfo)
 
 	return r.srtpStream.Close()
 }

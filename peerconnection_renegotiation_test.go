@@ -60,6 +60,85 @@ func sdpMidHasSsrc(offer SessionDescription, mid string, ssrc SSRC) bool {
 	return false
 }
 
+func TestPeerConnection_Renegotiation_AddRecvonlyTransceiver(t *testing.T) {
+	type testCase struct {
+		name          string
+		answererSends bool
+	}
+
+	testCases := []testCase{
+		// Assert the following behaviors:
+		// - Offerer can add a recvonly transceiver
+		// - During negotiation, answerer peer adds an inactive (or sendonly) transceiver
+		// - Offerer can add a track
+		// - Answerer can receive the RTP packets.
+		{"add recvonly, then receive from answerer", false},
+		// Assert the following behaviors:
+		// - Offerer can add a recvonly transceiver
+		// - During negotiation, answerer peer adds an inactive (or sendonly) transceiver
+		// - Answerer can add a track to the existing sendonly transceiver
+		// - Offerer can receive the RTP packets.
+		{"add recvonly, then send to answerer", true},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lim := test.TimeOut(time.Second * 30)
+			defer lim.Stop()
+
+			report := test.CheckRoutines(t)
+			defer report()
+
+			pcOffer, pcAnswer, err := newPair()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = pcOffer.AddTransceiverFromKind(
+				RTPCodecTypeVideo,
+				RtpTransceiverInit{
+					Direction: RTPTransceiverDirectionRecvonly,
+				},
+			)
+			assert.NoError(t, err)
+
+			assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+			localTrack, err := NewTrackLocalStaticSample(
+				RTPCodecCapability{MimeType: "video/VP8"}, "track-one", "stream-one",
+			)
+			require.NoError(t, err)
+
+			if tc.answererSends {
+				_, err = pcAnswer.AddTrack(localTrack)
+			} else {
+				_, err = pcOffer.AddTrack(localTrack)
+			}
+
+			require.NoError(t, err)
+
+			onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+
+			if tc.answererSends {
+				pcOffer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
+					onTrackFiredFunc()
+				})
+			} else {
+				pcAnswer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
+					onTrackFiredFunc()
+				})
+			}
+
+			assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+			sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{localTrack})
+
+			closePairNow(t, pcOffer, pcAnswer)
+		})
+	}
+}
+
 /*
 *  Assert the following behaviors
 * - We are able to call AddTrack after signaling

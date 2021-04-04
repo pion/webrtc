@@ -1044,15 +1044,31 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				}
 			}
 
-			if t == nil {
+			switch {
+			case t == nil:
 				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
 				if err != nil {
 					return err
 				}
-				t = pc.newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
+
+				localDirection := RTPTransceiverDirectionRecvonly
+				if direction == RTPTransceiverDirectionRecvonly {
+					localDirection = RTPTransceiverDirectionSendonly
+				}
+
+				t = pc.newRTPTransceiver(receiver, nil, localDirection, kind)
 
 				pc.onNegotiationNeeded()
+			case direction == RTPTransceiverDirectionRecvonly:
+				if t.Direction() == RTPTransceiverDirectionSendrecv {
+					t.setDirection(RTPTransceiverDirectionSendonly)
+				}
+			case direction == RTPTransceiverDirectionSendrecv:
+				if t.Direction() == RTPTransceiverDirectionSendonly {
+					t.setDirection(RTPTransceiverDirectionSendrecv)
+				}
 			}
+
 			if t.Mid() == "" {
 				if err := t.setMid(midValue); err != nil {
 					return err
@@ -1100,8 +1116,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	}
 
 	remoteIsLite := false
-	if liteValue, haveRemoteIs := desc.parsed.Attribute(sdp.AttrKeyICELite); haveRemoteIs && liteValue == sdp.AttrKeyICELite {
-		remoteIsLite = true
+	for _, a := range desc.parsed.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyICELite {
+			remoteIsLite = true
+		}
 	}
 
 	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
@@ -1810,25 +1828,7 @@ func (pc *PeerConnection) WriteRTCP(pkts []rtcp.Packet) error {
 }
 
 func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes) (int, error) {
-	raw, err := rtcp.Marshal(pkts)
-	if err != nil {
-		return 0, err
-	}
-
-	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
-	if err != nil {
-		return 0, nil
-	}
-
-	writeStream, err := srtcpSession.OpenWriteStream()
-	if err != nil {
-		return 0, fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
-	}
-
-	if n, err := writeStream.Write(raw); err != nil {
-		return n, err
-	}
-	return 0, nil
+	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
 // Close ends the PeerConnection
