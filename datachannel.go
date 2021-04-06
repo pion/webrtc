@@ -104,12 +104,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 
 // open opens the datachannel over the sctp transport
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
-	if sctpTransport == nil {
-		return errSCTPNotEstablished
-	}
-	sctpTransport.lock.RLock()
-	association := sctpTransport.association
-	sctpTransport.lock.RUnlock()
+	association := sctpTransport.association()
 	if association == nil {
 		return errSCTPNotEstablished
 	}

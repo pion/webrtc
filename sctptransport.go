@@ -41,7 +41,7 @@ type SCTPTransport struct {
 
 	onErrorHandler func(error)
 
-	association                *sctp.Association
+	sctpAssociation            *sctp.Association
 	onDataChannelHandler       func(*DataChannel)
 	onDataChannelOpenedHandler func(*DataChannel)
 
@@ -112,7 +112,7 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	r.association = sctpAssociation
+	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
 
 	go r.acceptDataChannels(sctpAssociation)
@@ -124,15 +124,15 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	if r.association == nil {
+	if r.sctpAssociation == nil {
 		return nil
 	}
-	err := r.association.Close()
+	err := r.sctpAssociation.Close()
 	if err != nil {
 		return err
 	}
 
-	r.association = nil
+	r.sctpAssociation = nil
 	r.state = SCTPTransportStateClosed
 
 	return nil
@@ -320,10 +320,6 @@ func (r *SCTPTransport) State() SCTPTransportState {
 }
 
 func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
-	r.lock.Lock()
-	association := r.association
-	r.lock.Unlock()
-
 	collector.Collecting()
 
 	stats := TransportStats{
@@ -332,6 +328,7 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 		ID:        "sctpTransport",
 	}
 
+	association := r.association()
 	if association != nil {
 		stats.BytesSent = association.BytesSent()
 		stats.BytesReceived = association.BytesReceived()
@@ -368,4 +365,14 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 	}
 
 	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+}
+
+func (r *SCTPTransport) association() *sctp.Association {
+	if r == nil {
+		return nil
+	}
+	r.lock.RLock()
+	association := r.sctpAssociation
+	r.lock.RUnlock()
+	return association
 }
