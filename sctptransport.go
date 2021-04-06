@@ -96,12 +96,13 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	}
 	r.isStarted = true
 
-	if err := r.ensureDTLS(); err != nil {
-		return err
+	dtlsTransport := r.Transport()
+	if dtlsTransport == nil || dtlsTransport.conn == nil {
+		return errSCTPTransportDTLS
 	}
 
 	sctpAssociation, err := sctp.Client(sctp.Config{
-		NetConn:       r.Transport().conn,
+		NetConn:       dtlsTransport.conn,
 		LoggerFactory: r.api.settingEngine.LoggerFactory,
 	})
 	if err != nil {
@@ -133,15 +134,6 @@ func (r *SCTPTransport) Stop() error {
 
 	r.association = nil
 	r.state = SCTPTransportStateClosed
-
-	return nil
-}
-
-func (r *SCTPTransport) ensureDTLS() error {
-	dtlsTransport := r.Transport()
-	if dtlsTransport == nil || dtlsTransport.conn == nil {
-		return errSCTPTransportDTLS
-	}
 
 	return nil
 }

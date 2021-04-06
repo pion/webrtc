@@ -104,19 +104,22 @@ func (api *API) newDataChannel(params *DataChannelParameters, log logging.Levele
 
 // open opens the datachannel over the sctp transport
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
+	if sctpTransport == nil {
+		return errSCTPNotEstablished
+	}
+	sctpTransport.lock.RLock()
+	association := sctpTransport.association
+	sctpTransport.lock.RUnlock()
+	if association == nil {
+		return errSCTPNotEstablished
+	}
+
 	d.mu.Lock()
-	if d.sctpTransport != nil {
-		// already open
+	if d.sctpTransport != nil { // already open
 		d.mu.Unlock()
 		return nil
 	}
 	d.sctpTransport = sctpTransport
-
-	if err := d.ensureSCTP(); err != nil {
-		d.mu.Unlock()
-		return err
-	}
-
 	var channelType datachannel.ChannelType
 	var reliabilityParameter uint32
 
@@ -160,8 +163,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 			return err
 		}
 	}
-
-	dc, err := datachannel.Dial(d.sctpTransport.association, *d.id, cfg)
+	dc, err := datachannel.Dial(association, *d.id, cfg)
 	if err != nil {
 		d.mu.Unlock()
 		return err
@@ -173,19 +175,6 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	d.mu.Unlock()
 
 	d.handleOpen(dc)
-	return nil
-}
-
-func (d *DataChannel) ensureSCTP() error {
-	if d.sctpTransport == nil {
-		return errSCTPNotEstablished
-	}
-
-	d.sctpTransport.lock.RLock()
-	defer d.sctpTransport.lock.RUnlock()
-	if d.sctpTransport.association == nil {
-		return errSCTPNotEstablished
-	}
 	return nil
 }
 
