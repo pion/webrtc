@@ -928,11 +928,16 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	pcA, pcB, err := newPair()
 	assert.NoError(t, err)
 
+	const expectedTrackCount = 500
+	ctx, done := context.WithCancel(context.Background())
 	pcA.OnNegotiationNeeded(func() {
+		count := len(pcA.GetTransceivers())
 		assert.NoError(t, signalPair(pcA, pcB))
+		if count == expectedTrackCount {
+			done()
+		}
 	})
 
-	const expectedTrackCount = 500
 	for i := 0; i < expectedTrackCount; i++ {
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
 		assert.NoError(t, err)
@@ -940,9 +945,7 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 		_, err = pcA.AddTrack(track)
 		assert.NoError(t, err)
 	}
-
-	pcA.ops.Done()
-
+	<-ctx.Done()
 	assert.Equal(t, expectedTrackCount, len(pcB.GetTransceivers()))
 	closePairNow(t, pcA, pcB)
 }
