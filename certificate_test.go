@@ -99,3 +99,18 @@ func TestGenerateCertificateExpires(t *testing.T) {
 	assert.NotNil(t, x509Cert)
 	assert.Contains(t, x509Cert.statsID, "certificate")
 }
+
+func TestPEM(t *testing.T) {
+	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.Nil(t, err)
+	cert, err := GenerateCertificate(sk)
+	assert.Nil(t, err)
+
+	pem, err := cert.PEM()
+	assert.Nil(t, err)
+	cert2, err := CertificateFromPEM(pem)
+	assert.Nil(t, err)
+	pem2, err := cert2.PEM()
+	assert.Nil(t, err)
+	assert.Equal(t, pem, pem2)
+}

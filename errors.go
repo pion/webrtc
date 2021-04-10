@@ -217,4 +217,6 @@ var (
 	errStatsICECandidateStateInvalid = errors.New("cannot convert to StatsICECandidatePairStateSucceeded invalid ice candidate state")
 
 	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
+
+	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
 )
