@@ -20,6 +20,19 @@ type RTPTransceiver struct {
 	kind    RTPCodecType
 }
 
+func newRTPTransceiver(
+	receiver *RTPReceiver,
+	sender *RTPSender,
+	direction RTPTransceiverDirection,
+	kind RTPCodecType,
+) *RTPTransceiver {
+	t := &RTPTransceiver{kind: kind}
+	t.setReceiver(receiver)
+	t.setSender(sender)
+	t.setDirection(direction)
+	return t
+}
+
 // Sender returns the RTPTransceiver's RTPSender if it has one
 func (t *RTPTransceiver) Sender() *RTPSender {
 	if v := t.sender.Load(); v != nil {
