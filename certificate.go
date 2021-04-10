@@ -147,7 +147,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 		BasicConstraintsValid: true,
 		NotBefore:             time.Now(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		NotAfter:              time.Now().AddDate(10, 0, 0),
+		NotAfter:              time.Now().AddDate(0, 1, 0),
 		SerialNumber:          serialNumber,
 		Version:               2,
 		Subject:               pkix.Name{CommonName: hex.EncodeToString(origin)},
