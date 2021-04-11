@@ -298,8 +298,7 @@ func (t *ICETransport) setState(i ICETransportState) {
 	t.state.Store(i)
 }
 
-// NewEndpoint registers a new endpoint on the underlying mux.
-func (t *ICETransport) NewEndpoint(f mux.MatchFunc) *mux.Endpoint {
+func (t *ICETransport) newEndpoint(f mux.MatchFunc) *mux.Endpoint {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	return t.mux.NewEndpoint(f)
