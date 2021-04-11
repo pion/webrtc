@@ -19,9 +19,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	defer lim.Stop()
 
 	pcOffer, pcAnswer, err := newPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	iceComplete := make(chan bool)
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
@@ -44,4 +42,32 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	}
 
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestICETransport_GetSelectedCandidatePair(t *testing.T) {
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
+
+	offererSelectedPair, err := offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.Nil(t, offererSelectedPair)
+
+	answererSelectedPair, err := answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.Nil(t, answererSelectedPair)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+	peerConnectionConnected.Wait()
+
+	offererSelectedPair, err = offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.NotNil(t, offererSelectedPair)
+
+	answererSelectedPair, err = answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.NotNil(t, answererSelectedPair)
+
+	closePairNow(t, offerer, answerer)
 }
