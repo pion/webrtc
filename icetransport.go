@@ -20,9 +20,6 @@ type ICETransport struct {
 	lock sync.RWMutex
 
 	role ICERole
-	// Component ICEComponent
-	// State ICETransportState
-	// gatheringState ICEGathererState
 
 	onConnectionStateChangeHandler       atomic.Value // func(ICETransportState)
 	onSelectedCandidatePairChangeHandler atomic.Value // func(*ICECandidatePair)
@@ -41,25 +38,31 @@ type ICETransport struct {
 	log logging.LeveledLogger
 }
 
-// func (t *ICETransport) GetLocalCandidates() []ICECandidate {
-//
-// }
-//
-// func (t *ICETransport) GetRemoteCandidates() []ICECandidate {
-//
-// }
-//
-// func (t *ICETransport) GetSelectedCandidatePair() ICECandidatePair {
-//
-// }
-//
-// func (t *ICETransport) GetLocalParameters() ICEParameters {
-//
-// }
-//
-// func (t *ICETransport) GetRemoteParameters() ICEParameters {
-//
-// }
+// GetSelectedCandidatePair returns the selected candidate pair on which packets are sent
+// if there is no selected pair nil is returned
+func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return nil, nil
+	}
+
+	icePair, err := agent.GetSelectedCandidatePair()
+	if icePair == nil || err != nil {
+		return nil, err
+	}
+
+	local, err := newICECandidateFromICE(icePair.Local)
+	if err != nil {
+		return nil, err
+	}
+
+	remote, err := newICECandidateFromICE(icePair.Remote)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ICECandidatePair{Local: &local, Remote: &remote}, nil
+}
 
 // NewICETransport creates a new NewICETransport.
 func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory) *ICETransport {
