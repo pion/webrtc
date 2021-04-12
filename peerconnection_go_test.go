@@ -1246,7 +1246,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 				return err
 			}
 
-			_, err = pc.AddTransceiverFromTrack(track, []RtpTransceiverInit{
+			_, err = pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
 				{Direction: dir},
 			}...)
 			return err
@@ -1254,7 +1254,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 
 		_, err := pc.AddTransceiverFromKind(
 			RTPCodecTypeVideo,
-			RtpTransceiverInit{Direction: dir},
+			RTPTransceiverInit{Direction: dir},
 		)
 		return err
 	}

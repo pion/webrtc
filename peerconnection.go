@@ -1265,7 +1265,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 
 	if remoteIsPlanB {
 		for _, incoming := range unhandledTracks {
-			t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
+			t, err := pc.AddTransceiverFromKind(incoming.kind, RTPTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
@@ -1360,7 +1360,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 			incoming.kind = RTPCodecTypeAudio
 		}
 
-		t, err := pc.AddTransceiverFromKind(incoming.kind, RtpTransceiverInit{
+		t, err := pc.AddTransceiverFromKind(incoming.kind, RTPTransceiverInit{
 			Direction: RTPTransceiverDirectionSendrecv,
 		})
 		if err != nil {
@@ -1638,7 +1638,7 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) (err error) {
 }
 
 // AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
-func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPTransceiverInit) (*RTPTransceiver, error) {
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -1685,7 +1685,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpT
 }
 
 // AddTransceiverFromTrack Create a new RtpTransceiver(SendRecv or SendOnly) and add it to the set of transceivers.
-func (pc *PeerConnection) AddTransceiverFromTrack(track TrackLocal, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+func (pc *PeerConnection) AddTransceiverFromTrack(track TrackLocal, init ...RTPTransceiverInit) (*RTPTransceiver, error) {
 	if pc.isClosed.get() {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}

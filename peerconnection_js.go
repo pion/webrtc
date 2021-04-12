@@ -489,7 +489,7 @@ func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
 }
 
 // AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
-func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RtpTransceiverInit) (transceiver *RTPTransceiver, err error) {
+func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPTransceiverInit) (transceiver *RTPTransceiver, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = recoveryToError(e)
@@ -709,7 +709,7 @@ func dataChannelInitToValue(options *DataChannelInit) js.Value {
 	})
 }
 
-func rtpTransceiverInitInitToValue(init RtpTransceiverInit) js.Value {
+func rtpTransceiverInitInitToValue(init RTPTransceiverInit) js.Value {
 	return js.ValueOf(map[string]interface{}{
 		"direction": init.Direction.String(),
 	})
