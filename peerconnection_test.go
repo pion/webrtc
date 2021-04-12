@@ -686,7 +686,7 @@ func TestAddTransceiver(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 			Direction: testCase.direction,
 		})
 		assert.NoError(t, err)

@@ -72,22 +72,22 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 		t.Errorf("NewPeerConnection failed: %v", err)
 	}
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
 	}); err != nil {
 		t.Errorf("AddTransceiver failed: %v", err)
 	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
 	}); err != nil {
 		t.Errorf("AddTransceiver failed: %v", err)
 	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
 	}); err != nil {
 		t.Errorf("AddTransceiver failed: %v", err)
 	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
 	}); err != nil {
 		t.Errorf("AddTransceiver failed: %v", err)
@@ -146,12 +146,12 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 		t.Errorf("NewPeerConnection failed: %v", err)
 	}
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	}); err != nil {
 		t.Errorf("Failed to add transceiver")
 	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	}); err != nil {
 		t.Errorf("Failed to add transceiver")
@@ -239,12 +239,12 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 		t.Errorf("NewPeerConnection failed: %v", err)
 	}
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	}); err != nil {
 		t.Errorf("Failed to add transceiver")
 	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{
+	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	}); err != nil {
 		t.Errorf("Failed to add transceiver")
