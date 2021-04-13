@@ -1,4 +1,4 @@
-FROM golang:1.14-alpine3.11
+FROM golang:1.15-alpine3.13
 
 RUN apk add --no-cache \
   chromium \
