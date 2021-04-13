@@ -21,7 +21,7 @@ func parseFmtp(line string) fmtp {
 	return f
 }
 
-// fmtpConsist checks that two FTMP parameters are not inconsistent.
+// fmtpConsist checks that two FMTP parameters are not inconsistent.
 func fmtpConsist(a, b fmtp) bool {
 	for k, v := range a {
 		if vb, ok := b[k]; ok && !strings.EqualFold(vb, v) {

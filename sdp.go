@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
@@ -271,8 +272,9 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 
 	return &SessionDescription{
-		SDP:  string(sdp),
-		Type: sessionDescription.Type,
+		SDP:    string(sdp),
+		Type:   sessionDescription.Type,
+		parsed: parsed,
 	}
 }
 
@@ -640,4 +642,23 @@ func rtpExtensionsFromMediaDescription(m *sdp.MediaDescription) (map[string]int,
 	}
 
 	return out, nil
+}
+
+// updateSDPOrigin saves sdp.Origin in PeerConnection when creating 1st local SDP;
+// for subsequent calling, it updates Origin for SessionDescription from saved one
+// and increments session version by one.
+// https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-25#section-5.2.2
+// https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-25#section-5.3.2
+func updateSDPOrigin(origin *sdp.Origin, d *sdp.SessionDescription) {
+	if atomic.CompareAndSwapUint64(&origin.SessionVersion, 0, d.Origin.SessionVersion) { // store
+		atomic.StoreUint64(&origin.SessionID, d.Origin.SessionID)
+	} else { // load
+		for { // awaiting for saving session id
+			d.Origin.SessionID = atomic.LoadUint64(&origin.SessionID)
+			if d.Origin.SessionID != 0 {
+				break
+			}
+		}
+		d.Origin.SessionVersion = atomic.AddUint64(&origin.SessionVersion, 1)
+	}
 }

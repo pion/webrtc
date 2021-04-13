@@ -1350,3 +1350,50 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 		})
 	}
 }
+
+func TestPeerConnection_SessionID(t *testing.T) {
+	defer test.TimeOut(time.Second * 10).Stop()
+	defer test.CheckRoutines(t)()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+	var offerSessionID uint64
+	var offerSessionVersion uint64
+	var answerSessionID uint64
+	var answerSessionVersion uint64
+	for i := 0; i < 10; i++ {
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+		offer := pcOffer.LocalDescription().parsed
+		sessionID := offer.Origin.SessionID
+		sessionVersion := offer.Origin.SessionVersion
+		if offerSessionID == 0 {
+			offerSessionID = sessionID
+			offerSessionVersion = sessionVersion
+		} else {
+			if offerSessionID != sessionID {
+				t.Errorf("offer[%v] session id mismatch: expected=%v, got=%v", i, offerSessionID, sessionID)
+			}
+			if offerSessionVersion+1 != sessionVersion {
+				t.Errorf("offer[%v] session version mismatch: expected=%v, got=%v", i, offerSessionVersion+1, sessionVersion)
+			}
+			offerSessionVersion++
+		}
+
+		answer := pcAnswer.LocalDescription().parsed
+		sessionID = answer.Origin.SessionID
+		sessionVersion = answer.Origin.SessionVersion
+		if answerSessionID == 0 {
+			answerSessionID = sessionID
+			answerSessionVersion = sessionVersion
+		} else {
+			if answerSessionID != sessionID {
+				t.Errorf("answer[%v] session id mismatch: expected=%v, got=%v", i, answerSessionID, sessionID)
+			}
+			if answerSessionVersion+1 != sessionVersion {
+				t.Errorf("answer[%v] session version mismatch: expected=%v, got=%v", i, answerSessionVersion+1, sessionVersion)
+			}
+			answerSessionVersion++
+		}
+	}
+	closePairNow(t, pcOffer, pcAnswer)
+}

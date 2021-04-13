@@ -31,6 +31,8 @@ type PeerConnection struct {
 	statsID string
 	mu      sync.RWMutex
 
+	sdpOrigin sdp.Origin
+
 	// ops is an operations queue which will ensure the enqueued actions are
 	// executed in order. It is used for asynchronously, but serially processing
 	// remote and local descriptions
@@ -672,6 +674,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			return SessionDescription{}, err
 		}
 
+		updateSDPOrigin(&pc.sdpOrigin, d)
 		sdpBytes, err := d.Marshal()
 		if err != nil {
 			return SessionDescription{}, err
@@ -809,6 +812,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, err
 	}
 
+	updateSDPOrigin(&pc.sdpOrigin, d)
 	sdpBytes, err := d.Marshal()
 	if err != nil {
 		return SessionDescription{}, err
