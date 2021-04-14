@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/build"
 	"html/template"
 	"log"
 	"net/http"
@@ -57,7 +58,7 @@ func serve(addr string) error {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Path
 		if url == "/wasm_exec.js" {
-			http.FileServer(http.Dir("./vendor-wasm/golang.org/misc/wasm/")).ServeHTTP(w, r)
+			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "misc/wasm/"))).ServeHTTP(w, r)
 			return
 		}
 
