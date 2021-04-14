@@ -75,7 +75,7 @@ func createOfferer() *webrtc.PeerConnection {
 	// we can send more
 	dc.SetBufferedAmountLowThreshold(bufferedAmountLowThreshold)
 
-	// This callback is made when the current bufferedAmount becomes lower than the threadshold
+	// This callback is made when the current bufferedAmount becomes lower than the threshold
 	dc.OnBufferedAmountLow(func() {
 		sendMoreCh <- struct{}{}
 	})
