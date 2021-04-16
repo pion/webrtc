@@ -1923,8 +1923,11 @@ func (pc *PeerConnection) newRTPTransceiver(
 // by the ICEAgent since the offer or answer was created.
 func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	return populateLocalCandidates(pc.currentLocalDescription, pc.iceGatherer, pc.ICEGatheringState())
+	localDescription := pc.currentLocalDescription
+	iceGather := pc.iceGatherer
+	iceGatheringState := pc.ICEGatheringState()
+	pc.mu.Unlock()
+	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
 }
 
 // PendingLocalDescription represents a local description that is in the
@@ -1933,8 +1936,11 @@ func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 // PeerConnection is in the stable state, the value is null.
 func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
 	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	return populateLocalCandidates(pc.pendingLocalDescription, pc.iceGatherer, pc.ICEGatheringState())
+	localDescription := pc.pendingLocalDescription
+	iceGather := pc.iceGatherer
+	iceGatheringState := pc.ICEGatheringState()
+	pc.mu.Unlock()
+	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
 }
 
 // CurrentRemoteDescription represents the last remote description that was
