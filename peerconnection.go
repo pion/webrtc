@@ -1948,6 +1948,9 @@ func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
 // into the stable state plus any remote candidates that have been supplied
 // via AddICECandidate() since the offer or answer was created.
 func (pc *PeerConnection) CurrentRemoteDescription() *SessionDescription {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
 	return pc.currentRemoteDescription
 }
 
@@ -1957,6 +1960,9 @@ func (pc *PeerConnection) CurrentRemoteDescription() *SessionDescription {
 // created. If the PeerConnection is in the stable state, the value is
 // null.
 func (pc *PeerConnection) PendingRemoteDescription() *SessionDescription {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
 	return pc.pendingRemoteDescription
 }
 
