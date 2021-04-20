@@ -6,8 +6,7 @@ services:
     hostname: answer
     restart: always   
     ports:
-      - 50000:50000
-    network_mode: "host"      
+      - 50000:50000    
       
   offer:
     depends_on:  
@@ -16,4 +15,3 @@ services:
     build: ./offer
     hostname: offer
     restart: always
-    network_mode: "host"
