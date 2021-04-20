@@ -334,7 +334,7 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 }
 
 // Look up a codec and enable if it exists
-func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType) (codecMatchType, error) {
+func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType, exactMatches, partialMatches []RTPCodecParameters) (codecMatchType, error) {
 	codecs := m.videoCodecs
 	if typ == RTPCodecTypeAudio {
 		codecs = m.audioCodecs
@@ -347,7 +347,24 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 			return codecMatchNone, err
 		}
 
-		if _, _, err = m.getCodecByPayload(PayloadType(payloadType)); err != nil {
+		var aptFound bool
+		for _, codec := range exactMatches {
+			if codec.PayloadType == PayloadType(payloadType) {
+				aptFound = true
+				break
+			}
+		}
+
+		if !aptFound {
+			for _, codec := range partialMatches {
+				if codec.PayloadType == PayloadType(payloadType) {
+					aptFound = true
+					break
+				}
+			}
+		}
+
+		if !aptFound {
 			return codecMatchNone, nil // not an error, we just ignore this codec we don't support
 		}
 	}
@@ -416,7 +433,7 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
 
 		for _, codec := range codecs {
-			matchType, mErr := m.matchRemoteCodec(codec, typ)
+			matchType, mErr := m.matchRemoteCodec(codec, typ, exactMatches, partialMatches)
 			if mErr != nil {
 				return mErr
 			}
