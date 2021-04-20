@@ -119,7 +119,7 @@ jobs:
         run: echo "GOPATH=${HOME}/go" >> $GITHUB_ENV
 
       - name: Set Go Path
-        run: echo "GO_JS_WASM_EXEC=${PWD}/test-wasm/go_js_wasm_exec" >> $GITHUB_ENV
+        run: echo "GO_JS_WASM_EXEC=${GOROOT}/misc/wasm/go_js_wasm_exec" >> $GITHUB_ENV
 
       - name: Insall NPM modules
         run: yarn install

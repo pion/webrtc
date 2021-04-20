@@ -19,7 +19,7 @@ then
 fi
 
 EXCLUDE_DIRECTORIES=${DISALLOWED_FUNCTIONS_EXCLUDED_DIRECTORIES:-"examples"}
-DISALLOWED_FUNCTIONS=('os.Exit(' 'panic(' 'Fatal(' 'Fatalf(' 'Fatalln(' 'fmt.Println(' 'fmt.Printf(' 'log.Print(' 'log.Println(' 'log.Printf(')
+DISALLOWED_FUNCTIONS=('os.Exit(' 'panic(' 'Fatal(' 'Fatalf(' 'Fatalln(' 'fmt.Println(' 'fmt.Printf(' 'log.Print(' 'log.Println(' 'log.Printf(' 'print(' 'println(')
 
 files=$(
   find "$SCRIPT_PATH/.." -name "*.go" \
