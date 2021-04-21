@@ -22,6 +22,9 @@ type SampleBuilder struct {
 	// Last seqnum that has been added to buffer
 	lastPush uint16
 
+	// Do not drop packets even if it is outdated
+	keepOutdatedPackets bool
+
 	// Last seqnum that has been successfully popped
 	// isContiguous is false when we start or when we have a gap
 	// that is older then maxLate
@@ -43,8 +46,8 @@ type SampleBuilder struct {
 // A large maxLate will result in less packet loss but higher latency.
 // The depacketizer extracts media samples from RTP packets.
 // Several depacketizers are available in package github.com/pion/rtp/codecs.
-func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts ...Option) *SampleBuilder {
-	s := &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer, sampleRate: sampleRate}
+func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, keepOutdatedPackets bool, opts ...Option) *SampleBuilder {
+	s := &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer, sampleRate: sampleRate, keepOutdatedPackets: keepOutdatedPackets}
 	for _, o := range opts {
 		o(s)
 	}
@@ -67,7 +70,7 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 	s.buffer[p.SequenceNumber] = p
 
 	// Remove outdated references if SequenceNumber is increased.
-	if int16(p.SequenceNumber-s.lastPush) > 0 {
+	if !s.keepOutdatedPackets && int16(p.SequenceNumber-s.lastPush) > 0 {
 		for i := s.lastPush; i != p.SequenceNumber+1; i++ {
 			s.releasePacket(i - s.maxLate)
 		}
