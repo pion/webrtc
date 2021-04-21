@@ -1,0 +1,52 @@
+<html>
+  <head>
+    <title>ice-single-port</title>
+  </head>
+
+  <body>
+    <h3> ICE Selected Pairs </h3>
+    <div id="iceSelectedPairs"></div> <br />
+  </body>
+
+  <script>
+    let createPeerConnection = () => {
+      let pc = new RTCPeerConnection()
+      let dc = pc.createDataChannel('data')
+
+      dc.onopen = () => {
+        let el = document.createElement('template')
+        let selectedPair = pc.sctp.transport.iceTransport.getSelectedCandidatePair()
+
+        el.innerHTML = `<div>
+          <ul>
+             <li> <i> Local</i> - ${selectedPair.local.candidate}</li>
+             <li> <i> Remote</i> - ${selectedPair.remote.candidate} </li>
+          </ul>
+        </div>`
+
+        document.getElementById('iceSelectedPairs').appendChild(el.content.firstChild);
+      }
+
+      pc.createOffer()
+        .then(offer => {
+          pc.setLocalDescription(offer)
+
+          return fetch(`/doSignaling`, {
+            method: 'post',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(offer)
+          })
+        })
+        .then(res => res.json())
+        .then(res => pc.setRemoteDescription(res))
+        .catch(alert)
+    }
+
+    for (i = 0; i < 10; i++) {
+      createPeerConnection()
+    }
+  </script>
+</html>
