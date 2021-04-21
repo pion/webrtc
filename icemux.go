@@ -16,3 +16,12 @@ func NewICETCPMux(logger logging.LeveledLogger, listener net.Listener, readBuffe
 		ReadBufferSize: readBufferSize,
 	})
 }
+
+// NewICEUDPMux creates a new instance of ice.UDPMuxDefault. It allows many PeerConnections to be served
+// by a single UDP Port.
+func NewICEUDPMux(logger logging.LeveledLogger, udpConn *net.UDPConn) ice.UDPMux {
+	return ice.NewUDPMuxDefault(ice.UDPMuxParams{
+		UDPConn: udpConn,
+		Logger:  logger,
+	})
+}
