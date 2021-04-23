@@ -273,6 +273,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Benny Daon](https://github.com/daonb)
 * [Tomek](https://github.com/trojek)
 * [Jin Gong](https://github.com/cgojin)
+* [yusuke](https://github.com/yusukem99)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
