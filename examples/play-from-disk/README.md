@@ -1,5 +1,5 @@
 # play-from-disk
-play-from-disk demonstrates how to send video and/or audio to your browser from flise saved to disk.
+play-from-disk demonstrates how to send video and/or audio to your browser from files saved to disk.
 
 ## Instructions
 ### Create IVF named `output.ivf` that contains a VP8 track and/or `output.ogg` that contains a Opus track
