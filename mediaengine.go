@@ -334,7 +334,7 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 }
 
 // Look up a codec and enable if it exists
-func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType) (codecMatchType, error) {
+func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType, exactMatches, partialMatches []RTPCodecParameters) (codecMatchType, error) {
 	codecs := m.videoCodecs
 	if typ == RTPCodecTypeAudio {
 		codecs = m.audioCodecs
@@ -347,9 +347,33 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 			return codecMatchNone, err
 		}
 
-		if _, _, err = m.getCodecByPayload(PayloadType(payloadType)); err != nil {
+		aptMatch := codecMatchNone
+		for _, codec := range exactMatches {
+			if codec.PayloadType == PayloadType(payloadType) {
+				aptMatch = codecMatchExact
+				break
+			}
+		}
+
+		if aptMatch == codecMatchNone {
+			for _, codec := range partialMatches {
+				if codec.PayloadType == PayloadType(payloadType) {
+					aptMatch = codecMatchPartial
+					break
+				}
+			}
+		}
+
+		if aptMatch == codecMatchNone {
 			return codecMatchNone, nil // not an error, we just ignore this codec we don't support
 		}
+
+		// if apt's media codec is partial match, then apt codec must be partial match too
+		_, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
+		if matchType == codecMatchExact && aptMatch == codecMatchPartial {
+			matchType = codecMatchPartial
+		}
+		return matchType, nil
 	}
 
 	_, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
@@ -416,7 +440,7 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
 
 		for _, codec := range codecs {
-			matchType, mErr := m.matchRemoteCodec(codec, typ)
+			matchType, mErr := m.matchRemoteCodec(codec, typ, exactMatches, partialMatches)
 			if mErr != nil {
 				return mErr
 			}
