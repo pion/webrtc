@@ -280,6 +280,72 @@ a=rtpmap:96 VP8/90000
 		_, _, err := m.getCodecByPayload(96)
 		assert.NoError(t, err)
 	})
+
+	t.Run("Matches when rtx apt for exact match codec", func(t *testing.T) {
+		const profileLevels = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 94 96 97
+a=rtpmap:94 VP8/90000
+a=rtpmap:96 VP9/90000
+a=fmtp:96 profile-id=2
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=2", nil},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+			PayloadType:        97,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
+
+		assert.True(t, m.negotiatedVideo)
+
+		_, _, err := m.getCodecByPayload(97)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Matches when rtx apt for partial match codec", func(t *testing.T) {
+		const profileLevels = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 94 96 97
+a=rtpmap:94 VP8/90000
+a=rtpmap:96 VP9/90000
+a=fmtp:96 profile-id=2
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=1", nil},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+			PayloadType:        97,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
+
+		assert.True(t, m.negotiatedVideo)
+
+		_, _, err := m.getCodecByPayload(97)
+		assert.ErrorIs(t, err, ErrCodecNotFound)
+	})
 }
 
 func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
