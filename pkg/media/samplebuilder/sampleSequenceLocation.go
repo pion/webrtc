@@ -50,12 +50,14 @@ const (
 	slCompareAfter
 )
 
+/*
 func minUint16(x, y uint16) uint16 {
 	if x < y {
 		return x
 	}
 	return y
 }
+*/
 
 func minUint32(x, y uint32) uint32 {
 	if x < y {
@@ -84,7 +86,7 @@ func (l sampleSequenceLocation) compare(pos uint16) int {
 	tail32 := head32 + count32
 
 	// pos32 is possibly two values, the normal value or a wrap
-	// arround the start value, figure out which it is...
+	// around the start value, figure out which it is...
 
 	pos32Normal := uint32(pos)
 	pos32Wrap := uint32(pos) + math.MaxUint16 + 1
