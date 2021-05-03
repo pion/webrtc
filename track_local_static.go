@@ -222,6 +222,7 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 		return codec, err
 	}
 
+	s.sequencer = rtp.NewRandomSequencer()
 	s.packetizer = rtp.NewPacketizer(
 		rtpOutboundMTU,
 		0, // Value is handled when writing
@@ -260,7 +261,9 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 	}
 
 	samples := uint32(sample.Duration.Seconds() * clockRate)
-	p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
+	if sample.PrevDroppedPackets > 0 {
+		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
+	}
 	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
 
 	writeErrs := []error{}
