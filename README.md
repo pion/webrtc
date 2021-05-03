@@ -276,6 +276,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [yusuke](https://github.com/yusukem99)
 * [Robin Raymond](https://github.com/robin-raymond)
 * [Patryk Rogalski](https://github.com/digitalix)
+* [Robin Raymond](https://github.com/robin-raymond)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
