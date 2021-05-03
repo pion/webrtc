@@ -19,8 +19,7 @@ type sampleBuilderTest struct {
 	maxLate         uint16
 }
 
-type fakeDepacketizer struct {
-}
+type fakeDepacketizer struct{}
 
 func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
 	return r, nil

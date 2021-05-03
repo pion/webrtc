@@ -11,7 +11,6 @@ import (
 
 // SampleBuilder buffers packets until media frames are complete.
 type SampleBuilder struct {
-	minConsume      uint16 // minConsume how many packets need to arrive
 	maxLate         uint16 // how many packets to wait until we get a valid Sample
 	buffer          [math.MaxUint16 + 1]*rtp.Packet
 	preparedSamples [math.MaxUint16 + 1]*media.Sample
@@ -91,7 +90,6 @@ func (s *SampleBuilder) purgeBuffers() {
 	s.purgeConsumedBuffers()
 
 	for (s.filled.count() > s.maxLate) && s.filled.hasData() {
-
 		if s.active.empty() {
 			// refill the active based on the filled packets
 			s.active = s.filled
@@ -141,7 +139,6 @@ const secondToNanoseconds = 1000000000
 // walking forwards building a sample if everything looks good clear and
 // update buffer+values
 func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
-
 	if s.active.empty() {
 		s.active = s.filled
 	}
@@ -162,8 +159,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 			consume.tail = i + 1
 			break
 		}
-		headTimestamp, _ := s.fetchTimestamp(s.active)
-		if s.buffer[i].Timestamp != headTimestamp {
+		headTimestamp, hasData := s.fetchTimestamp(s.active)
+		if hasData && s.buffer[i].Timestamp != headTimestamp {
 			consume.head = s.active.head
 			consume.tail = i
 			break
@@ -236,10 +233,11 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 // Pop scans s's buffer for a valid sample.
 // It returns nil if no valid samples have been found.
 func (s *SampleBuilder) Pop() *media.Sample {
-	result := s.buildSample(false)
+	_ = s.buildSample(false)
 	if s.prepared.empty() {
 		return nil
 	}
+	var result *media.Sample
 	result, s.preparedSamples[s.prepared.head] = s.preparedSamples[s.prepared.head], nil
 	s.prepared.head++
 	return result
