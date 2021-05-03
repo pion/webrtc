@@ -64,6 +64,14 @@ func TestSampleBuilder(t *testing.T) {
 			maxLateTimestamp: 0,
 		},
 		{
+			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed even if the market bit is set",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}, Payload: []byte{0x01}},
+			},
+			samples: []*media.Sample{},
+			maxLate: 50,
+		},
+		{
 			message: "SampleBuilder should emit two packets, we had three packets with unique timestamps",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
