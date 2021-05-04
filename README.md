@@ -274,6 +274,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [Tomek](https://github.com/trojek)
 * [Jin Gong](https://github.com/cgojin)
 * [yusuke](https://github.com/yusukem99)
+* [Patryk Rogalski](https://github.com/digitalix)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
