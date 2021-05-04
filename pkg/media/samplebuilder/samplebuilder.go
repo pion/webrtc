@@ -11,9 +11,10 @@ import (
 
 // SampleBuilder buffers packets until media frames are complete.
 type SampleBuilder struct {
-	maxLate         uint16 // how many packets to wait until we get a valid Sample
-	buffer          [math.MaxUint16 + 1]*rtp.Packet
-	preparedSamples [math.MaxUint16 + 1]*media.Sample
+	maxLate          uint16 // how many packets to wait until we get a valid Sample
+	maxLateTimestamp uint32 // max timestamp between old and new timestamps before dropping packets
+	buffer           [math.MaxUint16 + 1]*rtp.Packet
+	preparedSamples  [math.MaxUint16 + 1]*media.Sample
 
 	// Interface that allows us to take RTP packets to samples
 	depacketizer rtp.Depacketizer
@@ -55,6 +56,40 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts 
 	return s
 }
 
+func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
+
+	if s.maxLateTimestamp == 0 {
+		return false
+	}
+
+	var foundHead *rtp.Packet
+	var foundTail *rtp.Packet
+
+	for i := location.head; i != location.tail; i++ {
+		if packet := s.buffer[i]; packet != nil {
+			foundHead = packet
+			break
+		}
+	}
+
+	if foundHead == nil {
+		return false
+	}
+
+	for i := location.tail; i != location.head; i-- {
+		if packet := s.buffer[i]; packet != nil {
+			foundTail = packet
+			break
+		}
+	}
+
+	if foundTail == nil {
+		return false
+	}
+
+	return timestampDistance(foundHead.Timestamp, foundTail.Timestamp) > s.maxLateTimestamp
+}
+
 // fetchTimestamp returns the timestamp associated with a given sample location
 func (s *SampleBuilder) fetchTimestamp(location sampleSequenceLocation) (timestamp uint32, hasData bool) {
 	if location.empty() {
@@ -89,7 +124,7 @@ func (s *SampleBuilder) purgeConsumedBuffers() {
 func (s *SampleBuilder) purgeBuffers() {
 	s.purgeConsumedBuffers()
 
-	for (s.filled.count() > s.maxLate) && s.filled.hasData() {
+	for (s.tooOld(s.filled) || (s.filled.count() > s.maxLate)) && s.filled.hasData() {
 		if s.active.empty() {
 			// refill the active based on the filled packets
 			s.active = s.filled
@@ -260,6 +295,16 @@ func seqnumDistance(x, y uint16) uint16 {
 	return uint16(diff)
 }
 
+// timestampDistance computes the distance between two timestamps
+func timestampDistance(x, y uint32) uint32 {
+	diff := int32(x - y)
+	if diff < 0 {
+		return uint32(-diff)
+	}
+
+	return uint32(diff)
+}
+
 // An Option configures a SampleBuilder.
 type Option func(o *SampleBuilder)
 
@@ -276,5 +321,14 @@ func WithPartitionHeadChecker(checker rtp.PartitionHeadChecker) Option {
 func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
 	return func(o *SampleBuilder) {
 		o.packetReleaseHandler = h
+	}
+}
+
+// WithMaxTimeDelay ensures that packets that are too old in the buffer get
+// purged based on time rather than building up an extraordinarily long delay.
+func WithMaxTimeDelay(maxLateDuration time.Duration) Option {
+	return func(o *SampleBuilder) {
+		totalMillis := maxLateDuration.Milliseconds()
+		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMillis / 1000)
 	}
 }
