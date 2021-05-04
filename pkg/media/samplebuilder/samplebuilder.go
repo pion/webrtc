@@ -75,7 +75,7 @@ func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
 		return false
 	}
 
-	for i := location.tail; i != location.head; i-- {
+	for i := location.tail - 1; i != location.head; i-- {
 		if packet := s.buffer[i]; packet != nil {
 			foundTail = packet
 			break
