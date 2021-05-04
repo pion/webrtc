@@ -306,7 +306,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 					return t.api.settingEngine.srtpProtectionProfiles
 				}
 
-				return []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_128_GCM, dtls.SRTP_AES128_CM_HMAC_SHA1_80}
+				return defaultSrtpProtectionProfiles()
 			}(),
 			ClientAuth:         dtls.RequireAnyClientCert,
 			LoggerFactory:      t.api.settingEngine.LoggerFactory,

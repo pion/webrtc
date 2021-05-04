@@ -72,7 +72,8 @@ func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }
 
-// SetSRTPProtectionProfiles overrides default srtp protection profiles
+// SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
+// The default srtp protection profiles are provided by the function `defaultSrtpProtectionProfiles`
 func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectionProfile) {
 	e.srtpProtectionProfiles = profiles
 }
