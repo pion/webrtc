@@ -57,7 +57,6 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts 
 }
 
 func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
-
 	if s.maxLateTimestamp == 0 {
 		return false
 	}
