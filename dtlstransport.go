@@ -301,10 +301,16 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 					PrivateKey:  cert.privateKey,
 				},
 			},
-			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_128_GCM, dtls.SRTP_AES128_CM_HMAC_SHA1_80},
-			ClientAuth:             dtls.RequireAnyClientCert,
-			LoggerFactory:          t.api.settingEngine.LoggerFactory,
-			InsecureSkipVerify:     true,
+			SRTPProtectionProfiles: func() []dtls.SRTPProtectionProfile {
+				if len(t.api.settingEngine.srtpProtectionProfiles) > 0 {
+					return t.api.settingEngine.srtpProtectionProfiles
+				}
+
+				return defaultSrtpProtectionProfiles()
+			}(),
+			ClientAuth:         dtls.RequireAnyClientCert,
+			LoggerFactory:      t.api.settingEngine.LoggerFactory,
+			InsecureSkipVerify: true,
 		}, nil
 	}
 

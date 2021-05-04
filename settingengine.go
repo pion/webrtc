@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/pion/dtls/v2"
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/transport/packetio"
@@ -61,6 +62,7 @@ type SettingEngine struct {
 	iceUDPMux                                 ice.UDPMux
 	iceProxyDialer                            proxy.Dialer
 	disableMediaEngineCopy                    bool
+	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -68,6 +70,12 @@ type SettingEngine struct {
 // DataChannel.Detach method.
 func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
+}
+
+// SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
+// The default srtp protection profiles are provided by the function `defaultSrtpProtectionProfiles`
+func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectionProfile) {
+	e.srtpProtectionProfiles = profiles
 }
 
 // SetICETimeouts sets the behavior around ICE Timeouts
