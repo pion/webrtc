@@ -264,8 +264,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	return sample
 }
 
-// Pop scans s's buffer for a valid sample.
-// It returns nil if no valid samples have been found.
+// Pop compiles pushed RTP packets into media samples and then
+// returns the next valid sample (or nil if no sample is compiled).
 func (s *SampleBuilder) Pop() *media.Sample {
 	_ = s.buildSample(false)
 	if s.prepared.empty() {
@@ -277,8 +277,9 @@ func (s *SampleBuilder) Pop() *media.Sample {
 	return result
 }
 
-// PopWithTimestamp scans s's buffer for a valid sample and its RTP timestamp.
-// It returns nil, 0 when no valid samples have been found.
+// PopWithTimestamp compiles pushed RTP packets into media samples and then
+// returns the next valid sample with its associated RTP timestamp (or nil, 0 if
+// no sample is compiled).
 func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	sample := s.Pop()
 	return sample, sample.PacketTimestamp
