@@ -23,41 +23,12 @@ func (l sampleSequenceLocation) count() uint16 {
 	return seqnumDistance(l.head, l.tail)
 }
 
-/*
-func (l sampleSequenceLocation) adjacent(after sampleSequenceLocation) bool {
-	if !l.hasData() {
-		return false
-	}
-	if !after.hasData() {
-		return false
-	}
-	return l.tail == after.head
-}
-
-func (l sampleSequenceLocation) reset() {
-	l.head, l.tail = 0, 0
-}
-
-func (l sampleSequenceLocation) flush() {
-	l.tail = l.head
-}
-*/
-
 const (
 	slCompareVoid = iota
 	slCompareBefore
 	slCompareInside
 	slCompareAfter
 )
-
-/*
-func minUint16(x, y uint16) uint16 {
-	if x < y {
-		return x
-	}
-	return y
-}
-*/
 
 func minUint32(x, y uint32) uint32 {
 	if x < y {
@@ -109,40 +80,3 @@ func (l sampleSequenceLocation) compare(pos uint16) int {
 
 	return slCompareInside
 }
-
-/*
-func (l sampleSequenceLocation) calculateOverlap(other sampleSequenceLocation) sampleSequenceLocation {
-	if l.empty() {
-		return sampleSequenceLocation{}
-	}
-	if other.empty() {
-		return sampleSequenceLocation{}
-	}
-
-	lHead32 := uint32(l.head)
-	rHead32 := uint32(other.head)
-
-	lCount32 := uint32(l.head) + uint32(l.count())
-	rCount32 := uint32(other.head) + uint32(other.count())
-
-	// make the lHead always be first in the overlap
-	if lHead32 > rHead32 {
-		lHead32, rHead32 = rHead32, lHead32
-		lCount32, rCount32 = rCount32, lCount32
-	}
-
-	lTail32 := lHead32 + lCount32
-	rTail32 := rHead32 + rCount32
-
-	// if the right starts after the left there is no overlap
-	if rHead32 >= lTail32 {
-		return sampleSequenceLocation{}
-	}
-
-	// calculate an alternative possilbe tail (depending which tail ends first)
-	newPossibleTail := rHead32 + (lCount32 - (rHead32 - lHead32))
-
-	return sampleSequenceLocation{head: uint16(rHead32), tail: uint16(minUint32(newPossibleTail, rTail32))}
-}
-
-*/
