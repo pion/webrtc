@@ -14,8 +14,7 @@ import (
 // customLogger satisfies the interface logging.LeveledLogger
 // a logger is created per subsystem in Pion, so you can have custom
 // behavior per subsystem (ICE, DTLS, SCTP...)
-type customLogger struct {
-}
+type customLogger struct{}
 
 // Print all messages except trace
 func (c customLogger) Trace(msg string)                          {}
@@ -41,8 +40,7 @@ func (c customLogger) Errorf(format string, args ...interface{}) {
 // customLoggerFactory satisfies the interface logging.LoggerFactory
 // This allows us to create different loggers per subsystem. So we can
 // add custom behavior
-type customLoggerFactory struct {
-}
+type customLoggerFactory struct{}
 
 func (c customLoggerFactory) NewLogger(subsystem string) logging.LeveledLogger {
 	fmt.Printf("Creating logger for %s \n", subsystem)

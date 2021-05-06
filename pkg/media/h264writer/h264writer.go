@@ -18,8 +18,9 @@ type (
 	// Therefore, only 1-23, 24 (STAP-A), 28 (FU-A) NAL types are allowed.
 	// https://tools.ietf.org/html/rfc6184#section-5.2
 	H264Writer struct {
-		writer      io.Writer
-		hasKeyFrame bool
+		writer       io.Writer
+		hasKeyFrame  bool
+		cachedPacket *codecs.H264Packet
 	}
 )
 
@@ -53,7 +54,11 @@ func (h *H264Writer) WriteRTP(packet *rtp.Packet) error {
 		}
 	}
 
-	data, err := (&codecs.H264Packet{}).Unmarshal(packet.Payload)
+	if h.cachedPacket == nil {
+		h.cachedPacket = &codecs.H264Packet{}
+	}
+
+	data, err := h.cachedPacket.Unmarshal(packet.Payload)
 	if err != nil {
 		return err
 	}
@@ -65,6 +70,7 @@ func (h *H264Writer) WriteRTP(packet *rtp.Packet) error {
 
 // Close closes the underlying writer
 func (h *H264Writer) Close() error {
+	h.cachedPacket = nil
 	if h.writer != nil {
 		if closer, ok := h.writer.(io.Closer); ok {
 			return closer.Close()
