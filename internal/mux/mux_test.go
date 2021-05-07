@@ -142,3 +142,29 @@ func TestNonFatalRead(t *testing.T) {
 	assert.NoError(t, m.Close())
 	assert.NoError(t, ca.Close())
 }
+
+func BenchmarkDispatch(b *testing.B) {
+	m := &Mux{
+		endpoints: make(map[*Endpoint]MatchFunc),
+		log:       logging.NewDefaultLoggerFactory().NewLogger("mux"),
+	}
+
+	e := m.NewEndpoint(MatchSRTP)
+	m.NewEndpoint(MatchSRTCP)
+
+	buf := []byte{128, 1, 2, 3, 4}
+	buf2 := make([]byte, 1200)
+
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		err := m.dispatch(buf)
+		if err != nil {
+			b.Errorf("dispatch: %v", err)
+		}
+		_, err = e.buffer.Read(buf2)
+		if err != nil {
+			b.Errorf("read: %v", err)
+		}
+	}
+}
