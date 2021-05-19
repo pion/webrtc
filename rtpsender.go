@@ -300,6 +300,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			ssrc:            parameters.Encodings[idx].SSRC,
 			writeStream:     writeStream,
 			rtcpInterceptor: trackEncoding.rtcpInterceptor,
+			readerStream:    r,
 		}
 
 		codec, err := trackEncoding.track.Bind(trackEncoding.context)
