@@ -112,7 +112,13 @@ func (s *SampleBuilder) releasePacket(i uint16) {
 // purgeConsumedBuffers clears all buffers that have already been consumed by
 // popping.
 func (s *SampleBuilder) purgeConsumedBuffers() {
-	for s.active.compare(s.filled.head) == slCompareBefore && s.filled.hasData() {
+	s.purgeConsumedLocation(s.active)
+}
+
+// purgeConsumedLocation clears all buffers that have already been consumed
+// during a sample building method.
+func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation) {
+	for consume.compare(s.filled.head) == slCompareBefore && s.filled.hasData() {
 		s.releasePacket(s.filled.head)
 		s.filled.head++
 	}
@@ -231,6 +237,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if s.partitionHeadChecker != nil {
 		if !s.partitionHeadChecker.IsPartitionHead(s.buffer[consume.head].Payload) {
 			s.droppedPackets += consume.count()
+			s.purgeConsumedLocation(consume)
 			s.purgeConsumedBuffers()
 			return nil
 		}
@@ -259,6 +266,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
 
+	s.purgeConsumedLocation(consume)
 	s.purgeConsumedBuffers()
 
 	return sample
