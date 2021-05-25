@@ -328,6 +328,20 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 	}
 }
 
+func TestSampleBuilderPushMaxZero(t *testing.T) {
+	// Test packets released via 'maxLate' of zero.
+	pkts := []rtp.Packet{
+		{Header: rtp.Header{SequenceNumber: 0, Timestamp: 0, Marker: true}, Payload: []byte{0x01}},
+	}
+	s := New(0, &fakeDepacketizer{}, 1, WithPartitionHeadChecker(
+		&fakePartitionHeadChecker{headBytes: []byte{0x01}},
+	))
+	s.Push(&pkts[0])
+	if sample := s.Pop(); sample == nil {
+		t.Error("Should expect a popped sample")
+	}
+}
+
 func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
 	var released []*rtp.Packet
 	fakePacketReleaseHandler := func(p *rtp.Packet) {
