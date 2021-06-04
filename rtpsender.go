@@ -38,6 +38,8 @@ type RTPSender struct {
 	api *API
 	id  string
 
+	codecs []RTPCodecParameters
+
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan struct{}
 }
@@ -99,7 +101,7 @@ func (r *RTPSender) Transport() *DTLSTransport {
 // GetParameters describes the current configuration for the encoding and
 // transmission of media on the sender's track.
 func (r *RTPSender) GetParameters() RTPSendParameters {
-	return RTPSendParameters{
+	sendParameters := RTPSendParameters{
 		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
 			r.track.Kind(),
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
@@ -113,6 +115,8 @@ func (r *RTPSender) GetParameters() RTPSendParameters {
 			},
 		},
 	}
+	sendParameters.Codecs = r.codecs
+	return sendParameters
 }
 
 // Track returns the RTCRtpTransceiver track, or nil

@@ -295,6 +295,21 @@ func (m *MediaEngine) copy() *MediaEngine {
 	return cloned
 }
 
+func (m *MediaEngine) getUnNegotiatedCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
+	for _, codec := range m.videoCodecs {
+		if codec.PayloadType == payloadType {
+			return codec, RTPCodecTypeVideo, nil
+		}
+	}
+	for _, codec := range m.audioCodecs {
+		if codec.PayloadType == payloadType {
+			return codec, RTPCodecTypeAudio, nil
+		}
+	}
+
+	return RTPCodecParameters{}, 0, ErrCodecNotFound
+}
+
 func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
 	for _, codec := range m.negotiatedVideoCodecs {
 		if codec.PayloadType == payloadType {

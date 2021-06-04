@@ -1064,7 +1064,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 					localDirection = RTPTransceiverDirectionSendonly
 				}
 
-				t = newRTPTransceiver(receiver, nil, localDirection, kind)
+				t = newRTPTransceiver(receiver, nil, localDirection, kind, pc.api.mediaEngine)
 				pc.mu.Lock()
 				pc.addRTPTransceiver(t)
 				pc.mu.Unlock()
@@ -1654,7 +1654,7 @@ func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirect
 	if err != nil {
 		return
 	}
-	return newRTPTransceiver(r, s, direction, track.Kind()), nil
+	return newRTPTransceiver(r, s, direction, track.Kind(), pc.api.mediaEngine), nil
 }
 
 // AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
@@ -1688,7 +1688,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPT
 		if err != nil {
 			return nil, err
 		}
-		t = newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind)
+		t = newRTPTransceiver(receiver, nil, RTPTransceiverDirectionRecvonly, kind, pc.api.mediaEngine)
 	default:
 		return nil, errPeerConnAddTransceiverFromKindSupport
 	}
@@ -2231,7 +2231,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 				if t == nil {
 					if len(mediaTransceivers) == 0 {
-						t = &RTPTransceiver{kind: kind}
+						t = &RTPTransceiver{kind: kind, me: pc.api.mediaEngine, codecs: pc.api.mediaEngine.getCodecsByKind(kind)}
 						t.setDirection(RTPTransceiverDirectionInactive)
 						mediaTransceivers = append(mediaTransceivers, t)
 					}

@@ -38,6 +38,8 @@ type RTPReceiver struct {
 	closed, received chan interface{}
 	mu               sync.RWMutex
 
+	codecs []RTPCodecParameters
+
 	// A reference to the associated api object
 	api *API
 }
@@ -71,7 +73,9 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 // GetParameters describes the current configuration for the encoding and
 // transmission of media on the receiver's track.
 func (r *RTPReceiver) GetParameters() RTPParameters {
-	return r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+	parameters := r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+	parameters.Codecs = r.codecs
+	return parameters
 }
 
 // Track returns the RtpTransceiver TrackRemote

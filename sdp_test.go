@@ -363,17 +363,17 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 
 func TestPopulateSDP(t *testing.T) {
 	t.Run("Rid", func(t *testing.T) {
-		tr := &RTPTransceiver{kind: RTPCodecTypeVideo}
+		se := SettingEngine{}
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, me: &m, codecs: m.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
 		ridMap := map[string]string{
 			"ridkey": "some",
 		}
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, ridMap: ridMap}}
-
-		se := SettingEngine{}
-
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
 
 		d := &sdp.SessionDescription{}
 
@@ -396,6 +396,49 @@ func TestPopulateSDP(t *testing.T) {
 			}
 		}
 		assert.Equal(t, true, found, "Rid key should be present")
+	})
+	t.Run("transceiverCodecs", func(t *testing.T) {
+		se := SettingEngine{}
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, me: &m, codecs: m.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		codecErr := tr.SetCodecPreferences([]RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+				PayloadType:        96,
+			},
+		})
+		assert.NoError(t, codecErr)
+
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		assert.Nil(t, err)
+
+		// Test codecs
+		var foundVP8 bool
+		var foundVP9 bool
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media != "video" {
+				continue
+			}
+			for _, a := range desc.Attributes {
+				if strings.Contains(a.Key, "rtpmap") {
+					if a.Value == "98 VP9/90000" {
+						foundVP9 = true
+					} else if a.Value == "96 VP8/90000" {
+						foundVP8 = true
+					}
+				}
+			}
+		}
+		assert.Equal(t, true, foundVP8, "vp8 should be present in sdp")
+		assert.Equal(t, false, foundVP9, "vp9 should not be present in sdp")
 	})
 }
 
