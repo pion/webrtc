@@ -32,10 +32,11 @@ func newRTPTransceiver(
 	kind RTPCodecType,
 	mediaEngine *MediaEngine,
 ) *RTPTransceiver {
-	t := &RTPTransceiver{kind: kind, me: mediaEngine, codecs: mediaEngine.getCodecsByKind(kind)}
+	t := &RTPTransceiver{kind: kind, me: mediaEngine}
 	t.setReceiver(receiver)
 	t.setSender(sender)
 	t.setDirection(direction)
+	t.setCodecs(mediaEngine.getCodecsByKind(kind))
 	return t
 }
 
@@ -45,14 +46,14 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	if codecs == nil || len(codecs) < 1 {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		t.codecs = t.me.getCodecsByKind(t.kind)
-		t.updateCodecs(t.codecs)
+		t.codecs = []RTPCodecParameters{}
+		t.setCodecs(t.me.getCodecsByKind(t.kind))
 		return nil
 	}
 
 	newCodecs := make([]RTPCodecParameters, 0)
 	for _, codec := range codecs {
-		c, codecType, err := t.me.getUnNegotiatedCodecByPayload(codec.PayloadType)
+		c, codecType, err := t.me.getCodecByPayload(codec.PayloadType)
 		if err != nil {
 			return err
 		}
@@ -67,12 +68,12 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.codecs = newCodecs
-	t.updateCodecs(newCodecs)
+	t.setCodecs(newCodecs)
 
 	return nil
 }
 
-func (t *RTPTransceiver) updateCodecs(newCodecs []RTPCodecParameters) {
+func (t *RTPTransceiver) setCodecs(newCodecs []RTPCodecParameters) {
 	if sender := t.Sender(); sender != nil {
 		sender.codecs = newCodecs
 	}
@@ -88,7 +89,11 @@ func (t *RTPTransceiver) Codecs() []RTPCodecParameters {
 	defer t.mu.RUnlock()
 
 	codecs := make([]RTPCodecParameters, 0, len(t.codecs))
-	codecs = append(codecs, t.codecs...)
+	if len(t.codecs) != 0 {
+		codecs = append(codecs, t.codecs...)
+	} else {
+		codecs = append(codecs, t.me.getCodecsByKind(t.kind)...)
+	}
 
 	return codecs
 }

@@ -318,12 +318,14 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			id: "video",
 			transceivers: []*RTPTransceiver{{
 				kind: RTPCodecTypeVideo,
+				me:   engine,
 			}},
 		},
 		{
 			id: "audio",
 			transceivers: []*RTPTransceiver{{
 				kind: RTPCodecTypeAudio,
+				me:   engine,
 			}},
 		},
 		{
@@ -402,6 +404,9 @@ func TestPopulateSDP(t *testing.T) {
 
 		m := MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		m.pushCodecs(m.videoCodecs, RTPCodecTypeVideo)
+		m.pushCodecs(m.audioCodecs, RTPCodecTypeAudio)
 
 		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, me: &m, codecs: m.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)

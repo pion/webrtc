@@ -155,7 +155,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	}
 
 	if r.payloadType != codec.PayloadType {
-		//Codec has changed
+		// Codec has changed
 		r.context.params.Codecs = []RTPCodecParameters{codec}
 		r.streamInfo.PayloadType = uint8(codec.PayloadType)
 		r.streamInfo.MimeType = codec.MimeType
