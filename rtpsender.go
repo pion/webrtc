@@ -144,13 +144,24 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		return nil
 	}
 
-	if _, err := track.Bind(r.context); err != nil {
+	codec, err := track.Bind(r.context)
+	if err != nil {
 		// Re-bind the original track
 		if _, reBindErr := r.track.Bind(r.context); reBindErr != nil {
 			return reBindErr
 		}
 
 		return err
+	}
+
+	if r.payloadType != codec.PayloadType {
+		//Codec has changed
+		r.context.params.Codecs = []RTPCodecParameters{codec}
+		r.streamInfo.PayloadType = uint8(codec.PayloadType)
+		r.streamInfo.MimeType = codec.MimeType
+		r.streamInfo.SDPFmtpLine = codec.SDPFmtpLine
+		r.streamInfo.Channels = codec.Channels
+		r.streamInfo.ClockRate = codec.ClockRate
 	}
 
 	r.track = track
