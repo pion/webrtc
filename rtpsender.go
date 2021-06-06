@@ -90,6 +90,18 @@ func (r *RTPSender) setNegotiated() {
 	r.negotiated = true
 }
 
+func (r *RTPSender) setCodecs(codecs []RTPCodecParameters) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.codecs = codecs
+}
+
+func (r *RTPSender) getCodecs() []RTPCodecParameters {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return append([]RTPCodecParameters{}, r.codecs...)
+}
+
 // Transport returns the currently-configured *DTLSTransport or nil
 // if one has not yet been configured
 func (r *RTPSender) Transport() *DTLSTransport {
@@ -115,7 +127,7 @@ func (r *RTPSender) GetParameters() RTPSendParameters {
 			},
 		},
 	}
-	sendParameters.Codecs = r.codecs
+	sendParameters.Codecs = r.getCodecs()
 	return sendParameters
 }
 

@@ -84,11 +84,11 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 
 func (t *RTPTransceiver) setCodecs(newCodecs []RTPCodecParameters) {
 	if sender := t.Sender(); sender != nil {
-		sender.codecs = newCodecs
+		sender.setCodecs(newCodecs)
 	}
 
 	if receiver := t.Receiver(); receiver != nil {
-		receiver.codecs = newCodecs
+		receiver.setCodecs(newCodecs)
 	}
 }
 
