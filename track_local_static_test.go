@@ -141,8 +141,14 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 	_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	_, err = answerer.AddTrack(track)
+	tr, err := answerer.AddTransceiverFromTrack(track)
 	assert.NoError(t, err)
+	assert.NoError(t, tr.SetCodecPreferences([]RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+			PayloadType:        200,
+		},
+	}))
 
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	offerer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {

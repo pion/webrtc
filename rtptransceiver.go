@@ -43,18 +43,27 @@ func newRTPTransceiver(
 // SetCodecPreferences sets preferred list of supported codecs
 // if codecs is empty or nil we reset to default from MediaEngine
 func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error {
+	mediaEngineCodecs := t.me.getCodecsByKind(t.kind)
+
 	if codecs == nil || len(codecs) < 1 {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		t.codecs = []RTPCodecParameters{}
-		t.setCodecs(t.me.getCodecsByKind(t.kind))
+		t.setCodecs(mediaEngineCodecs)
 		return nil
 	}
 
 	newCodecs := make([]RTPCodecParameters, 0)
 	for _, codec := range codecs {
+		var c RTPCodecParameters
 		c, codecType, err := t.me.getCodecByPayload(codec.PayloadType)
 		if err != nil {
+			var matchType codecMatchType
+			c, matchType = codecParametersFuzzySearch(codec, mediaEngineCodecs)
+			if matchType != codecMatchNone {
+				continue
+			}
+
 			return err
 		}
 
@@ -92,7 +101,7 @@ func (t *RTPTransceiver) Codecs() []RTPCodecParameters {
 	if len(t.codecs) != 0 {
 		codecs = append(codecs, t.codecs...)
 	} else {
-		codecs = append(codecs, t.me.getCodecsByKind(t.kind)...)
+		codecs = t.me.getCodecsByKind(t.kind)
 	}
 
 	return codecs

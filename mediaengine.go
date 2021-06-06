@@ -316,12 +316,21 @@ func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParame
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for _, codec := range m.negotiatedVideoCodecs {
+	codecs := m.negotiatedVideoCodecs
+	if !m.negotiatedVideo {
+		codecs = m.videoCodecs
+	}
+	for _, codec := range codecs {
 		if codec.PayloadType == payloadType {
 			return codec, RTPCodecTypeVideo, nil
 		}
 	}
-	for _, codec := range m.negotiatedAudioCodecs {
+
+	codecs = m.negotiatedAudioCodecs
+	if !m.negotiatedAudio {
+		codecs = m.audioCodecs
+	}
+	for _, codec := range codecs {
 		if codec.PayloadType == payloadType {
 			return codec, RTPCodecTypeAudio, nil
 		}

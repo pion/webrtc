@@ -1026,6 +1026,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
 	weOffer := desc.Type == SDPTypeAnswer
 
+	for _, tr := range localTransceivers {
+		if err := tr.SetCodecPreferences(tr.Codecs()); err != nil {
+			return err
+		}
+	}
+
 	if !weOffer && !detectedPlanB {
 		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 			midValue := getMidValue(media)
