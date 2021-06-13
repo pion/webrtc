@@ -1,4 +1,4 @@
-name: update-authors
+name: generate-authors
 on:
   push:
     branches:
@@ -11,8 +11,11 @@ jobs:
       with:
         fetch-depth: 2
 
-    - name: Generate the AUTHORS file
+    - name: Generate the authors file
       run: .github/generate-authors.sh
+
+    - name: Add the authors file to git
+      run: git add AUTHORS.txt
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:

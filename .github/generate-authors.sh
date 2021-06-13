@@ -12,7 +12,7 @@
 set -e
 
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
-AUTHORS_PATH="$GITHUB_WORKSPACE/AUTHORS"
+AUTHORS_PATH="$GITHUB_WORKSPACE/AUTHORS.txt"
 
 if [ -f ${SCRIPT_PATH}/.ci.conf ]
 then
@@ -42,6 +42,7 @@ shouldBeIncluded () {
 
 
 IFS=$'\n' #Only split on newline
+# TODO: sort by most active
 for contributor in $(git log --format='%aN <%aE>' | LC_ALL=C.UTF-8 sort -uf)
 do
 	if shouldBeIncluded $contributor; then
@@ -52,9 +53,9 @@ unset IFS
 
 if [ ${#CONTRIBUTORS[@]} -ne 0 ]; then
 	cat >$AUTHORS_PATH <<-'EOH'
-	# This file lists all individuals having contributed content to the repository.
-	# For how it is generated, see `pion/.goassets/ci/.github/generate-authors.sh
-	EOH
+# This file is auto generated, using git to list all individuals contributors.
+# see `.github/generate-authors.sh` for the scripting
+EOH
     for i in "${CONTRIBUTORS[@]}"
     do
 	    echo "$i" >> $AUTHORS_PATH
