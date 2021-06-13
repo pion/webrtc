@@ -1,0 +1,22 @@
+name: update-authors
+on:
+  push:
+    branches:
+      - master
+jobs:
+  generate-authors:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+
+    - name: Generate the AUTHORS file
+      run: .github/generate-authors.sh
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        token: ${{ secrets.PIONBOT_PRIVATE_KEY }}
+        commit_message: "Update AUTHORS file"
+        commit_user_email: "59523206+pionbot@users.noreply.github.com"
+        commit_user_name: "Pion Bot"
