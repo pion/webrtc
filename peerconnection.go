@@ -45,8 +45,8 @@ type PeerConnection struct {
 	currentRemoteDescription *SessionDescription
 	pendingRemoteDescription *SessionDescription
 	signalingState           SignalingState
-	iceConnectionState       ICEConnectionState
-	connectionState          PeerConnectionState
+	iceConnectionState       atomic.Value // ICEConnectionState
+	connectionState          atomic.Value // PeerConnectionState
 
 	idpLoginURL *string
 
@@ -66,8 +66,8 @@ type PeerConnection struct {
 	rtpTransceivers []*RTPTransceiver
 
 	onSignalingStateChangeHandler     func(SignalingState)
-	onICEConnectionStateChangeHandler func(ICEConnectionState)
-	onConnectionStateChangeHandler    func(PeerConnectionState)
+	onICEConnectionStateChangeHandler atomic.Value // func(ICEConnectionState)
+	onConnectionStateChangeHandler    atomic.Value // func(PeerConnectionState)
 	onTrackHandler                    func(*TrackRemote, *RTPReceiver)
 	onDataChannelHandler              func(*DataChannel)
 	onNegotiationNeededHandler        atomic.Value // func()
@@ -128,12 +128,12 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		lastAnswer:             "",
 		greaterMid:             -1,
 		signalingState:         SignalingStateStable,
-		iceConnectionState:     ICEConnectionStateNew,
-		connectionState:        PeerConnectionStateNew,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
+	pc.iceConnectionState.Store(ICEConnectionStateNew)
+	pc.connectionState.Store(PeerConnectionStateNew)
 
 	if !api.settingEngine.disableMediaEngineCopy {
 		pc.api = &API{
@@ -458,29 +458,21 @@ func (pc *PeerConnection) onTrack(t *TrackRemote, r *RTPReceiver) {
 // OnICEConnectionStateChange sets an event handler which is called
 // when an ICE connection state is changed.
 func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState)) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	pc.onICEConnectionStateChangeHandler = f
+	pc.onICEConnectionStateChangeHandler.Store(f)
 }
 
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
-	pc.mu.Lock()
-	pc.iceConnectionState = cs
-	handler := pc.onICEConnectionStateChangeHandler
-	pc.mu.Unlock()
-
+	pc.iceConnectionState.Store(cs)
 	pc.log.Infof("ICE connection state changed: %s", cs)
-	if handler != nil {
-		go handler(cs)
+	if handler := pc.onICEConnectionStateChangeHandler.Load(); handler != nil {
+		handler.(func(ICEConnectionState))(cs)
 	}
 }
 
 // OnConnectionStateChange sets an event handler which is called
 // when the PeerConnectionState has changed
 func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-	pc.onConnectionStateChangeHandler = f
+	pc.onConnectionStateChangeHandler.Store(f)
 }
 
 // SetConfiguration updates the configuration of this PeerConnection object.
@@ -714,9 +706,6 @@ func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 // Update the PeerConnectionState given the state of relevant transports
 // https://www.w3.org/TR/webrtc/#rtcpeerconnectionstate-enum
 func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnectionState, dtlsTransportState DTLSTransportState) {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-
 	connectionState := PeerConnectionStateNew
 	switch {
 	// The RTCPeerConnection object's [[IsClosed]] slot is true.
@@ -743,15 +732,14 @@ func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnection
 		connectionState = PeerConnectionStateConnecting
 	}
 
-	if pc.connectionState == connectionState {
+	if pc.connectionState.Load() == connectionState {
 		return
 	}
 
 	pc.log.Infof("peer connection state changed: %s", connectionState)
-	pc.connectionState = connectionState
-	handler := pc.onConnectionStateChangeHandler
-	if handler != nil {
-		go handler(connectionState)
+	pc.connectionState.Store(connectionState)
+	if handler := pc.onConnectionStateChangeHandler.Load(); handler != nil {
+		go handler.(func(PeerConnectionState))(connectionState)
 	}
 }
 
@@ -1534,10 +1522,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 // ICEConnectionState returns the ICE connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
-	pc.mu.RLock()
-	defer pc.mu.RUnlock()
-
-	return pc.iceConnectionState
+	return pc.iceConnectionState.Load().(ICEConnectionState)
 }
 
 // GetSenders returns the RTPSender that are currently attached to this PeerConnection
@@ -1959,10 +1944,7 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 // ConnectionState attribute returns the connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
-	pc.mu.Lock()
-	defer pc.mu.Unlock()
-
-	return pc.connectionState
+	return pc.connectionState.Load().(PeerConnectionState)
 }
 
 // GetStats return data providing statistics about the overall connection
