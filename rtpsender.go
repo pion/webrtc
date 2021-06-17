@@ -38,7 +38,7 @@ type RTPSender struct {
 	api *API
 	id  string
 
-	codecs []RTPCodecParameters
+	tr *RTPTransceiver
 
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan struct{}
@@ -90,16 +90,10 @@ func (r *RTPSender) setNegotiated() {
 	r.negotiated = true
 }
 
-func (r *RTPSender) setCodecs(codecs []RTPCodecParameters) {
+func (r *RTPSender) setRTPTransceiver(tr *RTPTransceiver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.codecs = codecs
-}
-
-func (r *RTPSender) getCodecs() []RTPCodecParameters {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return append([]RTPCodecParameters{}, r.codecs...)
+	r.tr = tr
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -127,7 +121,7 @@ func (r *RTPSender) GetParameters() RTPSendParameters {
 			},
 		},
 	}
-	sendParameters.Codecs = r.getCodecs()
+	sendParameters.Codecs = r.tr.Codecs()
 	return sendParameters
 }
 

@@ -17,7 +17,7 @@ type RTPTransceiver struct {
 	receiver  atomic.Value // *RTPReceiver
 	direction atomic.Value // RTPTransceiverDirection
 
-	me     *MediaEngine
+	api    *API
 	mu     sync.RWMutex
 	codecs []RTPCodecParameters
 
@@ -30,33 +30,31 @@ func newRTPTransceiver(
 	sender *RTPSender,
 	direction RTPTransceiverDirection,
 	kind RTPCodecType,
-	mediaEngine *MediaEngine,
+	api *API,
 ) *RTPTransceiver {
-	t := &RTPTransceiver{kind: kind, me: mediaEngine}
+	t := &RTPTransceiver{kind: kind, api: api}
 	t.setReceiver(receiver)
 	t.setSender(sender)
 	t.setDirection(direction)
-	t.setCodecs(mediaEngine.getCodecsByKind(kind))
 	return t
 }
 
 // SetCodecPreferences sets preferred list of supported codecs
 // if codecs is empty or nil we reset to default from MediaEngine
 func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error {
-	mediaEngineCodecs := t.me.getCodecsByKind(t.kind)
+	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
 
 	if codecs == nil || len(codecs) < 1 {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		t.codecs = []RTPCodecParameters{}
-		t.setCodecs(mediaEngineCodecs)
 		return nil
 	}
 
 	newCodecs := make([]RTPCodecParameters, 0)
 	for _, codec := range codecs {
 		var c RTPCodecParameters
-		c, codecType, err := t.me.getCodecByPayload(codec.PayloadType)
+		c, codecType, err := t.api.mediaEngine.getCodecByPayload(codec.PayloadType)
 		if err != nil {
 			var matchType codecMatchType
 			c, matchType = codecParametersFuzzySearch(codec, mediaEngineCodecs)
@@ -77,19 +75,8 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.codecs = newCodecs
-	t.setCodecs(newCodecs)
 
 	return nil
-}
-
-func (t *RTPTransceiver) setCodecs(newCodecs []RTPCodecParameters) {
-	if sender := t.Sender(); sender != nil {
-		sender.setCodecs(newCodecs)
-	}
-
-	if receiver := t.Receiver(); receiver != nil {
-		receiver.setCodecs(newCodecs)
-	}
 }
 
 // Codecs returns list of supported codecs
@@ -101,7 +88,7 @@ func (t *RTPTransceiver) Codecs() []RTPCodecParameters {
 	if len(t.codecs) != 0 {
 		codecs = append(codecs, t.codecs...)
 	} else {
-		codecs = t.me.getCodecsByKind(t.kind)
+		codecs = t.api.mediaEngine.getCodecsByKind(t.kind)
 	}
 
 	return codecs
@@ -125,7 +112,7 @@ func (t *RTPTransceiver) SetSender(s *RTPSender, track TrackLocal) error {
 func (t *RTPTransceiver) setSender(s *RTPSender) {
 	if s != nil {
 		t.mu.RLock()
-		s.codecs = t.codecs
+		s.setRTPTransceiver(t)
 		t.mu.RUnlock()
 	}
 	t.sender.Store(s)
@@ -187,7 +174,7 @@ func (t *RTPTransceiver) Stop() error {
 func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 	if r != nil {
 		t.mu.RLock()
-		r.codecs = t.codecs
+		r.setRTPTransceiver(t)
 		t.mu.RUnlock()
 	}
 	t.receiver.Store(r)

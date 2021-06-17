@@ -9,13 +9,14 @@ import (
 )
 
 func TestNewRTPTransceiverCodecs(t *testing.T) {
-	me := MediaEngine{}
+	me := &MediaEngine{}
+	api := NewAPI(WithMediaEngine(me))
 	assert.NoError(t, me.RegisterDefaultCodecs())
 
 	me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo)
 	me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio)
 
-	tr := RTPTransceiver{kind: RTPCodecTypeVideo, me: &me, codecs: me.videoCodecs}
+	tr := RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 	assert.EqualValues(t, me.videoCodecs, tr.Codecs())
 
 	failTestCases := [][]RTPCodecParameters{

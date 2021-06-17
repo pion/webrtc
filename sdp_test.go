@@ -307,6 +307,8 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 	engine := &MediaEngine{}
 	assert.NoError(t, engine.RegisterDefaultCodecs())
 
+	api := NewAPI(WithMediaEngine(engine))
+
 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
 
@@ -317,15 +319,17 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 		{
 			id: "video",
 			transceivers: []*RTPTransceiver{{
-				kind: RTPCodecTypeVideo,
-				me:   engine,
+				kind:   RTPCodecTypeVideo,
+				api:    api,
+				codecs: engine.getCodecsByKind(RTPCodecTypeVideo),
 			}},
 		},
 		{
 			id: "audio",
 			transceivers: []*RTPTransceiver{{
-				kind: RTPCodecTypeAudio,
-				me:   engine,
+				kind:   RTPCodecTypeAudio,
+				api:    api,
+				codecs: engine.getCodecsByKind(RTPCodecTypeAudio),
 			}},
 		},
 		{
@@ -367,10 +371,11 @@ func TestPopulateSDP(t *testing.T) {
 	t.Run("Rid", func(t *testing.T) {
 		se := SettingEngine{}
 
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
 
-		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, me: &m, codecs: m.videoCodecs}
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
 		ridMap := map[string]string{
 			"ridkey": "some",
@@ -379,7 +384,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -402,13 +407,13 @@ func TestPopulateSDP(t *testing.T) {
 	t.Run("transceiverCodecs", func(t *testing.T) {
 		se := SettingEngine{}
 
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+		me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo)
+		me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio)
 
-		m.pushCodecs(m.videoCodecs, RTPCodecTypeVideo)
-		m.pushCodecs(m.audioCodecs, RTPCodecTypeAudio)
-
-		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, me: &m, codecs: m.videoCodecs}
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
 		codecErr := tr.SetCodecPreferences([]RTPCodecParameters{
 			{
@@ -422,7 +427,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		// Test codecs

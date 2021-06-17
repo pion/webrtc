@@ -38,7 +38,7 @@ type RTPReceiver struct {
 	closed, received chan interface{}
 	mu               sync.RWMutex
 
-	codecs []RTPCodecParameters
+	tr *RTPTransceiver
 
 	// A reference to the associated api object
 	api *API
@@ -62,10 +62,10 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 	return r, nil
 }
 
-func (r *RTPReceiver) setCodecs(codecs []RTPCodecParameters) {
+func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.codecs = codecs
+	r.tr = tr
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -78,7 +78,7 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 
 func (r *RTPReceiver) getParameters() RTPParameters {
 	parameters := r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
-	parameters.Codecs = r.codecs
+	parameters.Codecs = r.tr.Codecs()
 	return parameters
 }
 

@@ -116,11 +116,37 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		// released the lock.  Deal with it.
 		if data != nil {
 			n = copy(b, data)
+			t.checkAndUpdateTrack(b)
 			return
 		}
 	}
 
-	return r.readRTP(b, t)
+	n, attributes, err = r.readRTP(b, t)
+	t.checkAndUpdateTrack(b)
+
+	return
+}
+
+// checkAndUpdateTrack checks payloadType for every incoming packet
+// once a different payloadType is detected the track will be updated
+func (t *TrackRemote) checkAndUpdateTrack(b []byte) {
+	if len(b) < 2 {
+		return
+	}
+
+	if payloadType := PayloadType(b[1] & 0x7F); payloadType != t.PayloadType() {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
+		params, err := t.receiver.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
+		if err != nil {
+			return
+		}
+
+		t.payloadType = payloadType
+		t.codec = params.Codecs[0]
+		t.params = params
+	}
 }
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you.
