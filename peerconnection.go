@@ -1328,7 +1328,7 @@ func (pc *PeerConnection) startSCTP() {
 
 	var openedDCCount uint32
 	for _, d := range dataChannels {
-		if d.ReadyState() == DataChannelStateConnecting {
+		if d.ReadyState() == DataChannelStateConnecting && d.dataChannel.acknowledged {
 			err := d.open(pc.sctpTransport)
 			if err != nil {
 				pc.log.Warnf("failed to open data channel: %s", err)
