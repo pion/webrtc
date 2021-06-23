@@ -379,3 +379,12 @@ func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
 		t.Errorf("Unexpected packet released by samples built")
 	}
 }
+
+func TestPopWithTimestamp(t *testing.T) {
+	t.Run("Crash on nil", func(t *testing.T) {
+		s := New(0, &fakeDepacketizer{}, 1)
+		sample, timestamp := s.PopWithTimestamp()
+		assert.Nil(t, sample)
+		assert.Equal(t, uint32(0), timestamp)
+	})
+}

@@ -130,7 +130,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 			track: newTrackRemote(
 				r.kind,
 				parameters.Encodings[0].SSRC,
-				"",
+				parameters.Encodings[0].RID,
 				r,
 			),
 		}

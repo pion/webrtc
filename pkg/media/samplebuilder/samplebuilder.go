@@ -300,6 +300,9 @@ func (s *SampleBuilder) Pop() *media.Sample {
 // no sample is compiled).
 func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	sample := s.Pop()
+	if sample == nil {
+		return nil, 0
+	}
 	return sample, sample.PacketTimestamp
 }
 
