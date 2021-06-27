@@ -140,13 +140,24 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		return nil
 	}
 
-	if _, err := track.Bind(r.context); err != nil {
+	codec, err := track.Bind(TrackLocalContext{
+		id:          r.context.id,
+		params:      r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
+		ssrc:        r.context.ssrc,
+		writeStream: r.context.writeStream,
+	})
+	if err != nil {
 		// Re-bind the original track
 		if _, reBindErr := r.track.Bind(r.context); reBindErr != nil {
 			return reBindErr
 		}
 
 		return err
+	}
+
+	// Codec has changed
+	if r.payloadType != codec.PayloadType {
+		r.context.params.Codecs = []RTPCodecParameters{codec}
 	}
 
 	r.track = track
