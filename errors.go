@@ -202,6 +202,7 @@ var (
 
 	errRTPTransceiverCannotChangeMid        = errors.New("errRTPSenderTrackNil")
 	errRTPTransceiverSetSendingInvalidState = errors.New("invalid state change in RTPTransceiver.setSending")
+	errRTPTransceiverCodecUnsupported       = errors.New("unsupported codec type by this transceiver")
 
 	errSCTPTransportDTLS = errors.New("DTLS not established")
 
