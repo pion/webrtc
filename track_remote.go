@@ -116,11 +116,43 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		// released the lock.  Deal with it.
 		if data != nil {
 			n = copy(b, data)
+			err = t.checkAndUpdateTrack(b)
 			return
 		}
 	}
 
-	return r.readRTP(b, t)
+	n, attributes, err = r.readRTP(b, t)
+	if err != nil {
+		return
+	}
+
+	err = t.checkAndUpdateTrack(b)
+	return
+}
+
+// checkAndUpdateTrack checks payloadType for every incoming packet
+// once a different payloadType is detected the track will be updated
+func (t *TrackRemote) checkAndUpdateTrack(b []byte) error {
+	if len(b) < 2 {
+		return errRTPTooShort
+	}
+
+	if payloadType := PayloadType(b[1] & rtpPayloadTypeBitmask); payloadType != t.PayloadType() {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
+		params, err := t.receiver.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
+		if err != nil {
+			return err
+		}
+
+		t.kind = t.receiver.kind
+		t.payloadType = payloadType
+		t.codec = params.Codecs[0]
+		t.params = params
+	}
+
+	return nil
 }
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you.
@@ -136,26 +168,6 @@ func (t *TrackRemote) ReadRTP() (*rtp.Packet, interceptor.Attributes, error) {
 		return nil, nil, err
 	}
 	return r, attributes, nil
-}
-
-// determinePayloadType blocks and reads a single packet to determine the PayloadType for this Track
-// this is useful because we can't announce it to the user until we know the payloadType
-func (t *TrackRemote) determinePayloadType() error {
-	b := make([]byte, receiveMTU)
-	n, _, err := t.peek(b)
-	if err != nil {
-		return err
-	}
-	r := rtp.Packet{}
-	if err := r.Unmarshal(b[:n]); err != nil {
-		return err
-	}
-
-	t.mu.Lock()
-	t.payloadType = PayloadType(r.PayloadType)
-	defer t.mu.Unlock()
-
-	return nil
 }
 
 // peek is like Read, but it doesn't discard the packet read

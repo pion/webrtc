@@ -24,6 +24,8 @@ const (
 	mediaSectionApplication = "application"
 
 	rtpOutboundMTU = 1200
+
+	rtpPayloadTypeBitmask = 0x7F
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {

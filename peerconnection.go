@@ -1178,22 +1178,17 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	go func() {
-		if err := receiver.Track().determinePayloadType(); err != nil {
-			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
-			return
-		}
-
-		params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(receiver.Track().PayloadType())
+		b := make([]byte, receiveMTU)
+		n, _, err := receiver.Track().peek(b)
 		if err != nil {
-			pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
+			pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", receiver.Track().SSRC(), err)
 			return
 		}
 
-		receiver.Track().mu.Lock()
-		receiver.Track().kind = receiver.kind
-		receiver.Track().codec = params.Codecs[0]
-		receiver.Track().params = params
-		receiver.Track().mu.Unlock()
+		if err = receiver.Track().checkAndUpdateTrack(b[:n]); err != nil {
+			pc.log.Warnf("Failed to set codec settings for track SSRC %d (%s)", receiver.Track().SSRC(), err)
+			return
+		}
 
 		pc.onTrack(receiver.Track(), receiver)
 	}()
