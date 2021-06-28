@@ -69,7 +69,7 @@ func createPeerConnection(w http.ResponseWriter, r *http.Request) {
 // Add a single video track
 func addVideo(w http.ResponseWriter, r *http.Request) {
 	videoTrack, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{MimeType: "video/vp8"},
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8},
 		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
 		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
 	)
@@ -117,11 +117,24 @@ func main() {
 	if peerConnection, err = webrtc.NewPeerConnection(webrtc.Configuration{}); err != nil {
 		panic(err)
 	}
+	defer func() {
+		if cErr := peerConnection.Close(); cErr != nil {
+			fmt.Printf("cannot close peerConnection: %v\n", cErr)
+		}
+	}()
 
-	// Set the handler for ICE connection state
+	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
+	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+
+		if s == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
 	})
 
 	http.Handle("/", http.FileServer(http.Dir(".")))
@@ -129,8 +142,13 @@ func main() {
 	http.HandleFunc("/addVideo", addVideo)
 	http.HandleFunc("/removeVideo", removeVideo)
 
-	fmt.Println("Open http://localhost:8080 to access this demo")
-	panic(http.ListenAndServe(":8080", nil))
+	go func() {
+		fmt.Println("Open http://localhost:8080 to access this demo")
+		panic(http.ListenAndServe(":8080", nil))
+	}()
+
+	// Block forever
+	select {}
 }
 
 // Read a video file from disk and write it to a webrtc.Track

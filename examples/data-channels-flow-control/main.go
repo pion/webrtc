@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -120,7 +122,18 @@ func createAnswerer() *webrtc.PeerConnection {
 
 func main() {
 	offerPC := createOfferer()
+	defer func() {
+		if err := offerPC.Close(); err != nil {
+			fmt.Printf("cannot close offerPC: %v\n", err)
+		}
+	}()
+
 	answerPC := createAnswerer()
+	defer func() {
+		if err := answerPC.Close(); err != nil {
+			fmt.Printf("cannot close answerPC: %v\n", err)
+		}
+	}()
 
 	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
 	// send it to the other peer
@@ -135,6 +148,34 @@ func main() {
 	offerPC.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i != nil {
 			check(answerPC.AddICECandidate(i.ToJSON()))
+		}
+	})
+
+	// Set the handler for Peer connection state
+	// This will notify you when the peer has connected/disconnected
+	offerPC.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s (offerer)\n", s.String())
+
+		if s == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
+	})
+
+	// Set the handler for Peer connection state
+	// This will notify you when the peer has connected/disconnected
+	answerPC.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s (answerer)\n", s.String())
+
+		if s == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
 		}
 	})
 

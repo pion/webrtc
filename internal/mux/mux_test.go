@@ -106,6 +106,10 @@ func (m *muxErrorConn) Read(b []byte) (n int, err error) {
    pion/webrtc#1720
 */
 func TestNonFatalRead(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
 	expectedData := []byte("expectedData")
 
 	// In memory pipe
