@@ -3,7 +3,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/pion/webrtc/v3"
@@ -59,6 +61,12 @@ func main() {
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+
+		if connectionState == webrtc.ICEConnectionStateFailed {
+			if closeErr := peerConnection.Close(); closeErr != nil {
+				panic(closeErr)
+			}
+		}
 	})
 
 	// Wait for the offer to be pasted
@@ -101,6 +109,11 @@ func main() {
 		}
 
 		if _, err = videoTrack.Write(inboundRTPPacket[:n]); err != nil {
+			if errors.Is(err, io.ErrClosedPipe) {
+				// The peerConnection has been closed.
+				return
+			}
+
 			panic(err)
 		}
 	}
