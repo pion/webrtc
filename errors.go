@@ -202,6 +202,7 @@ var (
 
 	errRTPTransceiverCannotChangeMid        = errors.New("errRTPSenderTrackNil")
 	errRTPTransceiverSetSendingInvalidState = errors.New("invalid state change in RTPTransceiver.setSending")
+	errRTPTransceiverCodecUnsupported       = errors.New("unsupported codec type by this transceiver")
 
 	errSCTPTransportDTLS = errors.New("DTLS not established")
 
@@ -219,4 +220,6 @@ var (
 	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
 
 	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
+
+	errRTPTooShort = errors.New("not long enough to be a RTP Packet")
 )

@@ -3,7 +3,6 @@
 package webrtc
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -40,114 +39,80 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	t.Run("Basic", func(t *testing.T) {
-		s := SettingEngine{}
-		s.DisableSRTPReplayProtection(true)
+	s := SettingEngine{}
+	s.DisableSRTPReplayProtection(true)
 
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+	m := &MediaEngine{}
+	assert.NoError(t, m.RegisterDefaultCodecs())
 
-		sender, receiver, err := NewAPI(WithMediaEngine(m), WithSettingEngine(s)).newPair(Configuration{})
-		assert.NoError(t, err)
+	sender, receiver, err := NewAPI(WithMediaEngine(m), WithSettingEngine(s)).newPair(Configuration{})
+	assert.NoError(t, err)
 
-		trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
-		assert.NoError(t, err)
+	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
 
-		trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
-		assert.NoError(t, err)
+	trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264}, "video", "pion")
+	assert.NoError(t, err)
 
-		rtpSender, err := sender.AddTrack(trackA)
-		assert.NoError(t, err)
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
 
-		seenPacketA, seenPacketACancel := context.WithCancel(context.Background())
-		seenPacketB, seenPacketBCancel := context.WithCancel(context.Background())
+	seenPacketA, seenPacketACancel := context.WithCancel(context.Background())
+	seenPacketB, seenPacketBCancel := context.WithCancel(context.Background())
 
-		var onTrackCount uint64
-		receiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
-			assert.Equal(t, uint64(1), atomic.AddUint64(&onTrackCount, 1))
+	var onTrackCount uint64
+	receiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		assert.Equal(t, uint64(1), atomic.AddUint64(&onTrackCount, 1))
 
-			for {
-				pkt, _, err := track.ReadRTP()
-				if err != nil {
-					assert.True(t, errors.Is(io.EOF, err))
-					return
-				}
-
-				switch {
-				case bytes.Equal(pkt.Payload, []byte{0x10, 0xAA}):
-					seenPacketACancel()
-				case bytes.Equal(pkt.Payload, []byte{0x10, 0xBB}):
-					seenPacketBCancel()
-				}
+		for {
+			pkt, _, err := track.ReadRTP()
+			if err != nil {
+				assert.True(t, errors.Is(io.EOF, err))
+				return
 			}
-		})
 
-		assert.NoError(t, signalPair(sender, receiver))
-
-		// Block Until packet with 0xAA has been seen
-		func() {
-			for range time.Tick(time.Millisecond * 20) {
-				select {
-				case <-seenPacketA.Done():
-					return
-				default:
-					assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
-				}
+			switch {
+			case pkt.Payload[len(pkt.Payload)-1] == 0xAA:
+				assert.Equal(t, track.Codec().MimeType, MimeTypeVP8)
+				seenPacketACancel()
+			case pkt.Payload[len(pkt.Payload)-1] == 0xBB:
+				assert.Equal(t, track.Codec().MimeType, MimeTypeH264)
+				seenPacketBCancel()
+			default:
+				t.Fatalf("Unexpected RTP Data % 02x", pkt.Payload[len(pkt.Payload)-1])
 			}
-		}()
-
-		assert.NoError(t, rtpSender.ReplaceTrack(trackB))
-
-		// Block Until packet with 0xBB has been seen
-		func() {
-			for range time.Tick(time.Millisecond * 20) {
-				select {
-				case <-seenPacketB.Done():
-					return
-				default:
-					assert.NoError(t, trackB.WriteSample(media.Sample{Data: []byte{0xBB}, Duration: time.Second}))
-				}
-			}
-		}()
-
-		closePairNow(t, sender, receiver)
+		}
 	})
 
-	t.Run("Invalid Codec Change", func(t *testing.T) {
-		sender, receiver, err := newPair()
-		assert.NoError(t, err)
+	assert.NoError(t, signalPair(sender, receiver))
 
-		trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
-		assert.NoError(t, err)
-
-		trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "video", "pion")
-		assert.NoError(t, err)
-
-		rtpSender, err := sender.AddTrack(trackA)
-		assert.NoError(t, err)
-
-		assert.NoError(t, signalPair(sender, receiver))
-
-		seenPacket, seenPacketCancel := context.WithCancel(context.Background())
-		receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
-			seenPacketCancel()
-		})
-
-		func() {
-			for range time.Tick(time.Millisecond * 20) {
-				select {
-				case <-seenPacket.Done():
-					return
-				default:
-					assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
-				}
+	// Block Until packet with 0xAA has been seen
+	func() {
+		for range time.Tick(time.Millisecond * 20) {
+			select {
+			case <-seenPacketA.Done():
+				return
+			default:
+				assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
 			}
-		}()
+		}
+	}()
 
-		assert.True(t, errors.Is(rtpSender.ReplaceTrack(trackB), ErrUnsupportedCodec))
+	assert.NoError(t, rtpSender.ReplaceTrack(trackB))
 
-		closePairNow(t, sender, receiver)
-	})
+	// Block Until packet with 0xBB has been seen
+	func() {
+		for range time.Tick(time.Millisecond * 20) {
+			select {
+			case <-seenPacketB.Done():
+				return
+			default:
+				assert.NoError(t, trackB.WriteSample(media.Sample{Data: []byte{0xBB}, Duration: time.Second}))
+			}
+		}
+	}()
+
+	closePairNow(t, sender, receiver)
 }
 
 func Test_RTPSender_GetParameters(t *testing.T) {
@@ -182,7 +147,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 
 	sender, receiver, wan := createVNetPair(t)
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	rtpSender, err := sender.AddTrack(track)
@@ -199,5 +164,47 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 	assert.Error(t, err, packetio.ErrTimeout)
 
 	assert.NoError(t, wan.Stop())
+	closePairNow(t, sender, receiver)
+}
+
+func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, err := newPair()
+	assert.NoError(t, err)
+
+	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
+	receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
+		seenPacketCancel()
+	})
+
+	func() {
+		for range time.Tick(time.Millisecond * 20) {
+			select {
+			case <-seenPacket.Done():
+				return
+			default:
+				assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+			}
+		}
+	}()
+
+	assert.True(t, errors.Is(rtpSender.ReplaceTrack(trackB), ErrUnsupportedCodec))
+
 	closePairNow(t, sender, receiver)
 }
