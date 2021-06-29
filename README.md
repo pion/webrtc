@@ -276,6 +276,7 @@ Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contribu
 * [yusuke](https://github.com/yusukem99)
 * [Patryk Rogalski](https://github.com/digitalix)
 * [Robin Raymond](https://github.com/robin-raymond)
+* [Jagger Yu](https://github.com/aggresss)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
