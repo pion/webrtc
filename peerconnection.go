@@ -1197,7 +1197,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 
 	var transceiver *RTPTransceiver
 	for _, t := range pc.GetTransceivers() {
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
+		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil && t.usedToSend.Load() != true {
 			transceiver = t
 			break
 		}

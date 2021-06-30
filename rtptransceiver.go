@@ -14,6 +14,8 @@ type RTPTransceiver struct {
 	receiver  atomic.Value // *RTPReceiver
 	direction atomic.Value // RTPTransceiverDirection
 
+	usedToSend atomic.Value // track if direction has never had a value of "sendrecv" or "sendonly"
+
 	stopped bool
 	kind    RTPCodecType
 }
@@ -89,6 +91,9 @@ func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 }
 
 func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
+	if d == RTPTransceiverDirectionSendrecv || d == RTPTransceiverDirectionSendonly {
+		t.usedToSend.Store(true)
+	}
 	t.direction.Store(d)
 }
 
