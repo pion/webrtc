@@ -22,9 +22,6 @@ jobs:
         - name: File names
           run: .github/lint-filename.sh
 
-        - name: Contributors
-          run: .github/assert-contributors.sh
-
         - name: Functions
           run: .github/lint-disallowed-functions-in-library.sh
 

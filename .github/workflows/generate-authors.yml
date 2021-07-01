@@ -1,0 +1,42 @@
+name: generate-authors
+
+on:
+  pull_request:
+
+jobs:
+  generate-authors:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+
+    - name: Generate the authors file
+      run: .github/generate-authors.sh
+
+    - name: Add the authors file to git
+      run: git add AUTHORS.txt
+
+    - name: Get last commit message
+      id: last-commit-message
+      run: |
+        echo "::set-output name=msg::$(git log -1 --pretty=%s)"
+
+    - name: Get last commit author
+      id: last-commit-author
+      run: |
+        echo "::set-output name=msg::$(git log -1 --pretty='%aN <%ae>')"
+
+    - name: git diff, only generate commit if change
+      id: git-diff
+      run: git diff-index --quiet HEAD --
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      if: failure()
+      with:
+        commit_message: ${{ steps.last-commit-message.outputs.msg }}
+        commit_author: ${{ steps.last-commit-author.outputs.msg }}
+        commit_options: '--amend --no-edit'
+        push_options: '--force'
+        skip_fetch: true
