@@ -12,6 +12,7 @@
 set -e
 
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
+AUTHORS_PATH="$GITHUB_WORKSPACE/AUTHORS.txt"
 
 if [ -f ${SCRIPT_PATH}/.ci.conf ]
 then
@@ -21,18 +22,18 @@ fi
 #
 # DO NOT EDIT THIS
 #
-EXCLUDED_CONTRIBUTORS+=('John R. Bradley' 'renovate[bot]' 'Renovate Bot' 'Pion Bot')
+EXCLUDED_CONTRIBUTORS+=('John R. Bradley' 'renovate[bot]' 'Renovate Bot' 'Pion Bot' 'pionbot')
 # If you want to exclude a name from all repositories, send a PR to
 # https://github.com/pion/.goassets instead of this repository.
 # If you want to exclude a name only from this repository,
 # add EXCLUDED_CONTRIBUTORS=('name') to .github/.ci.conf
 
-MISSING_CONTRIBUTORS=()
+CONTRIBUTORS=()
 
 shouldBeIncluded () {
 	for i in "${EXCLUDED_CONTRIBUTORS[@]}"
 	do
-		if [ "$i" == "$1" ] ; then
+		if [[ $1 =~ "$i" ]]; then
 			return 1
 		fi
 	done
@@ -41,21 +42,25 @@ shouldBeIncluded () {
 
 
 IFS=$'\n' #Only split on newline
-for contributor in $(git log --format='%aN' | sort -u)
+for contributor in $(git log --format='%aN <%aE>' | LC_ALL=C.UTF-8 sort -uf)
 do
 	if shouldBeIncluded $contributor; then
-		if ! grep -q "$contributor" "$SCRIPT_PATH/../README.md"; then
-			MISSING_CONTRIBUTORS+=("$contributor")
-		fi
+		CONTRIBUTORS+=("$contributor")
 	fi
 done
 unset IFS
 
-if [ ${#MISSING_CONTRIBUTORS[@]} -ne 0 ]; then
-    echo "Please add the following contributors to the README"
-    for i in "${MISSING_CONTRIBUTORS[@]}"
+if [ ${#CONTRIBUTORS[@]} -ne 0 ]; then
+	cat >$AUTHORS_PATH <<-'EOH'
+# Thank you to everyone that made Pion possible. If you are interested in contributing
+# we would love to have you https://github.com/pion/webrtc/wiki/Contributing
+#
+# This file is auto generated, using git to list all individuals contributors.
+# see `.github/generate-authors.sh` for the scripting
+EOH
+    for i in "${CONTRIBUTORS[@]}"
     do
-	    echo "$i"
+	    echo "$i" >> $AUTHORS_PATH
     done
-    exit 1
+    exit 0
 fi

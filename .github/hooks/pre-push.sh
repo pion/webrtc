@@ -8,6 +8,6 @@
 
 set -e
 
-.github/assert-contributors.sh
+.github/generate-authors.sh
 
 exit 0
