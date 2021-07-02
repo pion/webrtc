@@ -1,0 +1,48 @@
+name: generate-authors
+
+on:
+  pull_request:
+
+jobs:
+  generate-authors:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+        token: ${{ secrets.PIONBOT_PRIVATE_KEY }}
+
+    - name: Generate the authors file
+      run: .github/generate-authors.sh
+
+    - name: Add the authors file to git
+      run: git add AUTHORS.txt
+
+    - name: Get last commit message
+      id: last-commit-message
+      run: |
+        COMMIT_MSG=$(git log -1 --pretty=%B)
+        COMMIT_MSG="${COMMIT_MSG//'%'/'%25'}"
+        COMMIT_MSG="${COMMIT_MSG//$'\n'/'%0A'}"
+        COMMIT_MSG="${COMMIT_MSG//$'\r'/'%0D'}"
+        echo "::set-output name=msg::$COMMIT_MSG"
+
+    - name: Get last commit author
+      id: last-commit-author
+      run: |
+        echo "::set-output name=msg::$(git log -1 --pretty='%aN <%ae>')"
+
+    - name: Check if AUTHORS.txt file has changed
+      id: git-status-output
+      run: |
+        echo "::set-output name=msg::$(git status -s | wc -l)"
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      if: ${{ steps.git-status-output.outputs.msg != '0' }}
+      with:
+        commit_message: ${{ steps.last-commit-message.outputs.msg }}
+        commit_author: ${{ steps.last-commit-author.outputs.msg }}
+        commit_options: '--amend --no-edit'
+        push_options: '--force'
+        skip_fetch: true
