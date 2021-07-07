@@ -388,3 +388,38 @@ func TestPopWithTimestamp(t *testing.T) {
 		assert.Equal(t, uint32(0), timestamp)
 	})
 }
+
+type truePartitionHeadChecker struct{}
+
+func (f *truePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+	return true
+}
+
+func TestSampleBuilderData(t *testing.T) {
+	s := New(10, &fakeDepacketizer{}, 1,
+		WithPartitionHeadChecker(&truePartitionHeadChecker{}),
+	)
+	j := 0
+	for i := 0; i < 0x20000; i++ {
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i + 42),
+			},
+			Payload: []byte{byte(i)},
+		}
+		s.Push(&p)
+		for {
+			sample, ts := s.PopWithTimestamp()
+			if sample == nil {
+				break
+			}
+			assert.Equal(t, ts, uint32(j+42), "timestamp")
+			assert.Equal(t, len(sample.Data), 1, "data length")
+			assert.Equal(t, byte(j), sample.Data[0], "data")
+			j++
+		}
+	}
+	// only the last packet should be dropped
+	assert.Equal(t, j, 0x1FFFF)
+}
