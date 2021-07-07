@@ -167,7 +167,6 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // If you wish to send a RTP Packet use TrackLocalStaticRTP
 type TrackLocalStaticSample struct {
 	packetizer rtp.Packetizer
-	sequencer  rtp.Sequencer
 	rtpTrack   *TrackLocalStaticRTP
 	clockRate  float64
 }
@@ -222,13 +221,12 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 		return codec, err
 	}
 
-	s.sequencer = rtp.NewRandomSequencer()
 	s.packetizer = rtp.NewPacketizer(
 		rtpOutboundMTU,
 		0, // Value is handled when writing
 		0, // Value is handled when writing
 		payloader,
-		s.sequencer,
+		rtp.NewRandomSequencer(),
 		codec.ClockRate,
 	)
 	s.clockRate = float64(codec.RTPCodecCapability.ClockRate)
@@ -255,16 +253,8 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 		return nil
 	}
 
-	// skip packets by the number of previously dropped packets
-	for i := uint16(0); i < sample.PrevDroppedPackets; i++ {
-		s.sequencer.NextSequenceNumber()
-	}
-
-	samples := uint32(sample.Duration.Seconds() * clockRate)
-	if sample.PrevDroppedPackets > 0 {
-		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
-	}
-	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
+	samples := sample.Duration.Seconds() * clockRate
+	packets := p.(rtp.Packetizer).Packetize(sample.Data, uint32(samples))
 
 	writeErrs := []error{}
 	for _, p := range packets {
