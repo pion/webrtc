@@ -296,7 +296,7 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 
 func (pc *PeerConnection) negotiationNeededOp() {
 	// Don't run NegotiatedNeeded checks if OnNegotiationNeeded is not set
-	if handler := pc.onNegotiationNeededHandler.Load(); handler == nil {
+	if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); !ok || handler == nil {
 		return
 	}
 
@@ -464,8 +464,8 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
 	pc.iceConnectionState.Store(cs)
 	pc.log.Infof("ICE connection state changed: %s", cs)
-	if handler := pc.onICEConnectionStateChangeHandler.Load(); handler != nil {
-		handler.(func(ICEConnectionState))(cs)
+	if handler, ok := pc.onICEConnectionStateChangeHandler.Load().(func(ICEConnectionState)); ok && handler != nil {
+		handler(cs)
 	}
 }
 
@@ -473,6 +473,14 @@ func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
 // when the PeerConnectionState has changed
 func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 	pc.onConnectionStateChangeHandler.Store(f)
+}
+
+func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
+	pc.connectionState.Store(cs)
+	pc.log.Infof("peer connection state changed: %s", cs)
+	if handler, ok := pc.onConnectionStateChangeHandler.Load().(func(PeerConnectionState)); ok && handler != nil {
+		go handler(cs)
+	}
 }
 
 // SetConfiguration updates the configuration of this PeerConnection object.
@@ -736,11 +744,7 @@ func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnection
 		return
 	}
 
-	pc.log.Infof("peer connection state changed: %s", connectionState)
-	pc.connectionState.Store(connectionState)
-	if handler := pc.onConnectionStateChangeHandler.Load(); handler != nil {
-		go handler.(func(PeerConnectionState))(connectionState)
-	}
+	pc.onConnectionStateChange(connectionState)
 }
 
 func (pc *PeerConnection) createICETransport() *ICETransport {
