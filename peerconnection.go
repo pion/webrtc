@@ -475,6 +475,14 @@ func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 	pc.onConnectionStateChangeHandler.Store(f)
 }
 
+func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
+	pc.connectionState.Store(cs)
+	pc.log.Infof("peer connection state changed: %s", cs)
+	if handler := pc.onConnectionStateChangeHandler.Load(); handler != nil {
+		go handler.(func(PeerConnectionState))(cs)
+	}
+}
+
 // SetConfiguration updates the configuration of this PeerConnection object.
 func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { //nolint:gocognit
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
@@ -736,11 +744,7 @@ func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnection
 		return
 	}
 
-	pc.log.Infof("peer connection state changed: %s", connectionState)
-	pc.connectionState.Store(connectionState)
-	if handler := pc.onConnectionStateChangeHandler.Load(); handler != nil {
-		go handler.(func(PeerConnectionState))(connectionState)
-	}
+	pc.onConnectionStateChange(connectionState)
 }
 
 func (pc *PeerConnection) createICETransport() *ICETransport {
