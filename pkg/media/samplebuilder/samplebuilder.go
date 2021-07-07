@@ -112,23 +112,7 @@ func (s *SampleBuilder) releasePacket(i uint16) {
 // purgeConsumedBuffers clears all buffers that have already been consumed by
 // popping.
 func (s *SampleBuilder) purgeConsumedBuffers() {
-	s.purgeConsumedLocation(s.active, false)
-}
-
-// purgeConsumedLocation clears all buffers that have already been consumed
-// during a sample building method.
-func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation, forceConsume bool) {
-	if !s.filled.hasData() {
-		return
-	}
-
-	switch consume.compare(s.filled.head) {
-	case slCompareInside:
-		if !forceConsume {
-			break
-		}
-		fallthrough
-	case slCompareBefore:
+	for s.active.compare(s.filled.head) == slCompareBefore && s.filled.hasData() {
 		s.releasePacket(s.filled.head)
 		s.filled.head++
 	}
@@ -247,7 +231,6 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if s.partitionHeadChecker != nil {
 		if !s.partitionHeadChecker.IsPartitionHead(s.buffer[consume.head].Payload) {
 			s.droppedPackets += consume.count()
-			s.purgeConsumedLocation(consume, true)
 			s.purgeConsumedBuffers()
 			return nil
 		}
@@ -255,8 +238,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// merge all the buffers into a sample
 	data := []byte{}
-	for i := consume.head; i != consume.tail; i++ {
-		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
+	for ; consume.head != consume.tail; consume.head++ {
+		p, err := s.depacketizer.Unmarshal(s.buffer[consume.head].Payload)
 		if err != nil {
 			return nil
 		}
@@ -276,7 +259,6 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
 
-	s.purgeConsumedLocation(consume, true)
 	s.purgeConsumedBuffers()
 
 	return sample
