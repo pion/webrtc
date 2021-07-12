@@ -203,7 +203,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	var consume sampleSequenceLocation
 
-	for i := s.active.head; s.buffer[i] != nil && i < s.active.tail; i++ {
+	for i := s.active.head; s.buffer[i] != nil && s.active.compare(i) != slCompareAfter; i++ {
 		if s.depacketizer.IsDetectedFinalPacketInSequence(s.buffer[i].Marker) {
 			consume.head = s.active.head
 			consume.tail = i + 1
