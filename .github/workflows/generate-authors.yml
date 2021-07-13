@@ -4,7 +4,21 @@ on:
   pull_request:
 
 jobs:
+  checksecret:
+    runs-on: ubuntu-latest
+    outputs:
+      is_PIONBOT_PRIVATE_KEY_set: ${{ steps.checksecret_job.outputs.is_PIONBOT_PRIVATE_KEY_set }}
+    steps:
+      - id: checksecret_job
+        env:
+          PIONBOT_PRIVATE_KEY: ${{ secrets.PIONBOT_PRIVATE_KEY }}
+        run: |
+          echo "is_PIONBOT_PRIVATE_KEY_set: ${{ env.PIONBOT_PRIVATE_KEY != '' }}"
+          echo "::set-output name=is_PIONBOT_PRIVATE_KEY_set::${{ env.PIONBOT_PRIVATE_KEY != '' }}"
+
   generate-authors:
+    needs: [checksecret]
+    if: needs.checksecret.outputs.is_PIONBOT_PRIVATE_KEY_set == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
