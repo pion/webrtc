@@ -78,7 +78,9 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 
 func (r *RTPReceiver) getParameters() RTPParameters {
 	parameters := r.api.mediaEngine.getRTPParametersByKind(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
-	parameters.Codecs = r.tr.getCodecs()
+	if r.tr != nil {
+		parameters.Codecs = r.tr.getCodecs()
+	}
 	return parameters
 }
 
