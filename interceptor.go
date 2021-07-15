@@ -8,7 +8,9 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
+	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors.
@@ -20,6 +22,10 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 	}
 
 	if err := ConfigureRTCPReports(interceptorRegistry); err != nil {
+		return err
+	}
+
+	if err := ConfigureTWCCSender(mediaEngine, interceptorRegistry); err != nil {
 		return err
 	}
 
@@ -58,6 +64,36 @@ func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Re
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack"}, RTPCodecTypeVideo)
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack", Parameter: "pli"}, RTPCodecTypeVideo)
 	interceptorRegistry.Add(responder)
+	interceptorRegistry.Add(generator)
+	return nil
+}
+
+// ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
+// a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
+func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo)
+	if err != nil {
+		return err
+	}
+	i, err := twcc.NewHeaderExtensionInterceptor()
+	if err != nil {
+		return err
+	}
+	interceptorRegistry.Add(i)
+	return err
+}
+
+// ConfigureTWCCSender will setup everything necessary for generating TWCC reports.
+func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeVideo)
+	err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo)
+	if err != nil {
+		return err
+	}
+	generator, err := twcc.NewSenderInterceptor()
+	if err != nil {
+		return err
+	}
 	interceptorRegistry.Add(generator)
 	return nil
 }

@@ -90,6 +90,7 @@ Markus Tzoe <chou.marcus@gmail.com>
 Marouane <6729798+nindolabs@users.noreply.github.com>
 Marouane <marouane@gamestream.biz>
 Masahiro Nakamura <13937915+tsuu32@users.noreply.github.com>
+Mathis Engelbart <mathis.engelbart@gmail.com>
 Max Hawkins <maxhawkins@gmail.com>
 mchlrhw <4028654+mchlrhw@users.noreply.github.com>
 Michael MacDonald <github@macdonald.cx>
