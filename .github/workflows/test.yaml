@@ -43,7 +43,7 @@ jobs:
           -bench=. \
           -v -race
 
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v2
         with:
           file: ./cover.out
           name: codecov-umbrella
@@ -131,7 +131,7 @@ jobs:
           -exec="${GO_JS_WASM_EXEC}" \
           -v ./...
 
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v2
         with:
           file: ./cover.out
           name: codecov-umbrella
