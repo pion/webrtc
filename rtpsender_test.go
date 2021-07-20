@@ -167,7 +167,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 	closePairNow(t, sender, receiver)
 }
 
-func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
+func Test_RTPSender_ReplaceTrack_InvalidTrackKindChange(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
@@ -184,6 +184,54 @@ func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
 	assert.NoError(t, err)
 
 	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
+	receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
+		seenPacketCancel()
+	})
+
+	func() {
+		for range time.Tick(time.Millisecond * 20) {
+			select {
+			case <-seenPacket.Done():
+				return
+			default:
+				assert.NoError(t, trackA.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+			}
+		}
+	}()
+
+	assert.True(t, errors.Is(rtpSender.ReplaceTrack(trackB), ErrRTPSenderNewTrackHasIncorrectKind))
+
+	closePairNow(t, sender, receiver)
+}
+
+func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, err := newPair()
+	assert.NoError(t, err)
+
+	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP9}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	err = rtpSender.tr.SetCodecPreferences([]RTPCodecParameters{{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
+		PayloadType:        96,
+	}})
 	assert.NoError(t, err)
 
 	assert.NoError(t, signalPair(sender, receiver))

@@ -145,6 +145,10 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if track != nil && r.tr.kind != track.Kind() {
+		return ErrRTPSenderNewTrackHasIncorrectKind
+	}
+
 	if r.hasSent() && r.track != nil {
 		if err := r.track.Unbind(r.context); err != nil {
 			return err
@@ -158,7 +162,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 
 	codec, err := track.Bind(TrackLocalContext{
 		id:          r.context.id,
-		params:      r.api.mediaEngine.getRTPParametersByKind(r.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
+		params:      r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
 		ssrc:        r.context.ssrc,
 		writeStream: r.context.writeStream,
 	})
