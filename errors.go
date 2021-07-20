@@ -135,6 +135,9 @@ var (
 	// ErrUnsupportedCodec indicates the remote peer doesn't support the requested codec
 	ErrUnsupportedCodec = errors.New("unable to start track, codec is not supported by remote")
 
+	// ErrRTPSenderNewTrackHasIncorrectKind indicates that the new track is of a different kind than the previous/original
+	ErrRTPSenderNewTrackHasIncorrectKind = errors.New("new track must be of the same kind as previous")
+
 	// ErrUnbindFailed indicates that a TrackLocal was not able to be unbind
 	ErrUnbindFailed = errors.New("failed to unbind TrackLocal from PeerConnection")
 
