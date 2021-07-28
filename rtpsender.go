@@ -38,7 +38,7 @@ type RTPSender struct {
 	api *API
 	id  string
 
-	tr *RTPTransceiver
+	rtpTransceiver *RTPTransceiver
 
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan struct{}
@@ -90,10 +90,10 @@ func (r *RTPSender) setNegotiated() {
 	r.negotiated = true
 }
 
-func (r *RTPSender) setRTPTransceiver(tr *RTPTransceiver) {
+func (r *RTPSender) setRTPTransceiver(rtpTransceiver *RTPTransceiver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.tr = tr
+	r.rtpTransceiver = rtpTransceiver
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -119,7 +119,11 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 			},
 		},
 	}
-	sendParameters.Codecs = r.tr.getCodecs()
+	if r.rtpTransceiver != nil {
+		sendParameters.Codecs = r.rtpTransceiver.getCodecs()
+	} else {
+		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.track.Kind())
+	}
 	return sendParameters
 }
 
@@ -145,7 +149,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if track != nil && r.tr.kind != track.Kind() {
+	if track != nil && r.rtpTransceiver.kind != track.Kind() {
 		return ErrRTPSenderNewTrackHasIncorrectKind
 	}
 
