@@ -3,94 +3,8 @@
 package webrtc
 
 import (
-	"io"
-	"testing"
-	"time"
-
-	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
-	"github.com/stretchr/testify/assert"
 )
-
-func TestDataChannel_ORTCE2E(t *testing.T) {
-	// Limit runtime in case of deadlocks
-	lim := test.TimeOut(time.Second * 20)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	stackA, stackB, err := newORTCPair()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	awaitSetup := make(chan struct{})
-	awaitString := make(chan struct{})
-	awaitBinary := make(chan struct{})
-	stackB.sctp.OnDataChannel(func(d *DataChannel) {
-		close(awaitSetup)
-
-		d.OnMessage(func(msg DataChannelMessage) {
-			if msg.IsString {
-				close(awaitString)
-			} else {
-				close(awaitBinary)
-			}
-		})
-	})
-
-	err = signalORTCPair(stackA, stackB)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var id uint16 = 1
-	dcParams := &DataChannelParameters{
-		Label: "Foo",
-		ID:    &id,
-	}
-	channelA, err := stackA.api.NewDataChannel(stackA.sctp, dcParams)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	<-awaitSetup
-
-	err = channelA.SendText("ABC")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = channelA.Send([]byte("ABC"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	<-awaitString
-	<-awaitBinary
-
-	err = stackA.close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = stackB.close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// attempt to send when channel is closed
-	err = channelA.Send([]byte("ABC"))
-	assert.Error(t, err)
-	assert.Equal(t, io.ErrClosedPipe, err)
-
-	err = channelA.SendText("test")
-	assert.Error(t, err)
-	assert.Equal(t, io.ErrClosedPipe, err)
-
-	err = channelA.ensureOpen()
-	assert.Error(t, err)
-	assert.Equal(t, io.ErrClosedPipe, err)
-}
 
 type testORTCStack struct {
 	api      *API
@@ -185,10 +99,10 @@ func (s *testORTCStack) close() error {
 }
 
 type testORTCSignal struct {
-	ICECandidates    []ICECandidate   `json:"iceCandidates"`
-	ICEParameters    ICEParameters    `json:"iceParameters"`
-	DTLSParameters   DTLSParameters   `json:"dtlsParameters"`
-	SCTPCapabilities SCTPCapabilities `json:"sctpCapabilities"`
+	ICECandidates    []ICECandidate
+	ICEParameters    ICEParameters
+	DTLSParameters   DTLSParameters
+	SCTPCapabilities SCTPCapabilities
 }
 
 func newORTCPair() (stackA *testORTCStack, stackB *testORTCStack, err error) {

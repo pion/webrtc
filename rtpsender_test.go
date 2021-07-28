@@ -228,7 +228,7 @@ func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
 	rtpSender, err := sender.AddTrack(trackA)
 	assert.NoError(t, err)
 
-	err = rtpSender.tr.SetCodecPreferences([]RTPCodecParameters{{
+	err = rtpSender.rtpTransceiver.SetCodecPreferences([]RTPCodecParameters{{
 		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
 		PayloadType:        96,
 	}})
