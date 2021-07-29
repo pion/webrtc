@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v2"
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/transport/vnet"
 	"github.com/pion/webrtc/v3/internal/util"
@@ -1091,7 +1091,6 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 				Extension:        false,
 				ExtensionProfile: 1,
 				Version:          2,
-				PayloadOffset:    20,
 				SequenceNumber:   27023,
 				Timestamp:        3653407706,
 				CSRC:             []uint32{},

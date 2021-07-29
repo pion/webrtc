@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 	"github.com/stretchr/testify/assert"
 )
 

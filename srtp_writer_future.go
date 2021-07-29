@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 	"github.com/pion/srtp/v2"
 )
 

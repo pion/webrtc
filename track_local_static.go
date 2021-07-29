@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
 )
