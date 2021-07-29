@@ -1,54 +1,70 @@
-package webrtc
+package fmtp
 
 import (
 	"reflect"
 	"testing"
 )
 
-func TestParseFmtp(t *testing.T) {
+func TestGenericParseFmtp(t *testing.T) {
 	testCases := map[string]struct {
 		input    string
-		expected fmtp
+		expected FMTP
 	}{
 		"OneParam": {
 			input: "key-name=value",
-			expected: fmtp{
-				"key-name": "value",
+			expected: &genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key-name": "value",
+				},
 			},
 		},
 		"OneParamWithWhiteSpeces": {
 			input: "\tkey-name=value ",
-			expected: fmtp{
-				"key-name": "value",
+			expected: &genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key-name": "value",
+				},
 			},
 		},
 		"TwoParams": {
 			input: "key-name=value;key2=value2",
-			expected: fmtp{
-				"key-name": "value",
-				"key2":     "value2",
+			expected: &genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key-name": "value",
+					"key2":     "value2",
+				},
 			},
 		},
 		"TwoParamsWithWhiteSpeces": {
 			input: "key-name=value;  \n\tkey2=value2 ",
-			expected: fmtp{
-				"key-name": "value",
-				"key2":     "value2",
+			expected: &genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key-name": "value",
+					"key2":     "value2",
+				},
 			},
 		},
 	}
 	for name, testCase := range testCases {
 		testCase := testCase
 		t.Run(name, func(t *testing.T) {
-			f := parseFmtp(testCase.input)
+			f := Parse("generic", testCase.input)
 			if !reflect.DeepEqual(testCase.expected, f) {
 				t.Errorf("Expected Fmtp params: %v, got: %v", testCase.expected, f)
+			}
+
+			if f.MimeType() != "generic" {
+				t.Errorf("Expected MimeType of generic, got: %s", f.MimeType())
 			}
 		})
 	}
 }
 
-func TestFmtpConsist(t *testing.T) {
+func TestGenericFmtpCompare(t *testing.T) {
 	consistString := map[bool]string{true: "consist", false: "inconsist"}
 
 	testCases := map[string]struct {
@@ -89,7 +105,18 @@ func TestFmtpConsist(t *testing.T) {
 	for name, testCase := range testCases {
 		testCase := testCase
 		check := func(t *testing.T, a, b string) {
-			c := fmtpConsist(parseFmtp(a), parseFmtp(b))
+			aa := Parse("", a)
+			bb := Parse("", b)
+			c := aa.Match(bb)
+			if c != testCase.consist {
+				t.Errorf(
+					"'%s' and '%s' are expected to be %s, but treated as %s",
+					a, b, consistString[testCase.consist], consistString[c],
+				)
+			}
+
+			// test reverse case here
+			c = bb.Match(aa)
 			if c != testCase.consist {
 				t.Errorf(
 					"'%s' and '%s' are expected to be %s, but treated as %s",
@@ -99,9 +126,6 @@ func TestFmtpConsist(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			check(t, testCase.a, testCase.b)
-		})
-		t.Run(name+"_Reversed", func(t *testing.T) {
-			check(t, testCase.b, testCase.a)
 		})
 	}
 }
