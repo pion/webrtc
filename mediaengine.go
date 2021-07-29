@@ -12,6 +12,7 @@ import (
 	"github.com/pion/rtp/v2"
 	"github.com/pion/rtp/v2/codecs"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v3/internal/fmtp"
 )
 
 const (
@@ -372,8 +373,8 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		codecs = m.audioCodecs
 	}
 
-	remoteFmtp := parseFmtp(remoteCodec.RTPCodecCapability.SDPFmtpLine)
-	if apt, hasApt := remoteFmtp["apt"]; hasApt {
+	remoteFmtp := fmtp.Parse(remoteCodec.RTPCodecCapability.MimeType, remoteCodec.RTPCodecCapability.SDPFmtpLine)
+	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
 		payloadType, err := strconv.Atoi(apt)
 		if err != nil {
 			return codecMatchNone, err
