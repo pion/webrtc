@@ -8,7 +8,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors.

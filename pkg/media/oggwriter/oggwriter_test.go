@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/pion/rtp"
+	"github.com/pion/rtp/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +31,6 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 1,
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      111,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -39,7 +38,6 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawPkt[20:],
-		Raw:     rawPkt,
 	}
 	assert.NoError(t, validPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 

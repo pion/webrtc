@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/pion/rtp"
-	"github.com/pion/rtp/codecs"
+	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp/v2/codecs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 1,
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -41,7 +40,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawValidPkt[20:],
-		Raw:     rawValidPkt,
 	}
 	assert.NoError(t, validPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
@@ -57,7 +55,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 1,
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -65,7 +62,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawMidPartPkt[20:],
-		Raw:     rawMidPartPkt,
 	}
 	assert.NoError(t, midPartPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
@@ -81,7 +77,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 1,
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      96,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -89,7 +84,6 @@ func TestIVFWriter_AddPacketAndClose(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawKeyframePkt[20:],
-		Raw:     rawKeyframePkt,
 	}
 	assert.NoError(t, keyframePacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
