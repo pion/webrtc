@@ -123,6 +123,7 @@ Robert Eperjesi <eperjesi@uber.com>
 Robin Raymond <robin-raymond@users.noreply.github.com>
 Roman Romanenko <romandafe94@gmail.com>
 ronan <ronan.jezequel@gmail.com>
+Ryan Shumate <Ryan.Shumate@garmin.com>
 salmān aljammāz <s@aljmz.com>
 Sam Lancia <sam@vaion.com>
 Sean DuBois <seaduboi@amazon.com>
