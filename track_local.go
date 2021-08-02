@@ -1,6 +1,6 @@
 package webrtc
 
-import "github.com/pion/rtp/v2"
+import "github.com/pion/rtp"
 
 // TrackLocalWriter is the Writer for outbound RTP Packets
 type TrackLocalWriter interface {

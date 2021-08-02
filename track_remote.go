@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 )
 
 // TrackRemote represents a single inbound source of media

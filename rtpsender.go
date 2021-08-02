@@ -10,7 +10,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 )
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer

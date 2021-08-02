@@ -4,7 +4,7 @@ package media
 import (
 	"time"
 
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 )
 
 // A Sample contains encoded media and timing information

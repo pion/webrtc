@@ -16,7 +16,7 @@ import (
 
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"

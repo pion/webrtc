@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/pkg/media"
 )
 

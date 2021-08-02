@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/pion/randutil"
-	"github.com/pion/rtp/v2"
-	"github.com/pion/rtp/v2/codecs"
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 )
 
 const (

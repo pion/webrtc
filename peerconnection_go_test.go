@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v2"
-	"github.com/pion/rtp/v2"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/transport/vnet"
 	"github.com/pion/webrtc/v3/internal/util"

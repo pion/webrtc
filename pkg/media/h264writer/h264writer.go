@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/pion/rtp/v2"
-	"github.com/pion/rtp/v2/codecs"
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 )
 
 type (
