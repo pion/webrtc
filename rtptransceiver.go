@@ -141,13 +141,13 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 
 // Stop irreversibly stops the RTPTransceiver
 func (t *RTPTransceiver) Stop() error {
-	if t.Sender() != nil {
-		if err := t.Sender().Stop(); err != nil {
+	if sender := t.Sender(); sender != nil {
+		if err := sender.Stop(); err != nil {
 			return err
 		}
 	}
-	if t.Receiver() != nil {
-		if err := t.Receiver().Stop(); err != nil {
+	if receiver := t.Receiver(); receiver != nil {
+		if err := receiver.Stop(); err != nil {
 			return err
 		}
 	}
