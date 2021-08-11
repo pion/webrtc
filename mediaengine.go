@@ -457,10 +457,10 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 		switch {
-		case !m.negotiatedAudio && strings.EqualFold(media.MediaName.Media, "audio"):
+		case strings.EqualFold(media.MediaName.Media, "audio"):
 			m.negotiatedAudio = true
 			typ = RTPCodecTypeAudio
-		case !m.negotiatedVideo && strings.EqualFold(media.MediaName.Media, "video"):
+		case strings.EqualFold(media.MediaName.Media, "video"):
 			m.negotiatedVideo = true
 			typ = RTPCodecTypeVideo
 		default:
