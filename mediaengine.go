@@ -206,8 +206,16 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
+		if m.negotiatedAudio {
+			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
+			return nil
+		}
 		m.audioCodecs = m.addCodec(m.audioCodecs, codec)
 	case RTPCodecTypeVideo:
+		if m.negotiatedVideo {
+			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+			return nil
+		}
 		m.videoCodecs = m.addCodec(m.videoCodecs, codec)
 	default:
 		return ErrUnknownType
