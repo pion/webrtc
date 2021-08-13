@@ -1,6 +1,8 @@
 # play-from-disk
 play-from-disk demonstrates how to send video and/or audio to your browser from files saved to disk.
 
+For an example of playing H264 from disk see [play-from-disk-h264](https://github.com/pion/example-webrtc-applications/tree/master/play-from-disk-h264)
+
 ## Instructions
 ### Create IVF named `output.ivf` that contains a VP8 track and/or `output.ogg` that contains a Opus track
 ```

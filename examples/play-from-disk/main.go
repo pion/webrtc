@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	audioFileName = "output.ogg"
-	videoFileName = "output.ivf"
+	audioFileName   = "output.ogg"
+	videoFileName   = "output.ivf"
+	oggPageDuration = time.Millisecond * 20
 )
 
 func main() {
@@ -93,8 +94,12 @@ func main() {
 
 			// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
 			// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
-			sleepTime := time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000)
-			for {
+			//
+			// It is important to use a time.Ticker instead of time.Sleep because
+			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
+			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
+			ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+			for ; true; <-ticker.C {
 				frame, _, ivfErr := ivf.ParseNextFrame()
 				if ivfErr == io.EOF {
 					fmt.Printf("All video frames parsed and sent")
@@ -105,7 +110,6 @@ func main() {
 					panic(ivfErr)
 				}
 
-				time.Sleep(sleepTime)
 				if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
 					panic(ivfErr)
 				}
@@ -155,7 +159,12 @@ func main() {
 
 			// Keep track of last granule, the difference is the amount of samples in the buffer
 			var lastGranule uint64
-			for {
+
+			// It is important to use a time.Ticker instead of time.Sleep because
+			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
+			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
+			ticker := time.NewTicker(oggPageDuration)
+			for ; true; <-ticker.C {
 				pageData, pageHeader, oggErr := ogg.ParseNextPage()
 				if oggErr == io.EOF {
 					fmt.Printf("All audio pages parsed and sent")
@@ -174,8 +183,6 @@ func main() {
 				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Duration: sampleDuration}); oggErr != nil {
 					panic(oggErr)
 				}
-
-				time.Sleep(sampleDuration)
 			}
 		}()
 	}
