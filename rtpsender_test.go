@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -161,7 +160,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 
 	assert.NoError(t, rtpSender.SetReadDeadline(time.Now().Add(1*time.Second)))
 	_, _, err = rtpSender.ReadRTCP()
-	assert.Error(t, err, packetio.ErrTimeout)
+	assert.Error(t, err)
 
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, sender, receiver)

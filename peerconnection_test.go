@@ -321,7 +321,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	// so CreateAnswer should return an InvalidStateError
 	assert.Equal(t, answerPeerConn.SignalingState(), SignalingStateStable)
 	_, err = answerPeerConn.CreateAnswer(nil)
-	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
+	assert.Error(t, err)
 
 	closePairNow(t, offerPeerConn, answerPeerConn)
 }

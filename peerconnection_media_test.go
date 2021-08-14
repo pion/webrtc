@@ -633,11 +633,11 @@ func TestRtpSenderReceiver_ReadClose_Error(t *testing.T) {
 	sender, receiver := tr.Sender(), tr.Receiver()
 	assert.NoError(t, sender.Stop())
 	_, _, err = sender.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, io.ErrClosedPipe)
+	assert.ErrorIs(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, receiver.Stop())
 	_, _, err = receiver.Read(make([]byte, 0, 1400))
-	assert.Error(t, err, io.ErrClosedPipe)
+	assert.ErrorIs(t, err, io.ErrClosedPipe)
 
 	assert.NoError(t, pc.Close())
 }
@@ -977,11 +977,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	close(testFinished)
 }
 
-// Assert that CreateOffer can't enter infinite loop
-// We attempt to generate an offer multiple times in case a user
-// has edited the PeerConnection. We can assert this broken behavior with an
-// empty MediaEngine. See pion/webrtc#1656 for full behavior
-func TestPeerConnection_CreateOffer_InfiniteLoop(t *testing.T) {
+// Assert that CreateOffer returns an error for a RTPSender with no codecs
+// pion/webrtc#1702
+func TestPeerConnection_CreateOffer_NoCodecs(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -1000,7 +998,7 @@ func TestPeerConnection_CreateOffer_InfiniteLoop(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = pc.CreateOffer(nil)
-	assert.Error(t, err, errExcessiveRetries)
+	assert.Equal(t, err, ErrSenderWithNoCodecs)
 
 	assert.NoError(t, pc.Close())
 }

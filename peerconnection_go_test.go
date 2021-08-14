@@ -442,7 +442,7 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 	assert.NoError(t, answerPeerConn.Close())
 
 	_, err = answerPeerConn.CreateAnswer(nil)
-	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrConnectionClosed})
+	assert.Equal(t, err, &rtcerr.InvalidStateError{Err: ErrConnectionClosed})
 }
 
 func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {

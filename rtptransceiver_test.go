@@ -40,7 +40,7 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 	}
 
 	for _, testCase := range failTestCases {
-		assert.Error(t, tr.SetCodecPreferences(testCase), errRTPTransceiverCodecUnsupported)
+		assert.ErrorIs(t, tr.SetCodecPreferences(testCase), errRTPTransceiverCodecUnsupported)
 	}
 
 	successTestCases := [][]RTPCodecParameters{
