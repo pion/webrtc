@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +40,10 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 		assert.NoError(t, readErr)
 
 		_, _, readErr = trackRemote.ReadRTP()
-		assert.Error(t, readErr, packetio.ErrTimeout)
+		assert.Error(t, readErr)
 
 		_, _, readErr = r.ReadRTCP()
-		assert.Error(t, readErr, packetio.ErrTimeout)
+		assert.Error(t, readErr)
 
 		seenPacketCancel()
 	})

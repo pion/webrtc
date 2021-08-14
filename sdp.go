@@ -303,6 +303,11 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 		}
 	}
 	if len(codecs) == 0 {
+		// If we are sender and we have no codecs throw an error early
+		if t.Sender() != nil {
+			return false, ErrSenderWithNoCodecs
+		}
+
 		// Explicitly reject track if we don't have the codec
 		d.WithMedia(&sdp.MediaDescription{
 			MediaName: sdp.MediaName{

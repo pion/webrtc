@@ -135,6 +135,10 @@ var (
 	// ErrUnsupportedCodec indicates the remote peer doesn't support the requested codec
 	ErrUnsupportedCodec = errors.New("unable to start track, codec is not supported by remote")
 
+	// ErrSenderWithNoCodecs indicates that a RTPSender was created without any codecs. To send media the MediaEngine needs at
+	// least one configured codec.
+	ErrSenderWithNoCodecs = errors.New("unable to populate media section, RTPSender created with no codecs")
+
 	// ErrRTPSenderNewTrackHasIncorrectKind indicates that the new track is of a different kind than the previous/original
 	ErrRTPSenderNewTrackHasIncorrectKind = errors.New("new track must be of the same kind as previous")
 
@@ -225,4 +229,6 @@ var (
 	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
 
 	errRTPTooShort = errors.New("not long enough to be a RTP Packet")
+
+	errExcessiveRetries = errors.New("excessive retries in CreateOffer")
 )

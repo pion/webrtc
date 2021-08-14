@@ -58,7 +58,7 @@ func TestDataChannel_ORTCE2E(t *testing.T) {
 	assert.NoError(t, stackB.close())
 
 	// attempt to send when channel is closed
-	assert.Error(t, channelA.Send([]byte("ABC")), io.ErrClosedPipe)
-	assert.Error(t, channelA.SendText("test"), io.ErrClosedPipe)
-	assert.Error(t, channelA.ensureOpen(), io.ErrClosedPipe)
+	assert.ErrorIs(t, channelA.Send([]byte("ABC")), io.ErrClosedPipe)
+	assert.ErrorIs(t, channelA.SendText("test"), io.ErrClosedPipe)
+	assert.ErrorIs(t, channelA.ensureOpen(), io.ErrClosedPipe)
 }

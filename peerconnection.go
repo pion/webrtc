@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -585,8 +584,6 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 	}
 	return false
 }
-
-var errExcessiveRetries = errors.New("excessive retries in CreateOffer")
 
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
