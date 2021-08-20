@@ -26,6 +26,7 @@ baiyufei <baiyufei@outlook.com>
 Bao Nguyen <bao@n4n.dev>
 Ben Weitzman <benweitzman@gmail.com>
 Benny Daon <benny@tuzig.com>
+bkim <bruce.kim.it@gmail.com>
 Bo Shi <boshi@mural.co>
 Brendan Rius <brendan.rius@gmail.com>
 Cameron Elliott <cameron-elliott@users.noreply.github.com>
