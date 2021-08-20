@@ -63,6 +63,16 @@ type SettingEngine struct {
 	iceProxyDialer                            proxy.Dialer
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
+	receiveMTU                                uint
+}
+
+// getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default
+func (e *SettingEngine) getReceiveMTU() uint {
+	if e.receiveMTU != 0 {
+		return e.receiveMTU
+	}
+
+	return receiveMTU
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -278,4 +288,10 @@ func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
 // modify codecs after signaling. Make sure not to share MediaEngines between PeerConnections.
 func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 	e.disableMediaEngineCopy = isDisabled
+}
+
+// SetReceiveMTU sets the size of read buffer that copies incoming packets. This is optional.
+// Leave this 0 for the default receiveMTU
+func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
+	e.receiveMTU = receiveMTU
 }

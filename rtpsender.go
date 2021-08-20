@@ -258,7 +258,7 @@ func (r *RTPSender) Read(b []byte) (n int, a interceptor.Attributes, err error) 
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you.
 func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, receiveMTU)
+	b := make([]byte, r.api.settingEngine.getReceiveMTU())
 	i, attributes, err := r.Read(b)
 	if err != nil {
 		return nil, nil, err

@@ -1179,7 +1179,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	go func() {
-		b := make([]byte, receiveMTU)
+		b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 		n, _, err := receiver.Track().peek(b)
 		if err != nil {
 			pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", receiver.Track().SSRC(), err)
@@ -1362,7 +1362,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 		return errPeerConnSimulcastStreamIDRTPExtensionRequired
 	}
 
-	b := make([]byte, receiveMTU)
+	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 	var mid, rid string
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
 		i, err := rtpStream.Read(b)

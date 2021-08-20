@@ -157,7 +157,7 @@ func (t *TrackRemote) checkAndUpdateTrack(b []byte) error {
 
 // ReadRTP is a convenience method that wraps Read and unmarshals for you.
 func (t *TrackRemote) ReadRTP() (*rtp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, receiveMTU)
+	b := make([]byte, t.receiver.api.settingEngine.getReceiveMTU())
 	i, attributes, err := t.Read(b)
 	if err != nil {
 		return nil, nil, err

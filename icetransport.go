@@ -155,7 +155,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 
 	config := mux.Config{
 		Conn:          t.conn,
-		BufferSize:    receiveMTU,
+		BufferSize:    int(t.gatherer.api.settingEngine.getReceiveMTU()),
 		LoggerFactory: t.loggerFactory,
 	}
 	t.mux = mux.NewMux(config)
