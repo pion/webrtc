@@ -166,7 +166,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 func getRids(media *sdp.MediaDescription) map[string]string {
 	rids := map[string]string{}
 	for _, attr := range media.Attributes {
-		if attr.Key == "rid" {
+		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
 			rids[split[0]] = attr.Value
 		}
@@ -341,7 +341,7 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 		recvRids := make([]string, 0, len(mediaSection.ridMap))
 
 		for rid := range mediaSection.ridMap {
-			media.WithValueAttribute("rid", rid+" recv")
+			media.WithValueAttribute(sdpAttributeRid, rid+" recv")
 			recvRids = append(recvRids, rid)
 		}
 		// Simulcast
@@ -653,7 +653,6 @@ func rtpExtensionsFromMediaDescription(m *sdp.MediaDescription) (map[string]int,
 // for subsequent calling, it updates Origin for SessionDescription from saved one
 // and increments session version by one.
 // https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-25#section-5.2.2
-// https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-25#section-5.3.2
 func updateSDPOrigin(origin *sdp.Origin, d *sdp.SessionDescription) {
 	if atomic.CompareAndSwapUint64(&origin.SessionVersion, 0, d.Origin.SessionVersion) { // store
 		atomic.StoreUint64(&origin.SessionID, d.Origin.SessionID)

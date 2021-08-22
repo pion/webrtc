@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -362,6 +363,29 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 }
 
+type undeclaredSsrcLogger struct{ unhandledSimulcastError chan struct{} }
+
+func (u *undeclaredSsrcLogger) Trace(msg string)                          {}
+func (u *undeclaredSsrcLogger) Tracef(format string, args ...interface{}) {}
+func (u *undeclaredSsrcLogger) Debug(msg string)                          {}
+func (u *undeclaredSsrcLogger) Debugf(format string, args ...interface{}) {}
+func (u *undeclaredSsrcLogger) Info(msg string)                           {}
+func (u *undeclaredSsrcLogger) Infof(format string, args ...interface{})  {}
+func (u *undeclaredSsrcLogger) Warn(msg string)                           {}
+func (u *undeclaredSsrcLogger) Warnf(format string, args ...interface{})  {}
+func (u *undeclaredSsrcLogger) Error(msg string)                          {}
+func (u *undeclaredSsrcLogger) Errorf(format string, args ...interface{}) {
+	if format == incomingUnhandledRTPSsrc {
+		close(u.unhandledSimulcastError)
+	}
+}
+
+type undeclaredSsrcLoggerFactory struct{ unhandledSimulcastError chan struct{} }
+
+func (u *undeclaredSsrcLoggerFactory) NewLogger(subsystem string) logging.LeveledLogger {
+	return &undeclaredSsrcLogger{u.unhandledSimulcastError}
+}
+
 // If a SessionDescription has a single media section and no SSRC
 // assume that it is meant to handle all RTP packets
 func TestUndeclaredSSRC(t *testing.T) {
@@ -371,85 +395,100 @@ func TestUndeclaredSSRC(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, pcAnswer, err := newPair()
-	assert.NoError(t, err)
-
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
-	assert.NoError(t, err)
-
-	_, err = pcOffer.CreateDataChannel("test-channel", nil)
-	assert.NoError(t, err)
-
-	vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
-	assert.NoError(t, err)
-
-	_, err = pcOffer.AddTrack(vp8Writer)
-	assert.NoError(t, err)
-
-	onTrackFired := make(chan *TrackRemote)
-	pcAnswer.OnTrack(func(trackRemote *TrackRemote, r *RTPReceiver) {
-		assert.Equal(t, trackRemote.StreamID(), vp8Writer.StreamID())
-		assert.Equal(t, trackRemote.ID(), vp8Writer.ID())
-		close(onTrackFired)
-	})
-
-	offer, err := pcOffer.CreateOffer(nil)
-	assert.NoError(t, err)
-
-	offerGatheringComplete := GatheringCompletePromise(pcOffer)
-	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-
-	<-offerGatheringComplete
-	offer = *pcOffer.LocalDescription()
-
-	// Filter SSRC lines, and remove SCTP
-	filteredSDP := ""
-	scanner := bufio.NewScanner(strings.NewReader(offer.SDP))
-	inApplicationMedia := false
-	for scanner.Scan() {
-		l := scanner.Text()
-		if strings.HasPrefix(l, "m=application") {
-			inApplicationMedia = !inApplicationMedia
-		} else if strings.HasPrefix(l, "a=ssrc") {
-			continue
-		}
-
-		if inApplicationMedia {
-			continue
-		}
-
-		filteredSDP += l + "\n"
-	}
-
-	offer.SDP = filteredSDP
-
-	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	assert.NoError(t, err)
-
-	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	<-answerGatheringComplete
-
-	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
-
-	go func() {
-		for {
-			assert.NoError(t, vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
-			time.Sleep(time.Millisecond * 25)
-
-			select {
-			case <-onTrackFired:
-				return
-			default:
+	// Filter SSRC lines
+	filterSsrc := func(offer *SessionDescription) (filteredSDP string) {
+		scanner := bufio.NewScanner(strings.NewReader(offer.SDP))
+		for scanner.Scan() {
+			l := scanner.Text()
+			if strings.HasPrefix(l, "a=ssrc") {
 				continue
 			}
-		}
-	}()
 
-	<-onTrackFired
-	closePairNow(t, pcOffer, pcAnswer)
+			filteredSDP += l + "\n"
+		}
+		return
+	}
+
+	t.Run("No SSRC", func(t *testing.T) {
+		pcOffer, pcAnswer, err := newPair()
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(vp8Writer)
+		assert.NoError(t, err)
+
+		onTrackFired := make(chan struct{})
+		pcAnswer.OnTrack(func(trackRemote *TrackRemote, r *RTPReceiver) {
+			assert.Equal(t, trackRemote.StreamID(), vp8Writer.StreamID())
+			assert.Equal(t, trackRemote.ID(), vp8Writer.ID())
+			close(onTrackFired)
+		})
+
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
+		offer.SDP = filterSsrc(pcOffer.LocalDescription())
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+		sendVideoUntilDone(onTrackFired, t, []*TrackLocalStaticSample{vp8Writer})
+		closePairNow(t, pcOffer, pcAnswer)
+	})
+
+	t.Run("Has RID", func(t *testing.T) {
+		unhandledSimulcastError := make(chan struct{})
+
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+
+		pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(SettingEngine{
+			LoggerFactory: &undeclaredSsrcLoggerFactory{unhandledSimulcastError},
+		}), WithMediaEngine(m)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(vp8Writer)
+		assert.NoError(t, err)
+
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
+		// Append RID to end of SessionDescription. Will not be considered unhandled anymore
+		offer.SDP = filterSsrc(pcOffer.LocalDescription()) + "a=" + sdpAttributeRid + "\r\n"
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+		sendVideoUntilDone(unhandledSimulcastError, t, []*TrackLocalStaticSample{vp8Writer})
+		closePairNow(t, pcOffer, pcAnswer)
+	})
 }
 
 func TestAddTransceiverFromTrackSendOnly(t *testing.T) {

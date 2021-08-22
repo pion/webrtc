@@ -204,7 +204,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "sendonly"},
-						{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+						{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
 					},
 				},
 			},
@@ -368,7 +368,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 }
 
 func TestPopulateSDP(t *testing.T) {
-	t.Run("Rid", func(t *testing.T) {
+	t.Run("rid", func(t *testing.T) {
 		se := SettingEngine{}
 
 		me := &MediaEngine{}
@@ -394,7 +394,7 @@ func TestPopulateSDP(t *testing.T) {
 				continue
 			}
 			for _, a := range desc.Attributes {
-				if a.Key == "rid" {
+				if a.Key == sdpAttributeRid {
 					if strings.Contains(a.Value, "ridkey") {
 						found = true
 						break
@@ -458,7 +458,7 @@ func TestGetRIDs(t *testing.T) {
 			},
 			Attributes: []sdp.Attribute{
 				{Key: "sendonly"},
-				{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+				{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
 			},
 		},
 	}

@@ -15,7 +15,7 @@ import (
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
-// a RTPReceiver may contain multiple streams if we are dealing with Multicast
+// a RTPReceiver may contain multiple streams if we are dealing with Simulcast
 type trackStreams struct {
 	track *TrackRemote
 
