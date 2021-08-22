@@ -1319,48 +1319,59 @@ func (pc *PeerConnection) startSCTP() {
 	pc.sctpTransport.lock.Unlock()
 }
 
-func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit
+func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *SessionDescription) (handled bool, err error) {
+	if len(remoteDescription.parsed.MediaDescriptions) != 1 {
+		return false, nil
+	}
+
+	onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
+	streamID := ""
+	id := ""
+
+	for _, a := range onlyMediaSection.Attributes {
+		switch a.Key {
+		case sdp.AttrKeyMsid:
+			if split := strings.Split(a.Value, " "); len(split) == 2 {
+				streamID = split[0]
+				id = split[1]
+			}
+		case sdp.AttrKeySSRC:
+			return false, errPeerConnSingleMediaSectionHasExplicitSSRC
+		case sdpAttributeRid:
+			return false, nil
+		}
+	}
+
+	incoming := trackDetails{
+		ssrc:     ssrc,
+		kind:     RTPCodecTypeVideo,
+		streamID: streamID,
+		id:       id,
+	}
+	if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
+		incoming.kind = RTPCodecTypeAudio
+	}
+
+	t, err := pc.AddTransceiverFromKind(incoming.kind, RTPTransceiverInit{
+		Direction: RTPTransceiverDirectionSendrecv,
+	})
+	if err != nil {
+		return false, fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
+	}
+
+	pc.startReceiver(incoming, t.Receiver())
+	return true, nil
+}
+
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
 	}
 
 	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
-	if len(remoteDescription.parsed.MediaDescriptions) == 1 {
-		onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
-		streamID := ""
-		id := ""
-
-		for _, a := range onlyMediaSection.Attributes {
-			switch a.Key {
-			case sdp.AttrKeyMsid:
-				if split := strings.Split(a.Value, " "); len(split) == 2 {
-					streamID = split[0]
-					id = split[1]
-				}
-			case sdp.AttrKeySSRC:
-				return errPeerConnSingleMediaSectionHasExplicitSSRC
-			}
-		}
-
-		incoming := trackDetails{
-			ssrc:     ssrc,
-			kind:     RTPCodecTypeVideo,
-			streamID: streamID,
-			id:       id,
-		}
-		if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
-			incoming.kind = RTPCodecTypeAudio
-		}
-
-		t, err := pc.AddTransceiverFromKind(incoming.kind, RTPTransceiverInit{
-			Direction: RTPTransceiverDirectionSendrecv,
-		})
-		if err != nil {
-			return fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
-		}
-		pc.startReceiver(incoming, t.Receiver())
-		return nil
+	if handled, err := pc.handleUndeclaredSSRC(ssrc, remoteDescription); handled || err != nil {
+		return err
 	}
 
 	midExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
@@ -1453,8 +1464,8 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 			go func(rtpStream io.Reader, ssrc SSRC) {
 				pc.dtlsTransport.storeSimulcastStream(stream)
 
-				if err := pc.handleUndeclaredSSRC(rtpStream, ssrc); err != nil {
-					pc.log.Errorf("Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v", ssrc, err)
+				if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
+					pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
 				}
 				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 			}(stream, SSRC(ssrc))

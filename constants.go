@@ -22,9 +22,13 @@ const (
 
 	mediaSectionApplication = "application"
 
+	sdpAttributeRid = "rid"
+
 	rtpOutboundMTU = 1200
 
 	rtpPayloadTypeBitmask = 0x7F
+
+	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {
