@@ -22,9 +22,6 @@ type SampleBuilder struct {
 	// sampleRate allows us to compute duration of media.SamplecA
 	sampleRate uint32
 
-	// Interface that checks whether the packet is the first fragment of the frame or not
-	partitionHeadChecker rtp.PartitionHeadChecker
-
 	// the handler to be called when the builder is about to remove the
 	// reference to some packet.
 	packetReleaseHandler func(*rtp.Packet)
@@ -204,7 +201,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var consume sampleSequenceLocation
 
 	for i := s.active.head; s.buffer[i] != nil && s.active.compare(i) != slCompareAfter; i++ {
-		if s.depacketizer.IsDetectedFinalPacketInSequence(s.buffer[i].Marker) {
+		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
 			consume.head = s.active.head
 			consume.tail = i + 1
 			break
@@ -244,13 +241,11 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// prior to decoding all the packets, check if this packet
 	// would end being disposed anyway
-	if s.partitionHeadChecker != nil {
-		if !s.partitionHeadChecker.IsPartitionHead(s.buffer[consume.head].Payload) {
-			s.droppedPackets += consume.count()
-			s.purgeConsumedLocation(consume, true)
-			s.purgeConsumedBuffers()
-			return nil
-		}
+	if !s.depacketizer.IsPartitionHead(s.buffer[consume.head].Payload) {
+		s.droppedPackets += consume.count()
+		s.purgeConsumedLocation(consume, true)
+		s.purgeConsumedBuffers()
+		return nil
 	}
 
 	// merge all the buffers into a sample
@@ -329,11 +324,9 @@ func timestampDistance(x, y uint32) uint32 {
 // An Option configures a SampleBuilder.
 type Option func(o *SampleBuilder)
 
-// WithPartitionHeadChecker assigns a codec-specific PartitionHeadChecker to SampleBuilder.
-// Several PartitionHeadCheckers are available in package github.com/pion/rtp/codecs.
-func WithPartitionHeadChecker(checker rtp.PartitionHeadChecker) Option {
+// WithPartitionHeadChecker is obsolete, it does nothing.
+func WithPartitionHeadChecker(checker interface{}) Option {
 	return func(o *SampleBuilder) {
-		o.partitionHeadChecker = checker
 	}
 }
 
