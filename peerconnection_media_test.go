@@ -387,7 +387,9 @@ func TestUndeclaredSSRC(t *testing.T) {
 	assert.NoError(t, err)
 
 	onTrackFired := make(chan *TrackRemote)
-	pcAnswer.OnTrack(func(t *TrackRemote, r *RTPReceiver) {
+	pcAnswer.OnTrack(func(trackRemote *TrackRemote, r *RTPReceiver) {
+		assert.Equal(t, trackRemote.StreamID(), vp8Writer.StreamID())
+		assert.Equal(t, trackRemote.ID(), vp8Writer.ID())
 		close(onTrackFired)
 	})
 

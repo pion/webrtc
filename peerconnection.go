@@ -1328,15 +1328,26 @@ func (pc *PeerConnection) handleUndeclaredSSRC(rtpStream io.Reader, ssrc SSRC) e
 	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
 	if len(remoteDescription.parsed.MediaDescriptions) == 1 {
 		onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
+		streamID := ""
+		id := ""
+
 		for _, a := range onlyMediaSection.Attributes {
-			if a.Key == ssrcStr {
+			switch a.Key {
+			case sdp.AttrKeyMsid:
+				if split := strings.Split(a.Value, " "); len(split) == 2 {
+					streamID = split[0]
+					id = split[1]
+				}
+			case sdp.AttrKeySSRC:
 				return errPeerConnSingleMediaSectionHasExplicitSSRC
 			}
 		}
 
 		incoming := trackDetails{
-			ssrc: ssrc,
-			kind: RTPCodecTypeVideo,
+			ssrc:     ssrc,
+			kind:     RTPCodecTypeVideo,
+			streamID: streamID,
+			id:       id,
 		}
 		if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
 			incoming.kind = RTPCodecTypeAudio
