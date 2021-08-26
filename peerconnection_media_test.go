@@ -117,7 +117,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		}
 	})
 
-	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, expectedTrackID, expectedStreamID)
+	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, expectedTrackID, expectedStreamID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,12 +221,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "audio", "pion1")
+	opusTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio", "pion1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 		pcOffer, pcAnswer, err := newPair()
 		assert.NoError(t, err)
 
-		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 		assert.NoError(t, err)
 
 		_, err = pcOffer.AddTrack(vp8Writer)
@@ -460,7 +460,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 		}), WithMediaEngine(m)).newPair(Configuration{})
 		assert.NoError(t, err)
 
-		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 		assert.NoError(t, err)
 
 		_, err = pcOffer.AddTrack(vp8Writer)
@@ -611,7 +611,7 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 	assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
 
 	addTrack := func() (TrackLocal, *RTPSender) {
-		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "foo", "bar")
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
 		assert.NoError(t, err)
 
 		sender, err := pc.AddTrack(track)
@@ -649,7 +649,7 @@ func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
 	dtlsTransport := pc.dtlsTransport
 	pc.dtlsTransport = nil
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "foo", "bar")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
 	assert.NoError(t, err)
 
 	_, err = pc.AddTrack(track)
@@ -735,7 +735,7 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 	}
 
 	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"},
+		RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"},
 		"track-id",
 		"track-label",
 	)
@@ -758,7 +758,7 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 func TestPlanBMediaExchange(t *testing.T) {
 	runTest := func(trackCount int, t *testing.T) {
 		addSingleTrack := func(p *PeerConnection) *TrackLocalStaticSample {
-			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()), fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()))
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()), fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()))
 			assert.NoError(t, err)
 
 			_, err = p.AddTrack(track)
@@ -843,7 +843,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { assert.NoError(t, pcAnswer.Close()) }()
 
-	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion1")
+	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1")
 	require.NoError(t, err)
 
 	sender1, err := pcOffer.AddTrack(track1)
@@ -864,7 +864,7 @@ func TestPeerConnection_Start_Only_Negotiated_Senders(t *testing.T) {
 
 	// Add a new track between providing the offer and applying the answer
 
-	track2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion2")
+	track2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 	require.NoError(t, err)
 
 	sender2, err := pcOffer.AddTrack(track2)
@@ -907,7 +907,7 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion1")
+	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1")
 	require.NoError(t, err)
 
 	sender1, err := pcOffer.AddTrack(track1)
@@ -969,7 +969,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	offerer, answerer, err := newPair()
@@ -1032,7 +1032,7 @@ func TestPeerConnection_CreateOffer_NoCodecs(t *testing.T) {
 	pc, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = pc.AddTrack(track)
@@ -1050,7 +1050,7 @@ func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
 	assert.NoError(t, err)
 
 	addTrack := func() *TrackLocalStaticSample {
-		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "foo", "bar")
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
 		assert.NoError(t, err)
 		_, err = pc.AddTrack(track)
 		assert.NoError(t, err)

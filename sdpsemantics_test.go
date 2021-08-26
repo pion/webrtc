@@ -172,28 +172,28 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 		t.Errorf("NewPeerConnection failed: %v", err)
 	}
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
 	if err != nil {
 		t.Errorf("Failed to create video track")
 	}
 	if _, err = apc.AddTrack(video1); err != nil {
 		t.Errorf("Failed to add video track")
 	}
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
 	if err != nil {
 		t.Errorf("Failed to create video track")
 	}
 	if _, err = apc.AddTrack(video2); err != nil {
 		t.Errorf("Failed to add video track")
 	}
-	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "3", "3")
+	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "3", "3")
 	if err != nil {
 		t.Errorf("Failed to create audio track")
 	}
 	if _, err = apc.AddTrack(audio1); err != nil {
 		t.Errorf("Failed to add audio track")
 	}
-	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "4", "4")
+	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "4", "4")
 	if err != nil {
 		t.Errorf("Failed to create audio track")
 	}
@@ -265,28 +265,28 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 		t.Errorf("NewPeerConnection failed: %v", err)
 	}
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
 	if err != nil {
 		t.Errorf("Failed to create video track")
 	}
 	if _, err = apc.AddTrack(video1); err != nil {
 		t.Errorf("Failed to add video track")
 	}
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
 	if err != nil {
 		t.Errorf("Failed to create video track")
 	}
 	if _, err = apc.AddTrack(video2); err != nil {
 		t.Errorf("Failed to add video track")
 	}
-	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "3", "3")
+	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "3", "3")
 	if err != nil {
 		t.Errorf("Failed to create audio track")
 	}
 	if _, err = apc.AddTrack(audio1); err != nil {
 		t.Errorf("Failed to add audio track")
 	}
-	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "4", "4")
+	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "4", "4")
 	if err != nil {
 		t.Errorf("Failed to create audio track")
 	}
