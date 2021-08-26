@@ -23,7 +23,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	sender, receiver, wan := createVNetPair(t)
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = sender.AddTrack(track)
