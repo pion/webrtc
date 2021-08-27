@@ -1151,12 +1151,19 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 }
 
 func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
-	encodings := []RTPDecodingParameters{}
-	if incoming.ssrc != 0 {
-		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{SSRC: incoming.ssrc}})
+	encodingSize := len(incoming.ssrcs)
+	if len(incoming.rids) >= encodingSize {
+		encodingSize = len(incoming.rids)
 	}
-	for _, rid := range incoming.rids {
-		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{RID: rid}})
+
+	encodings := make([]RTPDecodingParameters, encodingSize)
+	for i := range encodings {
+		if len(incoming.rids) > i {
+			encodings[i].RID = incoming.rids[i]
+		}
+		if len(incoming.ssrcs) > i {
+			encodings[i].SSRC = incoming.ssrcs[i]
+		}
 	}
 
 	if err := receiver.Receive(RTPReceiveParameters{Encodings: encodings}); err != nil {
@@ -1173,26 +1180,27 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		receiver.tracks[i].track.mu.Unlock()
 	}
 
-	// We can't block and wait for a single SSRC
-	if incoming.ssrc == 0 {
-		return
+	for _, t := range receiver.Tracks() {
+		if t.ssrc == 0 {
+			return
+		}
+
+		go func(track *TrackRemote) {
+			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
+			n, _, err := track.peek(b)
+			if err != nil {
+				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
+				return
+			}
+
+			if err = track.checkAndUpdateTrack(b[:n]); err != nil {
+				pc.log.Warnf("Failed to set codec settings for track SSRC %d (%s)", track.SSRC(), err)
+				return
+			}
+
+			pc.onTrack(track, receiver)
+		}(t)
 	}
-
-	go func() {
-		b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-		n, _, err := receiver.Track().peek(b)
-		if err != nil {
-			pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", receiver.Track().SSRC(), err)
-			return
-		}
-
-		if err = receiver.Track().checkAndUpdateTrack(b[:n]); err != nil {
-			pc.log.Warnf("Failed to set codec settings for track SSRC %d (%s)", receiver.Track().SSRC(), err)
-			return
-		}
-
-		pc.onTrack(receiver.Track(), receiver)
-	}()
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
@@ -1216,12 +1224,17 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 		}
 		incomingTrack := incomingTracks[i]
 
+		// If we already have a TrackRemote for a given SSRC don't handle it again
 		for _, t := range localTransceivers {
-			if receiver := t.Receiver(); receiver == nil || receiver.Track() == nil || receiver.Track().ssrc != incomingTrack.ssrc {
-				continue
+			if receiver := t.Receiver(); receiver != nil {
+				for _, track := range receiver.Tracks() {
+					for _, ssrc := range incomingTrack.ssrcs {
+						if ssrc == track.SSRC() {
+							incomingTracks = filterTrackWithSSRC(incomingTracks, track.SSRC())
+						}
+					}
+				}
 			}
-
-			incomingTracks = filterTrackWithSSRC(incomingTracks, incomingTrack.ssrc)
 		}
 	}
 
@@ -1260,7 +1273,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
-				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incoming.ssrc, err)
+				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incoming.ssrcs[0], err)
 				continue
 			}
 			pc.startReceiver(incoming, t.Receiver())
@@ -1343,7 +1356,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 	}
 
 	incoming := trackDetails{
-		ssrc:     ssrc,
+		ssrcs:    []SSRC{ssrc},
 		kind:     RTPCodecTypeVideo,
 		streamID: streamID,
 		id:       id,

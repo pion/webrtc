@@ -22,14 +22,16 @@ type trackDetails struct {
 	kind     RTPCodecType
 	streamID string
 	id       string
-	ssrc     SSRC
+	ssrcs    []SSRC
 	rids     []string
 }
 
 func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
 	for i := range trackDetails {
-		if trackDetails[i].ssrc == ssrc {
-			return &trackDetails[i]
+		for j := range trackDetails[i].ssrcs {
+			if trackDetails[i].ssrcs[j] == ssrc {
+				return &trackDetails[i]
+			}
 		}
 	}
 	return nil
@@ -38,10 +40,13 @@ func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
 func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetails {
 	filtered := []trackDetails{}
 	for i := range incomingTracks {
-		if incomingTracks[i].ssrc != ssrc {
-			filtered = append(filtered, incomingTracks[i])
+		for j := range incomingTracks[i].ssrcs {
+			if incomingTracks[i].ssrcs[j] != ssrc {
+				filtered = append(filtered, incomingTracks[i])
+			}
 		}
 	}
+
 	return filtered
 }
 
@@ -127,9 +132,11 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 				isNewTrack := true
 				trackDetails := &trackDetails{}
 				for i := range incomingTracks {
-					if incomingTracks[i].ssrc == SSRC(ssrc) {
-						trackDetails = &incomingTracks[i]
-						isNewTrack = false
+					for j := range incomingTracks[i].ssrcs {
+						if incomingTracks[i].ssrcs[j] == SSRC(ssrc) {
+							trackDetails = &incomingTracks[i]
+							isNewTrack = false
+						}
 					}
 				}
 
@@ -137,7 +144,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 				trackDetails.kind = codecType
 				trackDetails.streamID = streamID
 				trackDetails.id = trackID
-				trackDetails.ssrc = SSRC(ssrc)
+				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
 				if isNewTrack {
 					incomingTracks = append(incomingTracks, *trackDetails)

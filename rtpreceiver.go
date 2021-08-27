@@ -155,7 +155,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 			r.tracks = append(r.tracks, trackStreams{
 				track: newTrackRemote(
 					r.kind,
-					0,
+					encoding.SSRC,
 					encoding.RID,
 					r,
 				),
