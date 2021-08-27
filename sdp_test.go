@@ -219,14 +219,14 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Fail(t, "missing audio track with ssrc:2000")
 		} else {
 			assert.Equal(t, RTPCodecTypeAudio, track.kind)
-			assert.Equal(t, SSRC(2000), track.ssrc)
+			assert.Equal(t, SSRC(2000), track.ssrcs[0])
 			assert.Equal(t, "audio_trk_label", track.streamID)
 		}
 		if track := trackDetailsForSSRC(tracks, 3000); track == nil {
 			assert.Fail(t, "missing video track with ssrc:3000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)
-			assert.Equal(t, SSRC(3000), track.ssrc)
+			assert.Equal(t, SSRC(3000), track.ssrcs[0])
 			assert.Equal(t, "video_trk_label", track.streamID)
 		}
 		if track := trackDetailsForSSRC(tracks, 4000); track != nil {
@@ -236,7 +236,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Fail(t, "missing video track with ssrc:5000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)
-			assert.Equal(t, SSRC(5000), track.ssrc)
+			assert.Equal(t, SSRC(5000), track.ssrcs[0])
 			assert.Equal(t, "video_trk_id", track.id)
 			assert.Equal(t, "video_stream_id", track.streamID)
 		}
