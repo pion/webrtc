@@ -1227,7 +1227,23 @@ a=ssrc-group:FID 5004 5005
 `
 		})
 
-		fmt.Println(vp8Writer)
+		for sequenceNumber := uint16(0); !ridsFullfilled(); sequenceNumber++ {
+			time.Sleep(20 * time.Millisecond)
+
+			for ssrc := 5000; ssrc <= 5004; ssrc += 2 {
+				header := &rtp.Header{
+					Version:        2,
+					SSRC:           uint32(ssrc),
+					SequenceNumber: sequenceNumber,
+					PayloadType:    96,
+				}
+
+				_, err := vp8Writer.bindings[0].writeStream.WriteRTP(header, []byte{0x00})
+				assert.NoError(t, err)
+			}
+		}
+
+		assertRidCorrect(t)
 		closePairNow(t, pcOffer, pcAnswer)
 	})
 }
