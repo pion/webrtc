@@ -51,11 +51,11 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 }
 
 // extract all trackDetails from an SDP.
-func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) []trackDetails { // nolint:gocognit
-	incomingTracks := []trackDetails{}
-	rtxRepairFlows := map[uint32]bool{}
-
+func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (incomingTracks []trackDetails) { // nolint:gocognit
 	for _, media := range s.MediaDescriptions {
+		tracksInMediaSection := []trackDetails{}
+		rtxRepairFlows := map[uint32]bool{}
+
 		// Plan B can have multiple tracks in a signle media section
 		streamID := ""
 		trackID := ""
@@ -98,7 +98,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 							continue
 						}
 						rtxRepairFlows[uint32(rtxRepairFlow)] = true
-						incomingTracks = filterTrackWithSSRC(incomingTracks, SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
+						tracksInMediaSection = filterTrackWithSSRC(tracksInMediaSection, SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
 					}
 				}
 
@@ -131,10 +131,10 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 
 				isNewTrack := true
 				trackDetails := &trackDetails{}
-				for i := range incomingTracks {
-					for j := range incomingTracks[i].ssrcs {
-						if incomingTracks[i].ssrcs[j] == SSRC(ssrc) {
-							trackDetails = &incomingTracks[i]
+				for i := range tracksInMediaSection {
+					for j := range tracksInMediaSection[i].ssrcs {
+						if tracksInMediaSection[i].ssrcs[j] == SSRC(ssrc) {
+							trackDetails = &tracksInMediaSection[i]
 							isNewTrack = false
 						}
 					}
@@ -147,13 +147,13 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
 				if isNewTrack {
-					incomingTracks = append(incomingTracks, *trackDetails)
+					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)
 				}
 			}
 		}
 
 		if rids := getRids(media); len(rids) != 0 && trackID != "" && streamID != "" {
-			newTrack := trackDetails{
+			simulcastTrack := trackDetails{
 				mid:      midValue,
 				kind:     codecType,
 				streamID: streamID,
@@ -161,12 +161,20 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) [
 				rids:     []string{},
 			}
 			for rid := range rids {
-				newTrack.rids = append(newTrack.rids, rid)
+				simulcastTrack.rids = append(simulcastTrack.rids, rid)
+			}
+			if len(simulcastTrack.rids) == len(tracksInMediaSection) {
+				for i := range tracksInMediaSection {
+					simulcastTrack.ssrcs = append(simulcastTrack.ssrcs, tracksInMediaSection[i].ssrcs...)
+				}
 			}
 
-			incomingTracks = append(incomingTracks, newTrack)
+			tracksInMediaSection = []trackDetails{simulcastTrack}
 		}
+
+		incomingTracks = append(incomingTracks, tracksInMediaSection...)
 	}
+
 	return incomingTracks
 }
 

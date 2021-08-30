@@ -127,40 +127,31 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	}
 	defer close(r.received)
 
-	if len(parameters.Encodings) == 1 && parameters.Encodings[0].SSRC != 0 {
+	globalParams := r.getParameters()
+	codec := RTPCodecCapability{}
+	if len(globalParams.Codecs) != 0 {
+		codec = globalParams.Codecs[0].RTPCodecCapability
+	}
+
+	for i := range parameters.Encodings {
 		t := trackStreams{
 			track: newTrackRemote(
 				r.kind,
-				parameters.Encodings[0].SSRC,
-				parameters.Encodings[0].RID,
+				parameters.Encodings[i].SSRC,
+				parameters.Encodings[i].RID,
 				r,
 			),
 		}
 
-		globalParams := r.getParameters()
-		codec := RTPCodecCapability{}
-		if len(globalParams.Codecs) != 0 {
-			codec = globalParams.Codecs[0].RTPCodecCapability
-		}
-
-		t.streamInfo = createStreamInfo("", parameters.Encodings[0].SSRC, 0, codec, globalParams.HeaderExtensions)
-		var err error
-		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[0].SSRC, t.streamInfo); err != nil {
-			return err
+		if parameters.Encodings[i].SSRC != 0 {
+			t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
+			var err error
+			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[i].SSRC, t.streamInfo); err != nil {
+				return err
+			}
 		}
 
 		r.tracks = append(r.tracks, t)
-	} else {
-		for _, encoding := range parameters.Encodings {
-			r.tracks = append(r.tracks, trackStreams{
-				track: newTrackRemote(
-					r.kind,
-					encoding.SSRC,
-					encoding.RID,
-					r,
-				),
-			})
-		}
 	}
 
 	return nil

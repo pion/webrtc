@@ -1104,6 +1104,21 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 	var ridMapLock sync.RWMutex
 	ridMap := map[string]int{}
 
+	// Enable Extension Headers needed for Simulcast
+	m := &MediaEngine{}
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	for _, extension := range []string{
+		"urn:ietf:params:rtp-hdrext:sdes:mid",
+		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
+		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
+	} {
+		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeVideo); err != nil {
+			panic(err)
+		}
+	}
+
 	assertRidCorrect := func(t *testing.T) {
 		ridMapLock.Lock()
 		defer ridMapLock.Unlock()
@@ -1122,22 +1137,13 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		return ridCount == 3
 	}
 
-	signalWithModifications := func(t *testing.T, modificationFunc func(string) string) (*PeerConnection, *PeerConnection, *TrackLocalStaticRTP) {
-		// Enable Extension Headers needed for Simulcast
-		m := &MediaEngine{}
-		if err := m.RegisterDefaultCodecs(); err != nil {
-			panic(err)
-		}
-		for _, extension := range []string{
-			"urn:ietf:params:rtp-hdrext:sdes:mid",
-			"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-			"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-		} {
-			if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeVideo); err != nil {
-				panic(err)
-			}
-		}
+	onTrackHandler := func(trackRemote *TrackRemote, _ *RTPReceiver) {
+		ridMapLock.Lock()
+		defer ridMapLock.Unlock()
+		ridMap[trackRemote.RID()] = ridMap[trackRemote.RID()] + 1
+	}
 
+	t.Run("RTP Extension Based", func(t *testing.T) {
 		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
 		assert.NoError(t, err)
 
@@ -1147,43 +1153,17 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		_, err = pcOffer.AddTrack(vp8Writer)
 		assert.NoError(t, err)
 
-		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
-			ridMapLock.Lock()
-			defer ridMapLock.Unlock()
-			ridMap[trackRemote.RID()] = ridMap[trackRemote.RID()] + 1
-		})
+		ridMap = map[string]int{}
+		pcAnswer.OnTrack(onTrackHandler)
 
-		offer, err := pcOffer.CreateOffer(nil)
-		assert.NoError(t, err)
-
-		offerGatheringComplete := GatheringCompletePromise(pcOffer)
-		assert.NoError(t, pcOffer.SetLocalDescription(offer))
-		<-offerGatheringComplete
-
-		offer.SDP = modificationFunc(pcOffer.LocalDescription().SDP)
-
-		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
-
-		answer, err := pcAnswer.CreateAnswer(nil)
-		assert.NoError(t, err)
-
-		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-		<-answerGatheringComplete
-
-		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
-
-		return pcOffer, pcAnswer, vp8Writer
-	}
-
-	t.Run("RTP Extension Based", func(t *testing.T) {
-		pcOffer, pcAnswer, vp8Writer := signalWithModifications(t, func(sessionDescription string) string {
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			sessionDescription = strings.Split(sessionDescription, "a=end-of-candidates\r\n")[0]
 			sessionDescription = filterSsrc(sessionDescription)
 			for _, rid := range rids {
 				sessionDescription += "a=" + sdpAttributeRid + ":" + rid + " send\r\n"
 			}
 			return sessionDescription + "a=simulcast:send " + strings.Join(rids, ";") + "\r\n"
-		})
+		}))
 
 		for sequenceNumber := uint16(0); !ridsFullfilled(); sequenceNumber++ {
 			time.Sleep(20 * time.Millisecond)
@@ -1208,8 +1188,22 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 	})
 
 	t.Run("SSRC Based", func(t *testing.T) {
-		pcOffer, pcAnswer, vp8Writer := signalWithModifications(t, func(sessionDescription string) string {
+		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(vp8Writer)
+		assert.NoError(t, err)
+
+		ridMap = map[string]int{}
+		pcAnswer.OnTrack(onTrackHandler)
+
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			sessionDescription = strings.Split(sessionDescription, "a=end-of-candidates\r\n")[0]
 			sessionDescription = filterSsrc(sessionDescription)
+
 			for _, rid := range rids {
 				sessionDescription += "a=" + sdpAttributeRid + ":" + rid + " send\r\n"
 			}
@@ -1225,7 +1219,7 @@ a=ssrc-group:FID 5000 5001
 a=ssrc-group:FID 5002 5003
 a=ssrc-group:FID 5004 5005
 `
-		})
+		}))
 
 		for sequenceNumber := uint16(0); !ridsFullfilled(); sequenceNumber++ {
 			time.Sleep(20 * time.Millisecond)

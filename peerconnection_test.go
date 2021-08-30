@@ -28,7 +28,7 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	return pca, pcb, nil
 }
 
-func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
+func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnection, modificationFunc func(string) string) error {
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -46,7 +46,9 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 		return err
 	}
 	<-offerGatheringComplete
-	if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
+
+	offer.SDP = modificationFunc(pcOffer.LocalDescription().SDP)
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
 		return err
 	}
 
@@ -60,6 +62,10 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	}
 	<-answerGatheringComplete
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
+}
+
+func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
+	return signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string { return sessionDescription })
 }
 
 func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
