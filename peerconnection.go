@@ -2286,7 +2286,10 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			if err != nil {
 				return nil, err
 			}
-			t.codecs = codecs
+
+			if len(t.codecs) == 0 {
+				t.codecs = codecs
+			}
 
 			mediaTransceivers := []*RTPTransceiver{t}
 			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, ridMap: getRids(media)})
