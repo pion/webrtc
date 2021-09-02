@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/rtp"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -992,4 +993,151 @@ func TestPeerConnection_Renegotiation_DisableTrack(t *testing.T) {
 	assert.Equal(t, strings.Count(answer.SDP, "a=inactive"), 1)
 
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Enable Extension Headers needed for Simulcast
+	m := &MediaEngine{}
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	for _, extension := range []string{
+		"urn:ietf:params:rtp-hdrext:sdes:mid",
+		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
+		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
+	} {
+		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeVideo); err != nil {
+			panic(err)
+		}
+	}
+
+	originalRids := []string{"a", "b", "c"}
+	signalWithRids := func(sessionDescription string, rids []string) string {
+		sessionDescription = strings.SplitAfter(sessionDescription, "a=end-of-candidates\r\n")[0]
+		sessionDescription = filterSsrc(sessionDescription)
+		for _, rid := range rids {
+			sessionDescription += "a=" + sdpAttributeRid + ":" + rid + " send\r\n"
+		}
+		return sessionDescription + "a=simulcast:send " + strings.Join(rids, ";") + "\r\n"
+	}
+
+	var trackMapLock sync.RWMutex
+	trackMap := map[string]*TrackRemote{}
+
+	onTrackHandler := func(track *TrackRemote, _ *RTPReceiver) {
+		trackMapLock.Lock()
+		defer trackMapLock.Unlock()
+		trackMap[track.RID()] = track
+	}
+
+	sendUntilAllTracksFired := func(vp8Writer *TrackLocalStaticRTP, rids []string) {
+		allTracksFired := func() bool {
+			trackMapLock.Lock()
+			defer trackMapLock.Unlock()
+
+			return len(trackMap) == len(rids)
+		}
+
+		for sequenceNumber := uint16(0); !allTracksFired(); sequenceNumber++ {
+			time.Sleep(20 * time.Millisecond)
+
+			for ssrc, rid := range rids {
+				header := &rtp.Header{
+					Version:        2,
+					SSRC:           uint32(ssrc),
+					SequenceNumber: sequenceNumber,
+					PayloadType:    96,
+				}
+				assert.NoError(t, header.SetExtension(1, []byte("0")))
+				assert.NoError(t, header.SetExtension(2, []byte(rid)))
+
+				_, err := vp8Writer.bindings[0].writeStream.WriteRTP(header, []byte{0x00})
+				assert.NoError(t, err)
+			}
+		}
+	}
+
+	assertTracksClosed := func(t *testing.T) {
+		trackMapLock.Lock()
+		defer trackMapLock.Unlock()
+
+		for _, track := range trackMap {
+			_, _, err := track.ReadRTP() // Ignore first Read, this is our peeked data
+			assert.Nil(t, err)
+
+			_, _, err = track.ReadRTP()
+			assert.Equal(t, err, io.EOF)
+		}
+	}
+
+	t.Run("Disable Transceiver", func(t *testing.T) {
+		trackMap = map[string]*TrackRemote{}
+		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
+		assert.NoError(t, err)
+
+		rtpTransceiver, err := pcOffer.AddTransceiverFromTrack(
+			vp8Writer,
+			RTPTransceiverInit{
+				Direction: RTPTransceiverDirectionSendonly,
+			},
+		)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			return signalWithRids(sessionDescription, originalRids)
+		}))
+
+		pcAnswer.OnTrack(onTrackHandler)
+		sendUntilAllTracksFired(vp8Writer, originalRids)
+
+		assert.NoError(t, pcOffer.RemoveTrack(rtpTransceiver.Sender()))
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			sessionDescription = strings.SplitAfter(sessionDescription, "a=end-of-candidates\r\n")[0]
+			return sessionDescription
+		}))
+
+		assertTracksClosed(t)
+		closePairNow(t, pcOffer, pcAnswer)
+	})
+
+	t.Run("Change RID", func(t *testing.T) {
+		trackMap = map[string]*TrackRemote{}
+		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTransceiverFromTrack(
+			vp8Writer,
+			RTPTransceiverInit{
+				Direction: RTPTransceiverDirectionSendonly,
+			},
+		)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			return signalWithRids(sessionDescription, originalRids)
+		}))
+
+		pcAnswer.OnTrack(onTrackHandler)
+		sendUntilAllTracksFired(vp8Writer, originalRids)
+
+		newRids := []string{"d", "e", "f"}
+		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			return signalWithRids(sessionDescription, newRids)
+		}))
+
+		assertTracksClosed(t)
+		closePairNow(t, pcOffer, pcAnswer)
+	})
 }
