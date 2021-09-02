@@ -1181,7 +1181,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	for _, t := range receiver.Tracks() {
-		if t.ssrc == 0 {
+		if t.SSRC() == 0 {
 			return
 		}
 
