@@ -2061,26 +2061,48 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 }
 
+// nolint: gocognit
 func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
 	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
 	if isRenegotiation {
 		for _, t := range currentTransceivers {
 			receiver := t.Receiver()
-			if receiver == nil || t.Receiver().Track() == nil {
+			if receiver == nil {
 				continue
 			}
 
-			receiver.Track().mu.Lock()
-			ssrc := receiver.Track().ssrc
-
-			if details := trackDetailsForSSRC(trackDetails, ssrc); details != nil {
-				receiver.Track().id = details.id
-				receiver.Track().streamID = details.streamID
-				receiver.Track().mu.Unlock()
+			tracks := t.Receiver().Tracks()
+			if len(tracks) == 0 {
 				continue
 			}
 
-			receiver.Track().mu.Unlock()
+			receiverNeedsStopped := false
+			func() {
+				for _, t := range tracks {
+					t.mu.Lock()
+					defer t.mu.Unlock()
+
+					if t.ssrc != 0 {
+						if details := trackDetailsForSSRC(trackDetails, t.ssrc); details != nil {
+							t.id = details.id
+							t.streamID = details.streamID
+							continue
+						}
+					} else if t.rid != "" {
+						if details := trackDetailsForRID(trackDetails, t.rid); details != nil {
+							t.id = details.id
+							t.streamID = details.streamID
+							continue
+						}
+					}
+
+					receiverNeedsStopped = true
+				}
+			}()
+
+			if !receiverNeedsStopped {
+				continue
+			}
 
 			if err := receiver.Stop(); err != nil {
 				pc.log.Warnf("Failed to stop RtpReceiver: %s", err)

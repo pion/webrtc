@@ -37,6 +37,17 @@ func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
 	return nil
 }
 
+func trackDetailsForRID(trackDetails []trackDetails, rid string) *trackDetails {
+	for i := range trackDetails {
+		for j := range trackDetails[i].rids {
+			if trackDetails[i].rids[j] == rid {
+				return &trackDetails[i]
+			}
+		}
+	}
+	return nil
+}
+
 func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetails {
 	filtered := []trackDetails{}
 	for i := range incomingTracks {
