@@ -15,12 +15,16 @@ const (
 
 	// ICEProtocolTCP indicates the URL uses a TCP transport.
 	ICEProtocolTCP
+
+	// ICEProtocolSSLTCP indicates the URL uses a TCP+SSL transport.
+	ICEProtocolSSLTCP
 )
 
 // This is done this way because of a linter.
 const (
 	iceProtocolUDPStr = "udp"
 	iceProtocolTCPStr = "tcp"
+	iceProtocolSSLTCPStr = "ssltcp"
 )
 
 // NewICEProtocol takes a string and converts it to ICEProtocol
@@ -30,6 +34,8 @@ func NewICEProtocol(raw string) (ICEProtocol, error) {
 		return ICEProtocolUDP, nil
 	case strings.EqualFold(iceProtocolTCPStr, raw):
 		return ICEProtocolTCP, nil
+	case strings.EqualFold(iceProtocolSSLTCPStr, raw):
+		return ICEProtocolSSLTCP, nil
 	default:
 		return ICEProtocol(Unknown), fmt.Errorf("%w: %s", errICEProtocolUnknown, raw)
 	}
@@ -41,6 +47,8 @@ func (t ICEProtocol) String() string {
 		return iceProtocolUDPStr
 	case ICEProtocolTCP:
 		return iceProtocolTCPStr
+	case ICEProtocolSSLTCP:
+		return iceProtocolSSLTCPStr
 	default:
 		return ErrUnknownType.Error()
 	}
