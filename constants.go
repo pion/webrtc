@@ -29,6 +29,8 @@ const (
 	rtpPayloadTypeBitmask = 0x7F
 
 	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"
+
+	generatedCertificateOrigin = "WebRTC"
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {

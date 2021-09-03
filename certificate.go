@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -123,12 +122,6 @@ func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
 // GenerateCertificate causes the creation of an X.509 certificate and
 // corresponding private key.
 func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
-	origin := make([]byte, 16)
-	/* #nosec */
-	if _, err := rand.Read(origin); err != nil {
-		return nil, &rtcerr.UnknownError{Err: err}
-	}
-
 	// Max random value, a 130-bits integer, i.e 2^130 - 1
 	maxBigInt := new(big.Int)
 	/* #nosec */
@@ -140,18 +133,12 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 	}
 
 	return NewCertificate(secretKey, x509.Certificate{
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-			x509.ExtKeyUsageServerAuth,
-		},
-		BasicConstraintsValid: true,
-		NotBefore:             time.Now(),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		NotAfter:              time.Now().AddDate(0, 1, 0),
-		SerialNumber:          serialNumber,
-		Version:               2,
-		Subject:               pkix.Name{CommonName: hex.EncodeToString(origin)},
-		IsCA:                  true,
+		Issuer:       pkix.Name{CommonName: generatedCertificateOrigin},
+		NotBefore:    time.Now().AddDate(0, 0, -1),
+		NotAfter:     time.Now().AddDate(0, 1, -1),
+		SerialNumber: serialNumber,
+		Version:      2,
+		Subject:      pkix.Name{CommonName: generatedCertificateOrigin},
 	})
 }
 
