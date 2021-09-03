@@ -2064,7 +2064,10 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 // nolint: gocognit
 func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
 	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
-	if isRenegotiation {
+
+	if !isRenegotiation {
+		pc.undeclaredMediaProcessor()
+	} else {
 		for _, t := range currentTransceivers {
 			receiver := t.Receiver()
 			if receiver == nil {
@@ -2121,10 +2124,6 @@ func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDesc
 	pc.startRTPReceivers(trackDetails, currentTransceivers)
 	if haveApplicationMediaSection(remoteDesc.parsed) {
 		pc.startSCTP()
-	}
-
-	if !isRenegotiation {
-		pc.undeclaredMediaProcessor()
 	}
 }
 
