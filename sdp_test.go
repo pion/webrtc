@@ -375,8 +375,7 @@ func TestPopulateSDP(t *testing.T) {
 		assert.NoError(t, me.RegisterDefaultCodecs())
 		api := NewAPI(WithMediaEngine(me))
 
-		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
-		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		tr := newRTPTransceiver(nil, nil, RTPTransceiverDirectionRecvonly, RTPCodecTypeVideo, api)
 		ridMap := map[string]string{
 			"ridkey": "some",
 		}
