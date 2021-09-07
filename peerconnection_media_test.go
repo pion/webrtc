@@ -963,7 +963,6 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 // Assert that failed Simulcast probing doesn't cause
 // the handleUndeclaredSSRC to be leaked
 func TestPeerConnection_Simulcast_Probe(t *testing.T) {
-	return
 	lim := test.TimeOut(time.Second * 30) //nolint
 	defer lim.Stop()
 

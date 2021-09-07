@@ -338,15 +338,6 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 }
 
 func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
-	isChannelWithID := func(id uint16) bool {
-		for _, d := range r.dataChannels {
-			if d.id != nil && *d.id == id {
-				return true
-			}
-		}
-		return false
-	}
-
 	var id uint16
 	if dtlsRole != DTLSRoleClient {
 		id++
@@ -356,8 +347,19 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
+	// Create map of ids so we can compare without double-looping each time.
+	idsMap := make(map[uint16]struct{}, len(r.dataChannels))
+	for _, dc := range r.dataChannels {
+		if dc.id == nil {
+			continue
+		}
+
+		idsMap[*dc.id] = struct{}{}
+	}
+
 	for ; id < max-1; id += 2 {
-		if isChannelWithID(id) {
+		if _, ok := idsMap[id]; ok {
 			continue
 		}
 		*idOut = &id
