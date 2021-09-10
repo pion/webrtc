@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package main
@@ -152,19 +153,22 @@ func main() {
 				panic(err)
 			}
 
+			// Copy slice to avoid data race.
+			bb := append(b[:0:0], b[:n]...)
 			// Write
-			if _, err = c.conn.Write(b[:n]); err != nil {
-				// For this particular example, third party applications usually timeout after a short
-				// amount of time during which the user doesn't have enough time to provide the answer
-				// to the browser.
-				// That's why, for this particular example, the user first needs to provide the answer
-				// to the browser then open the third party application. Therefore we must not kill
-				// the forward on "connection refused" errors
-				if opError, ok := err.(*net.OpError); ok && opError.Err.Error() == "write: connection refused" {
-					continue
+			go func(b []byte) {
+				if _, err = c.conn.Write(b[:n]); err != nil {
+					// For this particular example, third party applications usually timeout after a short
+					// amount of time during which the user doesn't have enough time to provide the answer
+					// to the browser.
+					// That's why, for this particular example, the user first needs to provide the answer
+					// to the browser then open the third party application. Therefore we must not kill
+					// the forward on "connection refused" errors
+					if opError, ok := err.(*net.OpError); ok && opError.Err.Error() != "write: connection refused" {
+						panic(err)
+					}
 				}
-				panic(err)
-			}
+			}(bb)
 		}
 	})
 
