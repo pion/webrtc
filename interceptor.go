@@ -71,29 +71,40 @@ func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Re
 // ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
 // a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
 func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
-	err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo)
-	if err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
 		return err
 	}
+
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+		return err
+	}
+
 	i, err := twcc.NewHeaderExtensionInterceptor()
 	if err != nil {
 		return err
 	}
+
 	interceptorRegistry.Add(i)
-	return err
+	return nil
 }
 
 // ConfigureTWCCSender will setup everything necessary for generating TWCC reports.
 func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeVideo)
-	err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo)
-	if err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
 		return err
 	}
+
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeAudio)
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+		return err
+	}
+
 	generator, err := twcc.NewSenderInterceptor()
 	if err != nil {
 		return err
 	}
+
 	interceptorRegistry.Add(generator)
 	return nil
 }
