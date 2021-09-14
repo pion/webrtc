@@ -50,11 +50,19 @@ func trackDetailsForRID(trackDetails []trackDetails, rid string) *trackDetails {
 
 func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetails {
 	filtered := []trackDetails{}
-	for i := range incomingTracks {
-		for j := range incomingTracks[i].ssrcs {
-			if incomingTracks[i].ssrcs[j] != ssrc {
-				filtered = append(filtered, incomingTracks[i])
+	doesTrackHaveSSRC := func(t trackDetails) bool {
+		for i := range t.ssrcs {
+			if t.ssrcs[i] == ssrc {
+				return true
 			}
+		}
+
+		return false
+	}
+
+	for i := range incomingTracks {
+		if !doesTrackHaveSSRC(incomingTracks[i]) {
+			filtered = append(filtered, incomingTracks[i])
 		}
 	}
 
