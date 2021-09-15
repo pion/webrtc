@@ -19,13 +19,19 @@ import (
 type trackStreams struct {
 	track *TrackRemote
 
-	streamInfo interceptor.StreamInfo
+	streamInfo, repairStreamInfo *interceptor.StreamInfo
 
 	rtpReadStream  *srtp.ReadStreamSRTP
 	rtpInterceptor interceptor.RTPReader
 
 	rtcpReadStream  *srtp.ReadStreamSRTCP
 	rtcpInterceptor interceptor.RTCPReader
+
+	repairReadStream  *srtp.ReadStreamSRTP
+	repairInterceptor interceptor.RTPReader
+
+	repairRtcpReadStream  *srtp.ReadStreamSRTCP
+	repairRtcpInterceptor interceptor.RTCPReader
 }
 
 // RTPReceiver allows an application to inspect the receipt of a TrackRemote
@@ -146,7 +152,7 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		if parameters.Encodings[i].SSRC != 0 {
 			t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
 			var err error
-			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.streamsForSSRC(parameters.Encodings[i].SSRC, t.streamInfo); err != nil {
+			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
 				return err
 			}
 		}
@@ -245,8 +251,23 @@ func (r *RTPReceiver) Stop() error {
 				errs = append(errs, r.tracks[i].rtpReadStream.Close())
 			}
 
+			if r.tracks[i].repairReadStream != nil {
+				errs = append(errs, r.tracks[i].repairReadStream.Close())
+			}
+
+			if r.tracks[i].repairRtcpReadStream != nil {
+				errs = append(errs, r.tracks[i].repairRtcpReadStream.Close())
+			}
+
+			if r.tracks[i].streamInfo != nil {
+				r.api.interceptor.UnbindRemoteStream(r.tracks[i].streamInfo)
+			}
+
+			if r.tracks[i].repairStreamInfo != nil {
+				r.api.interceptor.UnbindRemoteStream(r.tracks[i].repairStreamInfo)
+			}
+
 			err = util.FlattenErrs(errs)
-			r.api.interceptor.UnbindRemoteStream(&r.tracks[i].streamInfo)
 		}
 	default:
 	}
@@ -276,7 +297,7 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 
 // receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
 // It populates all the internal state for the given RID
-func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC) (*TrackRemote, error) {
+func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) (*TrackRemote, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -286,54 +307,53 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, ssrc SSRC)
 			r.tracks[i].track.kind = r.kind
 			r.tracks[i].track.codec = params.Codecs[0]
 			r.tracks[i].track.params = params
-			r.tracks[i].track.ssrc = ssrc
-			r.tracks[i].streamInfo = createStreamInfo("", ssrc, params.Codecs[0].PayloadType, params.Codecs[0].RTPCodecCapability, params.HeaderExtensions)
+			r.tracks[i].track.ssrc = SSRC(streamInfo.SSRC)
 			r.tracks[i].track.mu.Unlock()
 
-			var err error
-			if r.tracks[i].rtpReadStream, r.tracks[i].rtpInterceptor, r.tracks[i].rtcpReadStream, r.tracks[i].rtcpInterceptor, err = r.streamsForSSRC(ssrc, r.tracks[i].streamInfo); err != nil {
-				return nil, err
-			}
+			r.tracks[i].streamInfo = streamInfo
+			r.tracks[i].rtpReadStream = rtpReadStream
+			r.tracks[i].rtpInterceptor = rtpInterceptor
+			r.tracks[i].rtcpReadStream = rtcpReadStream
+			r.tracks[i].rtcpInterceptor = rtcpInterceptor
 
 			return r.tracks[i].track, nil
 		}
 	}
 
-	return nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+	return nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 }
 
-func (r *RTPReceiver) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
-	srtpSession, err := r.transport.getSRTPSession()
-	if err != nil {
-		return nil, nil, nil, nil, err
+// receiveForRsid starts a routine that processes the repair stream for a RID
+// These packets aren't exposed to the user yet, but we need to process them for
+// TWCC
+func (r *RTPReceiver) receiveForRsid(rsid string, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range r.tracks {
+		if r.tracks[i].track.RID() == rsid {
+			var err error
+
+			r.tracks[i].repairStreamInfo = streamInfo
+			r.tracks[i].repairReadStream = rtpReadStream
+			r.tracks[i].repairInterceptor = rtpInterceptor
+			r.tracks[i].repairRtcpReadStream = rtcpReadStream
+			r.tracks[i].repairRtcpInterceptor = rtcpInterceptor
+
+			go func() {
+				b := make([]byte, r.api.settingEngine.getReceiveMTU())
+				for {
+					if _, _, readErr := r.tracks[i].repairInterceptor.Read(b, nil); readErr != nil {
+						return
+					}
+				}
+			}()
+
+			return err
+		}
 	}
 
-	rtpReadStream, err := srtpSession.OpenReadStream(uint32(ssrc))
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	rtpInterceptor := r.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-		n, err = rtpReadStream.Read(in)
-		return n, a, err
-	}))
-
-	srtcpSession, err := r.transport.getSRTCPSession()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(ssrc))
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	rtcpInterceptor := r.api.interceptor.BindRTCPReader(interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-		n, err = rtcpReadStream.Read(in)
-		return n, a, err
-	}))
-
-	return rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, nil
+	return fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rsid)
 }
 
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.

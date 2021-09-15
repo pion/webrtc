@@ -17,6 +17,7 @@ import (
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v2"
@@ -458,4 +459,38 @@ func (t *DTLSTransport) storeSimulcastStream(s *srtp.ReadStreamSRTP) {
 	defer t.lock.Unlock()
 
 	t.simulcastStreams = append(t.simulcastStreams, s)
+}
+
+func (t *DTLSTransport) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
+	srtpSession, err := t.getSRTPSession()
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	rtpReadStream, err := srtpSession.OpenReadStream(uint32(ssrc))
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	rtpInterceptor := t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+		n, err = rtpReadStream.Read(in)
+		return n, a, err
+	}))
+
+	srtcpSession, err := t.getSRTCPSession()
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(ssrc))
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	rtcpInterceptor := t.api.interceptor.BindRTCPReader(interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+		n, err = rtcpReadStream.Read(in)
+		return n, a, err
+	}))
+
+	return rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, nil
 }

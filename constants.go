@@ -31,6 +31,8 @@ const (
 	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"
 
 	generatedCertificateOrigin = "WebRTC"
+
+	sdesRepairRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {

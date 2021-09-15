@@ -1175,7 +1175,14 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 					PayloadType:    96,
 				}
 				assert.NoError(t, header.SetExtension(1, []byte("0")))
-				assert.NoError(t, header.SetExtension(2, []byte(rid)))
+
+				// Send RSID for first 10 packets
+				if sequenceNumber >= 10 {
+					assert.NoError(t, header.SetExtension(2, []byte(rid)))
+				} else {
+					assert.NoError(t, header.SetExtension(3, []byte(rid)))
+					header.SSRC += 10
+				}
 
 				_, err := vp8Writer.bindings[0].writeStream.WriteRTP(header, []byte{0x00})
 				assert.NoError(t, err)
