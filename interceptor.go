@@ -117,7 +117,7 @@ func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
 	return i.WriteRTP(&packet.Header, packet.Payload)
 }
 
-func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) interceptor.StreamInfo {
+func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
 		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
@@ -128,7 +128,7 @@ func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCo
 		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
 	}
 
-	return interceptor.StreamInfo{
+	return &interceptor.StreamInfo{
 		ID:                  id,
 		Attributes:          interceptor.Attributes{},
 		SSRC:                uint32(ssrc),
