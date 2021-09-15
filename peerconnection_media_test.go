@@ -304,9 +304,12 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetICETimeouts(1*time.Second, 5*time.Second, 250*time.Millisecond)
+	s.SetICETimeouts(time.Second/2, time.Second/2, time.Second/8)
 
-	pcOffer, pcAnswer, err := newPair()
+	m := &MediaEngine{}
+	assert.NoError(t, m.RegisterDefaultCodecs())
+
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s), WithMediaEngine(m)).newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
