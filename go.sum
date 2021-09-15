@@ -52,8 +52,9 @@ github.com/pion/mdns v0.0.5/go.mod h1:UgssrvdD3mxpi8tMxAXbsppL3vJ4Jipw1mTCW+al01
 github.com/pion/randutil v0.1.0 h1:CFG1UdESneORglEsnimhUjf33Rwjubwj6xfiOXBa3mA=
 github.com/pion/randutil v0.1.0/go.mod h1:XcJrSMMbbMRhASFVOlj/5hQial/Y8oH/HVo7TBZq+j8=
 github.com/pion/rtcp v1.2.6/go.mod h1:52rMNPWFsjr39z9B9MhnkqhPLoeHTv1aN63o/42bWE0=
-github.com/pion/rtcp v1.2.7 h1:cPeOJu9sHMTLTWmxzLH8/wcF8giondpLgvXDPfauUBY=
 github.com/pion/rtcp v1.2.7/go.mod h1:qVPhiCzAm4D/rxb6XzKeyZiQK69yJpbUDJSF7TgrqNo=
+github.com/pion/rtcp v1.2.8 h1:Cys8X6r0xxU65ESTmXkqr8eU1Q1Wx+lNkoZCUH4zD7E=
+github.com/pion/rtcp v1.2.8/go.mod h1:qVPhiCzAm4D/rxb6XzKeyZiQK69yJpbUDJSF7TgrqNo=
 github.com/pion/rtp v1.7.0/go.mod h1:bDb5n+BFZxXx0Ea7E5qe+klMuqiBrP+w8XSjiWtCUko=
 github.com/pion/rtp v1.7.2 h1:HCDKDCixh7PVjkQTsqHAbk1lg+bx059EHxcnyl42dYs=
 github.com/pion/rtp v1.7.2/go.mod h1:bDb5n+BFZxXx0Ea7E5qe+klMuqiBrP+w8XSjiWtCUko=
