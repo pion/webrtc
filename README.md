@@ -96,8 +96,9 @@ This book is vendor agnostic and will not have any Pion specific information.
 * [Simulcast](https://github.com/pion/webrtc/tree/master/examples/simulcast)
 * [SVC](https://github.com/pion/rtp/blob/master/codecs/vp9_packet.go#L138)
 * [NACK](https://github.com/pion/interceptor/pull/4)
-* Full loss recovery and congestion control is not complete, see [pion/interceptor](https://github.com/pion/interceptor) for progress
-  * See [ion](https://github.com/pion/ion-sfu/tree/master/pkg/buffer) for how an implementor can do it today
+* [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/master/pkg/report)
+* [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/master/pkg/twcc)
+* Bandwidth Estimation is actively being implemented, see [pion/interceptor#25](https://github.com/pion/interceptor/issues/25)
 
 #### Security
 * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA for DTLS v1.2
