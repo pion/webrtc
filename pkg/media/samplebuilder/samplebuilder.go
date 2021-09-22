@@ -40,6 +40,9 @@ type SampleBuilder struct {
 
 	// number of packets forced to be dropped
 	droppedPackets uint16
+
+	// allows inspecting head packets of each sample and then returns a custom metadata
+	packetHeadHandler func(headPacket interface{}) interface{}
 }
 
 // New constructs a new SampleBuilder.
@@ -253,11 +256,16 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// merge all the buffers into a sample
 	data := []byte{}
+	var metadata interface{}
 	for i := consume.head; i != consume.tail; i++ {
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
+		if i == consume.head && s.packetHeadHandler != nil {
+			metadata = s.packetHeadHandler(s.depacketizer)
+		}
+
 		data = append(data, p...)
 	}
 	samples := afterTimestamp - sampleTimestamp
@@ -267,6 +275,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
+		Metadata:           metadata,
 	}
 
 	s.droppedPackets = 0
@@ -338,6 +347,14 @@ func WithPartitionHeadChecker(interface{}) Option {
 func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
 	return func(o *SampleBuilder) {
 		o.packetReleaseHandler = h
+	}
+}
+
+// WithPacketHeadHandler set a head packet handler to allow inspecting
+// the packet to extract certain information and return as custom metadata
+func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
+	return func(o *SampleBuilder) {
+		o.packetHeadHandler = h
 	}
 }
 

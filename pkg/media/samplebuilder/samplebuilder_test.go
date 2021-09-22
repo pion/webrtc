@@ -389,6 +389,38 @@ func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
 	}
 }
 
+func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
+	packets := []*rtp.Packet{
+		{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+		{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 5}, Payload: []byte{0x02}},
+		{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 6}, Payload: []byte{0x01}},
+		{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 6}, Payload: []byte{0x02}},
+		{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 7}, Payload: []byte{0x01}},
+	}
+
+	headCount := 0
+	s := New(10, &fakeDepacketizer{}, 1, WithPacketHeadHandler(func(headPacket interface{}) interface{} {
+		headCount++
+		return true
+	}))
+
+	for _, pkt := range packets {
+		s.Push(pkt)
+	}
+
+	for {
+		sample := s.Pop()
+		if sample == nil {
+			break
+		}
+
+		assert.NotNil(t, sample.Metadata, "sample metadata shouldn't be nil")
+		assert.Equal(t, true, sample.Metadata, "sample metadata should've been set to true")
+	}
+
+	assert.Equal(t, 2, headCount, "two sample heads should have been inspected")
+}
+
 func TestPopWithTimestamp(t *testing.T) {
 	t.Run("Crash on nil", func(t *testing.T) {
 		s := New(0, &fakeDepacketizer{}, 1)
