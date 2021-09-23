@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -528,6 +529,19 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 			return m.negotiatedAudioCodecs
 		}
 
+		return m.audioCodecs
+	}
+
+	return nil
+}
+
+func (m *MediaEngine) getLocalCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if typ == RTPCodecTypeVideo {
+		return m.videoCodecs
+	} else if typ == RTPCodecTypeAudio {
 		return m.audioCodecs
 	}
 
