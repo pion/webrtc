@@ -304,9 +304,12 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetICETimeouts(1*time.Second, 5*time.Second, 250*time.Millisecond)
+	s.SetICETimeouts(time.Second/2, time.Second/2, time.Second/8)
 
-	pcOffer, pcAnswer, err := newPair()
+	m := &MediaEngine{}
+	assert.NoError(t, m.RegisterDefaultCodecs())
+
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s), WithMediaEngine(m)).newPair(Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1175,7 +1178,14 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 					PayloadType:    96,
 				}
 				assert.NoError(t, header.SetExtension(1, []byte("0")))
-				assert.NoError(t, header.SetExtension(2, []byte(rid)))
+
+				// Send RSID for first 10 packets
+				if sequenceNumber >= 10 {
+					assert.NoError(t, header.SetExtension(2, []byte(rid)))
+				} else {
+					assert.NoError(t, header.SetExtension(3, []byte(rid)))
+					header.SSRC += 10
+				}
 
 				_, err := vp8Writer.bindings[0].writeStream.WriteRTP(header, []byte{0x00})
 				assert.NoError(t, err)

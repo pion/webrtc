@@ -134,15 +134,22 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	if !api.settingEngine.disableMediaEngineCopy {
-		pc.api = &API{
-			settingEngine: api.settingEngine,
-			mediaEngine:   api.mediaEngine.copy(),
-			interceptor:   api.interceptor,
-		}
+	i, err := api.interceptorRegistry.Build("")
+	if err != nil {
+		return nil, err
 	}
 
-	var err error
+	pc.api = &API{
+		settingEngine: api.settingEngine,
+		interceptor:   i,
+	}
+
+	if api.settingEngine.disableMediaEngineCopy {
+		pc.api.mediaEngine = api.mediaEngine
+	} else {
+		pc.api.mediaEngine = api.mediaEngine.copy()
+	}
+
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
 	}
@@ -176,7 +183,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		}
 	})
 
-	pc.interceptorRTCPWriter = api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
+	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
 }
@@ -1397,33 +1404,44 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return errPeerConnSimulcastStreamIDRTPExtensionRequired
 	}
 
+	repairStreamIDExtensionID, _, _ := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdesRepairRTPStreamIDURI})
+
 	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-	var mid, rid string
+
+	i, err := rtpStream.Read(b)
+	if err != nil {
+		return err
+	}
+
+	var mid, rid, rsid string
+	payloadType, err := handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID), uint8(repairStreamIDExtensionID), &mid, &rid, &rsid)
+	if err != nil {
+		return err
+	}
+
+	params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
+	if err != nil {
+		return err
+	}
+
+	streamInfo := createStreamInfo("", ssrc, params.Codecs[0].PayloadType, params.Codecs[0].RTPCodecCapability, params.HeaderExtensions)
+	readStream, interceptor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
+	if err != nil {
+		return err
+	}
+
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
-		i, err := rtpStream.Read(b)
-		if err != nil {
-			return err
-		}
+		if mid == "" || (rid == "" && rsid == "") {
+			i, _, err := interceptor.Read(b, nil)
+			if err != nil {
+				return err
+			}
 
-		maybeMid, maybeRid, payloadType, err := handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID))
-		if err != nil {
-			return err
-		}
+			if _, err = handleUnknownRTPPacket(b[:i], uint8(midExtensionID), uint8(streamIDExtensionID), uint8(repairStreamIDExtensionID), &mid, &rid, &rsid); err != nil {
+				return err
+			}
 
-		if maybeMid != "" {
-			mid = maybeMid
-		}
-		if maybeRid != "" {
-			rid = maybeRid
-		}
-
-		if mid == "" || rid == "" {
 			continue
-		}
-
-		params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
-		if err != nil {
-			return err
 		}
 
 		for _, t := range pc.GetTransceivers() {
@@ -1432,7 +1450,11 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				continue
 			}
 
-			track, err := receiver.receiveForRid(rid, params, ssrc)
+			if rsid != "" {
+				return receiver.receiveForRsid(rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+			}
+
+			track, err := receiver.receiveForRid(rid, params, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
 			if err != nil {
 				return err
 			}
@@ -1441,6 +1463,13 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		}
 	}
 
+	if readStream != nil {
+		_ = readStream.Close()
+	}
+	if rtcpReadStream != nil {
+		_ = rtcpReadStream.Close()
+	}
+	pc.api.interceptor.UnbindRemoteStream(streamInfo)
 	return errPeerConnSimulcastIncomingSSRCFailed
 }
 
