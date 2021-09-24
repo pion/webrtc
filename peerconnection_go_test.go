@@ -178,7 +178,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 	certificate2, err := GenerateCertificate(secretKey2)
 	assert.Nil(t, err)
 
-	for _, testcase := range []struct {
+	for _, test := range []struct {
 		name    string
 		init    func() (*PeerConnection, error)
 		config  Configuration
@@ -266,14 +266,14 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials},
 		},
 	} {
-		pc, err := testcase.init()
+		pc, err := test.init()
 		if err != nil {
-			t.Errorf("SetConfiguration %q: init failed: %v", testcase.name, err)
+			t.Errorf("SetConfiguration %q: init failed: %v", test.name, err)
 		}
 
-		err = pc.SetConfiguration(testcase.config)
-		if got, want := err, testcase.wantErr; !reflect.DeepEqual(got, want) {
-			t.Errorf("SetConfiguration %q: err = %v, want %v", testcase.name, got, want)
+		err = pc.SetConfiguration(test.config)
+		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
+			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
 		}
 
 		assert.NoError(t, pc.Close())
@@ -446,7 +446,14 @@ func TestPeerConnection_AnswerWithClosedConnection(t *testing.T) {
 }
 
 func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
-	for _, testcase := range []struct {
+	createTransceiver := func(kind RTPCodecType, direction RTPTransceiverDirection) *RTPTransceiver {
+		r := &RTPTransceiver{kind: kind}
+		r.setDirection(direction)
+
+		return r
+	}
+
+	for _, test := range []struct {
 		name string
 
 		kinds      []RTPCodecType
@@ -459,7 +466,7 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			"Audio and Video Transceivers can not satisfy each other",
 			[]RTPCodecType{RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
-			[]*RTPTransceiver{newRTPTransceiver(nil, nil, RTPTransceiverDirectionSendrecv, RTPCodecTypeAudio, nil)},
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv)},
 			[]*RTPTransceiver{nil},
 		},
 		{
@@ -481,9 +488,9 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			[]RTPCodecType{RTPCodecTypeVideo},
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 
-			[]*RTPTransceiver{newRTPTransceiver(nil, nil, RTPTransceiverDirectionRecvonly, RTPCodecTypeVideo, nil)},
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly)},
 
-			[]*RTPTransceiver{newRTPTransceiver(nil, nil, RTPTransceiverDirectionRecvonly, RTPCodecTypeVideo, nil)},
+			[]*RTPTransceiver{createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly)},
 		},
 		{
 			"Don't satisfy a Sendonly with a SendRecv, later SendRecv will be marked as Inactive",
@@ -491,39 +498,39 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv},
 
 			[]*RTPTransceiver{
-				newRTPTransceiver(nil, nil, RTPTransceiverDirectionSendrecv, RTPCodecTypeVideo, nil),
-				newRTPTransceiver(nil, nil, RTPTransceiverDirectionRecvonly, RTPCodecTypeVideo, nil),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly),
 			},
 
 			[]*RTPTransceiver{
-				newRTPTransceiver(nil, nil, RTPTransceiverDirectionRecvonly, RTPCodecTypeVideo, nil),
-				newRTPTransceiver(nil, nil, RTPTransceiverDirectionSendrecv, RTPCodecTypeVideo, nil),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly),
+				createTransceiver(RTPCodecTypeVideo, RTPTransceiverDirectionSendrecv),
 			},
 		},
 	} {
-		if len(testcase.kinds) != len(testcase.directions) {
+		if len(test.kinds) != len(test.directions) {
 			t.Fatal("Kinds and Directions must be the same length")
 		}
 
 		got := []*RTPTransceiver{}
-		for i := range testcase.kinds {
-			res, filteredLocalTransceivers := satisfyTypeAndDirection(testcase.kinds[i], testcase.directions[i], testcase.localTransceivers)
+		for i := range test.kinds {
+			res, filteredLocalTransceivers := satisfyTypeAndDirection(test.kinds[i], test.directions[i], test.localTransceivers)
 
 			got = append(got, res)
-			testcase.localTransceivers = filteredLocalTransceivers
+			test.localTransceivers = filteredLocalTransceivers
 		}
 
-		if !reflect.DeepEqual(got, testcase.want) {
+		if !reflect.DeepEqual(got, test.want) {
 			gotStr := ""
 			for _, t := range got {
 				gotStr += fmt.Sprintf("%+v\n", t)
 			}
 
 			wantStr := ""
-			for _, t := range testcase.want {
+			for _, t := range test.want {
 				wantStr += fmt.Sprintf("%+v\n", t)
 			}
-			t.Errorf("satisfyTypeAndDirection %q: \ngot\n%s \nwant\n%s", testcase.name, gotStr, wantStr)
+			t.Errorf("satisfyTypeAndDirection %q: \ngot\n%s \nwant\n%s", test.name, gotStr, wantStr)
 		}
 	}
 }
@@ -1251,7 +1258,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 		return err
 	}
 
-	for _, testcase := range []struct {
+	for _, test := range []struct {
 		name                  string
 		offerDirection        RTPTransceiverDirection
 		answerStartDirection  RTPTransceiverDirection
@@ -1312,11 +1319,11 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly},
 		},
 	} {
-		offerDirection := testcase.offerDirection
-		answerStartDirection := testcase.answerStartDirection
-		answerFinalDirections := testcase.answerFinalDirections
+		offerDirection := test.offerDirection
+		answerStartDirection := test.answerStartDirection
+		answerFinalDirections := test.answerFinalDirections
 
-		t.Run(testcase.name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			pcOffer, pcAnswer, err := newPair()
 			assert.NoError(t, err)
 
@@ -1423,37 +1430,6 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 	pc.OnNegotiationNeeded(nil)
 	pc.onNegotiationNeeded()
 	pc.negotiationNeededOp()
-
-	assert.NoError(t, pc.Close())
-}
-
-func TestPeerConnection_SkipStoppedTransceiver(t *testing.T) {
-	defer test.TimeOut(time.Second).Stop()
-
-	pc, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video1", "pion")
-	assert.NoError(t, err)
-
-	transceiver, err := pc.AddTransceiverFromTrack(track)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(pc.GetTransceivers()))
-	assert.NoError(t, pc.RemoveTrack(transceiver.Sender()))
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			assert.NoError(t, transceiver.Stop())
-		}() // no error, no panic
-	}
-	wg.Wait()
-	track, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video2", "pion")
-	assert.NoError(t, err)
-	_, err = pc.AddTrack(track) // should not use the above stopped transceiver
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(pc.GetTransceivers()))
 
 	assert.NoError(t, pc.Close())
 }
