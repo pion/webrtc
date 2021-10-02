@@ -18,12 +18,13 @@ import (
 // trackDetails represents any media source that can be represented in a SDP
 // This isn't keyed by SSRC because it also needs to support rid based sources
 type trackDetails struct {
-	mid      string
-	kind     RTPCodecType
-	streamID string
-	id       string
-	ssrcs    []SSRC
-	rids     []string
+	mid        string
+	kind       RTPCodecType
+	streamID   string
+	id         string
+	ssrcs      []SSRC
+	repairSsrc SSRC
+	rids       []string
 }
 
 func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
@@ -73,7 +74,7 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (incomingTracks []trackDetails) { // nolint:gocognit
 	for _, media := range s.MediaDescriptions {
 		tracksInMediaSection := []trackDetails{}
-		rtxRepairFlows := map[uint32]bool{}
+		rtxRepairFlows := map[uint64]uint64{}
 
 		// Plan B can have multiple tracks in a signle media section
 		streamID := ""
@@ -106,7 +107,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 					// as this declares that the second SSRC (632943048) is a rtx repair flow (RFC4588) for the first
 					// (2231627014) as specified in RFC5576
 					if len(split) == 3 {
-						_, err := strconv.ParseUint(split[1], 10, 32)
+						baseSsrc, err := strconv.ParseUint(split[1], 10, 32)
 						if err != nil {
 							log.Warnf("Failed to parse SSRC: %v", err)
 							continue
@@ -116,7 +117,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 							log.Warnf("Failed to parse SSRC: %v", err)
 							continue
 						}
-						rtxRepairFlows[uint32(rtxRepairFlow)] = true
+						rtxRepairFlows[rtxRepairFlow] = baseSsrc
 						tracksInMediaSection = filterTrackWithSSRC(tracksInMediaSection, SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
 					}
 				}
@@ -139,7 +140,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 					continue
 				}
 
-				if rtxRepairFlow := rtxRepairFlows[uint32(ssrc)]; rtxRepairFlow {
+				if _, ok := rtxRepairFlows[ssrc]; ok {
 					continue // This ssrc is a RTX repair flow, ignore
 				}
 
@@ -164,6 +165,12 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 				trackDetails.streamID = streamID
 				trackDetails.id = trackID
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+
+				for repairSsrc, baseSsrc := range rtxRepairFlows {
+					if baseSsrc == ssrc {
+						trackDetails.repairSsrc = SSRC(repairSsrc)
+					}
+				}
 
 				if isNewTrack {
 					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)

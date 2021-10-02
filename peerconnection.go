@@ -1171,6 +1171,8 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		if len(incoming.ssrcs) > i {
 			encodings[i].SSRC = incoming.ssrcs[i]
 		}
+
+		encodings[i].RTX.SSRC = incoming.repairSsrc
 	}
 
 	if err := receiver.Receive(RTPReceiveParameters{Encodings: encodings}); err != nil {
@@ -1451,7 +1453,9 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRsid(rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				receiver.mu.Lock()
+				defer receiver.mu.Unlock()
+				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
 			}
 
 			track, err := receiver.receiveForRid(rid, params, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)

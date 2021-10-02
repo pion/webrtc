@@ -158,6 +158,18 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		}
 
 		r.tracks = append(r.tracks, t)
+
+		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
+			streamInfo := createStreamInfo("", rtxSsrc, 0, codec, globalParams.HeaderExtensions)
+			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(rtxSsrc, *streamInfo)
+			if err != nil {
+				return err
+			}
+
+			if err = r.receiveForRtx(rtxSsrc, "", streamInfo, rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -323,37 +335,40 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, streamInfo
 	return nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 }
 
-// receiveForRsid starts a routine that processes the repair stream for a RID
+// receiveForRtx starts a routine that processes the repair stream
 // These packets aren't exposed to the user yet, but we need to process them for
 // TWCC
-func (r *RTPReceiver) receiveForRsid(rsid string, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for i := range r.tracks {
-		if r.tracks[i].track.RID() == rsid {
-			var err error
-
-			r.tracks[i].repairStreamInfo = streamInfo
-			r.tracks[i].repairReadStream = rtpReadStream
-			r.tracks[i].repairInterceptor = rtpInterceptor
-			r.tracks[i].repairRtcpReadStream = rtcpReadStream
-			r.tracks[i].repairRtcpInterceptor = rtcpInterceptor
-
-			go func() {
-				b := make([]byte, r.api.settingEngine.getReceiveMTU())
-				for {
-					if _, _, readErr := r.tracks[i].repairInterceptor.Read(b, nil); readErr != nil {
-						return
-					}
-				}
-			}()
-
-			return err
+func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) error {
+	var track *trackStreams
+	if ssrc != 0 && len(r.tracks) == 1 {
+		track = &r.tracks[0]
+	} else {
+		for i := range r.tracks {
+			if r.tracks[i].track.RID() == rsid {
+				track = &r.tracks[i]
+			}
 		}
 	}
 
-	return fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rsid)
+	if track == nil {
+		return fmt.Errorf("%w: ssrc(%d) rsid(%s)", errRTPReceiverForRIDTrackStreamNotFound, ssrc, rsid)
+	}
+
+	track.repairStreamInfo = streamInfo
+	track.repairReadStream = rtpReadStream
+	track.repairInterceptor = rtpInterceptor
+	track.repairRtcpReadStream = rtcpReadStream
+	track.repairRtcpInterceptor = rtcpInterceptor
+
+	go func() {
+		b := make([]byte, r.api.settingEngine.getReceiveMTU())
+		for {
+			if _, _, readErr := track.repairInterceptor.Read(b, nil); readErr != nil {
+				return
+			}
+		}
+	}()
+	return nil
 }
 
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.
