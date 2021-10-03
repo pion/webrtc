@@ -412,7 +412,7 @@ func (d *DataChannel) Label() string {
 	return d.label
 }
 
-// Ordered represents if the DataChannel is ordered, and false if
+// Ordered returns true if the DataChannel is ordered, and false if
 // out-of-order delivery is allowed.
 func (d *DataChannel) Ordered() bool {
 	d.mu.RLock()
