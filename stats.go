@@ -781,6 +781,24 @@ type DataChannelStats struct {
 	BytesReceived uint64 `json:"bytesReceived"`
 }
 
+type SCTPTransportStats struct {
+	// The identifier of the object that was inspected to produce the
+	// RTCTransportStats for the DTLSTransport and ICETransport supporting the SCTP transport.
+	TransportID string `json:"transportId"`
+
+	// The latest smoothed round-trip time value, corresponding to spinfo_srtt defined in [RFC6458]
+	// but converted to seconds. If there has been no round-trip time measurements yet, this value is undefined.
+	SmoothedRoundTripTime float64 `json:"smoothedRoundTripTime"`
+
+	// The latest congestion window, corresponding to spinfo_cwnd defined in [RFC6458].
+	CongestionWindow uint32 `json:"congestionWindow"`
+
+	// The latest receiver window, corresponding to sstat_rwnd defined in [RFC6458].
+	ReceiverWindow uint32 `json:"receiverWindow"`
+
+	//
+}
+
 // MediaStreamStats contains statistics related to a specific MediaStream.
 type MediaStreamStats struct {
 	// Timestamp is the timestamp associated with this object.

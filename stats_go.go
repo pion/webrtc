@@ -32,6 +32,21 @@ func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, boo
 	return dcStats, true
 }
 
+// GetDataChannelStats is a helper method to return the associated stats for a given DataChannel
+func (r StatsReport) GetSCTPTransportStats(pc *PeerConnection) (SCTPTransportStats, bool) {
+	statsID := pc.getStatsID()
+	stats, ok := r[statsID]
+	if !ok {
+		return SCTPTransportStats{}, false
+	}
+
+	sctpStats, ok := stats.(SCTPTransportStats)
+	if !ok {
+		return SCTPTransportStats{}, false
+	}
+	return sctpStats, true
+}
+
 // GetICECandidateStats is a helper method to return the associated stats for a given ICECandidate
 func (r StatsReport) GetICECandidateStats(c *ICECandidate) (ICECandidateStats, bool) {
 	statsID := c.statsID
