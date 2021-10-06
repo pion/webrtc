@@ -18,6 +18,8 @@ const sctpMaxChannels = uint16(65535)
 
 // SCTPTransport provides details about the SCTP transport.
 type SCTPTransport struct {
+	statsID string
+
 	lock sync.RWMutex
 
 	dtlsTransport *DTLSTransport
@@ -85,6 +87,12 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 	return SCTPCapabilities{
 		MaxMessageSize: 0,
 	}
+}
+
+func (r *SCTPTransport) getStatsID() string {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.statsID
 }
 
 // Start the SCTPTransport. Since both local and remote parties must mutually
@@ -322,16 +330,17 @@ func (r *SCTPTransport) State() SCTPTransportState {
 func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
 
-	stats := TransportStats{
-		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeTransport,
-		ID:        "sctpTransport",
+	stats := SCTPTransportStats{
+		TransportID: "iceTransport",
+		ID: "sctpTransport",
 	}
 
 	association := r.association()
 	if association != nil {
-		stats.BytesSent = association.BytesSent()
-		stats.BytesReceived = association.BytesReceived()
+		//stats.BytesSent = association.BytesSent()
+		//stats.BytesReceived = association.BytesReceived()
+		stats.MTU = association.MTU()
+		stats.SmoothedRoundTripTime = association.SmoothedRoundTripTime()
 	}
 
 	collector.Collect(stats.ID, stats)
