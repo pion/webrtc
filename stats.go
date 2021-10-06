@@ -55,6 +55,9 @@ const (
 	// StatsTypeTransport is used by TransportStats.
 	StatsTypeTransport StatsType = "transport"
 
+	// StatsTypeSCTPTransport is used by SCTPTransportStats
+	StatsTypeSCTPTransport StatsType = "sctp-transport"
+
 	// StatsTypeCandidatePair is used by ICECandidatePairStats.
 	StatsTypeCandidatePair StatsType = "candidate-pair"
 
@@ -796,7 +799,11 @@ type SCTPTransportStats struct {
 	// The latest receiver window, corresponding to sstat_rwnd defined in [RFC6458].
 	ReceiverWindow uint32 `json:"receiverWindow"`
 
-	//
+	// The latest maximum transmission unit, corresponding to spinfo_mtu defined in [RFC6458].
+	MTU uint32 `json:"mtu"`
+
+	// The number of unacknowledged DATA chunks, corresponding to sstat_unackdata defined in [RFC6458].
+	UNACKData uint32 `json:"unackData"`
 }
 
 // MediaStreamStats contains statistics related to a specific MediaStream.
