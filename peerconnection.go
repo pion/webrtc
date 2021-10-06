@@ -172,6 +172,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 
 	// Create the SCTP transport
 	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
+	pc.sctpTransport.statsID = fmt.Sprintf("SCTPTransport-%d", time.Now().UnixNano()),
 
 	// Wire up the on datachannel handler
 	pc.sctpTransport.OnDataChannel(func(d *DataChannel) {
