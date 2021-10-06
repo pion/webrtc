@@ -1616,6 +1616,15 @@ func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 	return pc.rtpTransceivers
 }
 
+// GetSCTPTransport returns the SCTPTransport currently attached to this PeerConnection
+func (pc *PeerConnection) GetSCTPTransport() []*RTPTransceiver {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	return pc.sctpTransport
+}
+
+
 // AddTrack adds a Track to the PeerConnection
 func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	if pc.isClosed.get() {
