@@ -33,14 +33,14 @@ func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, boo
 }
 
 // GetDataChannelStats is a helper method to return the associated stats for a given DataChannel
-func (r StatsReport) GetSCTPTransportStats(pc *PeerConnection) (SCTPTransportStats, bool) {
-	statsID := pc.getStatsID()
+func (r StatsReport) GetSCTPTransportStats(st *SCTPTransport) (SCTPTransportStats, bool) {
+	statsID := st.getStatsID()
 	stats, ok := r[statsID]
 	if !ok {
 		return SCTPTransportStats{}, false
 	}
 
-	sctpStats, ok := stats.(SCTPTransportStats)
+	stStats, ok := stats.(SCTPTransportStats)
 	if !ok {
 		return SCTPTransportStats{}, false
 	}
