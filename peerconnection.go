@@ -1618,7 +1618,7 @@ func (pc *PeerConnection) GetTransceivers() []*RTPTransceiver {
 }
 
 // GetSCTPTransport returns the SCTPTransport currently attached to this PeerConnection
-func (pc *PeerConnection) GetSCTPTransport() []*RTPTransceiver {
+func (pc *PeerConnection) GetSCTPTransport() []*SCTPTransport {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
