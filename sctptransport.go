@@ -339,8 +339,11 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	if association != nil {
 		//stats.BytesSent = association.BytesSent()
 		//stats.BytesReceived = association.BytesReceived()
-		stats.MTU = association.MTU()
 		stats.SmoothedRoundTripTime = association.SmoothedRoundTripTime()
+		stats.CongestionWindow = association.CWND()
+		stats.ReceiverWindow = association.RWND()
+		stats.MTU = association.MTU()
+		//stats.UNACKData = association.UNACKData()
 	}
 
 	collector.Collect(stats.ID, stats)
