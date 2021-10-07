@@ -785,6 +785,8 @@ type DataChannelStats struct {
 }
 
 type SCTPTransportStats struct {
+	ID string `json:"id"`
+	
 	// The identifier of the object that was inspected to produce the
 	// RTCTransportStats for the DTLSTransport and ICETransport supporting the SCTP transport.
 	TransportID string `json:"transportId"`

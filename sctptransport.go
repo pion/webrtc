@@ -6,7 +6,7 @@ import (
 	"io"
 	"math"
 	"sync"
-	"time"
+	//"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -18,8 +18,6 @@ const sctpMaxChannels = uint16(65535)
 
 // SCTPTransport provides details about the SCTP transport.
 type SCTPTransport struct {
-	statsID string
-
 	lock sync.RWMutex
 
 	dtlsTransport *DTLSTransport
@@ -87,12 +85,6 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 	return SCTPCapabilities{
 		MaxMessageSize: 0,
 	}
-}
-
-func (r *SCTPTransport) getStatsID() string {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	return r.statsID
 }
 
 // Start the SCTPTransport. Since both local and remote parties must mutually
@@ -339,7 +331,7 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	if association != nil {
 		//stats.BytesSent = association.BytesSent()
 		//stats.BytesReceived = association.BytesReceived()
-		stats.SmoothedRoundTripTime = association.SmoothedRoundTripTime()
+		stats.SmoothedRoundTripTime = association.RTT()
 		stats.CongestionWindow = association.CWND()
 		stats.ReceiverWindow = association.RWND()
 		stats.MTU = association.MTU()
