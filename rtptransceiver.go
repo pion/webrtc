@@ -69,7 +69,10 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	filteredCodecs := []RTPCodecParameters{}
 	for _, codec := range t.codecs {
 		if c, matchType := codecParametersFuzzySearch(codec, mediaEngineCodecs); matchType != codecMatchNone {
-			filteredCodecs = append(filteredCodecs, c)
+			if codec.PayloadType == 0 {
+				codec.PayloadType = c.PayloadType
+			}
+			filteredCodecs = append(filteredCodecs, codec)
 		}
 	}
 
