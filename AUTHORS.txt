@@ -28,6 +28,7 @@ Ben Weitzman <benweitzman@gmail.com>
 Benny Daon <benny@tuzig.com>
 bkim <bruce.kim.it@gmail.com>
 Bo Shi <boshi@mural.co>
+boks1971 <raja.gobi@tutanota.com>
 Brendan Rius <brendan.rius@gmail.com>
 Cameron Elliott <cameron-elliott@users.noreply.github.com>
 Cecylia Bocovich <cohosh@torproject.org>
@@ -152,6 +153,7 @@ Tomek <tomek@pop-os.localdomain>
 Twometer <twometer@outlook.de>
 Vicken Simonian <vsimon@gmail.com>
 wattanakorn495 <wattanakorn.i@ku.th>
+Will Forcey <wsforc3y@gmail.com>
 Will Watson <william.a.watson@gmail.com>
 Woodrow Douglass <wdouglass@carnegierobotics.com>
 xsbchen <xsbchen@qq.com>

@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"strconv"
@@ -1134,6 +1135,16 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 
 		newRids := []string{"d", "e", "f"}
 		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+			scanner := bufio.NewScanner(strings.NewReader(sessionDescription))
+			sessionDescription = ""
+			for scanner.Scan() {
+				l := scanner.Text()
+				if strings.HasPrefix(l, "a=rid") || strings.HasPrefix(l, "a=simulcast") {
+					continue
+				}
+
+				sessionDescription += l + "\n"
+			}
 			return signalWithRids(sessionDescription, newRids)
 		}))
 
