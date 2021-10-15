@@ -1235,7 +1235,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 				for _, track := range receiver.Tracks() {
 					for _, ssrc := range incomingTrack.ssrcs {
 						if ssrc == track.SSRC() {
-							filteredTracks = filterTrackWithSSRC(incomingTracks, track.SSRC())
+							filteredTracks = filterTrackWithSSRC(filteredTracks, track.SSRC())
 						}
 					}
 				}
