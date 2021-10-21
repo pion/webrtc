@@ -77,6 +77,7 @@ Jorropo <jorropo.pgm@gmail.com>
 Juliusz Chroboczek <jch@irif.fr>
 Justin Okamoto <jdokamoto@gmail.com>
 Justin Okamoto <justmoto@amazon.com>
+Kevin Staunton-Lambert <kevin.staunton-lambert@metacdn.com>
 Konstantin Chugalinskiy <kchugalinskiy@yandex.ru>
 Konstantin Itskov <konstantin.itskov@kovits.com>
 krishna chiatanya <kittuov@gmail.com>
