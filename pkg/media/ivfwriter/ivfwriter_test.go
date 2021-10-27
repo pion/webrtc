@@ -230,3 +230,12 @@ func TestIVFWriter_VP8(t *testing.T) {
 		}
 	}
 }
+
+func TestIVFWriter_EmptyPayload(t *testing.T) {
+	buffer := &bytes.Buffer{}
+
+	writer, err := NewWith(buffer)
+	assert.NoError(t, err)
+
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{}}))
+}
