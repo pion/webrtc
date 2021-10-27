@@ -172,6 +172,9 @@ func (i *OggWriter) WriteRTP(packet *rtp.Packet) error {
 	if packet == nil {
 		return errInvalidNilPacket
 	}
+	if len(packet.Payload) == 0 {
+		return nil
+	}
 
 	opusPacket := codecs.OpusPacket{}
 	if _, err := opusPacket.Unmarshal(packet.Payload); err != nil {

@@ -76,6 +76,9 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 	if i.ioWriter == nil {
 		return errFileNotOpened
 	}
+	if len(packet.Payload) == 0 {
+		return nil
+	}
 
 	vp8Packet := codecs.VP8Packet{}
 	if _, err := vp8Packet.Unmarshal(packet.Payload); err != nil {
