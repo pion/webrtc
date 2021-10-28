@@ -20,10 +20,12 @@ go get github.com/pion/webrtc/v3/examples/play-from-disk
 ```
 
 ### Open play-from-disk example page
-[jsfiddle.net](https://jsfiddle.net/9s10amwL/) you should see two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/a1cz42op/) you should see two text-areas, 'Start Session' button and 'Copy browser SessionDescription to clipboard'
 
-### Run play-from-disk with your browsers SessionDescription as stdin
-The `output.ivf` you created should be in the same directory as `play-from-disk`. In the jsfiddle the top textarea is your browser, copy that and:
+### Run play-from-disk with your browsers Session Description as stdin
+The `output.ivf` you created should be in the same directory as `play-from-disk`. In the jsfiddle press 'Copy browser Session Description to clipboard' or copy the base64 string manually.
+
+Now use this value you just copied as the input to `play-from-disk`
 
 #### Linux/macOS
 Run `echo $BROWSER_SDP | play-from-disk`
@@ -31,8 +33,8 @@ Run `echo $BROWSER_SDP | play-from-disk`
 1. Paste the SessionDescription into a file.
 1. Run `play-from-disk < my_file`
 
-### Input play-from-disk's SessionDescription into your browser
-Copy the text that `play-from-disk` just emitted and copy into second text area
+### Input play-from-disk's Session Description into your browser
+Copy the text that `play-from-disk` just emitted and copy into the second text area in the jsfiddle
 
 ### Hit 'Start Session' in jsfiddle, enjoy your video!
 A video should start playing in your browser above the input boxes. `play-from-disk` will exit when the file reaches the end
