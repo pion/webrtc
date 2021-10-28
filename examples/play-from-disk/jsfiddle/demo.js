@@ -1,18 +1,16 @@
 /* eslint-env browser */
 
-let pc = new RTCPeerConnection({
-  iceServers: [
-    {
-      urls: 'stun:stun.l.google.com:19302'
-    }
-  ]
+const pc = new RTCPeerConnection({
+  iceServers: [{
+    urls: 'stun:stun.l.google.com:19302'
+  }]
 })
-let log = msg => {
+const log = msg => {
   document.getElementById('div').innerHTML += msg + '<br>'
 }
 
 pc.ontrack = function (event) {
-  var el = document.createElement(event.track.kind)
+  const el = document.createElement(event.track.kind)
   el.srcObject = event.streams[0]
   el.autoplay = true
   el.controls = true
@@ -28,13 +26,17 @@ pc.onicecandidate = event => {
 }
 
 // Offer to receive 1 audio, and 1 video track
-pc.addTransceiver('video', {'direction': 'sendrecv'})
-pc.addTransceiver('audio', {'direction': 'sendrecv'})
+pc.addTransceiver('video', {
+  direction: 'sendrecv'
+})
+pc.addTransceiver('audio', {
+  direction: 'sendrecv'
+})
 
 pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
 
 window.startSession = () => {
-  let sd = document.getElementById('remoteSessionDescription').value
+  const sd = document.getElementById('remoteSessionDescription').value
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
@@ -43,5 +45,20 @@ window.startSession = () => {
     pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
   } catch (e) {
     alert(e)
+  }
+}
+
+window.copySessionDescription = () => {
+  const browserSessionDescription = document.getElementById('localSessionDescription')
+
+  browserSessionDescription.focus()
+  browserSessionDescription.select()
+
+  try {
+    const successful = document.execCommand('copy')
+    const msg = successful ? 'successful' : 'unsuccessful'
+    log('Copying SessionDescription was ' + msg)
+  } catch (err) {
+    log('Oops, unable to copy SessionDescription ' + err)
   }
 }
