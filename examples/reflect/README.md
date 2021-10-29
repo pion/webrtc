@@ -1,6 +1,8 @@
 # reflect
 reflect demonstrates how with one PeerConnection you can send video to Pion and have the packets sent back. This example could be easily extended to do server side processing.
 
+## (architecture)[https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Freflect%2Fdrawio]
+
 ## Instructions
 ### Download reflect
 ```
