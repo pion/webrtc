@@ -3,6 +3,8 @@ broadcast is a Pion WebRTC application that demonstrates how to broadcast a vide
 
 This could serve as the building block to building conferencing software, and other applications where publishers are bandwidth constrained.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fbroadcast%2Fdrawio)
+
 ## Instructions
 ### Download broadcast
 ```
