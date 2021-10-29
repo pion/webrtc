@@ -195,7 +195,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		}
 
 		<-r.onDataChannel(rtcDC)
-		rtcDC.handleOpen(dc)
+		rtcDC.handleOpen(dc, true)
 
 		r.lock.Lock()
 		r.dataChannelsOpened++
