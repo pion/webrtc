@@ -6,6 +6,8 @@ decrypts in Javascript.
 insertable-streams allows the browser to process encoded video. You could implement
 E2E encyption, add metadata or insert a completely different video feed!
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Finsertable-streams%2Fdrawio)
+
 ## Instructions
 ### Create IVF named `output.ivf` that contains a VP8 track
 ```
