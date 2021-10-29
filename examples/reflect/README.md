@@ -3,7 +3,7 @@ reflect demonstrates how with one PeerConnection you can send video to Pion and 
 
 ## Basic schematic
 
-![Alt](new_drawio.png)
+![Alt](new_drawio)
 
 ## Instructions
 ### Download reflect
