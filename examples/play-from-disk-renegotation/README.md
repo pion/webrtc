@@ -3,7 +3,7 @@ play-from-disk-renegotiation demonstrates Pion WebRTC's renegotiation abilities.
 
 For a simpler example of playing a file from disk we also have [examples/play-from-disk](/examples/play-from-disk)
 
-## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fplay-from-disk-renegotiation%2Fdrawio)
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fplay-from-disk-renegotation%2Fdrawio)
 
 ## Instructions
 
