@@ -3,6 +3,8 @@ save-to-disk is a simple application that shows how to record your webcam/microp
 
 If you wish to save VP8/Opus inside the same file see [save-to-webm](https://github.com/pion/example-webrtc-applications/tree/master/save-to-webm)
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fsave-to-disk%2Fdrawio)
+
 ## Instructions
 ### Download save-to-disk
 ```
