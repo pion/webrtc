@@ -3,6 +3,8 @@ rtp-to-webrtc demonstrates how to consume a RTP stream video UDP, and then send 
 
 With this example we have pre-made GStreamer and ffmpeg pipelines, but you can use any tool you like!
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Frtp-to-webrtc%2Fdrawio)
+
 ## Instructions
 ### Download rtp-to-webrtc
 ```
