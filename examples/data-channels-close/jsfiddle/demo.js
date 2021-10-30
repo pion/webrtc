@@ -11,7 +11,18 @@ let log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
+function randomString(length) {
+  var result = '';
+  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var charactersLength = characters.length;
+  for (var i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
+
 window.createDataChannel = name => {
+  name = randomString(7)
   let dc = pc.createDataChannel(name)
   let fullName = `Data channel '${dc.label}' (${dc.id})`
   dc.onopen = () => {
