@@ -1,6 +1,8 @@
 # data-channels-create
 data-channels-create is a Pion WebRTC application that shows how you can send/recv DataChannel messages from a web browser. The difference with the data-channels example is that the datachannel is initialized from the pion side in this example.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fdata-channels-create%2Fdrawio)
+
 ## Instructions
 ### Download data-channels-create
 ```
