@@ -4,6 +4,8 @@ pion-to-pion is an example of two pion instances communicating directly!
 The SDP offer and answer are exchanged automatically over HTTP.
 The `answer` side acts like a HTTP server and should therefore be ran first.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fpion-to-pion%2Fdrawio)
+
 ## Instructions
 First run `answer`:
 ```sh
