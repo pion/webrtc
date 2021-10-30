@@ -5,6 +5,8 @@ The browser will not send higher quality streams unless it has the available ban
 the bandwidth estimation in `chrome://webrtc-internals`. It is under `VideoBwe` when `Read Stats From: Legacy non-Standard`
 is selected.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fsimulcast%2Fdrawio)
+
 ## Instructions
 ### Download simulcast
 ```
