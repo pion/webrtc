@@ -9,6 +9,8 @@ This example demonstrates how to use the following property / methods.
 These methods are equivalent to that of JavaScript WebRTC API.
 See https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel for more details.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fdata-channels-flow-control%2Fdrawio)
+
 ## When do we need it?
 Send or SendText methods are called on DataChannel to send data to the connected peer.
 The methods return immediately, but it does not mean the data was actually sent onto
