@@ -1,6 +1,8 @@
 # ice-restart
 ice-restart demonstrates Pion WebRTC's ICE Restart abilities.
 
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fice-restart%2Fdrawio)
+
 ## Instructions
 
 ### Download ice-restart
