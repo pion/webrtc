@@ -111,6 +111,8 @@ func benchmarkDataChannelSend(b *testing.B, numChannels int) {
 }
 
 func TestDataChannel_Open(t *testing.T) {
+	const openOnceChannelCapacity = 2
+
 	t.Run("handler should be called once", func(t *testing.T) {
 		report := test.CheckRoutines(t)
 		defer report()
@@ -121,7 +123,7 @@ func TestDataChannel_Open(t *testing.T) {
 		}
 
 		done := make(chan bool)
-		openCalls := make(chan bool, 2)
+		openCalls := make(chan bool, openOnceChannelCapacity)
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			if d.Label() != expectedLabel {
@@ -154,6 +156,63 @@ func TestDataChannel_Open(t *testing.T) {
 		closePair(t, offerPC, answerPC, done)
 
 		assert.Len(t, openCalls, 1)
+	})
+
+	t.Run("handler should be called once when already negotiated", func(t *testing.T) {
+		report := test.CheckRoutines(t)
+		defer report()
+
+		offerPC, answerPC, err := newPair()
+		if err != nil {
+			t.Fatalf("Failed to create a PC pair for testing")
+		}
+
+		done := make(chan bool)
+		answerOpenCalls := make(chan bool, openOnceChannelCapacity)
+		offerOpenCalls := make(chan bool, openOnceChannelCapacity)
+
+		negotiated := true
+		ordered := true
+		dataChannelID := uint16(0)
+
+		answerDC, err := answerPC.CreateDataChannel(expectedLabel, &DataChannelInit{
+			ID:         &dataChannelID,
+			Negotiated: &negotiated,
+			Ordered:    &ordered,
+		})
+		assert.NoError(t, err)
+		offerDC, err := offerPC.CreateDataChannel(expectedLabel, &DataChannelInit{
+			ID:         &dataChannelID,
+			Negotiated: &negotiated,
+			Ordered:    &ordered,
+		})
+		assert.NoError(t, err)
+
+		answerDC.OnMessage(func(msg DataChannelMessage) {
+			go func() {
+				// Wait a little bit to ensure all messages are processed.
+				time.Sleep(100 * time.Millisecond)
+				done <- true
+			}()
+		})
+		answerDC.OnOpen(func() {
+			answerOpenCalls <- true
+		})
+
+		offerDC.OnOpen(func() {
+			offerOpenCalls <- true
+			e := offerDC.SendText("Ping")
+			if e != nil {
+				t.Fatalf("Failed to send string on data channel")
+			}
+		})
+
+		assert.NoError(t, signalPair(offerPC, answerPC))
+
+		closePair(t, offerPC, answerPC, done)
+
+		assert.Len(t, answerOpenCalls, 1)
+		assert.Len(t, offerOpenCalls, 1)
 	})
 }
 
