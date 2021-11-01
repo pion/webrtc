@@ -34,7 +34,7 @@ Run `echo $BROWSER_SDP | play-from-disk`
 1. Run `play-from-disk < my_file`
 
 ### Input play-from-disk's Session Description into your browser
-Copy the text that `play-from-disk` just emitted and copy into the second text area in the jsfiddle
+After SDP from `play-from-disk` is emitted, it will be copied to clipboard. Paste it into the second text area in the jsfiddle.
 
 ### Hit 'Start Session' in jsfiddle, enjoy your video!
 A video should start playing in your browser above the input boxes. `play-from-disk` will exit when the file reaches the end

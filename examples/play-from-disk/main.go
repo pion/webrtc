@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 	"github.com/pion/webrtc/v3/pkg/media"
@@ -239,8 +240,11 @@ func main() {
 	<-gatherComplete
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
-
+	sdp := signal.Encode(*peerConnection.LocalDescription())
+	fmt.Println(sdp)
+	if clipboard.WriteAll(sdp) != nil {
+		fmt.Println("Copying SDP to clipboard failed. Please copy manually.")
+	}
 	// Block forever
 	select {}
 }

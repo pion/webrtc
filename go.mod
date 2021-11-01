@@ -3,6 +3,7 @@ module github.com/pion/webrtc/v3
 go 1.13
 
 require (
+	github.com/atotto/clipboard v0.1.4
 	github.com/onsi/ginkgo v1.16.1 // indirect
 	github.com/onsi/gomega v1.11.0 // indirect
 	github.com/pion/datachannel v1.5.0
