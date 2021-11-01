@@ -169,7 +169,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 	d.mu.Unlock()
 
-	d.handleOpen(dc, false)
+	d.handleOpen(dc, false, d.negotiated)
 	return nil
 }
 
@@ -263,7 +263,7 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 	handler(msg)
 }
 
-func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote bool) {
+func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
 	d.dataChannel = dc
 	d.mu.Unlock()
@@ -272,7 +272,8 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote bool) {
 	// Fire the OnOpen handler immediately not using pion/datachannel
 	// * detached datachannels have no read loop, the user needs to read and query themselves
 	// * remote datachannels should fire OnOpened. This isn't spec compliant, but we can't break behavior yet
-	if d.api.settingEngine.detach.DataChannels || isRemote {
+	// * already negotiated datachannels should fire OnOpened
+	if d.api.settingEngine.detach.DataChannels || isRemote || isAlreadyNegotiated {
 		d.onOpen()
 	} else {
 		dc.OnOpen(func() {
