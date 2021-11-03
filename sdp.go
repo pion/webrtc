@@ -189,11 +189,6 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 			for rid := range rids {
 				simulcastTrack.rids = append(simulcastTrack.rids, rid)
 			}
-			if len(simulcastTrack.rids) == len(tracksInMediaSection) {
-				for i := range tracksInMediaSection {
-					simulcastTrack.ssrcs = append(simulcastTrack.ssrcs, tracksInMediaSection[i].ssrcs...)
-				}
-			}
 
 			tracksInMediaSection = []trackDetails{simulcastTrack}
 		}
