@@ -1313,28 +1313,6 @@ func (pc *PeerConnection) startSCTP() {
 
 		return
 	}
-
-	// DataChannels that need to be opened now that SCTP is available
-	// make a copy we may have incoming DataChannels mutating this while we open
-	pc.sctpTransport.lock.RLock()
-	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-	pc.sctpTransport.lock.RUnlock()
-
-	var openedDCCount uint32
-	for _, d := range dataChannels {
-		if d.ReadyState() == DataChannelStateConnecting {
-			err := d.open(pc.sctpTransport)
-			if err != nil {
-				pc.log.Warnf("failed to open data channel: %s", err)
-				continue
-			}
-			openedDCCount++
-		}
-	}
-
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannelsOpened += openedDCCount
-	pc.sctpTransport.lock.Unlock()
 }
 
 func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *SessionDescription) (handled bool, err error) {

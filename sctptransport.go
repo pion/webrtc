@@ -110,10 +110,26 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	}
 
 	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
+	dataChannels := append([]*DataChannel{}, r.dataChannels...)
+	r.lock.Unlock()
+
+	var openedDCCount uint32
+	for _, d := range dataChannels {
+		if d.ReadyState() == DataChannelStateConnecting {
+			err := d.open(r)
+			if err != nil {
+				r.log.Warnf("failed to open data channel: %s", err)
+				continue
+			}
+			openedDCCount++
+		}
+	}
+
+	r.lock.Lock()
+	r.dataChannelsOpened += openedDCCount
+	r.lock.Unlock()
 
 	go r.acceptDataChannels(sctpAssociation)
 
