@@ -22,3 +22,8 @@ require (
 	golang.org/x/net v0.0.0-20211020060615-d418f374d309
 	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 // indirect
 )
+
+replace (
+	github.com/pion/interceptor v0.1.0 => ../interceptor
+	github.com/pion/transport v0.12.3 => ../transport
+)
