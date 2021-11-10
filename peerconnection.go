@@ -1064,6 +1064,20 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				pc.mu.Lock()
 				pc.addRTPTransceiver(t)
 				pc.mu.Unlock()
+
+				// if transceiver is create by remote sdp, set prefer codec same as remote peer
+				if codecs, err := codecsFromMediaDescription(media); err == nil {
+					filteredCodecs := []RTPCodecParameters{}
+					for _, codec := range codecs {
+						if c, matchType := codecParametersFuzzySearch(codec, pc.api.mediaEngine.getCodecsByKind(kind)); matchType == codecMatchExact {
+							// if codec match exact, use payloadtype register to mediaengine
+							codec.PayloadType = c.PayloadType
+							filteredCodecs = append(filteredCodecs, codec)
+						}
+					}
+					_ = t.SetCodecPreferences(filteredCodecs)
+				}
+
 			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
