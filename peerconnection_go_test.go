@@ -1433,3 +1433,124 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 
 	assert.NoError(t, pc.Close())
 }
+
+func TestTransceiverCreatedByRemoteSdpHasSameCodecOrderAsRemote(t *testing.T) {
+	t.Run("Codec MatchExact", func(t *testing.T) { //nolint:dupl
+		const remoteSdp = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:0
+a=rtpmap:98 H264/90000
+a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
+a=rtpmap:94 VP8/90000
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=sendonly
+m=video 60323 UDP/TLS/RTP/SAVPF 108 98 125
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:1
+a=rtpmap:98 H264/90000
+a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
+a=rtpmap:108 VP8/90000
+a=sendonly
+a=rtpmap:125 H264/90000
+a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
+			PayloadType:        98,
+		}, RTPCodecTypeVideo))
+
+		api := NewAPI(WithMediaEngine(&m))
+		pc, err := api.NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  remoteSdp,
+		}))
+		ans, _ := pc.CreateAnswer(nil)
+		assert.NoError(t, pc.SetLocalDescription(ans))
+		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
+		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 94, codecOfTr2.PayloadType)
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("Codec PartialExact Only", func(t *testing.T) { //nolint:dupl
+		const remoteSdp = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 98 106
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:0
+a=rtpmap:98 H264/90000
+a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032
+a=sendonly
+m=video 60323 UDP/TLS/RTP/SAVPF 125 98
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:1
+a=rtpmap:125 H264/90000
+a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032
+a=rtpmap:98 H264/90000
+a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=sendonly
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
+			PayloadType:        98,
+		}, RTPCodecTypeVideo))
+
+		api := NewAPI(WithMediaEngine(&m))
+		pc, err := api.NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  remoteSdp,
+		}))
+		ans, _ := pc.CreateAnswer(nil)
+		assert.NoError(t, pc.SetLocalDescription(ans))
+		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
+		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		// h.264/profile-id=640032 should be remap to 106 as same as transceiver 1
+		assert.EqualValues(t, 106, codecOfTr2.PayloadType)
+		assert.NoError(t, pc.Close())
+	})
+}
