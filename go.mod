@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/onsi/ginkgo v1.16.1 // indirect
 	github.com/onsi/gomega v1.11.0 // indirect
-	github.com/pion/datachannel v1.5.1
+	github.com/pion/datachannel v1.5.2
 	github.com/pion/dtls/v2 v2.0.10
 	github.com/pion/ice/v2 v2.1.13
 	github.com/pion/interceptor v0.1.0
