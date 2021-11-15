@@ -385,11 +385,11 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 	// Create map of ids so we can compare without double-looping each time.
 	idsMap := make(map[uint16]struct{}, len(r.dataChannels))
 	for _, dc := range r.dataChannels {
-		if dc.id == nil {
+		if dc.ID() == nil {
 			continue
 		}
 
-		idsMap[*dc.id] = struct{}{}
+		idsMap[*dc.ID()] = struct{}{}
 	}
 
 	for ; id < max-1; id += 2 {
