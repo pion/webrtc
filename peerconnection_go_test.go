@@ -1222,7 +1222,7 @@ func TestICELite(t *testing.T) {
 
 	assert.NoError(t, peerConnection.SetLocalDescription(SDPAnswer))
 
-	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.role,
+	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.Role(),
 		"pion did not set state to ICE-CONTROLLED against ice-light offer")
 
 	assert.NoError(t, peerConnection.Close())
