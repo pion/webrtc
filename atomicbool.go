@@ -18,3 +18,11 @@ func (b *atomicBool) set(value bool) { // nolint: unparam
 func (b *atomicBool) get() bool {
 	return atomic.LoadInt32(&(b.val)) != 0
 }
+
+func (b *atomicBool) swap(value bool) bool {
+	var i int32 = 0
+	if value {
+		i = 1
+	}
+	return atomic.SwapInt32(&(b.val), i) != 0
+}
