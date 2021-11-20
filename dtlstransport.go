@@ -359,10 +359,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return ErrNoSRTPProtectionProfile
 	}
 
-	if t.api.settingEngine.disableCertificateFingerprintVerification {
-		return nil
-	}
-
 	// Check the fingerprint if a certificate was exchanged
 	remoteCerts := dtlsConn.ConnectionState().PeerCertificates
 	if len(remoteCerts) == 0 {
@@ -371,23 +367,25 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	}
 	t.remoteCertificate = remoteCerts[0]
 
-	parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
-	if err != nil {
-		if closeErr := dtlsConn.Close(); closeErr != nil {
-			t.log.Error(err.Error())
+	if !t.api.settingEngine.disableCertificateFingerprintVerification {
+		parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
+		if err != nil {
+			if closeErr := dtlsConn.Close(); closeErr != nil {
+				t.log.Error(err.Error())
+			}
+
+			t.onStateChange(DTLSTransportStateFailed)
+			return err
 		}
 
-		t.onStateChange(DTLSTransportStateFailed)
-		return err
-	}
+		if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
+			if closeErr := dtlsConn.Close(); closeErr != nil {
+				t.log.Error(err.Error())
+			}
 
-	if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
-		if closeErr := dtlsConn.Close(); closeErr != nil {
-			t.log.Error(err.Error())
+			t.onStateChange(DTLSTransportStateFailed)
+			return err
 		}
-
-		t.onStateChange(DTLSTransportStateFailed)
-		return err
 	}
 
 	t.conn = dtlsConn
