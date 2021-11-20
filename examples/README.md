@@ -17,6 +17,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [RTP Forwarder](rtp-forwarder): The rtp-forwarder example demonstrates how to forward your audio/video streams using RTP.
 * [RTP to WebRTC](rtp-to-webrtc): The rtp-to-webrtc example demonstrates how to take RTP packets sent to a Pion process into your browser.
 * [Simulcast](simulcast): The simulcast example demonstrates how to accept and demux 1 Track that contains 3 Simulcast streams. It then returns the media as 3 independent Tracks back to the sender.
+* [Swap Tracks](swap-tracks): The swap-tracks example demonstrates deeper usage of the Pion Media API. The server accepts 3 media streams, and then dynamically routes them back as a single stream to the user.
 
 #### Data Channel API
 * [Data Channels](data-channels): The data-channels example shows how you can send/recv DataChannel messages from a web browser.
@@ -24,11 +25,16 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [Data Channels Close](data-channels-close): Example data-channels-close is a variant of data-channels that allow playing with the life cycle of data channels.
 * [Data Channels Detach](data-channels-detach): The data-channels-detach example shows how you can send/recv DataChannel messages using the underlying DataChannel implementation directly. This provides a more idiomatic way of interacting with Data Channels.
 * [Data Channels Detach Create](data-channels-detach-create): Example data-channels-detach-create shows how you can send/recv DataChannel messages using the underlying DataChannel implementation directly. This provides a more idiomatic way of interacting with Data Channels. The difference with the data-channels-detach example is that the data channel is initialized in this example.
+* [Data Channels Flow Control](data-channels-flow-control): Example data-channels-flow-control shows how to use the DataChannel API efficiently. You can measure the amount the rate at which the remote peer is receiving data, and structure your application accordingly.
 * [ORTC](ortc): Example ortc shows how you an use the ORTC API for DataChannel communication.
 * [Pion to Pion](pion-to-pion): Example pion-to-pion is an example of two pion instances communicating directly! It therefore has no corresponding web page.
 
 #### Miscellaneous
 * [Custom Logger](custom-logger) The custom-logger demonstrates how the user can override the logging and process messages instead of printing to stdout. It has no corresponding web page.
+* [ICE Restart](ice-restart) Example ice-restart demonstrates how a WebRTC connection can roam between networks. This example restarts ICE in a loop and prints the new addresses it uses each time.
+* [ICE Single Port](ice-single-port) Example ice-single-port demonstrates how multiple WebRTC connections can be served from a single port. By default Pion listens on a new port for every PeerConnection. Pion can be configured to use a single port for multiple connections.
+* [ICE TCP](ice-tcp) Example ice-tcp demonstrates how a WebRTC connection can be made over TCP instead of UDP. By default Pion only does UDP. Pion can be configured to use a TCP port, and this TCP port can be used for many connections.
+* [VNet](vnet) Example vnet demonstrates Pion's network virtualisation library. This example connects two PeerConnections over a virtual network and prints statistics about the data traveling over it.
 
 ### Usage
 We've made it easy to run the browser based examples on your local machine.

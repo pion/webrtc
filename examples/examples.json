@@ -24,6 +24,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Data Channels Flow Control",
+		"link": "data-channels-flow-control",
+		"description": "The data-channels-detach data-channels-flow-control shows how to use the DataChannel API efficiently. You can measure the amount the rate at which the remote peer is receiving data, and structure your application accordingly",
+		"type": "browser"
+	},
+	{
 		"title": "Reflect",
 		"link": "reflect",
 		"description": "The reflect example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.",
@@ -87,6 +93,36 @@
 		"title": "Simulcast",
 		"link": "simulcast",
 		"description": "Example simulcast demonstrates how to accept and demux 1 Track that contains 3 Simulcast streams. It then returns the media as 3 independent Tracks back to the sender.",
+		"type": "browser"
+	},
+	{
+		"title": "ICE Restart",
+		"link": "#",
+		"description": "Example ice-restart demonstrates how a WebRTC connection can roam between networks. This example restarts ICE in a loop and prints the new addresses it uses each time.",
+		"type": "browser"
+	},
+	{
+		"title": "ICE Single Port",
+		"link": "#",
+		"description": "Example ice-single-port demonstrates how multiple WebRTC connections can be served from a single port. By default Pion listens on a new port for every PeerConnection. Pion can be configured to use a single port for multiple connections.",
+		"type": "browser"
+	},
+	{
+		"title": "ICE TCP",
+		"link": "#",
+		"description": "Example ice-tcp demonstrates how a WebRTC connection can be made over TCP instead of UDP. By default Pion only does UDP. Pion can be configured to use a TCP port, and this TCP port can be used for many connections.",
+		"type": "browser"
+	},
+	{
+		"title": "Swap Tracks",
+		"link": "#",
+		"description": "The swap-tracks example demonstrates deeper usage of the Pion Media API. The server accepts 3 media streams, and then dynamically routes them back as a single stream to the user.",
+		"type": "browser"
+	},
+	{
+		"title": "VNet",
+		"link": "#",
+		"description": "The vnet example demonstrates Pion's network virtualisation library. This example connects two PeerConnections over a virtual network and prints statistics about the data traveling over it.",
 		"type": "browser"
 	}
 ]
