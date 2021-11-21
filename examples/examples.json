@@ -130,5 +130,11 @@
 		"link": "rtcp-processing",
 		"description": "The rtcp-processing example demonstrates Pion's RTCP APIs. This allow access to media statistics and control information.",
 		"type": "browser"
+	},
+	{
+		"title": "trickle-ice",
+		"link": "#",
+		"description": "The trickle-ice example demonstrates Pion WebRTC's Trickle ICE APIs.",
+		"type": "browser"
 	}
 ]
