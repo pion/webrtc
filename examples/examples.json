@@ -115,7 +115,7 @@
 	},
 	{
 		"title": "Swap Tracks",
-		"link": "#",
+		"link": "swap-tracks",
 		"description": "The swap-tracks example demonstrates deeper usage of the Pion Media API. The server accepts 3 media streams, and then dynamically routes them back as a single stream to the user.",
 		"type": "browser"
 	},
@@ -123,6 +123,12 @@
 		"title": "VNet",
 		"link": "#",
 		"description": "The vnet example demonstrates Pion's network virtualisation library. This example connects two PeerConnections over a virtual network and prints statistics about the data traveling over it.",
+		"type": "browser"
+	},
+	{
+		"title": "rtcp-processing",
+		"link": "rtcp-processing",
+		"description": "The rtcp-processing example demonstrates Pion's RTCP APIs. This allow access to media statistics and control information.",
 		"type": "browser"
 	}
 ]
