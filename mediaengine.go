@@ -535,11 +535,13 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 }
 
 func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 
+	// perform before locking to prevent recursive RLocks
+	foundCodecs := m.getCodecsByKind(typ)
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.negotiatedVideo && typ == RTPCodecTypeVideo ||
 		m.negotiatedAudio && typ == RTPCodecTypeAudio {
 		for id, e := range m.negotiatedHeaderExtensions {
@@ -557,7 +559,7 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 
 	return RTPParameters{
 		HeaderExtensions: headerExtensions,
-		Codecs:           m.getCodecsByKind(typ),
+		Codecs:           foundCodecs,
 	}
 }
 

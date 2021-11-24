@@ -1064,6 +1064,20 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				pc.mu.Lock()
 				pc.addRTPTransceiver(t)
 				pc.mu.Unlock()
+
+				// if transceiver is create by remote sdp, set prefer codec same as remote peer
+				if codecs, err := codecsFromMediaDescription(media); err == nil {
+					filteredCodecs := []RTPCodecParameters{}
+					for _, codec := range codecs {
+						if c, matchType := codecParametersFuzzySearch(codec, pc.api.mediaEngine.getCodecsByKind(kind)); matchType == codecMatchExact {
+							// if codec match exact, use payloadtype register to mediaengine
+							codec.PayloadType = c.PayloadType
+							filteredCodecs = append(filteredCodecs, codec)
+						}
+					}
+					_ = t.SetCodecPreferences(filteredCodecs)
+				}
+
 			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
@@ -1313,28 +1327,6 @@ func (pc *PeerConnection) startSCTP() {
 
 		return
 	}
-
-	// DataChannels that need to be opened now that SCTP is available
-	// make a copy we may have incoming DataChannels mutating this while we open
-	pc.sctpTransport.lock.RLock()
-	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
-	pc.sctpTransport.lock.RUnlock()
-
-	var openedDCCount uint32
-	for _, d := range dataChannels {
-		if d.ReadyState() == DataChannelStateConnecting {
-			err := d.open(pc.sctpTransport)
-			if err != nil {
-				pc.log.Warnf("failed to open data channel: %s", err)
-				continue
-			}
-			openedDCCount++
-		}
-	}
-
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannelsOpened += openedDCCount
-	pc.sctpTransport.lock.Unlock()
 }
 
 func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *SessionDescription) (handled bool, err error) {
@@ -1859,12 +1851,10 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 // Close ends the PeerConnection
 func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
-	if pc.isClosed.get() {
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	if pc.isClosed.swap(true) {
 		return nil
 	}
-
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
-	pc.isClosed.set(true)
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.signalingState.Set(SignalingStateClosed)

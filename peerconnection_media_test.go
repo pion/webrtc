@@ -129,6 +129,9 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
+			if pcOffer.ICEConnectionState() != ICEConnectionStateConnected {
+				continue
+			}
 			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
 				fmt.Println(routineErr)
 			}

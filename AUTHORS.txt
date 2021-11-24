@@ -30,6 +30,7 @@ bkim <bruce.kim.it@gmail.com>
 Bo Shi <boshi@mural.co>
 boks1971 <raja.gobi@tutanota.com>
 Brendan Rius <brendan.rius@gmail.com>
+brian <brian@cyalive.com>
 Cameron Elliott <cameron-elliott@users.noreply.github.com>
 Cecylia Bocovich <cohosh@torproject.org>
 Cedric Fung <cedric@vec.io>
@@ -50,6 +51,7 @@ digitalix <digitalix4@gmail.com>
 donotanswer <viktor.ferter@doclerholding.com>
 earle <aguilar@dm.ai>
 Egon Elbre <egonelbre@gmail.com>
+Eric Daniels <eric@erdaniels.com>
 feixiao <feixiao2020@sina.com>
 frank <frank@huzhedeMacBook-Pro.local>
 Gareth Hayes <gareth.hayes@gmail.com>
