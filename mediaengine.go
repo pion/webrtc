@@ -177,6 +177,11 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{"video/ulpfec", 90000, 0, "", nil},
 			PayloadType:        116,
 		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=2;profile-level-id=42001f", videoRTCPFeedback},
+			PayloadType:        150,
+		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
 			return err
@@ -584,10 +589,30 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 	}, nil
 }
 
+func getPacketizationModeFromFmtp(fmtp string) int{
+	s := strings.Split(fmtp, ";")
+
+	for _, part := range s{
+		fragment := strings.Split(part, "=")
+		if fragment[0] == "packetization-mode"{
+			pm, err := strconv.Atoi(fragment[1]); if err != nil{
+				return 1
+			}else{
+				return pm
+			}
+		}
+	}
+	return 1
+}
+
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	switch strings.ToLower(codec.MimeType) {
 	case strings.ToLower(MimeTypeH264):
-		return &codecs.H264Payloader{}, nil
+		if getPacketizationModeFromFmtp(codec.SDPFmtpLine) == 2 {
+			return &codecs.H264InterleavedPayloader{}, nil
+		} else {
+			return &codecs.H264Payloader{}, nil
+		}
 	case strings.ToLower(MimeTypeOpus):
 		return &codecs.OpusPayloader{}, nil
 	case strings.ToLower(MimeTypeVP8):

@@ -250,7 +250,15 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// merge all the buffers into a sample
 	data := []byte{}
+	var extensions []rtp.Extension = nil
+
 	for i := consume.head; i != consume.tail; i++ {
+		if extensions == nil {	// get first rtp packet extensions if exists
+			if s.buffer[i].Extension && s.buffer[i].Extensions != nil {
+				extensions = s.buffer[i].Extensions
+			}
+		}
+
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
@@ -264,6 +272,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
+		Extensions:         extensions,
 	}
 
 	s.droppedPackets = 0

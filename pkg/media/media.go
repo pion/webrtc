@@ -14,6 +14,7 @@ type Sample struct {
 	Duration           time.Duration
 	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
+	Extensions         []rtp.Extension
 }
 
 // Writer defines an interface to handle
