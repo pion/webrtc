@@ -123,6 +123,3 @@ If you need commercial support or don't want to use public methods you can conta
 
 ### Contributing
 Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
-
-### License
-MIT License - see [LICENSE](LICENSE) for full text
