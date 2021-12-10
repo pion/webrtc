@@ -40,8 +40,8 @@ github.com/onsi/gomega v1.11.0/go.mod h1:azGKhqFUon9Vuj0YmTfLSmx0FUwqXYSTl5re8lQ
 github.com/pion/datachannel v1.5.2 h1:piB93s8LGmbECrpO84DnkIVWasRMk3IimbcXkTQLE6E=
 github.com/pion/datachannel v1.5.2/go.mod h1:FTGQWaHrdCwIJ1rw6xBIfZVkslikjShim5yr05XFuCQ=
 github.com/pion/dtls/v2 v2.0.9/go.mod h1:O0Wr7si/Zj5/EBFlDzDd6UtVxx25CE1r7XM7BQKYQho=
-github.com/pion/dtls/v2 v2.0.11 h1:kUT7LwOWFh/g+pXCg35+VeSFGG2/FmD9pDW/zz06/3g=
-github.com/pion/dtls/v2 v2.0.11/go.mod h1:5Pe3QJI0Ajsx+uCfxREeewGFlKYBzLrXe9ku7Y0oRXM=
+github.com/pion/dtls/v2 v2.0.12 h1:QMSvNht7FM/XDXij3Ic90SCbl5yL7kppeI4ghfF4in8=
+github.com/pion/dtls/v2 v2.0.12/go.mod h1:5Pe3QJI0Ajsx+uCfxREeewGFlKYBzLrXe9ku7Y0oRXM=
 github.com/pion/ice/v2 v2.1.14 h1:nD9GZs3MiR1/dPa5EiMRMe8hLBG3/qqCdx/hTS2g8VE=
 github.com/pion/ice/v2 v2.1.14/go.mod h1:ovgYHUmwYLlRvcCLI67PnQ5YGe+upXZbGgllBDG/ktU=
 github.com/pion/interceptor v0.1.2 h1:1IfrJ+AQ0HhwxNl4hqh9hMvl1hBKiNhAAr7DrUHsC6s=
