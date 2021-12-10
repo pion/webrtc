@@ -8,7 +8,7 @@ require (
 	github.com/pion/datachannel v1.5.2
 	github.com/pion/dtls/v2 v2.0.12
 	github.com/pion/ice/v2 v2.1.14
-	github.com/pion/interceptor v0.1.2
+	github.com/pion/interceptor v0.1.4
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.9
