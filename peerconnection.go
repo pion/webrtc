@@ -2268,7 +2268,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		switch {
 		case sdpSemantics == SDPSemanticsPlanB || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB:
 			if !detectedPlanB {
-				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
+				return nil, &rtcerr.TypeError{Err: fmt.Errorf("%w: Expected PlanB, but RemoteDescription is UnifiedPlan", ErrIncorrectSDPSemantics)}
 			}
 			// If we're responding to a plan-b offer, then we should try to fill up this
 			// media entry with all matching local transceivers
@@ -2292,7 +2292,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers})
 		case sdpSemantics == SDPSemanticsUnifiedPlan || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback:
 			if detectedPlanB {
-				return nil, &rtcerr.TypeError{Err: ErrIncorrectSDPSemantics}
+				return nil, &rtcerr.TypeError{Err: fmt.Errorf("%w: Expected UnifiedPlan, but RemoteDescription is PlanB", ErrIncorrectSDPSemantics)}
 			}
 			t, localTransceivers = findByMid(midValue, localTransceivers)
 			if t == nil {
