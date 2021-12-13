@@ -82,7 +82,7 @@ var (
 
 	// ErrIncorrectSDPSemantics indicates that the PeerConnection was configured to
 	// generate SDP Answers with different SDP Semantics than the received Offer
-	ErrIncorrectSDPSemantics = errors.New("offer SDP semantics does not match configuration")
+	ErrIncorrectSDPSemantics = errors.New("remote SessionDescription semantics does not match configuration")
 
 	// ErrIncorrectSignalingState indicates that the signaling state of PeerConnection is not correct
 	ErrIncorrectSignalingState = errors.New("operation can not be run in current signaling state")
