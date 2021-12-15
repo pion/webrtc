@@ -1555,12 +1555,12 @@ a=sendonly
 	})
 }
 
-// Assert that remote candidates with an unknown type are ignored and logged.
+// Assert that remote candidates with an unknown transport are ignored and logged.
 // This allows us to accept SessionDescriptions with proprietary candidates
 // like `ssltcp`.
-func TestInvalidCandidateType(t *testing.T) {
+func TestInvalidCandidateTransport(t *testing.T) {
 	const (
-		sslTCPCandidate = `candidate:1 1 udp 1 127.0.0.1 443 typ ssltcp generation 0`
+		sslTCPCandidate = `candidate:1 1 ssltcp 1 127.0.0.1 443 typ host generation 0`
 		sslTCPOffer     = `v=0
 o=- 0 2 IN IP4 127.0.0.1
 s=-

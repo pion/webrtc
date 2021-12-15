@@ -561,7 +561,7 @@ func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) 
 			if a.IsICECandidate() {
 				c, err := ice.UnmarshalCandidate(a.Value)
 				if err != nil {
-					if errors.Is(err, ice.ErrUnknownCandidateTyp) {
+					if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
 						log.Warnf("Discarding remote candidate: %s", err)
 						continue
 					}
