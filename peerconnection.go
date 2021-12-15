@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -1096,7 +1097,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed)
+	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed, pc.log)
 	if err != nil {
 		return err
 	}
@@ -1551,6 +1552,10 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 	if candidateValue != "" {
 		candidate, err := ice.UnmarshalCandidate(candidateValue)
 		if err != nil {
+			if errors.Is(err, ice.ErrUnknownCandidateTyp) {
+				pc.log.Warnf("Discarding remote candidate: %s", err)
+				return nil
+			}
 			return err
 		}
 

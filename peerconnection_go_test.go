@@ -1554,3 +1554,32 @@ a=sendonly
 		assert.NoError(t, pc.Close())
 	})
 }
+
+// Assert that remote candidates with an unknown type are ignored and logged.
+// This allows us to accept SessionDescriptions with proprietary candidates
+// like `ssltcp`.
+func TestInvalidCandidateType(t *testing.T) {
+	const (
+		sslTCPCandidate = `candidate:1 1 udp 1 127.0.0.1 443 typ ssltcp generation 0`
+		sslTCPOffer     = `v=0
+o=- 0 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=msid-semantic: WMS
+m=application 9 DTLS/SCTP 5000
+c=IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=mid:0
+a=` + sslTCPCandidate + "\n"
+	)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: sslTCPOffer}))
+	assert.NoError(t, peerConnection.AddICECandidate(ICECandidateInit{Candidate: sslTCPCandidate}))
+
+	assert.NoError(t, peerConnection.Close())
+}

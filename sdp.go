@@ -3,6 +3,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -536,7 +537,7 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 	return parts[1], parts[0], nil
 }
 
-func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandidate, error) {
+func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
 	candidates := []ICECandidate{}
 	remotePwds := []string{}
 	remoteUfrags := []string{}
@@ -560,6 +561,10 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandi
 			if a.IsICECandidate() {
 				c, err := ice.UnmarshalCandidate(a.Value)
 				if err != nil {
+					if errors.Is(err, ice.ErrUnknownCandidateTyp) {
+						log.Warnf("Discarding remote candidate: %s", err)
+						continue
+					}
 					return "", "", nil, err
 				}
 
