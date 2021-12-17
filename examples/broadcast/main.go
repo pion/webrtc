@@ -64,6 +64,18 @@ func main() { // nolint:gocognit
 			}
 		}()
 
+		// Read incoming RTCP packets
+		// Before these packets are returned they are processed by interceptors. For things
+		// like TWCC and RTCP Reports this needs to be called.
+		go func() {
+			rtcpBuf := make([]byte, 1500)
+			for {
+				if _, _, rtcpErr := receiver.Read(rtcpBuf); rtcpErr != nil {
+					return
+				}
+			}
+		}()
+
 		// Create a local track, all our SFU clients will be fed via this track
 		localTrack, newTrackErr := webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "video", "pion")
 		if newTrackErr != nil {

@@ -123,8 +123,6 @@ func main() {
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		fmt.Println("Track has started")
 
-		// Start reading from all the streams and sending them to the related output track
-		rid := track.RID()
 		go func() {
 			ticker := time.NewTicker(3 * time.Second)
 			for range ticker.C {
@@ -134,6 +132,21 @@ func main() {
 				}
 			}
 		}()
+
+		// Read incoming RTCP packets
+		// Before these packets are returned they are processed by interceptors. For things
+		// like TWCC and RTCP Reports this needs to be called.
+		go func() {
+			rtcpBuf := make([]byte, 1500)
+			for {
+				if _, _, rtcpErr := receiver.Read(rtcpBuf); rtcpErr != nil {
+					return
+				}
+			}
+		}()
+
+		// Start reading from all the streams and sending them to the related output track
+		rid := track.RID()
 		for {
 			// Read RTP packets being sent to Pion
 			packet, _, readErr := track.ReadRTP()
