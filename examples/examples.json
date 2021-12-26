@@ -6,18 +6,6 @@
 		"type": "browser"
 	},
 	{
-		"title": "Data Channels Create",
-		"link": "data-channels-create",
-		"description": "Example data-channels-create shows how you can send/recv DataChannel messages from a web browser. The difference with the data-channels example is that the data channel is initialized from the server side in this example.",
-		"type": "browser"
-	},
-	{
-		"title": "Data Channels Close",
-		"link": "data-channels-close",
-		"description": "Example data-channels-close is a variant of data-channels that allow playing with the life cycle of data channels.",
-		"type": "browser"
-	},
-	{
 		"title": "Data Channels Detach",
 		"link": "data-channels-detach",
 		"description": "The data-channels-detach is an example that shows how you can detach a data channel.",
