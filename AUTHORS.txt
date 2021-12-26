@@ -14,6 +14,7 @@ aler9 <46489434+aler9@users.noreply.github.com>
 Alex Browne <stephenalexbrowne@gmail.com>
 Alex Harford <harford@gmail.com>
 AlexWoo(武杰) <wj19840501@gmail.com>
+Ali Error <alipadida@live.com>
 Andrew N. Shalaev <isqad88@gmail.com>
 Antoine Baché <antoine.bache@epitech.eu>
 Antoine Baché <antoine@tenten.app>
