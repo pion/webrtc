@@ -26,6 +26,7 @@ type RTPSender struct {
 	transport *DTLSTransport
 
 	payloadType PayloadType
+	kind        RTPCodecType
 	ssrc        SSRC
 
 	// nolint:godox
@@ -66,6 +67,7 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 		ssrc:       SSRC(randutil.NewMathRandomGenerator().Uint32()),
 		id:         id,
 		srtpStream: &srtpWriterFuture{},
+		kind:       track.Kind(),
 	}
 
 	r.srtpStream.rtpSender = r
@@ -107,7 +109,7 @@ func (r *RTPSender) Transport() *DTLSTransport {
 func (r *RTPSender) getParameters() RTPSendParameters {
 	sendParameters := RTPSendParameters{
 		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
-			r.track.Kind(),
+			r.kind,
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
 		),
 		Encodings: []RTPEncodingParameters{
@@ -122,7 +124,7 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 	if r.rtpTransceiver != nil {
 		sendParameters.Codecs = r.rtpTransceiver.getCodecs()
 	} else {
-		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.track.Kind())
+		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.kind)
 	}
 	return sendParameters
 }
@@ -149,7 +151,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if track != nil && r.rtpTransceiver.kind != track.Kind() {
+	if track != nil && r.kind != track.Kind() {
 		return ErrRTPSenderNewTrackHasIncorrectKind
 	}
 
