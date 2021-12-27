@@ -255,3 +255,19 @@ func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
 
 	closePairNow(t, sender, receiver)
 }
+
+func Test_RTPSender_GetParameters_NilTrack(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	rtpSender, err := peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, rtpSender.ReplaceTrack(nil))
+	rtpSender.GetParameters()
+
+	assert.NoError(t, peerConnection.Close())
+}
