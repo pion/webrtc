@@ -3,6 +3,8 @@
 package webrtc
 
 import (
+	"encoding/binary"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -141,11 +143,13 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 		p.Header.PayloadType = uint8(b.payloadType)
 		log.WithFields(
 			log.Fields{
+				"type":           "INTENSIVE",
 				"subcomponent":   "webrtc",
 				"ssrc":           p.Header.SSRC,
 				"timestamp":      p.Timestamp,
 				"sequenceNumber": p.SequenceNumber,
 				"hasExtension":   p.Extension,
+				"extensions":     fmt.Sprintf("%v", p.Extensions),
 			}).Trace("outgoing rtp..")
 		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
@@ -277,8 +281,17 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 	}
 	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
 
-	if len(packets) > 0 {
-		packets[0].SetExtensions(sample.Extensions)
+	err := addExtensions(sample, packets)
+
+	if err != nil {
+		log.WithFields(
+			log.Fields{
+				"subcomponent": "webrtc",
+				"type":         "INTENSIVE",
+				"err":          err.Error(),
+				"hasExtension": packets[0].Extension,
+				"extensions":   fmt.Sprintf("%v", packets[0].Extensions),
+			}).Error("encountered an error when adding extension")
 	}
 
 	writeErrs := []error{}
@@ -310,8 +323,18 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 
 	samples := sample.Duration.Seconds() * clockRate
 	packets := p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
-	if len(packets) > 0 {
-		packets[0].SetExtensions(sample.Extensions)
+
+	err := addExtensions(sample, packets)
+
+	if err != nil {
+		log.WithFields(
+			log.Fields{
+				"subcomponent": "webrtc",
+				"type":         "INTENSIVE",
+				"err":          err.Error(),
+				"hasExtension": packets[0].Extension,
+				"extensions":   fmt.Sprintf("%v", packets[0].Extensions),
+			}).Error("encountered an error when adding extension")
 	}
 
 	writeErrs := []error{}
@@ -327,10 +350,57 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	return util.FlattenErrs(writeErrs)
 }
 
+func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
+	var sampleAttr byte = 0
+	position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_FIRST_PACKET_ATTR_POS")
+	if err == nil {
+		sampleAttr |= 1 << position
+	}
+	if position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_IFRAME_ATTR_POS"); sample.IsIFrame && err == nil {
+		sampleAttr |= 1 << position
+	}
+	if position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_SPS_PPS_ATTR_POS"); sample.IsSpsPps && err == nil {
+		sampleAttr |= 1 << position
+	}
+	if position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_ABR_ATTR_POS"); sample.IsAbr && err == nil {
+		sampleAttr |= 1 << position
+	}
+
+	extensionErrs := []error{}
+
+	if len(packets) > 0 {
+		extensionErrs = append(extensionErrs, packets[0].SetExtensions(sample.Extensions))
+		if sample.WithHyperscaleExtensions {
+			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(id, []byte{sampleAttr}))
+			}
+			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
+				donBytes := make([]byte, 2)
+				binary.BigEndian.PutUint16(donBytes, sample.Don)
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(id, donBytes))
+			}
+		}
+	}
+
+	return util.FlattenErrs(extensionErrs)
+}
+
+func getExtensionVal(envVariable string) (uint8, error) {
+	envValue := os.Getenv(envVariable)
+	if envValue != "" {
+		parsed, err := strconv.ParseUint(envValue, 10, 8)
+		if err == nil {
+			return uint8(parsed), nil
+		}
+		return 0, err
+	}
+	return 0, fmt.Errorf("extension value %s does not exist", envValue)
+}
+
 func getRtpOutboundMtu() uint16 {
 	rtpOutboundMTUEnv := os.Getenv("HYPERSCALE_WEBRTC_RTP_OUTBOUND_MTU")
 	if rtpOutboundMTUEnv != "" {
-		parsed, err := strconv.ParseUint(rtpOutboundMTUEnv,10,16)
+		parsed, err := strconv.ParseUint(rtpOutboundMTUEnv, 10, 16)
 		if err == nil {
 			return uint16(parsed)
 		}
