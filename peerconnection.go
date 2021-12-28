@@ -1059,6 +1059,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 				localDirection := RTPTransceiverDirectionRecvonly
 				if direction == RTPTransceiverDirectionRecvonly {
 					localDirection = RTPTransceiverDirectionSendonly
+				} else if direction == RTPTransceiverDirectionInactive {
+					localDirection = RTPTransceiverDirectionInactive
 				}
 
 				t = newRTPTransceiver(receiver, nil, localDirection, kind, pc.api)

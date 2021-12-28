@@ -1583,3 +1583,31 @@ a=` + sslTCPCandidate + "\n"
 
 	assert.NoError(t, peerConnection.Close())
 }
+
+func TestOfferWithInactiveDirection(t *testing.T) {
+	const remoteSDP = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=fingerprint:sha-256 F7:BF:B4:42:5B:44:C0:B9:49:70:6D:26:D7:3E:E6:08:B1:5B:25:2E:32:88:50:B6:3C:BE:4E:18:A7:2C:85:7C
+a=group:BUNDLE 0 1
+a=msid-semantic:WMS *
+m=video 9 UDP/TLS/RTP/SAVPF 97
+c=IN IP4 0.0.0.0
+a=inactive
+a=ice-pwd:05d682b2902af03db90d9a9a5f2f8d7f
+a=ice-ufrag:93cc7e4d
+a=mid:0
+a=rtpmap:97 H264/90000
+a=setup:actpass
+a=ssrc:1455629982 cname:{61fd3093-0326-4b12-8258-86bdc1fe677a}
+`
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSDP}))
+	assert.Equal(t, RTPTransceiverDirectionInactive, peerConnection.rtpTransceivers[0].direction.Load().(RTPTransceiverDirection))
+
+	assert.NoError(t, peerConnection.Close())
+}
