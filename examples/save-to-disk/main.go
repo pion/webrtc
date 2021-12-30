@@ -116,18 +116,6 @@ func main() {
 			}
 		}()
 
-		// Read incoming RTCP packets
-		// Before these packets are returned they are processed by interceptors. For things
-		// like TWCC and RTCP Reports this needs to be called.
-		go func() {
-			rtcpBuf := make([]byte, 1500)
-			for {
-				if _, _, rtcpErr := receiver.Read(rtcpBuf); rtcpErr != nil {
-					return
-				}
-			}
-		}()
-
 		codec := track.Codec()
 		if strings.EqualFold(codec.MimeType, webrtc.MimeTypeOpus) {
 			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")

@@ -110,18 +110,6 @@ func main() {
 			}
 		}()
 
-		// Read incoming RTCP packets
-		// Before these packets are returned they are processed by interceptors. For things
-		// like TWCC and RTCP Reports this needs to be called.
-		go func() {
-			rtcpBuf := make([]byte, 1500)
-			for {
-				if _, _, rtcpErr := receiver.Read(rtcpBuf); rtcpErr != nil {
-					return
-				}
-			}
-		}()
-
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().MimeType)
 		for {
 			// Read RTP packets being sent to Pion
