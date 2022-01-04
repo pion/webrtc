@@ -19,6 +19,9 @@ const (
 	// MimeTypeH264 H264 MIME type.
 	// Note: Matching should be case insensitive.
 	MimeTypeH264 = "video/H264"
+	// MimeTypeH265 H265 MIME type
+	// Note: Matching should be case insensitive.
+	MimeTypeH265 = "video/H265"
 	// MimeTypeOpus Opus MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeOpus = "audio/opus"
@@ -28,6 +31,9 @@ const (
 	// MimeTypeVP9 VP9 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeVP9 = "video/VP9"
+	// MimeTypeAV1 AV1 MIME type
+	// Note: Matching should be case insensitive.
+	MimeTypeAV1 = "video/AV1"
 	// MimeTypeG722 G722 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeG722 = "audio/G722"
