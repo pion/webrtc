@@ -660,7 +660,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 					continue
 				}
 				pc.greaterMid++
-				err = t.setMid(strconv.Itoa(pc.greaterMid))
+				err = t.SetMid(strconv.Itoa(pc.greaterMid))
 				if err != nil {
 					return SessionDescription{}, err
 				}
@@ -1092,7 +1092,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			}
 
 			if t.Mid() == "" {
-				if err := t.setMid(midValue); err != nil {
+				if err := t.SetMid(midValue); err != nil {
 					return err
 				}
 			}
