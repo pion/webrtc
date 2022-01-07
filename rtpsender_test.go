@@ -271,3 +271,59 @@ func Test_RTPSender_GetParameters_NilTrack(t *testing.T) {
 
 	assert.NoError(t, peerConnection.Close())
 }
+
+func Test_RTPSender_Send(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	rtpSender, err := peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+
+	parameter := rtpSender.GetParameters()
+	err = rtpSender.Send(parameter)
+	<-rtpSender.sendCalled
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.Close())
+}
+
+func Test_RTPSender_Send_Called_Once(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	rtpSender, err := peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+
+	parameter := rtpSender.GetParameters()
+	err = rtpSender.Send(parameter)
+	<-rtpSender.sendCalled
+	assert.NoError(t, err)
+
+	err = rtpSender.Send(parameter)
+	assert.Equal(t, errRTPSenderSendAlreadyCalled, err)
+
+	assert.NoError(t, peerConnection.Close())
+}
+
+func Test_RTPSender_Send_Track_Removed(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	rtpSender, err := peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+
+	parameter := rtpSender.GetParameters()
+	assert.NoError(t, peerConnection.RemoveTrack(rtpSender))
+	assert.Equal(t, errRTPSenderTrackRemoved, rtpSender.Send(parameter))
+
+	assert.NoError(t, peerConnection.Close())
+}
