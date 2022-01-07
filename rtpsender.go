@@ -195,8 +195,11 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.hasSent() {
+	switch {
+	case r.hasSent():
 		return errRTPSenderSendAlreadyCalled
+	case r.track == nil:
+		return errRTPSenderTrackRemoved
 	}
 
 	writeStream := &interceptorToTrackLocalWriter{}

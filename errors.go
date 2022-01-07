@@ -205,6 +205,7 @@ var (
 	errRTPSenderTrackNil          = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil  = errors.New("DTLSTransport must not be nil")
 	errRTPSenderSendAlreadyCalled = errors.New("Send has already been called")
+	errRTPSenderTrackRemoved      = errors.New("Sender Track has been removed or replaced to nil")
 
 	errRTPTransceiverCannotChangeMid        = errors.New("errRTPSenderTrackNil")
 	errRTPTransceiverSetSendingInvalidState = errors.New("invalid state change in RTPTransceiver.setSending")
