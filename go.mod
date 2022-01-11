@@ -6,7 +6,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/datachannel v1.5.2
-	github.com/pion/dtls/v2 v2.0.13
+	github.com/pion/dtls/v2 v2.1.0
 	github.com/pion/ice/v2 v2.1.18
 	github.com/pion/interceptor v0.1.4
 	github.com/pion/logging v0.2.2
