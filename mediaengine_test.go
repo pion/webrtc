@@ -111,6 +111,28 @@ a=fmtp:112 minptime=10; useinbandfec=1
 		assert.Equal(t, opusCodec.MimeType, MimeTypeOpus)
 	})
 
+	t.Run("Ambiguous Payload Type", func(t *testing.T) {
+		const opusSamePayload = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 96
+a=rtpmap:96 opus/48000/2
+a=fmtp:96 minptime=10; useinbandfec=1
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(opusSamePayload)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		opusCodec, _, err := m.getCodecByPayload(96)
+		assert.NoError(t, err)
+		assert.Equal(t, opusCodec.MimeType, MimeTypeOpus)
+	})
+
 	t.Run("Case Insensitive", func(t *testing.T) {
 		const opusUpcase = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
