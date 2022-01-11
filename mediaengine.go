@@ -313,27 +313,39 @@ func (m *MediaEngine) copy() *MediaEngine {
 	return cloned
 }
 
+func findCodecByPayload(codecs []RTPCodecParameters, payloadType PayloadType) *RTPCodecParameters {
+	for _, codec := range codecs {
+		if codec.PayloadType == payloadType {
+			return &codec
+		}
+	}
+	return nil
+}
+
 func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	codecs := m.negotiatedVideoCodecs
-	if !m.negotiatedVideo {
-		codecs = m.videoCodecs
-	}
-	for _, codec := range codecs {
-		if codec.PayloadType == payloadType {
-			return codec, RTPCodecTypeVideo, nil
+	// if we've negotiated audio or video, check the negotiated types before our
+	// built-in payload types, to ensure we pick the codec the other side wants.
+	if m.negotiatedVideo {
+		if codec := findCodecByPayload(m.negotiatedVideoCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeVideo, nil
 		}
 	}
-
-	codecs = m.negotiatedAudioCodecs
-	if !m.negotiatedAudio {
-		codecs = m.audioCodecs
+	if m.negotiatedAudio {
+		if codec := findCodecByPayload(m.negotiatedAudioCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeAudio, nil
+		}
 	}
-	for _, codec := range codecs {
-		if codec.PayloadType == payloadType {
-			return codec, RTPCodecTypeAudio, nil
+	if !m.negotiatedVideo {
+		if codec := findCodecByPayload(m.videoCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeVideo, nil
+		}
+	}
+	if !m.negotiatedAudio {
+		if codec := findCodecByPayload(m.audioCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeAudio, nil
 		}
 	}
 
