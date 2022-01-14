@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -133,6 +134,34 @@ func Test_RTPSender_GetParameters(t *testing.T) {
 	assert.NotEqual(t, 0, len(parameters.Codecs))
 	assert.Equal(t, 1, len(parameters.Encodings))
 	assert.Equal(t, rtpTransceiver.Sender().ssrc, parameters.Encodings[0].SSRC)
+	assert.Equal(t, "", parameters.Encodings[0].RID)
+
+	closePairNow(t, offerer, answerer)
+}
+
+func Test_RTPSender_GetParameters_WithRID(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	rtpTransceiver, err := offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("moo"))
+	assert.NoError(t, err)
+
+	err = rtpTransceiver.setSendingTrack(track)
+	assert.NoError(t, err)
+
+	parameters := rtpTransceiver.Sender().GetParameters()
+	assert.Equal(t, track.RID(), parameters.Encodings[0].RID)
 
 	closePairNow(t, offerer, answerer)
 }

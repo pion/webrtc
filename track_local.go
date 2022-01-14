@@ -67,6 +67,9 @@ type TrackLocal interface {
 	// and StreamID would be 'desktop' or 'webcam'
 	ID() string
 
+	// RID is the RTP Stream ID for this track.
+	RID() string
+
 	// StreamID is the group this track belongs too. This must be unique
 	StreamID() string
 

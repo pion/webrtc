@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -107,6 +108,10 @@ func (r *RTPSender) Transport() *DTLSTransport {
 }
 
 func (r *RTPSender) getParameters() RTPSendParameters {
+	var rid string
+	if r.track != nil {
+		rid = r.track.RID()
+	}
 	sendParameters := RTPSendParameters{
 		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
 			r.kind,
@@ -115,6 +120,7 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 		Encodings: []RTPEncodingParameters{
 			{
 				RTPCodingParameters: RTPCodingParameters{
+					RID:         rid,
 					SSRC:        r.ssrc,
 					PayloadType: r.payloadType,
 				},
