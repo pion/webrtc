@@ -976,6 +976,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
+		pc.configureRTPReceivers(haveLocalDescription, remoteDesc, currentTransceivers)
 		pc.ops.Enqueue(func() {
 			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
 		})
@@ -1130,6 +1131,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
 				return err
 			}
+			pc.configureRTPReceivers(true, &desc, currentTransceivers)
 			pc.ops.Enqueue(func() {
 				pc.startRTP(true, &desc, currentTransceivers)
 			})
@@ -1163,6 +1165,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
+
+		pc.configureRTPReceivers(false, &desc, currentTransceivers)
 	}
 
 	pc.ops.Enqueue(func() {
@@ -1174,28 +1178,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	return nil
 }
 
-func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
-	encodingSize := len(incoming.ssrcs)
-	if len(incoming.rids) >= encodingSize {
-		encodingSize = len(incoming.rids)
-	}
-
-	encodings := make([]RTPDecodingParameters, encodingSize)
-	for i := range encodings {
-		if len(incoming.rids) > i {
-			encodings[i].RID = incoming.rids[i]
-		}
-		if len(incoming.ssrcs) > i {
-			encodings[i].SSRC = incoming.ssrcs[i]
-		}
-
-		encodings[i].RTX.SSRC = incoming.repairSsrc
-	}
-
-	if err := receiver.Receive(RTPReceiveParameters{Encodings: encodings}); err != nil {
-		pc.log.Warnf("RTPReceiver Receive failed %s", err)
-		return
-	}
+func (pc *PeerConnection) configureReceiver(incoming trackDetails, receiver *RTPReceiver) {
+	receiver.configureReceive(trackDetailsToRTPReceiveParameters(&incoming))
 
 	// set track id and label early so they can be set as new track information
 	// is received from the SDP.
@@ -1205,9 +1189,16 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		receiver.tracks[i].track.streamID = incoming.streamID
 		receiver.tracks[i].track.mu.Unlock()
 	}
+}
+
+func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
+	if err := receiver.startReceive(trackDetailsToRTPReceiveParameters(&incoming)); err != nil {
+		pc.log.Warnf("RTPReceiver Receive failed %s", err)
+		return
+	}
 
 	for _, t := range receiver.Tracks() {
-		if t.SSRC() == 0 {
+		if t.SSRC() == 0 || t.RID() != "" {
 			return
 		}
 
@@ -1229,19 +1220,90 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 }
 
-// startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
-func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
-	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
+func runIfNewReceiver(
+	incomingTrack trackDetails,
+	transceivers []*RTPTransceiver,
+	f func(incomingTrack trackDetails, receiver *RTPReceiver),
+) bool {
+	for _, t := range transceivers {
+		if t.Mid() != incomingTrack.mid {
+			continue
+		}
 
-	remoteIsPlanB := false
-	switch pc.configuration.SDPSemantics {
-	case SDPSemanticsPlanB:
-		remoteIsPlanB = true
-	case SDPSemanticsUnifiedPlanWithFallback:
-		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
-	default:
-		// none
+		receiver := t.Receiver()
+		if (incomingTrack.kind != t.Kind()) ||
+			(t.Direction() != RTPTransceiverDirectionRecvonly && t.Direction() != RTPTransceiverDirectionSendrecv) ||
+			receiver == nil ||
+			(receiver.haveReceived()) {
+			continue
+		}
+
+		f(incomingTrack, receiver)
+		return true
 	}
+
+	return false
+}
+
+// configurepRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
+func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
+	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+
+	if isRenegotiation {
+		for _, t := range currentTransceivers {
+			receiver := t.Receiver()
+			if receiver == nil {
+				continue
+			}
+
+			tracks := t.Receiver().Tracks()
+			if len(tracks) == 0 {
+				continue
+			}
+
+			receiverNeedsStopped := false
+			func() {
+				for _, t := range tracks {
+					t.mu.Lock()
+					defer t.mu.Unlock()
+
+					if t.rid != "" {
+						if details := trackDetailsForRID(incomingTracks, t.rid); details != nil {
+							t.id = details.id
+							t.streamID = details.streamID
+							continue
+						}
+					} else if t.ssrc != 0 {
+						if details := trackDetailsForSSRC(incomingTracks, t.ssrc); details != nil {
+							t.id = details.id
+							t.streamID = details.streamID
+							continue
+						}
+					}
+
+					receiverNeedsStopped = true
+				}
+			}()
+
+			if !receiverNeedsStopped {
+				continue
+			}
+
+			if err := receiver.Stop(); err != nil {
+				pc.log.Warnf("Failed to stop RtpReceiver: %s", err)
+				continue
+			}
+
+			receiver, err := pc.api.NewRTPReceiver(receiver.kind, pc.dtlsTransport)
+			if err != nil {
+				pc.log.Warnf("Failed to create new RtpReceiver: %s", err)
+				continue
+			}
+			t.setReceiver(receiver)
+		}
+	}
+
+	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
 	// Ensure we haven't already started a transceiver for this ssrc
 	filteredTracks := append([]trackDetails{}, incomingTracks...)
@@ -1260,45 +1322,49 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks []trackDetails, curre
 		}
 	}
 
-	unhandledTracks := filteredTracks[:0]
-	for i := range filteredTracks {
-		trackHandled := false
-		for j := range localTransceivers {
-			t := localTransceivers[j]
-			incomingTrack := filteredTracks[i]
+	for _, incomingTrack := range filteredTracks {
+		_ = runIfNewReceiver(incomingTrack, localTransceivers, pc.configureReceiver)
+	}
+}
 
-			if t.Mid() != incomingTrack.mid {
-				continue
-			}
+// startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
+func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
+	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	if len(incomingTracks) == 0 {
+		return
+	}
 
-			receiver := t.Receiver()
-			if (incomingTrack.kind != t.kind) ||
-				(t.Direction() != RTPTransceiverDirectionRecvonly && t.Direction() != RTPTransceiverDirectionSendrecv) ||
-				receiver == nil ||
-				(receiver.haveReceived()) {
-				continue
-			}
+	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
-			pc.startReceiver(incomingTrack, receiver)
-			trackHandled = true
-			break
-		}
-
+	unhandledTracks := incomingTracks[:0]
+	for _, incomingTrack := range incomingTracks {
+		trackHandled := runIfNewReceiver(incomingTrack, localTransceivers, pc.startReceiver)
 		if !trackHandled {
-			unhandledTracks = append(unhandledTracks, filteredTracks[i])
+			unhandledTracks = append(unhandledTracks, incomingTrack)
 		}
 	}
 
+	remoteIsPlanB := false
+	switch pc.configuration.SDPSemantics {
+	case SDPSemanticsPlanB:
+		remoteIsPlanB = true
+	case SDPSemanticsUnifiedPlanWithFallback:
+		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
+	default:
+		// none
+	}
+
 	if remoteIsPlanB {
-		for _, incoming := range unhandledTracks {
-			t, err := pc.AddTransceiverFromKind(incoming.kind, RTPTransceiverInit{
+		for _, incomingTrack := range unhandledTracks {
+			t, err := pc.AddTransceiverFromKind(incomingTrack.kind, RTPTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
-				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incoming.ssrcs[0], err)
+				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incomingTrack.ssrcs[0], err)
 				continue
 			}
-			pc.startReceiver(incoming, t.Receiver())
+			pc.configureReceiver(incomingTrack, t.Receiver())
+			pc.startReceiver(incomingTrack, t.Receiver())
 		}
 	}
 }
@@ -1372,6 +1438,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 		return false, fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
 	}
 
+	pc.configureReceiver(incoming, t.Receiver())
 	pc.startReceiver(incoming, t.Receiver())
 	return true, nil
 }
@@ -2089,65 +2156,11 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 
 // nolint: gocognit
 func (pc *PeerConnection) startRTP(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
-	trackDetails := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
-
 	if !isRenegotiation {
 		pc.undeclaredMediaProcessor()
-	} else {
-		for _, t := range currentTransceivers {
-			receiver := t.Receiver()
-			if receiver == nil {
-				continue
-			}
-
-			tracks := t.Receiver().Tracks()
-			if len(tracks) == 0 {
-				continue
-			}
-
-			receiverNeedsStopped := false
-			func() {
-				for _, t := range tracks {
-					t.mu.Lock()
-					defer t.mu.Unlock()
-
-					if t.rid != "" {
-						if details := trackDetailsForRID(trackDetails, t.rid); details != nil {
-							t.id = details.id
-							t.streamID = details.streamID
-							continue
-						}
-					} else if t.ssrc != 0 {
-						if details := trackDetailsForSSRC(trackDetails, t.ssrc); details != nil {
-							t.id = details.id
-							t.streamID = details.streamID
-							continue
-						}
-					}
-
-					receiverNeedsStopped = true
-				}
-			}()
-
-			if !receiverNeedsStopped {
-				continue
-			}
-
-			if err := receiver.Stop(); err != nil {
-				pc.log.Warnf("Failed to stop RtpReceiver: %s", err)
-				continue
-			}
-
-			receiver, err := pc.api.NewRTPReceiver(receiver.kind, pc.dtlsTransport)
-			if err != nil {
-				pc.log.Warnf("Failed to create new RtpReceiver: %s", err)
-				continue
-			}
-			t.setReceiver(receiver)
-		}
 	}
 
-	pc.startRTPReceivers(trackDetails, currentTransceivers)
+	pc.startRTPReceivers(remoteDesc, currentTransceivers)
 	if haveApplicationMediaSection(remoteDesc.parsed) {
 		pc.startSCTP()
 	}

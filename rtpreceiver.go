@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -122,8 +123,27 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 	return tracks
 }
 
-// Receive initialize the track and starts all the transports
-func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
+// configureReceive initialize the track
+func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range parameters.Encodings {
+		t := trackStreams{
+			track: newTrackRemote(
+				r.kind,
+				parameters.Encodings[i].SSRC,
+				parameters.Encodings[i].RID,
+				r,
+			),
+		}
+
+		r.tracks = append(r.tracks, t)
+	}
+}
+
+// startReceive starts all the transports
+func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	select {
@@ -140,13 +160,20 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	}
 
 	for i := range parameters.Encodings {
-		t := trackStreams{
-			track: newTrackRemote(
-				r.kind,
-				parameters.Encodings[i].SSRC,
-				parameters.Encodings[i].RID,
-				r,
-			),
+		if parameters.Encodings[i].RID != "" {
+			// RID based tracks will be set up in receiveForRid
+			continue
+		}
+
+		var t *trackStreams
+		for idx, ts := range r.tracks {
+			if ts.track != nil && parameters.Encodings[i].SSRC != 0 && ts.track.SSRC() == parameters.Encodings[i].SSRC {
+				t = &r.tracks[idx]
+				break
+			}
+		}
+		if t == nil {
+			return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, parameters.Encodings[i].SSRC)
 		}
 
 		if parameters.Encodings[i].SSRC != 0 {
@@ -156,8 +183,6 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 				return err
 			}
 		}
-
-		r.tracks = append(r.tracks, t)
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
 			streamInfo := createStreamInfo("", rtxSsrc, 0, codec, globalParams.HeaderExtensions)
@@ -173,6 +198,12 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	}
 
 	return nil
+}
+
+// Receive initialize the track and starts all the transports
+func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
+	r.configureReceive(parameters)
+	return r.startReceive(parameters)
 }
 
 // Read reads incoming RTCP for this RTPReceiver

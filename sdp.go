@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -198,6 +199,27 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 	}
 
 	return incomingTracks
+}
+
+func trackDetailsToRTPReceiveParameters(t *trackDetails) RTPReceiveParameters {
+	encodingSize := len(t.ssrcs)
+	if len(t.rids) >= encodingSize {
+		encodingSize = len(t.rids)
+	}
+
+	encodings := make([]RTPDecodingParameters, encodingSize)
+	for i := range encodings {
+		if len(t.rids) > i {
+			encodings[i].RID = t.rids[i]
+		}
+		if len(t.ssrcs) > i {
+			encodings[i].SSRC = t.ssrcs[i]
+		}
+
+		encodings[i].RTX.SSRC = t.repairSsrc
+	}
+
+	return RTPReceiveParameters{Encodings: encodings}
 }
 
 func getRids(media *sdp.MediaDescription) map[string]string {
