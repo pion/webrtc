@@ -1,3 +1,4 @@
+//go:build js && wasm
 // +build js,wasm
 
 // Package webrtc implements the WebRTC 1.0 as defined in W3C WebRTC specification document.
@@ -55,6 +56,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (_ *PeerConnectio
 	}, nil
 }
 
+// JSValue returns the underlying PeerConnection
 func (pc *PeerConnection) JSValue() js.Value {
 	return pc.underlying
 }
@@ -561,7 +563,7 @@ func iceServerToValue(server ICEServer) js.Value {
 }
 
 func valueToConfiguration(configValue js.Value) Configuration {
-	if jsValueIsNull(configValue) || jsValueIsUndefined(configValue) {
+	if configValue.IsNull() || configValue.IsUndefined() {
 		return Configuration{}
 	}
 	return Configuration{
@@ -578,7 +580,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 }
 
 func valueToICEServers(iceServersValue js.Value) []ICEServer {
-	if jsValueIsNull(iceServersValue) || jsValueIsUndefined(iceServersValue) {
+	if iceServersValue.IsNull() || iceServersValue.IsUndefined() {
 		return nil
 	}
 	iceServers := make([]ICEServer, iceServersValue.Length())
@@ -599,10 +601,10 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 }
 
 func valueToICECandidate(val js.Value) *ICECandidate {
-	if jsValueIsNull(val) || jsValueIsUndefined(val) {
+	if val.IsNull() || val.IsUndefined() {
 		return nil
 	}
-	if jsValueIsUndefined(val.Get("protocol")) && !jsValueIsUndefined(val.Get("candidate")) {
+	if val.Get("protocol").IsUndefined() && !val.Get("candidate").IsUndefined() {
 		// Missing some fields, assume it's Firefox and parse SDP candidate.
 		c, err := ice.UnmarshalCandidate(val.Get("candidate").String())
 		if err != nil {
@@ -653,7 +655,7 @@ func sessionDescriptionToValue(desc *SessionDescription) js.Value {
 }
 
 func valueToSessionDescription(descValue js.Value) *SessionDescription {
-	if jsValueIsNull(descValue) || jsValueIsUndefined(descValue) {
+	if descValue.IsNull() || descValue.IsUndefined() {
 		return nil
 	}
 	return &SessionDescription{
