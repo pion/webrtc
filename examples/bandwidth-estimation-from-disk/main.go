@@ -41,6 +41,13 @@ func main() {
 	}
 	currentQuality := 0
 
+	for _, level := range qualityLevels {
+		_, err := os.Stat(level.fileName)
+		if os.IsNotExist(err) {
+			panic(fmt.Sprintf("File %s was not found", level.fileName))
+		}
+	}
+
 	i := &interceptor.Registry{}
 	m := &webrtc.MediaEngine{}
 	if err := m.RegisterDefaultCodecs(); err != nil {
