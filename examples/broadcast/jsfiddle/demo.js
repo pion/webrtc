@@ -54,6 +54,21 @@ window.createSession = isPublisher => {
     }
   }
 
+  window.copySDP = () => {
+  const browserSDP = document.getElementById('localSessionDescription')
+
+  browserSDP.focus()
+  browserSDP.select()
+
+  try {
+    const successful = document.execCommand('copy')
+    const msg = successful ? 'successful' : 'unsuccessful'
+    log('Copying SDP was ' + msg)
+  } catch (err) {
+    log('Unable to copy SDP ' + err)
+  }
+}
+
   let btns = document.getElementsByClassName('createSessionButton')
   for (let i = 0; i < btns.length; i++) {
     btns[i].style = 'display: none'

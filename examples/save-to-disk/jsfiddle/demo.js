@@ -38,3 +38,18 @@ window.startSession = () => {
     alert(e)
   }
 }
+
+window.copySDP = () => {
+  const browserSDP = document.getElementById('localSessionDescription')
+
+  browserSDP.focus()
+  browserSDP.select()
+
+  try {
+    const successful = document.execCommand('copy')
+    const msg = successful ? 'successful' : 'unsuccessful'
+    log('Copying SDP was ' + msg)
+  } catch (err) {
+    log('Unable to copy SDP ' + err)
+  }
+}
