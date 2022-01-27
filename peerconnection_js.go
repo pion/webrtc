@@ -502,7 +502,6 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPT
 		return &RTPTransceiver{
 			underlying: pc.underlying.Call("addTransceiver", kind.String(), rtpTransceiverInitInitToValue(init[0])),
 		}, err
-
 	}
 
 	return &RTPTransceiver{
