@@ -19,6 +19,10 @@ func TestNewAPI(t *testing.T) {
 	if api.mediaEngine == nil {
 		t.Error("Failed to init media engine")
 	}
+
+	if api.interceptorRegistry == nil {
+		t.Error("Failed to init interceptor registry")
+	}
 }
 
 func TestNewAPI_Options(t *testing.T) {
@@ -39,4 +43,15 @@ func TestNewAPI_Options(t *testing.T) {
 	if len(api.mediaEngine.audioCodecs) == 0 || len(api.mediaEngine.videoCodecs) == 0 {
 		t.Error("Failed to set media engine")
 	}
+}
+
+func TestNewAPI_OptionsDefaultize(t *testing.T) {
+	api := NewAPI(
+		WithMediaEngine(nil),
+		WithInterceptorRegistry(nil),
+	)
+
+	assert.NotNil(t, api.settingEngine)
+	assert.NotNil(t, api.mediaEngine)
+	assert.NotNil(t, api.interceptorRegistry)
 }
