@@ -1083,6 +1083,14 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 					_ = t.SetCodecPreferences(filteredCodecs)
 				}
 
+				if extensions, err := rtpExtensionsFromMediaDescription(media); err == nil {
+					headerExtensions := []RTPHeaderExtensionParameter{}
+					for uri, id := range extensions {
+						headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{URI: uri, ID: id})
+					}
+					_ = t.SetHeaderExtensions(headerExtensions)
+				}
+
 			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
@@ -1200,7 +1208,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 
 	for _, t := range receiver.Tracks() {
 		if t.SSRC() == 0 || t.RID() != "" {
-			return
+			continue
 		}
 
 		go func(track *TrackRemote) {

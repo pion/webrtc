@@ -337,7 +337,18 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) {
+func addTransceiverSDP(
+	d *sdp.SessionDescription,
+	isPlanB, shouldAddCandidates bool,
+	dtlsFingerprints []DTLSFingerprint,
+	mediaEngine *MediaEngine,
+	midValue string,
+	iceParams ICEParameters,
+	candidates []ICECandidate,
+	dtlsRole sdp.ConnectionRole,
+	iceGatheringState ICEGatheringState,
+	mediaSection mediaSection,
+) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, errSDPZeroTransceivers
@@ -389,6 +400,10 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 
 	parameters := mediaEngine.getRTPParametersByKind(t.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
+		if !t.hasHeaderExtension(rtpExtension.URI) {
+			continue
+		}
+
 		extURL, err := url.Parse(rtpExtension.URI)
 		if err != nil {
 			return false, err

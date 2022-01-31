@@ -18,7 +18,8 @@ type RTPTransceiver struct {
 	receiver  atomic.Value // *RTPReceiver
 	direction atomic.Value // RTPTransceiverDirection
 
-	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
+	codecs           []RTPCodecParameters // User provided codecs via SetCodecPreferences
+	headerExtensions []RTPHeaderExtensionParameter
 
 	stopped bool
 	kind    RTPCodecType
@@ -78,6 +79,33 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	}
 
 	return filteredCodecs
+}
+
+// SetHeaderExtensions stores header extension from SDP
+func (t *RTPTransceiver) SetHeaderExtensions(headerExtensions []RTPHeaderExtensionParameter) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.headerExtensions = headerExtensions
+	return nil
+}
+
+func (t *RTPTransceiver) hasHeaderExtension(uri string) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	// if nothing specific set, accept all
+	if len(t.headerExtensions) == 0 {
+		return true
+	}
+
+	for _, he := range t.headerExtensions {
+		if he.URI == uri {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one

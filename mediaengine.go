@@ -476,10 +476,10 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 		switch {
-		case !m.negotiatedAudio && strings.EqualFold(media.MediaName.Media, "audio"):
+		case strings.EqualFold(media.MediaName.Media, "audio"):
 			m.negotiatedAudio = true
 			typ = RTPCodecTypeAudio
-		case !m.negotiatedVideo && strings.EqualFold(media.MediaName.Media, "video"):
+		case strings.EqualFold(media.MediaName.Media, "video"):
 			m.negotiatedVideo = true
 			typ = RTPCodecTypeVideo
 		default:
@@ -561,18 +561,24 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.negotiatedVideo && typ == RTPCodecTypeVideo ||
-		m.negotiatedAudio && typ == RTPCodecTypeAudio {
-		for id, e := range m.negotiatedHeaderExtensions {
-			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
-				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
-			}
-		}
+
+	var mediaHeaderExtensions map[int]mediaEngineHeaderExtension
+	if (m.negotiatedVideo && typ == RTPCodecTypeVideo) || (m.negotiatedAudio && typ == RTPCodecTypeAudio) {
+		mediaHeaderExtensions = m.negotiatedHeaderExtensions
 	} else {
+		mediaHeaderExtensions = make(map[int]mediaEngineHeaderExtension, len(m.headerExtensions))
 		for id, e := range m.headerExtensions {
-			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
-				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id + 1, URI: e.uri})
-			}
+			mediaHeaderExtensions[id+1] = e
+		}
+	}
+
+	for id, e := range mediaHeaderExtensions {
+		if (typ == RTPCodecTypeVideo && !e.isVideo) || (typ == RTPCodecTypeAudio && !e.isAudio) {
+			continue
+		}
+
+		if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) {
+			headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
 		}
 	}
 
