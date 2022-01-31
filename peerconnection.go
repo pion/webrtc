@@ -1546,12 +1546,6 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		}
 	}
 
-	if readStream != nil {
-		_ = readStream.Close()
-	}
-	if rtcpReadStream != nil {
-		_ = rtcpReadStream.Close()
-	}
 	pc.api.interceptor.UnbindRemoteStream(streamInfo)
 	return errPeerConnSimulcastIncomingSSRCFailed
 }
