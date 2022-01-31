@@ -1450,6 +1450,18 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return errPeerConnRemoteDescriptionNil
 	}
 
+	// If a SSRC already exists in the RemoteDescription don't perform heuristics upon it
+	for _, track := range trackDetailsFromSDP(pc.log, remoteDescription.parsed) {
+		if track.repairSsrc != nil && ssrc == *track.repairSsrc {
+			return nil
+		}
+		for _, trackSsrc := range track.ssrcs {
+			if ssrc == trackSsrc {
+				return nil
+			}
+		}
+	}
+
 	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
 	if handled, err := pc.handleUndeclaredSSRC(ssrc, remoteDescription); handled || err != nil {
 		return err
