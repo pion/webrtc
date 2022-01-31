@@ -25,7 +25,7 @@ type trackDetails struct {
 	streamID   string
 	id         string
 	ssrcs      []SSRC
-	repairSsrc SSRC
+	repairSsrc *SSRC
 	rids       []string
 }
 
@@ -168,9 +168,10 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 				trackDetails.id = trackID
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
-				for repairSsrc, baseSsrc := range rtxRepairFlows {
+				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
-						trackDetails.repairSsrc = SSRC(repairSsrc)
+						repairSsrc := SSRC(r)
+						trackDetails.repairSsrc = &repairSsrc
 					}
 				}
 
@@ -216,7 +217,9 @@ func trackDetailsToRTPReceiveParameters(t *trackDetails) RTPReceiveParameters {
 			encodings[i].SSRC = t.ssrcs[i]
 		}
 
-		encodings[i].RTX.SSRC = t.repairSsrc
+		if t.repairSsrc != nil {
+			encodings[i].RTX.SSRC = *t.repairSsrc
+		}
 	}
 
 	return RTPReceiveParameters{Encodings: encodings}
