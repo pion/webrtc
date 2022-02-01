@@ -1004,20 +1004,11 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// Enable Extension Headers needed for Simulcast
 	m := &MediaEngine{}
 	if err := m.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, RTPCodecTypeVideo); err != nil {
-			panic(err)
-		}
-	}
+	registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
 
 	originalRids := []string{"a", "b", "c"}
 	signalWithRids := func(sessionDescription string, rids []string) string {
