@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -78,7 +79,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIcePwd)
 	})
 
@@ -89,7 +90,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIceUfrag)
 	})
 
@@ -102,7 +103,7 @@ func TestExtractICEDetails(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s)
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
@@ -120,7 +121,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s)
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
@@ -134,7 +135,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionConflictingIceUfrag)
 	})
 
@@ -146,7 +147,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionConflictingIcePwd)
 	})
 }

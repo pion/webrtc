@@ -1,22 +1,28 @@
 # broadcast
+
 broadcast is a Pion WebRTC application that demonstrates how to broadcast a video to many peers, while only requiring the broadcaster to upload once.
 
 This could serve as the building block to building conferencing software, and other applications where publishers are bandwidth constrained.
 
-## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fbroadcast%2Fdrawio)
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc-pion%2Fmaster%2Fexamples%2Fbroadcast%2Fdrawio)
 
 ## Instructions
+
 ### Download broadcast
+
 ```
 export GO111MODULE=on
 go get github.com/pion/webrtc/v3/examples/broadcast
 ```
 
 ### Open broadcast example page
+
 [jsfiddle.net](https://jsfiddle.net/1jc4go7v/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
 
 ### Run Broadcast
+
 #### Linux/macOS
+
 Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 
 ### Start a publisher
@@ -29,6 +35,7 @@ Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 * The connection state will be printed in the terminal and under `logs` in the browser.
 
 ### Join the broadcast
+
 * Click `Join a Broadcast`
 * Copy the string in the first input labelled `Browser base64 Session Description`
 * Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
