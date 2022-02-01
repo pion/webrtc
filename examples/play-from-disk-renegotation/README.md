@@ -1,13 +1,15 @@
 # play-from-disk-renegotiation
+
 play-from-disk-renegotiation demonstrates Pion WebRTC's renegotiation abilities.
 
 For a simpler example of playing a file from disk we also have [examples/play-from-disk](/examples/play-from-disk)
 
-## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc%2Fmaster%2Fexamples%2Fplay-from-disk-renegotation%2Fdrawio)
+## [architecture](https://viewer.diagrams.net/?tags=%7B%7D&highlight=FFFFFF&edit=_blank&layers=1&nav=1&title=drawio#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fmohammadne%2Fwebrtc-pion%2Fmaster%2Fexamples%2Fplay-from-disk-renegotation%2Fdrawio)
 
 ## Instructions
 
 ### Download play-from-disk-renegotiation
+
 This example requires you to clone the repo since it is serving static HTML.
 
 ```
@@ -30,6 +32,7 @@ ffmpeg -i $INPUT_FILE -g 30 -b:v 2M output.ivf
 The `output.ivf` you created should be in the same directory as `play-from-disk-renegotiation`. Execute `go run *.go`
 
 ### Open the Web UI
+
 Open [http://localhost:8080](http://localhost:8080) and you should have a `Add Track` and `Remove Track` button.  Press these to add as many tracks as you want, or to remove as many as you wish.
 
 Congrats, you have used Pion WebRTC! Now start building something cool
