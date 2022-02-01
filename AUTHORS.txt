@@ -14,6 +14,7 @@ aler9 <46489434+aler9@users.noreply.github.com>
 Alex Browne <stephenalexbrowne@gmail.com>
 Alex Harford <harford@gmail.com>
 AlexWoo(武杰) <wj19840501@gmail.com>
+Ali Error <alipadida@live.com>
 Andrew N. Shalaev <isqad88@gmail.com>
 Antoine Baché <antoine.bache@epitech.eu>
 Antoine Baché <antoine@tenten.app>
@@ -76,15 +77,18 @@ John Berthels <john.berthels@gmail.com>
 John Bradley <jrb@turrettech.com>
 JooYoung <qkdlql@naver.com>
 Jorropo <jorropo.pgm@gmail.com>
+juberti <juberti@alphaexplorationco.com>
 Juliusz Chroboczek <jch@irif.fr>
 Justin Okamoto <jdokamoto@gmail.com>
 Justin Okamoto <justmoto@amazon.com>
 Kevin Staunton-Lambert <kevin.staunton-lambert@metacdn.com>
+Kevin Wang <kevmo314@gmail.com>
 Konstantin Chugalinskiy <kchugalinskiy@yandex.ru>
 Konstantin Itskov <konstantin.itskov@kovits.com>
 krishna chiatanya <kittuov@gmail.com>
 Kuzmin Vladimir <vova-kyzmin@yandex.ru>
 lawl <github@dumbinter.net>
+Len <len@hpcnt.com>
 Lukas Herman <lherman.cs@gmail.com>
 Luke <luke@street.dev>
 Luke Curley <kixelated@gmail.com>
@@ -129,11 +133,13 @@ Reese <3253971+figadore@users.noreply.github.com>
 rob-deutsch <robzyb+altgithub@gmail.com>
 Robert Eperjesi <eperjesi@uber.com>
 Robin Raymond <robin-raymond@users.noreply.github.com>
+Roman Romanenko <roman.romanenko@aliexpress.ru>
 Roman Romanenko <romandafe94@gmail.com>
 ronan <ronan.jezequel@gmail.com>
 Ryan Shumate <Ryan.Shumate@garmin.com>
 salmān aljammāz <s@aljmz.com>
 Sam Lancia <sam@vaion.com>
+Sean DuBois <duboisea@twitch.tv>
 Sean DuBois <seaduboi@amazon.com>
 Sean DuBois <sean@siobud.com>
 Sean DuBois <sean_dubois@apple.com>

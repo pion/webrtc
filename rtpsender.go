@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -26,6 +27,7 @@ type RTPSender struct {
 	transport *DTLSTransport
 
 	payloadType PayloadType
+	kind        RTPCodecType
 	ssrc        SSRC
 
 	// nolint:godox
@@ -66,6 +68,7 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 		ssrc:       SSRC(randutil.NewMathRandomGenerator().Uint32()),
 		id:         id,
 		srtpStream: &srtpWriterFuture{},
+		kind:       track.Kind(),
 	}
 
 	r.srtpStream.rtpSender = r
@@ -105,14 +108,19 @@ func (r *RTPSender) Transport() *DTLSTransport {
 }
 
 func (r *RTPSender) getParameters() RTPSendParameters {
+	var rid string
+	if r.track != nil {
+		rid = r.track.RID()
+	}
 	sendParameters := RTPSendParameters{
 		RTPParameters: r.api.mediaEngine.getRTPParametersByKind(
-			r.track.Kind(),
+			r.kind,
 			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
 		),
 		Encodings: []RTPEncodingParameters{
 			{
 				RTPCodingParameters: RTPCodingParameters{
+					RID:         rid,
 					SSRC:        r.ssrc,
 					PayloadType: r.payloadType,
 				},
@@ -122,7 +130,7 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 	if r.rtpTransceiver != nil {
 		sendParameters.Codecs = r.rtpTransceiver.getCodecs()
 	} else {
-		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.track.Kind())
+		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.kind)
 	}
 	return sendParameters
 }
@@ -149,7 +157,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if track != nil && r.rtpTransceiver.kind != track.Kind() {
+	if track != nil && r.kind != track.Kind() {
 		return ErrRTPSenderNewTrackHasIncorrectKind
 	}
 
@@ -193,8 +201,11 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.hasSent() {
+	switch {
+	case r.hasSent():
 		return errRTPSenderSendAlreadyCalled
+	case r.track == nil:
+		return errRTPSenderTrackRemoved
 	}
 
 	writeStream := &interceptorToTrackLocalWriter{}

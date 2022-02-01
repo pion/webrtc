@@ -1,8 +1,10 @@
+//go:build !js
 // +build !js
 
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -23,7 +25,7 @@ type trackDetails struct {
 	streamID   string
 	id         string
 	ssrcs      []SSRC
-	repairSsrc SSRC
+	repairSsrc *SSRC
 	rids       []string
 }
 
@@ -166,9 +168,10 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 				trackDetails.id = trackID
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
-				for repairSsrc, baseSsrc := range rtxRepairFlows {
+				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
-						trackDetails.repairSsrc = SSRC(repairSsrc)
+						repairSsrc := SSRC(r)
+						trackDetails.repairSsrc = &repairSsrc
 					}
 				}
 
@@ -197,6 +200,29 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 	}
 
 	return incomingTracks
+}
+
+func trackDetailsToRTPReceiveParameters(t *trackDetails) RTPReceiveParameters {
+	encodingSize := len(t.ssrcs)
+	if len(t.rids) >= encodingSize {
+		encodingSize = len(t.rids)
+	}
+
+	encodings := make([]RTPDecodingParameters, encodingSize)
+	for i := range encodings {
+		if len(t.rids) > i {
+			encodings[i].RID = t.rids[i]
+		}
+		if len(t.ssrcs) > i {
+			encodings[i].SSRC = t.ssrcs[i]
+		}
+
+		if t.repairSsrc != nil {
+			encodings[i].RTX.SSRC = *t.repairSsrc
+		}
+	}
+
+	return RTPReceiveParameters{Encodings: encodings}
 }
 
 func getRids(media *sdp.MediaDescription) map[string]string {
@@ -536,7 +562,7 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 	return parts[1], parts[0], nil
 }
 
-func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandidate, error) {
+func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
 	candidates := []ICECandidate{}
 	remotePwds := []string{}
 	remoteUfrags := []string{}
@@ -560,6 +586,10 @@ func extractICEDetails(desc *sdp.SessionDescription) (string, string, []ICECandi
 			if a.IsICECandidate() {
 				c, err := ice.UnmarshalCandidate(a.Value)
 				if err != nil {
+					if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
+						log.Warnf("Discarding remote candidate: %s", err)
+						continue
+					}
 					return "", "", nil, err
 				}
 
