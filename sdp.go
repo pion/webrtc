@@ -732,3 +732,13 @@ func updateSDPOrigin(origin *sdp.Origin, d *sdp.SessionDescription) {
 		d.Origin.SessionVersion = atomic.AddUint64(&origin.SessionVersion, 1)
 	}
 }
+
+func isIceLiteSet(desc *sdp.SessionDescription) bool {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyICELite {
+			return true
+		}
+	}
+
+	return false
+}

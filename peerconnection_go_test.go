@@ -563,80 +563,52 @@ func TestOneAttrKeyConnectionSetupPerMediaDescriptionInSDP(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-func TestPeerConnection_OfferingLite(t *testing.T) {
+func TestPeerConnection_IceLite(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
-	s := SettingEngine{}
-	s.SetLite(true)
-	offerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	answerPC, err := NewAPI().NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = signalPair(offerPC, answerPC); err != nil {
-		t.Fatal(err)
-	}
-
-	iceComplete := make(chan interface{})
-	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
-		if iceState == ICEConnectionStateConnected {
-			select {
-			case <-iceComplete:
-			default:
-				close(iceComplete)
-			}
+	connectTwoAgents := func(offerIsLite, answerisLite bool) {
+		offerSettingEngine := SettingEngine{}
+		offerSettingEngine.SetLite(offerIsLite)
+		offerPC, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		answerSettingEngine := SettingEngine{}
+		answerSettingEngine.SetLite(answerisLite)
+		answerPC, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err = signalPair(offerPC, answerPC); err != nil {
+			t.Fatal(err)
+		}
+
+		dataChannelOpen := make(chan interface{})
+		answerPC.OnDataChannel(func(_ *DataChannel) {
+			close(dataChannelOpen)
+		})
+
+		<-dataChannelOpen
+		closePairNow(t, offerPC, answerPC)
+	}
+
+	t.Run("Offerer", func(t *testing.T) {
+		connectTwoAgents(true, false)
 	})
 
-	<-iceComplete
-	closePairNow(t, offerPC, answerPC)
-}
-
-func TestPeerConnection_AnsweringLite(t *testing.T) {
-	report := test.CheckRoutines(t)
-	defer report()
-
-	lim := test.TimeOut(time.Second * 10)
-	defer lim.Stop()
-
-	offerPC, err := NewAPI().NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s := SettingEngine{}
-	s.SetLite(true)
-	answerPC, err := NewAPI(WithSettingEngine(s)).NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = signalPair(offerPC, answerPC); err != nil {
-		t.Fatal(err)
-	}
-
-	iceComplete := make(chan interface{})
-	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
-		if iceState == ICEConnectionStateConnected {
-			select {
-			case <-iceComplete:
-			default:
-				close(iceComplete)
-			}
-		}
+	t.Run("Answerer", func(t *testing.T) {
+		connectTwoAgents(false, true)
 	})
 
-	<-iceComplete
-	closePairNow(t, offerPC, answerPC)
+	t.Run("Both", func(t *testing.T) {
+		connectTwoAgents(true, true)
+	})
 }
 
 func TestOnICEGatheringStateChange(t *testing.T) {
