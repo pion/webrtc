@@ -32,6 +32,7 @@ Bo Shi <boshi@mural.co>
 boks1971 <raja.gobi@tutanota.com>
 Brendan Rius <brendan.rius@gmail.com>
 brian <brian@cyalive.com>
+Bryan Phelps <bryan@coder.com>
 Cameron Elliott <cameron-elliott@users.noreply.github.com>
 Cecylia Bocovich <cohosh@torproject.org>
 Cedric Fung <cedric@vec.io>
