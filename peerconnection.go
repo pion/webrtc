@@ -786,8 +786,9 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 // CreateAnswer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
+	remoteDesc := pc.RemoteDescription()
 	switch {
-	case pc.RemoteDescription() == nil:
+	case remoteDesc == nil:
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
 		return SessionDescription{}, errIdentityProviderNotImplemented
@@ -800,6 +801,13 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	connectionRole := connectionRoleFromDtlsRole(pc.api.settingEngine.answeringDTLSRole)
 	if connectionRole == sdp.ConnectionRole(0) {
 		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
+
+		// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+		// If both or neither agents are lite the offering agent is controlling.
+		// RFC 8445 S6.1.1
+		if isIceLiteSet(remoteDesc.parsed) && !pc.api.settingEngine.candidates.ICELite {
+			connectionRole = connectionRoleFromDtlsRole(DTLSRoleServer)
+		}
 	}
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
@@ -1140,12 +1148,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return nil
 	}
 
-	remoteIsLite := false
-	for _, a := range desc.parsed.Attributes {
-		if strings.TrimSpace(a.Key) == sdp.AttrKeyICELite {
-			remoteIsLite = true
-		}
-	}
+	remoteIsLite := isIceLiteSet(desc.parsed)
 
 	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
 	if err != nil {

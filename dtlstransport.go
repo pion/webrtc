@@ -446,7 +446,7 @@ func (t *DTLSTransport) validateFingerPrint(remoteCert *x509.Certificate) error 
 }
 
 func (t *DTLSTransport) ensureICEConn() error {
-	if t.iceTransport == nil || t.iceTransport.State() == ICETransportStateNew {
+	if t.iceTransport == nil {
 		return errICEConnectionNotStarted
 	}
 
