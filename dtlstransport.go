@@ -327,6 +327,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		dtlsConfig.ReplayProtectionWindow = int(*t.api.settingEngine.replayProtection.DTLS)
 	}
 
+	if t.api.settingEngine.dtls.retransmissionInterval != 0 {
+		dtlsConfig.FlightInterval = t.api.settingEngine.dtls.retransmissionInterval
+	}
+
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
 	if role == DTLSRoleClient {
