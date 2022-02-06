@@ -1,3 +1,4 @@
+/* eslint-env browser */
 
 // Create peer conn
 const pc = new RTCPeerConnection({
@@ -38,7 +39,7 @@ requestAnimationFrame(() => drawCircle(document.getElementById('canvasOne').getC
 requestAnimationFrame(() => drawCircle(document.getElementById('canvasTwo').getContext('2d'), '#cf635f', 0))
 requestAnimationFrame(() => drawCircle(document.getElementById('canvasThree').getContext('2d'), '#46c240', 0))
 
-function drawCircle(ctx, color, angle) {
+function drawCircle (ctx, color, angle) {
   // Background
   ctx.clearRect(0, 0, 200, 200)
   ctx.fillStyle = '#eeeeee'

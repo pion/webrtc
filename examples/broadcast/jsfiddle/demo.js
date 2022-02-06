@@ -1,10 +1,10 @@
 /* eslint-env browser */
-var log = msg => {
+const log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
 window.createSession = isPublisher => {
-  let pc = new RTCPeerConnection({
+  const pc = new RTCPeerConnection({
     iceServers: [
       {
         urls: 'stun:stun.l.google.com:19302'
@@ -21,7 +21,7 @@ window.createSession = isPublisher => {
   if (isPublisher) {
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       .then(stream => {
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        stream.getTracks().forEach(track => pc.addTrack(track, stream))
         document.getElementById('video1').srcObject = stream
         pc.createOffer()
           .then(d => pc.setLocalDescription(d))
@@ -34,7 +34,7 @@ window.createSession = isPublisher => {
       .catch(log)
 
     pc.ontrack = function (event) {
-      var el = document.getElementById('video1')
+      const el = document.getElementById('video1')
       el.srcObject = event.streams[0]
       el.autoplay = true
       el.controls = true
@@ -42,7 +42,7 @@ window.createSession = isPublisher => {
   }
 
   window.startSession = () => {
-    let sd = document.getElementById('remoteSessionDescription').value
+    const sd = document.getElementById('remoteSessionDescription').value
     if (sd === '') {
       return alert('Session Description must not be empty')
     }
@@ -55,21 +55,21 @@ window.createSession = isPublisher => {
   }
 
   window.copySDP = () => {
-  const browserSDP = document.getElementById('localSessionDescription')
+    const browserSDP = document.getElementById('localSessionDescription')
 
-  browserSDP.focus()
-  browserSDP.select()
+    browserSDP.focus()
+    browserSDP.select()
 
-  try {
-    const successful = document.execCommand('copy')
-    const msg = successful ? 'successful' : 'unsuccessful'
-    log('Copying SDP was ' + msg)
-  } catch (err) {
-    log('Unable to copy SDP ' + err)
+    try {
+      const successful = document.execCommand('copy')
+      const msg = successful ? 'successful' : 'unsuccessful'
+      log('Copying SDP was ' + msg)
+    } catch (err) {
+      log('Unable to copy SDP ' + err)
+    }
   }
-}
 
-  let btns = document.getElementsByClassName('createSessionButton')
+  const btns = document.getElementsByClassName('createSessionButton')
   for (let i = 0; i < btns.length; i++) {
     btns[i].style = 'display: none'
   }
