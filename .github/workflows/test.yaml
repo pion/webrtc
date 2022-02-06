@@ -115,7 +115,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '12.x'
+          node-version: '16.x'
 
       - uses: actions/cache@v2
         with:
@@ -129,7 +129,7 @@ jobs:
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
         env:
-          GO_VERSION: 1.16
+          GO_VERSION: 1.17
 
       - name: Set Go Root
         run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
