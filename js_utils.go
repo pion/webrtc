@@ -23,7 +23,6 @@ func awaitPromise(promise js.Value) (js.Value, error) {
 		return js.Undefined()
 	})
 	defer thenFunc.Release()
-	promise.Call("then", thenFunc)
 
 	catchFunc := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		go func() {
@@ -32,7 +31,8 @@ func awaitPromise(promise js.Value) (js.Value, error) {
 		return js.Undefined()
 	})
 	defer catchFunc.Release()
-	promise.Call("catch", catchFunc)
+
+	promise.Call("then", thenFunc).Call("catch", catchFunc)
 
 	select {
 	case result := <-resultsChan:
