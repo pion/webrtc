@@ -1,13 +1,13 @@
 /* eslint-env browser */
 
-let pc = new RTCPeerConnection({
+const pc = new RTCPeerConnection({
   iceServers: [
     {
       urls: 'stun:stun.l.google.com:19302'
     }
   ]
 })
-var log = msg => {
+const log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
@@ -27,7 +27,7 @@ pc.onicecandidate = event => {
 }
 
 window.startSession = () => {
-  let sd = document.getElementById('remoteSessionDescription').value
+  const sd = document.getElementById('remoteSessionDescription').value
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
