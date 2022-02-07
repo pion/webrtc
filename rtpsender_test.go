@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,21 +15,6 @@ import (
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
-
-func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *sync.WaitGroup {
-	var triggered sync.WaitGroup
-	triggered.Add(len(peers))
-
-	hdlr := func(p PeerConnectionState) {
-		if p == state {
-			triggered.Done()
-		}
-	}
-	for _, p := range peers {
-		p.OnConnectionStateChange(hdlr)
-	}
-	return &triggered
-}
 
 func Test_RTPSender_ReplaceTrack(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)

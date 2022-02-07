@@ -35,6 +35,11 @@ func main() {
 	})
 	sendChannel.OnOpen(func() {
 		fmt.Println("sendChannel has opened")
+
+		candidatePair, err := pc.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+
+		fmt.Println(candidatePair)
+		fmt.Println(err)
 	})
 	sendChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
 		log(fmt.Sprintf("Message from DataChannel %s payload %s", sendChannel.Label(), string(msg.Data)))
@@ -89,6 +94,33 @@ func main() {
 			signal.Decode(sd, &descr)
 			if err := pc.SetRemoteDescription(descr); err != nil {
 				handleError(err)
+			}
+		}()
+		return js.Undefined()
+	}))
+	js.Global().Set("copySDP", js.FuncOf(func(_ js.Value, _ []js.Value) interface{} {
+		go func() {
+			defer func() {
+				if e := recover(); e != nil {
+					switch e := e.(type) {
+					case error:
+						handleError(e)
+					default:
+						handleError(fmt.Errorf("recovered with non-error value: (%T) %s", e, e))
+					}
+				}
+			}()
+
+			browserSDP := getElementByID("localSessionDescription")
+
+			browserSDP.Call("focus")
+			browserSDP.Call("select")
+
+			copyStatus := js.Global().Get("document").Call("execCommand", "copy")
+			if copyStatus.Bool() {
+				log("Copying SDP was successful")
+			} else {
+				log("Copying SDP was unsuccessful")
 			}
 		}()
 		return js.Undefined()
