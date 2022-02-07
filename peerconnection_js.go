@@ -523,6 +523,21 @@ func (pc *PeerConnection) GetTransceivers() (transceivers []*RTPTransceiver) {
 	return
 }
 
+// SCTP returns the SCTPTransport for this PeerConnection
+//
+// The SCTP transport over which SCTP data is sent and received. If SCTP has not been negotiated, the value is nil.
+// https://www.w3.org/TR/webrtc/#attributes-15
+func (pc *PeerConnection) SCTP() *SCTPTransport {
+	underlying := pc.underlying.Get("sctp")
+	if underlying.IsNull() || underlying.IsUndefined() {
+		return nil
+	}
+
+	return &SCTPTransport{
+		underlying: underlying,
+	}
+}
+
 // Converts a Configuration to js.Value so it can be passed
 // through to the JavaScript WebRTC API. Any zero values are converted to
 // js.Undefined(), which will result in the default value being used.
