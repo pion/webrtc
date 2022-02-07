@@ -83,6 +83,24 @@ func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, directi
 	return false
 }
 
+func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *sync.WaitGroup {
+	var triggered sync.WaitGroup
+	triggered.Add(len(peers))
+
+	for _, p := range peers {
+		done := false
+		hdlr := func(p PeerConnectionState) {
+			if !done && p == state {
+				done = true
+				triggered.Done()
+			}
+		}
+
+		p.OnConnectionStateChange(hdlr)
+	}
+	return &triggered
+}
+
 func TestNew(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{
 		ICEServers: []ICEServer{
@@ -715,4 +733,18 @@ func TestAddTransceiver(t *testing.T) {
 		assert.True(t, offerMediaHasDirection(offer, RTPCodecTypeVideo, testCase.direction))
 		assert.NoError(t, pc.Close())
 	}
+}
+
+// Assert that SCTPTransport -> DTLSTransport -> ICETransport works after connected
+func TestTransportChain(t *testing.T) {
+	offer, answer, err := newPair()
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	assert.NotNil(t, offer.SCTP().Transport().ICETransport())
+
+	closePairNow(t, offer, answer)
 }
