@@ -5,7 +5,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -13,57 +15,33 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-var peerConnection *webrtc.PeerConnection //nolint
+var api *webrtc.API //nolint
 
 func doSignaling(w http.ResponseWriter, r *http.Request) {
-	var err error
-
-	if peerConnection == nil {
-		settingEngine := webrtc.SettingEngine{}
-
-		// Enable support only for TCP ICE candidates.
-		settingEngine.SetNetworkTypes([]webrtc.NetworkType{
-			webrtc.NetworkTypeTCP4,
-			webrtc.NetworkTypeTCP6,
-		})
-
-		var tcpListener net.Listener
-		tcpListener, err = net.ListenTCP("tcp", &net.TCPAddr{
-			IP:   net.IP{0, 0, 0, 0},
-			Port: 8443,
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("Listening for ICE TCP at %s\n", tcpListener.Addr())
-
-		tcpMux := webrtc.NewICETCPMux(nil, tcpListener, 8)
-		settingEngine.SetICETCPMux(tcpMux)
-
-		api := webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
-		if peerConnection, err = api.NewPeerConnection(webrtc.Configuration{}); err != nil {
-			panic(err)
-		}
-
-		// Set the handler for ICE connection state
-		// This will notify you when the peer has connected/disconnected
-		peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-			fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-		})
-
-		// Send the current time via a DataChannel to the remote peer every 3 seconds
-		peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-			d.OnOpen(func() {
-				for range time.Tick(time.Second * 3) {
-					if err = d.SendText(time.Now().String()); err != nil {
-						panic(err)
-					}
-				}
-			})
-		})
+	peerConnection, err := api.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		panic(err)
 	}
+
+	// Set the handler for ICE connection state
+	// This will notify you when the peer has connected/disconnected
+	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
+		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
+	})
+
+	// Send the current time via a DataChannel to the remote peer every 3 seconds
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		d.OnOpen(func() {
+			for range time.Tick(time.Second * 3) {
+				if err = d.SendText(time.Now().String()); err != nil {
+					if errors.Is(io.ErrClosedPipe, err) {
+						return
+					}
+					panic(err)
+				}
+			}
+		})
+	})
 
 	var offer webrtc.SessionDescription
 	if err = json.NewDecoder(r.Body).Decode(&offer); err != nil {
@@ -101,6 +79,29 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	settingEngine := webrtc.SettingEngine{}
+
+	// Enable support only for TCP ICE candidates.
+	settingEngine.SetNetworkTypes([]webrtc.NetworkType{
+		webrtc.NetworkTypeTCP4,
+		webrtc.NetworkTypeTCP6,
+	})
+
+	tcpListener, err := net.ListenTCP("tcp", &net.TCPAddr{
+		IP:   net.IP{0, 0, 0, 0},
+		Port: 8443,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Listening for ICE TCP at %s\n", tcpListener.Addr())
+
+	tcpMux := webrtc.NewICETCPMux(nil, tcpListener, 8)
+	settingEngine.SetICETCPMux(tcpMux)
+
+	api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
+
 	http.Handle("/", http.FileServer(http.Dir(".")))
 	http.HandleFunc("/doSignaling", doSignaling)
 
