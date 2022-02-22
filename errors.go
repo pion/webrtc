@@ -142,6 +142,9 @@ var (
 	// ErrRTPSenderNewTrackHasIncorrectKind indicates that the new track is of a different kind than the previous/original
 	ErrRTPSenderNewTrackHasIncorrectKind = errors.New("new track must be of the same kind as previous")
 
+	// ErrRTPSenderNewTrackHasIncorrectEnvelope indicates that the new track has a different envelope than the previous/original
+	ErrRTPSenderNewTrackHasIncorrectEnvelope = errors.New("new track must have the same envelope as previous")
+
 	// ErrUnbindFailed indicates that a TrackLocal was not able to be unbind
 	ErrUnbindFailed = errors.New("failed to unbind TrackLocal from PeerConnection")
 
@@ -202,10 +205,16 @@ var (
 	errRTPReceiverWithSSRCTrackStreamNotFound = errors.New("unable to find stream for Track with SSRC")
 	errRTPReceiverForRIDTrackStreamNotFound   = errors.New("no trackStreams found for RID")
 
-	errRTPSenderTrackNil          = errors.New("Track must not be nil")
-	errRTPSenderDTLSTransportNil  = errors.New("DTLSTransport must not be nil")
-	errRTPSenderSendAlreadyCalled = errors.New("Send has already been called")
-	errRTPSenderTrackRemoved      = errors.New("Sender Track has been removed or replaced to nil")
+	errRTPSenderTrackNil             = errors.New("Track must not be nil")
+	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")
+	errRTPSenderSendAlreadyCalled    = errors.New("Send has already been called")
+	errRTPSenderStopped              = errors.New("Sender has already been stopped")
+	errRTPSenderTrackRemoved         = errors.New("Sender Track has been removed or replaced to nil")
+	errRTPSenderRidNil               = errors.New("Sender cannot add encoding as rid is empty")
+	errRTPSenderNoBaseEncoding       = errors.New("Sender cannot add encoding as there is no base track")
+	errRTPSenderBaseEncodingMismatch = errors.New("Sender cannot add encoding as provided track does not match base track")
+	errRTPSenderRIDCollision         = errors.New("Sender cannot encoding due to RID collision")
+	errRTPSenderNoTrackForRID        = errors.New("Sender does not have track for RID")
 
 	errRTPTransceiverCannotChangeMid        = errors.New("errRTPSenderTrackNil")
 	errRTPTransceiverSetSendingInvalidState = errors.New("invalid state change in RTPTransceiver.setSending")
