@@ -340,7 +340,60 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
-func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, mediaEngine *MediaEngine, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, mediaSection mediaSection) (bool, error) {
+func addSenderSDP(
+	mediaSection mediaSection,
+	isPlanB bool,
+	media *sdp.MediaDescription,
+) {
+	for _, mt := range mediaSection.transceivers {
+		sender := mt.Sender()
+		if sender == nil {
+			continue
+		}
+
+		track := sender.Track()
+		if track == nil {
+			continue
+		}
+
+		sendParameters := sender.GetParameters()
+		for _, encoding := range sendParameters.Encodings {
+			media = media.WithMediaSource(uint32(encoding.SSRC), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
+			if !isPlanB {
+				media = media.WithPropertyAttribute("msid:" + track.StreamID() + " " + track.ID())
+			}
+		}
+
+		if len(sendParameters.Encodings) > 1 {
+			sendRids := make([]string, 0, len(sendParameters.Encodings))
+
+			for _, encoding := range sendParameters.Encodings {
+				media.WithValueAttribute(sdpAttributeRid, encoding.RID+" send")
+				sendRids = append(sendRids, encoding.RID)
+			}
+			// Simulcast
+			media.WithValueAttribute("simulcast", "send "+strings.Join(sendRids, ";"))
+		}
+
+		if !isPlanB {
+			break
+		}
+	}
+}
+
+func addTransceiverSDP(
+	d *sdp.SessionDescription,
+	isPlanB bool,
+	shouldAddCandidates bool,
+	dtlsFingerprints []DTLSFingerprint,
+	mediaEngine *MediaEngine,
+	midValue string,
+	iceParams ICEParameters,
+	candidates []ICECandidate,
+	dtlsRole sdp.ConnectionRole,
+	iceGatheringState ICEGatheringState,
+	mediaSection mediaSection,
+) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
 		return false, errSDPZeroTransceivers
@@ -410,16 +463,7 @@ func addTransceiverSDP(d *sdp.SessionDescription, isPlanB, shouldAddCandidates b
 		media.WithValueAttribute("simulcast", "recv "+strings.Join(recvRids, ";"))
 	}
 
-	for _, mt := range transceivers {
-		if sender := mt.Sender(); sender != nil && sender.Track() != nil {
-			track := sender.Track()
-			media = media.WithMediaSource(uint32(sender.ssrc), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
-			if !isPlanB {
-				media = media.WithPropertyAttribute("msid:" + track.StreamID() + " " + track.ID())
-				break
-			}
-		}
-	}
+	addSenderSDP(mediaSection, isPlanB, media)
 
 	media = media.WithPropertyAttribute(t.Direction().String())
 

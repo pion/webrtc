@@ -16,6 +16,7 @@ import (
 // srtpWriterFuture blocks Read/Write calls until
 // the SRTP Session is available
 type srtpWriterFuture struct {
+	ssrc           SSRC
 	rtpSender      *RTPSender
 	rtcpReadStream atomic.Value // *srtp.ReadStreamSRTCP
 	rtpWriteStream atomic.Value // *srtp.WriteStreamSRTP
@@ -52,7 +53,7 @@ func (s *srtpWriterFuture) init(returnWhenNoSRTP bool) error {
 		return err
 	}
 
-	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(s.rtpSender.ssrc))
+	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(s.ssrc))
 	if err != nil {
 		return err
 	}
