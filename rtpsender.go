@@ -261,6 +261,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		ssrc:            context.ssrc,
 		writeStream:     context.writeStream,
 		rtcpInterceptor: context.rtcpInterceptor,
+		readerStream:    r,
 	})
 	if err != nil {
 		// Re-bind the original track
