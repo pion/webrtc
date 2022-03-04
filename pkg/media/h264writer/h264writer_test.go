@@ -37,8 +37,13 @@ func TestIsKeyFrame(t *testing.T) {
 			false,
 		},
 		{
-			"When given a keyframe; it should return true",
+			"When given a SPS packetized with STAP-A; it should return true",
 			[]byte{0x38, 0x00, 0x03, 0x27, 0x90, 0x90, 0x00, 0x05, 0x28, 0x90, 0x90, 0x90, 0x90},
+			true,
+		},
+		{
+			"When given a SPS with no packetization; it should return true",
+			[]byte{0x27, 0x90, 0x90, 0x00},
 			true,
 		},
 	}
@@ -128,14 +133,12 @@ func TestWriteRTP(t *testing.T) {
 			if reuseH264Writer != nil {
 				h264Writer = reuseH264Writer
 			}
-			packet := &rtp.Packet{
+
+			assert.Equal(t, tt.wantErr, h264Writer.WriteRTP(&rtp.Packet{
 				Payload: tt.payload,
-			}
-
-			err := h264Writer.WriteRTP(packet)
-
-			assert.Equal(t, tt.wantErr, err)
+			}))
 			assert.True(t, bytes.Equal(tt.wantBytes, writer.Bytes()))
+
 			if !tt.reuseWriter {
 				assert.Nil(t, h264Writer.Close())
 				reuseWriter = nil

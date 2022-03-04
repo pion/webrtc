@@ -1,8 +1,10 @@
+//go:build !js
 // +build !js
 
 package webrtc
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -46,7 +48,7 @@ func getMdNames(sdp *sdp.SessionDescription) []string {
 func extractSsrcList(md *sdp.MediaDescription) []string {
 	ssrcMap := map[string]struct{}{}
 	for _, attr := range md.Attributes {
-		if attr.Key == ssrcStr {
+		if attr.Key == sdp.AttrKeySSRC {
 			ssrc := strings.Fields(attr.Value)[0]
 			ssrcMap[ssrc] = struct{}{}
 		}
@@ -68,35 +70,30 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
-	}); err != nil {
-		t.Errorf("AddTransceiver failed: %v", err)
-	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+	})
+	assert.NoError(t, err)
+
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
-	}); err != nil {
-		t.Errorf("AddTransceiver failed: %v", err)
-	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
+	})
+	assert.NoError(t, err)
+
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
-	}); err != nil {
-		t.Errorf("AddTransceiver failed: %v", err)
-	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
+	})
+	assert.NoError(t, err)
+
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
-	}); err != nil {
-		t.Errorf("AddTransceiver failed: %v", err)
-	}
+	})
+	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateOffer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
 	mdNames := getMdNames(offer.parsed)
 	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
@@ -113,18 +110,12 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 	apc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	if err = apc.SetRemoteDescription(offer); err != nil {
-		t.Errorf("SetRemoteDescription failed: %s", err)
-	}
+	assert.NoError(t, apc.SetRemoteDescription(offer))
 
 	answer, err := apc.CreateAnswer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateAnswer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
 	mdNames = getMdNames(answer.parsed)
 	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
@@ -142,76 +133,58 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
-	}); err != nil {
-		t.Errorf("Failed to add transceiver")
-	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
+	})
+	assert.NoError(t, err)
+
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
-	}); err != nil {
-		t.Errorf("Failed to add transceiver")
-	}
+	})
+	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateOffer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
-	mdNames := getMdNames(offer.parsed)
-	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
+	assert.ObjectsAreEqual(getMdNames(offer.parsed), []string{"video", "audio", "data"})
 
 	apc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
-	if err != nil {
-		t.Errorf("Failed to create video track")
-	}
-	if _, err = apc.AddTrack(video1); err != nil {
-		t.Errorf("Failed to add video track")
-	}
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
-	if err != nil {
-		t.Errorf("Failed to create video track")
-	}
-	if _, err = apc.AddTrack(video2); err != nil {
-		t.Errorf("Failed to add video track")
-	}
-	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "3", "3")
-	if err != nil {
-		t.Errorf("Failed to create audio track")
-	}
-	if _, err = apc.AddTrack(audio1); err != nil {
-		t.Errorf("Failed to add audio track")
-	}
-	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "4", "4")
-	if err != nil {
-		t.Errorf("Failed to create audio track")
-	}
-	if _, err = apc.AddTrack(audio2); err != nil {
-		t.Errorf("Failed to add audio track")
-	}
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	assert.NoError(t, err)
 
-	if err = apc.SetRemoteDescription(offer); err != nil {
-		t.Errorf("SetRemoteDescription failed: %s", err)
-	}
+	_, err = apc.AddTrack(video1)
+	assert.NoError(t, err)
+
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(video2)
+	assert.NoError(t, err)
+
+	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "3", "3")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(audio1)
+	assert.NoError(t, err)
+
+	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "4", "4")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(audio2)
+	assert.NoError(t, err)
+
+	assert.NoError(t, apc.SetRemoteDescription(offer))
 
 	answer, err := apc.CreateAnswer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateAnswer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
-	mdNames = getMdNames(answer.parsed)
-	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
+	assert.ObjectsAreEqual(getMdNames(answer.parsed), []string{"video", "audio", "data"})
 
 	// Verify that each section has 2 SSRCs (one for each sender)
 	for _, section := range []string{"video", "audio"} {
@@ -235,81 +208,63 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	opc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsPlanB,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
-	}); err != nil {
-		t.Errorf("Failed to add transceiver")
-	}
-	if _, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
+	})
+	assert.NoError(t, err)
+
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
-	}); err != nil {
-		t.Errorf("Failed to add transceiver")
-	}
+	})
+	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateOffer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
-	mdNames := getMdNames(offer.parsed)
-	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
+	assert.ObjectsAreEqual(getMdNames(offer.parsed), []string{"video", "audio", "data"})
 
 	apc, err := NewPeerConnection(Configuration{
 		SDPSemantics: SDPSemanticsUnifiedPlanWithFallback,
 	})
-	if err != nil {
-		t.Errorf("NewPeerConnection failed: %v", err)
-	}
+	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
-	if err != nil {
-		t.Errorf("Failed to create video track")
-	}
-	if _, err = apc.AddTrack(video1); err != nil {
-		t.Errorf("Failed to add video track")
-	}
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/h264", SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
-	if err != nil {
-		t.Errorf("Failed to create video track")
-	}
-	if _, err = apc.AddTrack(video2); err != nil {
-		t.Errorf("Failed to add video track")
-	}
-	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "3", "3")
-	if err != nil {
-		t.Errorf("Failed to create audio track")
-	}
-	if _, err = apc.AddTrack(audio1); err != nil {
-		t.Errorf("Failed to add audio track")
-	}
-	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "audio/opus"}, "4", "4")
-	if err != nil {
-		t.Errorf("Failed to create audio track")
-	}
-	if _, err = apc.AddTrack(audio2); err != nil {
-		t.Errorf("Failed to add audio track")
-	}
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	assert.NoError(t, err)
 
-	if err = apc.SetRemoteDescription(offer); err != nil {
-		t.Errorf("SetRemoteDescription failed: %s", err)
-	}
+	_, err = apc.AddTrack(video1)
+	assert.NoError(t, err)
+
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(video2)
+	assert.NoError(t, err)
+
+	audio1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "3", "3")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(audio1)
+	assert.NoError(t, err)
+
+	audio2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "4", "4")
+	assert.NoError(t, err)
+
+	_, err = apc.AddTrack(audio2)
+	assert.NoError(t, err)
+
+	assert.NoError(t, apc.SetRemoteDescription(offer))
 
 	answer, err := apc.CreateAnswer(nil)
-	if err != nil {
-		t.Errorf("Plan B CreateAnswer failed: %s", err)
-	}
+	assert.NoError(t, err)
 
-	mdNames = getMdNames(answer.parsed)
-	assert.ObjectsAreEqual(mdNames, []string{"video", "audio", "data"})
+	assert.ObjectsAreEqual(getMdNames(answer.parsed), []string{"video", "audio", "data"})
 
 	extractSsrcList := func(md *sdp.MediaDescription) []string {
 		ssrcMap := map[string]struct{}{}
 		for _, attr := range md.Attributes {
-			if attr.Key == ssrcStr {
+			if attr.Key == sdp.AttrKeySSRC {
 				ssrc := strings.Fields(attr.Value)[0]
 				ssrcMap[ssrc] = struct{}{}
 			}
@@ -330,4 +285,46 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	}
 
 	closePairNow(t, apc, opc)
+}
+
+// Assert that we can catch Remote SessionDescription that don't match our Semantics
+func TestSDPSemantics_SetRemoteDescription_Mismatch(t *testing.T) {
+	planBOffer := "v=0\r\no=- 4648475892259889561 3 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE video audio\r\na=ice-ufrag:1hhfzwf0ijpzm\r\na=ice-pwd:jm5puo2ab1op3vs59ca53bdk7s\r\na=fingerprint:sha-256 40:42:FB:47:87:52:BF:CB:EC:3A:DF:EB:06:DA:2D:B7:2F:59:42:10:23:7B:9D:4C:C9:58:DD:FF:A2:8F:17:67\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:video\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 goog-remb\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f\r\na=ssrc:1505338584 cname:10000000b5810aac\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:audio\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=ssrc:697641945 cname:10000000b5810aac\r\n"
+	unifiedPlanOffer := "v=0\r\no=- 4648475892259889561 3 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0 1\r\na=ice-ufrag:1hhfzwf0ijpzm\r\na=ice-pwd:jm5puo2ab1op3vs59ca53bdk7s\r\na=fingerprint:sha-256 40:42:FB:47:87:52:BF:CB:EC:3A:DF:EB:06:DA:2D:B7:2F:59:42:10:23:7B:9D:4C:C9:58:DD:FF:A2:8F:17:67\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:0\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 goog-remb\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f\r\na=ssrc:1505338584 cname:10000000b5810aac\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:1\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=ssrc:697641945 cname:10000000b5810aac\r\n"
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	t.Run("PlanB", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{
+			SDPSemantics: SDPSemanticsUnifiedPlan,
+		})
+		assert.NoError(t, err)
+
+		err = pc.SetRemoteDescription(SessionDescription{SDP: planBOffer, Type: SDPTypeOffer})
+		assert.NoError(t, err)
+
+		_, err = pc.CreateAnswer(nil)
+		assert.True(t, errors.Is(err, ErrIncorrectSDPSemantics))
+
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("UnifiedPlan", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{
+			SDPSemantics: SDPSemanticsPlanB,
+		})
+		assert.NoError(t, err)
+
+		err = pc.SetRemoteDescription(SessionDescription{SDP: unifiedPlanOffer, Type: SDPTypeOffer})
+		assert.NoError(t, err)
+
+		_, err = pc.CreateAnswer(nil)
+		assert.True(t, errors.Is(err, ErrIncorrectSDPSemantics))
+
+		assert.NoError(t, pc.Close())
+	})
 }

@@ -1,8 +1,10 @@
+//go:build !js
+// +build !js
+
 package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
@@ -26,41 +28,44 @@ func main() {
 		panic(err)
 	}
 
-	// Create a datachannel with label 'data'
-	dataChannel, err := peerConnection.CreateDataChannel("data", nil)
-	if err != nil {
-		panic(err)
-	}
+	// Set a handler for when a new remote track starts
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		fmt.Printf("Track has started streamId(%s) id(%s) rid(%s) \n", track.StreamID(), track.ID(), track.RID())
 
-	// Set the handler for ICE connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
-	})
+		for {
+			// Read the RTCP packets as they become available for our new remote track
+			rtcpPackets, _, rtcpErr := receiver.ReadRTCP()
+			if rtcpErr != nil {
+				panic(rtcpErr)
+			}
 
-	// Register channel opening handling
-	dataChannel.OnOpen(func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
-
-		for range time.NewTicker(5 * time.Second).C {
-			message := signal.RandSeq(15)
-			fmt.Printf("Sending '%s'\n", message)
-
-			// Send the message as text
-			sendErr := dataChannel.SendText(message)
-			if sendErr != nil {
-				panic(sendErr)
+			for _, r := range rtcpPackets {
+				// Print a string description of the packets
+				if stringer, canString := r.(fmt.Stringer); canString {
+					fmt.Printf("Received RTCP Packet: %v", stringer.String())
+				}
 			}
 		}
 	})
 
-	// Register text message handling
-	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
-		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label(), string(msg.Data))
+	// Set the handler for ICE connection state
+	// This will notify you when the peer has connected/disconnected
+	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
+		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 	})
 
-	// Create an offer to send to the browser
-	offer, err := peerConnection.CreateOffer(nil)
+	// Wait for the offer to be pasted
+	offer := webrtc.SessionDescription{}
+	signal.Decode(signal.MustReadStdin(), &offer)
+
+	// Set the remote SessionDescription
+	err = peerConnection.SetRemoteDescription(offer)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create answer
+	answer, err := peerConnection.CreateAnswer(nil)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +74,7 @@ func main() {
 	gatherComplete := webrtc.GatheringCompletePromise(peerConnection)
 
 	// Sets the LocalDescription, and starts our UDP listeners
-	err = peerConnection.SetLocalDescription(offer)
+	err = peerConnection.SetLocalDescription(answer)
 	if err != nil {
 		panic(err)
 	}
@@ -81,16 +86,6 @@ func main() {
 
 	// Output the answer in base64 so we can paste it in browser
 	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
-
-	// Wait for the answer to be pasted
-	answer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &answer)
-
-	// Apply the answer as the remote description
-	err = peerConnection.SetRemoteDescription(answer)
-	if err != nil {
-		panic(err)
-	}
 
 	// Block forever
 	select {}

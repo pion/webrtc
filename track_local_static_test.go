@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -22,7 +23,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	t.Run("Offerer", func(t *testing.T) {
@@ -93,7 +94,7 @@ func Test_TrackLocalStatic_Closed(t *testing.T) {
 	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(vp8Writer)
@@ -135,7 +136,7 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 	answerer, err := NewAPI(WithMediaEngine(mediaEngineTwo)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
@@ -171,7 +172,7 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
-	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(vp8Writer)
@@ -203,7 +204,7 @@ func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = pcAnswer.AddTrack(vp8Writer)
@@ -231,7 +232,7 @@ func BenchmarkTrackLocalWrite(b *testing.B) {
 		b.Fatalf("Failed to create a PC pair for testing")
 	}
 
-	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(b, err)
 
 	_, err = offerPC.AddTrack(track)

@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -78,7 +79,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIcePwd)
 	})
 
@@ -89,7 +90,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIceUfrag)
 	})
 
@@ -102,7 +103,7 @@ func TestExtractICEDetails(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s)
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
@@ -120,7 +121,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s)
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
@@ -134,7 +135,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionConflictingIceUfrag)
 	})
 
@@ -146,7 +147,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s)
+		_, _, _, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionConflictingIcePwd)
 	})
 }
@@ -204,7 +205,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "sendonly"},
-						{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+						{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
 					},
 				},
 			},
@@ -219,14 +220,14 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Fail(t, "missing audio track with ssrc:2000")
 		} else {
 			assert.Equal(t, RTPCodecTypeAudio, track.kind)
-			assert.Equal(t, SSRC(2000), track.ssrc)
+			assert.Equal(t, SSRC(2000), track.ssrcs[0])
 			assert.Equal(t, "audio_trk_label", track.streamID)
 		}
 		if track := trackDetailsForSSRC(tracks, 3000); track == nil {
 			assert.Fail(t, "missing video track with ssrc:3000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)
-			assert.Equal(t, SSRC(3000), track.ssrc)
+			assert.Equal(t, SSRC(3000), track.ssrcs[0])
 			assert.Equal(t, "video_trk_label", track.streamID)
 		}
 		if track := trackDetailsForSSRC(tracks, 4000); track != nil {
@@ -236,7 +237,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Fail(t, "missing video track with ssrc:5000")
 		} else {
 			assert.Equal(t, RTPCodecTypeVideo, track.kind)
-			assert.Equal(t, SSRC(5000), track.ssrc)
+			assert.Equal(t, SSRC(5000), track.ssrcs[0])
 			assert.Equal(t, "video_trk_id", track.id)
 			assert.Equal(t, "video_stream_id", track.streamID)
 		}
@@ -307,6 +308,8 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 	engine := &MediaEngine{}
 	assert.NoError(t, engine.RegisterDefaultCodecs())
 
+	api := NewAPI(WithMediaEngine(engine))
+
 	sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
 
@@ -317,13 +320,17 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 		{
 			id: "video",
 			transceivers: []*RTPTransceiver{{
-				kind: RTPCodecTypeVideo,
+				kind:   RTPCodecTypeVideo,
+				api:    api,
+				codecs: engine.getCodecsByKind(RTPCodecTypeVideo),
 			}},
 		},
 		{
 			id: "audio",
 			transceivers: []*RTPTransceiver{{
-				kind: RTPCodecTypeAudio,
+				kind:   RTPCodecTypeAudio,
+				api:    api,
+				codecs: engine.getCodecsByKind(RTPCodecTypeAudio),
 			}},
 		},
 		{
@@ -362,22 +369,23 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 }
 
 func TestPopulateSDP(t *testing.T) {
-	t.Run("Rid", func(t *testing.T) {
-		tr := &RTPTransceiver{kind: RTPCodecTypeVideo}
+	t.Run("rid", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
 		ridMap := map[string]string{
 			"ridkey": "some",
 		}
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, ridMap: ridMap}}
 
-		se := SettingEngine{}
-
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
-
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &m, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -387,7 +395,7 @@ func TestPopulateSDP(t *testing.T) {
 				continue
 			}
 			for _, a := range desc.Attributes {
-				if a.Key == "rid" {
+				if a.Key == sdpAttributeRid {
 					if strings.Contains(a.Value, "ridkey") {
 						found = true
 						break
@@ -396,6 +404,50 @@ func TestPopulateSDP(t *testing.T) {
 			}
 		}
 		assert.Equal(t, true, found, "Rid key should be present")
+	})
+	t.Run("SetCodecPreferences", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+		me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo)
+		me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio)
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		codecErr := tr.SetCodecPreferences([]RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+				PayloadType:        96,
+			},
+		})
+		assert.NoError(t, codecErr)
+
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		assert.Nil(t, err)
+
+		// Test codecs
+		foundVP8 := false
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media != "video" {
+				continue
+			}
+			for _, a := range desc.Attributes {
+				if strings.Contains(a.Key, "rtpmap") {
+					if a.Value == "98 VP9/90000" {
+						t.Fatal("vp9 should not be present in sdp")
+					} else if a.Value == "96 VP8/90000" {
+						foundVP8 = true
+					}
+				}
+			}
+		}
+		assert.Equal(t, true, foundVP8, "vp8 should be present in sdp")
 	})
 }
 
@@ -407,7 +459,7 @@ func TestGetRIDs(t *testing.T) {
 			},
 			Attributes: []sdp.Attribute{
 				{Key: "sendonly"},
-				{Key: "rid", Value: "f send pt=97;max-width=1280;max-height=720"},
+				{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
 			},
 		},
 	}

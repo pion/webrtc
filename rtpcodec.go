@@ -2,6 +2,8 @@ package webrtc
 
 import (
 	"strings"
+
+	"github.com/pion/webrtc/v3/internal/fmtp"
 )
 
 // RTPCodecType determines the type of a codec
@@ -97,12 +99,12 @@ const (
 // Used for lookup up a codec in an existing list to find a match
 // Returns codecMatchExact, codecMatchPartial, or codecMatchNone
 func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecParameters) (RTPCodecParameters, codecMatchType) {
-	needleFmtp := parseFmtp(needle.RTPCodecCapability.SDPFmtpLine)
+	needleFmtp := fmtp.Parse(needle.RTPCodecCapability.MimeType, needle.RTPCodecCapability.SDPFmtpLine)
 
 	// First attempt to match on MimeType + SDPFmtpLine
 	for _, c := range haystack {
-		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
-			fmtpConsist(needleFmtp, parseFmtp(c.RTPCodecCapability.SDPFmtpLine)) {
+		cfmtp := fmtp.Parse(c.RTPCodecCapability.MimeType, c.RTPCodecCapability.SDPFmtpLine)
+		if needleFmtp.Match(cfmtp) {
 			return c, codecMatchExact
 		}
 	}

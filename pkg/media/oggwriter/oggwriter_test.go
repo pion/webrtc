@@ -31,7 +31,6 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			Extension:        true,
 			ExtensionProfile: 1,
 			Version:          2,
-			PayloadOffset:    20,
 			PayloadType:      111,
 			SequenceNumber:   27023,
 			Timestamp:        3653407706,
@@ -39,7 +38,6 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			CSRC:             []uint32{},
 		},
 		Payload: rawPkt[20:],
-		Raw:     rawPkt,
 	}
 	assert.NoError(t, validPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
@@ -58,9 +56,9 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 		},
 		{
 			buffer:       &bytes.Buffer{},
-			message:      "OggWriter shouldn't be able to write an empty packet",
+			message:      "OggWriter shouldn't be able to write a nil packet",
 			messageClose: "OggWriter should be able to close the file",
-			packet:       &rtp.Packet{},
+			packet:       nil,
 			err:          errInvalidNilPacket,
 			closeErr:     nil,
 		},
@@ -122,4 +120,13 @@ func TestOggWriter_AddPacketAndClose(t *testing.T) {
 			assert.Equal(t.closeErr, res, t.messageClose)
 		}
 	}
+}
+
+func TestOggWriter_EmptyPayload(t *testing.T) {
+	buffer := &bytes.Buffer{}
+
+	writer, err := NewWith(buffer, 48000, 2)
+	assert.NoError(t, err)
+
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{}}))
 }

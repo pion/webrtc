@@ -11,7 +11,7 @@ go get github.com/pion/webrtc/v3/examples/broadcast
 ```
 
 ### Open broadcast example page
-[jsfiddle.net](https://jsfiddle.net/1jc4go7v/) You should see two buttons 'Publish a Broadcast' and 'Join a Broadcast'
+[jsfiddle.net](https://jsfiddle.net/ypcsbnu3/) You should see two buttons `Publish a Broadcast` and `Join a Broadcast`
 
 ### Run Broadcast
 #### Linux/macOS
@@ -20,7 +20,7 @@ Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 ### Start a publisher
 
 * Click `Publish a Broadcast`
-* Copy the string in the first input labelled `Browser base64 Session Description`
+* Press `Copy browser SDP to clipboard` or copy the `Browser base64 Session Description` string manually
 * Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
 * The `broadcast` terminal application will respond with an answer, paste this into the second input field in your browser.
 * Press `Start Session`

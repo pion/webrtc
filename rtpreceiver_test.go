@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -7,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	sender, receiver, wan := createVNetPair(t)
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = sender.AddTrack(track)
@@ -41,10 +41,10 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 		assert.NoError(t, readErr)
 
 		_, _, readErr = trackRemote.ReadRTP()
-		assert.Error(t, readErr, packetio.ErrTimeout)
+		assert.Error(t, readErr)
 
 		_, _, readErr = r.ReadRTCP()
-		assert.Error(t, readErr, packetio.ErrTimeout)
+		assert.Error(t, readErr)
 
 		seenPacketCancel()
 	})

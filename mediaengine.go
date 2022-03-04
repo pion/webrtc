@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -6,17 +7,22 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v3/internal/fmtp"
 )
 
 const (
 	// MimeTypeH264 H264 MIME type.
 	// Note: Matching should be case insensitive.
 	MimeTypeH264 = "video/H264"
+	// MimeTypeH265 H265 MIME type
+	// Note: Matching should be case insensitive.
+	MimeTypeH265 = "video/H265"
 	// MimeTypeOpus Opus MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeOpus = "audio/opus"
@@ -26,6 +32,9 @@ const (
 	// MimeTypeVP9 VP9 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeVP9 = "video/VP9"
+	// MimeTypeAV1 AV1 MIME type
+	// Note: Matching should be case insensitive.
+	MimeTypeAV1 = "video/AV1"
 	// MimeTypeG722 G722 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeG722 = "audio/G722"
@@ -57,6 +66,8 @@ type MediaEngine struct {
 
 	headerExtensions           []mediaEngineHeaderExtension
 	negotiatedHeaderExtensions map[int]mediaEngineHeaderExtension
+
+	mu sync.RWMutex
 }
 
 // RegisterDefaultCodecs registers the default codecs supported by Pion WebRTC.
@@ -196,6 +207,9 @@ func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParame
 // These are the list of codecs supported by this PeerConnection.
 // RegisterCodec is not safe for concurrent use.
 func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
@@ -211,6 +225,9 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 // RegisterHeaderExtension adds a header extension to the MediaEngine
 // To determine the negotiated value use `GetHeaderExtensionID` after signaling is complete
 func (m *MediaEngine) RegisterHeaderExtension(extension RTPHeaderExtensionCapability, typ RTPCodecType, allowedDirections ...RTPTransceiverDirection) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.negotiatedHeaderExtensions == nil {
 		m.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
 	}
@@ -251,6 +268,9 @@ func (m *MediaEngine) RegisterHeaderExtension(extension RTPHeaderExtensionCapabi
 
 // RegisterFeedback adds feedback mechanism to already registered codecs.
 func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	switch typ {
 	case RTPCodecTypeVideo:
 		for i, v := range m.videoCodecs {
@@ -268,6 +288,9 @@ func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) 
 // getHeaderExtensionID returns the negotiated ID for a header extension.
 // If the Header Extension isn't enabled ok will be false
 func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapability) (val int, audioNegotiated, videoNegotiated bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if m.negotiatedHeaderExtensions == nil {
 		return 0, false, false
 	}
@@ -284,6 +307,8 @@ func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapabilit
 // copy copies any user modifiable state of the MediaEngine
 // all internal state is reset
 func (m *MediaEngine) copy() *MediaEngine {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	cloned := &MediaEngine{
 		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
 		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
@@ -295,15 +320,39 @@ func (m *MediaEngine) copy() *MediaEngine {
 	return cloned
 }
 
-func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
-	for _, codec := range m.negotiatedVideoCodecs {
+func findCodecByPayload(codecs []RTPCodecParameters, payloadType PayloadType) *RTPCodecParameters {
+	for _, codec := range codecs {
 		if codec.PayloadType == payloadType {
-			return codec, RTPCodecTypeVideo, nil
+			return &codec
 		}
 	}
-	for _, codec := range m.negotiatedAudioCodecs {
-		if codec.PayloadType == payloadType {
-			return codec, RTPCodecTypeAudio, nil
+	return nil
+}
+
+func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParameters, RTPCodecType, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// if we've negotiated audio or video, check the negotiated types before our
+	// built-in payload types, to ensure we pick the codec the other side wants.
+	if m.negotiatedVideo {
+		if codec := findCodecByPayload(m.negotiatedVideoCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeVideo, nil
+		}
+	}
+	if m.negotiatedAudio {
+		if codec := findCodecByPayload(m.negotiatedAudioCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeAudio, nil
+		}
+	}
+	if !m.negotiatedVideo {
+		if codec := findCodecByPayload(m.videoCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeVideo, nil
+		}
+	}
+	if !m.negotiatedAudio {
+		if codec := findCodecByPayload(m.audioCodecs, payloadType); codec != nil {
+			return *codec, RTPCodecTypeAudio, nil
 		}
 	}
 
@@ -311,6 +360,9 @@ func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParame
 }
 
 func (m *MediaEngine) collectStats(collector *statsReportCollector) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	statsLoop := func(codecs []RTPCodecParameters) {
 		for _, codec := range codecs {
 			collector.Collecting()
@@ -340,8 +392,8 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		codecs = m.audioCodecs
 	}
 
-	remoteFmtp := parseFmtp(remoteCodec.RTPCodecCapability.SDPFmtpLine)
-	if apt, hasApt := remoteFmtp["apt"]; hasApt {
+	remoteFmtp := fmtp.Parse(remoteCodec.RTPCodecCapability.MimeType, remoteCodec.RTPCodecCapability.SDPFmtpLine)
+	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
 		payloadType, err := strconv.Atoi(apt)
 		if err != nil {
 			return codecMatchNone, err
@@ -418,6 +470,9 @@ func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) 
 
 // Update the MediaEngine from a remote description
 func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 		switch {
@@ -478,6 +533,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 }
 
 func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	if typ == RTPCodecTypeVideo {
 		if m.negotiatedVideo {
 			return m.negotiatedVideoCodecs
@@ -498,6 +556,11 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 
+	// perform before locking to prevent recursive RLocks
+	foundCodecs := m.getCodecsByKind(typ)
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.negotiatedVideo && typ == RTPCodecTypeVideo ||
 		m.negotiatedAudio && typ == RTPCodecTypeAudio {
 		for id, e := range m.negotiatedHeaderExtensions {
@@ -515,7 +578,7 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 
 	return RTPParameters{
 		HeaderExtensions: headerExtensions,
-		Codecs:           m.getCodecsByKind(typ),
+		Codecs:           foundCodecs,
 	}
 }
 
@@ -525,6 +588,8 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 		return RTPParameters{}, err
 	}
 
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 	for id, e := range m.negotiatedHeaderExtensions {
 		if e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo {
@@ -545,7 +610,9 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	case strings.ToLower(MimeTypeOpus):
 		return &codecs.OpusPayloader{}, nil
 	case strings.ToLower(MimeTypeVP8):
-		return &codecs.VP8Payloader{}, nil
+		return &codecs.VP8Payloader{
+			EnablePictureID: true,
+		}, nil
 	case strings.ToLower(MimeTypeVP9):
 		return &codecs.VP9Payloader{}, nil
 	case strings.ToLower(MimeTypeG722):

@@ -1,6 +1,7 @@
 {
   "extends": [
-    "config:base"
+    "config:base",
+    ":disableDependencyDashboard"
   ],
   "postUpdateOptions": [
     "gomodTidy"
@@ -15,5 +16,12 @@
       "packagePatterns": ["^golang.org/x/"],
       "schedule": ["on the first day of the month"]
     }
+  ],
+  "ignorePaths": [
+    ".github/workflows/generate-authors.yml",
+    ".github/workflows/lint.yaml",
+    ".github/workflows/renovate-go-mod-fix.yaml",
+    ".github/workflows/test.yaml",
+    ".github/workflows/tidy-check.yaml"
   ]
 }

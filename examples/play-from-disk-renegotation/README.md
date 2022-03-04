@@ -16,11 +16,15 @@ cd webrtc/examples/play-from-disk-renegotiation
 ```
 
 ### Create IVF named `output.ivf` that contains a VP8 track
+
 ```
-ffmpeg -i $INPUT_FILE -g 30 output.ivf
+ffmpeg -i $INPUT_FILE -g 30 -b:v 2M output.ivf
 ```
 
+**Note**: In the `ffmpeg` command, the argument `-b:v 2M` specifies the video bitrate to be 2 megabits per second. We provide this default value to produce decent video quality, but if you experience problems with this configuration (such as dropped frames etc.), you can decrease this. See the [ffmpeg documentation](https://ffmpeg.org/ffmpeg.html#Options) for more information on the format of the value.
+
 ### Run play-from-disk-renegotiation
+
 The `output.ivf` you created should be in the same directory as `play-from-disk-renegotiation`. Execute `go run *.go`
 
 ### Open the Web UI

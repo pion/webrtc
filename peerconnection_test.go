@@ -28,7 +28,7 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	return pca, pcb, nil
 }
 
-func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
+func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnection, modificationFunc func(string) string) error {
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -46,7 +46,9 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 		return err
 	}
 	<-offerGatheringComplete
-	if err = pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()); err != nil {
+
+	offer.SDP = modificationFunc(pcOffer.LocalDescription().SDP)
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
 		return err
 	}
 
@@ -62,6 +64,10 @@ func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
 }
 
+func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
+	return signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string { return sessionDescription })
+}
+
 func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
 	parsed := &sdp.SessionDescription{}
 	if err := parsed.Unmarshal([]byte(offer.SDP)); err != nil {
@@ -75,6 +81,24 @@ func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, directi
 		}
 	}
 	return false
+}
+
+func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *sync.WaitGroup {
+	var triggered sync.WaitGroup
+	triggered.Add(len(peers))
+
+	for _, p := range peers {
+		done := false
+		hdlr := func(p PeerConnectionState) {
+			if !done && p == state {
+				done = true
+				triggered.Done()
+			}
+		}
+
+		p.OnConnectionStateChange(hdlr)
+	}
+	return &triggered
 }
 
 func TestNew(t *testing.T) {
@@ -321,7 +345,7 @@ func TestCreateOfferAnswer(t *testing.T) {
 	// so CreateAnswer should return an InvalidStateError
 	assert.Equal(t, answerPeerConn.SignalingState(), SignalingStateStable)
 	_, err = answerPeerConn.CreateAnswer(nil)
-	assert.Error(t, err, &rtcerr.InvalidStateError{Err: ErrIncorrectSignalingState})
+	assert.Error(t, err)
 
 	closePairNow(t, offerPeerConn, answerPeerConn)
 }
@@ -709,4 +733,18 @@ func TestAddTransceiver(t *testing.T) {
 		assert.True(t, offerMediaHasDirection(offer, RTPCodecTypeVideo, testCase.direction))
 		assert.NoError(t, pc.Close())
 	}
+}
+
+// Assert that SCTPTransport -> DTLSTransport -> ICETransport works after connected
+func TestTransportChain(t *testing.T) {
+	offer, answer, err := newPair()
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	assert.NotNil(t, offer.SCTP().Transport().ICETransport())
+
+	closePairNow(t, offer, answer)
 }

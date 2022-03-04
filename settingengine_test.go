@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -211,4 +212,24 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 
 		closePairNow(t, offerer, answerer)
 	})
+}
+
+func TestSetDTLSRetransmissionInterval(t *testing.T) {
+	s := SettingEngine{}
+
+	if s.dtls.retransmissionInterval != 0 {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
+	}
+
+	s.SetDTLSRetransmissionInterval(100 * time.Millisecond)
+	if s.dtls.retransmissionInterval == 0 ||
+		s.dtls.retransmissionInterval != 100*time.Millisecond {
+		t.Errorf("Failed to set DTLS retransmission interval")
+	}
+
+	s.SetDTLSRetransmissionInterval(1 * time.Second)
+	if s.dtls.retransmissionInterval == 0 ||
+		s.dtls.retransmissionInterval != 1*time.Second {
+		t.Errorf("Failed to set DTLS retransmission interval")
+	}
 }

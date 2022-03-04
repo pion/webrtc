@@ -98,3 +98,38 @@ func TestSkipSEI(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(byte(0xAB), nal.Data[0])
 }
+
+func TestIssue1734_NextNal(t *testing.T) {
+	tt := [...][]byte{
+		[]byte("\x00\x00\x010\x00\x00\x01\x00\x00\x01"),
+		[]byte("\x00\x00\x00\x01\x00\x00\x01"),
+	}
+
+	for _, cur := range tt {
+		r, err := NewReader(bytes.NewReader(cur))
+		assert.NoError(t, err)
+
+		// Just make sure it doesn't crash
+		for {
+			nal, err := r.NextNAL()
+
+			if err != nil || nal == nil {
+				break
+			}
+		}
+	}
+}
+
+func TestTrailing01AfterStartCode(t *testing.T) {
+	r, err := NewReader(bytes.NewReader([]byte{
+		0x0, 0x0, 0x0, 0x1, 0x01,
+		0x0, 0x0, 0x0, 0x1, 0x01,
+	}))
+	assert.NoError(t, err)
+
+	for i := 0; i <= 1; i++ {
+		nal, err := r.NextNAL()
+		assert.NoError(t, err)
+		assert.NotNil(t, nal)
+	}
+}

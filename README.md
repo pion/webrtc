@@ -21,16 +21,6 @@
 </p>
 <br>
 
-### New Release
-
-Pion WebRTC v3.0.0 has been released! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v3.0.0) to learn about new features and breaking changes.
-
-If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v2` release.
-
-We would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
-
-----
-
 ### Usage
 [Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v2` or `/v3` when importing.
 
@@ -96,8 +86,9 @@ This book is vendor agnostic and will not have any Pion specific information.
 * [Simulcast](https://github.com/pion/webrtc/tree/master/examples/simulcast)
 * [SVC](https://github.com/pion/rtp/blob/master/codecs/vp9_packet.go#L138)
 * [NACK](https://github.com/pion/interceptor/pull/4)
-* Full loss recovery and congestion control is not complete, see [pion/interceptor](https://github.com/pion/interceptor) for progress
-  * See [ion](https://github.com/pion/ion-sfu/tree/master/pkg/buffer) for how an implementor can do it today
+* [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/master/pkg/report)
+* [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/master/pkg/twcc)
+* Bandwidth Estimation is actively being implemented, see [pion/interceptor#25](https://github.com/pion/interceptor/issues/25)
 
 #### Security
 * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA for DTLS v1.2
@@ -132,150 +123,6 @@ If you need commercial support or don't want to use public methods you can conta
 
 ### Contributing
 Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
-
-* [John Bradley](https://github.com/kc5nra) - *Original Author*
-* [Michael Melvin Santry](https://github.com/santrym) - *Mascot*
-* [Raphael Randschau](https://github.com/nicolai86) - *STUN*
-* [Sean DuBois](https://github.com/Sean-Der) - *Original Author*
-* [Michiel De Backker](https://github.com/backkem) - *SDP, Public API, Project Management*
-* [Brendan Rius](https://github.com/brendanrius) - *Cleanup*
-* [Konstantin Itskov](https://github.com/trivigy) - *SDP Parsing*
-* [chenkaiC4](https://github.com/chenkaiC4) - *Fix GolangCI Linter*
-* [Ronan J](https://github.com/ronanj) - *Fix STCP PPID*
-* [wattanakorn495](https://github.com/wattanakorn495)
-* [Max Hawkins](https://github.com/maxhawkins) - *RTCP*
-* [Justin Okamoto](https://github.com/justinokamoto) - *Fix Docs*
-* [leeoxiang](https://github.com/notedit) - *Implement Janus examples*
-* [Denis](https://github.com/Hixon10) - *Adding docker-compose to pion-to-pion example*
-* [earle](https://github.com/aguilEA) - *Generate DTLS fingerprint in Go*
-* [Jake B](https://github.com/silbinarywolf) - *Fix Windows installation instructions*
-* [Michael MacDonald](https://github.com/mjmac) - *Plan B compatibility, Remote TURN/Trickle-ICE, Logging framework*
-* [Oleg Kovalov](https://github.com/cristaloleg) *Use wildcards instead of hardcoding travis-ci config*
-* [Woodrow Douglass](https://github.com/wdouglass) *RTCP, RTP improvements, G.722 support, Bugfixes*
-* [Tobias Fridén](https://github.com/tobiasfriden) *SRTP authentication verification*
-* [Yutaka Takeda](https://github.com/enobufs) *Fix ICE connection timeout*
-* [Hugo Arregui](https://github.com/hugoArregui) *Fix connection timeout*
-* [Rob Deutsch](https://github.com/rob-deutsch) *RTPReceiver graceful shutdown*
-* [Jin Lei](https://github.com/jinleileiking) - *SFU example use http*
-* [Will Watson](https://github.com/wwatson) - *Enable gocritic*
-* [Luke Curley](https://github.com/kixelated)
-* [Antoine Baché](https://github.com/Antonito) - *OGG Opus export*
-* [frank](https://github.com/feixiao) - *Building examples on OSX*
-* [mxmCherry](https://github.com/mxmCherry)
-* [Alex Browne](https://github.com/albrow) - *JavaScript/Wasm bindings*
-* [adwpc](https://github.com/adwpc) - *SFU example with websocket*
-* [imalic3](https://github.com/imalic3) - *SFU websocket example with datachannel broadcast*
-* [Žiga Željko](https://github.com/zigazeljko)
-* [Simonacca Fotokite](https://github.com/simonacca-fotokite)
-* [Marouane](https://github.com/nindolabs) *Fix Offer bundle generation*
-* [Christopher Fry](https://github.com/christopherfry)
-* [Adam Kiss](https://github.com/masterada)
-* [xsbchen](https://github.com/xsbchen)
-* [Alex Harford](https://github.com/alexjh)
-* [Aleksandr Razumov](https://github.com/ernado)
-* [mchlrhw](https://github.com/mchlrhw)
-* [AlexWoo(武杰)](https://github.com/AlexWoo) *Fix RemoteDescription parsing for certificate fingerprint*
-* [Cecylia Bocovich](https://github.com/cohosh)
-* [Slugalisk](https://github.com/slugalisk)
-* [Agugua Kenechukwu](https://github.com/spaceCh1mp)
-* [Ato Araki](https://github.com/atotto)
-* [Rafael Viscarra](https://github.com/rviscarra)
-* [Mike Coleman](https://github.com/fivebats)
-* [Suhas Gaddam](https://github.com/suhasgaddam)
-* [Atsushi Watanabe](https://github.com/at-wat)
-* [Robert Eperjesi](https://github.com/epes)
-* [Aaron France](https://github.com/AeroNotix)
-* [Gareth Hayes](https://github.com/gazhayes)
-* [Sebastian Waisbrot](https://github.com/seppo0010)
-* [Masataka Hisasue](https://github.com/sylba2050) - *Fix Docs*
-* [Hongchao Ma(马洪超)](https://github.com/hcm007)
-* [Aaron France](https://github.com/AeroNotix)
-* [Chris Hiszpanski](https://github.com/thinkski) - *Fix Answer bundle generation*
-* [Vicken Simonian](https://github.com/vsimon)
-* [Guilherme Souza](https://github.com/gqgs)
-* [Andrew N. Shalaev](https://github.com/isqad)
-* [David Hamilton](https://github.com/dihamilton)
-* [Ilya Mayorov](https://github.com/faroyam)
-* [Patrick Lange](https://github.com/langep)
-* [cyannuk](https://github.com/cyannuk)
-* [Lukas Herman](https://github.com/lherman-cs)
-* [Konstantin Chugalinskiy](https://github.com/kchugalinskiy)
-* [Bao Nguyen](https://github.com/sysbot)
-* [Luke S](https://github.com/encounter)
-* [Hendrik Hofstadt](https://github.com/hendrikhofstadt)
-* [Clayton McCray](https://github.com/ClaytonMcCray)
-* [lawl](https://github.com/lawl)
-* [Jorropo](https://github.com/Jorropo)
-* [Akil](https://github.com/akilude)
-* [Quentin Renard](https://github.com/asticode)
-* [opennota](https://github.com/opennota)
-* [Simon Eisenmann](https://github.com/longsleep)
-* [Ben Weitzman](https://github.com/benweitzman)
-* [Masahiro Nakamura](https://github.com/tsuu32)
-* [Tarrence van As](https://github.com/tarrencev)
-* [Yuki Igarashi](https://github.com/bonprosoft)
-* [Egon Elbre](https://github.com/egonelbre)
-* [Jerko Steiner](https://github.com/jeremija)
-* [Roman Romanenko](https://github.com/r-novel)
-* [YongXin SHI](https://github.com/a-wing)
-* [Magnus Wahlstrand](https://github.com/kyeett)
-* [Chad Retz](https://github.com/cretz)
-* [Simone Gotti](https://github.com/sgotti)
-* [Cedric Fung](https://github.com/cedricfung)
-* [Norman Rasmussen](https://github.com/normanr) - *Fix Empty DataChannel messages*
-* [salmān aljammāz](https://github.com/saljam)
-* [cnderrauber](https://github.com/cnderrauber)
-* [Juliusz Chroboczek](https://github.com/jech)
-* [John Berthels](https://github.com/jbert)
-* [Somers Matthews](https://github.com/somersbmatthews)
-* [Vitaliy F](https://github.com/funvit)
-* [Ivan Egorov](https://github.com/vany-egorov)
-* [Nick Mykins](https://github.com/nmyk)
-* [Jason Brady](https://github.com/jbrady42)
-* [krishna chiatanya](https://github.com/kittuov)
-* [JacobZwang](https://github.com/JacobZwang)
-* [박종훈](https://github.com/JonghunBok)
-* [Sam Lancia](https://github.com/nerd2)
-* [Henry](https://github.com/cryptix)
-* [Jeff Tchang](https://github.com/tachang)
-* [JooYoung Lim](https://github.com/DevRockstarZ)
-* [Sidney San Martín](https://github.com/s4y)
-* [soolaugust](https://github.com/soolaugust)
-* [Kuzmin Vladimir](https://github.com/tekig)
-* [Alessandro Ros](https://github.com/aler9)
-* [Thomas Miller](https://github.com/tmiv)
-* [yoko(q191201771)](https://github.com/q191201771)
-* [Joshua Obasaju](https://github.com/obasajujoshua31)
-* [Mission Liao](https://github.com/mission-liao)
-* [Hanjun Kim](https://github.com/hallazzang)
-* [ZHENK](https://github.com/scorpionknifes)
-* [Rahul Nakre](https://github.com/rahulnakre)
-* [OrlandoCo](https://github.com/OrlandoCo)
-* [Assad Obaid](https://github.com/assadobaid)
-* [Jamie Good](https://github.com/jamiegood) - *Bug fix in jsfiddle example*
-* [Artur Shellunts](https://github.com/ashellunts)
-* [Sean Knight](https://github.com/SeanKnight)
-* [o0olele](https://github.com/o0olele)
-* [Bo Shi](https://github.com/bshimc)
-* [Suzuki Takeo](https://github.com/BambooTuna)
-* [baiyufei](https://github.com/baiyufei)
-* [pascal-ace](https://github.com/pascal-ace)
-* [Threadnaught](https://github.com/Threadnaught)
-* [Dean Eigenmann](https://github.com/decanus)
-* [Cameron Elliott](https://github.com/cameronelliott)
-* [Pascal Benoit](https://github.com/pascal-ace)
-* [Mats](https://github.com/Mindgamesnl)
-* [donotanswer](https://github.com/f-viktor)
-* [Reese](https://github.com/figadore)
-* [David Zhao](https://github.com/davidzhao)
-* [Nam V. Do](https://github.com/namvdo)
-* [Markus Tzoe](https://github.com/zyxar)
-* [Benny Daon](https://github.com/daonb)
-* [Tomek](https://github.com/trojek)
-* [Jin Gong](https://github.com/cgojin)
-* [yusuke](https://github.com/yusukem99)
-* [Patryk Rogalski](https://github.com/digitalix)
-* [Robin Raymond](https://github.com/robin-raymond)
 
 ### License
 MIT License - see [LICENSE](LICENSE) for full text

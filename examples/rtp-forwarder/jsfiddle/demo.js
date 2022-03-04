@@ -1,13 +1,13 @@
 /* eslint-env browser */
 
-let pc = new RTCPeerConnection({
+const pc = new RTCPeerConnection({
   iceServers: [
     {
       urls: 'stun:stun.l.google.com:19302'
     }
   ]
 })
-var log = msg => {
+const log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }
 
@@ -26,7 +26,7 @@ pc.onicecandidate = event => {
 }
 
 window.startSession = () => {
-  let sd = document.getElementById('remoteSessionDescription').value
+  const sd = document.getElementById('remoteSessionDescription').value
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
@@ -35,5 +35,20 @@ window.startSession = () => {
     pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
   } catch (e) {
     alert(e)
+  }
+}
+
+window.copySDP = () => {
+  const browserSDP = document.getElementById('localSessionDescription')
+
+  browserSDP.focus()
+  browserSDP.select()
+
+  try {
+    const successful = document.execCommand('copy')
+    const msg = successful ? 'successful' : 'unsuccessful'
+    log('Copying SDP was ' + msg)
+  } catch (err) {
+    log('Unable to copy SDP ' + err)
   }
 }

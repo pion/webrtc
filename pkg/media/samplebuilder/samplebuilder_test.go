@@ -20,27 +20,31 @@ type sampleBuilderTest struct {
 	maxLateTimestamp uint32
 }
 
-type fakeDepacketizer struct{}
+type fakeDepacketizer struct {
+	headChecker bool
+	headBytes   []byte
+}
 
 func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
 	return r, nil
 }
 
-func (f *fakeDepacketizer) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
-	return rtpPacketMarketBit
-}
-
-type fakePartitionHeadChecker struct {
-	headBytes []byte
-}
-
-func (f *fakePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
+	if !f.headChecker {
+		// simulates a bug in the 3.0 version
+		// the tests should be fixed to not assume the bug
+		return true
+	}
 	for _, b := range f.headBytes {
 		if payload[0] == b {
 			return true
 		}
 	}
 	return false
+}
+
+func (f *fakeDepacketizer) IsPartitionTail(marker bool, payload []byte) bool {
+	return marker
 }
 
 func TestSampleBuilder(t *testing.T) {
@@ -226,18 +230,17 @@ func TestSampleBuilder(t *testing.T) {
 
 		for _, t := range testData {
 			var opts []Option
-			if t.withHeadChecker {
-				opts = append(opts, WithPartitionHeadChecker(
-					&fakePartitionHeadChecker{headBytes: t.headBytes},
-				))
-			}
 			if t.maxLateTimestamp != 0 {
 				opts = append(opts, WithMaxTimeDelay(
 					time.Millisecond*time.Duration(int64(t.maxLateTimestamp)),
 				))
 			}
 
-			s := New(t.maxLate, &fakeDepacketizer{}, 1, opts...)
+			d := &fakeDepacketizer{
+				headChecker: t.withHeadChecker,
+				headBytes:   t.headBytes,
+			}
+			s := New(t.maxLate, d, 1, opts...)
 			samples := []*media.Sample{}
 
 			for _, p := range t.packets {
@@ -333,9 +336,12 @@ func TestSampleBuilderPushMaxZero(t *testing.T) {
 	pkts := []rtp.Packet{
 		{Header: rtp.Header{SequenceNumber: 0, Timestamp: 0, Marker: true}, Payload: []byte{0x01}},
 	}
-	s := New(0, &fakeDepacketizer{}, 1, WithPartitionHeadChecker(
-		&fakePartitionHeadChecker{headBytes: []byte{0x01}},
-	))
+	d := &fakeDepacketizer{
+		headChecker: true,
+		headBytes:   []byte{0x01},
+	}
+
+	s := New(0, d, 1)
 	s.Push(&pkts[0])
 	if sample := s.Pop(); sample == nil {
 		t.Error("Should expect a popped sample")
@@ -387,4 +393,175 @@ func TestPopWithTimestamp(t *testing.T) {
 		assert.Nil(t, sample)
 		assert.Equal(t, uint32(0), timestamp)
 	})
+}
+
+type truePartitionHeadChecker struct{}
+
+func (f *truePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+	return true
+}
+
+func TestSampleBuilderData(t *testing.T) {
+	s := New(10, &fakeDepacketizer{}, 1,
+		WithPartitionHeadChecker(&truePartitionHeadChecker{}),
+	)
+	j := 0
+	for i := 0; i < 0x20000; i++ {
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i + 42),
+			},
+			Payload: []byte{byte(i)},
+		}
+		s.Push(&p)
+		for {
+			sample, ts := s.PopWithTimestamp()
+			if sample == nil {
+				break
+			}
+			assert.Equal(t, ts, uint32(j+42), "timestamp")
+			assert.Equal(t, len(sample.Data), 1, "data length")
+			assert.Equal(t, byte(j), sample.Data[0], "data")
+			j++
+		}
+	}
+	// only the last packet should be dropped
+	assert.Equal(t, j, 0x1FFFF)
+}
+
+func BenchmarkSampleBuilderSequential(b *testing.B) {
+	s := New(100, &fakeDepacketizer{}, 1)
+	b.ResetTimer()
+	j := 0
+	for i := 0; i < b.N; i++ {
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i + 42),
+			},
+			Payload: make([]byte, 50),
+		}
+		s.Push(&p)
+		for {
+			s := s.Pop()
+			if s == nil {
+				break
+			}
+			j++
+		}
+	}
+	if b.N > 200 && j < b.N-100 {
+		b.Errorf("Got %v (N=%v)", j, b.N)
+	}
+}
+
+func BenchmarkSampleBuilderLoss(b *testing.B) {
+	s := New(100, &fakeDepacketizer{}, 1)
+	b.ResetTimer()
+	j := 0
+	for i := 0; i < b.N; i++ {
+		if i%13 == 0 {
+			continue
+		}
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i + 42),
+			},
+			Payload: make([]byte, 50),
+		}
+		s.Push(&p)
+		for {
+			s := s.Pop()
+			if s == nil {
+				break
+			}
+			j++
+		}
+	}
+	if b.N > 200 && j < b.N/2-100 {
+		b.Errorf("Got %v (N=%v)", j, b.N)
+	}
+}
+
+func BenchmarkSampleBuilderReordered(b *testing.B) {
+	s := New(100, &fakeDepacketizer{}, 1)
+	b.ResetTimer()
+	j := 0
+	for i := 0; i < b.N; i++ {
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i ^ 3),
+				Timestamp:      uint32((i ^ 3) + 42),
+			},
+			Payload: make([]byte, 50),
+		}
+		s.Push(&p)
+		for {
+			s := s.Pop()
+			if s == nil {
+				break
+			}
+			j++
+		}
+	}
+	if b.N > 2 && j < b.N-5 && j > b.N {
+		b.Errorf("Got %v (N=%v)", j, b.N)
+	}
+}
+
+func BenchmarkSampleBuilderFragmented(b *testing.B) {
+	s := New(100, &fakeDepacketizer{}, 1)
+	b.ResetTimer()
+	j := 0
+	for i := 0; i < b.N; i++ {
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i/2 + 42),
+			},
+			Payload: make([]byte, 50),
+		}
+		s.Push(&p)
+		for {
+			s := s.Pop()
+			if s == nil {
+				break
+			}
+			j++
+		}
+	}
+	if b.N > 200 && j < b.N/2-100 {
+		b.Errorf("Got %v (N=%v)", j, b.N)
+	}
+}
+
+func BenchmarkSampleBuilderFragmentedLoss(b *testing.B) {
+	s := New(100, &fakeDepacketizer{}, 1)
+	b.ResetTimer()
+	j := 0
+	for i := 0; i < b.N; i++ {
+		if i%13 == 0 {
+			continue
+		}
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i/2 + 42),
+			},
+			Payload: make([]byte, 50),
+		}
+		s.Push(&p)
+		for {
+			s := s.Pop()
+			if s == nil {
+				break
+			}
+			j++
+		}
+	}
+	if b.N > 200 && j < b.N/3-100 {
+		b.Errorf("Got %v (N=%v)", j, b.N)
+	}
 }

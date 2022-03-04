@@ -9,10 +9,12 @@ go get github.com/pion/webrtc/v3/examples/rtp-forwarder
 ```
 
 ### Open rtp-forwarder example page
-[jsfiddle.net](https://jsfiddle.net/1qva2zd8/) you should see your Webcam, two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/xjcve6d3/) you should see your Webcam, two text-areas and `Copy browser SDP to clipboard`, `Start Session` buttons
 
 ### Run rtp-forwarder, with your browsers SessionDescription as stdin
-In the jsfiddle the top textarea is your browser, copy that and:
+In the jsfiddle the top textarea is your browser's Session Description. Press `Copy browser SDP to clipboard` or copy the base64 string manually.
+We will use this value in the next step.
+
 #### Linux/macOS
 Run `echo $BROWSER_SDP | rtp-forwarder`
 #### Windows
@@ -33,7 +35,7 @@ Run `ffprobe -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to get more 
 
 Run `ffplay -i rtp-forwarder.sdp -protocol_whitelist file,udp,rtp` to play your streams
 
-You can add `-fflags nobuffer` to lower the latency. You will have worse playback in networks with jitter.
+You can add `-fflags nobuffer -flags low_delay -framedrop` to lower the latency. You will have worse playback in networks with jitter. Read about minimizing the delay on [Stackoverflow](https://stackoverflow.com/a/49273163/5472819).
 
 #### Twitch/RTMP
 `ffmpeg -protocol_whitelist file,udp,rtp -i rtp-forwarder.sdp -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -g 50 -c:a aac -b:a 160k -ac 2 -ar 44100 -f flv rtmp://live.twitch.tv/app/$STREAM_KEY` Make sure to replace `$STREAM_KEY` at the end of the URL first.

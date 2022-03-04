@@ -1,3 +1,4 @@
+//go:build e2e
 // +build e2e
 
 package main
@@ -333,7 +334,7 @@ func createTrack(offer webrtc.SessionDescription) (*webrtc.PeerConnection, *webr
 		return nil, nil, nil, errPc
 	}
 
-	track, errTrack := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "pion")
+	track, errTrack := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
 	if errTrack != nil {
 		return nil, nil, nil, errTrack
 	}

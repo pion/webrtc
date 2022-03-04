@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -33,26 +34,30 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 		assert.NoError(t, m.RegisterDefaultCodecs())
 
 		ir := &interceptor.Registry{}
-		ir.Add(&mock_interceptor.Interceptor{
-			BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
-				return interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
-					// set extension on outgoing packet
-					header.Extension = true
-					header.ExtensionProfile = 0xBEDE
-					assert.NoError(t, header.SetExtension(2, []byte("foo")))
+		ir.Add(&mock_interceptor.Factory{
+			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
+				return &mock_interceptor.Interceptor{
+					BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
+						return interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+							// set extension on outgoing packet
+							header.Extension = true
+							header.ExtensionProfile = 0xBEDE
+							assert.NoError(t, header.SetExtension(2, []byte("foo")))
 
-					return writer.Write(header, payload, attributes)
-				})
-			},
-			BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
-				return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-					if a == nil {
-						a = interceptor.Attributes{}
-					}
+							return writer.Write(header, payload, attributes)
+						})
+					},
+					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+							if a == nil {
+								a = interceptor.Attributes{}
+							}
 
-					a.Set("attribute", "value")
-					return reader.Read(b, a)
-				})
+							a.Set("attribute", "value")
+							return reader.Read(b, a)
+						})
+					},
+				}, nil
 			},
 		})
 
@@ -65,7 +70,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	offerer := createPC()
 	answerer := createPC()
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = offerer.AddTrack(track)
@@ -148,12 +153,14 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 		},
 	}
 	ir := &interceptor.Registry{}
-	ir.Add(mockInterceptor)
+	ir.Add(&mock_interceptor.Factory{
+		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) { return mockInterceptor, nil },
+	})
 
 	sender, receiver, err := NewAPI(WithMediaEngine(m), WithInterceptorRegistry(ir)).newPair(Configuration{})
 	assert.NoError(t, err)
 
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/vp8"}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
 	_, err = sender.AddTrack(track)
@@ -208,4 +215,25 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 	if cnt := atomic.LoadUint32(&cntClose); cnt != 2 {
 		t.Errorf("CloseFn is expected to be called twice, but called %d times", cnt)
 	}
+}
+
+func Test_InterceptorRegistry_Build(t *testing.T) {
+	registryBuildCount := 0
+
+	ir := &interceptor.Registry{}
+	ir.Add(&mock_interceptor.Factory{
+		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
+			registryBuildCount++
+			return &interceptor.NoOp{}, nil
+		},
+	})
+
+	peerConnectionA, err := NewAPI(WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionB, err := NewAPI(WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, registryBuildCount)
+	closePairNow(t, peerConnectionA, peerConnectionB)
 }

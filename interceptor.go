@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -8,7 +9,9 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
+	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors.
@@ -20,6 +23,10 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 	}
 
 	if err := ConfigureRTCPReports(interceptorRegistry); err != nil {
+		return err
+	}
+
+	if err := ConfigureTWCCSender(mediaEngine, interceptorRegistry); err != nil {
 		return err
 	}
 
@@ -62,6 +69,47 @@ func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Re
 	return nil
 }
 
+// ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
+// a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
+func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
+		return err
+	}
+
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+		return err
+	}
+
+	i, err := twcc.NewHeaderExtensionInterceptor()
+	if err != nil {
+		return err
+	}
+
+	interceptorRegistry.Add(i)
+	return nil
+}
+
+// ConfigureTWCCSender will setup everything necessary for generating TWCC reports.
+func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeVideo)
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
+		return err
+	}
+
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeAudio)
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+		return err
+	}
+
+	generator, err := twcc.NewSenderInterceptor()
+	if err != nil {
+		return err
+	}
+
+	interceptorRegistry.Add(generator)
+	return nil
+}
+
 type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }
 
 func (i *interceptorToTrackLocalWriter) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
@@ -81,7 +129,7 @@ func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
 	return i.WriteRTP(&packet.Header, packet.Payload)
 }
 
-func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) interceptor.StreamInfo {
+func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
 		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
@@ -92,7 +140,7 @@ func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCo
 		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
 	}
 
-	return interceptor.StreamInfo{
+	return &interceptor.StreamInfo{
 		ID:                  id,
 		Attributes:          interceptor.Attributes{},
 		SSRC:                uint32(ssrc),

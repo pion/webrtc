@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -153,10 +154,15 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport, restart bool) error {
 	}
 
 	if d.id == nil {
-		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &d.id)
+		// avoid holding lock when generating ID, since id generation locks
+		d.mu.Unlock()
+		var dcID *uint16
+		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID)
 		if err != nil {
 			return err
 		}
+		d.mu.Lock()
+		d.id = dcID
 	}
 	dc, err := datachannel.Dial(association, *d.id, cfg)
 	if err != nil {
@@ -174,7 +180,7 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport, restart bool) error {
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 	d.mu.Unlock()
 
-	d.handleOpen(dc)
+	d.handleOpen(dc, false, d.negotiated)
 	return nil
 }
 
@@ -268,13 +274,23 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 	handler(msg)
 }
 
-func (d *DataChannel) handleOpen(dc *datachannel.DataChannel) {
+func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
 	d.dataChannel = dc
 	d.mu.Unlock()
 	d.setReadyState(DataChannelStateOpen)
 
-	d.onOpen()
+	// Fire the OnOpen handler immediately not using pion/datachannel
+	// * detached datachannels have no read loop, the user needs to read and query themselves
+	// * remote datachannels should fire OnOpened. This isn't spec compliant, but we can't break behavior yet
+	// * already negotiated datachannels should fire OnOpened
+	if d.api.settingEngine.detach.DataChannels || isRemote || isAlreadyNegotiated {
+		d.onOpen()
+	} else {
+		dc.OnOpen(func() {
+			d.onOpen()
+		})
+	}
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -424,7 +440,7 @@ func (d *DataChannel) Label() string {
 	return d.label
 }
 
-// Ordered represents if the DataChannel is ordered, and false if
+// Ordered returns true if the DataChannel is ordered, and false if
 // out-of-order delivery is allowed.
 func (d *DataChannel) Ordered() bool {
 	d.mu.RLock()
