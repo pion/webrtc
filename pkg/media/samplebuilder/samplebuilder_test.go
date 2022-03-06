@@ -18,6 +18,7 @@ type sampleBuilderTest struct {
 	samples          []*media.Sample
 	maxLate          uint16
 	maxLateTimestamp uint32
+	defaultSamples   uint32
 }
 
 type fakeDepacketizer struct {
@@ -48,9 +49,10 @@ func (f *fakeDepacketizer) IsPartitionTail(marker bool, payload []byte) bool {
 }
 
 func TestSampleBuilder(t *testing.T) {
+
 	testData := []sampleBuilderTest{
 		{
-			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
+			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed and no marker is set",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
 			},
@@ -59,13 +61,30 @@ func TestSampleBuilder(t *testing.T) {
 			maxLateTimestamp: 0,
 		},
 		{
-			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed even if the market bit is set",
+			message: "SampleBuilder should emit packet even if one RTP packet has been pushed as long as market bit is set",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}, Payload: []byte{0x01}},
 			},
-			samples:          []*media.Sample{},
+			samples: []*media.Sample{
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+			},
 			maxLate:          50,
 			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should emit two packets, we had three packets with unique timestamps. first sample with defaultSamples",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x03}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01}, Duration: time.Duration(3000000000000), PacketTimestamp: 5},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 6},
+			},
+			maxLate:          50,
+			maxLateTimestamp: 0,
+			defaultSamples:   3000,
 		},
 		{
 			message: "SampleBuilder should emit two packets, we had three packets with unique timestamps",
@@ -82,6 +101,66 @@ func TestSampleBuilder(t *testing.T) {
 			maxLateTimestamp: 0,
 		},
 		{
+			message: "SampleBuilder should emit three packets, we had three packets with unique timestamps and last one with marker",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7, Marker: true}, Payload: []byte{0x03}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 6},
+				{Data: []byte{0x03}, Duration: time.Second, PacketTimestamp: 7},
+			},
+			maxLate:          50,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should emit 0 packets because of low maxRate",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 5}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 5}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 5}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 5}, Payload: []byte{0x05}}, // jump in sn
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 5, Marker: true}, Payload: []byte{0x06}},
+			},
+			samples:          []*media.Sample{},
+			maxLate:          5,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should emit 1 packet even with low maxRate, since there's no sn jump",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 5}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 5}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 5}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 5}, Payload: []byte{0x05}},
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 5, Marker: true}, Payload: []byte{0x06}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}, Duration: time.Second, PacketTimestamp: 5},
+			},
+			maxLate:          5,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should emit three packets, we had three packets with unique timestamps, second and third packets have markers",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 6, Marker: true}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7, Marker: true}, Payload: []byte{0x03}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 6},
+				{Data: []byte{0x03}, Duration: time.Second, PacketTimestamp: 7},
+			},
+			maxLate:          50,
+			maxLateTimestamp: 0,
+		},
+		{
 			message: "SampleBuilder should emit one packet, we had a packet end of sequence marker and run out of space",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}, Payload: []byte{0x01}},
@@ -93,7 +172,22 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5},
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+			},
+			maxLate:          5,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should emit one packet, we had a packet end of sequence marker and run out of space",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 65534, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 65535, Timestamp: 5}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 0, Timestamp: 5}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 1, Timestamp: 5}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 2, Timestamp: 5, Marker: true}, Payload: []byte{0x05}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01, 0x02, 0x03, 0x04, 0x05}, Duration: time.Second, PacketTimestamp: 5},
 			},
 			maxLate:          5,
 			maxLateTimestamp: 0,
@@ -114,7 +208,7 @@ func TestSampleBuilder(t *testing.T) {
 			maxLateTimestamp: 0,
 		},
 		{
-			message: "SampleBuilder should emit one packet, we had a packet end of sequence marker and run out of space",
+			message: "SampleBuilder should emit two packets, we had 2 packet end of sequence marker and run out of space",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}, Payload: []byte{0x01}},
 				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7, Marker: true}, Payload: []byte{0x02}},
@@ -125,10 +219,29 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5},
-				{Data: []byte{0x02}, Duration: time.Second * 2, PacketTimestamp: 7, PrevDroppedPackets: 1},
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 7, PrevDroppedPackets: 1},
 			},
 			maxLate:          5,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder should three packets, we had a packet with marker, second packet with a unique timestamp and third with new timestamp and marker",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 5, Marker: true}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 6}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 7}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 7}, Payload: []byte{0x05}},
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 7}, Payload: []byte{0x06}},
+				{Header: rtp.Header{SequenceNumber: 5006, Timestamp: 7, Marker: true}, Payload: []byte{0x07}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01, 0x02}, Duration: time.Second, PacketTimestamp: 5},
+				{Data: []byte{0x03}, Duration: time.Second * 1, PacketTimestamp: 6, PrevDroppedPackets: 0},
+				{Data: []byte{0x04, 0x05, 0x06, 0x07}, Duration: time.Second * 1, PacketTimestamp: 7, PrevDroppedPackets: 0},
+			},
+			maxLate:          50,
 			maxLateTimestamp: 0,
 		},
 		{
@@ -147,7 +260,7 @@ func TestSampleBuilder(t *testing.T) {
 			maxLateTimestamp: 0,
 		},
 		{
-			message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one",
+			message: "SampleBuilder shouldn't emit a packet because we have a gap before a valid one and no marker",
 			packets: []*rtp.Packet{
 				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
 				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 6}, Payload: []byte{0x02}},
@@ -157,6 +270,7 @@ func TestSampleBuilder(t *testing.T) {
 			maxLate:          50,
 			maxLateTimestamp: 0,
 		},
+
 		{
 			message: "SampleBuilder shouldn't emit a packet after a gap as there are gaps and have not reached maxLate yet",
 			packets: []*rtp.Packet{
@@ -216,12 +330,44 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5017, Timestamp: 7001}, Payload: []byte{0x05}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x04, 0x05}, Duration: time.Second * time.Duration(2), PacketTimestamp: 4000, PrevDroppedPackets: 13},
+				{Data: []byte{0x04, 0x05}, Duration: time.Second, PacketTimestamp: 4000, PrevDroppedPackets: 13},
 			},
 			withHeadChecker:  true,
 			headBytes:        []byte{0x04},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
+		},
+		{
+			message: "SampleBuilder should emit one packet, we had a packet end of sequence marker and run out of space",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 9}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5006, Timestamp: 11}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 13}, Payload: []byte{0x05}},
+				{Header: rtp.Header{SequenceNumber: 5010, Timestamp: 15}, Payload: []byte{0x06}},
+				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
+			},
+			samples: []*media.Sample{
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
+			},
+			maxLate:          5,
+			maxLateTimestamp: 0,
+		},
+		{
+			message: "SampleBuilder shouldn't emit any packet, we do not have a valid end of sequence and run out of space",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x02}},
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 9}, Payload: []byte{0x03}},
+				{Header: rtp.Header{SequenceNumber: 5006, Timestamp: 11}, Payload: []byte{0x04}},
+				{Header: rtp.Header{SequenceNumber: 5008, Timestamp: 13}, Payload: []byte{0x05}},
+				{Header: rtp.Header{SequenceNumber: 5010, Timestamp: 15}, Payload: []byte{0x06}},
+				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
+			},
+			samples:          []*media.Sample{},
+			maxLate:          5,
+			maxLateTimestamp: 0,
 		},
 	}
 
@@ -235,6 +381,12 @@ func TestSampleBuilder(t *testing.T) {
 					time.Millisecond*time.Duration(int64(t.maxLateTimestamp)),
 				))
 			}
+
+			defaultSamples := uint32(1)
+			if t.defaultSamples != 0 {
+				defaultSamples = t.defaultSamples
+			}
+			opts = append(opts, WithDefaultSamples(defaultSamples)) // 1fps
 
 			d := &fakeDepacketizer{
 				headChecker: t.withHeadChecker,
@@ -257,7 +409,7 @@ func TestSampleBuilder(t *testing.T) {
 // SampleBuilder should respect maxLate if we popped successfully but then have a gap larger then maxLate
 func TestSampleBuilderMaxLate(t *testing.T) {
 	assert := assert.New(t)
-	s := New(50, &fakeDepacketizer{}, 1)
+	s := New(50, &fakeDepacketizer{}, 1, WithDefaultSamples(1))
 
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 0, Timestamp: 1}, Payload: []byte{0x01}})
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 2}, Payload: []byte{0x01}})
