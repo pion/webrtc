@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -27,7 +28,7 @@ func sendVideoUntilDone(done <-chan struct{}, t *testing.T, tracks []*TrackLocal
 		select {
 		case <-time.After(20 * time.Millisecond):
 			for _, track := range tracks {
-				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil))
 			}
 		case <-done:
 			return
@@ -181,7 +182,7 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 
 	// Send 10 packets, OnTrack MUST not be fired
 	for i := 0; i <= 10; i++ {
-		assert.NoError(t, vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+		assert.NoError(t, vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil))
 		time.Sleep(20 * time.Millisecond)
 	}
 
@@ -198,12 +199,12 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
 	pcOffer.ops.Done()
-	assert.Equal(t, 0, len(vp8Track.rtpTrack.bindings))
+	assert.Equal(t, 0, len(vp8Track.RtpTrack.bindings))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
 	pcOffer.ops.Done()
-	assert.Equal(t, 1, len(vp8Track.rtpTrack.bindings))
+	assert.Equal(t, 1, len(vp8Track.RtpTrack.bindings))
 
 	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{vp8Track})
 
@@ -300,8 +301,8 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	vp8Track.rtpTrack.id = "foo2"
-	vp8Track.rtpTrack.streamID = "bar2"
+	vp8Track.RtpTrack.id = "foo2"
+	vp8Track.RtpTrack.streamID = "bar2"
 
 	haveRenegotiated.set(true)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
@@ -690,12 +691,12 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 	assert.True(t, sender.isNegotiated())
 
 	pcAnswer.ops.Done()
-	assert.Equal(t, 0, len(localTrack.rtpTrack.bindings))
+	assert.Equal(t, 0, len(localTrack.RtpTrack.bindings))
 
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
 	pcAnswer.ops.Done()
-	assert.Equal(t, 1, len(localTrack.rtpTrack.bindings))
+	assert.Equal(t, 1, len(localTrack.RtpTrack.bindings))
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
@@ -908,7 +909,7 @@ func TestNegotiationNeededRemoveTrack(t *testing.T) {
 	sender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
 
-	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil))
 
 	wg.Wait()
 

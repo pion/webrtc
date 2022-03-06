@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package main
@@ -110,7 +111,7 @@ func main() {
 					panic(ivfErr)
 				}
 
-				if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
+				if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}, nil); ivfErr != nil {
 					panic(ivfErr)
 				}
 			}
@@ -180,7 +181,7 @@ func main() {
 				lastGranule = pageHeader.GranulePosition
 				sampleDuration := time.Duration((sampleCount/48000)*1000) * time.Millisecond
 
-				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Duration: sampleDuration}); oggErr != nil {
+				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Duration: sampleDuration}, nil); oggErr != nil {
 					panic(oggErr)
 				}
 			}

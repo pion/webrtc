@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -53,7 +54,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 	assert.NoError(t, signalPair(sender, receiver))
 
 	peerConnectionsConnected.Wait()
-	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}, nil))
 
 	<-seenPacket.Done()
 	assert.NoError(t, wan.Stop())

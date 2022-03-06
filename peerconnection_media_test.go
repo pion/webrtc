@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -132,7 +133,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 			if pcOffer.ICEConnectionState() != ICEConnectionStateConnected {
 				continue
 			}
-			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil); routineErr != nil {
 				fmt.Println(routineErr)
 			}
 
@@ -359,7 +360,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i <= 5; i++ {
-		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); rtpErr != nil {
+		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil); rtpErr != nil {
 			t.Fatal(rtpErr)
 		} else if rtcpErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}}); rtcpErr != nil {
 			t.Fatal(rtcpErr)
@@ -806,7 +807,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 				select {
 				case <-time.After(20 * time.Millisecond):
 					for _, track := range outboundTracks {
-						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}, nil))
 					}
 				case <-done:
 					return

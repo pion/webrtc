@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -59,7 +60,7 @@ func TestSetRTPParameters(t *testing.T) {
 	assert.NoError(t, signalPair(sender, receiver))
 
 	peerConnectionsConnected.Wait()
-	assert.NoError(t, outgoingTrack.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+	assert.NoError(t, outgoingTrack.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}, nil))
 
 	<-seenPacket.Done()
 	assert.NoError(t, wan.Stop())
