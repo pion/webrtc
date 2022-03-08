@@ -55,11 +55,19 @@ func main() {
 	// Create the API object with the MediaEngine
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
 
+
+	// TODO retrieve the TURN credentials from amazon
+	// see https://github.com/aws/amazon-chime-sdk-js/blob/4aa8c569ca24ace9ef4d89fc99ec6ca4d645da0a/src/task/ReceiveTURNCredentialsTask.ts#L105
+	username := "aaa"
+	credentials := "bbb"
+
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
+				URLs:       []string{"turn:ice.m2.ue1.app.chime.aws:3478?transport=udp", "turns:ice.m2.ue1.app.chime.aws:443?transport=tcp"},
+				Username:   username,
+				Credential: credentials,
 			},
 		},
 	}
@@ -193,12 +201,15 @@ func main() {
 		}
 	})
 
-	// Wait for the offer to be pasted
-	offer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &offer)
+	// Create a default offer
+	sessionDescription, err := peerConnection.CreateOffer(nil)
+
+	if err != nil {
+		panic(err)
+	}
 
 	// Set the remote SessionDescription
-	if err = peerConnection.SetRemoteDescription(offer); err != nil {
+	if err = peerConnection.SetRemoteDescription(sessionDescription); err != nil {
 		panic(err)
 	}
 
