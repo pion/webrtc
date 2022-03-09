@@ -14,6 +14,7 @@ type H264Reader struct {
 	countOfConsecutiveZeroBytes int
 	nalPrefixParsed             bool
 	readBuffer                  []byte
+	tmpReadBuf                  []byte
 }
 
 var (
@@ -32,6 +33,7 @@ func NewReader(in io.Reader) (*H264Reader, error) {
 		nalBuffer:       make([]byte, 0),
 		nalPrefixParsed: false,
 		readBuffer:      make([]byte, 0),
+		tmpReadBuf:      make([]byte, 4096),
 	}
 
 	return reader, nil
@@ -51,13 +53,11 @@ type NAL struct {
 
 func (reader *H264Reader) read(numToRead int) (data []byte) {
 	for len(reader.readBuffer) < numToRead {
-		buf := make([]byte, 4096)
-		n, err := reader.stream.Read(buf)
+		n, err := reader.stream.Read(reader.tmpReadBuf)
 		if n == 0 || err != nil {
 			break
 		}
-		buf = buf[0:n]
-		reader.readBuffer = append(reader.readBuffer, buf...)
+		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
 	}
 	var numShouldRead int
 	if numToRead <= len(reader.readBuffer) {
