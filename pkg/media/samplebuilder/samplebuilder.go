@@ -37,6 +37,9 @@ type SampleBuilder struct {
 
 	// number of packets forced to be dropped
 	droppedPackets uint16
+
+	defaultSamples      uint32
+	lastPoppedTimestamp uint32
 }
 
 // New constructs a new SampleBuilder.
@@ -46,7 +49,7 @@ type SampleBuilder struct {
 // The depacketizer extracts media samples from RTP packets.
 // Several depacketizers are available in package github.com/pion/rtp/codecs.
 func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts ...Option) *SampleBuilder {
-	s := &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer, sampleRate: sampleRate}
+	s := &SampleBuilder{maxLate: maxLate, depacketizer: depacketizer, sampleRate: sampleRate, lastPoppedTimestamp: 0}
 	for _, o := range opts {
 		o(s)
 	}
@@ -201,15 +204,15 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var consume sampleSequenceLocation
 
 	for i := s.active.head; s.buffer[i] != nil && s.active.compare(i) != slCompareAfter; i++ {
-		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
-			consume.head = s.active.head
-			consume.tail = i + 1
-			break
-		}
 		headTimestamp, hasData := s.fetchTimestamp(s.active)
 		if hasData && s.buffer[i].Timestamp != headTimestamp {
 			consume.head = s.active.head
 			consume.tail = i
+			break
+		}
+		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
+			consume.head = s.active.head
+			consume.tail = i + 1
 			break
 		}
 	}
@@ -218,23 +221,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		return nil
 	}
 
-	if !purgingBuffers && s.buffer[consume.tail] == nil {
-		// wait for the next packet after this set of packets to arrive
-		// to ensure at least one post sample timestamp is known
-		// (unless we have to release right now)
-		return nil
-	}
-
 	sampleTimestamp, _ := s.fetchTimestamp(s.active)
-	afterTimestamp := sampleTimestamp
-
-	// scan for any packet after the current and use that time stamp as the diff point
-	for i := consume.tail; i < s.active.tail; i++ {
-		if s.buffer[i] != nil {
-			afterTimestamp = s.buffer[i].Timestamp
-			break
-		}
-	}
 
 	// the head set of packets is now fully consumed
 	s.active.head = consume.tail
@@ -253,7 +240,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var extensions []rtp.Extension = nil
 
 	for i := consume.head; i != consume.tail; i++ {
-		if extensions == nil {	// get first rtp packet extensions if exists
+		if extensions == nil { // get first rtp packet extensions if exists
 			if s.buffer[i].Extension && s.buffer[i].Extensions != nil {
 				extensions = s.buffer[i].Extensions
 			}
@@ -265,7 +252,13 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		}
 		data = append(data, p...)
 	}
-	samples := afterTimestamp - sampleTimestamp
+
+	// calculate duration based on previous timestamp
+	samples := sampleTimestamp - s.lastPoppedTimestamp
+	if s.lastPoppedTimestamp == 0 || s.filled.count() > s.maxLate {
+		// first popped sample
+		samples = s.defaultSamples
+	}
 
 	sample := &media.Sample{
 		Data:               data,
@@ -275,13 +268,28 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		Extensions:         extensions,
 	}
 
+	//markers := fmt.Sprintf("[%d-%d] | ", s.buffer[consume.head].Timestamp, s.buffer[consume.tail-1].Timestamp)
+	//for i := consume.head; i != consume.tail; i++ {
+	//	markers += fmt.Sprintf("[%d,%d,%t],", s.buffer[i].Timestamp, s.buffer[i].SequenceNumber, s.buffer[i].Marker)
+	//}
+	//fmt.Println(markers)
+
 	s.droppedPackets = 0
+	s.lastPoppedTimestamp = sample.PacketTimestamp
 
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
 
 	s.purgeConsumedLocation(consume, true)
 	s.purgeConsumedBuffers()
+
+	// release consumed packets without waiting for next rtp push
+	for i := consume.head; i != consume.tail; i++ {
+		if s.filled.compare(i) == slCompareInside && s.filled.hasData() {
+			s.releasePacket(s.filled.head)
+			s.filled.head++
+		}
+	}
 
 	return sample
 }
@@ -353,5 +361,10 @@ func WithMaxTimeDelay(maxLateDuration time.Duration) Option {
 	return func(o *SampleBuilder) {
 		totalMillis := maxLateDuration.Milliseconds()
 		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMillis / 1000)
+	}
+}
+func WithDefaultSamples(samples uint32) Option {
+	return func(o *SampleBuilder) {
+		o.defaultSamples = samples
 	}
 }
