@@ -5,69 +5,69 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func CreateReader(h264 []byte, assert *assert.Assertions) *H264Reader {
+func CreateReader(h264 []byte, require *require.Assertions) *H264Reader {
 	reader, err := NewReader(bytes.NewReader(h264))
 
-	assert.Nil(err)
-	assert.NotNil(reader)
+	require.Nil(err)
+	require.NotNil(reader)
 
 	return reader
 }
 
 func TestDataDoesNotStartWithH264Header(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	testFunction := func(input []byte) {
-		reader := CreateReader(input, assert)
+	testFunction := func(input []byte, expectedErr error) {
+		reader := CreateReader(input, require)
 		nal, err := reader.NextNAL()
-		assert.Equal(errDataIsNotH264Stream, err)
-		assert.Nil(nal)
+		require.ErrorIs(err, expectedErr)
+		require.Nil(nal)
 	}
 
 	h264Bytes1 := []byte{2}
-	testFunction(h264Bytes1)
+	testFunction(h264Bytes1, io.EOF)
 
 	h264Bytes2 := []byte{0, 2}
-	testFunction(h264Bytes2)
+	testFunction(h264Bytes2, io.EOF)
 
 	h264Bytes3 := []byte{0, 0, 2}
-	testFunction(h264Bytes3)
+	testFunction(h264Bytes3, io.EOF)
 
 	h264Bytes4 := []byte{0, 0, 2, 0}
-	testFunction(h264Bytes4)
+	testFunction(h264Bytes4, errDataIsNotH264Stream)
 
 	h264Bytes5 := []byte{0, 0, 0, 2}
-	testFunction(h264Bytes5)
+	testFunction(h264Bytes5, errDataIsNotH264Stream)
 }
 
 func TestParseHeader(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	h264Bytes := []byte{0x0, 0x0, 0x1, 0xAB}
 
-	reader := CreateReader(h264Bytes, assert)
+	reader := CreateReader(h264Bytes, require)
 
 	nal, err := reader.NextNAL()
-	assert.Nil(err)
+	require.Nil(err)
 
-	assert.Equal(1, len(nal.Data))
-	assert.True(nal.ForbiddenZeroBit)
-	assert.Equal(uint32(0), nal.PictureOrderCount)
-	assert.Equal(uint8(1), nal.RefIdc)
-	assert.Equal(NalUnitTypeEndOfStream, nal.UnitType)
+	require.Equal(1, len(nal.Data))
+	require.True(nal.ForbiddenZeroBit)
+	require.Equal(uint32(0), nal.PictureOrderCount)
+	require.Equal(uint8(1), nal.RefIdc)
+	require.Equal(NalUnitTypeEndOfStream, nal.UnitType)
 }
 
 func TestEOF(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	testFunction := func(input []byte) {
-		reader := CreateReader(input, assert)
+		reader := CreateReader(input, require)
 
 		nal, err := reader.NextNAL()
-		assert.Equal(io.EOF, err)
-		assert.Nil(nal)
+		require.Equal(io.EOF, err)
+		require.Nil(nal)
 	}
 
 	h264Bytes1 := []byte{0, 0, 0, 1}
@@ -81,22 +81,22 @@ func TestEOF(t *testing.T) {
 }
 
 func TestSkipSEI(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	h264Bytes := []byte{
 		0x0, 0x0, 0x0, 0x1, 0xAA,
 		0x0, 0x0, 0x0, 0x1, 0x6, // SEI
 		0x0, 0x0, 0x0, 0x1, 0xAB,
 	}
 
-	reader := CreateReader(h264Bytes, assert)
+	reader := CreateReader(h264Bytes, require)
 
 	nal, err := reader.NextNAL()
-	assert.Nil(err)
-	assert.Equal(byte(0xAA), nal.Data[0])
+	require.Nil(err)
+	require.Equal(byte(0xAA), nal.Data[0])
 
 	nal, err = reader.NextNAL()
-	assert.Nil(err)
-	assert.Equal(byte(0xAB), nal.Data[0])
+	require.Nil(err)
+	require.Equal(byte(0xAB), nal.Data[0])
 }
 
 func TestIssue1734_NextNal(t *testing.T) {
@@ -107,7 +107,7 @@ func TestIssue1734_NextNal(t *testing.T) {
 
 	for _, cur := range tt {
 		r, err := NewReader(bytes.NewReader(cur))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Just make sure it doesn't crash
 		for {
@@ -125,11 +125,11 @@ func TestTrailing01AfterStartCode(t *testing.T) {
 		0x0, 0x0, 0x0, 0x1, 0x01,
 		0x0, 0x0, 0x0, 0x1, 0x01,
 	}))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for i := 0; i <= 1; i++ {
 		nal, err := r.NextNAL()
-		assert.NoError(t, err)
-		assert.NotNil(t, nal)
+		require.NoError(t, err)
+		require.NotNil(t, nal)
 	}
 }

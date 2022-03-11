@@ -51,10 +51,13 @@ type NAL struct {
 	Data []byte // header byte + rbsp
 }
 
-func (reader *H264Reader) read(numToRead int) (data []byte) {
+func (reader *H264Reader) read(numToRead int) (data []byte, e error) {
 	for len(reader.readBuffer) < numToRead {
 		n, err := reader.stream.Read(reader.tmpReadBuf)
-		if n == 0 || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
 			break
 		}
 		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
@@ -67,14 +70,17 @@ func (reader *H264Reader) read(numToRead int) (data []byte) {
 	}
 	data = reader.readBuffer[0:numShouldRead]
 	reader.readBuffer = reader.readBuffer[numShouldRead:]
-	return data
+	return data, nil
 }
 
 func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e error) {
 	nalPrefix3Bytes := []byte{0, 0, 1}
 	nalPrefix4Bytes := []byte{0, 0, 0, 1}
 
-	prefixBuffer := reader.read(4)
+	prefixBuffer, e := reader.read(4)
+	if e != nil {
+		return
+	}
 
 	n := len(prefixBuffer)
 
@@ -121,7 +127,11 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 	}
 
 	for {
-		buffer := reader.read(1)
+		buffer, err := reader.read(1)
+		if err != nil {
+			break
+		}
+
 		n := len(buffer)
 
 		if n != 1 {
