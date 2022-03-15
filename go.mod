@@ -18,6 +18,6 @@ require (
 	github.com/pion/srtp/v2 v2.0.5
 	github.com/pion/transport v0.13.0
 	github.com/sclevine/agouti v3.0.0+incompatible
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 )
