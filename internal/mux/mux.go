@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
@@ -57,8 +58,6 @@ func (m *Mux) NewEndpoint(f MatchFunc) *Endpoint {
 	}
 
 	// Set a maximum size of the buffer in bytes.
-	// NOTE: We actually won't get anywhere close to this limit.
-	// SRTP will constantly read from the endpoint and drop packets if it's full.
 	e.buffer.SetLimitSize(maxBufferSize)
 
 	m.lock.Lock()
@@ -146,7 +145,16 @@ func (m *Mux) dispatch(buf []byte) error {
 		return nil
 	}
 
-	_, err := endpoint.buffer.Write(buf)
+	// Attempt again later when encountering a temporarily full buffer (fix for #2152)
+	var err error
+	for {
+		_, err = endpoint.buffer.Write(buf)
+		if !errors.Is(err, packetio.ErrFull) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
 	if err != nil {
 		return err
 	}

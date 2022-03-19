@@ -3,6 +3,7 @@ package mux
 import (
 	"io"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -29,14 +30,36 @@ func TestStressDuplex(t *testing.T) {
 
 func stressDuplex(t *testing.T) {
 	ca, cb, stop := pipeMemory()
+	stopSpin := make(chan struct{})
 
 	defer func() {
+		close(stopSpin)
 		stop(t)
 	}()
 
+	// MsgSize * MsgCount > maxBufferSize
 	opt := test.Options{
 		MsgSize:  2048,
-		MsgCount: 100,
+		MsgCount: 2000,
+	}
+
+	// Stress the system whilst testing (tests for #2152)
+	// wasm is excluded because the additional stress makes test run too slowly.
+	if runtime.GOARCH != "wasm" {
+		spin := func() {
+			// nolint:staticcheck
+			// Suppress linter warning about spinning loop (SA5004)—spinning is intended.
+			for {
+				select {
+				case <-stopSpin:
+					return
+				default:
+				}
+			}
+		}
+		for i := 0; i < runtime.NumCPU(); i++ {
+			go spin()
+		}
 	}
 
 	assert.NoError(t, test.StressDuplex(ca, cb, opt))
