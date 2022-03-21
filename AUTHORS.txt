@@ -132,6 +132,7 @@ rahulnakre <rahulnakre@gmail.com>
 Raphael Randschau <nicolai86@me.com>
 Raphael Randschau <nicolai86@users.noreply.github.com>
 Reese <3253971+figadore@users.noreply.github.com>
+rob <me@iamcalledrob.com>
 rob-deutsch <robzyb+altgithub@gmail.com>
 Robert Eperjesi <eperjesi@uber.com>
 Robin Raymond <robin-raymond@users.noreply.github.com>
