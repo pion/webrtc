@@ -78,8 +78,8 @@ func (m *Mux) RemoveEndpoint(e *Endpoint) {
 func (m *Mux) Close() error {
 	m.lock.Lock()
 	for e := range m.endpoints {
-		err := e.close()
-		if err != nil {
+		if err := e.close(); err != nil {
+			m.lock.Unlock()
 			return err
 		}
 
