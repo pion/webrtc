@@ -13,6 +13,8 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v3/encryption"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -184,6 +186,8 @@ type TrackLocalStaticSample struct {
 	Packetizer rtp.Packetizer
 	sequencer  rtp.Sequencer
 	RtpTrack   *TrackLocalStaticRTP
+	hyperscaleEncryption bool
+	encryption *encryption.Encryption
 	ClockRate  float64
 }
 
@@ -194,9 +198,15 @@ func NewTrackLocalStaticSample(c RTPCodecCapability, id, streamID string) (*Trac
 		return nil, err
 	}
 
-	return &TrackLocalStaticSample{
+	track := &TrackLocalStaticSample{
 		RtpTrack: rtpTrack,
-	}, nil
+	}
+
+	track.hyperscaleEncryption = os.Getenv("HYPERSCALE_RTP_ENCRYPTION_ACTIVE") == "true"
+	if track.hyperscaleEncryption {
+		track.encryption = encryption.NewEncryption()
+	}
+	return track, nil
 }
 
 // ID is the unique identifier for this Track. This should be unique for the
@@ -281,7 +291,7 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 	}
 	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
 
-	err := addExtensions(sample, packets)
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption)
 
 	if err != nil {
 		log.WithFields(
@@ -324,7 +334,7 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	samples := sample.Duration.Seconds() * clockRate
 	packets := p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
 
-	err := addExtensions(sample, packets)
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption)
 
 	if err != nil {
 		log.WithFields(
@@ -350,8 +360,10 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	return util.FlattenErrs(writeErrs)
 }
 
-func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
+func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption) error {
 	var sampleAttr byte = 0
+	var encPosition uint8 = 0
+
 	position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_FIRST_PACKET_ATTR_POS")
 	if err == nil {
 		sampleAttr |= 1 << position
@@ -366,13 +378,22 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
 		sampleAttr |= 1 << position
 	}
 
+	if hyperscaleEncryption {
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); encryption.ShouldEncrypt(sample, 0) && err == nil {
+			sampleAttr |= 1 << encPosition
+		}
+	}
+
+
 	extensionErrs := []error{}
+	attributesExtId := uint8(0)
 
 	if len(packets) > 0 {
 		extensionErrs = append(extensionErrs, packets[0].SetExtensions(sample.Extensions))
 		if sample.WithHyperscaleExtensions {
-			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
-				extensionErrs = append(extensionErrs, packets[0].SetExtension(id, []byte{sampleAttr}))
+			if attributesExtId, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))
+				fmt.Println("uzi packet sn ", packets[0].SequenceNumber, "isSpsPps: ", sample.IsSpsPps, "isIFrame: ", sample.IsIFrame)
 			}
 			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
 				donBytes := make([]byte, 2)
@@ -381,6 +402,20 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
 			}
 		}
 	}
+
+	if hyperscaleEncryption {
+		// now check wethear the rest of the packets need to be encrypted
+		for i := 1; i < len(packets); i++ {
+			sampleAttr = 0
+			if encryption.ShouldEncrypt(sample, i) {
+				sampleAttr |= 1 << encPosition
+			} else {
+				sampleAttr |= 0 << encPosition
+			}
+			extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
+		}
+	}
+
 
 	return util.FlattenErrs(extensionErrs)
 }
