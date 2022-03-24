@@ -392,8 +392,7 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 		extensionErrs = append(extensionErrs, packets[0].SetExtensions(sample.Extensions))
 		if sample.WithHyperscaleExtensions {
 			if attributesExtId, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
-				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))
-				fmt.Println("uzi packet sn ", packets[0].SequenceNumber, "isSpsPps: ", sample.IsSpsPps, "isIFrame: ", sample.IsIFrame)
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))			
 			}
 			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
 				donBytes := make([]byte, 2)
