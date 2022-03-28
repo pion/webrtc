@@ -11,17 +11,6 @@
 			}
 		</style>
 		<link rel="stylesheet" type="text/css" href="demo.css">
-		{{ if .JS }}
-		<script src="demo.js"></script>
-		{{ else }}
-		<script src="/wasm_exec.js"></script>
-		<script>
-			const go = new Go();
-			WebAssembly.instantiateStreaming(fetch("demo.wasm"), go.importObject).then((result) => {
-				go.run(result.instance);
-			});
-		</script>
-		{{ end }}
 	</head>
 	<body>
 		<h1>{{ .Title }}</h1>
@@ -31,4 +20,15 @@
 		{{ template "demo.html" }}
 		</div>
 	</body>
+       {{ if .JS }}
+       <script src="demo.js"></script>
+       {{ else }}
+       <script src="/wasm_exec.js"></script>
+       <script>
+               const go = new Go();
+               WebAssembly.instantiateStreaming(fetch("demo.wasm"), go.importObject).then((result) => {
+                       go.run(result.instance);
+               });
+       </script>
+       {{ end }}
 </html>
