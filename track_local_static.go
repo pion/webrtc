@@ -209,6 +209,10 @@ func NewTrackLocalStaticSample(c RTPCodecCapability, id, streamID string) (*Trac
 	return track, nil
 }
 
+func (s *TrackLocalStaticSample) SetHyperscaleEncryption(active bool){
+	s.hyperscaleEncryption = active
+}
+
 // ID is the unique identifier for this Track. This should be unique for the
 // stream, but doesn't have to globally unique. A common example would be 'audio' or 'video'
 // and StreamID would be 'desktop' or 'webcam'
