@@ -383,7 +383,8 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 	}
 
 	if hyperscaleEncryption {
-		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); encryption.ShouldEncrypt(sample, 0) && err == nil {
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !encryption.ShouldEncrypt(sample, 0) && err == nil {
+			// set the 'skip encryption' bit
 			sampleAttr |= 1 << encPosition
 		}
 	}
@@ -410,7 +411,8 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 		// now check wethear the rest of the packets need to be encrypted
 		for i := 1; i < len(packets); i++ {
 			sampleAttr = 0
-			if encryption.ShouldEncrypt(sample, i) {
+			// set the 'skip encryption' bit
+			if !encryption.ShouldEncrypt(sample, i) {
 				sampleAttr |= 1 << encPosition
 			} else {
 				sampleAttr |= 0 << encPosition
