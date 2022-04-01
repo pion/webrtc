@@ -27,18 +27,18 @@ pc.ontrack = event => {
 }
 
 const canvases = [
-    document.getElementById('canvasOne'),
-    document.getElementById('canvasTwo'),
-    document.getElementById('canvasThree')
-];
+  document.getElementById('canvasOne'),
+  document.getElementById('canvasTwo'),
+  document.getElementById('canvasThree')
+]
 
 // Firefox requires getContext to be invoked on an HTML Canvas Element
 // prior to captureStream
-const canvasContexts = canvases.map(c => c.getContext('2d'));
+const canvasContexts = canvases.map(c => c.getContext('2d'))
 
 // Capture canvas streams and add to peer conn
-const streams = canvases.map(c => c.captureStream());
-streams.forEach(stream => stream.getVideoTracks().forEach(track => pc.addTrack(track, stream)));
+const streams = canvases.map(c => c.captureStream())
+streams.forEach(stream => stream.getVideoTracks().forEach(track => pc.addTrack(track, stream)))
 
 // Start circles
 requestAnimationFrame(() => drawCircle(canvasContexts[0], '#006699', 0))
