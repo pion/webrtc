@@ -26,18 +26,24 @@ pc.ontrack = event => {
   document.getElementById('serverVideo').srcObject = new MediaStream([event.track])
 }
 
-// Capture canvas streams and add to peer conn
-const streams = [
-  document.getElementById('canvasOne').captureStream(),
-  document.getElementById('canvasTwo').captureStream(),
-  document.getElementById('canvasThree').captureStream()
+const canvases = [
+  document.getElementById('canvasOne'),
+  document.getElementById('canvasTwo'),
+  document.getElementById('canvasThree')
 ]
+
+// Firefox requires getContext to be invoked on an HTML Canvas Element
+// prior to captureStream
+const canvasContexts = canvases.map(c => c.getContext('2d'))
+
+// Capture canvas streams and add to peer conn
+const streams = canvases.map(c => c.captureStream())
 streams.forEach(stream => stream.getVideoTracks().forEach(track => pc.addTrack(track, stream)))
 
 // Start circles
-requestAnimationFrame(() => drawCircle(document.getElementById('canvasOne').getContext('2d'), '#006699', 0))
-requestAnimationFrame(() => drawCircle(document.getElementById('canvasTwo').getContext('2d'), '#cf635f', 0))
-requestAnimationFrame(() => drawCircle(document.getElementById('canvasThree').getContext('2d'), '#46c240', 0))
+requestAnimationFrame(() => drawCircle(canvasContexts[0], '#006699', 0))
+requestAnimationFrame(() => drawCircle(canvasContexts[1], '#cf635f', 0))
+requestAnimationFrame(() => drawCircle(canvasContexts[2], '#46c240', 0))
 
 function drawCircle (ctx, color, angle) {
   // Background
