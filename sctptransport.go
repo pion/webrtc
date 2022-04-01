@@ -102,10 +102,11 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 		return errSCTPTransportDTLS
 	}
 
+	dataChannels, streamIdentifiers := r.reserveStreamIdentifiers()
 	sctpAssociation, err := sctp.Client(sctp.Config{
 		NetConn:       dtlsTransport.conn,
 		LoggerFactory: r.api.settingEngine.LoggerFactory,
-	})
+	}, streamIdentifiers...)
 	if err != nil {
 		return err
 	}
@@ -113,7 +114,6 @@ func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
 	r.lock.Lock()
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
-	dataChannels := append([]*DataChannel{}, r.dataChannels...)
 	r.lock.Unlock()
 
 	var openedDCCount uint32
@@ -412,4 +412,32 @@ func (r *SCTPTransport) association() *sctp.Association {
 	association := r.sctpAssociation
 	r.lock.RUnlock()
 	return association
+}
+
+
+func (r *SCTPTransport) reserveStreamIdentifiers() ([]*DataChannel, []uint16) {
+	r.lock.Lock()
+	dataChannels := append([]*DataChannel{}, r.dataChannels...)
+	r.lock.Unlock()
+
+	var streamIdentifiers []uint16
+	for _, d := range dataChannels {
+		if d.ReadyState() != DataChannelStateConnecting {
+			continue
+		}
+		d.mu.Lock()
+		if d.id == nil {
+			d.mu.Unlock()
+			var dcID *uint16
+			err := r.generateAndSetDataChannelID(r.dtlsTransport.role(), &dcID)
+			if err != nil {
+				continue
+			}
+			d.mu.Lock()
+			d.id = dcID
+			streamIdentifiers = append(streamIdentifiers, *d.id)
+		}
+		d.mu.Unlock()
+	}
+	return dataChannels, streamIdentifiers
 }
