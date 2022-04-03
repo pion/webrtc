@@ -293,9 +293,17 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 	if sample.PrevDroppedPackets > 0 {
 		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
 	}
-	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
+	packets, payloadDataIdx := p.(rtp.Packetizer).PacketizeAndDetectData(sample.Data, samples)
 
-	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption)
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
+
+	log.WithFields(
+		log.Fields{
+			"subcomponent": "webrtc",
+			"type":         "INTENSIVE",
+			"isIframe":     sample.IsIFrame,
+			"payloadDataIdx": payloadDataIdx,
+		}).Trace("dataIndex found")
 
 	if err != nil {
 		log.WithFields(
@@ -338,7 +346,7 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	samples := sample.Duration.Seconds() * clockRate
 	packets := p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
 
-	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption)
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, -1)
 
 	if err != nil {
 		log.WithFields(
@@ -364,7 +372,7 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	return util.FlattenErrs(writeErrs)
 }
 
-func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption) error {
+func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption, payloadDataIdx int) error {
 	var sampleAttr byte = 0
 	var encPosition uint8 = 0
 
@@ -383,7 +391,7 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 	}
 
 	if hyperscaleEncryption {
-		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !encryption.ShouldEncrypt(sample, 0) && err == nil {
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !encryption.ShouldEncrypt(sample, 0, payloadDataIdx) && err == nil {
 			// set the 'skip encryption' bit
 			sampleAttr |= 1 << encPosition
 		}
@@ -412,7 +420,7 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 		for i := 1; i < len(packets); i++ {
 			sampleAttr = 0
 			// set the 'skip encryption' bit
-			if !encryption.ShouldEncrypt(sample, i) {
+			if !encryption.ShouldEncrypt(sample, i, payloadDataIdx) {
 				sampleAttr |= 1 << encPosition
 			} else {
 				sampleAttr |= 0 << encPosition
