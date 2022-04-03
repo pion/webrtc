@@ -27,11 +27,11 @@ func NewEncryption() *Encryption {
 	return enc
 }
 
-func (encryption Encryption) ShouldEncrypt(sample media.Sample, packetSequence int) bool {
+func (encryption Encryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
 	if sample.IsAbr {
-		return encryption.abrEncryptionStrategy.ShouldEncrypt(sample, packetSequence)
+		return encryption.abrEncryptionStrategy.ShouldEncrypt(sample, packetSequence, payloadDataIdx)
 	} else {
-		return encryption.uiEncryptionStrategy.ShouldEncrypt(sample, packetSequence)
+		return encryption.uiEncryptionStrategy.ShouldEncrypt(sample, packetSequence, payloadDataIdx)
 	}
 }
 
@@ -49,23 +49,16 @@ func resolveEncryptionStrategy(strategy string) EncryptionStrategy {
 }
 
 type EncryptionStrategy interface {
-	ShouldEncrypt(sample media.Sample, packetSequence int) bool
+	ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool
 }
 
 type FrameFirstPacketEncryption struct {
 
 }
 
-func (FrameFirstPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int) bool {
-	// we want to encrypt the first packet of the IDR data, not the metadata (sps/pps)
-	// following h264 payloader scheme, when an iframe includes sps/ssp they get packetized
-	// using STAP-A in a single packet and are the first packet of the frame.
-	// in this case, the next packet, seq == 1 will be the first packet conataining the IDR data.
-	// when the frame doesn't include sps/pps the first IDR data packet is expected to be
-	// the first packet of the frame, seq == 0
-	if sample.IsSpsPps && sample.IsIFrame && packetSequence == 1 {
-		return true
-	} else if !sample.IsSpsPps && sample.IsIFrame && packetSequence == 0 {
+func (FrameFirstPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
+	// we need to encrypt the first 'data' packet of the frame and skip any metadata packets
+	if packetSequence == payloadDataIdx {
 		return true
 	}
 
@@ -76,7 +69,7 @@ type FullPacketEncryption struct {
 
 }
 
-func (FullPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int) bool {
+func (FullPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
 	return true
 }
 
@@ -84,6 +77,6 @@ type NoPacketEncryption struct {
 
 }
 
-func (NoPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int) bool {
+func (NoPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
 	return false
 }
