@@ -303,7 +303,7 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 			"type":         "INTENSIVE",
 			"isIframe":     sample.IsIFrame,
 			"payloadDataIdx": payloadDataIdx,
-		}).Trace("dataIndex found")
+		}).Trace("write sample: dataIndex ", payloadDataIdx)
 
 	if err != nil {
 		log.WithFields(
@@ -344,9 +344,18 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	}
 
 	samples := sample.Duration.Seconds() * clockRate
-	packets := p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
 
-	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, -1)
+	packets, payloadDataIdx := p.(rtp.Packetizer).PacketizeInterleavedAndDetectData(sample.Data, uint32(samples))
+
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
+
+	log.WithFields(
+		log.Fields{
+			"subcomponent": "webrtc",
+			"type":         "INTENSIVE",
+			"isIframe":     sample.IsIFrame,
+			"payloadDataIdx": payloadDataIdx,
+		}).Trace("write interleaved sample: dataIndex ", payloadDataIdx)
 
 	if err != nil {
 		log.WithFields(
