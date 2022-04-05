@@ -282,9 +282,9 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 
 	samples := uint32(sample.Duration.Seconds() * clockRate)
 	if sample.PrevDroppedPackets > 0 {
-		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
+		p.SkipSamples(samples * uint32(sample.PrevDroppedPackets))
 	}
-	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
+	packets := p.Packetize(sample.Data, samples)
 
 	writeErrs := []error{}
 	for _, p := range packets {
