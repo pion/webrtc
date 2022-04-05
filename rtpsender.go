@@ -27,7 +27,7 @@ type trackEncoding struct {
 	rtcpInterceptor interceptor.RTCPReader
 	streamInfo      interceptor.StreamInfo
 
-	context TrackLocalContext
+	context *baseTrackLocalContext
 
 	ssrc SSRC
 }
@@ -242,13 +242,13 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	}
 
 	var replacedTrack TrackLocal
-	var context *TrackLocalContext
+	var context *baseTrackLocalContext
 	if len(r.trackEncodings) != 0 {
 		replacedTrack = r.trackEncodings[0].track
-		context = &r.trackEncodings[0].context
+		context = r.trackEncodings[0].context
 	}
 	if r.hasSent() && replacedTrack != nil {
-		if err := replacedTrack.Unbind(*context); err != nil {
+		if err := replacedTrack.Unbind(context); err != nil {
 			return err
 		}
 	}
@@ -258,16 +258,16 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		return nil
 	}
 
-	codec, err := track.Bind(TrackLocalContext{
-		id:              context.id,
+	codec, err := track.Bind(&baseTrackLocalContext{
+		id:              context.ID(),
 		params:          r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
-		ssrc:            context.ssrc,
-		writeStream:     context.writeStream,
-		rtcpInterceptor: context.rtcpInterceptor,
+		ssrc:            context.SSRC(),
+		writeStream:     context.WriteStream(),
+		rtcpInterceptor: context.RTCPReader(),
 	})
 	if err != nil {
 		// Re-bind the original track
-		if _, reBindErr := replacedTrack.Bind(*context); reBindErr != nil {
+		if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
 			return reBindErr
 		}
 
@@ -297,7 +297,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 
 	for idx, trackEncoding := range r.trackEncodings {
 		writeStream := &interceptorToTrackLocalWriter{}
-		trackEncoding.context = TrackLocalContext{
+		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
 			params:          r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
 			ssrc:            parameters.Encodings[idx].SSRC,
