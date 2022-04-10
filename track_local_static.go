@@ -293,7 +293,15 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 	if sample.PrevDroppedPackets > 0 {
 		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
 	}
-	packets, payloadDataIdx := p.(rtp.Packetizer).PacketizeAndDetectData(sample.Data, samples)
+
+	payloadDataIdx := -1
+	var packets []*rtp.Packet
+
+	if s.hyperscaleEncryption {
+		packets, payloadDataIdx = p.(rtp.Packetizer).PacketizeAndDetectData(sample.Data, uint32(samples))
+	} else {
+		packets = p.(rtp.Packetizer).Packetize(sample.Data, uint32(samples))
+	}
 
 	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
 
@@ -345,7 +353,14 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 
 	samples := sample.Duration.Seconds() * clockRate
 
-	packets, payloadDataIdx := p.(rtp.Packetizer).PacketizeInterleavedAndDetectData(sample.Data, uint32(samples))
+	payloadDataIdx := -1
+	var packets []*rtp.Packet
+
+	if s.hyperscaleEncryption {
+		packets, payloadDataIdx = p.(rtp.Packetizer).PacketizeInterleavedAndDetectData(sample.Data, uint32(samples))
+	} else {
+		packets = p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
+	}
 
 	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
 
