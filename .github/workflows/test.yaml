@@ -64,7 +64,6 @@ jobs:
 
       - uses: codecov/codecov-action@v2
         with:
-          file: ./cover.out
           name: codecov-umbrella
           fail_ci_if_error: true
           flags: go
@@ -153,7 +152,6 @@ jobs:
 
       - uses: codecov/codecov-action@v2
         with:
-          file: ./cover.out
           name: codecov-umbrella
           fail_ci_if_error: true
           flags: wasm
