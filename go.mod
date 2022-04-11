@@ -12,7 +12,7 @@ require (
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.9
-	github.com/pion/rtp v1.7.9
+	github.com/pion/rtp v1.7.11
 	github.com/pion/sctp v1.8.2
 	github.com/pion/sdp/v3 v3.0.4
 	github.com/pion/srtp/v2 v2.0.5
