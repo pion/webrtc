@@ -446,8 +446,6 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 			// set the 'skip encryption' bit
 			if !encryption.ShouldEncrypt(sample, i, payloadDataIdx) {
 				sampleAttr |= 1 << encPosition
-			} else {
-				sampleAttr |= 0 << encPosition
 			}
 			extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
 		}
