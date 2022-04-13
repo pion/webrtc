@@ -46,6 +46,7 @@ cnderrauber <zengjie9004@gmail.com>
 cyannuk <cyannuk@issart.com>
 David Hamilton <davidhamiltron@gmail.com>
 David Zhao <david@davidzhao.com>
+david.s <david.s@hpcnt.com>
 Dean Sheather <dean@coder.com>
 decanus <7621705+decanus@users.noreply.github.com>
 Denis <Hixon10@yandex.ru>
