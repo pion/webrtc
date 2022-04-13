@@ -48,14 +48,29 @@ jobs:
           go get github.com/ory/go-acc
           git checkout go.mod go.sum
 
+      - name: Set up gotestfmt
+        uses: haveyoudebuggedit/gotestfmt-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Avoid getting rate limited
+
       - name: Run test
         run: |
           TEST_BENCH_OPTION="-bench=."
           if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
 
+          set -euo pipefail
           go-acc -o cover.out ./... -- \
             ${TEST_BENCH_OPTION} \
-            -v -race
+            -json \
+            -v -race 2>&1 | tee /tmp/gotest.log | gotestfmt
+
+      - name: Upload test log
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: test-log-${{ matrix.go }}
+          path: /tmp/gotest.log
+          if-no-files-found: error
 
       - name: Run TEST_HOOK
         run: |
