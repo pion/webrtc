@@ -88,7 +88,7 @@ This book is vendor agnostic and will not have any Pion specific information.
 * [NACK](https://github.com/pion/interceptor/pull/4)
 * [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/master/pkg/report)
 * [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/master/pkg/twcc)
-* Bandwidth Estimation is actively being implemented, see [pion/interceptor#25](https://github.com/pion/interceptor/issues/25)
+* [Bandwidth Estimation](https://github.com/pion/webrtc/tree/master/examples/bandwidth-estimation-from-disk)
 
 #### Security
 * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA for DTLS v1.2
