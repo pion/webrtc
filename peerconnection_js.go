@@ -568,11 +568,10 @@ func iceServersToValue(iceServers []ICEServer) js.Value {
 
 func iceServerToValue(server ICEServer) js.Value {
 	return js.ValueOf(map[string]interface{}{
-		"urls":     stringsToValue(server.URLs), // required
-		"username": stringToValueOrUndefined(server.Username),
-		// Note: credential and credentialType are not currently supported.
-		// "credential":     interfaceToValueOrUndefined(server.Credential),
-		// "credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
+		"urls":           stringsToValue(server.URLs), // required
+		"username":       stringToValueOrUndefined(server.Username),
+		"credential":     interfaceToValueOrUndefined(server.Credential),
+		"credentialType": stringEnumToValueOrUndefined(server.CredentialType.String()),
 	})
 }
 
