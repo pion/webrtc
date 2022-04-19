@@ -3,103 +3,30 @@ package mux
 import (
 	"io"
 	"net"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/packetio"
 	"github.com/pion/transport/test"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testPipeBufferSize = 8192
 
-func TestStressDuplex(t *testing.T) {
-	// Limit runtime in case of deadlocks
-	lim := test.TimeOut(time.Second * 20)
-	defer lim.Stop()
-
-	// Check for leaking routines
-	report := test.CheckRoutines(t)
-	defer report()
-
-	// Run the test
-	stressDuplex(t)
-}
-
-func stressDuplex(t *testing.T) {
-	ca, cb, stop := pipeMemory()
-	stopSpin := make(chan struct{})
-
-	defer func() {
-		close(stopSpin)
-		stop(t)
-	}()
-
-	// MsgSize * MsgCount > maxBufferSize
-	opt := test.Options{
-		MsgSize:  2048,
-		MsgCount: 2000,
-	}
-
-	// Stress the system whilst testing (tests for #2152)
-	// wasm is excluded because the additional stress makes test run too slowly.
-	if runtime.GOARCH != "wasm" {
-		spin := func() {
-			// nolint:staticcheck
-			// Suppress linter warning about spinning loop (SA5004)—spinning is intended.
-			for {
-				select {
-				case <-stopSpin:
-					return
-				default:
-				}
-			}
-		}
-		for i := 0; i < runtime.NumCPU(); i++ {
-			go spin()
-		}
-	}
-
-	assert.NoError(t, test.StressDuplex(ca, cb, opt))
-}
-
-func pipeMemory() (*Endpoint, net.Conn, func(*testing.T)) {
-	// In memory pipe
-	ca, cb := net.Pipe()
-
-	m := NewMux(Config{
-		Conn:          ca,
-		BufferSize:    testPipeBufferSize,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
-
-	e := m.NewEndpoint(MatchAll)
-	m.RemoveEndpoint(e)
-	e = m.NewEndpoint(MatchAll)
-
-	stop := func(t *testing.T) {
-		assert.NoError(t, cb.Close())
-		assert.NoError(t, m.Close())
-	}
-
-	return e, cb, stop
-}
-
 func TestNoEndpoints(t *testing.T) {
 	// In memory pipe
 	ca, cb := net.Pipe()
-	assert.NoError(t, cb.Close())
+	require.NoError(t, cb.Close())
 
 	m := NewMux(Config{
 		Conn:          ca,
 		BufferSize:    testPipeBufferSize,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 	})
-	assert.NoError(t, m.dispatch(make([]byte, 1)))
-	assert.NoError(t, m.Close())
-	assert.NoError(t, ca.Close())
+	require.NoError(t, m.dispatch(make([]byte, 1)))
+	require.NoError(t, m.Close())
+	require.NoError(t, ca.Close())
 }
 
 type muxErrorConnReadResult struct {
@@ -137,7 +64,7 @@ func TestNonFatalRead(t *testing.T) {
 
 	// In memory pipe
 	ca, cb := net.Pipe()
-	assert.NoError(t, cb.Close())
+	require.NoError(t, cb.Close())
 
 	conn := &muxErrorConn{ca, []muxErrorConnReadResult{
 		// Non-fatal timeout error
@@ -158,16 +85,42 @@ func TestNonFatalRead(t *testing.T) {
 
 	buff := make([]byte, testPipeBufferSize)
 	n, err := e.Read(buff)
-	assert.NoError(t, err)
-	assert.Equal(t, buff[:n], expectedData)
+	require.NoError(t, err)
+	require.Equal(t, buff[:n], expectedData)
 
 	n, err = e.Read(buff)
-	assert.NoError(t, err)
-	assert.Equal(t, buff[:n], expectedData)
+	require.NoError(t, err)
+	require.Equal(t, buff[:n], expectedData)
 
 	<-m.closedCh
-	assert.NoError(t, m.Close())
-	assert.NoError(t, ca.Close())
+	require.NoError(t, m.Close())
+	require.NoError(t, ca.Close())
+}
+
+// If a endpoint returns packetio.ErrFull it is a non-fatal error and shouldn't cause
+// the mux to be destroyed
+// pion/webrtc#2180
+func TestNonFatalDispatch(t *testing.T) {
+	in, out := net.Pipe()
+
+	m := NewMux(Config{
+		Conn:          out,
+		LoggerFactory: logging.NewDefaultLoggerFactory(),
+		BufferSize:    1500,
+	})
+
+	e := m.NewEndpoint(MatchSRTP)
+	e.buffer.SetLimitSize(1)
+
+	for i := 0; i <= 25; i++ {
+		srtpPacket := []byte{128, 1, 2, 3, 4}
+		_, err := in.Write(srtpPacket)
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, m.Close())
+	require.NoError(t, in.Close())
+	require.NoError(t, out.Close())
 }
 
 func BenchmarkDispatch(b *testing.B) {

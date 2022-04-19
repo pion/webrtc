@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
@@ -145,19 +144,13 @@ func (m *Mux) dispatch(buf []byte) error {
 		return nil
 	}
 
-	// Attempt again later when encountering a temporarily full buffer (fix for #2152)
-	var err error
-	for {
-		_, err = endpoint.buffer.Write(buf)
-		if !errors.Is(err, packetio.ErrFull) {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	_, err := endpoint.buffer.Write(buf)
+
+	// Expected when bytes are received faster than the endpoint can process them (#2152, #2180)
+	if errors.Is(err, packetio.ErrFull) {
+		m.log.Infof("mux: endpoint buffer is full, dropping packet")
+		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
