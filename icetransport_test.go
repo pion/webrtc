@@ -12,6 +12,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestICETransport_OnConnectionStateChange(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	iceOfferComplete := make(chan struct{})
+	iceAnswerComplete := make(chan struct{})
+
+	pcOffer.SCTP().Transport().ICETransport().OnConnectionStateChange(func(s ICETransportState) {
+		if s == ICETransportStateConnected {
+			close(iceOfferComplete)
+		}
+	})
+
+	pcAnswer.SCTP().Transport().ICETransport().OnConnectionStateChange(func(s ICETransportState) {
+		if s == ICETransportStateConnected {
+			close(iceAnswerComplete)
+		}
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	<-iceOfferComplete
+
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
 func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
