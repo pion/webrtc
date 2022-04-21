@@ -233,3 +233,21 @@ func TestSetDTLSRetransmissionInterval(t *testing.T) {
 		t.Errorf("Failed to set DTLS retransmission interval")
 	}
 }
+
+func TestSetICEAcceptAggressiveNomination(t *testing.T) {
+	s := SettingEngine{}
+
+	if s.candidates.AcceptAggressiveNomination != false {
+		t.Fatalf("SettingEngine AcceptAggressiveNomination defaults aren't as expected.")
+	}
+
+	s.SetICEAcceptAggressiveNomination(true)
+	if s.candidates.AcceptAggressiveNomination != true {
+		t.Errorf("Failed to set ICE accept aggressive nomination")
+	}
+
+	s.SetICEAcceptAggressiveNomination(false)
+	if s.candidates.AcceptAggressiveNomination != false {
+		t.Errorf("Failed to set ICE accept aggressive nomination")
+	}
+}
