@@ -7,6 +7,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   e2e-test:
     name: Test

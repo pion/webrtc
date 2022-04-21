@@ -16,6 +16,9 @@ on:
       - opened
       - edited
       - synchronize
+permissions:
+  contents: read
+
 jobs:
   lint-commit-message:
     name: Metadata
@@ -37,6 +40,9 @@ jobs:
           run: .github/lint-disallowed-functions-in-library.sh
 
   lint-go:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     name: Go
     runs-on: ubuntu-latest
     strategy:

@@ -5,6 +5,9 @@ on:
       - opened
       - edited
       - synchronize
+permissions:
+  contents: read
+
 jobs:
   StandardJS:
     runs-on: ubuntu-latest
