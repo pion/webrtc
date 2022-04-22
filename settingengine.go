@@ -36,16 +36,15 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
-		ICELite                    bool
-		ICENetworkTypes            []NetworkType
-		InterfaceFilter            func(string) bool
-		NAT1To1IPs                 []string
-		NAT1To1IPCandidateType     ICECandidateType
-		MulticastDNSMode           ice.MulticastDNSMode
-		MulticastDNSHostName       string
-		UsernameFragment           string
-		Password                   string
-		AcceptAggressiveNomination bool
+		ICELite                bool
+		ICENetworkTypes        []NetworkType
+		InterfaceFilter        func(string) bool
+		NAT1To1IPs             []string
+		NAT1To1IPCandidateType ICECandidateType
+		MulticastDNSMode       ice.MulticastDNSMode
+		MulticastDNSHostName   string
+		UsernameFragment       string
+		Password               string
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -228,13 +227,6 @@ func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
 func (e *SettingEngine) SetICECredentials(usernameFragment, password string) {
 	e.candidates.UsernameFragment = usernameFragment
 	e.candidates.Password = password
-}
-
-// SetICEAcceptAggressiveNomination sets the Ice agent to accept aggressive nomination
-//
-// This is useful for compatible with chrome and other browser use aggressive nomination to update nominate candidate pairs
-func (e *SettingEngine) SetICEAcceptAggressiveNomination(acceptAggressiveNomination bool) {
-	e.candidates.AcceptAggressiveNomination = acceptAggressiveNomination
 }
 
 // DisableCertificateFingerprintVerification disables fingerprint verification after DTLS Handshake has finished
