@@ -22,8 +22,9 @@ type ICETransport struct {
 
 	role ICERole
 
-	onConnectionStateChangeHandler       atomic.Value // func(ICETransportState)
-	onSelectedCandidatePairChangeHandler atomic.Value // func(*ICECandidatePair)
+	onConnectionStateChangeHandler         atomic.Value // func(ICETransportState)
+	internalOnConnectionStateChangeHandler atomic.Value // func(ICETransportState)
+	onSelectedCandidatePairChangeHandler   atomic.Value // func(*ICECandidatePair)
 
 	state atomic.Value // ICETransportState
 
@@ -220,8 +221,10 @@ func (t *ICETransport) OnConnectionStateChange(f func(ICETransportState)) {
 }
 
 func (t *ICETransport) onConnectionStateChange(state ICETransportState) {
-	handler := t.onConnectionStateChangeHandler.Load()
-	if handler != nil {
+	if handler := t.onConnectionStateChangeHandler.Load(); handler != nil {
+		handler.(func(ICETransportState))(state)
+	}
+	if handler := t.internalOnConnectionStateChangeHandler.Load(); handler != nil {
 		handler.(func(ICETransportState))(state)
 	}
 }

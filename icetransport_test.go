@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,23 +23,32 @@ func TestICETransport_OnConnectionStateChange(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
-	iceOfferComplete := make(chan struct{})
-	iceAnswerComplete := make(chan struct{})
+	var (
+		iceComplete             sync.WaitGroup
+		peerConnectionConnected sync.WaitGroup
+	)
+	iceComplete.Add(2)
+	peerConnectionConnected.Add(2)
 
-	pcOffer.SCTP().Transport().ICETransport().OnConnectionStateChange(func(s ICETransportState) {
+	onIceComplete := func(s ICETransportState) {
 		if s == ICETransportStateConnected {
-			close(iceOfferComplete)
+			iceComplete.Done()
 		}
-	})
+	}
+	pcOffer.SCTP().Transport().ICETransport().OnConnectionStateChange(onIceComplete)
+	pcAnswer.SCTP().Transport().ICETransport().OnConnectionStateChange(onIceComplete)
 
-	pcAnswer.SCTP().Transport().ICETransport().OnConnectionStateChange(func(s ICETransportState) {
-		if s == ICETransportStateConnected {
-			close(iceAnswerComplete)
+	onConnected := func(s PeerConnectionState) {
+		if s == PeerConnectionStateConnected {
+			peerConnectionConnected.Done()
 		}
-	})
+	}
+	pcOffer.OnConnectionStateChange(onConnected)
+	pcAnswer.OnConnectionStateChange(onConnected)
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-	<-iceOfferComplete
+	iceComplete.Wait()
+	peerConnectionConnected.Wait()
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
