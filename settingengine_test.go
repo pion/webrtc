@@ -233,3 +233,12 @@ func TestSetDTLSRetransmissionInterval(t *testing.T) {
 		t.Errorf("Failed to set DTLS retransmission interval")
 	}
 }
+
+func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {
+	s := SettingEngine{}
+	assert.Equal(t, uint32(0), s.sctp.maxReceiveBufferSize)
+
+	expSize := uint32(4 * 1024 * 1024)
+	s.SetSCTPMaxReceiveBufferSize(expSize)
+	assert.Equal(t, expSize, s.sctp.maxReceiveBufferSize)
+}
