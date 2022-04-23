@@ -123,5 +123,9 @@ If you need commercial support or don't want to use public methods you can conta
 ### Contributing
 Check out the **[contributing wiki](https://github.com/pion/webrtc/wiki/Contributing)** to join the group of amazing people making this project possible:
 
+### Sponsoring
+
+Work on Pion's congestion control and bandwidth estimation was funded through the [User-Operated Internet](https://nlnet.nl/useroperated/) fund, a fund established by [NLnet](https://nlnet.nl/) made possible by financial support from the [PKT Community](https://pkt.cash/)/[The Network Steward](https://pkt.cash/network-steward) and stichting [Technology Commons Trust](https://technologycommons.org/).
+
 ### License
 MIT License - see [LICENSE](LICENSE) for full text
