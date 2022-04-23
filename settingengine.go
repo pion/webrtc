@@ -54,6 +54,9 @@ type SettingEngine struct {
 	dtls struct {
 		retransmissionInterval time.Duration
 	}
+	sctp struct {
+		maxReceiveBufferSize uint32
+	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
 	disableCertificateFingerprintVerification bool
@@ -303,4 +306,10 @@ func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
 // SetDTLSRetransmissionInterval sets the retranmission interval for DTLS.
 func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 	e.dtls.retransmissionInterval = interval
+}
+
+// SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
+// Leave this 0 for the default maxReceiveBufferSize.
+func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32) {
+	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
 }
