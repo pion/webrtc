@@ -13,10 +13,10 @@ type writerCloser struct {
 	bytes.Buffer
 }
 
-var errCloseErr = errors.New("close error")
+var errClose = errors.New("close error")
 
 func (w *writerCloser) Close() error {
-	return errCloseErr
+	return errClose
 }
 
 func TestNewWith(t *testing.T) {

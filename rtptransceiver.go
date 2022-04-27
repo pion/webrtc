@@ -82,8 +82,8 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 // Sender returns the RTPTransceiver's RTPSender if it has one
 func (t *RTPTransceiver) Sender() *RTPSender {
-	if v := t.sender.Load(); v != nil {
-		return v.(*RTPSender)
+	if v, ok := t.sender.Load().(*RTPSender); ok {
+		return v
 	}
 
 	return nil
@@ -109,8 +109,8 @@ func (t *RTPTransceiver) setSender(s *RTPSender) {
 
 // Receiver returns the RTPTransceiver's RTPReceiver if it has one
 func (t *RTPTransceiver) Receiver() *RTPReceiver {
-	if v := t.receiver.Load(); v != nil {
-		return v.(*RTPReceiver)
+	if v, ok := t.receiver.Load().(*RTPReceiver); ok {
+		return v
 	}
 
 	return nil
@@ -127,8 +127,8 @@ func (t *RTPTransceiver) SetMid(mid string) error {
 
 // Mid gets the Transceiver's mid value. When not already set, this value will be set in CreateOffer or CreateAnswer.
 func (t *RTPTransceiver) Mid() string {
-	if v := t.mid.Load(); v != nil {
-		return v.(string)
+	if v, ok := t.mid.Load().(string); ok {
+		return v
 	}
 	return ""
 }
@@ -140,7 +140,10 @@ func (t *RTPTransceiver) Kind() RTPCodecType {
 
 // Direction returns the RTPTransceiver's current direction
 func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
-	return t.direction.Load().(RTPTransceiverDirection)
+	if direction, ok := t.direction.Load().(RTPTransceiverDirection); ok {
+		return direction
+	}
+	return RTPTransceiverDirection(0)
 }
 
 // Stop irreversibly stops the RTPTransceiver

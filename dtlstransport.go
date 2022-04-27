@@ -134,7 +134,7 @@ func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
 
 	srtcpSession, err := t.getSRTCPSession()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
@@ -232,16 +232,16 @@ func (t *DTLSTransport) startSRTP() error {
 }
 
 func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
-	if value := t.srtpSession.Load(); value != nil {
-		return value.(*srtp.SessionSRTP), nil
+	if value, ok := t.srtpSession.Load().(*srtp.SessionSRTP); ok {
+		return value, nil
 	}
 
 	return nil, errDtlsTransportNotStarted
 }
 
 func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
-	if value := t.srtcpSession.Load(); value != nil {
-		return value.(*srtp.SessionSRTCP), nil
+	if value, ok := t.srtcpSession.Load().(*srtp.SessionSRTCP); ok {
+		return value, nil
 	}
 
 	return nil, errDtlsTransportNotStarted
@@ -407,12 +407,12 @@ func (t *DTLSTransport) Stop() error {
 	// Try closing everything and collect the errors
 	var closeErrs []error
 
-	if srtpSessionValue := t.srtpSession.Load(); srtpSessionValue != nil {
-		closeErrs = append(closeErrs, srtpSessionValue.(*srtp.SessionSRTP).Close())
+	if srtpSession, err := t.getSRTPSession(); err == nil && srtpSession != nil {
+		closeErrs = append(closeErrs, srtpSession.Close())
 	}
 
-	if srtcpSessionValue := t.srtcpSession.Load(); srtcpSessionValue != nil {
-		closeErrs = append(closeErrs, srtcpSessionValue.(*srtp.SessionSRTCP).Close())
+	if srtcpSession, err := t.getSRTCPSession(); err == nil && srtcpSession != nil {
+		closeErrs = append(closeErrs, srtcpSession.Close())
 	}
 
 	for i := range t.simulcastStreams {

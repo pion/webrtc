@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"errors"
 	"io"
 	"math"
 	"sync"
@@ -174,7 +175,7 @@ ACCEPT:
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
 		if err != nil {
-			if err != io.EOF {
+			if errors.Is(err, io.EOF) {
 				r.log.Errorf("Failed to accept data channel: %v", err)
 				r.onError(err)
 			}

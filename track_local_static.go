@@ -134,7 +134,7 @@ var rtpPacketPool = sync.Pool{
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 	ipacket := rtpPacketPool.Get()
-	packet := ipacket.(*rtp.Packet)
+	packet := ipacket.(*rtp.Packet) //nolint:forcetypeassert
 	defer func() {
 		*packet = rtp.Packet{}
 		rtpPacketPool.Put(ipacket)
@@ -167,7 +167,7 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 	ipacket := rtpPacketPool.Get()
-	packet := ipacket.(*rtp.Packet)
+	packet := ipacket.(*rtp.Packet) //nolint:forcetypeassert
 	defer func() {
 		*packet = rtp.Packet{}
 		rtpPacketPool.Put(ipacket)

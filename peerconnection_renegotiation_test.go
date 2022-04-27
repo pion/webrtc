@@ -6,6 +6,7 @@ package webrtc
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"strconv"
 	"strings"
@@ -438,7 +439,7 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	pcAnswer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
 		tracksCh <- track
 		for {
-			if _, _, readErr := track.ReadRTP(); readErr == io.EOF {
+			if _, _, readErr := track.ReadRTP(); errors.Is(readErr, io.EOF) {
 				tracksClosed <- struct{}{}
 				return
 			}
@@ -527,7 +528,7 @@ func TestPeerConnection_Renegotiation_RemoveTrack(t *testing.T) {
 		onTrackFiredFunc()
 
 		for {
-			if _, _, err := track.ReadRTP(); err == io.EOF {
+			if _, _, err := track.ReadRTP(); errors.Is(err, io.EOF) {
 				trackClosedFunc()
 				return
 			}

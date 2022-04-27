@@ -321,12 +321,12 @@ var rlBufPool = sync.Pool{New: func() interface{} {
 
 func (d *DataChannel) readLoop() {
 	for {
-		buffer := rlBufPool.Get().([]byte)
+		buffer := rlBufPool.Get().([]byte) //nolint:forcetypeassert
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
 			rlBufPool.Put(buffer) // nolint:staticcheck
 			d.setReadyState(DataChannelStateClosed)
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				d.onError(err)
 			}
 			d.onClose()
@@ -488,8 +488,8 @@ func (d *DataChannel) ID() *uint16 {
 
 // ReadyState represents the state of the DataChannel object.
 func (d *DataChannel) ReadyState() DataChannelState {
-	if v := d.readyState.Load(); v != nil {
-		return v.(DataChannelState)
+	if v, ok := d.readyState.Load().(DataChannelState); ok {
+		return v
 	}
 	return DataChannelState(0)
 }

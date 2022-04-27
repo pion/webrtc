@@ -1,8 +1,10 @@
+//go:build !js
 // +build !js
 
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -217,16 +219,17 @@ func main() {
 			frame, _, err = ivf.ParseNextFrame()
 		}
 
-		switch err {
+		switch {
+		// If we have reached the end of the file start again
+		case errors.Is(err, io.EOF):
+			ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
+
 		// No error write the video frame
-		case nil:
+		case err == nil:
 			currentTimestamp = frameHeader.Timestamp
 			if err = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
 				panic(err)
 			}
-		// If we have reached the end of the file start again
-		case io.EOF:
-			ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
 		// Error besides io.EOF that we dont know how to handle
 		default:
 			panic(err)

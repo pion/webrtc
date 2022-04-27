@@ -100,9 +100,7 @@ func (p Packet) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	data := append(hdrData, p.Payload...)
-
-	return data, nil
+	return append(hdrData, p.Payload...), nil
 }
 
 // Unmarshal decodes the Packet from binary.

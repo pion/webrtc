@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -102,7 +103,7 @@ func main() {
 			ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
 			for ; true; <-ticker.C {
 				frame, _, ivfErr := ivf.ParseNextFrame()
-				if ivfErr == io.EOF {
+				if errors.Is(ivfErr, io.EOF) {
 					fmt.Printf("All video frames parsed and sent")
 					os.Exit(0)
 				}
@@ -167,7 +168,7 @@ func main() {
 			ticker := time.NewTicker(oggPageDuration)
 			for ; true; <-ticker.C {
 				pageData, pageHeader, oggErr := ogg.ParseNextPage()
-				if oggErr == io.EOF {
+				if errors.Is(oggErr, io.EOF) {
 					fmt.Printf("All audio pages parsed and sent")
 					os.Exit(0)
 				}

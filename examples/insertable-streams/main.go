@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -78,7 +79,7 @@ func main() {
 		sleepTime := time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000)
 		for {
 			frame, _, ivfErr := ivf.ParseNextFrame()
-			if ivfErr == io.EOF {
+			if errors.Is(ivfErr, io.EOF) {
 				fmt.Printf("All frames parsed and sent")
 				os.Exit(0)
 			}

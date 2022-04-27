@@ -20,7 +20,7 @@ func (b *atomicBool) get() bool {
 }
 
 func (b *atomicBool) swap(value bool) bool {
-	var i int32 = 0
+	var i int32
 	if value {
 		i = 1
 	}
