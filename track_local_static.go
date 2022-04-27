@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -11,9 +12,9 @@ import (
 	"sync"
 
 	"github.com/pion/rtp"
+	"github.com/pion/webrtc/v3/encryption"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/encryption"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -183,12 +184,12 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP
 type TrackLocalStaticSample struct {
-	Packetizer rtp.Packetizer
-	sequencer  rtp.Sequencer
-	RtpTrack   *TrackLocalStaticRTP
+	Packetizer           rtp.Packetizer
+	sequencer            rtp.Sequencer
+	RtpTrack             *TrackLocalStaticRTP
 	hyperscaleEncryption bool
-	encryption *encryption.Encryption
-	ClockRate  float64
+	encryption           *encryption.Encryption
+	ClockRate            float64
 }
 
 // NewTrackLocalStaticSample returns a TrackLocalStaticSample
@@ -209,7 +210,7 @@ func NewTrackLocalStaticSample(c RTPCodecCapability, id, streamID string) (*Trac
 	return track, nil
 }
 
-func (s *TrackLocalStaticSample) SetHyperscaleEncryption(active bool){
+func (s *TrackLocalStaticSample) SetHyperscaleEncryption(active bool) {
 	s.hyperscaleEncryption = active
 }
 
@@ -307,9 +308,9 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 
 	log.WithFields(
 		log.Fields{
-			"subcomponent": "webrtc",
-			"type":         "INTENSIVE",
-			"isIframe":     sample.IsIFrame,
+			"subcomponent":   "webrtc",
+			"type":           "INTENSIVE",
+			"isIframe":       sample.IsIFrame,
 			"payloadDataIdx": payloadDataIdx,
 		}).Trace("write sample: dataIndex ", payloadDataIdx)
 
@@ -366,9 +367,9 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 
 	log.WithFields(
 		log.Fields{
-			"subcomponent": "webrtc",
-			"type":         "INTENSIVE",
-			"isIframe":     sample.IsIFrame,
+			"subcomponent":   "webrtc",
+			"type":           "INTENSIVE",
+			"isIframe":       sample.IsIFrame,
 			"payloadDataIdx": payloadDataIdx,
 		}).Trace("write interleaved sample: dataIndex ", payloadDataIdx)
 
@@ -399,6 +400,7 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption, payloadDataIdx int) error {
 	var sampleAttr byte = 0
 	var encPosition uint8 = 0
+	var shouldEncrypt, done bool = false, false
 
 	position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_FIRST_PACKET_ATTR_POS")
 	if err == nil {
@@ -415,12 +417,12 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 	}
 
 	if hyperscaleEncryption {
-		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !encryption.ShouldEncrypt(sample, 0, payloadDataIdx) && err == nil {
+		shouldEncrypt, done = encryption.ShouldEncrypt(sample, 0, payloadDataIdx)
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !shouldEncrypt && err == nil {
 			// set the 'skip encryption' bit
 			sampleAttr |= 1 << encPosition
 		}
 	}
-
 
 	extensionErrs := []error{}
 	attributesExtId := uint8(0)
@@ -429,7 +431,7 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 		extensionErrs = append(extensionErrs, packets[0].SetExtensions(sample.Extensions))
 		if sample.WithHyperscaleExtensions {
 			if attributesExtId, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
-				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))			
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))
 			}
 			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
 				donBytes := make([]byte, 2)
@@ -440,17 +442,28 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 	}
 
 	if hyperscaleEncryption {
-		// now check wethear the rest of the packets need to be encrypted
-		for i := 1; i < len(packets); i++ {
-			sampleAttr = 0
-			// set the 'skip encryption' bit
-			if !encryption.ShouldEncrypt(sample, i, payloadDataIdx) {
-				sampleAttr |= 1 << encPosition
+		// since default is to encrypt, if first packet returned 'encrypt' and result will not change for next packets
+		// no need to check the rest of the packets
+		if !shouldEncrypt || !done {
+			// now check whether the rest of the packets need to be encrypted
+			for i := 1; i < len(packets); i++ {
+				sampleAttr = 0
+				shouldEncrypt, done = encryption.ShouldEncrypt(sample, i, payloadDataIdx)
+
+				// set the 'skip encryption' bit
+				if !shouldEncrypt {
+					sampleAttr |= 1 << encPosition
+					extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
+				}
+
+				// since default is to encrypt, i.e. we set the bit to 'skip encryption',
+				// if this packet should encrypt and rest of the packets have the same result, no need to look further
+				if shouldEncrypt && done {
+					break
+				}
 			}
-			extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
 		}
 	}
-
 
 	return util.FlattenErrs(extensionErrs)
 }

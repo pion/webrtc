@@ -3,16 +3,11 @@ package encryption
 import (
 	"github.com/pion/webrtc/v3/pkg/media"
 	"os"
-
 )
 
-type EncryptionFactory struct {
-
-}
-
 type Encryption struct {
-	uiEncryptionStrategy EncryptionStrategy
-	abrEncryptionStrategy EncryptionStrategy
+	uiEncryptionStrategy  Strategy
+	abrEncryptionStrategy Strategy
 }
 
 func NewEncryption() *Encryption {
@@ -27,7 +22,7 @@ func NewEncryption() *Encryption {
 	return enc
 }
 
-func (encryption Encryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
+func (encryption Encryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) (bool, bool) {
 	if sample.IsAbr {
 		return encryption.abrEncryptionStrategy.ShouldEncrypt(sample, packetSequence, payloadDataIdx)
 	} else {
@@ -35,7 +30,7 @@ func (encryption Encryption) ShouldEncrypt(sample media.Sample, packetSequence i
 	}
 }
 
-func resolveEncryptionStrategy(strategy string) EncryptionStrategy {
+func resolveEncryptionStrategy(strategy string) Strategy {
 	switch strategy {
 	case "FULL":
 		return FullPacketEncryption{}
@@ -48,35 +43,38 @@ func resolveEncryptionStrategy(strategy string) EncryptionStrategy {
 	}
 }
 
-type EncryptionStrategy interface {
-	ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool
+type Strategy interface {
+	ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) (bool, bool)
 }
 
+// FrameFirstPacketEncryption skip preceding metadata packets and encrypt the first 'data' packet of the frame
 type FrameFirstPacketEncryption struct {
-
 }
 
-func (FrameFirstPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
-	// we need to encrypt the first 'data' packet of the frame and skip any metadata packets
-	if packetSequence == payloadDataIdx {
-		return true
+func (FrameFirstPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) (bool, bool) {
+	if packetSequence == payloadDataIdx { // encrypt this packet but come back to ask about the next one
+		return true, false
+	} else if packetSequence > payloadDataIdx { // don't encrypt and subsequent calls will return the same result
+		return false, true
+	} else { // packets before data packet, don't encrypt, keep checking further packets
+		return false, false
 	}
-
-	return false
 }
 
+// FullPacketEncryption encrypt every packet in the frame
 type FullPacketEncryption struct {
-
 }
 
-func (FullPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
-	return true
+func (FullPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) (bool, bool) {
+	// encrypt regardless of packet sequence, subsequent calls will return the same result
+	return true, true
 }
 
+// NoPacketEncryption don't encrypt any packet in the frame
 type NoPacketEncryption struct {
-
 }
 
-func (NoPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) bool {
-	return false
+func (NoPacketEncryption) ShouldEncrypt(sample media.Sample, packetSequence int, payloadDataIdx int) (bool, bool) {
+	// don't encrypt regardless of packet sequence, subsequent calls will return the same result
+	return false, true
 }
