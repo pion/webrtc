@@ -1651,7 +1651,10 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 // ICEConnectionState returns the ICE connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
-	return pc.iceConnectionState.Load().(ICEConnectionState)
+	if state, ok := pc.iceConnectionState.Load().(ICEConnectionState); ok {
+		return state
+	}
+	return ICEConnectionState(0)
 }
 
 // GetSenders returns the RTPSender that are currently attached to this PeerConnection
@@ -2071,7 +2074,10 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 // ConnectionState attribute returns the connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
-	return pc.connectionState.Load().(PeerConnectionState)
+	if state, ok := pc.connectionState.Load().(PeerConnectionState); ok {
+		return state
+	}
+	return PeerConnectionState(0)
 }
 
 // GetStats return data providing statistics about the overall connection

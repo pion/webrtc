@@ -1580,7 +1580,7 @@ a=ssrc:1455629982 cname:{61fd3093-0326-4b12-8258-86bdc1fe677a}
 	assert.NoError(t, err)
 
 	assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSDP}))
-	assert.Equal(t, RTPTransceiverDirectionInactive, peerConnection.rtpTransceivers[0].direction.Load().(RTPTransceiverDirection))
+	assert.Equal(t, RTPTransceiverDirectionInactive, peerConnection.rtpTransceivers[0].direction.Load().(RTPTransceiverDirection)) //nolint:forcetypeassert
 
 	assert.NoError(t, peerConnection.Close())
 }

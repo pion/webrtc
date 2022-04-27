@@ -262,7 +262,7 @@ func TestReader(t *testing.T) {
 		var packets []Packet
 		for {
 			pkt, err := r.Next()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			if err != nil {

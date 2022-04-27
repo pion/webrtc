@@ -23,7 +23,7 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 
 	// Look ahead to see if there's a valid preamble
 	peek, err := bio.Peek(preambleLen)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil, hdr, errMalformed
 	}
 	if err != nil {
@@ -38,7 +38,7 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 
 	// consume the preamble
 	_, _, err = bio.ReadLine()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil, hdr, errMalformed
 	}
 	if err != nil {

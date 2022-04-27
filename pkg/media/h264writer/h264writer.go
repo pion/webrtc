@@ -26,7 +26,7 @@ type (
 
 // New builds a new H264 writer
 func New(filename string) (*H264Writer, error) {
-	f, err := os.Create(filename)
+	f, err := os.Create(filename) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

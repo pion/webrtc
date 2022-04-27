@@ -43,7 +43,7 @@ type OggWriter struct {
 
 // New builds a new OGG Opus writer
 func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	f, err := os.Create(fileName)
+	f, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

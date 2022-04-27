@@ -66,7 +66,10 @@ func (o *operations) pop() func() {
 
 	e := o.ops.Front()
 	o.ops.Remove(e)
-	return e.Value.(operation)
+	if op, ok := e.Value.(operation); ok {
+		return op
+	}
+	return nil
 }
 
 func (o *operations) start() {

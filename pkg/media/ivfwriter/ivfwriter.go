@@ -43,7 +43,7 @@ type IVFWriter struct {
 
 // New builds a new IVF writer
 func New(fileName string, opts ...Option) (*IVFWriter, error) {
-	f, err := os.Create(fileName)
+	f, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}

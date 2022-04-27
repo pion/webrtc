@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -161,7 +162,8 @@ func main() {
 				// That's why, for this particular example, the user first needs to provide the answer
 				// to the browser then open the third party application. Therefore we must not kill
 				// the forward on "connection refused" errors
-				if opError, ok := err.(*net.OpError); ok && opError.Err.Error() == "write: connection refused" {
+				var opError *net.OpError
+				if errors.As(err, &opError); ok && opError.Err.Error() == "write: connection refused" {
 					continue
 				}
 				panic(err)
