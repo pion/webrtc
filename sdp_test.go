@@ -449,6 +449,26 @@ func TestPopulateSDP(t *testing.T) {
 		}
 		assert.Equal(t, true, foundVP8, "vp8 should be present in sdp")
 	})
+	t.Run("ice-lite", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetLite(true)
+
+		offerSdp, err := populateSDP(&sdp.SessionDescription{}, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &MediaEngine{}, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, []mediaSection{}, ICEGatheringStateComplete)
+		assert.Nil(t, err)
+
+		var found bool
+		// ice-lite is an session-level attribute
+		for _, a := range offerSdp.Attributes {
+			if a.Key == sdp.AttrKeyICELite {
+				// ice-lite does not have value (e.g. ":<value>") and it should be an empty string
+				if a.Value == "" {
+					found = true
+					break
+				}
+			}
+		}
+		assert.Equal(t, true, found, "ICELite key should be present")
+	})
 }
 
 func TestGetRIDs(t *testing.T) {
