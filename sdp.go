@@ -538,7 +538,7 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 
 	if isICELite {
 		// RFC 5245 S15.3
-		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
+		d = d.WithValueAttribute(sdp.AttrKeyICELite, "")
 	}
 
 	return d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue), nil
