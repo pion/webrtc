@@ -469,6 +469,39 @@ func TestPopulateSDP(t *testing.T) {
 		}
 		assert.Equal(t, true, found, "ICELite key should be present")
 	})
+	t.Run("rejected track", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		registerCodecErr := me.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo)
+		assert.NoError(t, registerCodecErr)
+		api := NewAPI(WithMediaEngine(me))
+
+		videoTransceiver := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		audioTransceiver := &RTPTransceiver{kind: RTPCodecTypeAudio, api: api, codecs: []RTPCodecParameters{}}
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{videoTransceiver}}, {id: "audio", transceivers: []*RTPTransceiver{audioTransceiver}}}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		assert.NoError(t, err)
+
+		// Test codecs
+		foundRejectedTrack := false
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media != "audio" {
+				continue
+			}
+			assert.True(t, desc.ConnectionInformation != nil, "connection information must be provided for rejected tracks")
+			assert.Equal(t, desc.MediaName.Formats, []string{"0"}, "rejected tracks have 0 for Formats")
+			assert.Equal(t, desc.MediaName.Port, sdp.RangedPort{Value: 0}, "rejected tracks have 0 for Port")
+			foundRejectedTrack = true
+		}
+		assert.Equal(t, true, foundRejectedTrack, "rejected track wasn't present")
+	})
 }
 
 func TestGetRIDs(t *testing.T) {
