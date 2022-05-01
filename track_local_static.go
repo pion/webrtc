@@ -400,7 +400,7 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption, payloadDataIdx int) error {
 	var sampleAttr byte = 0
 	var encPosition uint8 = 0
-	var shouldEncrypt, done bool = false, false
+	var shouldEncryptFirstPacket, resultWillNotChangeFirstPacket bool = false, false
 
 	position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_FIRST_PACKET_ATTR_POS")
 	if err == nil {
@@ -417,8 +417,8 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 	}
 
 	if hyperscaleEncryption {
-		shouldEncrypt, done = encryption.ShouldEncrypt(sample, 0, payloadDataIdx)
-		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !shouldEncrypt && err == nil {
+		shouldEncryptFirstPacket, resultWillNotChangeFirstPacket = encryption.ShouldEncrypt(sample, 0, payloadDataIdx)
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !shouldEncryptFirstPacket && err == nil {
 			// set the 'skip encryption' bit
 			sampleAttr |= 1 << encPosition
 		}
@@ -441,26 +441,26 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 		}
 	}
 
-	if hyperscaleEncryption {
-		// since default is to encrypt, if first packet returned 'encrypt' and result will not change for next packets
-		// no need to check the rest of the packets
-		if !shouldEncrypt || !done {
-			// now check whether the rest of the packets need to be encrypted
-			for i := 1; i < len(packets); i++ {
-				sampleAttr = 0
-				shouldEncrypt, done = encryption.ShouldEncrypt(sample, i, payloadDataIdx)
+	// since default is to encrypt, if first packet returned 'encrypt' and result will not change for next packets
+	// no need to check the rest of the packets
+	stopChecking := shouldEncryptFirstPacket && resultWillNotChangeFirstPacket
 
-				// set the 'skip encryption' bit
-				if !shouldEncrypt {
-					sampleAttr |= 1 << encPosition
-					extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
-				}
+	if hyperscaleEncryption && !stopChecking {
+		// now check whether the rest of the packets need to be encrypted
+		for i := 1; i < len(packets); i++ {
+			sampleAttr = 0
+			shouldEncryptPacket, resultWillNotChangeRemainingPackets := encryption.ShouldEncrypt(sample, i, payloadDataIdx)
 
-				// since default is to encrypt, i.e. we set the bit to 'skip encryption',
-				// if this packet should encrypt and rest of the packets have the same result, no need to look further
-				if shouldEncrypt && done {
-					break
-				}
+			// set the 'skip encryption' bit
+			if !shouldEncryptPacket {
+				sampleAttr |= 1 << encPosition
+				extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
+			}
+
+			// since default is to encrypt, i.e. we set the bit to 'skip encryption',
+			// if this packet should encrypt and rest of the packets have the same result, no need to look further
+			if shouldEncryptPacket && resultWillNotChangeRemainingPackets {
+				break
 			}
 		}
 	}
