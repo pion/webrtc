@@ -13,6 +13,7 @@ type SampleHyperscaleExtensions struct {
 	IsIFrame                 bool
 	IsSpsPps                 bool
 	IsAbr                    bool
+	IsAudio                  bool	
 	WithHyperscaleExtensions bool
 }
 

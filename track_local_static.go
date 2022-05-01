@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package webrtc
@@ -11,8 +12,10 @@ import (
 	"sync"
 
 	"github.com/pion/rtp"
+	"github.com/pion/webrtc/v3/encryption"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/media"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -181,10 +184,12 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP
 type TrackLocalStaticSample struct {
-	Packetizer rtp.Packetizer
-	sequencer  rtp.Sequencer
-	RtpTrack   *TrackLocalStaticRTP
-	ClockRate  float64
+	Packetizer           rtp.Packetizer
+	sequencer            rtp.Sequencer
+	RtpTrack             *TrackLocalStaticRTP
+	hyperscaleEncryption bool
+	encryption           *encryption.Encryption
+	ClockRate            float64
 }
 
 // NewTrackLocalStaticSample returns a TrackLocalStaticSample
@@ -194,9 +199,19 @@ func NewTrackLocalStaticSample(c RTPCodecCapability, id, streamID string) (*Trac
 		return nil, err
 	}
 
-	return &TrackLocalStaticSample{
+	track := &TrackLocalStaticSample{
 		RtpTrack: rtpTrack,
-	}, nil
+	}
+
+	track.hyperscaleEncryption = os.Getenv("HYPERSCALE_RTP_ENCRYPTION_ACTIVE") == "true"
+	if track.hyperscaleEncryption {
+		track.encryption = encryption.NewEncryption()
+	}
+	return track, nil
+}
+
+func (s *TrackLocalStaticSample) SetHyperscaleEncryption(active bool) {
+	s.hyperscaleEncryption = active
 }
 
 // ID is the unique identifier for this Track. This should be unique for the
@@ -279,9 +294,25 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, onRtpPacket fu
 	if sample.PrevDroppedPackets > 0 {
 		p.(rtp.Packetizer).SkipSamples(samples * uint32(sample.PrevDroppedPackets))
 	}
-	packets := p.(rtp.Packetizer).Packetize(sample.Data, samples)
 
-	err := addExtensions(sample, packets)
+	payloadDataIdx := -1
+	var packets []*rtp.Packet
+
+	if s.hyperscaleEncryption {
+		packets, payloadDataIdx = p.(rtp.Packetizer).PacketizeAndDetectData(sample.Data, uint32(samples))
+	} else {
+		packets = p.(rtp.Packetizer).Packetize(sample.Data, uint32(samples))
+	}
+
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
+
+	log.WithFields(
+		log.Fields{
+			"subcomponent":   "webrtc",
+			"type":           "INTENSIVE",
+			"isIframe":       sample.IsIFrame,
+			"payloadDataIdx": payloadDataIdx,
+		}).Trace("write sample: dataIndex ", payloadDataIdx)
 
 	if err != nil {
 		log.WithFields(
@@ -322,9 +353,25 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	}
 
 	samples := sample.Duration.Seconds() * clockRate
-	packets := p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
 
-	err := addExtensions(sample, packets)
+	payloadDataIdx := -1
+	var packets []*rtp.Packet
+
+	if s.hyperscaleEncryption {
+		packets, payloadDataIdx = p.(rtp.Packetizer).PacketizeInterleavedAndDetectData(sample.Data, uint32(samples))
+	} else {
+		packets = p.(rtp.Packetizer).PacketizeInterleaved(sample.Data, uint32(samples))
+	}
+
+	err := addExtensions(sample, packets, s.hyperscaleEncryption, s.encryption, payloadDataIdx)
+
+	log.WithFields(
+		log.Fields{
+			"subcomponent":   "webrtc",
+			"type":           "INTENSIVE",
+			"isIframe":       sample.IsIFrame,
+			"payloadDataIdx": payloadDataIdx,
+		}).Trace("write interleaved sample: dataIndex ", payloadDataIdx)
 
 	if err != nil {
 		log.WithFields(
@@ -350,8 +397,11 @@ func (s *TrackLocalStaticSample) WriteInterleavedSample(sample media.Sample, onR
 	return util.FlattenErrs(writeErrs)
 }
 
-func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
+func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncryption bool, encryption *encryption.Encryption, payloadDataIdx int) error {
 	var sampleAttr byte = 0
+	var encPosition uint8 = 0
+	var shouldEncryptFirstPacket, resultWillNotChangeFirstPacket bool = false, false
+
 	position, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_FIRST_PACKET_ATTR_POS")
 	if err == nil {
 		sampleAttr |= 1 << position
@@ -366,18 +416,51 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet) error {
 		sampleAttr |= 1 << position
 	}
 
+	if hyperscaleEncryption {
+		shouldEncryptFirstPacket, resultWillNotChangeFirstPacket = encryption.ShouldEncrypt(sample, 0, payloadDataIdx)
+		if encPosition, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_ENCRYPTION_ATTR_POS"); !shouldEncryptFirstPacket && err == nil {
+			// set the 'skip encryption' bit
+			sampleAttr |= 1 << encPosition
+		}
+	}
+
 	extensionErrs := []error{}
+	attributesExtId := uint8(0)
 
 	if len(packets) > 0 {
 		extensionErrs = append(extensionErrs, packets[0].SetExtensions(sample.Extensions))
 		if sample.WithHyperscaleExtensions {
-			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
-				extensionErrs = append(extensionErrs, packets[0].SetExtension(id, []byte{sampleAttr}))
+			if attributesExtId, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
+				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))
 			}
 			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
 				donBytes := make([]byte, 2)
 				binary.BigEndian.PutUint16(donBytes, sample.Don)
 				extensionErrs = append(extensionErrs, packets[0].SetExtension(id, donBytes))
+			}
+		}
+	}
+
+	// since default is to encrypt, if first packet returned 'encrypt' and result will not change for next packets
+	// no need to check the rest of the packets
+	stopChecking := shouldEncryptFirstPacket && resultWillNotChangeFirstPacket
+
+	if hyperscaleEncryption && !stopChecking {
+		// now check whether the rest of the packets need to be encrypted
+		for i := 1; i < len(packets); i++ {
+			sampleAttr = 0
+			shouldEncryptPacket, resultWillNotChangeRemainingPackets := encryption.ShouldEncrypt(sample, i, payloadDataIdx)
+
+			// set the 'skip encryption' bit
+			if !shouldEncryptPacket {
+				sampleAttr |= 1 << encPosition
+				extensionErrs = append(extensionErrs, packets[i].SetExtension(attributesExtId, []byte{sampleAttr}))
+			}
+
+			// since default is to encrypt, i.e. we set the bit to 'skip encryption',
+			// if this packet should encrypt and rest of the packets have the same result, no need to look further
+			if shouldEncryptPacket && resultWillNotChangeRemainingPackets {
+				break
 			}
 		}
 	}
