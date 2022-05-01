@@ -20,5 +20,5 @@ require (
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
-	golang.org/x/net v0.0.0-20220401154927-543a649e0bdd
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
 )
