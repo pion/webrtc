@@ -4,6 +4,7 @@
 # This file is auto generated, using git to list all individuals contributors.
 # see `.github/generate-authors.sh` for the scripting
 a-wing <1@233.email>
+Aaron Boushley <boushley@pretzelaux.com>
 Aaron France <aaron.l.france@gmail.com>
 Adam Kiss <masterada@gmail.com>
 adwpc <adwpc@hotmail.com>
