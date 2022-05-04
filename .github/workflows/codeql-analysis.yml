@@ -1,0 +1,27 @@
+name: "CodeQL"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: 'go'
+
+    - name: CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
