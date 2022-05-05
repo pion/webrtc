@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/pion/ice/v2"
@@ -41,7 +42,13 @@ func TestICEServer_validate(t *testing.T) {
 		}
 
 		for i, testCase := range testCases {
-			_, err := testCase.iceServer.urls()
+			var iceServer ICEServer
+			jsonobj, err := json.Marshal(testCase.iceServer)
+			assert.NoError(t, err)
+			err = json.Unmarshal(jsonobj, &iceServer)
+			assert.NoError(t, err)
+			assert.Equal(t, iceServer, testCase.iceServer)
+			_, err = testCase.iceServer.urls()
 			assert.Nil(t, err, "testCase: %d %v", i, testCase)
 		}
 	})
@@ -86,6 +93,22 @@ func TestICEServer_validate(t *testing.T) {
 				testCase.expectedErr.Error(),
 				"testCase: %d %v", i, testCase,
 			)
+		}
+	})
+	t.Run("JsonFailure", func(t *testing.T) {
+		testCases := [][]byte{
+			[]byte(`{"urls":"NOTAURL","username":"unittest","credential":"placeholder","credentialType":"password"}`),
+			[]byte(`{"urls":["turn:[2001:db8:1234:5678::1]?transport=udp"],"username":"unittest","credential":"placeholder","credentialType":"invalid"}`),
+			[]byte(`{"urls":["turn:[2001:db8:1234:5678::1]?transport=udp"],"username":6,"credential":"placeholder","credentialType":"password"}`),
+			[]byte(`{"urls":["turn:192.158.29.39?transport=udp"],"username":"unittest","credential":{"Bad Object": true},"credentialType":"oauth"}`),
+			[]byte(`{"urls":["turn:192.158.29.39?transport=udp"],"username":"unittest","credential":{"MACKey":"WmtzanB3ZW9peFhtdm42NzUzNG0=","AccessToken":null,"credentialType":"oauth"}`),
+			[]byte(`{"urls":["turn:192.158.29.39?transport=udp"],"username":"unittest","credential":{"MACKey":"WmtzanB3ZW9peFhtdm42NzUzNG0=","AccessToken":null,"credentialType":"password"}`),
+			[]byte(`{"urls":["turn:192.158.29.39?transport=udp"],"username":"unittest","credential":{"MACKey":1337,"AccessToken":"AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ5VhNDgeMR3+ZlZ35byg972fW8QjpEl7bx91YLBPFsIhsxloWcXPhA=="},"credentialType":"oauth"}`),
+		}
+		for i, testCase := range testCases {
+			var tc ICEServer
+			err := json.Unmarshal(testCase, &tc)
+			assert.Error(t, err, "testCase: %d %v", i, string(testCase))
 		}
 	})
 }

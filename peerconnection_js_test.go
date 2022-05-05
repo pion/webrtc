@@ -69,3 +69,35 @@ func TestValueToICECandidate(t *testing.T) {
 		assert.Equal(t, testCase.expect, val)
 	}
 }
+
+func TestValueToICEServer(t *testing.T) {
+	testCases := []ICEServer{
+		{
+			URLs:           []string{"turn:192.158.29.39?transport=udp"},
+			Username:       "unittest",
+			Credential:     "placeholder",
+			CredentialType: ICECredentialTypePassword,
+		},
+		{
+			URLs:           []string{"turn:[2001:db8:1234:5678::1]?transport=udp"},
+			Username:       "unittest",
+			Credential:     "placeholder",
+			CredentialType: ICECredentialTypePassword,
+		},
+		{
+			URLs:     []string{"turn:192.158.29.39?transport=udp"},
+			Username: "unittest",
+			Credential: OAuthCredential{
+				MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
+				AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ5VhNDgeMR3+ZlZ35byg972fW8QjpEl7bx91YLBPFsIhsxloWcXPhA==",
+			},
+			CredentialType: ICECredentialTypeOauth,
+		},
+	}
+
+	for _, testCase := range testCases {
+		v := iceServerToValue(testCase)
+		s := valueToICEServer(v)
+		assert.Equal(t, testCase, s)
+	}
+}
