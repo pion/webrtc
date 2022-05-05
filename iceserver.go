@@ -4,6 +4,8 @@
 package webrtc
 
 import (
+	"encoding/json"
+
 	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
@@ -66,4 +68,112 @@ func (s ICEServer) urls() ([]*ice.URL, error) {
 	}
 
 	return urls, nil
+}
+
+func iceserverUnmarshalUrls(val interface{}) (*[]string, error) {
+	s, ok := val.([]interface{})
+	if !ok {
+		return nil, errInvalidICEServer
+	}
+	out := make([]string, len(s))
+	for idx, url := range s {
+		out[idx], ok = url.(string)
+		if !ok {
+			return nil, errInvalidICEServer
+		}
+	}
+	return &out, nil
+}
+
+func iceserverUnmarshalOauth(val interface{}) (*OAuthCredential, error) {
+	c, ok := val.(map[string]interface{})
+	if !ok {
+		return nil, errInvalidICEServer
+	}
+	MACKey, ok := c["MACKey"].(string)
+	if !ok {
+		return nil, errInvalidICEServer
+	}
+	AccessToken, ok := c["AccessToken"].(string)
+	if !ok {
+		return nil, errInvalidICEServer
+	}
+	return &OAuthCredential{
+		MACKey:      MACKey,
+		AccessToken: AccessToken,
+	}, nil
+}
+
+func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
+	if val, ok := m["urls"]; ok {
+		u, err := iceserverUnmarshalUrls(val)
+		if err != nil {
+			return err
+		}
+		s.URLs = *u
+	} else {
+		s.URLs = []string{}
+	}
+
+	if val, ok := m["username"]; ok {
+		s.Username, ok = val.(string)
+		if !ok {
+			return errInvalidICEServer
+		}
+	}
+	if val, ok := m["credentialType"]; ok {
+		ct, ok := val.(string)
+		if !ok || (newICECredentialType(ct) == ICECredentialType(Unknown)) {
+			return errInvalidICEServer
+		}
+		s.CredentialType = newICECredentialType(ct)
+	} else {
+		s.CredentialType = ICECredentialType(Unknown)
+	}
+	if val, ok := m["credential"]; ok {
+		switch s.CredentialType {
+		case ICECredentialType(Unknown):
+			s.Credential = val
+		case ICECredentialTypePassword:
+			s.Credential = val
+		case ICECredentialTypeOauth:
+			c, err := iceserverUnmarshalOauth(val)
+			if err != nil {
+				return err
+			}
+			s.Credential = *c
+		default:
+			return errInvalidICECredentialTypeString
+		}
+	}
+	return nil
+}
+
+// UnmarshalJSON parses the JSON-encoded data and stores the result
+func (s *ICEServer) UnmarshalJSON(b []byte) error {
+	var tmp interface{}
+	err := json.Unmarshal(b, &tmp)
+	if err != nil {
+		return err
+	}
+	if m, ok := tmp.(map[string]interface{}); ok {
+		return s.iceserverUnmarshalFields(m)
+	}
+	return errInvalidICEServer
+}
+
+// MarshalJSON returns the JSON encoding
+func (s ICEServer) MarshalJSON() ([]byte, error) {
+	m := make(map[string]interface{})
+	m["urls"] = s.URLs
+	if s.Username != "" {
+		m["username"] = s.Username
+	}
+	if s.Credential != nil {
+		m["credential"] = s.Credential
+	}
+	if s.CredentialType != ICECredentialType(Unknown) {
+		m["credentialType"] = s.CredentialType
+	}
+	return json.Marshal(m)
 }
