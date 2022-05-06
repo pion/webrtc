@@ -155,7 +155,7 @@ func main() {
 			}
 
 			// Write
-			if _, err = c.conn.Write(b[:n]); err != nil {
+			if _, writeErr := c.conn.Write(b[:n]); writeErr != nil {
 				// For this particular example, third party applications usually timeout after a short
 				// amount of time during which the user doesn't have enough time to provide the answer
 				// to the browser.
@@ -163,7 +163,7 @@ func main() {
 				// to the browser then open the third party application. Therefore we must not kill
 				// the forward on "connection refused" errors
 				var opError *net.OpError
-				if errors.As(err, &opError); ok && opError.Err.Error() == "write: connection refused" {
+				if errors.As(writeErr, &opError) && opError.Err.Error() == "write: connection refused" {
 					continue
 				}
 				panic(err)
