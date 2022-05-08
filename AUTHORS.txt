@@ -45,6 +45,7 @@ Christopher Fry <chris.fry@getcruise.com>
 Clayton McCray <cpmdmccray@gmail.com>
 cnderrauber <zengjie9004@gmail.com>
 cyannuk <cyannuk@issart.com>
+Daniele Sluijters <daenney@users.noreply.github.com>
 David Hamilton <davidhamiltron@gmail.com>
 David Zhao <david@davidzhao.com>
 david.s <david.s@hpcnt.com>

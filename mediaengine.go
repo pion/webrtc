@@ -394,7 +394,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 
 	remoteFmtp := fmtp.Parse(remoteCodec.RTPCodecCapability.MimeType, remoteCodec.RTPCodecCapability.SDPFmtpLine)
 	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
-		payloadType, err := strconv.Atoi(apt)
+		payloadType, err := strconv.ParseUint(apt, 10, 8)
 		if err != nil {
 			return codecMatchNone, err
 		}

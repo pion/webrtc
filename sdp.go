@@ -714,7 +714,7 @@ func codecsFromMediaDescription(m *sdp.MediaDescription) (out []RTPCodecParamete
 	}
 
 	for _, payloadStr := range m.MediaName.Formats {
-		payloadType, err := strconv.Atoi(payloadStr)
+		payloadType, err := strconv.ParseUint(payloadStr, 10, 8)
 		if err != nil {
 			return nil, err
 		}
@@ -728,7 +728,7 @@ func codecsFromMediaDescription(m *sdp.MediaDescription) (out []RTPCodecParamete
 		}
 
 		channels := uint16(0)
-		val, err := strconv.Atoi(codec.EncodingParameters)
+		val, err := strconv.ParseUint(codec.EncodingParameters, 10, 16)
 		if err == nil {
 			channels = uint16(val)
 		}
