@@ -36,6 +36,9 @@ jobs:
         - name: Functions
           run: .github/lint-disallowed-functions-in-library.sh
 
+        - name: Logging messages should not have trailing newlines
+          run: .github/lint-no-trailing-newline-in-log-messages.sh
+
   lint-go:
     name: Go
     runs-on: ubuntu-latest

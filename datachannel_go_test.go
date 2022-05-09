@@ -356,7 +356,7 @@ func TestEOF(t *testing.T) {
 			dc.OnOpen(func() {
 				detached, err2 := dc.Detach()
 				if err2 != nil {
-					log.Debugf("Detach failed: %s\n", err2.Error())
+					log.Debugf("Detach failed: %s", err2.Error())
 					t.Error(err2)
 				}
 
@@ -377,7 +377,7 @@ func TestEOF(t *testing.T) {
 
 			log.Debug("Waiting for ping...")
 			msg, err2 := ioutil.ReadAll(dc)
-			log.Debugf("Received ping! \"%s\"\n", string(msg))
+			log.Debugf("Received ping! \"%s\"", string(msg))
 			if err2 != nil {
 				t.Error(err2)
 			}
@@ -457,7 +457,7 @@ func TestEOF(t *testing.T) {
 				return
 			}
 
-			log.Debugf("pcb: new datachannel: %s\n", dc.Label())
+			log.Debugf("pcb: new datachannel: %s", dc.Label())
 
 			dcb = dc
 			// Register channel opening handling
@@ -474,7 +474,7 @@ func TestEOF(t *testing.T) {
 			// Register the OnMessage to handle incoming messages
 			log.Debug("pcb: registering onMessage callback")
 			dcb.OnMessage(func(dcMsg DataChannelMessage) {
-				log.Debugf("pcb: received ping: %s\n", string(dcMsg.Data))
+				log.Debugf("pcb: received ping: %s", string(dcMsg.Data))
 				if !reflect.DeepEqual(dcMsg.Data, testData) {
 					t.Error("data mismatch")
 				}
@@ -505,7 +505,7 @@ func TestEOF(t *testing.T) {
 		// Register the OnMessage to handle incoming messages
 		log.Debug("pca: registering onMessage callback")
 		dca.OnMessage(func(dcMsg DataChannelMessage) {
-			log.Debugf("pca: received pong: %s\n", string(dcMsg.Data))
+			log.Debugf("pca: received pong: %s", string(dcMsg.Data))
 			if !reflect.DeepEqual(dcMsg.Data, testData) {
 				t.Error("data mismatch")
 			}

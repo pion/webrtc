@@ -18,6 +18,14 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
 
+    # The code in examples/ might intentionally do things like log credentials
+    # in order to show how the library is used, aid in debugging etc. We
+    # should ignore those for CodeQL scanning, and only focus on the package
+    # itself.
+    - name: Remove example code
+      run: |
+        rm -rf examples/
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:

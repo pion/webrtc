@@ -10,3 +10,4 @@
 exec 1>&2
 
 .github/lint-disallowed-functions-in-library.sh
+.github/lint-no-trailing-newline-in-log-messages.sh
