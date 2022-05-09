@@ -109,15 +109,15 @@ func (m *Mux) readLoop() {
 		case errors.Is(err, io.EOF), errors.Is(err, ice.ErrClosed):
 			return
 		case errors.Is(err, io.ErrShortBuffer), errors.Is(err, packetio.ErrTimeout):
-			m.log.Errorf("mux: failed to read from packetio.Buffer %s\n", err.Error())
+			m.log.Errorf("mux: failed to read from packetio.Buffer %s", err.Error())
 			continue
 		case err != nil:
-			m.log.Errorf("mux: ending readLoop packetio.Buffer error %s\n", err.Error())
+			m.log.Errorf("mux: ending readLoop packetio.Buffer error %s", err.Error())
 			return
 		}
 
 		if err = m.dispatch(buf[:n]); err != nil {
-			m.log.Errorf("mux: ending readLoop dispatch error %s\n", err.Error())
+			m.log.Errorf("mux: ending readLoop dispatch error %s", err.Error())
 			return
 		}
 	}
@@ -137,7 +137,7 @@ func (m *Mux) dispatch(buf []byte) error {
 
 	if endpoint == nil {
 		if len(buf) > 0 {
-			m.log.Warnf("Warning: mux: no endpoint for packet starting with %d\n", buf[0])
+			m.log.Warnf("Warning: mux: no endpoint for packet starting with %d", buf[0])
 		} else {
 			m.log.Warnf("Warning: mux: no endpoint for zero length packet")
 		}
