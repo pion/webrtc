@@ -19,5 +19,13 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-# We changed this line to require our node_shim.js.
-exec node --require="${DIR}/node_shim.js" "$(go env GOROOT)/misc/wasm/wasm_exec.js" "$@"
+NODE_WASM_EXEC="$(go env GOROOT)/misc/wasm/wasm_exec_node.js"
+WASM_EXEC="$(go env GOROOT)/misc/wasm/wasm_exec.js"
+
+if test -f "$NODE_WASM_EXEC"; then
+	exec node --require="${DIR}/node_shim.js" "$NODE_WASM_EXEC" "$@"
+else
+	exec node --require="${DIR}/node_shim.js" "$WASM_EXEC" "$@"
+fi
+
+
