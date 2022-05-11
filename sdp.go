@@ -501,7 +501,7 @@ type mediaSection struct {
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
+func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, isExtmapAllowMixed bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
 
@@ -550,6 +550,10 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 	if isICELite {
 		// RFC 5245 S15.3
 		d = d.WithValueAttribute(sdp.AttrKeyICELite, "")
+	}
+
+	if isExtmapAllowMixed {
+		d = d.WithPropertyAttribute(sdp.AttrKeyExtMapAllowMixed)
 	}
 
 	return d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue), nil
@@ -791,6 +795,16 @@ func updateSDPOrigin(origin *sdp.Origin, d *sdp.SessionDescription) {
 func isIceLiteSet(desc *sdp.SessionDescription) bool {
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == sdp.AttrKeyICELite {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isExtMapAllowMixedSet(desc *sdp.SessionDescription) bool {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyExtMapAllowMixed {
 			return true
 		}
 	}
