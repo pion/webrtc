@@ -354,7 +354,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			s, err = populateSDP(s, false,
 				dtlsFingerprints,
 				SDPMediaDescriptionFingerprints,
-				false, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew)
+				false, true, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew)
 			assert.NoError(t, err)
 
 			sdparray, err := s.Marshal()
@@ -385,7 +385,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -428,7 +428,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		// Test codecs
@@ -453,7 +453,7 @@ func TestPopulateSDP(t *testing.T) {
 		se := SettingEngine{}
 		se.SetLite(true)
 
-		offerSdp, err := populateSDP(&sdp.SessionDescription{}, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, &MediaEngine{}, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, []mediaSection{}, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(&sdp.SessionDescription{}, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, &MediaEngine{}, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, []mediaSection{}, ICEGatheringStateComplete)
 		assert.Nil(t, err)
 
 		var found bool
@@ -486,7 +486,7 @@ func TestPopulateSDP(t *testing.T) {
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete)
 		assert.NoError(t, err)
 
 		// Test codecs
@@ -501,6 +501,38 @@ func TestPopulateSDP(t *testing.T) {
 			foundRejectedTrack = true
 		}
 		assert.Equal(t, true, foundRejectedTrack, "rejected track wasn't present")
+	})
+	t.Run("allow mixed extmap", func(t *testing.T) {
+		se := SettingEngine{}
+		offerSdp, err := populateSDP(&sdp.SessionDescription{}, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, &MediaEngine{}, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, []mediaSection{}, ICEGatheringStateComplete)
+		assert.Nil(t, err)
+
+		var found bool
+		// session-level attribute
+		for _, a := range offerSdp.Attributes {
+			if a.Key == sdp.AttrKeyExtMapAllowMixed {
+				if a.Value == "" {
+					found = true
+					break
+				}
+			}
+		}
+		assert.Equal(t, true, found, "AllowMixedExtMap key should be present")
+
+		offerSdp, err = populateSDP(&sdp.SessionDescription{}, false, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, false, &MediaEngine{}, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, []mediaSection{}, ICEGatheringStateComplete)
+		assert.Nil(t, err)
+
+		found = false
+		// session-level attribute
+		for _, a := range offerSdp.Attributes {
+			if a.Key == sdp.AttrKeyExtMapAllowMixed {
+				if a.Value == "" {
+					found = true
+					break
+				}
+			}
+		}
+		assert.Equal(t, false, found, "AllowMixedExtMap key should not be present")
 	})
 }
 

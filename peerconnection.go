@@ -2250,7 +2250,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 		return nil, err
 	}
 
-	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, isPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, true, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
 }
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
@@ -2277,6 +2277,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	if pc.pendingRemoteDescription != nil {
 		remoteDescription = pc.pendingRemoteDescription
 	}
+	isExtmapAllowMixed := isExtMapAllowMixedSet(remoteDescription.parsed)
 	localTransceivers := append([]*RTPTransceiver{}, transceivers...)
 	detectedPlanB := descriptionIsPlanB(remoteDescription)
 	mediaSections := []mediaSection{}
@@ -2371,7 +2372,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		return nil, err
 	}
 
-	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, detectedPlanB, dtlsFingerprints, pc.api.settingEngine.sdpMediaLevelFingerprints, pc.api.settingEngine.candidates.ICELite, isExtmapAllowMixed, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
 }
 
 func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
