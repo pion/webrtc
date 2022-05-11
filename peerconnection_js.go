@@ -640,12 +640,16 @@ func valueToICECredential(iceCredentialValue js.Value) interface{} {
 }
 
 func valueToICEServer(iceServerValue js.Value) ICEServer {
+	tpe, err := newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType")))
+	if err != nil {
+		tpe = ICECredentialTypePassword
+	}
 	s := ICEServer{
 		URLs:     valueToStrings(iceServerValue.Get("urls")), // required
 		Username: valueToStringOrZero(iceServerValue.Get("username")),
 		// Note: Credential and CredentialType are not currently supported.
 		Credential:     valueToICECredential(iceServerValue.Get("credential")),
-		CredentialType: newICECredentialType(valueToStringOrZero(iceServerValue.Get("credentialType"))),
+		CredentialType: tpe,
 	}
 
 	// default to password
