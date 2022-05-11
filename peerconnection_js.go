@@ -589,9 +589,7 @@ func iceServerToValue(server ICEServer) js.Value {
 			out["credential"] = oauthCredentialToValue(t)
 		}
 	}
-	if server.CredentialType != ICECredentialType(Unknown) {
-		out["credentialType"] = stringEnumToValueOrUndefined(server.CredentialType.String())
-	}
+	out["credentialType"] = stringEnumToValueOrUndefined(server.CredentialType.String())
 	return js.ValueOf(out)
 }
 
@@ -652,10 +650,6 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 		CredentialType: tpe,
 	}
 
-	// default to password
-	if s.CredentialType == ICECredentialType(Unknown) {
-		s.CredentialType = ICECredentialTypePassword
-	}
 	return s
 }
 
