@@ -112,3 +112,12 @@ func TestICEServer_validate(t *testing.T) {
 		}
 	})
 }
+
+func TestICEServerZeroValue(t *testing.T) {
+	server := ICEServer{
+		URLs:       []string{"turn:galene.org:1195"},
+		Username:   "galene",
+		Credential: "secret",
+	}
+	assert.Equal(t, server.CredentialType, ICECredentialTypePassword)
+}

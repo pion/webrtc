@@ -17,9 +17,10 @@ func TestNewICECredentialType(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
+		tpe, err := newICECredentialType(testCase.credentialTypeString)
+		assert.NoError(t, err)
 		assert.Equal(t,
-			testCase.expectedCredentialType,
-			newICECredentialType(testCase.credentialTypeString),
+			testCase.expectedCredentialType, tpe,
 			"testCase: %d %v", i, testCase,
 		)
 	}
@@ -53,9 +54,10 @@ func TestICECredentialType_new(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
+		tpe, err := newICECredentialType(testCase.expectedString)
+		assert.NoError(t, err)
 		assert.Equal(t,
-			newICECredentialType(testCase.expectedString),
-			testCase.credentialType,
+			tpe, testCase.credentialType,
 			"testCase: %d %v", i, testCase,
 		)
 	}

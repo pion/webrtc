@@ -12,7 +12,7 @@ type ICECredentialType int
 const (
 	// ICECredentialTypePassword describes username and password based
 	// credentials as described in https://tools.ietf.org/html/rfc5389.
-	ICECredentialTypePassword ICECredentialType = iota + 1
+	ICECredentialTypePassword ICECredentialType = iota
 
 	// ICECredentialTypeOauth describes token based credential as described
 	// in https://tools.ietf.org/html/rfc7635.
@@ -25,21 +25,19 @@ const (
 	iceCredentialTypeOauthStr    = "oauth"
 )
 
-func newICECredentialType(raw string) ICECredentialType {
+func newICECredentialType(raw string) (ICECredentialType, error) {
 	switch raw {
 	case iceCredentialTypePasswordStr:
-		return ICECredentialTypePassword
+		return ICECredentialTypePassword, nil
 	case iceCredentialTypeOauthStr:
-		return ICECredentialTypeOauth
+		return ICECredentialTypeOauth, nil
 	default:
-		return ICECredentialType(Unknown)
+		return ICECredentialTypePassword, errInvalidICECredentialTypeString
 	}
 }
 
 func (t ICECredentialType) String() string {
 	switch t {
-	case Unknown:
-		return ""
 	case ICECredentialTypePassword:
 		return iceCredentialTypePasswordStr
 	case ICECredentialTypeOauth:
@@ -52,15 +50,13 @@ func (t ICECredentialType) String() string {
 // UnmarshalJSON parses the JSON-encoded data and stores the result
 func (t *ICECredentialType) UnmarshalJSON(b []byte) error {
 	var val string
-	var tmp ICECredentialType
 	if err := json.Unmarshal(b, &val); err != nil {
 		return err
 	}
 
-	tmp = newICECredentialType(val)
-
-	if (tmp == ICECredentialType(Unknown)) && (val != "") {
-		return fmt.Errorf("%w: (%s)", errInvalidICECredentialTypeString, val)
+	tmp, err := newICECredentialType(val)
+	if err != nil {
+		return fmt.Errorf("%w: (%s)", err, val)
 	}
 
 	*t = tmp

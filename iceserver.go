@@ -123,17 +123,19 @@ func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
 	}
 	if val, ok := m["credentialType"]; ok {
 		ct, ok := val.(string)
-		if !ok || (newICECredentialType(ct) == ICECredentialType(Unknown)) {
+		if !ok {
 			return errInvalidICEServer
 		}
-		s.CredentialType = newICECredentialType(ct)
+		tpe, err := newICECredentialType(ct)
+		if err != nil {
+			return err
+		}
+		s.CredentialType = tpe
 	} else {
-		s.CredentialType = ICECredentialType(Unknown)
+		s.CredentialType = ICECredentialTypePassword
 	}
 	if val, ok := m["credential"]; ok {
 		switch s.CredentialType {
-		case ICECredentialType(Unknown):
-			s.Credential = val
 		case ICECredentialTypePassword:
 			s.Credential = val
 		case ICECredentialTypeOauth:
@@ -172,8 +174,6 @@ func (s ICEServer) MarshalJSON() ([]byte, error) {
 	if s.Credential != nil {
 		m["credential"] = s.Credential
 	}
-	if s.CredentialType != ICECredentialType(Unknown) {
-		m["credentialType"] = s.CredentialType
-	}
+	m["credentialType"] = s.CredentialType
 	return json.Marshal(m)
 }
