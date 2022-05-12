@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -19,11 +20,15 @@ func TestSDPSemantics_String(t *testing.T) {
 		value          SDPSemantics
 		expectedString string
 	}{
-		{SDPSemantics(42), unknownStr},
 		{SDPSemanticsUnifiedPlanWithFallback, "unified-plan-with-fallback"},
 		{SDPSemanticsPlanB, "plan-b"},
 		{SDPSemanticsUnifiedPlan, "unified-plan"},
 	}
+
+	assert.Equal(t,
+		unknownStr,
+		SDPSemantics(42).String(),
+	)
 
 	for i, testCase := range testCases {
 		assert.Equal(t,
@@ -31,6 +36,37 @@ func TestSDPSemantics_String(t *testing.T) {
 			testCase.value.String(),
 			"testCase: %d %v", i, testCase,
 		)
+		assert.Equal(t,
+			testCase.value,
+			newSDPSemantics(testCase.expectedString),
+			"testCase: %d %v", i, testCase,
+		)
+	}
+}
+
+func TestSDPSemantics_JSON(t *testing.T) {
+	testCases := []struct {
+		value SDPSemantics
+		JSON  []byte
+	}{
+		{SDPSemanticsUnifiedPlanWithFallback, []byte("\"unified-plan-with-fallback\"")},
+		{SDPSemanticsPlanB, []byte("\"plan-b\"")},
+		{SDPSemanticsUnifiedPlan, []byte("\"unified-plan\"")},
+	}
+
+	for i, testCase := range testCases {
+		res, err := json.Marshal(testCase.value)
+		assert.NoError(t, err)
+		assert.Equal(t,
+			testCase.JSON,
+			res,
+			"testCase: %d %v", i, testCase,
+		)
+
+		var v SDPSemantics
+		err = json.Unmarshal(testCase.JSON, &v)
+		assert.NoError(t, err)
+		assert.Equal(t, v, testCase.value)
 	}
 }
 

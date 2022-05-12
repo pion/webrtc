@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -197,6 +198,46 @@ func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error
 			return err
 		}
 		return nil
+	}
+}
+
+func TestStatsConvertState(t *testing.T) {
+	testCases := []struct {
+		ice   ice.CandidatePairState
+		stats StatsICECandidatePairState
+	}{
+		{
+			ice.CandidatePairStateWaiting,
+			StatsICECandidatePairStateWaiting,
+		},
+		{
+			ice.CandidatePairStateInProgress,
+			StatsICECandidatePairStateInProgress,
+		},
+		{
+			ice.CandidatePairStateFailed,
+			StatsICECandidatePairStateFailed,
+		},
+		{
+			ice.CandidatePairStateSucceeded,
+			StatsICECandidatePairStateSucceeded,
+		},
+	}
+
+	s, err := toStatsICECandidatePairState(ice.CandidatePairState(42))
+
+	assert.Error(t, err)
+	assert.Equal(t,
+		StatsICECandidatePairState("Unknown"),
+		s)
+	for i, testCase := range testCases {
+		s, err := toStatsICECandidatePairState(testCase.ice)
+		assert.NoError(t, err)
+		assert.Equal(t,
+			testCase.stats,
+			s,
+			"testCase: %d %v", i, testCase,
+		)
 	}
 }
 
