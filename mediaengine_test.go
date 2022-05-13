@@ -460,3 +460,61 @@ func TestUpdateHeaderExtenstionToClonedMediaEngine(t *testing.T) {
 	validate(&src)
 	validate(src.copy())
 }
+
+func TestExtensionIdCollision(t *testing.T) {
+	mustParse := func(raw string) sdp.SessionDescription {
+		s := sdp.SessionDescription{}
+		assert.NoError(t, s.Unmarshal([]byte(raw)))
+		return s
+	}
+	sdpSnippet := `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=extmap:2 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
+a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=rtpmap:111 opus/48000/2
+`
+
+	m := MediaEngine{}
+	assert.NoError(t, m.RegisterDefaultCodecs())
+
+	assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeVideo))
+	assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"urn:3gpp:video-orientation"}, RTPCodecTypeVideo))
+
+	assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeAudio))
+	assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.AudioLevelURI}, RTPCodecTypeAudio))
+
+	assert.NoError(t, m.updateFromRemoteDescription(mustParse(sdpSnippet)))
+
+	assert.True(t, m.negotiatedAudio)
+	assert.False(t, m.negotiatedVideo)
+
+	id, audioNegotiated, videoNegotiated := m.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
+	assert.Equal(t, id, 0)
+	assert.False(t, audioNegotiated)
+	assert.False(t, videoNegotiated)
+
+	id, audioNegotiated, videoNegotiated = m.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
+	assert.Equal(t, id, 2)
+	assert.True(t, audioNegotiated)
+	assert.False(t, videoNegotiated)
+
+	id, audioNegotiated, videoNegotiated = m.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.AudioLevelURI})
+	assert.Equal(t, id, 1)
+	assert.True(t, audioNegotiated)
+	assert.False(t, videoNegotiated)
+
+	params := m.getRTPParametersByKind(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
+	extensions := params.HeaderExtensions
+
+	assert.Equal(t, 2, len(extensions))
+	assert.Equal(t, sdp.SDESMidURI, extensions[0].URI)
+	assert.Equal(t, 2, extensions[0].ID)
+	assert.Equal(t, "urn:3gpp:video-orientation", extensions[1].URI)
+	assert.NotEqual(t, 1, extensions[1].ID)
+	assert.NotEqual(t, 2, extensions[1].ID)
+	assert.NotEqual(t, 5, extensions[1].ID)
+}
