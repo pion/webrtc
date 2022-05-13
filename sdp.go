@@ -407,13 +407,19 @@ func addTransceiverSDP(
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
+	localCodecs := mediaEngine.getLocalCodecsByKind(t.Kind())
 	codecs := t.getCodecs()
 	for _, codec := range codecs {
 		name := strings.TrimPrefix(codec.MimeType, "audio/")
 		name = strings.TrimPrefix(name, "video/")
 		media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
-		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
+		rtcpFeedback := codec.RTPCodecCapability.RTCPFeedback
+		if c, matchType := codecParametersFuzzySearch(codec, localCodecs); matchType != codecMatchNone {
+			rtcpFeedback = c.RTCPFeedback
+		}
+
+		for _, feedback := range rtcpFeedback {
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
 		}
 	}
