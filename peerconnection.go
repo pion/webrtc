@@ -428,6 +428,8 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 
 // OnICECandidate sets an event handler which is invoked when a new ICE
 // candidate is found.
+// ICE candidate gathering only starts after SetLocalDescription or 
+// SetRemoteDescription is called.
 // Take note that the handler is gonna be called with a nil pointer when
 // gathering is finished.
 func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
