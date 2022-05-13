@@ -553,7 +553,7 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	return nil
 }
 
-func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
+func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters { //nolint:gocognit
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 
 	// perform before locking to prevent recursive RLocks
@@ -569,9 +569,31 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 			}
 		}
 	} else {
-		for id, e := range m.headerExtensions {
+		for _, e := range m.headerExtensions {
 			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
-				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id + 1, URI: e.uri})
+				usingNegotiatedID := false
+				for id := range m.negotiatedHeaderExtensions {
+					if m.negotiatedHeaderExtensions[id].uri == e.uri {
+						usingNegotiatedID = true
+						headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
+						break
+					}
+				}
+				if !usingNegotiatedID {
+					for id := 1; id < 15; id++ {
+						idAvailable := true
+						for checkID := range headerExtensions {
+							if headerExtensions[checkID].ID == id {
+								idAvailable = false
+								break
+							}
+						}
+						if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
+							headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
+							break
+						}
+					}
+				}
 			}
 		}
 	}
