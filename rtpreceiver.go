@@ -160,11 +160,6 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 	}
 
 	for i := range parameters.Encodings {
-		if parameters.Encodings[i].RID != "" {
-			// RID based tracks will be set up in receiveForRid
-			continue
-		}
-
 		var t *trackStreams
 		for idx, ts := range r.tracks {
 			if ts.track != nil && parameters.Encodings[i].SSRC != 0 && ts.track.SSRC() == parameters.Encodings[i].SSRC {
@@ -180,6 +175,12 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 			t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
 			var err error
 			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
+				return err
+			}
+		}
+
+		if parameters.Encodings[i].SSRC != 0 && parameters.Encodings[i].RID != "" {
+			if _, err := r.receiveForRid(parameters.Encodings[i].RID, globalParams, t.streamInfo, t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor); err != nil {
 				return err
 			}
 		}
@@ -341,9 +342,6 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 // receiveForRid is the sibling of Receive expect for RIDs instead of SSRCs
 // It populates all the internal state for the given RID
 func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) (*TrackRemote, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	for i := range r.tracks {
 		if r.tracks[i].track.RID() == rid {
 			r.tracks[i].track.mu.Lock()

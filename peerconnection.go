@@ -1526,16 +1526,22 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				continue
 			}
 
+			receiver.mu.Lock()
+
 			if rsid != "" {
-				receiver.mu.Lock()
-				defer receiver.mu.Unlock()
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				if err := receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor); err != nil {
+					receiver.mu.Unlock()
+					return err
+				}
 			}
 
 			track, err := receiver.receiveForRid(rid, params, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
 			if err != nil {
+				receiver.mu.Unlock()
 				return err
 			}
+
+			receiver.mu.Unlock()
 			pc.onTrack(track, receiver)
 			return nil
 		}
