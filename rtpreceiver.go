@@ -143,7 +143,7 @@ func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
 }
 
 // startReceive starts all the transports
-func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
+func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //nolint:gocognit
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	select {
