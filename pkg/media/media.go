@@ -13,8 +13,9 @@ type SampleHyperscaleExtensions struct {
 	IsIFrame                 bool
 	IsSpsPps                 bool
 	IsAbr                    bool
-	IsAudio                  bool	
+	IsAudio                  bool
 	WithHyperscaleExtensions bool
+	Dts                      uint64
 }
 
 // A Sample contains encoded media and timing information
