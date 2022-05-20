@@ -15,6 +15,9 @@ on:
     branches:
       - renovate/*
 
+permissions:
+  contents: write
+
 jobs:
   go-mod-fix:
     runs-on: ubuntu-latest

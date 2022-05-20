@@ -16,6 +16,10 @@ on:
       - opened
       - edited
       - synchronize
+
+permissions:
+  contents: read
+
 jobs:
   lint-commit-message:
     name: Metadata
@@ -41,6 +45,9 @@ jobs:
 
   lint-go:
     name: Go
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
