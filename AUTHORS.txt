@@ -49,6 +49,7 @@ cyannuk <cyannuk@issart.com>
 Daniele Sluijters <daenney@users.noreply.github.com>
 David Hamilton <davidhamiltron@gmail.com>
 David Zhao <david@davidzhao.com>
+David Zhao <dz@livekit.io>
 david.s <david.s@hpcnt.com>
 Dean Sheather <dean@coder.com>
 decanus <7621705+decanus@users.noreply.github.com>
