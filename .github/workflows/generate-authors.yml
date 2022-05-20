@@ -16,6 +16,8 @@ on:
 
 jobs:
   checksecret:
+    permissions:
+      contents: none
     runs-on: ubuntu-latest
     outputs:
       is_PIONBOT_PRIVATE_KEY_set: ${{ steps.checksecret_job.outputs.is_PIONBOT_PRIVATE_KEY_set }}
@@ -28,6 +30,8 @@ jobs:
           echo "::set-output name=is_PIONBOT_PRIVATE_KEY_set::${{ env.PIONBOT_PRIVATE_KEY != '' }}"
 
   generate-authors:
+    permissions:
+      contents: write
     needs: [checksecret]
     if: needs.checksecret.outputs.is_PIONBOT_PRIVATE_KEY_set == 'true'
     runs-on: ubuntu-latest

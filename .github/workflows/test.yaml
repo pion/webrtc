@@ -17,12 +17,16 @@ on:
   pull_request:
     branches:
     - master
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17"]
+        go: ["1.17", "1.18"]
       fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
@@ -44,9 +48,7 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Setup go-acc
-        run: |
-          go get github.com/ory/go-acc
-          git checkout go.mod go.sum
+        run: go install github.com/ory/go-acc@latest
 
       - name: Set up gotestfmt
         uses: haveyoudebuggedit/gotestfmt-action@v2
