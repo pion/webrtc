@@ -635,8 +635,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		// in-parallel steps to create an offer
 		// https://w3c.github.io/webrtc-pc/#dfn-in-parallel-steps-to-create-an-offer
 		isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
-		if pc.currentRemoteDescription != nil {
-			isPlanB = descriptionIsPlanB(pc.currentRemoteDescription)
+		if pc.currentRemoteDescription != nil && isPlanB {
+			isPlanB = descriptionPossiblyPlanB(pc.currentRemoteDescription)
 		}
 
 		// include unmatched local transceivers
@@ -1032,7 +1032,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription())
+	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription(), pc.log)
+	if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
+		detectedPlanB = descriptionPossiblyPlanB(pc.RemoteDescription())
+	}
+
 	weOffer := desc.Type == SDPTypeAnswer
 
 	if !weOffer && !detectedPlanB {
@@ -1355,7 +1359,7 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 	case SDPSemanticsPlanB:
 		remoteIsPlanB = true
 	case SDPSemanticsUnifiedPlanWithFallback:
-		remoteIsPlanB = descriptionIsPlanB(pc.RemoteDescription())
+		remoteIsPlanB = descriptionPossiblyPlanB(pc.RemoteDescription())
 	default:
 		// none
 	}
@@ -2281,7 +2285,12 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	}
 	isExtmapAllowMixed := isExtMapAllowMixedSet(remoteDescription.parsed)
 	localTransceivers := append([]*RTPTransceiver{}, transceivers...)
-	detectedPlanB := descriptionIsPlanB(remoteDescription)
+
+	detectedPlanB := descriptionIsPlanB(remoteDescription, pc.log)
+	if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
+		detectedPlanB = descriptionPossiblyPlanB(remoteDescription)
+	}
+
 	mediaSections := []mediaSection{}
 	alreadyHaveApplicationMediaSection := false
 	for _, media := range remoteDescription.parsed.MediaDescriptions {

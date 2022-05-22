@@ -486,6 +486,7 @@ t=0 0
 a=group:BUNDLE audio
 a=msid-semantic: WMS 2867270241552712
 m=video 0 UDP/TLS/RTP/SAVPF 0
+a=mid:video
 c=IN IP4 192.168.84.254
 a=inactive
 m=audio 9 UDP/TLS/RTP/SAVPF 111
