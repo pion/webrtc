@@ -433,6 +433,13 @@ func addExtensions(sample media.Sample, packets []*rtp.Packet, hyperscaleEncrypt
 			if attributesExtId, err = getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_ATTR_ID"); err == nil {
 				extensionErrs = append(extensionErrs, packets[0].SetExtension(attributesExtId, []byte{sampleAttr}))
 			}
+			if isDtsExtensionEnabled() {
+				if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_SAMPLE_DTS_ID"); err == nil {
+					dtsBytes := make([]byte, 8)
+					binary.BigEndian.PutUint64(dtsBytes, sample.Dts)
+					extensionErrs = append(extensionErrs, packets[0].SetExtension(id, dtsBytes))
+				}
+			}
 			if id, err := getExtensionVal("HYPERSCALE_RTP_EXTENSION_DON_ID"); err == nil {
 				donBytes := make([]byte, 2)
 				binary.BigEndian.PutUint16(donBytes, sample.Don)
@@ -478,6 +485,11 @@ func getExtensionVal(envVariable string) (uint8, error) {
 		return 0, err
 	}
 	return 0, fmt.Errorf("extension value %s does not exist", envValue)
+}
+
+func isDtsExtensionEnabled() bool {
+	envValue := os.Getenv("HYPERSCALE_RTP_EXTENSION_SAMPLE_DTS_ENABLED")
+	return envValue == "true"
 }
 
 func getRtpOutboundMtu() uint16 {
