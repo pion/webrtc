@@ -415,6 +415,20 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 		assert.ErrorIs(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionInactive), ErrRegisterHeaderExtensionInvalidDirection)
 		assert.ErrorIs(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirection(0)), ErrRegisterHeaderExtensionInvalidDirection)
 	})
+
+	t.Run("Unique extmapid with different codec", func(t *testing.T) {
+		m := &MediaEngine{}
+		registerCodec(m)
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio))
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test2"}, RTPCodecTypeVideo))
+
+		audio := m.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+		video := m.getRTPParametersByKind(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+
+		assert.Equal(t, 1, len(audio.HeaderExtensions))
+		assert.Equal(t, 1, len(video.HeaderExtensions))
+		assert.NotEqual(t, audio.HeaderExtensions[0].ID, video.HeaderExtensions[0].ID)
+	})
 }
 
 // If a user attempts to register a codec twice we should just discard duplicate calls
