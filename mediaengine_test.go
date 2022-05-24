@@ -525,10 +525,26 @@ a=rtpmap:111 opus/48000/2
 	extensions := params.HeaderExtensions
 
 	assert.Equal(t, 2, len(extensions))
-	assert.Equal(t, sdp.SDESMidURI, extensions[0].URI)
-	assert.Equal(t, 2, extensions[0].ID)
-	assert.Equal(t, "urn:3gpp:video-orientation", extensions[1].URI)
-	assert.NotEqual(t, 1, extensions[1].ID)
-	assert.NotEqual(t, 2, extensions[1].ID)
-	assert.NotEqual(t, 5, extensions[1].ID)
+
+	midIndex := -1;
+	if extensions[0].URI == sdp.SDESMidURI {
+		midIndex = 0
+	} else if extensions[1].URI == sdp.SDESMidURI {
+		midIndex = 1
+	}
+
+	voIndex := -1;
+	if extensions[0].URI == "urn:3gpp:video-orientation" {
+		voIndex = 0
+	} else if extensions[1].URI == "urn:3gpp:video-orientation" {
+		voIndex = 1
+	}
+
+	assert.NotEqual(t, midIndex, -1)
+	assert.NotEqual(t, voIndex, -1)
+
+	assert.Equal(t, 2, extensions[midIndex].ID)
+	assert.NotEqual(t, 1, extensions[voIndex].ID)
+	assert.NotEqual(t, 2, extensions[voIndex].ID)
+	assert.NotEqual(t, 5, extensions[voIndex].ID)
 }
