@@ -67,7 +67,7 @@ func (g *genericFMTP) Match(b FMTP) bool {
 		return false
 	}
 
-	if g.mimeType != c.MimeType() {
+	if !strings.EqualFold(g.mimeType, c.MimeType()) {
 		return false
 	}
 
