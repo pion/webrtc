@@ -156,13 +156,11 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error {
 	if d.id == nil {
 		// avoid holding lock when generating ID, since id generation locks
 		d.mu.Unlock()
-		var dcID *uint16
-		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID)
+		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &d.id)
 		if err != nil {
 			return err
 		}
 		d.mu.Lock()
-		d.id = dcID
 	}
 	dc, err := datachannel.Dial(association, *d.id, cfg)
 	if err != nil {
