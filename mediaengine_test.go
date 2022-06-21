@@ -634,3 +634,64 @@ a=fmtp:127 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001
 		})
 	}
 }
+
+func TestMediaEngine_NewTrackCodecsAfterOneNegotiation(t *testing.T) {
+	me, me2 := &MediaEngine{}, &MediaEngine{}
+	se := SettingEngine{}
+	se.DisableMediaEngineCopy(true)
+
+	feedback := []RTCPFeedback{
+		{Type: TypeRTCPFBTransportCC},
+		{Type: TypeRTCPFBCCM, Parameter: "fir"},
+		{Type: TypeRTCPFBNACK},
+		{Type: TypeRTCPFBNACK, Parameter: "pli"},
+	}
+	vp8 := RTPCodecCapability{MimeTypeVP8, 90000, 0, "", feedback}
+	h264 := RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", feedback}
+
+	codecVp8 := RTPCodecParameters{RTPCodecCapability: vp8, PayloadType: 96}
+	codecH264 := RTPCodecParameters{RTPCodecCapability: h264, PayloadType: 108}
+
+	assert.NoError(t, me2.RegisterCodec(codecVp8, RTPCodecTypeVideo))
+	assert.NoError(t, me2.RegisterCodec(codecH264, RTPCodecTypeVideo))
+
+	config := Configuration{SDPSemantics: SDPSemanticsUnifiedPlan}
+	offerer, err := NewAPI(WithMediaEngine(me), WithSettingEngine(se)).NewPeerConnection(config)
+	assert.NoError(t, err)
+
+	answerer, err := NewAPI(WithMediaEngine(me2)).NewPeerConnection(config)
+	assert.NoError(t, err)
+
+	trackVP8, err := NewTrackLocalStaticSample(vp8, "video-vp8", "pion-vp8")
+	assert.NoError(t, err)
+
+	trackH264, err := NewTrackLocalStaticSample(h264, "video-h264", "pion-h264")
+	assert.NoError(t, err)
+
+	codecs := []RTPCodecParameters{codecH264, codecVp8}
+	for i, track := range []TrackLocal{trackH264, trackVP8} {
+		assert.NoError(t, me.RegisterCodec(codecs[i], RTPCodecTypeVideo))
+
+		transceiver, err := offerer.AddTransceiverFromTrack(track, RTPTransceiverInit{
+			Direction: RTPTransceiverDirectionSendonly,
+		})
+		assert.NoError(t, err)
+
+		// Have to do this to force the codec
+		assert.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{codecs[i]}))
+
+		hasCorrectCodec := false
+		for _, c := range transceiver.codecs {
+			hasCorrectCodec = hasCorrectCodec || strings.EqualFold(codecs[i].MimeType, c.MimeType)
+		}
+		assert.True(t, hasCorrectCodec)
+
+		_, err = answerer.AddTrack(track)
+		assert.NoError(t, err)
+
+		assert.NoError(t, signalPair(offerer, answerer))
+	}
+
+	assert.NoError(t, offerer.Close())
+	assert.NoError(t, answerer.Close())
+}
