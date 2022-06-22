@@ -16,7 +16,7 @@ require (
 	github.com/pion/sctp v1.8.2
 	github.com/pion/sdp/v3 v3.0.5
 	github.com/pion/srtp/v2 v2.0.9
-	github.com/pion/transport v0.13.0
+	github.com/pion/transport v0.13.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/crypto v0.0.0-20220516162934-403b01795ae8 // indirect
