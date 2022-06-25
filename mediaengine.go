@@ -476,10 +476,10 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 		switch {
-		case !m.negotiatedAudio && strings.EqualFold(media.MediaName.Media, "audio"):
+		case strings.EqualFold(media.MediaName.Media, "audio"):
 			m.negotiatedAudio = true
 			typ = RTPCodecTypeAudio
-		case !m.negotiatedVideo && strings.EqualFold(media.MediaName.Media, "video"):
+		case strings.EqualFold(media.MediaName.Media, "video"):
 			m.negotiatedVideo = true
 			typ = RTPCodecTypeVideo
 		default:
@@ -532,19 +532,42 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 	return nil
 }
 
+// getCodecsByKindWithRegistered returns both negotiated (if negotiation done) and registered codecs
+// to support tracks added (with different codecs from negotiated codecs) after 1st successful negotiation
+func (m *MediaEngine) getCodecsByKindWithRegistered(typ RTPCodecType) []RTPCodecParameters {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if typ == RTPCodecTypeVideo {
+		if m.negotiatedVideo {
+			return append(m.negotiatedVideoCodecs, m.videoCodecs...)
+		}
+
+		return m.videoCodecs
+	} else if typ == RTPCodecTypeAudio {
+		if m.negotiatedAudio {
+			return append(m.negotiatedAudioCodecs, m.audioCodecs...)
+		}
+
+		return m.audioCodecs
+	}
+
+	return nil
+}
+
 func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if typ == RTPCodecTypeVideo {
 		if m.negotiatedVideo {
-			return m.negotiatedVideoCodecs
+			return append(m.negotiatedVideoCodecs, m.videoCodecs...)
 		}
 
 		return m.videoCodecs
 	} else if typ == RTPCodecTypeAudio {
 		if m.negotiatedAudio {
-			return m.negotiatedAudioCodecs
+			return append(m.negotiatedAudioCodecs, m.audioCodecs...)
 		}
 
 		return m.audioCodecs

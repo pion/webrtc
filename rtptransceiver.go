@@ -48,7 +48,7 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	defer t.mu.Unlock()
 
 	for _, codec := range codecs {
-		if _, matchType := codecParametersFuzzySearch(codec, t.api.mediaEngine.getCodecsByKind(t.kind)); matchType == codecMatchNone {
+		if _, matchType := codecParametersFuzzySearch(codec, t.api.mediaEngine.getCodecsByKindWithRegistered(t.kind)); matchType == codecMatchNone {
 			return fmt.Errorf("%w %s", errRTPTransceiverCodecUnsupported, codec.MimeType)
 		}
 	}
@@ -62,7 +62,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
+	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKindWithRegistered(t.kind)
 	if len(t.codecs) == 0 {
 		return mediaEngineCodecs
 	}
