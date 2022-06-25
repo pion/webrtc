@@ -561,13 +561,13 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 
 	if typ == RTPCodecTypeVideo {
 		if m.negotiatedVideo {
-			return append(m.negotiatedVideoCodecs, m.videoCodecs...)
+			return m.negotiatedVideoCodecs
 		}
 
 		return m.videoCodecs
 	} else if typ == RTPCodecTypeAudio {
 		if m.negotiatedAudio {
-			return append(m.negotiatedAudioCodecs, m.audioCodecs...)
+			return m.negotiatedAudioCodecs
 		}
 
 		return m.audioCodecs

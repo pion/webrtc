@@ -692,6 +692,5 @@ func TestMediaEngine_NewTrackCodecsAfterOneNegotiation(t *testing.T) {
 		assert.NoError(t, signalPair(offerer, answerer))
 	}
 
-	assert.NoError(t, offerer.Close())
-	assert.NoError(t, answerer.Close())
+	closePairNow(t, offerer, answerer)
 }

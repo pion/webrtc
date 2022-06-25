@@ -1094,6 +1094,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 							filteredCodecs = append(filteredCodecs, codec)
 						}
 					}
+
+					if len(filteredCodecs) == 0 {
+						return ErrUnsupportedCodec
+					}
+
 					_ = t.SetCodecPreferences(filteredCodecs)
 				}
 
