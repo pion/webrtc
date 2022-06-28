@@ -568,7 +568,29 @@ func getMidValue(media *sdp.MediaDescription) string {
 	return ""
 }
 
-func descriptionIsPlanB(desc *SessionDescription) bool {
+// SessionDescription contains a MediaSection with Multiple SSRCs, it is Plan-B
+func descriptionIsPlanB(desc *SessionDescription, log logging.LeveledLogger) bool {
+	if desc == nil || desc.parsed == nil {
+		return false
+	}
+
+	// Store all MIDs that already contain a track
+	midWithTrack := map[string]bool{}
+
+	for _, trackDetail := range trackDetailsFromSDP(log, desc.parsed) {
+		if _, ok := midWithTrack[trackDetail.mid]; ok {
+			return true
+		}
+		midWithTrack[trackDetail.mid] = true
+	}
+
+	return false
+}
+
+// SessionDescription contains a MediaSection with name `audio`, `video` or `data`
+// If only one SSRC is set we can't know if it is Plan-B or Unified. If users have
+// set fallback mode assume it is Plan-B
+func descriptionPossiblyPlanB(desc *SessionDescription) bool {
 	if desc == nil || desc.parsed == nil {
 		return false
 	}

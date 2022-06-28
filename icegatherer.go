@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -143,6 +144,11 @@ func (g *ICEGatherer) Gather() error {
 	g.lock.Lock()
 	agent := g.agent
 	g.lock.Unlock()
+
+	// it is possible agent had just been closed
+	if agent == nil {
+		return fmt.Errorf("%w: unable to gather", errICEAgentNotExist)
+	}
 
 	g.setState(ICEGathererStateGathering)
 	if err := agent.OnCandidate(func(candidate ice.Candidate) {

@@ -569,31 +569,33 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 			}
 		}
 	} else {
+		mediaHeaderExtensions := make(map[int]mediaEngineHeaderExtension)
 		for _, e := range m.headerExtensions {
-			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
-				usingNegotiatedID := false
-				for id := range m.negotiatedHeaderExtensions {
-					if m.negotiatedHeaderExtensions[id].uri == e.uri {
-						usingNegotiatedID = true
-						headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
+			usingNegotiatedID := false
+			for id := range m.negotiatedHeaderExtensions {
+				if m.negotiatedHeaderExtensions[id].uri == e.uri {
+					usingNegotiatedID = true
+					mediaHeaderExtensions[id] = e
+					break
+				}
+			}
+			if !usingNegotiatedID {
+				for id := 1; id < 15; id++ {
+					idAvailable := true
+					if _, ok := mediaHeaderExtensions[id]; ok {
+						idAvailable = false
+					}
+					if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
+						mediaHeaderExtensions[id] = e
 						break
 					}
 				}
-				if !usingNegotiatedID {
-					for id := 1; id < 15; id++ {
-						idAvailable := true
-						for checkID := range headerExtensions {
-							if headerExtensions[checkID].ID == id {
-								idAvailable = false
-								break
-							}
-						}
-						if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
-							headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
-							break
-						}
-					}
-				}
+			}
+		}
+
+		for id, e := range mediaHeaderExtensions {
+			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
+				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
 			}
 		}
 	}

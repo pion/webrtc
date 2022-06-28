@@ -18,6 +18,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   Check:
     runs-on: ubuntu-latest

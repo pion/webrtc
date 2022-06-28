@@ -4,7 +4,9 @@
 package webrtc
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/pion/sdp/v3"
@@ -415,6 +417,20 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 		assert.ErrorIs(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionInactive), ErrRegisterHeaderExtensionInvalidDirection)
 		assert.ErrorIs(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirection(0)), ErrRegisterHeaderExtensionInvalidDirection)
 	})
+
+	t.Run("Unique extmapid with different codec", func(t *testing.T) {
+		m := &MediaEngine{}
+		registerCodec(m)
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio))
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test2"}, RTPCodecTypeVideo))
+
+		audio := m.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+		video := m.getRTPParametersByKind(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+
+		assert.Equal(t, 1, len(audio.HeaderExtensions))
+		assert.Equal(t, 1, len(video.HeaderExtensions))
+		assert.NotEqual(t, audio.HeaderExtensions[0].ID, video.HeaderExtensions[0].ID)
+	})
 }
 
 // If a user attempts to register a codec twice we should just discard duplicate calls
@@ -511,10 +527,110 @@ a=rtpmap:111 opus/48000/2
 	extensions := params.HeaderExtensions
 
 	assert.Equal(t, 2, len(extensions))
-	assert.Equal(t, sdp.SDESMidURI, extensions[0].URI)
-	assert.Equal(t, 2, extensions[0].ID)
-	assert.Equal(t, "urn:3gpp:video-orientation", extensions[1].URI)
-	assert.NotEqual(t, 1, extensions[1].ID)
-	assert.NotEqual(t, 2, extensions[1].ID)
-	assert.NotEqual(t, 5, extensions[1].ID)
+
+	midIndex := -1
+	if extensions[0].URI == sdp.SDESMidURI {
+		midIndex = 0
+	} else if extensions[1].URI == sdp.SDESMidURI {
+		midIndex = 1
+	}
+
+	voIndex := -1
+	if extensions[0].URI == "urn:3gpp:video-orientation" {
+		voIndex = 0
+	} else if extensions[1].URI == "urn:3gpp:video-orientation" {
+		voIndex = 1
+	}
+
+	assert.NotEqual(t, midIndex, -1)
+	assert.NotEqual(t, voIndex, -1)
+
+	assert.Equal(t, 2, extensions[midIndex].ID)
+	assert.NotEqual(t, 1, extensions[voIndex].ID)
+	assert.NotEqual(t, 2, extensions[voIndex].ID)
+	assert.NotEqual(t, 5, extensions[voIndex].ID)
+}
+
+func TestCaseInsensitiveMimeType(t *testing.T) {
+	const offerSdp = `
+v=0
+o=- 8448668841136641781 4 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0 1 2
+a=extmap-allow-mixed
+a=msid-semantic: WMS 4beea6b0-cf95-449c-a1ec-78e16b247426
+m=video 9 UDP/TLS/RTP/SAVPF 96 127
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:1
+a=sendonly
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 transport-cc
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtpmap:127 H264/90000
+a=rtcp-fb:127 goog-remb
+a=rtcp-fb:127 transport-cc
+a=rtcp-fb:127 ccm fir
+a=rtcp-fb:127 nack
+a=rtcp-fb:127 nack pli
+a=fmtp:127 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+
+`
+
+	for _, mimeTypeVp8 := range []string{
+		"video/vp8",
+		"video/VP8",
+	} {
+		t.Run(fmt.Sprintf("MimeType: %s", mimeTypeVp8), func(t *testing.T) {
+			me := &MediaEngine{}
+			feedback := []RTCPFeedback{
+				{Type: TypeRTCPFBTransportCC},
+				{Type: TypeRTCPFBCCM, Parameter: "fir"},
+				{Type: TypeRTCPFBNACK},
+				{Type: TypeRTCPFBNACK, Parameter: "pli"},
+			}
+
+			for _, codec := range []RTPCodecParameters{
+				{
+					RTPCodecCapability: RTPCodecCapability{MimeType: mimeTypeVp8, ClockRate: 90000, RTCPFeedback: feedback},
+					PayloadType:        96,
+				},
+				{
+					RTPCodecCapability: RTPCodecCapability{MimeType: "video/h264", ClockRate: 90000, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", RTCPFeedback: feedback},
+					PayloadType:        127,
+				},
+			} {
+				assert.NoError(t, me.RegisterCodec(codec, RTPCodecTypeVideo))
+			}
+
+			api := NewAPI(WithMediaEngine(me))
+			pc, err := api.NewPeerConnection(Configuration{
+				SDPSemantics: SDPSemanticsUnifiedPlan,
+			})
+			assert.NoError(t, err)
+
+			offer := SessionDescription{
+				Type: SDPTypeOffer,
+				SDP:  offerSdp,
+			}
+
+			assert.NoError(t, pc.SetRemoteDescription(offer))
+			answer, err := pc.CreateAnswer(nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, answer)
+			assert.NoError(t, pc.SetLocalDescription(answer))
+			assert.True(t, strings.Contains(answer.SDP, "VP8") || strings.Contains(answer.SDP, "vp8"))
+
+			assert.NoError(t, pc.Close())
+		})
+	}
 }
