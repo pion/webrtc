@@ -2147,6 +2147,15 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	return statsCollector.Ready()
 }
 
+// Returns the remote DTLS certificate bytes.
+//
+// If DTLS has not been established yet, it returns an empty slice.
+//
+// See DTLSTransport.GetRemoteCertificate
+func (pc *PeerConnection) GetRemoteDTLSCertificate() []byte {
+	return pc.dtlsTransport.GetRemoteCertificate()
+}
+
 // Start all transports. PeerConnection now has enough state
 func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, remoteUfrag, remotePwd, fingerprint, fingerprintHash string) {
 	// Start the ice transport

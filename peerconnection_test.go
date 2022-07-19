@@ -749,3 +749,17 @@ func TestTransportChain(t *testing.T) {
 
 	closePairNow(t, offer, answer)
 }
+
+func TestPeerConnection_GetRemoteDTLSCertificate(t *testing.T) {
+	offer, answer, err := newPair()
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	assert.NotEmpty(t, offer.GetRemoteDTLSCertificate())
+	assert.NotEmpty(t, answer.GetRemoteDTLSCertificate())
+
+	closePairNow(t, offer, answer)
+}
