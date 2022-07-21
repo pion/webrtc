@@ -3,19 +3,20 @@
 
 package main
 
+/*
+#cgo pkg-config: libavformat
+#include <libavformat/avformat.h>
+*/
+import "C"
 import (
-	"context"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
+	"unsafe"
 
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
-	"github.com/pion/webrtc/v3/pkg/media/oggreader"
 )
 
 const (
@@ -25,17 +26,6 @@ const (
 )
 
 func main() {
-	// Assert that we have an audio or video file
-	_, err := os.Stat(videoFileName)
-	haveVideoFile := !os.IsNotExist(err)
-
-	_, err = os.Stat(audioFileName)
-	haveAudioFile := !os.IsNotExist(err)
-
-	if !haveAudioFile && !haveVideoFile {
-		panic("Could not find `" + audioFileName + "` or `" + videoFileName + "`")
-	}
-
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -53,148 +43,60 @@ func main() {
 		}
 	}()
 
-	iceConnectedCtx, iceConnectedCtxCancel := context.WithCancel(context.Background())
-
-	if haveVideoFile {
-		// Create a video track
-		videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
-		if videoTrackErr != nil {
-			panic(videoTrackErr)
-		}
-
-		rtpSender, videoTrackErr := peerConnection.AddTrack(videoTrack)
-		if videoTrackErr != nil {
-			panic(videoTrackErr)
-		}
-
-		// Read incoming RTCP packets
-		// Before these packets are returned they are processed by interceptors. For things
-		// like NACK this needs to be called.
-		go func() {
-			rtcpBuf := make([]byte, 1500)
-			for {
-				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
-					return
-				}
-			}
-		}()
-
-		go func() {
-			// Open a IVF file and start reading using our IVFReader
-			file, ivfErr := os.Open(videoFileName)
-			if ivfErr != nil {
-				panic(ivfErr)
-			}
-
-			ivf, header, ivfErr := ivfreader.NewWith(file)
-			if ivfErr != nil {
-				panic(ivfErr)
-			}
-
-			// Wait for connection established
-			<-iceConnectedCtx.Done()
-
-			// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
-			// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
-			//
-			// It is important to use a time.Ticker instead of time.Sleep because
-			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
-			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
-			ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
-			for ; true; <-ticker.C {
-				frame, _, ivfErr := ivf.ParseNextFrame()
-				if errors.Is(ivfErr, io.EOF) {
-					fmt.Printf("All video frames parsed and sent")
-					os.Exit(0)
-				}
-
-				if ivfErr != nil {
-					panic(ivfErr)
-				}
-
-				if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
-					panic(ivfErr)
-				}
-			}
-		}()
+	// Create a video track
+	videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+	if videoTrackErr != nil {
+		panic(videoTrackErr)
 	}
 
-	if haveAudioFile {
-		// Create a audio track
-		audioTrack, audioTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
-		if audioTrackErr != nil {
-			panic(audioTrackErr)
-		}
-
-		rtpSender, audioTrackErr := peerConnection.AddTrack(audioTrack)
-		if audioTrackErr != nil {
-			panic(audioTrackErr)
-		}
-
-		// Read incoming RTCP packets
-		// Before these packets are returned they are processed by interceptors. For things
-		// like NACK this needs to be called.
-		go func() {
-			rtcpBuf := make([]byte, 1500)
-			for {
-				if _, _, rtcpErr := rtpSender.Read(rtcpBuf); rtcpErr != nil {
-					return
-				}
-			}
-		}()
-
-		go func() {
-			// Open a OGG file and start reading using our OGGReader
-			file, oggErr := os.Open(audioFileName)
-			if oggErr != nil {
-				panic(oggErr)
-			}
-
-			// Open on oggfile in non-checksum mode.
-			ogg, _, oggErr := oggreader.NewWith(file)
-			if oggErr != nil {
-				panic(oggErr)
-			}
-
-			// Wait for connection established
-			<-iceConnectedCtx.Done()
-
-			// Keep track of last granule, the difference is the amount of samples in the buffer
-			var lastGranule uint64
-
-			// It is important to use a time.Ticker instead of time.Sleep because
-			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
-			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
-			ticker := time.NewTicker(oggPageDuration)
-			for ; true; <-ticker.C {
-				pageData, pageHeader, oggErr := ogg.ParseNextPage()
-				if errors.Is(oggErr, io.EOF) {
-					fmt.Printf("All audio pages parsed and sent")
-					os.Exit(0)
-				}
-
-				if oggErr != nil {
-					panic(oggErr)
-				}
-
-				// The amount of samples is the difference between the last and current timestamp
-				sampleCount := float64(pageHeader.GranulePosition - lastGranule)
-				lastGranule = pageHeader.GranulePosition
-				sampleDuration := time.Duration((sampleCount/48000)*1000) * time.Millisecond
-
-				if oggErr = audioTrack.WriteSample(media.Sample{Data: pageData, Duration: sampleDuration}); oggErr != nil {
-					panic(oggErr)
-				}
-			}
-		}()
+	videoRTPSender, videoTrackErr := peerConnection.AddTrack(videoTrack)
+	if videoTrackErr != nil {
+		panic(videoTrackErr)
 	}
+
+	// Read incoming RTCP packets
+	// Before these packets are returned they are processed by interceptors. For things
+	// like NACK this needs to be called.
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := videoRTPSender.Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
+
+	// Create a audio track
+	audioTrack, audioTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
+	if audioTrackErr != nil {
+		panic(audioTrackErr)
+	}
+
+	audioRTPSender, audioTrackErr := peerConnection.AddTrack(audioTrack)
+	if audioTrackErr != nil {
+		panic(audioTrackErr)
+	}
+
+	// Read incoming RTCP packets
+	// Before these packets are returned they are processed by interceptors. For things
+	// like NACK this needs to be called.
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := audioRTPSender.Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
+
+	completeCh := make(chan bool)
 
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
 		if connectionState == webrtc.ICEConnectionStateConnected {
-			iceConnectedCtxCancel()
+			completeCh <- true
 		}
 	})
 
@@ -243,6 +145,44 @@ func main() {
 	// Output the answer in base64 so we can paste it in browser
 	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
 
-	// Block forever
-	select {}
+	<-completeCh
+
+	// create a new hls demuxer
+	avformatctx := C.avformat_alloc_context()
+	if avformatctx == nil {
+		panic("failed")
+	}
+
+	curl := C.CString("https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8")
+	defer C.free(unsafe.Pointer(curl))
+
+	if averr := C.avformat_open_input(&avformatctx, curl, nil, nil); averr < 0 {
+		panic("failed")
+	}
+
+	if averr := C.avformat_find_stream_info(avformatctx, nil); averr < 0 {
+		panic("failed")
+	}
+
+	streams := make([]*C.AVStream, avformatctx.nb_streams)
+	for i, stream := range (*[1 << 30]*C.AVStream)(unsafe.Pointer(avformatctx.streams))[:avformatctx.nb_streams] {
+		streams[i] = stream
+	}
+
+	for {
+		p := C.av_packet_alloc()
+		if averr := C.av_read_frame(avformatctx, p); averr < 0 {
+			panic("failed")
+		}
+		data := (*[1<<30]byte)(unsafe.Pointer(p.data))[0:p.size]
+		stream := streams[p.stream_index]
+		duration := time.Duration(float64(p.duration) * float64(stream.time_base.num) / float64(stream.time_base.den) * float64(time.Second))
+		sample := media.Sample{Data: data[:], Duration: duration}
+		if p.stream_index == 0 {
+			videoTrack.WriteSample(sample)
+		} else {
+			audioTrack.WriteSample(sample)
+		}
+		C.av_packet_free(&p)
+	}
 }
