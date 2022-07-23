@@ -3,6 +3,7 @@ services:
   answer:
     container_name: answer
     build: ./answer
+    command: answer -offer-address offer:50000
     hostname: answer
     restart: always   
     ports:
@@ -13,5 +14,6 @@ services:
       - answer
     container_name: offer
     build: ./offer
+    command: offer -answer-address answer:60000
     hostname: offer
     restart: always
