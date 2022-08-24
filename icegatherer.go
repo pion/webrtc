@@ -23,6 +23,8 @@ type ICEGatherer struct {
 
 	validatedServers []*ice.URL
 	gatherPolicy     ICETransportPolicy
+	usernameFragment string
+	password         string
 
 	agent *ice.Agent
 
@@ -49,11 +51,19 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 			validatedServers = append(validatedServers, url...)
 		}
 	}
+	if opts.UsernameFragment == "" {
+		opts.UsernameFragment = api.settingEngine.candidates.UsernameFragment
+	}
+	if opts.Password == "" {
+		opts.Password = api.settingEngine.candidates.Password
+	}
 
 	return &ICEGatherer{
 		state:            ICEGathererStateNew,
 		gatherPolicy:     opts.ICEGatherPolicy,
 		validatedServers: validatedServers,
+		usernameFragment: opts.UsernameFragment,
+		password:         opts.Password,
 		api:              api,
 		log:              api.settingEngine.LoggerFactory.NewLogger("ice"),
 	}, nil
@@ -111,8 +121,8 @@ func (g *ICEGatherer) createAgent() error {
 		Net:                    g.api.settingEngine.vnet,
 		MulticastDNSMode:       mDNSMode,
 		MulticastDNSHostName:   g.api.settingEngine.candidates.MulticastDNSHostName,
-		LocalUfrag:             g.api.settingEngine.candidates.UsernameFragment,
-		LocalPwd:               g.api.settingEngine.candidates.Password,
+		LocalUfrag:             g.usernameFragment,
+		LocalPwd:               g.password,
 		TCPMux:                 g.api.settingEngine.iceTCPMux,
 		UDPMux:                 g.api.settingEngine.iceUDPMux,
 		ProxyDialer:            g.api.settingEngine.iceProxyDialer,
