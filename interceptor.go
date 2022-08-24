@@ -12,6 +12,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
+	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
@@ -105,6 +106,19 @@ func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *intercep
 		return err
 	}
 
+	interceptorRegistry.Add(generator)
+	return nil
+}
+
+// ConfigureCongestionControlFeedback registers congestion control feedback as
+// defined in RFC 8888 (https://datatracker.ietf.org/doc/rfc8888/)
+func ConfigureCongestionControlFeedback(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBACK, Parameter: "ccfb"}, RTPCodecTypeVideo)
+	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBACK, Parameter: "ccfb"}, RTPCodecTypeAudio)
+	generator, err := rfc8888.NewSenderInterceptor()
+	if err != nil {
+		return err
+	}
 	interceptorRegistry.Add(generator)
 	return nil
 }
