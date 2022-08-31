@@ -67,6 +67,7 @@ type SettingEngine struct {
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
+	iceUDPMuxSrflx                            ice.UniversalUDPMux
 	iceProxyDialer                            proxy.Dialer
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
@@ -168,10 +169,13 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 // Two types of candidates are supported:
 //
 // ICECandidateTypeHost:
-//		The public IP address will be used for the host candidate in the SDP.
+//
+//	The public IP address will be used for the host candidate in the SDP.
+//
 // ICECandidateTypeSrflx:
-//		A server reflexive candidate with the given public IP address will be added
-// to the SDP.
+//
+//	A server reflexive candidate with the given public IP address will be added
+//	to the SDP.
 //
 // Please note that if you choose ICECandidateTypeHost, then the private IP address
 // won't be advertised with the peer. Also, this option cannot be used along with mDNS.
@@ -190,9 +194,12 @@ func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateTy
 // may be useful when interacting with non-compliant clients or debugging issues.
 //
 // DTLSRoleActive:
-// 		Act as DTLS Client, send the ClientHello and starts the handshake
+//
+//	Act as DTLS Client, send the ClientHello and starts the handshake
+//
 // DTLSRolePassive:
-// 		Act as DTLS Server, wait for ClientHello
+//
+//	Act as DTLS Server, wait for ClientHello
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
 		return errSettingEngineSetAnsweringDTLSRole
@@ -283,6 +290,12 @@ func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
 // UDPMux should be started prior to creating PeerConnections.
 func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
 	e.iceUDPMux = udpMux
+}
+
+// SetICEUDPMuxSrflx allows ICE traffic from server reflexive candidates to be
+// multiplexed onto a single port.
+func (e *SettingEngine) SetICEUDPMuxSrflx(udpMuxSrflx ice.UniversalUDPMux) {
+	e.iceUDPMuxSrflx = udpMuxSrflx
 }
 
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
