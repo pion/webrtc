@@ -1425,7 +1425,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 				id = split[1]
 			}
 		case sdp.AttrKeySSRC:
-			return false, errPeerConnSingleMediaSectionHasExplicitSSRC
+			pc.log.Warnf("deprecated ssrc behavior %q", errPeerConnSingleMediaSectionHasExplicitSSRC)
 		case sdpAttributeRid:
 			return false, nil
 		}
