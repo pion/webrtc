@@ -128,13 +128,13 @@ func TestPeerConnection_Renegotiation_AddRecvonlyTransceiver(t *testing.T) {
 				pcOffer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
 					onTrackFiredFunc()
 				})
+				assert.NoError(t, signalPair(pcAnswer, pcOffer))
 			} else {
 				pcAnswer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
 					onTrackFiredFunc()
 				})
+				assert.NoError(t, signalPair(pcOffer, pcAnswer))
 			}
-
-			assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 			sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{localTrack})
 
@@ -380,6 +380,7 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 
 	offer, err = pcOffer.CreateOffer(nil)
 	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
 
 	assert.Equal(t, len(offer.parsed.MediaDescriptions), 2)
 
@@ -390,6 +391,11 @@ func TestPeerConnection_Transceiver_Mid(t *testing.T) {
 
 	pcOffer.ops.Done()
 	pcAnswer.ops.Done()
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	answer, err = pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 
 	track3, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion3")
 	require.NoError(t, err)
@@ -468,12 +474,12 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 
 	require.NoError(t, pcOffer.RemoveTrack(sender1))
 
-	sender2, err := pcOffer.AddTrack(track2)
-	require.NoError(t, err)
-
 	require.NoError(t, signalPair(pcOffer, pcAnswer))
 	<-tracksClosed
 
+	sender2, err := pcOffer.AddTrack(track2)
+	require.NoError(t, err)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
 	transceivers = pcOffer.GetTransceivers()
 	require.Equal(t, 1, len(transceivers))
 	require.Equal(t, "0", transceivers[0].Mid())
@@ -1144,4 +1150,45 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 		assertTracksClosed(t)
 		closePairNow(t, pcOffer, pcAnswer)
 	})
+}
+
+func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	assert.NoError(t, err)
+	sender, err := pcOffer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	assert.Equal(t, len(pcOffer.GetTransceivers()), 1)
+	assert.Equal(t, pcOffer.GetTransceivers()[0].getCurrentDirection(), RTPTransceiverDirectionSendonly)
+	assert.NoError(t, pcOffer.RemoveTrack(sender))
+	assert.Equal(t, pcOffer.GetTransceivers()[0].getCurrentDirection(), RTPTransceiverDirectionSendonly)
+
+	// should not reuse tranceiver
+	vp8Track2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	assert.NoError(t, err)
+	sender2, err := pcOffer.AddTrack(vp8Track2)
+	assert.NoError(t, err)
+	assert.Equal(t, len(pcOffer.GetTransceivers()), 2)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	assert.True(t, sender2.rtpTransceiver == pcOffer.GetTransceivers()[1])
+
+	// should reuse first transceiver
+	sender, err = pcOffer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+	assert.Equal(t, len(pcOffer.GetTransceivers()), 2)
+	assert.True(t, sender.rtpTransceiver == pcOffer.GetTransceivers()[0])
+
+	closePairNow(t, pcOffer, pcAnswer)
 }

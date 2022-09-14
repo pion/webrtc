@@ -984,6 +984,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
+		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
@@ -1143,6 +1144,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	if isRenegotation {
 		if weOffer {
+			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
 				return err
 			}
@@ -1172,6 +1174,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
 	if weOffer {
+		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
@@ -1228,6 +1231,51 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 			pc.onTrack(track, receiver)
 		}(t)
 	}
+}
+
+func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransceivers []*RTPTransceiver, weOffer bool) error {
+	currentTransceivers = append([]*RTPTransceiver{}, currentTransceivers...)
+	for _, media := range answer.parsed.MediaDescriptions {
+		midValue := getMidValue(media)
+		if midValue == "" {
+			return errPeerConnRemoteDescriptionWithoutMidValue
+		}
+
+		if media.MediaName.Media == mediaSectionApplication {
+			continue
+		}
+
+		var t *RTPTransceiver
+		t, currentTransceivers = findByMid(midValue, currentTransceivers)
+
+		if t == nil {
+			return fmt.Errorf("%w: %q", errPeerConnTranscieverMidNil, midValue)
+		}
+
+		direction := getPeerDirection(media)
+		if direction == RTPTransceiverDirection(Unknown) {
+			continue
+		}
+
+		// reverse direction if it was a remote answer
+		if weOffer {
+			switch direction {
+			case RTPTransceiverDirectionSendonly:
+				direction = RTPTransceiverDirectionRecvonly
+			case RTPTransceiverDirectionRecvonly:
+				// Pion will answer recvonly with a offer recvonly transceiver, so we should
+				// not change the direction to sendonly if we are the offerer, otherwise this
+				// tranceiver can't be reuse for AddTrack
+				if t.Direction() != RTPTransceiverDirectionRecvonly {
+					direction = RTPTransceiverDirectionSendonly
+				}
+			default:
+			}
+		}
+
+		t.setCurrentDirection(direction)
+	}
+	return nil
 }
 
 func runIfNewReceiver(
@@ -1706,7 +1754,13 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	for _, t := range pc.rtpTransceivers {
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil {
+		currentDirection := t.getCurrentDirection()
+		// According to https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack, if the
+		// transceiver can be reused only if it's currentDirection never be sendrecv or sendonly.
+		// But that will cause sdp inflate. So we only check currentDirection's current value,
+		// that's worked for all browsers.
+		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil &&
+			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
 			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 			if err == nil {
 				err = t.SetSender(sender, track)
