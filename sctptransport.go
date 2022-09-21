@@ -224,7 +224,7 @@ ACCEPT:
 			Ordered:           ordered,
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
-		}, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
+		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)
