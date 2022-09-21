@@ -1991,7 +1991,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		}
 	}
 
-	d, err := pc.api.newDataChannel(params, pc.log)
+	d, err := pc.api.newDataChannel(params, nil, pc.log)
 	if err != nil {
 		return nil, err
 	}
