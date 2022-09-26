@@ -7,7 +7,7 @@ require (
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/datachannel v1.5.2
 	github.com/pion/dtls/v2 v2.1.5
-	github.com/pion/ice/v2 v2.2.7
+	github.com/pion/ice/v2 v2.2.8
 	github.com/pion/interceptor v0.1.11
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
@@ -19,6 +19,7 @@ require (
 	github.com/pion/transport v0.13.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.7.1
-	golang.org/x/crypto v0.0.0-20220516162934-403b01795ae8 // indirect
-	golang.org/x/net v0.0.0-20220630215102-69896b714898
+	golang.org/x/crypto v0.0.0-20220924013350-4ba4fb4dd9e7 // indirect
+	golang.org/x/net v0.0.0-20220923203811-8be639271d50
+	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect
 )
