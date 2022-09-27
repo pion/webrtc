@@ -44,8 +44,8 @@ github.com/pion/datachannel v1.5.2 h1:piB93s8LGmbECrpO84DnkIVWasRMk3IimbcXkTQLE6
 github.com/pion/datachannel v1.5.2/go.mod h1:FTGQWaHrdCwIJ1rw6xBIfZVkslikjShim5yr05XFuCQ=
 github.com/pion/dtls/v2 v2.1.5 h1:jlh2vtIyUBShchoTDqpCCqiYCyRFJ/lvf/gQ8TALs+c=
 github.com/pion/dtls/v2 v2.1.5/go.mod h1:BqCE7xPZbPSubGasRoDFJeTsyJtdD1FanJYL0JGheqY=
-github.com/pion/ice/v2 v2.2.8 h1:lUpgsAv6fsCNwyNRcSQVhhF8QKMzy6UY5MLXMzHX3Jw=
-github.com/pion/ice/v2 v2.2.8/go.mod h1:J6HhupoMLTOv0yALipuOHEPoSMk7dm1ofwUI1KHVHk8=
+github.com/pion/ice/v2 v2.2.9 h1:7MT82FJ9pYxSumXfMvNpN6if7jhIyRM1GBo95qw+Yi8=
+github.com/pion/ice/v2 v2.2.9/go.mod h1:J6HhupoMLTOv0yALipuOHEPoSMk7dm1ofwUI1KHVHk8=
 github.com/pion/interceptor v0.1.11 h1:00U6OlqxA3FFB50HSg25J/8cWi7P6FbSzw4eFn24Bvs=
 github.com/pion/interceptor v0.1.11/go.mod h1:tbtKjZY14awXd7Bq0mmWvgtHB5MDaRN7HV3OZ/uy7s8=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
