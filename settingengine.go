@@ -160,7 +160,7 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 }
 
 // SetIPFilter sets the filtering functions when gathering ICE candidates
-// This can be used to exclude certain ip  from ICE. Which may be
+// This can be used to exclude certain ip from ICE. Which may be
 // useful if you know a certain ip will never succeed, or if you wish to reduce
 // the amount of information you wish to expose to the remote peer
 func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
