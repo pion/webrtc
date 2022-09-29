@@ -142,10 +142,7 @@ func (g *ICEGatherer) Gather() error {
 		return err
 	}
 
-	g.lock.Lock()
-	agent := g.agent
-	g.lock.Unlock()
-
+	agent := g.getAgent()
 	// it is possible agent had just been closed
 	if agent == nil {
 		return fmt.Errorf("%w: unable to gather", errICEAgentNotExist)
@@ -205,7 +202,13 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 		return ICEParameters{}, err
 	}
 
-	frag, pwd, err := g.agent.GetLocalUserCredentials()
+	agent := g.getAgent()
+	// it is possible agent had just been closed
+	if agent == nil {
+		return ICEParameters{}, fmt.Errorf("%w: unable to get local parameters", errICEAgentNotExist)
+	}
+
+	frag, pwd, err := agent.GetLocalUserCredentials()
 	if err != nil {
 		return ICEParameters{}, err
 	}
@@ -222,7 +225,14 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 	if err := g.createAgent(); err != nil {
 		return nil, err
 	}
-	iceCandidates, err := g.agent.GetLocalCandidates()
+
+	agent := g.getAgent()
+	// it is possible agent had just been closed
+	if agent == nil {
+		return nil, fmt.Errorf("%w: unable to get local candidates", errICEAgentNotExist)
+	}
+
+	iceCandidates, err := agent.GetLocalCandidates()
 	if err != nil {
 		return nil, err
 	}
