@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"io"
+	"net"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -39,6 +40,7 @@ type SettingEngine struct {
 		ICELite                bool
 		ICENetworkTypes        []NetworkType
 		InterfaceFilter        func(string) bool
+		IPFilter               func(net.IP) bool
 		NAT1To1IPs             []string
 		NAT1To1IPCandidateType ICECandidateType
 		MulticastDNSMode       ice.MulticastDNSMode
@@ -155,6 +157,14 @@ func (e *SettingEngine) SetNetworkTypes(candidateTypes []NetworkType) {
 // the amount of information you wish to expose to the remote peer
 func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 	e.candidates.InterfaceFilter = filter
+}
+
+// SetIPFilter sets the filtering functions when gathering ICE candidates
+// This can be used to exclude certain ip  from ICE. Which may be
+// useful if you know a certain ip will never succeed, or if you wish to reduce
+// the amount of information you wish to expose to the remote peer
+func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
+	e.candidates.IPFilter = filter
 }
 
 // SetNAT1To1IPs sets a list of external IP addresses of 1:1 (D)NAT
