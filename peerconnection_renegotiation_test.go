@@ -1192,3 +1192,44 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
+
+func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerPC, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPC, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	_, err = offerPC.CreateDataChannel("test", nil)
+	assert.NoError(t, err)
+
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	assert.NoError(t, err)
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	assert.NoError(t, err)
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	assert.NoError(t, answerPC.SetRemoteDescription(offer), offer.SDP)
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	assert.NoError(t, offerPC.SetRemoteDescription(answer))
+	assert.Equal(t, SignalingStateStable, offerPC.SignalingState())
+
+	tr, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	assert.NoError(t, err)
+	assert.NoError(t, tr.SetMid("3"))
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
+	assert.NoError(t, err)
+	_, err = offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, offerPC.Close())
+	assert.NoError(t, answerPC.Close())
+}

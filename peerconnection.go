@@ -659,7 +659,13 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 				}
 			}
 			for _, t := range currentTransceivers {
-				if t.Mid() != "" {
+				if mid := t.Mid(); mid != "" {
+					numericMid, errMid := strconv.Atoi(mid)
+					if errMid == nil {
+						if numericMid > pc.greaterMid {
+							pc.greaterMid = numericMid
+						}
+					}
 					continue
 				}
 				pc.greaterMid++
