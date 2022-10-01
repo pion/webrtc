@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"reflect"
 	"regexp"
@@ -376,7 +375,7 @@ func TestEOF(t *testing.T) {
 			defer func() { assert.NoError(t, dc.Close(), "should succeed") }()
 
 			log.Debug("Waiting for ping...")
-			msg, err2 := ioutil.ReadAll(dc)
+			msg, err2 := io.ReadAll(dc)
 			log.Debugf("Received ping! \"%s\"", string(msg))
 			if err2 != nil {
 				t.Error(err2)
@@ -423,7 +422,7 @@ func TestEOF(t *testing.T) {
 			assert.NoError(t, dc.Close(), "should succeed")
 
 			log.Debug("Wating for EOF")
-			ret, err2 := ioutil.ReadAll(dc)
+			ret, err2 := io.ReadAll(dc)
 			assert.Nil(t, err2, "should succeed")
 			assert.Equal(t, 0, len(ret), "should be empty")
 		}()
