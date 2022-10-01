@@ -53,8 +53,8 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(params.UsernameFragment) == 0 ||
-		len(params.Password) == 0 {
+	if params.UsernameFragment == "" ||
+		params.Password == "" {
 		t.Fatalf("Empty local username or password frag")
 	}
 
