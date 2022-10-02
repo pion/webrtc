@@ -177,6 +177,7 @@ Will Forcey <wsforc3y@gmail.com>
 Will Watson <william.a.watson@gmail.com>
 Woodrow Douglass <wdouglass@carnegierobotics.com>
 xsbchen <xsbchen@qq.com>
+Yoon SeungYong <simon.y@hpcnt.com>
 Yuki Igarashi <me@bonprosoft.com>
 yusuke <yusuke.m99@gmail.com>
 Yutaka Takeda <yt0916@gmail.com>
