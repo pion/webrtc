@@ -20,6 +20,6 @@ require (
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be // indirect
-	golang.org/x/net v0.0.0-20220927171203-f486391704dc
+	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 )
