@@ -6,10 +6,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
+	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -75,24 +75,19 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Listen on UDP Port 8443, will be used for all WebRTC traffic
-	udpListener, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.IP{0, 0, 0, 0},
-		Port: 8443,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Listening for WebRTC traffic at %s\n", udpListener.LocalAddr())
-
 	// Create a SettingEngine, this allows non-standard WebRTC behavior
 	settingEngine := webrtc.SettingEngine{}
 
 	// Configure our SettingEngine to use our UDPMux. By default a PeerConnection has
 	// no global state. The API+SettingEngine allows the user to share state between them.
 	// In this case we are sharing our listening port across many.
-	settingEngine.SetICEUDPMux(webrtc.NewICEUDPMux(nil, udpListener))
+	// Listen on UDP Port 8443, will be used for all WebRTC traffic
+	mux, err := ice.NewMultiUDPMuxFromPort(8443)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Listening for WebRTC traffic at %d\n", 8443)
+	settingEngine.SetICEUDPMux(mux)
 
 	// Create a new API using our SettingEngine
 	api = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
