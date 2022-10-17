@@ -1,10 +1,8 @@
 module github.com/pion/webrtc/v3
 
-go 1.13
+go 1.19
 
 require (
-	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/datachannel v1.5.2
 	github.com/pion/dtls/v2 v2.1.5
 	github.com/pion/ice/v2 v2.2.11
@@ -19,7 +17,20 @@ require (
 	github.com/pion/transport v0.13.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.7.1
-	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
 	golang.org/x/net v0.0.0-20221004154528-8021a29435af
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/google/uuid v1.3.0 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/onsi/gomega v1.17.0 // indirect
+	github.com/pion/mdns v0.0.5 // indirect
+	github.com/pion/stun v0.3.5 // indirect
+	github.com/pion/turn/v2 v2.0.8 // indirect
+	github.com/pion/udp v0.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
 	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )
