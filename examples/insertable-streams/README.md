@@ -19,7 +19,7 @@ go get github.com/pion/webrtc/v3/examples/insertable-streams
 ```
 
 ### Open insertable-streams example page
-[jsfiddle.net](https://jsfiddle.net/uqr80Lak/) you should see two text-areas and a 'Start Session' button. You will also have a 'Decrypt' checkbox.
+[jsfiddle.net](https://jsfiddle.net/t5xoaryc/) you should see two text-areas and a 'Start Session' button. You will also have a 'Decrypt' checkbox.
 When unchecked the browser will not decrypt the incoming video stream, so it will stop playing or display certificates.
 
 ### Run insertable-streams with your browsers SessionDescription as stdin

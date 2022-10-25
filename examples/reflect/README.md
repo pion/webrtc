@@ -9,7 +9,7 @@ go get github.com/pion/webrtc/v3/examples/reflect
 ```
 
 ### Open reflect example page
-[jsfiddle.net](https://jsfiddle.net/ogs7muqh/1/) you should see two text-areas and a 'Start Session' button.
+[jsfiddle.net](https://jsfiddle.net/g643ft1k/) you should see two text-areas and a 'Start Session' button.
 
 ### Run reflect, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser's Session Description. Press `Copy browser SDP to clipboard` or copy the base64 string manually.

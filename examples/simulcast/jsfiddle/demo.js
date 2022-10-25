@@ -85,7 +85,7 @@ window.startSession = () => {
 
   try {
     console.log('answer', JSON.parse(atob(sd)))
-    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
+    pc.setRemoteDescription(JSON.parse(atob(sd)))
   } catch (e) {
     alert(e)
   }
