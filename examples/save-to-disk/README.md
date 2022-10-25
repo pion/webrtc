@@ -11,7 +11,7 @@ go get github.com/pion/webrtc/v3/examples/save-to-disk
 ```
 
 ### Open save-to-disk example page
-[jsfiddle.net](https://jsfiddle.net/xjcve6d3/) you should see your Webcam, two text-areas and two buttons: `Copy browser SDP to clipboard`, `Start Session`.
+[jsfiddle.net](https://jsfiddle.net/s179hacu/) you should see your Webcam, two text-areas and two buttons: `Copy browser SDP to clipboard`, `Start Session`.
 
 ### Run save-to-disk, with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser's Session Description. Press `Copy browser SDP to clipboard` or copy the base64 string manually.

@@ -42,7 +42,7 @@ window.startSession = () => {
   }
 
   try {
-    pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sd))))
+    pc.setRemoteDescription(JSON.parse(atob(sd)))
   } catch (e) {
     alert(e)
   }
