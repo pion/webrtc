@@ -128,18 +128,27 @@ var rtpPacketPool = sync.Pool{
 	},
 }
 
+func resetPacketPoolAllocation(localPacket *rtp.Packet) {
+	*localPacket = rtp.Packet{}
+	rtpPacketPool.Put(localPacket)
+}
+
+func getPacketAllocationFromPool() *rtp.Packet {
+	ipacket := rtpPacketPool.Get()
+	return ipacket.(*rtp.Packet) //nolint:forcetypeassert
+}
+
 // WriteRTP writes a RTP Packet to the TrackLocalStaticRTP
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
-	ipacket := rtpPacketPool.Get()
-	packet := ipacket.(*rtp.Packet) //nolint:forcetypeassert
-	defer func() {
-		*packet = rtp.Packet{}
-		rtpPacketPool.Put(ipacket)
-	}()
+	packet := getPacketAllocationFromPool()
+
+	defer resetPacketPoolAllocation(packet)
+
 	*packet = *p
+
 	return s.writeRTP(packet)
 }
 
@@ -166,12 +175,9 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
-	ipacket := rtpPacketPool.Get()
-	packet := ipacket.(*rtp.Packet) //nolint:forcetypeassert
-	defer func() {
-		*packet = rtp.Packet{}
-		rtpPacketPool.Put(ipacket)
-	}()
+	packet := getPacketAllocationFromPool()
+
+	defer resetPacketPoolAllocation(packet)
 
 	if err = packet.Unmarshal(b); err != nil {
 		return 0, err
