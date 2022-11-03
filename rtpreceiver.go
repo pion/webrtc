@@ -180,7 +180,13 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		}
 
 		if parameters.Encodings[i].SSRC != 0 && parameters.Encodings[i].RID != "" {
-			if _, err := r.receiveForRid(parameters.Encodings[i].RID, globalParams, t.streamInfo, t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor); err != nil {
+			streamInfo := createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
+			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streamInfo)
+			if err != nil {
+				return err
+			}
+
+			if _, err := r.receiveForRid(parameters.Encodings[i].RID, globalParams, t.streamInfo, rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor); err != nil {
 				return err
 			}
 		}
