@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "samplebuilder",
+    srcs = [
+        "sampleSequenceLocation.go",
+        "samplebuilder.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/samplebuilder",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//webrtc/pkg/media",
+        "@com_github_pion_rtp//:rtp",
+    ],
+)
+
+go_test(
+    name = "samplebuilder_test",
+    srcs = [
+        "sampleSequenceLocation_test.go",
+        "samplebuilder_test.go",
+    ],
+    embed = [":samplebuilder"],
+    deps = [
+        "//webrtc/pkg/media",
+        "@com_github_pion_rtp//:rtp",
+        "@com_github_stretchr_testify//assert",
+    ],
+)

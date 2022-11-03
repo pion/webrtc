@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "null",
+    srcs = ["null.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/null",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "null_test",
+    srcs = ["null_test.go"],
+    embed = [":null"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)

@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "rtpdump",
+    srcs = [
+        "reader.go",
+        "rtpdump.go",
+        "writer.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/rtpdump",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "rtpdump_test",
+    srcs = [
+        "reader_test.go",
+        "rtpdump_test.go",
+        "writer_test.go",
+    ],
+    embed = [":rtpdump"],
+)

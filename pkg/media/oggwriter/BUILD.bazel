@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "oggwriter",
+    srcs = ["oggwriter.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/oggwriter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_pion_randutil//:randutil",
+        "@com_github_pion_rtp//:rtp",
+        "@com_github_pion_rtp//codecs",
+    ],
+)
+
+go_test(
+    name = "oggwriter_test",
+    srcs = ["oggwriter_test.go"],
+    embed = [":oggwriter"],
+    deps = [
+        "@com_github_pion_rtp//:rtp",
+        "@com_github_stretchr_testify//assert",
+    ],
+)

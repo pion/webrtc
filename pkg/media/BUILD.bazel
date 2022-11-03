@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "media",
+    srcs = ["media.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/media",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_pion_rtp//:rtp"],
+)
+
+go_test(
+    name = "media_test",
+    srcs = ["media_test.go"],
+)

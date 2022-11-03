@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "h264reader",
+    srcs = [
+        "h264reader.go",
+        "nalunittype.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/h264reader",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "h264reader_test",
+    srcs = ["h264reader_test.go"],
+    embed = [":h264reader"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

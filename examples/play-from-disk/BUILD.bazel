@@ -1,0 +1,108 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "play-from-disk_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/pion/webrtc/v3/examples/play-from-disk",
+    visibility = ["//visibility:private"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:android": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//webrtc",
+            "//webrtc/examples/internal/signal",
+            "//webrtc/pkg/media",
+            "//webrtc/pkg/media/ivfreader",
+            "//webrtc/pkg/media/oggreader",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+go_binary(
+    name = "play-from-disk",
+    embed = [":play-from-disk_lib"],
+    visibility = ["//visibility:public"],
+)

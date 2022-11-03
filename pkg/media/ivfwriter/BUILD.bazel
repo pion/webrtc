@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ivfwriter",
+    srcs = ["ivfwriter.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/ivfwriter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_pion_rtp//:rtp",
+        "@com_github_pion_rtp//codecs",
+        "@com_github_pion_rtp//pkg/frame",
+    ],
+)
+
+go_test(
+    name = "ivfwriter_test",
+    srcs = ["ivfwriter_test.go"],
+    embed = [":ivfwriter"],
+    deps = [
+        "@com_github_pion_rtp//:rtp",
+        "@com_github_pion_rtp//codecs",
+        "@com_github_stretchr_testify//assert",
+    ],
+)

@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "mux",
+    srcs = [
+        "endpoint.go",
+        "mux.go",
+        "muxfunc.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/internal/mux",
+    visibility = ["//webrtc:__subpackages__"],
+    deps = [
+        "@com_github_pion_ice_v2//:ice",
+        "@com_github_pion_logging//:logging",
+        "@com_github_pion_transport//packetio",
+    ],
+)
+
+go_test(
+    name = "mux_test",
+    srcs = ["mux_test.go"],
+    embed = [":mux"],
+    deps = [
+        "@com_github_pion_logging//:logging",
+        "@com_github_pion_transport//packetio",
+        "@com_github_pion_transport//test",
+        "@com_github_stretchr_testify//require",
+    ],
+)

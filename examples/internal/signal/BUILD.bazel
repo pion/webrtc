@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "signal",
+    srcs = [
+        "http.go",
+        "rand.go",
+        "signal.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/examples/internal/signal",
+    visibility = ["//webrtc/examples:__subpackages__"],
+    deps = ["@com_github_pion_randutil//:randutil"],
+)

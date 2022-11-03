@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "oggreader",
+    srcs = ["oggreader.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/oggreader",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "oggreader_test",
+    srcs = ["oggreader_test.go"],
+    embed = [":oggreader"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)

@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "fmtp",
+    srcs = [
+        "fmtp.go",
+        "h264.go",
+    ],
+    importpath = "github.com/pion/webrtc/v3/internal/fmtp",
+    visibility = ["//webrtc:__subpackages__"],
+)
+
+go_test(
+    name = "fmtp_test",
+    srcs = [
+        "fmtp_test.go",
+        "h264_test.go",
+    ],
+    embed = [":fmtp"],
+)

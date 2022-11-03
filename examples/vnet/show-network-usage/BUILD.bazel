@@ -1,0 +1,82 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "show-network-usage_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/pion/webrtc/v3/examples/vnet/show-network-usage",
+    visibility = ["//visibility:private"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:android": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//webrtc",
+            "@com_github_pion_logging//:logging",
+            "@com_github_pion_transport//vnet",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+go_binary(
+    name = "show-network-usage",
+    embed = [":show-network-usage_lib"],
+    visibility = ["//visibility:public"],
+)

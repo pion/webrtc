@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ivfreader",
+    srcs = ["ivfreader.go"],
+    importpath = "github.com/pion/webrtc/v3/pkg/media/ivfreader",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "ivfreader_test",
+    srcs = ["ivfreader_test.go"],
+    embed = [":ivfreader"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)
