@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  runner:
+    build: 
+      context: .
+      dockerfile: ./aatp/infra/runner/Dockerfile
+    volumes:
+      - ./aatp/datachannels:/suite
+      - ./aatp/result:/result
+    depends_on:
+      - client
+      - pion
+    environment:
+      PWARGS: ${PWARGS--x}
+  client:
+    image: halverneus/static-file-server:latest
+    environment:
+      PORT: 80
+    expose:
+      - "80"
+    volumes:
+      - ./aatp/datachannels/client:/web
+  pion:
+    build:
+      context: .
+      dockerfile: ./aatp/infra/pion/Dockerfile
+    expose:
+      - "22"
+    volumes:
+      - ./aatp/datachannels:/source

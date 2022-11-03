@@ -1,0 +1,21 @@
+{
+  "name": "terminal7-tester",
+  "version": "0.1.0",
+  "description": "A playwright based box testing for Terminal7",
+  "main": "runner.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@playwright/test": "^1.22.2",
+    "playwright-chromium": "^1.22.2",
+    "playwright-firefox": "^1.22.2",
+    "playwright-webkit": "^1.22.2",
+    "redis": "<5",
+    "ssh2": "~1.11.0",
+    "wait-port": "^0.2.9",
+    "@types/node": "^18.7.18"
+  }
+}
