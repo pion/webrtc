@@ -1,0 +1,19 @@
+name: Examples Tests
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  pion-to-pion-test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: test
+        run: cd examples/pion-to-pion && ./test.sh
+

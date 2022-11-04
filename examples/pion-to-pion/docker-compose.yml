@@ -1,10 +1,12 @@
 version: '3'
 services:
   answer:
+    container_name: answer
     build: ./answer
     command: answer -offer-address offer:50000
 
   offer:
+    container_name: offer
     depends_on:
       - answer
     build: ./offer
