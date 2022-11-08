@@ -474,6 +474,7 @@ go_library(
 
 go_test(
     name = "webrtc_test",
+    race = "on",
     srcs = [
         "api_test.go",
         "bundlepolicy_test.go",
