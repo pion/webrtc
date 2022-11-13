@@ -70,11 +70,9 @@ type MediaEngine struct {
 	mu sync.RWMutex
 }
 
-// RegisterDefaultCodecs registers the default codecs supported by Pion WebRTC.
-// RegisterDefaultCodecs is not safe for concurrent use.
-func (m *MediaEngine) RegisterDefaultCodecs() error {
-	// Default Pion Audio Codecs
-	for _, codec := range []RTPCodecParameters{
+// DefaultAudioCodecParameters returns default audio codec parameters
+func (m *MediaEngine) DefaultAudioCodecParameters() []RTPCodecParameters {
+	return []RTPCodecParameters{
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "minptime=10;useinbandfec=1", nil},
 			PayloadType:        111,
@@ -91,14 +89,13 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{MimeTypePCMA, 8000, 0, "", nil},
 			PayloadType:        8,
 		},
-	} {
-		if err := m.RegisterCodec(codec, RTPCodecTypeAudio); err != nil {
-			return err
-		}
 	}
+}
 
+// DefaultVideoCodecParameters returns default video codec parameters
+func (m *MediaEngine) DefaultVideoCodecParameters() []RTPCodecParameters {
 	videoRTCPFeedback := []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}
-	for _, codec := range []RTPCodecParameters{
+	return []RTPCodecParameters{
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", videoRTCPFeedback},
 			PayloadType:        96,
@@ -184,7 +181,21 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{"video/ulpfec", 90000, 0, "", nil},
 			PayloadType:        116,
 		},
-	} {
+	}
+}
+
+// RegisterDefaultCodecs registers the default codecs supported by Pion WebRTC.
+// RegisterDefaultCodecs is not safe for concurrent use.
+func (m *MediaEngine) RegisterDefaultCodecs() error {
+	// Default Pion Audio Codecs
+	for _, codec := range m.DefaultAudioCodecParameters() {
+		if err := m.RegisterCodec(codec, RTPCodecTypeAudio); err != nil {
+			return err
+		}
+	}
+
+	// Default Pion Video Codecs
+	for _, codec := range m.DefaultVideoCodecParameters() {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
 			return err
 		}
