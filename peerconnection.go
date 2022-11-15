@@ -21,6 +21,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/srtp/v2"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
@@ -1632,14 +1633,14 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 			if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 				pc.log.Warn(ErrSimulcastProbeOverflow.Error())
+				pc.dtlsTransport.storeSimulcastStream(stream)
 				continue
 			}
 
 			go func(rtpStream io.Reader, ssrc SSRC) {
-				pc.dtlsTransport.storeSimulcastStream(stream)
-
 				if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
 					pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
+					pc.dtlsTransport.storeSimulcastStream(stream)
 				}
 				atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 			}(stream, SSRC(ssrc))
@@ -1647,6 +1648,12 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 	}()
 
 	go func() {
+		var unhandledStreams []*srtp.ReadStreamSRTCP
+		defer func() {
+			for _, s := range unhandledStreams {
+				s.Close()
+			}
+		}()
 		for {
 			srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 			if err != nil {
@@ -1654,12 +1661,13 @@ func (pc *PeerConnection) undeclaredMediaProcessor() {
 				return
 			}
 
-			_, ssrc, err := srtcpSession.AcceptStream()
+			stream, ssrc, err := srtcpSession.AcceptStream()
 			if err != nil {
 				pc.log.Warnf("Failed to accept RTCP %v", err)
 				return
 			}
 			pc.log.Warnf("Incoming unhandled RTCP ssrc(%d), OnTrack will not be fired", ssrc)
+			unhandledStreams = append(unhandledStreams, stream)
 		}
 	}()
 }
