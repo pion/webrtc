@@ -12,10 +12,10 @@
 set -e
 
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
-AUTHORS_PATH="$GITHUB_WORKSPACE/AUTHORS.txt"
+GIT_WORKDIR=${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}
+AUTHORS_PATH="${GIT_WORKDIR}/AUTHORS.txt"
 
-if [ -f ${SCRIPT_PATH}/.ci.conf ]
-then
+if [ -f ${SCRIPT_PATH}/.ci.conf ]; then
   . ${SCRIPT_PATH}/.ci.conf
 fi
 
@@ -31,8 +31,7 @@ EXCLUDED_CONTRIBUTORS+=('John R. Bradley' 'renovate[bot]' 'Renovate Bot' 'Pion B
 CONTRIBUTORS=()
 
 shouldBeIncluded () {
-	for i in "${EXCLUDED_CONTRIBUTORS[@]}"
-	do
+	for i in "${EXCLUDED_CONTRIBUTORS[@]}"; do
 		if [[ $1 =~ "$i" ]]; then
 			return 1
 		fi
@@ -42,25 +41,23 @@ shouldBeIncluded () {
 
 
 IFS=$'\n' #Only split on newline
-for contributor in $(git log --format='%aN <%aE>' | LC_ALL=C.UTF-8 sort -uf)
-do
-	if shouldBeIncluded $contributor; then
-		CONTRIBUTORS+=("$contributor")
+for CONTRIBUTOR in $(git log --format='%aN <%aE>' | LC_ALL=C.UTF-8 sort -uf); do
+	if shouldBeIncluded ${CONTRIBUTOR}; then
+		CONTRIBUTORS+=("${CONTRIBUTOR}")
 	fi
 done
 unset IFS
 
 if [ ${#CONTRIBUTORS[@]} -ne 0 ]; then
-	cat >$AUTHORS_PATH <<-'EOH'
+	cat >${AUTHORS_PATH} <<-'EOH'
 # Thank you to everyone that made Pion possible. If you are interested in contributing
 # we would love to have you https://github.com/pion/webrtc/wiki/Contributing
 #
 # This file is auto generated, using git to list all individuals contributors.
 # see `.github/generate-authors.sh` for the scripting
 EOH
-    for i in "${CONTRIBUTORS[@]}"
-    do
-	    echo "$i" >> $AUTHORS_PATH
+    for i in "${CONTRIBUTORS[@]}"; do
+	    echo "$i" >> ${AUTHORS_PATH}
     done
     exit 0
 fi
