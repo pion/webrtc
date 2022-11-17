@@ -15,7 +15,7 @@ build_n_run() {
 usage() {
    cat <<EOS
 This script builds & runs the acceptance test procedures.
-When no path is given it fnds all the testing suites under `./aatp`
+When no path is given it fnds all the testing suites under `./ats`
 setup their lab and runs them.
 
 Syntax: $0 [-h|z|n] <test_path>
@@ -32,7 +32,7 @@ exit_error() {
     usage
     exit 1
 }
-mkdir -p aatp/assets
+mkdir -p ats/assets
 while getopts ":hnz" option; do
     echo "option " $option
    case $option in
@@ -53,7 +53,7 @@ done
 shift $((OPTIND-1))
 if [ $# -eq 0 ]
 then
-    for compose in `find aatp -name "lab.yaml"`
+    for compose in `find ats -name "lab.yaml"`
     do
         dir=$(dirname $compose)
         echo ">>> Setting a lab based on $dir"

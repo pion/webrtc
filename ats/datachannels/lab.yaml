@@ -3,10 +3,10 @@ services:
   runner:
     build: 
       context: .
-      dockerfile: ./aatp/infra/runner/Dockerfile
+      dockerfile: ./ats/infra/runner/Dockerfile
     volumes:
-      - ./aatp/datachannels:/suite
-      - ./aatp/result:/result
+      - ./ats/datachannels:/suite
+      - ./ats/result:/result
     depends_on:
       - client
       - pion
@@ -19,12 +19,12 @@ services:
     expose:
       - "80"
     volumes:
-      - ./aatp/datachannels/client:/web
+      - ./ats/datachannels/client:/web
   pion:
     build:
       context: .
-      dockerfile: ./aatp/infra/pion/Dockerfile
+      dockerfile: ./ats/infra/pion/Dockerfile
     expose:
       - "22"
     volumes:
-      - ./aatp/datachannels:/source
+      - ./ats/datachannels:/source
