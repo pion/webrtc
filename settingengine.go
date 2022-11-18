@@ -98,8 +98,8 @@ func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectio
 }
 
 // SetICETimeouts sets the behavior around ICE Timeouts
-// * disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
-// * failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
+// * disconnectedTimeout is the duration without network activity before an Agent is considered disconnected. Default is 5 Seconds
+// * failedTimeout is the duration without network activity before an Agent is considered failed after disconnected. Default is 25 Seconds
 // * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepAliveInterval time.Duration) {
 	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
