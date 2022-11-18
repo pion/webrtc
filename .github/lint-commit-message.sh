@@ -58,7 +58,7 @@ if [ "$#" -eq 1 ]; then
    fi
    lint_commit_message "$(sed -n '/# Please enter the commit message for your changes. Lines starting/q;p' "$1")"
 else
-    for commit in $(git rev-list --no-merges origin/master..); do
-      lint_commit_message "$(git log --format="%B" -n 1 $commit)"
+    for COMMIT in $(git rev-list --no-merges origin/master..); do
+      lint_commit_message "$(git log --format="%B" -n 1 ${COMMIT})"
     done
 fi
