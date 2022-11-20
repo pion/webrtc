@@ -48,9 +48,16 @@ test.describe("pion's data channels example", ()  => {
         })
         conn.on('end', e => console.log("ssh ended", e))
         conn.on('keyboard-interactive', e => console.log("ssh interaction", e))
+        let offer
+        while (!offer) {
+             await sleep(200)
+             offer = await page.evaluate(() => document.getElementById('localSessionDescription').value)
+        }
         try {
             stream = await new Promise((resolve, reject) => {
-                conn.exec("/usr/local/go/bin/go run /source/examples/data-channels", { pty: true }, async (err, s) => {
+                
+                conn.exec(`bash -c 'cd /source; echo ${offer} |  /go/bin/data-channels'`,
+                        { pty: true }, async (err, s) => {
                     if (err)
                         reject(err)
                     else 
@@ -66,40 +73,30 @@ test.describe("pion's data channels example", ()  => {
             console.log(`closed with ${signal}`)
             cmdClosed = true
             conn.end()
-        }).on('data', async (data) => {
-            let s
-            let b = new Buffer.from(data)
-            
-            console.log("got data from data-channels", b.toString())
-            // remove the CR & LF in the end
-            // if (webexecCan.slice(-1) == "\n")
-            //    webexecCan = webexecCan.slice(0, -2)
-            // ignore the leading READY
-            switch(lineCounter++) {
-                case 0:
+        }).on('data', lines => 
+            new Buffer.from(lines).toString().split("\r\n").forEach(async line => {
+                if (!line)
+                    return
+                lineCounter++
+                if (lineCounter == 1) {
                     await page.evaluate(async (answer) =>
-                        document.getElementById("remoteSessionDescription").value = answer,
-                        b.toString())
+                        document.getElementById("remoteSessionDescription")
+                                .value = answer,
+                        line)
                     page.locator("data-test-id=start-session").click()
                     await sleep(3000)
                     await page.evaluate(async () => 
                         document.getElementById("message").value = "BADFACE")
                     await page.locator("data-test-id=send-message").click()
-                    break
-                case 1:
-                    expect(b.toString()).toEqual("BADFACE")
-                    finished = true
-                    break
-            }
-        }).stderr.on('data', (data) => {
+                    return
+                }
+                if (line.includes("BADFACE"))
+                    finished=true
+            })
+        ).stderr.on('data', (data) => {
               console.log("ERROR: " + data)
         })
-        let offer
-        while (!offer) {
-             await sleep(200)
-             offer = await page.evaluate(() => document.getElementById('localSessionDescription').value)
-        }
-        stream.write(offer + "\n")
+        expect(page.locator("#logs")).toHaveText(/Random messages will now be sent/)
         while (!finished) {
             await sleep(500)
         }
