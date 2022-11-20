@@ -5,5 +5,7 @@ COPY ./ats/infra/pion/ssh_config /etc/ssh/
 COPY ./ats/infra/pion/docker_entry.sh /usr/local/bin
 RUN /etc/init.d/ssh start
 RUN useradd -s /bin/bash -d /home/pion -M -p '$y$j9T$6LsNr6MtK4Nt6NeECphjP1$Try0q9dVUdZGihzzxJZ0soO09wQhseYzyB/E2Jf4tO8' pion
+RUN mkdir /home/pion
+RUN chown pion /home/pion
 WORKDIR /source
 CMD go run .

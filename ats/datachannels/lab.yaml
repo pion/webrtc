@@ -19,7 +19,7 @@ services:
     expose:
       - "80"
     volumes:
-      - ./ats/datachannels/client:/web
+      - ./examples/data-channels/jsfiddle:/web
   pion:
     build:
       context: .
@@ -27,4 +27,6 @@ services:
     expose:
       - "22"
     volumes:
-      - ./ats/datachannels:/source
+      - .:/source
+    entrypoint: /source/ats/datachannels/pion_entrypoint.sh
+

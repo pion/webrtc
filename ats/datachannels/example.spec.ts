@@ -1,9 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { test, expect, Page, BrowserContext } from '@playwright/test'
 import { Client } from 'ssh2'
-import { getOffer } from '../infra/lib'
-import * as fs from 'fs'
-import waitPort from 'wait-port'
 
 test.describe("pion's data channels example", ()  => {
 
@@ -19,16 +16,17 @@ test.describe("pion's data channels example", ()  => {
         page.on('pageerror', (err: Error) => console.log('PAGEERROR', err.message))
         const response = await page.goto("http://client/demo.html")
         await expect(response.ok()).toBeTruthy()
+        await page.evaluate(() => {
+            var newScript = document.createElement('script');
+            newScript.type = 'text/javascript';
+            newScript.src = '/demo.js';
+            document.getElementsByTagName('head')[0].appendChild(newScript);
+        })
     })
 
     test('can connect', async () => {
-        await sleep(2000)
-        const offer = await page.evalute(() =>
-            document.getElementById('localSessionDescription').value 
-        )
         let cmdClosed = false
         let conn, stream
-        let sentCans = []
         try {
             conn = await new Promise((resolve, reject) => {
                 const conn = new Client()
@@ -52,7 +50,7 @@ test.describe("pion's data channels example", ()  => {
         conn.on('keyboard-interactive', e => console.log("ssh interaction", e))
         try {
             stream = await new Promise((resolve, reject) => {
-                conn.exec("webexec accept", { pty: true }, async (err, s) => {
+                conn.exec("/usr/local/go/bin/go run /source/examples/data-channels", { pty: true }, async (err, s) => {
                     if (err)
                         reject(err)
                     else 
@@ -62,6 +60,8 @@ test.describe("pion's data channels example", ()  => {
         } catch(e) { expect(e).toBeNull() }
         let dataLines = 0
         let webexecCan = ""
+        let finished = false
+        let lineCounter = 0
         stream.on('close', (code, signal) => {
             console.log(`closed with ${signal}`)
             cmdClosed = true
@@ -69,62 +69,38 @@ test.describe("pion's data channels example", ()  => {
         }).on('data', async (data) => {
             let s
             let b = new Buffer.from(data)
-            webexecCan += b.toString()
+            
+            console.log("got data from data-channels", b.toString())
             // remove the CR & LF in the end
-            if (webexecCan.slice(-1) == "\n")
-                webexecCan = webexecCan.slice(0, -2)
+            // if (webexecCan.slice(-1) == "\n")
+            //    webexecCan = webexecCan.slice(0, -2)
             // ignore the leading READY
-            if (webexecCan == "READY") {
-                webexecCan = ""
-                return
+            switch(lineCounter++) {
+                case 0:
+                    await page.evaluate(async (answer) =>
+                        document.getElementById("remoteSessionDescription").value = answer,
+                        b.toString())
+                    page.locator("data-test-id=start-session").click()
+                    await sleep(3000)
+                    await page.evaluate(async () => 
+                        document.getElementById("message").value = "BADFACE")
+                    await page.locator("data-test-id=send-message").click()
+                    break
+                case 1:
+                    expect(b.toString()).toEqual("BADFACE")
+                    finished = true
+                    break
             }
-            try {
-                s = JSON.parse(webexecCan)
-            } catch(e) { return }
-            let found = sentCans.indexOf(webexecCan)
-            webexecCan = ""
-            if (found >= 0) {
-                return
-            }
-            await page.evaluate(async (can) => {
-                if (!can)
-                    return
-                if (can.candidate) {
-                    try {
-                        await window.pc.addIceCandidate(can)
-                    } catch(e) { expect(e).toBeNull() }
-                } else {
-                    try {
-                        await window.pc.setRemoteDescription(can)
-                    } catch(e) { expect(e).toBeNull() }
-                }
-
-
-            }, s)
         }).stderr.on('data', (data) => {
               console.log("ERROR: " + data)
         })
-        const offer = await getOffer(page)
-        sentCans.push(offer)
+        let offer
+        while (!offer) {
+             await sleep(200)
+             offer = await page.evaluate(() => document.getElementById('localSessionDescription').value)
+        }
         stream.write(offer + "\n")
-        let pcState = null
-        while (pcState != "connected") {
-            let cans = []
-            try {
-                cans = await page.evaluate(() => {
-                    ret = window.candidates
-                    window.candidates = []
-                    return ret
-                })
-            } catch(e) { expect(e).toBeNull() }
-           cans.forEach((c) => {
-               const s = JSON.stringify(c)
-               stream.write(s+"\n")
-               sentCans.push(s)
-           })
-            try {
-                pcState = await page.evaluate(() => window.pc.connectionState)
-            } catch(e) { expect(e).toBeNull() }
+        while (!finished) {
             await sleep(500)
         }
     })
