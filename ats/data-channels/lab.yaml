@@ -3,15 +3,15 @@ services:
   runner:
     build: 
       context: .
-      dockerfile: ./ats/infra/runner/Dockerfile
+      dockerfile: ./ats/infra/playwright/Dockerfile
     volumes:
-      - ./ats/datachannels:/suite
+      - ./ats/data-channels:/specs
       - ./ats/result:/result
     depends_on:
       - client
       - pion
     environment:
-      PWARGS: ${PWARGS--x}
+      PWOPTS: ${PWOPTS--x}
   client:
     image: halverneus/static-file-server:latest
     environment:
@@ -28,5 +28,4 @@ services:
       - "22"
     volumes:
       - .:/source
-    entrypoint: /source/ats/datachannels/pion_entrypoint.sh
-
+    entrypoint: /source/ats/data-channels/pion_entrypoint.sh

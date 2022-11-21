@@ -14,11 +14,11 @@ build_n_run() {
 }
 usage() {
    cat <<EOS
-This script builds & runs the acceptance test procedures.
-When no path is given it fnds all the testing suites under `./ats`
-setup their lab and runs them.
+This script builds & runs the acceptance test specifications.
+When no path is given it finds all sub directories of `./ats` with a `lab.yaml`
+file builds them and bring them up
 
-Syntax: $0 [-h|z|n] <test_path>
+Syntax: $0 [-h|z|n] [path]
 options:
 
 h     Print this usage

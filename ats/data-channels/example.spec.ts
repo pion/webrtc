@@ -6,48 +6,55 @@ test.describe("pion's data channels example", ()  => {
 
     const sleep = (ms) => { return new Promise(r => setTimeout(r, ms)) }
 
-    let page: Page,
-        context: BrowserContext
+    let page: Page
+    let context: BrowserContext
+    let SSHconn: Client
+    let stream
 
     test.beforeAll(async ({ browser }) => {
         context = await browser.newContext()
         page = await context.newPage()
         page.on('console', (msg) => console.log('console log:', msg.text()))
         page.on('pageerror', (err: Error) => console.log('PAGEERROR', err.message))
+        // Load the javascript file
+        page.on('load', () => page.evaluate(() => {
+                var newScript = document.createElement('script')
+                // newScript.type = 'text/javascript';
+                newScript.src = '/demo.js'
+                console.log("loading demo.js")
+                document.head.appendChild(newScript)
+            })
+        )
         const response = await page.goto("http://client/demo.html")
         await expect(response.ok()).toBeTruthy()
-        await page.evaluate(() => {
-            var newScript = document.createElement('script');
-            newScript.type = 'text/javascript';
-            newScript.src = '/demo.js';
-            document.getElementsByTagName('head')[0].appendChild(newScript);
-        })
+        SSHconn = null
     })
 
-    test('can connect', async () => {
-        let cmdClosed = false
-        let conn, stream
-        try {
-            conn = await new Promise((resolve, reject) => {
-                const conn = new Client()
-                conn.on('error', e => reject(e))
-                conn.on('ready', () => resolve(conn))
-                conn.connect({
-                  host: 'pion',
-                  port: 22,
-                  username: 'pion',
-                  password: 'pion'
+    test('setup SSH', async () => {
+        while (SSHconn == null) {
+            try {
+                SSHconn = await new Promise((resolve, reject) => {
+                    const SSHconn = new Client()
+                    SSHconn.on('error', e => reject(e))
+                    SSHconn.on('ready', () => resolve(SSHconn))
+                    SSHconn.connect({
+                      host: 'pion',
+                      port: 22,
+                      username: 'pion',
+                      password: 'pion'
+                    })
                 })
-            })
-        } catch(e) { expect(e).toBeNull() }
+            } catch(e) { console.log("SSH connection failed, retrying", e) }
+        }
         // log key SSH events
-        conn.on('error', e => console.log("ssh error", e))
-        conn.on('close', e => {
-            cmdClosed = true
+        SSHconn.on('error', e => console.log("ssh error", e))
+        SSHconn.on('close', e => {
             console.log("ssh closed", e)
         })
-        conn.on('end', e => console.log("ssh ended", e))
-        conn.on('keyboard-interactive', e => console.log("ssh interaction", e))
+        SSHconn.on('end', e => console.log("ssh ended", e))
+        SSHconn.on('keyboard-interactive', e => console.log("ssh interaction", e))
+    })
+    test('open the command stream', async () => {
         let offer
         while (!offer) {
              await sleep(200)
@@ -55,8 +62,7 @@ test.describe("pion's data channels example", ()  => {
         }
         try {
             stream = await new Promise((resolve, reject) => {
-                
-                conn.exec(`bash -c 'cd /source; echo ${offer} |  /go/bin/data-channels'`,
+                SSHconn.exec(`bash -c 'cd /source; echo ${offer} |  /go/bin/data-channels'`,
                         { pty: true }, async (err, s) => {
                     if (err)
                         reject(err)
@@ -65,16 +71,16 @@ test.describe("pion's data channels example", ()  => {
                 })
             })
         } catch(e) { expect(e).toBeNull() }
-        let dataLines = 0
-        let webexecCan = ""
+        stream.on('close', (code, signal) => {
+            console.log(`SSH closed with ${signal}`)
+            SSHconn.end()
+        }) 
+    })
+    test('transmit and receive data', async()=> {
         let finished = false
         let lineCounter = 0
-        stream.on('close', (code, signal) => {
-            console.log(`closed with ${signal}`)
-            cmdClosed = true
-            conn.end()
-        }).on('data', lines => 
-            new Buffer.from(lines).toString().split("\r\n").forEach(async line => {
+        stream.on('data', lines => 
+            new Buffer.from(lines).toString().split("\r\n").forEach(async (line: string) => {
                 if (!line)
                     return
                 lineCounter++
