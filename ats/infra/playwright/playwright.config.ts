@@ -11,16 +11,25 @@ const config: PlaywrightTestConfig = {
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "chromium",
+      permissions:["camera", "microphone"],
+
+      use:{
+        browserName:"chromium",
+        launchOptions:{
+            args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
+        }
+      },
     },
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'safari',
-      use: { ...devices['Desktop Safari'] },
+      name: "firefox",
+      use: {
+        browserName:"firefox",
+        launchOptions: {
+          args:[ "--quiet", "--use-test-media-devices" ],
+          firefoxUserPrefs: { "media.navigator.streams.fake": true, "media.navigator.permission.disabled": true }
+        }
+      }
     },
   ],
 };
