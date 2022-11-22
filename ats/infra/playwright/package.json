@@ -1,8 +1,7 @@
 {
-  "name": "terminal7-tester",
+  "name": "pion-playwroght",
   "version": "0.1.0",
-  "description": "A playwright based box testing for Terminal7",
-  "main": "runner.js",
+  "description": "A playwright based box testing for pion",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

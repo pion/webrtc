@@ -19,8 +19,7 @@ test.describe("pion's data channels example", ()  => {
         // Load the javascript file
         page.on('load', () => page.evaluate(() => {
                 var newScript = document.createElement('script')
-                // newScript.type = 'text/javascript';
-                newScript.src = '/demo.js'
+                newScript.src = 'demo.js'
                 console.log("loading demo.js")
                 document.head.appendChild(newScript)
             })
@@ -44,7 +43,10 @@ test.describe("pion's data channels example", ()  => {
                       password: 'pion'
                     })
                 })
-            } catch(e) { console.log("SSH connection failed, retrying", e) }
+            } catch(e) {
+                console.log("SSH connection failed, retrying")
+                await sleep(3000)
+            }
         }
         // log key SSH events
         SSHconn.on('error', e => console.log("ssh error", e))
@@ -58,7 +60,9 @@ test.describe("pion's data channels example", ()  => {
         let offer
         while (!offer) {
              await sleep(200)
-             offer = await page.evaluate(() => document.getElementById('localSessionDescription').value)
+             offer = await page.evaluate(() =>
+                document.getElementById('localSessionDescription').value
+            )
         }
         try {
             stream = await new Promise((resolve, reject) => {
@@ -80,7 +84,8 @@ test.describe("pion's data channels example", ()  => {
         let finished = false
         let lineCounter = 0
         stream.on('data', lines => 
-            new Buffer.from(lines).toString().split("\r\n").forEach(async (line: string) => {
+            new Buffer.from(lines).toString().split("\r\n")
+                .forEach(async (line: string) => {
                 if (!line)
                     return
                 lineCounter++
