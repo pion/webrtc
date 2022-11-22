@@ -232,11 +232,7 @@ ACCEPT:
 		}
 
 		<-r.onDataChannel(rtcDC)
-<<<<<<< HEAD
 		rtcDC.handleOpen(dc, true, dc.Config.Negotiated)
-=======
-		rtcDC.handleOpen(dc, true)
->>>>>>> c5faa92 (Use OnOpen handler for DataChannels)
 
 		r.lock.Lock()
 		r.dataChannelsOpened++
