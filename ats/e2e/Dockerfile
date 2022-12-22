@@ -6,7 +6,6 @@ RUN apk add --no-cache \
 
 ENV CGO_ENABLED=0
 
-COPY . /go/src/github.com/pion/webrtc
-WORKDIR /go/src/github.com/pion/webrtc/e2e
+WORKDIR /go/src/github.com/pion/webrtc/ats/e2e
 
 CMD ["go", "test", "-tags=e2e", "-v", "."]

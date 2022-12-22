@@ -1,0 +1,8 @@
+version: "3.9"
+services:
+  runner:
+    build: 
+      context: .
+      dockerfile: ./ats/e2e/Dockerfile
+    volumes:
+      - .:/go/src/github.com/pion/webrtc
