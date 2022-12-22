@@ -37,16 +37,17 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait *time.Duration
 	}
 	candidates struct {
-		ICELite                bool
-		ICENetworkTypes        []NetworkType
-		InterfaceFilter        func(string) bool
-		IPFilter               func(net.IP) bool
-		NAT1To1IPs             []string
-		NAT1To1IPCandidateType ICECandidateType
-		MulticastDNSMode       ice.MulticastDNSMode
-		MulticastDNSHostName   string
-		UsernameFragment       string
-		Password               string
+		ICELite                  bool
+		ICENetworkTypes          []NetworkType
+		InterfaceFilter          func(string) bool
+		IPFilter                 func(net.IP) bool
+		NAT1To1IPs               []string
+		NAT1To1IPCandidateType   ICECandidateType
+		MulticastDNSMode         ice.MulticastDNSMode
+		MulticastDNSHostName     string
+		UsernameFragment         string
+		Password                 string
+		IncludeLoopbackCandidate bool
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -193,6 +194,12 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
 func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
+}
+
+// SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful
+// for some VM have public IP mapped to loopback interface
+func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
+	e.candidates.IncludeLoopbackCandidate = include
 }
 
 // SetAnsweringDTLSRole sets the DTLS role that is selected when offering
