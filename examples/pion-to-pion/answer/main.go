@@ -172,6 +172,10 @@ func main() { // nolint:gocognit
 		// Register text message handling
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
 			fmt.Printf("Message from DataChannel '%s': '%s'\n", d.Label(), string(msg.Data))
+			// make a clean exit on EOF
+			if string(msg.Data) == "EOF" {
+				os.Exit(0)
+			}
 		})
 	})
 
