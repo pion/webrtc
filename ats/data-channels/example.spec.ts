@@ -97,17 +97,16 @@ test.describe("pion's data channels example", ()  => {
                     page.locator("data-test-id=start-session").click()
                     await sleep(3000)
                     await page.evaluate(async () => 
-                        document.getElementById("message").value = "BADFACE")
+                        document.getElementById("message").value = "EOF")
                     await page.locator("data-test-id=send-message").click()
                     return
                 }
-                if (line.includes("BADFACE"))
+                if (line.includes("EOF"))
                     finished=true
             })
         ).stderr.on('data', (data) => {
               console.log("ERROR: " + data)
         })
-        expect(page.locator("#logs")).toHaveText(/Random messages will now be sent/)
         while (!finished) {
             await sleep(500)
         }

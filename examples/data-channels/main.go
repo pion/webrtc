@@ -52,9 +52,8 @@ func main() {
 
 		// Register channel opening handling
 		d.OnOpen(func() {
-			msg := fmt.Sprintf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
-			fmt.Printf(msg)
-			d.SendText(msg)
+			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
+
 			for range time.NewTicker(5 * time.Second).C {
 				message := signal.RandSeq(15)
 				fmt.Printf("Sending '%s'\n", message)
