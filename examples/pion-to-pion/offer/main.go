@@ -198,7 +198,7 @@ func main() { //nolint:gocognit
 		if postErr == nil {
 			break
 		}
-		time.Sleep(time.Second)
+		time.Sleep(3 * time.Second)
 	}
 	if err != nil {
 		panic(err)
