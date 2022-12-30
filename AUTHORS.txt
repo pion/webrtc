@@ -42,6 +42,7 @@ Cedric Fung <cedric@vec.io>
 cgojin <gongjin21@hotmail.com>
 Chad Retz <chad.retz@stackpath.com>
 chenkaiC4 <chenkaic4@gmail.com>
+Chinmay Kousik <chinmaykousik1@gmail.com>
 Chris Hiszpanski <chris@hiszpanski.name>
 Christopher Fry <chris.fry@getcruise.com>
 Clayton McCray <cpmdmccray@gmail.com>
