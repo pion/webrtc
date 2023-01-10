@@ -65,6 +65,8 @@ Eric Fontaine <ericfontainejazz@gmail.com>
 feixiao <feixiao2020@sina.com>
 Forest Johnson <forest.n.johnson@gmail.com>
 frank <frank@huzhedeMacBook-Pro.local>
+funvit <funvit@gmail.com>
+Gabor Pongracz <gabor.pongracz@proemergotech.com>
 Gareth Hayes <gareth.hayes@gmail.com>
 Guilherme <gqgs@protonmail.com>
 Hanjun Kim <hallazzang@gmail.com>
@@ -81,6 +83,7 @@ Jake B <doogie1012@gmail.com>
 Jamie Good <jamie.good@gmail.com>
 Jason <jabrady42@gmail.com>
 Jeff Tchang <jeff.tchang@gmail.com>
+jeremija
 Jerko Steiner <jerko.steiner@gmail.com>
 jinleileiking <jinleileiking@gmail.com>
 John Berthels <john.berthels@gmail.com>
@@ -133,6 +136,7 @@ opennota <opennota@gmail.com>
 OrlandoCo <luisorlando.co@gmail.com>
 Pascal Benoit <pascal.benoit@acemediastools.fr>
 pascal-ace <47424881+pascal-ace@users.noreply.github.com>
+Patrice Ferlet <patrice.ferlet@smile.fr>
 Patrick Lange <mail@langep.com>
 Patryk Rogalski <digitalix4@gmail.com>
 Pieere Pi <pihuibin@hotmail.com>
@@ -164,6 +168,7 @@ Simon Eisenmann <simon@longsleep.org>
 simonacca-fotokite <47634061+simonacca-fotokite@users.noreply.github.com>
 Simone Gotti <simone.gotti@gmail.com>
 Slugalisk <slugalisk@gmail.com>
+Somers Matthews <somersbmatthews@gmail.com>
 soolaugust <soolaugust@gmail.com>
 spaceCh1mp <drimboat@gmail.com>
 stephanrotolante <stephanrotolante@gmail.com>

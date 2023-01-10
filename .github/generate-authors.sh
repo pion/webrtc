@@ -12,8 +12,9 @@
 set -e
 
 SCRIPT_PATH=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
-GIT_WORKDIR=${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}
-AUTHORS_PATH="${GIT_WORKDIR}/AUTHORS.txt"
+if [ -z "${AUTHORS_PATH}" ]; then
+  AUTHORS_PATH="$GITHUB_WORKSPACE/AUTHORS.txt"
+fi
 
 if [ -f ${SCRIPT_PATH}/.ci.conf ]; then
   . ${SCRIPT_PATH}/.ci.conf
@@ -41,7 +42,12 @@ shouldBeIncluded () {
 
 
 IFS=$'\n' #Only split on newline
-for CONTRIBUTOR in $(git log --format='%aN <%aE>' | LC_ALL=C.UTF-8 sort -uf); do
+for CONTRIBUTOR in $(
+	(
+		git log --format='%aN <%aE>'
+		git log --format='%(trailers:key=Co-authored-by)' | sed -n 's/^[^:]*:\s*//p'
+	) | LC_ALL=C.UTF-8 sort -uf
+); do
 	if shouldBeIncluded ${CONTRIBUTOR}; then
 		CONTRIBUTORS+=("${CONTRIBUTOR}")
 	fi
