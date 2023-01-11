@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.17", "1.18"] # auto-update/supported-go-version-list
+        go: ['1.19', '1.18'] # auto-update/supported-go-version-list
       fail-fast: false
     name: Go ${{ matrix.go }}
     steps:
@@ -67,7 +67,7 @@ jobs:
             -v -race 2>&1 | grep -v '^go: downloading' | tee /tmp/gotest.log | gotestfmt
 
       - name: Upload test log
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: always()
         with:
           name: test-log-${{ matrix.go }}
@@ -79,7 +79,7 @@ jobs:
           if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
           if [ -n "${TEST_HOOK}" ]; then ${TEST_HOOK}; fi
 
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3
         with:
           name: codecov-umbrella
           fail_ci_if_error: true
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.17", "1.18"] # auto-update/supported-go-version-list
+        go: ['1.19', '1.18'] # auto-update/supported-go-version-list
       fail-fast: false
     name: Go i386 ${{ matrix.go }}
     steps:
@@ -145,7 +145,7 @@ jobs:
       - name: Download Go
         run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
         env:
-          GO_VERSION: 1.17 # auto-update/latest-go-version
+          GO_VERSION: '1.19' # auto-update/latest-go-version
 
       - name: Set Go Root
         run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
@@ -167,7 +167,7 @@ jobs:
             -exec="${GO_JS_WASM_EXEC}" \
             -v ./...
 
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3
         with:
           name: codecov-umbrella
           fail_ci_if_error: true
