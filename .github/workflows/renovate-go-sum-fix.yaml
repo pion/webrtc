@@ -9,13 +9,15 @@
 # https://github.com/pion/.goassets instead of this repository.
 #
 
-name: Generate Authors
-
+name: Fix go.sum
 on:
-  pull_request:
+  push:
+    branches:
+      - renovate/*
 
 jobs:
-  generate:
-    uses: pion/.goassets/.github/workflows/generate-authors.reusable.yml@master
+  fix:
+    runs-on: ubuntu-latest
+    uses: pion/.goassets/.github/workflows/renovate-go-sum-fix.reusable.yml@master
     with:
       token: ${{ secrets.PIONBOT_PRIVATE_KEY }}

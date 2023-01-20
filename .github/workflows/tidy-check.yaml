@@ -12,31 +12,13 @@
 name: Go mod tidy
 on:
   pull_request:
-    branches:
-      - master
   push:
     branches:
       - master
 
-permissions:
-  contents: read
-
 jobs:
-  Check:
+  tidy:
     runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.19' # auto-update/latest-go-version
-      - name: check
-        run: |
-          go mod download
-          go mod tidy
-          if ! git diff --exit-code
-          then
-            echo "Not go mod tidied"
-            exit 1
-          fi
+    uses: pion/.goassets/.github/workflows/tidy-check.reusable.yml@master
+    with:
+      go-version: '1.19' # auto-update/latest-go-version
