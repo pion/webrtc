@@ -2,7 +2,7 @@
 # we would love to have you https://github.com/pion/webrtc/wiki/Contributing
 #
 # This file is auto generated, using git to list all individuals contributors.
-# see `.github/generate-authors.sh` for the scripting
+# see https://github.com/pion/.goassets/blob/master/scripts/generate-authors.sh for the scripting
 a-wing <1@233.email>
 Aaron Boushley <boushley@pretzelaux.com>
 Aaron France <aaron.l.france@gmail.com>
@@ -91,6 +91,7 @@ John Bradley <jrb@turrettech.com>
 John Selbie <jselbie@gmail.com>
 JooYoung <qkdlql@naver.com>
 Jorropo <jorropo.pgm@gmail.com>
+Josh Bleecher Snyder <josharian@gmail.com>
 juberti <juberti@alphaexplorationco.com>
 Juliusz Chroboczek <jch@irif.fr>
 Justin Okamoto <jdokamoto@gmail.com>
@@ -164,6 +165,7 @@ Sean DuBois <sean@siobud.com>
 Sean DuBois <sean_dubois@apple.com>
 Sean Knight <git@seanknight.com>
 Sebastian Waisbrot <seppo0010@gmail.com>
+Sidney San Martín <sidney@s4y.us>
 Simon Eisenmann <simon@longsleep.org>
 simonacca-fotokite <47634061+simonacca-fotokite@users.noreply.github.com>
 Simone Gotti <simone.gotti@gmail.com>
