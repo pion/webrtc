@@ -18,7 +18,6 @@ linters:
     - bidichk          # Checks for dangerous unicode character sequences
     - bodyclose        # checks whether HTTP response body is closed successfully
     - contextcheck     # check the function whether use a non-inherited context
-    - deadcode         # Finds unused code
     - decorder         # check declaration order and count of types, constants, variables and functions
     - depguard         # Go linter that checks if package imports are in a list of acceptable packages
     - dogsled          # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
@@ -60,7 +59,6 @@ linters:
     - predeclared      # find code that shadows one of Go's predeclared identifiers
     - revive           # golint replacement, finds style mistakes
     - staticcheck      # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
-    - structcheck      # Finds unused struct fields
     - stylecheck       # Stylecheck is a replacement for golint
     - tagliatelle      # Checks the struct tags.
     - tenv             # tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
@@ -69,7 +67,6 @@ linters:
     - unconvert        # Remove unnecessary type conversions
     - unparam          # Reports unused function parameters
     - unused           # Checks Go code for unused constants, variables, functions and types
-    - varcheck         # Finds unused global variables and constants
     - wastedassign     # wastedassign finds wasted assignment statements
     - whitespace       # Tool for detection of leading and trailing whitespace
   disable:

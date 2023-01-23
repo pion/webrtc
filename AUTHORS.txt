@@ -197,3 +197,6 @@ ZHENK <chengzhenyang@gmail.com>
 zigazeljko <ziga.zeljko@gmail.com>
 Štefan Uram <SterverSVK@users.noreply.github.com>
 박종훈 <jonghun.park.194@gmail.com>
+
+# List of contributors not appearing in Git history
+
