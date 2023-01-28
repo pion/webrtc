@@ -13,162 +13,29 @@ name: Test
 on:
   push:
     branches:
-    - master
+      - master
   pull_request:
-    branches:
-    - master
-
-permissions:
-  contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    uses: pion/.goassets/.github/workflows/test.reusable.yml@master
     strategy:
       matrix:
         go: ['1.19', '1.18'] # auto-update/supported-go-version-list
       fail-fast: false
-    name: Go ${{ matrix.go }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/go/bin
-            ~/.cache
-          key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-amd64-go-
-
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go }}
-
-      - name: Setup go-acc
-        run: go install github.com/ory/go-acc@latest
-
-      - name: Set up gotestfmt
-        uses: haveyoudebuggedit/gotestfmt-action@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }} # Avoid getting rate limited
-
-      - name: Run test
-        run: |
-          TEST_BENCH_OPTION="-bench=."
-          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
-
-          set -euo pipefail
-          go-acc -o cover.out ./... -- \
-            ${TEST_BENCH_OPTION} \
-            -json \
-            -v -race 2>&1 | grep -v '^go: downloading' | tee /tmp/gotest.log | gotestfmt
-
-      - name: Upload test log
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: test-log-${{ matrix.go }}
-          path: /tmp/gotest.log
-          if-no-files-found: error
-
-      - name: Run TEST_HOOK
-        run: |
-          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
-          if [ -n "${TEST_HOOK}" ]; then ${TEST_HOOK}; fi
-
-      - uses: codecov/codecov-action@v3
-        with:
-          name: codecov-umbrella
-          fail_ci_if_error: true
-          flags: go
+    with:
+      go-version: ${{ matrix.go }}
 
   test-i386:
-    runs-on: ubuntu-latest
+    uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@master
     strategy:
       matrix:
         go: ['1.19', '1.18'] # auto-update/supported-go-version-list
       fail-fast: false
-    name: Go i386 ${{ matrix.go }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache
-          key: ${{ runner.os }}-i386-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-i386-go-
-
-      - name: Run test
-        run: |
-          mkdir -p $HOME/go/pkg/mod $HOME/.cache
-          docker run \
-            -u $(id -u):$(id -g) \
-            -e "GO111MODULE=on" \
-            -e "CGO_ENABLED=0" \
-            -v $GITHUB_WORKSPACE:/go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
-            -v $HOME/go/pkg/mod:/go/pkg/mod \
-            -v $HOME/.cache:/.cache \
-            -w /go/src/github.com/pion/$(basename $GITHUB_WORKSPACE) \
-            i386/golang:${{matrix.go}}-alpine \
-            /usr/local/go/bin/go test \
-              ${TEST_EXTRA_ARGS:-} \
-              -v ./...
+    with:
+      go-version: ${{ matrix.go }}
 
   test-wasm:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: WASM
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16.x'
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache
-          key: ${{ runner.os }}-wasm-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-wasm-go-
-
-      - name: Download Go
-        run: curl -sSfL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar -C ~ -xzf -
-        env:
-          GO_VERSION: '1.19' # auto-update/latest-go-version
-
-      - name: Set Go Root
-        run: echo "GOROOT=${HOME}/go" >> $GITHUB_ENV
-
-      - name: Set Go Path
-        run: echo "GOPATH=${HOME}/go" >> $GITHUB_ENV
-
-      - name: Set Go Path
-        run: echo "GO_JS_WASM_EXEC=${GOROOT}/misc/wasm/go_js_wasm_exec" >> $GITHUB_ENV
-
-      - name: Insall NPM modules
-        run: yarn install
-
-      - name: Run Tests
-        run: |
-          if [ -f .github/.ci.conf ]; then . .github/.ci.conf; fi
-          GOOS=js GOARCH=wasm $GOPATH/bin/go test \
-            -coverprofile=cover.out -covermode=atomic \
-            -exec="${GO_JS_WASM_EXEC}" \
-            -v ./...
-
-      - uses: codecov/codecov-action@v3
-        with:
-          name: codecov-umbrella
-          fail_ci_if_error: true
-          flags: wasm
+    uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
+    with:
+      go-version: '1.19' # auto-update/latest-go-version

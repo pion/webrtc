@@ -9,15 +9,14 @@
 # https://github.com/pion/.goassets instead of this repository.
 #
 
-name: Go mod tidy
+name: Fix go.sum
 on:
-  pull_request:
   push:
     branches:
-      - master
+      - renovate/*
 
 jobs:
-  tidy:
-    uses: pion/.goassets/.github/workflows/tidy-check.reusable.yml@master
-    with:
-      go-version: '1.19' # auto-update/latest-go-version
+  fix:
+    uses: pion/.goassets/.github/workflows/renovate-go-sum-fix.reusable.yml@master
+    secrets:
+      token: ${{ secrets.PIONBOT_PRIVATE_KEY }}
