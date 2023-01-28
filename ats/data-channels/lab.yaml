@@ -27,5 +27,4 @@ services:
     expose:
       - "22"
     volumes:
-      - .:/source
-    entrypoint: /source/ats/data-channels/pion_entrypoint.sh
+      - .:/go/src/github.com/pion/webrtc
