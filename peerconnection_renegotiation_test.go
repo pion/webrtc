@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -1232,4 +1233,54 @@ func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
 
 	assert.NoError(t, offerPC.Close())
 	assert.NoError(t, answerPC.Close())
+}
+
+func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tracksCh := make(chan *TrackRemote)
+	pcOffer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
+		fmt.Println("on track")
+		tracksCh <- track
+		for {
+			if _, _, readErr := track.ReadRTP(); errors.Is(readErr, io.EOF) {
+				return
+			}
+		}
+	})
+
+	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionRecvonly,
+	})
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+		Direction: RTPTransceiverDirectionSendonly,
+	})
+
+	assert.NoError(t, err)
+	_, err = pcAnswer.AddTrack(vp8Track)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go sendVideoUntilDone(ctx.Done(), t, []*TrackLocalStaticSample{vp8Track})
+
+	<-tracksCh
+	cancel()
+
+	closePairNow(t, pcOffer, pcAnswer)
 }
