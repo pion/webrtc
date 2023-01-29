@@ -8,11 +8,10 @@ on:
       - master
 
 jobs:
-  e2e-test:
-    name: Test
+  acceptance-tests:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v3
-      - name: test
+      - name: run tests
         run: ats/run
