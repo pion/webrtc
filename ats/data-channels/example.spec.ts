@@ -2,7 +2,6 @@ import { Buffer } from 'node:buffer';
 import { test, expect, Page, BrowserContext } from '@playwright/test'
 import { Client } from 'ssh2'
 
-const GOBIN = "/usr/local/go/bin/go"
 
 test.describe("pion's data channels example", ()  => {
 
@@ -67,8 +66,8 @@ test.describe("pion's data channels example", ()  => {
         }
         try {
             stream = await new Promise((resolve, reject) => {
-                const dir = "/go/src/github.com/pion/webrtc/examples/data-channels"
-                SSHconn.exec(`bash -c 'cd ${dir}; echo ${offer} | ${GOBIN} run .'`,
+                const path = "/go/src/github.com/pion/webrtc/ats/data-channels/start_server.bash"
+                SSHconn.exec(`bash ${path} ${offer}`,
                         { pty: true }, async (err, s) => {
                     if (err)
                         reject(err)
