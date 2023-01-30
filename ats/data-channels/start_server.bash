@@ -6,6 +6,6 @@ $GO build . > $TMP 2>&1
 if [ $? -eq 0 ]; then
     echo $1 | ./data-channels
 else
-    cat $TMP
+    tail -5 $TMP | tr '\n' ':'
 fi
 rm $TMP
