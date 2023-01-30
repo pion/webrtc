@@ -1270,14 +1270,16 @@ func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransc
 			case RTPTransceiverDirectionSendonly:
 				direction = RTPTransceiverDirectionRecvonly
 			case RTPTransceiverDirectionRecvonly:
-				// Pion will answer recvonly with a offer recvonly transceiver, so we should
-				// not change the direction to sendonly if we are the offerer, otherwise this
-				// tranceiver can't be reuse for AddTrack
-				if t.Direction() != RTPTransceiverDirectionRecvonly {
-					direction = RTPTransceiverDirectionSendonly
-				}
+				direction = RTPTransceiverDirectionSendonly
 			default:
 			}
+		}
+
+		// If a transceiver is created by applying a remote description that has recvonly transceiver,
+		// it will have no sender. In this case, the transceiver's current direction is set to inactive so
+		// that the transceiver can be reused by next AddTrack.
+		if direction == RTPTransceiverDirectionSendonly && t.Sender() == nil {
+			direction = RTPTransceiverDirectionInactive
 		}
 
 		t.setCurrentDirection(direction)
