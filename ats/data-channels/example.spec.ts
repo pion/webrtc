@@ -22,7 +22,6 @@ test.describe("pion's data channels example", ()  => {
         page.on('load', () => page.evaluate(() => {
                 var newScript = document.createElement('script')
                 newScript.src = 'demo.js'
-                console.log("loading demo.js")
                 document.head.appendChild(newScript)
             })
         )
@@ -84,7 +83,7 @@ test.describe("pion's data channels example", ()  => {
         }) 
     })
     test('transmit and receive data', async()=> {
-        let finished = false
+        let eof = false
         let lineCounter = 0
         stream.on('data', lines => 
             new Buffer.from(lines).toString().split("\r\n")
@@ -93,25 +92,35 @@ test.describe("pion's data channels example", ()  => {
                     return
                 lineCounter++
                 if (lineCounter == 1) {
+                    // copy the answer to the page
                     await page.evaluate(async (answer) =>
                         document.getElementById("remoteSessionDescription")
                                 .value = answer,
                         line)
                     page.locator("data-test-id=start-session").click()
-                    await sleep(3000)
+                    // set the message to EOF
                     await page.evaluate(async () => 
                         document.getElementById("message").value = "EOF")
+                    // wait for the send channel to open
+                    let connected = false
+                    while (!connected) {
+                        await sleep(200)
+                        connected = await page.evaluate(() => sendChannel.readyState == "open")
+                    }
+                    // send the message
                     await page.locator("data-test-id=send-message").click()
                     return
                 }
+                // exit the test when EOF was received from the server
                 if (line.includes("EOF"))
-                    finished=true
+                    eof = true
             })
         ).stderr.on('data', (data) => {
               console.log("ERROR: " + data)
         })
-        while (!finished) {
-            await sleep(500)
+        // wait for the EOF message
+        while (!eof) {
+            await sleep(200)
         }
     })
 })
