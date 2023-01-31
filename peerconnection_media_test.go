@@ -1336,3 +1336,135 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		closePairNow(t, pcOffer, pcAnswer)
 	})
 }
+
+// Everytime we receieve a new SSRC we probe it and try to determine the proper way to handle it.
+// In most cases a Track explicitly declares a SSRC and a OnTrack is fired. In two cases we don't
+// know the SSRC ahead of time
+// * Undeclared SSRC in a single media section (https://github.com/pion/webrtc/issues/880)
+// * Simulcast
+//
+// The Undeclared SSRC processing code would run before Simulcast. If a Simulcast Offer/Answer only
+// contained one Media Section we would never fire the OnTrack. We would assume it was a failed
+// Undeclared SSRC processing. This test asserts that we properly handled this.
+func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Enable Extension Headers needed for Simulcast
+	m := &MediaEngine{}
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
+
+	pcSender, pcReceiver, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(4)
+
+	var connectionWg sync.WaitGroup
+	connectionWg.Add(2)
+
+	connectionStateChangeHandler := func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			connectionWg.Done()
+		}
+	}
+
+	pcSender.OnConnectionStateChange(connectionStateChangeHandler)
+	pcReceiver.OnConnectionStateChange(connectionStateChangeHandler)
+
+	pcReceiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		defer wg.Done()
+	})
+
+	go func() {
+		defer wg.Done()
+		vp8WriterA, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("a"))
+		assert.NoError(t, err)
+
+		sender, err := pcSender.AddTrack(vp8WriterA)
+		assert.NoError(t, err)
+		assert.NotNil(t, sender)
+
+		vp8WriterB, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("b"))
+		assert.NoError(t, err)
+		err = sender.AddEncoding(vp8WriterB)
+		assert.NoError(t, err)
+
+		vp8WriterC, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("c"))
+		assert.NoError(t, err)
+		err = sender.AddEncoding(vp8WriterC)
+		assert.NoError(t, err)
+
+		parameters := sender.GetParameters()
+		var midID, ridID, rsidID uint8
+		for _, extension := range parameters.HeaderExtensions {
+			switch extension.URI {
+			case sdp.SDESMidURI:
+				midID = uint8(extension.ID)
+			case sdp.SDESRTPStreamIDURI:
+				ridID = uint8(extension.ID)
+			case sdesRepairRTPStreamIDURI:
+				rsidID = uint8(extension.ID)
+			}
+		}
+		assert.NotZero(t, midID)
+		assert.NotZero(t, ridID)
+		assert.NotZero(t, rsidID)
+
+		// signaling
+		offerSDP, err := pcSender.CreateOffer(nil)
+		assert.NoError(t, err)
+		err = pcSender.SetLocalDescription(offerSDP)
+		assert.NoError(t, err)
+
+		err = pcReceiver.SetRemoteDescription(offerSDP)
+		assert.NoError(t, err)
+		answerSDP, err := pcReceiver.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcReceiver)
+		err = pcReceiver.SetLocalDescription(answerSDP)
+		assert.NoError(t, err)
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcSender.SetRemoteDescription(*pcReceiver.LocalDescription()))
+
+		connectionWg.Wait()
+
+		var seqNo uint16
+		for i := 0; i < 100; i++ {
+			pkt := &rtp.Packet{
+				Header: rtp.Header{
+					Version:        2,
+					SequenceNumber: seqNo,
+					PayloadType:    96,
+				},
+				Payload: []byte{0x00, 0x00},
+			}
+
+			assert.NoError(t, pkt.SetExtension(ridID, []byte("a")))
+			assert.NoError(t, pkt.SetExtension(midID, []byte(sender.rtpTransceiver.Mid())))
+			assert.NoError(t, vp8WriterA.WriteRTP(pkt))
+
+			assert.NoError(t, pkt.SetExtension(ridID, []byte("b")))
+			assert.NoError(t, pkt.SetExtension(midID, []byte(sender.rtpTransceiver.Mid())))
+			assert.NoError(t, vp8WriterB.WriteRTP(pkt))
+
+			assert.NoError(t, pkt.SetExtension(ridID, []byte("c")))
+			assert.NoError(t, pkt.SetExtension(midID, []byte(sender.rtpTransceiver.Mid())))
+			assert.NoError(t, vp8WriterC.WriteRTP(pkt))
+
+			seqNo++
+		}
+	}()
+
+	wg.Wait()
+
+	closePairNow(t, pcSender, pcReceiver)
+}
