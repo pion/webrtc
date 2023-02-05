@@ -15,8 +15,8 @@ build_n_run() {
 usage() {
    cat <<EOS
 This script builds & runs the acceptance test specifications.
-When no path is given it finds all sub directories of `./ats` with a `lab.yaml`
-file builds them and bring them up
+When no path is given it finds all sub directories of `./acceptance_tests`
+with a `lab.yaml` file builds them and bring them up
 
 Syntax: $0 [-h|z|n] [path]
 options:
@@ -32,7 +32,7 @@ exit_error() {
     usage
     exit 1
 }
-mkdir -p ats/assets
+mkdir -p acceptance_tests/assets
 while getopts ":hnz" option; do
     echo "option " $option
    case $option in
@@ -53,7 +53,7 @@ done
 shift $((OPTIND-1))
 if [ $# -eq 0 ]
 then
-    for compose in `find ats -name "lab.yaml"`
+    for compose in `find acceptance_tests -name "lab.yaml"`
     do
         dir=$(dirname $compose)
         echo ">>> Setting a lab based on $dir"

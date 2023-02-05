@@ -3,6 +3,6 @@ services:
   runner:
     build: 
       context: .
-      dockerfile: ./ats/e2e/Dockerfile
+      dockerfile: ./acceptance_tests/e2e/Dockerfile
     volumes:
       - .:/go/src/github.com/pion/webrtc
