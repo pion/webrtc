@@ -66,7 +66,7 @@ test.describe("pion's data channels example", ()  => {
         }
         try {
             stream = await new Promise((resolve, reject) => {
-                const path = "/go/src/github.com/pion/webrtc/acceptance_tests/data-channels/start_server.bash"
+                const path = "/go/src/github.com/pion/webrtc/acceptance-tests/data-channels/start_server.bash"
                 SSHconn.exec(`bash ${path} ${offer}`,
                         { pty: true }, async (err, s) => {
                     if (err)

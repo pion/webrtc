@@ -21,5 +21,5 @@ You should see them connect and start to exchange messages.
 
 ## Running as a test
 ```sh
-./acceptance_tests/run acceptance_tests/pion-to-pion
+./acceptance-tests/run acceptance-tests/pion-to-pion
 ```

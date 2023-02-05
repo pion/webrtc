@@ -3,10 +3,10 @@ services:
   runner:
     build: 
       context: .
-      dockerfile: ./acceptance_tests/infra/playwright/Dockerfile
+      dockerfile: ./acceptance-tests/infra/playwright/Dockerfile
     volumes:
-      - ./acceptance_tests/data-channels:/specs
-      - ./acceptance_tests/result:/result
+      - ./acceptance-tests/data-channels:/specs
+      - ./acceptance-tests/result:/result
     depends_on:
       - client
       - pion
@@ -23,7 +23,7 @@ services:
   pion:
     build:
       context: .
-      dockerfile: ./acceptance_tests/infra/pion/Dockerfile
+      dockerfile: ./acceptance-tests/infra/pion/Dockerfile
     expose:
       - "22"
     volumes:

@@ -14,10 +14,10 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: run tests
-        run: acceptance_tests/run
+        run: acceptance-tests/run
       - name: Upload test results
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
         with:
-          name: playwright-report
+          name: tests-result
           path: ats/result

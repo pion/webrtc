@@ -6,6 +6,6 @@ RUN apk add --no-cache \
 
 ENV CGO_ENABLED=0
 
-WORKDIR /go/src/github.com/pion/webrtc/acceptance_tests/e2e
+WORKDIR /go/src/github.com/pion/webrtc/acceptance-tests/e2e
 
 CMD ["go", "test", "-tags=e2e", "-v", "."]
