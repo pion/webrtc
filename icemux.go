@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"net"
+	"time"
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
@@ -23,5 +24,15 @@ func NewICEUDPMux(logger logging.LeveledLogger, udpConn net.PacketConn) ice.UDPM
 	return ice.NewUDPMuxDefault(ice.UDPMuxParams{
 		UDPConn: udpConn,
 		Logger:  logger,
+	})
+}
+
+// NewICEUniversalUDPMux creates a new instance of ice.UniversalUDPMux.  It allows many PeerConnections with
+// host, server reflexive and relayed candidates to by served by a single UDP port.
+func NewICEUniversalUDPMux(logger logging.LeveledLogger, udpConn net.PacketConn, xorMappedAddrCacheTTL time.Duration) ice.UniversalUDPMux {
+	return ice.NewUniversalUDPMuxDefault(ice.UniversalUDPMuxParams{
+		Logger:                logger,
+		UDPConn:               udpConn,
+		XORMappedAddrCacheTTL: xorMappedAddrCacheTTL,
 	})
 }
