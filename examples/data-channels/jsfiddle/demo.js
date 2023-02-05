@@ -17,7 +17,6 @@ sendChannel.onopen = () => console.log('sendChannel has opened')
 sendChannel.onmessage = e => log(`Message from DataChannel '${sendChannel.label}' payload '${e.data}'`)
 
 pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
-// after dom is loaded get the candidate
 pc.onicecandidate = event => {
   if (event.candidate === null) {
     document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))

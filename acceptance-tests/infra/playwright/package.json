@@ -1,7 +1,8 @@
 {
-  "name": "pion-playwroght",
+  "name": "pion-playwright",
   "version": "0.1.0",
-  "description": "A playwright based box testing for pion",
+  private: true,
+  "description": "A playwright client for pion testing",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
