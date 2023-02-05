@@ -20,16 +20,7 @@ pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
 // after dom is loaded get the candidate
 pc.onicecandidate = event => {
   if (event.candidate === null) {
-    const offer = btoa(JSON.stringify(pc.localDescription))
-    // make sure the DOM is ready
-    if (document.readyState === 'complete') {
-      const browserSDP = document.getElementById('localSessionDescription')
-      browserSDP.value = offer
-    } else
-      document.addEventListener('DOMContentLoaded', () => {
-        const browserSDP = document.getElementById('localSessionDescription')
-        browserSDP.value = offer
-      })
+    document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
   }
 }
 
