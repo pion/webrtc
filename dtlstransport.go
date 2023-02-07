@@ -310,9 +310,10 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 				return defaultSrtpProtectionProfiles()
 			}(),
-			ClientAuth:         dtls.RequireAnyClientCert,
-			LoggerFactory:      t.api.settingEngine.LoggerFactory,
-			InsecureSkipVerify: true,
+			ClientAuth:              dtls.RequireAnyClientCert,
+			LoggerFactory:           t.api.settingEngine.LoggerFactory,
+			InsecureSkipVerify:      true,
+			InsecureSkipVerifyHello: true,
 		}, nil
 	}
 
