@@ -11,8 +11,9 @@ import (
 	"github.com/pion/dtls/v2"
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
-	"github.com/pion/transport/packetio"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/packetio"
+	"github.com/pion/transport/v2/vnet"
 	"golang.org/x/net/proxy"
 )
 
@@ -65,7 +66,7 @@ type SettingEngine struct {
 	disableCertificateFingerprintVerification bool
 	disableSRTPReplayProtection               bool
 	disableSRTCPReplayProtection              bool
-	vnet                                      *vnet.Net
+	net                                       transport.Net
 	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
@@ -179,9 +180,13 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
 // Two types of candidates are supported:
 //
 // ICECandidateTypeHost:
-//		The public IP address will be used for the host candidate in the SDP.
+//
+//	The public IP address will be used for the host candidate in the SDP.
+//
 // ICECandidateTypeSrflx:
-//		A server reflexive candidate with the given public IP address will be added
+//
+//	A server reflexive candidate with the given public IP address will be added
+//
 // to the SDP.
 //
 // Please note that if you choose ICECandidateTypeHost, then the private IP address
@@ -207,9 +212,12 @@ func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 // may be useful when interacting with non-compliant clients or debugging issues.
 //
 // DTLSRoleActive:
-// 		Act as DTLS Client, send the ClientHello and starts the handshake
+//
+//	Act as DTLS Client, send the ClientHello and starts the handshake
+//
 // DTLSRolePassive:
-// 		Act as DTLS Server, wait for ClientHello
+//
+//	Act as DTLS Server, wait for ClientHello
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
 		return errSettingEngineSetAnsweringDTLSRole
@@ -224,8 +232,17 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 // VNet is a virtual network layer for Pion, allowing users to simulate
 // different topologies, latency, loss and jitter. This can be useful for
 // learning WebRTC concepts or testing your application in a lab environment
+// Deprecated: Please use SetNet()
 func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
-	e.vnet = vnet
+	e.SetNet(vnet)
+}
+
+// SetNet sets the Net instance that is passed to pion/ice
+//
+// Net is an network interface layer for Pion, allowing users to replace
+// Pions network stack with a custom implementation.
+func (e *SettingEngine) SetNet(net transport.Net) {
+	e.net = net
 }
 
 // SetICEMulticastDNSMode controls if pion/ice queries and generates mDNS ICE Candidates

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2/vnet"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +21,11 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	assert.NoError(t, err)
 
 	// Create a network interface for offerer
-	offerVNet := vnet.NewNet(&vnet.NetConfig{
+	offerVNet, err := vnet.NewNet(&vnet.NetConfig{
 		StaticIPs: []string{"1.2.3.4"},
 	})
+	assert.NoError(t, err)
+
 	// Add the network interface to the router
 	assert.NoError(t, wan.AddNet(offerVNet))
 
@@ -32,9 +34,11 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	offerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
 
 	// Create a network interface for answerer
-	answerVNet := vnet.NewNet(&vnet.NetConfig{
+	answerVNet, err := vnet.NewNet(&vnet.NetConfig{
 		StaticIPs: []string{"1.2.3.5"},
 	})
+	assert.NoError(t, err)
+
 	// Add the network interface to the router
 	assert.NoError(t, wan.AddNet(answerVNet))
 
