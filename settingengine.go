@@ -100,9 +100,18 @@ func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectio
 }
 
 // SetICETimeouts sets the behavior around ICE Timeouts
-// * disconnectedTimeout is the duration without network activity before an Agent is considered disconnected. Default is 5 Seconds
-// * failedTimeout is the duration without network activity before an Agent is considered failed after disconnected. Default is 25 Seconds
-// * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
+//
+// disconnectedTimeout:
+//
+//	Duration without network activity before an Agent is considered disconnected. Default is 5 Seconds
+//
+// failedTimeout:
+//
+//	Duration without network activity before an Agent is considered failed after disconnected. Default is 25 Seconds
+//
+// keepAliveInterval:
+//
+//	How often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepAliveInterval time.Duration) {
 	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
 	e.timeout.ICEFailedTimeout = &failedTimeout
@@ -171,7 +180,7 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
 
 // SetNAT1To1IPs sets a list of external IP addresses of 1:1 (D)NAT
 // and a candidate type for which the external IP address is used.
-// This is useful when you are host a server using Pion on an AWS EC2 instance
+// This is useful when you host a server using Pion on an AWS EC2 instance
 // which has a private address, behind a 1:1 DNAT with a public IP (e.g.
 // Elastic IP). In this case, you can give the public IP address so that
 // Pion will use the public IP address in its candidate instead of the private
@@ -185,9 +194,7 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
 //
 // ICECandidateTypeSrflx:
 //
-//	A server reflexive candidate with the given public IP address will be added
-//
-// to the SDP.
+//  A server reflexive candidate with the given public IP address will be added to the SDP.
 //
 // Please note that if you choose ICECandidateTypeHost, then the private IP address
 // won't be advertised with the peer. Also, this option cannot be used along with mDNS.
