@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/packetio"
-	"github.com/pion/transport/test"
+	"github.com/pion/transport/v2/packetio"
+	"github.com/pion/transport/v2/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,11 +49,14 @@ func (m *muxErrorConn) Read(b []byte) (n int, err error) {
 	return
 }
 
-/* Don't end the mux readLoop for packetio.ErrTimeout or io.ErrShortBuffer, assert the following
-   * io.ErrShortBuffer and packetio.ErrTimeout don't end the read loop
-   * io.EOF ends the loop
+/*
+Don't end the mux readLoop for packetio.ErrTimeout or io.ErrShortBuffer, assert the following
 
-   pion/webrtc#1720
+  - io.ErrShortBuffer and packetio.ErrTimeout don't end the read loop
+
+  - io.EOF ends the loop
+
+    pion/webrtc#1720
 */
 func TestNonFatalRead(t *testing.T) {
 	// Limit runtime in case of deadlocks

@@ -9,7 +9,7 @@ import (
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
-	"github.com/pion/transport/packetio"
+	"github.com/pion/transport/v2/packetio"
 )
 
 // The maximum amount of data that can be buffered before returning errors.
