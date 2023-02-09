@@ -1247,7 +1247,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			"offer sendonly answer sendrecv",
 			RTPTransceiverDirectionSendonly,
 			RTPTransceiverDirectionSendrecv,
-			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 		},
 		{
 			"offer recvonly answer sendrecv",
@@ -1259,7 +1259,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			"offer sendrecv answer sendonly",
 			RTPTransceiverDirectionSendrecv,
 			RTPTransceiverDirectionSendonly,
-			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionRecvonly},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
 		},
 		{
 			"offer sendonly answer sendonly",
