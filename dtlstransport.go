@@ -326,6 +326,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 	dtlsConfig.FlightInterval = t.api.settingEngine.dtls.retransmissionInterval
 	dtlsConfig.InsecureSkipVerifyHello = t.api.settingEngine.dtls.insecureSkipHelloVerify
+	dtlsConfig.EllipticCurves = t.api.settingEngine.dtls.ellipticCurves
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2"
+	dtlsElliptic "github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v2"
@@ -58,6 +59,7 @@ type SettingEngine struct {
 	dtls struct {
 		insecureSkipHelloVerify bool
 		retransmissionInterval  time.Duration
+		ellipticCurves          []dtlsElliptic.Curve
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -356,6 +358,11 @@ func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 // but will have lower DoS attack resistance.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 	e.dtls.insecureSkipHelloVerify = skip
+}
+
+// SetDTLSEllipticCurves sets the elliptic curves for DTLS.
+func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Curve) {
+	e.dtls.ellipticCurves = ellipticCurves
 }
 
 // SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
