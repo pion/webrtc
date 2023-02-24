@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/transport/v2/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -231,6 +232,20 @@ func TestSetDTLSRetransmissionInterval(t *testing.T) {
 	if s.dtls.retransmissionInterval == 0 ||
 		s.dtls.retransmissionInterval != 1*time.Second {
 		t.Errorf("Failed to set DTLS retransmission interval")
+	}
+}
+
+func TestSetDTLSEllipticCurves(t *testing.T) {
+	s := SettingEngine{}
+
+	if len(s.dtls.ellipticCurves) != 0 {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
+	}
+
+	s.SetDTLSEllipticCurves(elliptic.P256)
+	if len(s.dtls.ellipticCurves) == 0 ||
+		s.dtls.ellipticCurves[0] != elliptic.P256 {
+		t.Errorf("Failed to set DTLS elliptic curves")
 	}
 }
 
