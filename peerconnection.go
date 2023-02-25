@@ -1104,7 +1104,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 					}
 					_ = t.SetCodecPreferences(filteredCodecs)
 				}
-
+			case direction == RTPTransceiverDirectionSendonly:
+				if t.Direction() == RTPTransceiverDirectionInactive {
+					t.setDirection(RTPTransceiverDirectionRecvonly)
+				}
 			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
