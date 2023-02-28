@@ -56,7 +56,8 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		retransmissionInterval time.Duration
+		insecureSkipHelloVerify bool
+		retransmissionInterval  time.Duration
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -347,6 +348,11 @@ func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
 // SetDTLSRetransmissionInterval sets the retranmission interval for DTLS.
 func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 	e.dtls.retransmissionInterval = interval
+}
+
+// SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
+func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
+	e.dtls.insecureSkipHelloVerify = skip
 }
 
 // SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
