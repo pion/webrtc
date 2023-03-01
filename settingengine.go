@@ -358,8 +358,8 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 
 // DisableDTLSHelloVerifyDoSProtection set whether WebRTC connection's underlying DTLS connection
 // would not require client to send HelloVerify packet when acting as DTLS servers.
-// When set to true, the WebRTC connection would enjoy slightly less DoS Protection,
-// as ICE already provides some DoS protection. This is the browser's common behaviour.
+// When set to true, the WebRTC connection would enjoy slightly less DoS protection,
+// as ICE already provides some DoS protection. This is the browser's common behavior.
 // Leave this false for the default to require client to send DTLS HelloVerify packet
 func (e *SettingEngine) DisableDTLSHelloVerifyDoSProtection(isDisabled bool) {
 	e.disableDTLSHelloVerifyDoSProtection = isDisabled

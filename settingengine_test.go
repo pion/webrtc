@@ -242,3 +242,11 @@ func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {
 	s.SetSCTPMaxReceiveBufferSize(expSize)
 	assert.Equal(t, expSize, s.sctp.maxReceiveBufferSize)
 }
+
+func TestDisableDTLSHelloVerifyDoSProtection(t *testing.T) {
+	s := SettingEngine{}
+	assert.False(t, s.disableDTLSHelloVerifyDoSProtection)
+
+	s.DisableDTLSHelloVerifyDoSProtection(true)
+	assert.True(t, s.disableDTLSHelloVerifyDoSProtection)
+}
