@@ -142,10 +142,7 @@ func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
 		return 0, fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
 	}
 
-	if n, err := writeStream.Write(raw); err != nil {
-		return n, err
-	}
-	return 0, nil
+	return writeStream.Write(raw)
 }
 
 // GetLocalParameters returns the DTLS parameters of the local DTLSTransport upon construction.
