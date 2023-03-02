@@ -245,8 +245,8 @@ func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {
 
 func TestDisableDTLSHelloVerifyDoSProtection(t *testing.T) {
 	s := SettingEngine{}
-	assert.False(t, s.disableDTLSHelloVerifyDoSProtection)
+	assert.False(t, s.dtls.disableDTLSHelloVerifyDoSProtection)
 
 	s.DisableDTLSHelloVerifyDoSProtection(true)
-	assert.True(t, s.disableDTLSHelloVerifyDoSProtection)
+	assert.True(t, s.dtls.disableDTLSHelloVerifyDoSProtection)
 }
