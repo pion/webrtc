@@ -56,7 +56,8 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		retransmissionInterval time.Duration
+		retransmissionInterval              time.Duration
+		disableDTLSHelloVerifyDoSProtection bool
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -67,7 +68,6 @@ type SettingEngine struct {
 	disableSRTPReplayProtection               bool
 	disableSRTCPReplayProtection              bool
 	net                                       transport.Net
-	disableDTLSHelloVerifyDoSProtection       bool
 	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
@@ -362,5 +362,5 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 // as ICE already provides some DoS protection. This is the browser's common behavior.
 // Leave this false for the default to require client to send DTLS HelloVerify packet
 func (e *SettingEngine) DisableDTLSHelloVerifyDoSProtection(isDisabled bool) {
-	e.disableDTLSHelloVerifyDoSProtection = isDisabled
+	e.dtls.disableDTLSHelloVerifyDoSProtection = isDisabled
 }
