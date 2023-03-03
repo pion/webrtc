@@ -3,6 +3,7 @@ package webrtc
 import (
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -88,10 +89,11 @@ func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *
 	triggered.Add(len(peers))
 
 	for _, p := range peers {
-		done := false
+		var done atomic.Value
+		done.Store(false)
 		hdlr := func(p PeerConnectionState) {
-			if !done && p == state {
-				done = true
+			if val, ok := done.Load().(bool); ok && (!val && p == state) {
+				done.Store(true)
 				triggered.Done()
 			}
 		}
