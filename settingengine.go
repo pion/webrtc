@@ -195,7 +195,7 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
 //
 // ICECandidateTypeSrflx:
 //
-//  A server reflexive candidate with the given public IP address will be added to the SDP.
+//	A server reflexive candidate with the given public IP address will be added to the SDP.
 //
 // Please note that if you choose ICECandidateTypeHost, then the private IP address
 // won't be advertised with the peer. Also, this option cannot be used along with mDNS.
@@ -351,6 +351,9 @@ func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 }
 
 // SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
+// If true and when acting as DTLS server, will allow client to skip hello verify phase and
+// receive ServerHello after initial ClientHello. This will mean faster connect times,
+// but will have lower DoS attack resistance.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 	e.dtls.insecureSkipHelloVerify = skip
 }
