@@ -1584,3 +1584,39 @@ a=ssrc:1455629982 cname:{61fd3093-0326-4b12-8258-86bdc1fe677a}
 
 	assert.NoError(t, peerConnection.Close())
 }
+
+func TestPeerConnectionState(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	assert.Equal(t, PeerConnectionStateNew, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateChecking, DTLSTransportStateNew)
+	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateNew)
+	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnecting)
+	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnected)
+	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateCompleted, DTLSTransportStateConnected)
+	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateClosed)
+	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateDisconnected, DTLSTransportStateConnected)
+	assert.Equal(t, PeerConnectionStateDisconnected, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateFailed, DTLSTransportStateConnected)
+	assert.Equal(t, PeerConnectionStateFailed, pc.ConnectionState())
+
+	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateFailed)
+	assert.Equal(t, PeerConnectionStateFailed, pc.ConnectionState())
+
+	assert.NoError(t, pc.Close())
+	assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
+}

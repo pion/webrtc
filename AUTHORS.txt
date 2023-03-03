@@ -16,11 +16,13 @@ Aleksandr Razumov <ar@gortc.io>
 aler9 <46489434+aler9@users.noreply.github.com>
 Alex Browne <stephenalexbrowne@gmail.com>
 Alex Harford <harford@gmail.com>
+Alexey Khit <alexey.khit@gmail.com>
 AlexWoo(武杰) <wj19840501@gmail.com>
 Ali Error <alipadida@live.com>
 Andrew N. Shalaev <isqad88@gmail.com>
 Antoine Baché <antoine.bache@epitech.eu>
 Antoine Baché <antoine@tenten.app>
+Anton <leonardspbox@gmail.com>
 Artur Shellunts <shellunts.artur@gmail.com>
 Assad Obaid <assad@lap5cg901003r.se.axis.com>
 Ato Araki <ato.araki@gmail.com>
@@ -110,6 +112,7 @@ Luke <luke@street.dev>
 Luke Curley <kixelated@gmail.com>
 Luke S <luke@street.dev>
 Magnus Wahlstrand <magnus.wahlstrand@gmail.com>
+Manish <itzmanish108@gmail.com>
 Markus Tzoe <chou.marcus@gmail.com>
 Marouane <6729798+nindolabs@users.noreply.github.com>
 Marouane <marouane@gamestream.biz>
