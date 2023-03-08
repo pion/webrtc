@@ -1285,3 +1285,38 @@ func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
+
+func TestNegotiationNeededWithRecvonlyTrack(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	pcAnswer.OnNegotiationNeeded(wg.Done)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := signalPair(pcOffer, pcAnswer); err != nil {
+		t.Fatal(err)
+	}
+
+	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		onDataChannelCancel()
+	})
+	<-onDataChannel.Done()
+	wg.Wait()
+
+	closePairNow(t, pcOffer, pcAnswer)
+}
