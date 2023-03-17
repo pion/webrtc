@@ -55,7 +55,7 @@ type RTPSender struct {
 }
 
 // NewRTPSender constructs a new RTPSender
-func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSender, error) {
+func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport, ssrcOverride SSRC) (*RTPSender, error) {
 	if track == nil {
 		return nil, errRTPSenderTrackNil
 	} else if transport == nil {
@@ -76,7 +76,7 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 		kind:       track.Kind(),
 	}
 
-	r.addEncoding(track)
+	r.addEncoding(track, ssrcOverride)
 
 	return r, nil
 }
@@ -188,12 +188,16 @@ func (r *RTPSender) AddEncoding(track TrackLocal) error {
 		}
 	}
 
-	r.addEncoding(track)
+	r.addEncoding(track, 0)
 	return nil
 }
 
-func (r *RTPSender) addEncoding(track TrackLocal) {
-	ssrc := SSRC(randutil.NewMathRandomGenerator().Uint32())
+func (r *RTPSender) addEncoding(track TrackLocal, ssrcOverride SSRC) {
+	ssrc := ssrcOverride
+	if ssrc == 0 {
+		ssrc = SSRC(randutil.NewMathRandomGenerator().Uint32())
+	}
+
 	trackEncoding := &trackEncoding{
 		track:      track,
 		srtpStream: &srtpWriterFuture{ssrc: ssrc},

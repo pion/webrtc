@@ -1792,7 +1792,7 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		// that's worked for all browsers.
 		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil &&
 			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
-			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport, 0)
 			if err == nil {
 				err = t.SetSender(sender, track)
 				if err != nil {
@@ -1808,7 +1808,7 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		}
 	}
 
-	transceiver, err := pc.newTransceiverFromTrack(RTPTransceiverDirectionSendrecv, track)
+	transceiver, err := pc.newTransceiverFromTrack(RTPTransceiverDirectionSendrecv, track, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1842,7 +1842,7 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) (err error) {
 	return
 }
 
-func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirection, track TrackLocal) (t *RTPTransceiver, err error) {
+func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirection, track TrackLocal, ssrcOverride SSRC) (t *RTPTransceiver, err error) {
 	var (
 		r *RTPReceiver
 		s *RTPSender
@@ -1853,9 +1853,9 @@ func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirect
 		if err != nil {
 			return
 		}
-		s, err = pc.api.NewRTPSender(track, pc.dtlsTransport)
+		s, err = pc.api.NewRTPSender(track, pc.dtlsTransport, ssrcOverride)
 	case RTPTransceiverDirectionSendonly:
-		s, err = pc.api.NewRTPSender(track, pc.dtlsTransport)
+		s, err = pc.api.NewRTPSender(track, pc.dtlsTransport, ssrcOverride)
 	default:
 		err = errPeerConnAddTransceiverFromTrackSupport
 	}
@@ -1887,7 +1887,8 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPT
 		if err != nil {
 			return nil, err
 		}
-		t, err = pc.newTransceiverFromTrack(direction, track)
+
+		t, err = pc.newTransceiverFromTrack(direction, track, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -1913,13 +1914,15 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track TrackLocal, init ...RTPT
 	}
 
 	direction := RTPTransceiverDirectionSendrecv
+	ssrc := SSRC(0)
 	if len(init) > 1 {
 		return nil, errPeerConnAddTransceiverFromTrackOnlyAcceptsOne
 	} else if len(init) == 1 {
 		direction = init[0].Direction
+		ssrc = init[0].SSRCOverride
 	}
 
-	t, err = pc.newTransceiverFromTrack(direction, track)
+	t, err = pc.newTransceiverFromTrack(direction, track, ssrc)
 	if err == nil {
 		pc.mu.Lock()
 		pc.addRTPTransceiver(t)

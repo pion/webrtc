@@ -31,7 +31,7 @@ func Test_ORTC_Media(t *testing.T) {
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
-	rtpSender, err := stackA.api.NewRTPSender(track, stackA.dtls)
+	rtpSender, err := stackA.api.NewRTPSender(track, stackA.dtls, 0)
 	assert.NoError(t, err)
 	assert.NoError(t, rtpSender.Send(rtpSender.GetParameters()))
 
