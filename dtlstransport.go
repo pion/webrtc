@@ -330,7 +330,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
-	if role == DTLSRoleClient {
+	if t.api.settingEngine.dtls.connectionState != nil {
+		dtlsConn, err = dtls.Resume(t.api.settingEngine.dtls.connectionState, dtlsEndpoint, dtlsConfig)
+	} else if role == DTLSRoleClient {
 		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsConfig)
 	} else {
 		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsConfig)

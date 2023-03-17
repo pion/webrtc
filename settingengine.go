@@ -60,6 +60,7 @@ type SettingEngine struct {
 		insecureSkipHelloVerify bool
 		retransmissionInterval  time.Duration
 		ellipticCurves          []dtlsElliptic.Curve
+		connectionState         *dtls.State
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -369,4 +370,8 @@ func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Cur
 // Leave this 0 for the default maxReceiveBufferSize.
 func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32) {
 	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
+}
+
+func (e *SettingEngine) SetDTLSConnectionState(connectionState *dtls.State) {
+	e.dtls.connectionState = connectionState
 }
