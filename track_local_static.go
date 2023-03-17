@@ -189,6 +189,8 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP
 type TrackLocalStaticSample struct {
+	SequenceNumberOverride uint16
+
 	packetizer rtp.Packetizer
 	sequencer  rtp.Sequencer
 	rtpTrack   *TrackLocalStaticRTP
@@ -248,7 +250,12 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 		return codec, err
 	}
 
-	s.sequencer = rtp.NewRandomSequencer()
+	if s.SequenceNumberOverride != 0 {
+		s.sequencer = rtp.NewFixedSequencer(s.SequenceNumberOverride)
+	} else {
+		s.sequencer = rtp.NewRandomSequencer()
+	}
+
 	s.packetizer = rtp.NewPacketizer(
 		rtpOutboundMTU,
 		0, // Value is handled when writing
