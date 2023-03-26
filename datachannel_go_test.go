@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -182,7 +183,11 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 		report := test.CheckRoutines(t)
 		defer report()
 
-		var nCbs int
+		var nOfferBufferedAmountLowCbs uint32
+		var offerBufferedAmountLowThreshold uint64 = 1500
+		var nAnswerBufferedAmountLowCbs uint32
+		var answerBufferedAmountLowThreshold uint64 = 1400
+
 		buf := make([]byte, 1000)
 
 		offerPC, answerPC, err := newPair()
@@ -190,56 +195,81 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 			t.Fatalf("Failed to create a PC pair for testing")
 		}
 
+		nPacketsToSend := int(10)
+		var nOfferReceived uint32
+		var nAnswerReceived uint32
+
 		done := make(chan bool)
 
-		answerPC.OnDataChannel(func(d *DataChannel) {
+		answerPC.OnDataChannel(func(answerDC *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
 			// created in signalPair).
-			if d.Label() != expectedLabel {
+			if answerDC.Label() != expectedLabel {
 				return
 			}
-			var nPacketsReceived int
-			d.OnMessage(func(msg DataChannelMessage) {
-				nPacketsReceived++
 
-				if nPacketsReceived == 10 {
-					go func() {
-						time.Sleep(time.Second)
-						done <- true
-					}()
+			answerDC.OnOpen(func() {
+				assert.Equal(t, answerBufferedAmountLowThreshold, answerDC.BufferedAmountLowThreshold(), "value mismatch")
+
+				for i := 0; i < nPacketsToSend; i++ {
+					e := answerDC.Send(buf)
+					if e != nil {
+						t.Fatalf("Failed to send string on data channel")
+					}
 				}
 			})
-			assert.True(t, d.Ordered(), "Ordered should be set to true")
+
+			answerDC.OnMessage(func(msg DataChannelMessage) {
+				atomic.AddUint32(&nAnswerReceived, 1)
+			})
+			assert.True(t, answerDC.Ordered(), "Ordered should be set to true")
+
+			// The value is temporarily stored in the answerDC object
+			// until the answerDC gets opened
+			answerDC.SetBufferedAmountLowThreshold(answerBufferedAmountLowThreshold)
+			// The callback function is temporarily stored in the answerDC object
+			// until the answerDC gets opened
+			answerDC.OnBufferedAmountLow(func() {
+				atomic.AddUint32(&nAnswerBufferedAmountLowCbs, 1)
+				if atomic.LoadUint32(&nOfferBufferedAmountLowCbs) > 0 {
+					done <- true
+				}
+			})
 		})
 
-		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		offerDC, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		if err != nil {
 			t.Fatalf("Failed to create a PC pair for testing")
 		}
 
-		assert.True(t, dc.Ordered(), "Ordered should be set to true")
+		assert.True(t, offerDC.Ordered(), "Ordered should be set to true")
 
-		dc.OnOpen(func() {
-			for i := 0; i < 10; i++ {
-				e := dc.Send(buf)
+		offerDC.OnOpen(func() {
+			assert.Equal(t, offerBufferedAmountLowThreshold, offerDC.BufferedAmountLowThreshold(), "value mismatch")
+
+			for i := 0; i < nPacketsToSend; i++ {
+				e := offerDC.Send(buf)
 				if e != nil {
 					t.Fatalf("Failed to send string on data channel")
 				}
-				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
-				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
+				// assert.Equal(t, (i+1)*len(buf), int(offerDC.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
 
-		dc.OnMessage(func(msg DataChannelMessage) {
+		offerDC.OnMessage(func(msg DataChannelMessage) {
+			atomic.AddUint32(&nOfferReceived, 1)
 		})
 
-		// The value is temporarily stored in the dc object
-		// until the dc gets opened
-		dc.SetBufferedAmountLowThreshold(1500)
-		// The callback function is temporarily stored in the dc object
-		// until the dc gets opened
-		dc.OnBufferedAmountLow(func() {
-			nCbs++
+		// The value is temporarily stored in the offerDC object
+		// until the offerDC gets opened
+		offerDC.SetBufferedAmountLowThreshold(offerBufferedAmountLowThreshold)
+		// The callback function is temporarily stored in the offerDC object
+		// until the offerDC gets opened
+		offerDC.OnBufferedAmountLow(func() {
+			atomic.AddUint32(&nOfferBufferedAmountLowCbs, 1)
+			if atomic.LoadUint32(&nAnswerBufferedAmountLowCbs) > 0 {
+				done <- true
+			}
 		})
 
 		err = signalPair(offerPC, answerPC)
@@ -249,7 +279,10 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 
 		closePair(t, offerPC, answerPC, done)
 
-		assert.True(t, nCbs > 0, "callback should be made at least once")
+		t.Logf("nOfferBufferedAmountLowCbs : %d", nOfferBufferedAmountLowCbs)
+		t.Logf("nAnswerBufferedAmountLowCbs: %d", nAnswerBufferedAmountLowCbs)
+		assert.True(t, nOfferBufferedAmountLowCbs > uint32(0), "callback should be made at least once")
+		assert.True(t, nAnswerBufferedAmountLowCbs > uint32(0), "callback should be made at least once")
 	})
 
 	t.Run("set after datachannel becomes open", func(t *testing.T) {

@@ -307,6 +307,9 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	// * remote datachannels should fire OnOpened. This isn't spec compliant, but we can't break behavior yet
 	// * already negotiated datachannels should fire OnOpened
 	if d.api.settingEngine.detach.DataChannels || isRemote || isAlreadyNegotiated {
+		// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
+		d.dataChannel.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
+		d.dataChannel.OnBufferedAmountLow(d.onBufferedAmountLow)
 		d.onOpen()
 	} else {
 		dc.OnOpen(func() {
