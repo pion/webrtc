@@ -222,6 +222,8 @@ func (t *DTLSTransport) startSRTP() error {
 		return fmt.Errorf("%w: %v", errFailedToStartSRTCP, err)
 	}
 
+	srtcpSession.Resume(t.api.settingEngine.srtpState)
+
 	t.srtpSession.Store(srtpSession)
 	t.srtcpSession.Store(srtcpSession)
 	close(t.srtpReady)
@@ -242,6 +244,15 @@ func (t *DTLSTransport) getSRTCPSession() (*srtp.SessionSRTCP, error) {
 	}
 
 	return nil, errDtlsTransportNotStarted
+}
+
+func (t *DTLSTransport) GetSRTPState() map[uint32]uint32 {
+	srtcpSession, err := t.getSRTCPSession()
+	if err != nil {
+		return nil
+	}
+
+	return srtcpSession.State()
 }
 
 func (t *DTLSTransport) role() DTLSRole {

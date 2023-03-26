@@ -78,6 +78,7 @@ type SettingEngine struct {
 	iceProxyDialer                            proxy.Dialer
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
+	srtpState                                 map[uint32]uint32
 	receiveMTU                                uint
 }
 
@@ -374,4 +375,8 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 
 func (e *SettingEngine) SetDTLSConnectionState(connectionState *dtls.State) {
 	e.dtls.connectionState = connectionState
+}
+
+func (e *SettingEngine) SetSRTPState(state map[uint32]uint32) {
+	e.srtpState = state
 }
