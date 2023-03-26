@@ -52,7 +52,7 @@ func createOfferer() *webrtc.PeerConnection {
 		MaxRetransmits: &maxRetransmits,
 	}
 
-	sendMoreCh := make(chan struct{})
+	sendMoreCh := make(chan struct{}, 1)
 
 	// Create a datachannel with label 'data'
 	dc, err := pc.CreateDataChannel("data", options)
@@ -79,7 +79,12 @@ func createOfferer() *webrtc.PeerConnection {
 
 	// This callback is made when the current bufferedAmount becomes lower than the threshold
 	dc.OnBufferedAmountLow(func() {
-		sendMoreCh <- struct{}{}
+		// Make sure to not block this channel or perform long running operations in this callback
+		// This callback is executed by pion/sctp. If this callback is blocking it will stop operations
+		select {
+		case sendMoreCh <- struct{}{}:
+		default:
+		}
 	})
 
 	return pc
