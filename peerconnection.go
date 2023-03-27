@@ -1897,6 +1897,44 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPT
 	return t, nil
 }
 
+// ReuseTransceiverFromTrack Reuse old RtpTransceiver or Create a new RtpTransceiver and adds it to the set of transceivers.
+func (pc *PeerConnection) ReuseTransceiverFromTrack(track TrackLocal, init ...RTPTransceiverInit) (t *RTPTransceiver, err error) {
+	if pc.isClosed.get() {
+		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	for _, t := range pc.rtpTransceivers {
+		currentDirection := t.getCurrentDirection()
+		if !t.stopped && t.kind == track.Kind() && currentDirection == RTPTransceiverDirectionInactive {
+			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+			if err == nil {
+				err = t.SetSender(sender, track)
+				if err != nil {
+					_ = sender.Stop()
+					t.setSender(nil)
+				}
+			} else {
+				return nil, err
+			}
+			pc.onNegotiationNeeded()
+			return t, nil
+		}
+	}
+	direction := RTPTransceiverDirectionSendrecv
+	if len(init) > 1 {
+		return nil, errPeerConnAddTransceiverFromTrackOnlyAcceptsOne
+	} else if len(init) == 1 {
+		direction = init[0].Direction
+	}
+	t, err = pc.newTransceiverFromTrack(direction, track)
+	if err != nil {
+		return nil, err
+	}
+	pc.addRTPTransceiver(t)
+	return
+}
+
 // AddTransceiverFromTrack Create a new RtpTransceiver(SendRecv or SendOnly) and add it to the set of transceivers.
 func (pc *PeerConnection) AddTransceiverFromTrack(track TrackLocal, init ...RTPTransceiverInit) (t *RTPTransceiver, err error) {
 	if pc.isClosed.get() {
