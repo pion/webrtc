@@ -456,11 +456,15 @@ func addTransceiverSDP(
 
 	parameters := mediaEngine.getRTPParametersByKind(t.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
-		extURL, err := url.Parse(rtpExtension.URI)
-		if err != nil {
-			return false, err
+		if mediaSection.extensions != nil {
+			if _, enabled := mediaSection.extensions[rtpExtension.URI]; enabled {
+				extURL, err := url.Parse(rtpExtension.URI)
+				if err != nil {
+					return false, err
+				}
+				media.WithExtMap(sdp.ExtMap{Value: rtpExtension.ID, URI: extURL})
+			}
 		}
-		media.WithExtMap(sdp.ExtMap{Value: rtpExtension.ID, URI: extURL})
 	}
 
 	if len(mediaSection.ridMap) > 0 {
@@ -498,6 +502,7 @@ type mediaSection struct {
 	transceivers []*RTPTransceiver
 	data         bool
 	ridMap       map[string]string
+	extensions   map[string]int
 }
 
 // populateSDP serializes a PeerConnections state into an SDP

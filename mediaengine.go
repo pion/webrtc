@@ -475,14 +475,30 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
+
+		// Determine the type
 		switch {
-		case !m.negotiatedAudio && strings.EqualFold(media.MediaName.Media, "audio"):
-			m.negotiatedAudio = true
+		case strings.EqualFold(media.MediaName.Media, "audio"):
 			typ = RTPCodecTypeAudio
-		case !m.negotiatedVideo && strings.EqualFold(media.MediaName.Media, "video"):
-			m.negotiatedVideo = true
+		case strings.EqualFold(media.MediaName.Media, "video"):
 			typ = RTPCodecTypeVideo
+		}
+
+		switch {
+		case !m.negotiatedAudio && typ == RTPCodecTypeAudio:
+			m.negotiatedAudio = true
+		case !m.negotiatedVideo && typ == RTPCodecTypeVideo:
+			m.negotiatedVideo = true
 		default:
+			extensions, err := rtpExtensionsFromMediaDescription(media)
+			if err != nil {
+				return err
+			}
+			for extension, id := range extensions {
+				if err = m.updateHeaderExtension(id, extension, typ); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 
