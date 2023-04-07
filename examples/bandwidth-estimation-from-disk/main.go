@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// bandwidth-estimation-from-disk demonstrates how to use Pion's Bandwidth Estimation APIs.
 package main
 
 import (
@@ -32,6 +33,7 @@ const (
 	ivfHeaderSize = 32
 )
 
+// nolint: gocognit
 func main() {
 	qualityLevels := []struct {
 		fileName string

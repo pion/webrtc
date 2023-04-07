@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// insertable-streams demonstrates how to use insertable streams with Pion
 package main
 
 import (
@@ -19,6 +20,7 @@ import (
 
 const cipherKey = 0xAA
 
+// nolint:gocognit
 func main() {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{

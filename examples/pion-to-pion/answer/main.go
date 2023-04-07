@@ -1,3 +1,4 @@
+// pion-to-pion is an example of two pion instances communicating directly!
 package main
 
 import (
@@ -23,11 +24,7 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 		return err
 	}
 
-	if closeErr := resp.Body.Close(); closeErr != nil {
-		return closeErr
-	}
-
-	return nil
+	return resp.Body.Close()
 }
 
 func main() { // nolint:gocognit
@@ -176,5 +173,6 @@ func main() { // nolint:gocognit
 	})
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
+	// nolint: gosec
 	panic(http.ListenAndServe(*answerAddr, nil))
 }

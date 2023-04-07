@@ -1,10 +1,9 @@
+// HTTP server that demonstrates Pion WebRTC examples
 package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
-	"fmt"
 	"go/build"
 	"html/template"
 	"log"
@@ -16,11 +15,6 @@ import (
 
 // Examples represents the examples loaded from examples.json.
 type Examples []*Example
-
-var (
-	errListExamples  = errors.New("failed to list examples (please run in the examples folder)")
-	errParseExamples = errors.New("failed to parse examples")
-)
 
 // Example represents an example loaded from examples.json.
 type Example struct {
@@ -45,10 +39,7 @@ func main() {
 
 func serve(addr string) error {
 	// Load the examples
-	examples, err := getExamples()
-	if err != nil {
-		return err
-	}
+	examples := getExamples()
 
 	// Load the templates
 	homeTemplate := template.Must(template.ParseFiles("index.html"))
@@ -84,7 +75,7 @@ func serve(addr string) error {
 				}
 
 				temp := template.Must(template.ParseFiles("example.html"))
-				_, err = temp.ParseFiles(filepath.Join(fiddle, "demo.html"))
+				_, err := temp.ParseFiles(filepath.Join(fiddle, "demo.html"))
 				if err != nil {
 					panic(err)
 				}
@@ -106,21 +97,22 @@ func serve(addr string) error {
 		}
 
 		// Serve the main page
-		err = homeTemplate.Execute(w, examples)
+		err := homeTemplate.Execute(w, examples)
 		if err != nil {
 			panic(err)
 		}
 	})
 
 	// Start the server
+	// nolint: gosec
 	return http.ListenAndServe(addr, nil)
 }
 
 // getExamples loads the examples from the examples.json file.
-func getExamples() (*Examples, error) {
+func getExamples() *Examples {
 	file, err := os.Open("./examples.json")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errListExamples, err)
+		panic(err)
 	}
 	defer func() {
 		closeErr := file.Close()
@@ -132,7 +124,7 @@ func getExamples() (*Examples, error) {
 	var examples Examples
 	err = json.NewDecoder(file).Decode(&examples)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errParseExamples, err)
+		panic(err)
 	}
 
 	for _, example := range examples {
@@ -147,5 +139,5 @@ func getExamples() (*Examples, error) {
 		}
 	}
 
-	return &examples, nil
+	return &examples
 }

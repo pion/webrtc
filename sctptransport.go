@@ -92,7 +92,7 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
+func (r *SCTPTransport) Start(SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
 	}

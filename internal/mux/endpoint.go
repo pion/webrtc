@@ -60,16 +60,16 @@ func (e *Endpoint) RemoteAddr() net.Addr {
 }
 
 // SetDeadline is a stub
-func (e *Endpoint) SetDeadline(t time.Time) error {
+func (e *Endpoint) SetDeadline(time.Time) error {
 	return nil
 }
 
 // SetReadDeadline is a stub
-func (e *Endpoint) SetReadDeadline(t time.Time) error {
+func (e *Endpoint) SetReadDeadline(time.Time) error {
 	return nil
 }
 
 // SetWriteDeadline is a stub
-func (e *Endpoint) SetWriteDeadline(t time.Time) error {
+func (e *Endpoint) SetWriteDeadline(time.Time) error {
 	return nil
 }

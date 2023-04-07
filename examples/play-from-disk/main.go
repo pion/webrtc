@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// play-from-disk demonstrates how to send video and/or audio to your browser from files saved to disk.
 package main
 
 import (
@@ -24,6 +25,7 @@ const (
 	oggPageDuration = time.Millisecond * 20
 )
 
+// nolint:gocognit
 func main() {
 	// Assert that we have an audio or video file
 	_, err := os.Stat(videoFileName)

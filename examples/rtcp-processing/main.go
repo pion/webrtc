@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// rtcp-processing demonstrates the Public API for processing RTCP packets in Pion WebRTC.
 package main
 
 import (

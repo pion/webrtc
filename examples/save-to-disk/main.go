@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// save-to-disk is a simple application that shows how to record your webcam/microphone using Pion WebRTC and save VP8/Opus to disk.
 package main
 
 import (
@@ -36,6 +37,7 @@ func saveToDisk(i media.Writer, track *webrtc.TrackRemote) {
 	}
 }
 
+// nolint:gocognit
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

@@ -21,6 +21,7 @@ func HTTPSDPServer() chan string {
 	})
 
 	go func() {
+		// nolint: gosec
 		err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 		if err != nil {
 			panic(err)

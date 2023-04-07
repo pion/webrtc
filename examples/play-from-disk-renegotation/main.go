@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// play-from-disk-renegotation demonstrates Pion WebRTC's renegotiation abilities.
 package main
 
 import (
@@ -145,6 +146,7 @@ func main() {
 
 	go func() {
 		fmt.Println("Open http://localhost:8080 to access this demo")
+		// nolint: gosec
 		panic(http.ListenAndServe(":8080", nil))
 	}()
 

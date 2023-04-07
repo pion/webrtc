@@ -25,7 +25,7 @@ func TestOperations_Enqueue(t *testing.T) {
 	}
 }
 
-func TestOperations_Done(t *testing.T) {
+func TestOperations_Done(*testing.T) {
 	ops := newOperations()
 	ops.Done()
 }

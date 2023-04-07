@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// rtp-forwarder shows how to forward your webcam/microphone via RTP using Pion WebRTC.
 package main
 
 import (
@@ -23,6 +24,7 @@ type udpConn struct {
 	payloadType uint8
 }
 
+// nolint:gocognit
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

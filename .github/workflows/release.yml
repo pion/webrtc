@@ -19,4 +19,4 @@ jobs:
   release:
     uses: pion/.goassets/.github/workflows/release.reusable.yml@master
     with:
-      go-version: '1.19' # auto-update/latest-go-version
+      go-version: '1.20' # auto-update/latest-go-version

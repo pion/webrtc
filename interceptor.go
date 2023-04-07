@@ -26,11 +26,7 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 		return err
 	}
 
-	if err := ConfigureTWCCSender(mediaEngine, interceptorRegistry); err != nil {
-		return err
-	}
-
-	return nil
+	return ConfigureTWCCSender(mediaEngine, interceptorRegistry)
 }
 
 // ConfigureRTCPReports will setup everything necessary for generating Sender and Receiver Reports
