@@ -58,10 +58,8 @@ func TestStatsMarshal(t *testing.T) {
 		RemoteOutboundRTPStreamStats{},
 		RTPContributingSourceStats{},
 		SenderAudioTrackAttachmentStats{},
-		SenderAudioTrackAttachmentStats{},
 		SenderVideoTrackAttachmentStats{},
 		TransportStats{},
-		VideoReceiverStats{},
 		VideoReceiverStats{},
 		VideoSenderStats{},
 	} {
