@@ -105,10 +105,12 @@ func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
 	for _, algo := range fingerprintAlgorithms {
 		name, err := fingerprint.StringFromHash(algo)
 		if err != nil {
+			// nolint
 			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		value, err := fingerprint.Fingerprint(c.x509Cert, algo)
 		if err != nil {
+			// nolint
 			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		res[i] = DTLSFingerprint{

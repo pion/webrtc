@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// custom-logger is an example of how the Pion API provides an customizable logging API
 package main
 
 import (
@@ -19,8 +20,8 @@ import (
 type customLogger struct{}
 
 // Print all messages except trace
-func (c customLogger) Trace(msg string)                          {}
-func (c customLogger) Tracef(format string, args ...interface{}) {}
+func (c customLogger) Trace(string)                  {}
+func (c customLogger) Tracef(string, ...interface{}) {}
 
 func (c customLogger) Debug(msg string) { fmt.Printf("customLogger Debug: %s\n", msg) }
 func (c customLogger) Debugf(format string, args ...interface{}) {

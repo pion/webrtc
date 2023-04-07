@@ -407,10 +407,7 @@ func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if err := r.tracks[0].rtcpReadStream.SetReadDeadline(t); err != nil {
-		return err
-	}
-	return nil
+	return r.tracks[0].rtcpReadStream.SetReadDeadline(t)
 }
 
 // SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid will block before returning. 0 is forever.

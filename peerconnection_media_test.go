@@ -385,16 +385,16 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 
 type undeclaredSsrcLogger struct{ unhandledSimulcastError chan struct{} }
 
-func (u *undeclaredSsrcLogger) Trace(msg string)                          {}
-func (u *undeclaredSsrcLogger) Tracef(format string, args ...interface{}) {}
-func (u *undeclaredSsrcLogger) Debug(msg string)                          {}
-func (u *undeclaredSsrcLogger) Debugf(format string, args ...interface{}) {}
-func (u *undeclaredSsrcLogger) Info(msg string)                           {}
-func (u *undeclaredSsrcLogger) Infof(format string, args ...interface{})  {}
-func (u *undeclaredSsrcLogger) Warn(msg string)                           {}
-func (u *undeclaredSsrcLogger) Warnf(format string, args ...interface{})  {}
-func (u *undeclaredSsrcLogger) Error(msg string)                          {}
-func (u *undeclaredSsrcLogger) Errorf(format string, args ...interface{}) {
+func (u *undeclaredSsrcLogger) Trace(string)                  {}
+func (u *undeclaredSsrcLogger) Tracef(string, ...interface{}) {}
+func (u *undeclaredSsrcLogger) Debug(string)                  {}
+func (u *undeclaredSsrcLogger) Debugf(string, ...interface{}) {}
+func (u *undeclaredSsrcLogger) Info(string)                   {}
+func (u *undeclaredSsrcLogger) Infof(string, ...interface{})  {}
+func (u *undeclaredSsrcLogger) Warn(string)                   {}
+func (u *undeclaredSsrcLogger) Warnf(string, ...interface{})  {}
+func (u *undeclaredSsrcLogger) Error(string)                  {}
+func (u *undeclaredSsrcLogger) Errorf(format string, _ ...interface{}) {
 	if format == incomingUnhandledRTPSsrc {
 		close(u.unhandledSimulcastError)
 	}
@@ -402,7 +402,7 @@ func (u *undeclaredSsrcLogger) Errorf(format string, args ...interface{}) {
 
 type undeclaredSsrcLoggerFactory struct{ unhandledSimulcastError chan struct{} }
 
-func (u *undeclaredSsrcLoggerFactory) NewLogger(subsystem string) logging.LeveledLogger {
+func (u *undeclaredSsrcLoggerFactory) NewLogger(string) logging.LeveledLogger {
 	return &undeclaredSsrcLogger{u.unhandledSimulcastError}
 }
 

@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// ice-tcp demonstrates Pion WebRTC's ICE TCP abilities.
 package main
 
 import (
@@ -106,5 +107,6 @@ func main() {
 	http.HandleFunc("/doSignaling", doSignaling)
 
 	fmt.Println("Open http://localhost:8080 to access this demo")
+	// nolint: gosec
 	panic(http.ListenAndServe(":8080", nil))
 }

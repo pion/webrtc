@@ -4,7 +4,7 @@ package mux
 type MatchFunc func([]byte) bool
 
 // MatchAll always returns true
-func MatchAll(b []byte) bool {
+func MatchAll([]byte) bool {
 	return true
 }
 

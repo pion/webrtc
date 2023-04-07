@@ -43,7 +43,7 @@ func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
 	return false
 }
 
-func (f *fakeDepacketizer) IsPartitionTail(marker bool, payload []byte) bool {
+func (f *fakeDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {
 	return marker
 }
 
@@ -397,7 +397,7 @@ func TestPopWithTimestamp(t *testing.T) {
 
 type truePartitionHeadChecker struct{}
 
-func (f *truePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+func (f *truePartitionHeadChecker) IsPartitionHead([]byte) bool {
 	return true
 }
 

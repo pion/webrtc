@@ -805,7 +805,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 }
 
 // CreateAnswer starts the PeerConnection and generates the localDescription
-func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
+func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	remoteDesc := pc.RemoteDescription()
 	switch {
@@ -1514,6 +1514,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 		Direction: RTPTransceiverDirectionSendrecv,
 	})
 	if err != nil {
+		// nolint
 		return false, fmt.Errorf("%w: %d: %s", errPeerConnRemoteSSRCAddTransceiver, ssrc, err)
 	}
 
@@ -2011,7 +2012,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 }
 
 // SetIdentityProvider is used to configure an identity provider to generate identity assertions
-func (pc *PeerConnection) SetIdentityProvider(provider string) error {
+func (pc *PeerConnection) SetIdentityProvider(string) error {
 	return errPeerConnSetIdentityProviderNotImplemented
 }
 

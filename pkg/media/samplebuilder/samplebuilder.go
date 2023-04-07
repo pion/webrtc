@@ -325,7 +325,7 @@ func timestampDistance(x, y uint32) uint32 {
 type Option func(o *SampleBuilder)
 
 // WithPartitionHeadChecker is obsolete, it does nothing.
-func WithPartitionHeadChecker(checker interface{}) Option {
+func WithPartitionHeadChecker(interface{}) Option {
 	return func(o *SampleBuilder) {
 	}
 }

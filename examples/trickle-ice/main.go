@@ -1,3 +1,4 @@
+// trickle-ice demonstrates Pion WebRTC's Trickle ICE APIs.  ICE is the subsystem WebRTC uses to establish connectivity.
 package main
 
 import (
@@ -110,5 +111,6 @@ func main() {
 	http.Handle("/websocket", websocket.Handler(websocketServer))
 
 	fmt.Println("Open http://localhost:8080 to access this demo")
+	// nolint: gosec
 	panic(http.ListenAndServe(":8080", nil))
 }

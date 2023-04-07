@@ -139,6 +139,7 @@ func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
 
 	writeStream, err := srtcpSession.OpenWriteStream()
 	if err != nil {
+		// nolint
 		return 0, fmt.Errorf("%w: %v", errPeerConnWriteRTCPOpenWriteStream, err)
 	}
 
@@ -209,16 +210,19 @@ func (t *DTLSTransport) startSRTP() error {
 	connState := t.conn.ConnectionState()
 	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.role() == DTLSRoleClient)
 	if err != nil {
+		// nolint
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
 	}
 
 	srtpSession, err := srtp.NewSessionSRTP(t.srtpEndpoint, srtpConfig)
 	if err != nil {
+		// nolint
 		return fmt.Errorf("%w: %v", errFailedToStartSRTP, err)
 	}
 
 	srtcpSession, err := srtp.NewSessionSRTCP(t.srtcpEndpoint, srtpConfig)
 	if err != nil {
+		// nolint
 		return fmt.Errorf("%w: %v", errFailedToStartSRTCP, err)
 	}
 

@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// reflect demonstrates how with one PeerConnection you can send video to Pion and have the packets sent back
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"github.com/pion/webrtc/v3/examples/internal/signal"
 )
 
+// nolint:gocognit
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

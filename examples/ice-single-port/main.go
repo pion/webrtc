@@ -1,6 +1,7 @@
 //go:build !js
 // +build !js
 
+// ice-single-port demonstrates Pion WebRTC's ability to serve many PeerConnections on a single port.
 package main
 
 import (
@@ -96,5 +97,6 @@ func main() {
 	http.HandleFunc("/doSignaling", doSignaling)
 
 	fmt.Println("Open http://localhost:8080 to access this demo")
+	// nolint: gosec
 	panic(http.ListenAndServe(":8080", nil))
 }

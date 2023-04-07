@@ -1,3 +1,4 @@
+// data-channels is a Pion WebRTC application that shows how you can send/recv DataChannel messages from a web browser
 package main
 
 import (
