@@ -1340,6 +1340,7 @@ func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc
 				continue
 			}
 
+			mid := t.Mid()
 			receiverNeedsStopped := false
 			func() {
 				for _, t := range tracks {
@@ -1347,7 +1348,7 @@ func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc
 					defer t.mu.Unlock()
 
 					if t.rid != "" {
-						if details := trackDetailsForRID(incomingTracks, t.rid); details != nil {
+						if details := trackDetailsForRID(incomingTracks, mid, t.rid); details != nil {
 							t.id = details.id
 							t.streamID = details.streamID
 							continue
