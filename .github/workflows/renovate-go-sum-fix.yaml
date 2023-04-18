@@ -8,6 +8,8 @@
 # If you want to update the shared CI config, send a PR to
 # https://github.com/pion/.goassets instead of this repository.
 #
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
 
 name: Fix go.sum
 on:
