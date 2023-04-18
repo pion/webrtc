@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Pion
+Source: https://github.com/pion/
+
+Files: README.md AUTHORS.txt renovate.json
+Copyright: 2023 The Pion community <https://pion.ly>
+License: MIT
