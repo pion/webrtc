@@ -43,6 +43,8 @@ func NewAPI(options ...func(*API)) *API {
 
 // WithMediaEngine allows providing a MediaEngine to the API.
 // Settings can be changed after passing the engine to an API.
+// When a PeerConnection is created the MediaEngine is copied
+// and no more changes can be made.
 func WithMediaEngine(m *MediaEngine) func(a *API) {
 	return func(a *API) {
 		a.mediaEngine = m
