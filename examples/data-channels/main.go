@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // data-channels is a Pion WebRTC application that shows how you can send/recv DataChannel messages from a web browser
 package main
 

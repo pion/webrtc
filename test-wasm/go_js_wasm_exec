@@ -1,8 +1,7 @@
 #!/bin/bash
-# Copyright 2018 The Go Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style
-# license that can be found in the LICENSE file.
-# Modified work copyright 2019 Alex Browne.
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-FileCopyrightText: 2019 Alex Browne
+# SPDX-License-Identifier: MIT
 
 # Check Node.js version
 if [[ $(node --version) =~ v[0-9]\. ]]
