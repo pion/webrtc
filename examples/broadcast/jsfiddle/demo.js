@@ -1,4 +1,8 @@
 /* eslint-env browser */
+
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 const log = msg => {
   document.getElementById('logs').innerHTML += msg + '<br>'
 }

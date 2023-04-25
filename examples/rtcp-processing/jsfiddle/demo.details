@@ -1,5 +1,8 @@
 ---
- name: rtcp-processing
- description: play-from-disk demonstrates how to process RTCP messages from Pion WebRTC
- authors:
-   - Sean DuBois
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: rtcp-processing
+description: play-from-disk demonstrates how to process RTCP messages from Pion WebRTC
+authors:
+  - Sean DuBois

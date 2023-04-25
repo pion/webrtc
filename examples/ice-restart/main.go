@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // ice-restart demonstrates Pion WebRTC's ICE Restart abilities.
 package main
 
