@@ -111,47 +111,29 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", videoRTCPFeedback},
-			PayloadType:        98,
-		},
-		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
-			PayloadType:        99,
-		},
-
-		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=1", videoRTCPFeedback},
-			PayloadType:        100,
-		},
-		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=100", nil},
-			PayloadType:        101,
-		},
-
-		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", videoRTCPFeedback},
 			PayloadType:        102,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=102", nil},
-			PayloadType:        121,
+			PayloadType:        103,
 		},
 
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
-			PayloadType:        127,
+			PayloadType:        104,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=127", nil},
-			PayloadType:        120,
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=104", nil},
+			PayloadType:        105,
 		},
 
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", videoRTCPFeedback},
-			PayloadType:        125,
+			PayloadType:        106,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=125", nil},
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=106", nil},
 			PayloadType:        107,
 		},
 
@@ -165,21 +147,21 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f", videoRTCPFeedback},
 			PayloadType:        127,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=127", nil},
-			PayloadType:        120,
+			PayloadType:        125,
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032", videoRTCPFeedback},
-			PayloadType:        123,
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f", videoRTCPFeedback},
+			PayloadType:        39,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=123", nil},
-			PayloadType:        118,
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=39", nil},
+			PayloadType:        40,
 		},
 
 		{
@@ -192,8 +174,30 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/ulpfec", 90000, 0, "", nil},
-			PayloadType:        116,
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", videoRTCPFeedback},
+			PayloadType:        98,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
+			PayloadType:        99,
+		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=2", videoRTCPFeedback},
+			PayloadType:        100,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=100", nil},
+			PayloadType:        101,
+		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f", videoRTCPFeedback},
+			PayloadType:        112,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=112", nil},
+			PayloadType:        113,
 		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
