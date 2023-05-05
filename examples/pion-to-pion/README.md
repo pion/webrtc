@@ -19,9 +19,7 @@ offer
 
 You should see them connect and start to exchange messages.
 
-## You can use Docker-compose to start this example:
+## Running as a test
 ```sh
-docker-compose up -d
+./acceptance-tests/run acceptance-tests/pion-to-pion
 ```
-
-Now, you can see message exchanging, using `docker logs`.

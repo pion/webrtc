@@ -1,0 +1,9 @@
+Include /etc/ssh/ssh_config.d/*.conf
+Host *
+PasswordAuthentication yes
+SendEnv LANG LC_*
+HashKnownHosts yes
+GSSAPIAuthentication yes
+PermitEmptyPasswords yes
+PermitRootLogin yes
+

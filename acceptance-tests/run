@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+BUILD=1
+build_n_run() {
+
+    if [ $BUILD -eq 1 ]
+    then
+        docker compose -f $1  --project-directory . build $BUILD_OPTIONS
+        if [ $? -ne 0 ]
+        then
+            exit "docker compose build failed"
+        fi
+    fi
+    docker compose -f $1  --project-directory . up --exit-code-from runner
+}
+usage() {
+   cat <<EOS
+This script builds & runs the acceptance test specifications.
+When no path is given it finds all sub directories of `./acceptance-tests`
+with a `lab.yaml` file builds them and bring them up
+
+Syntax: $0 [-h|z|n] [path]
+options:
+
+h     Print this usage
+z     Build the docker images from scratch before running
+n     Don't build the images
+
+EOS
+}
+
+exit_error() {
+    usage
+    exit 1
+}
+mkdir -p acceptance-tests/assets
+while getopts ":hnz" option; do
+    echo "option " $option
+   case $option in
+      h) # display usage
+         usage
+         exit;;
+      n) # No Build
+         BUILD=0
+         ;;
+      z) # No Cache
+         BUILD_OPTIONS="--no-cache"
+         ;;
+      \?) # Invalid option
+         echo "Error: Invalid option"
+         exit_error;;
+   esac
+done
+shift $((OPTIND-1))
+if [ $# -eq 0 ]
+then
+    for compose in `find acceptance-tests -name "lab.yaml"`
+    do
+        dir=$(dirname $compose)
+        echo ">>> Setting a lab based on $dir"
+        build_n_run $compose
+        if [ $? -ne 0 ]
+        then
+            echo ">>> $dir tests FAILED"
+             exit 4
+        fi
+    done
+else
+    for arg in $@
+    do
+        echo ">>> Setting a lab based on $arg"
+        build_n_run $arg/lab.yaml
+        if [ $? -ne 0 ]
+        then
+             echo ">>> $arg FAILED"
+             exit 4
+        fi
+        echo ">>> $arg tests PASSED"
+    done
+fi

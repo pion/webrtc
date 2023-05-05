@@ -1,0 +1,17 @@
+version: '3'
+services:
+  answer:
+    image: golang:1.19
+    volumes:
+      - .:/go/src/github.com/pion/webrtc
+    working_dir: /go/src/github.com/pion/webrtc/examples/pion-to-pion/answer
+    command: go run . -offer-address runner:50000
+
+  runner:
+    depends_on:
+      - answer
+    image: golang:1.19
+    volumes:
+      - .:/go/src/github.com/pion/webrtc
+    working_dir: /go/src/github.com/pion/webrtc/examples/pion-to-pion/offer
+    command: go run . -answer-address answer:60000 -count 3 -wait 1

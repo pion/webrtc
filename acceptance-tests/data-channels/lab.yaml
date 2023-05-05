@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  runner:
+    build: 
+      context: .
+      dockerfile: ./acceptance-tests/infra/playwright/Dockerfile
+    volumes:
+      - ./acceptance-tests/data-channels:/specs
+      - ./acceptance-tests/result:/result
+    depends_on:
+      - client
+      - pion
+    environment:
+      PWOPTS: ${PWOPTS--x}
+  client:
+    image: halverneus/static-file-server:latest
+    environment:
+      PORT: 80
+    expose:
+      - "80"
+    volumes:
+      - ./examples/data-channels/jsfiddle:/web
+  pion:
+    build:
+      context: .
+      dockerfile: ./acceptance-tests/infra/pion/Dockerfile
+    expose:
+      - "22"
+    volumes:
+      - .:/go/src/github.com/pion/webrtc

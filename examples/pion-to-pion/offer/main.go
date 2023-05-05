@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"sync"
@@ -29,6 +30,8 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 func main() { //nolint:gocognit
 	offerAddr := flag.String("offer-address", ":50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", "127.0.0.1:60000", "Address that the Answer HTTP server is hosted on.")
+	count := flag.Int("count", math.MaxInt, "Number of messages  to send")
+	wait := flag.Int("wait", 5, "How long to wait between messages")
 	flag.Parse()
 
 	var candidatesMux sync.Mutex
@@ -131,13 +134,28 @@ func main() { //nolint:gocognit
 		}
 	})
 
+	done := make(chan bool)
+	messagesSent := 0
+
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
+		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every %d seconds\n", dataChannel.Label(), dataChannel.ID(), *wait)
+		waitDuration := time.Duration(*wait) * time.Second
 
-		for range time.NewTicker(5 * time.Second).C {
+		for range time.NewTicker(waitDuration).C {
+			// send EOF for orderly teardown of the session
+			if messagesSent == *count {
+				err = dataChannel.SendText("EOF")
+				if err != nil {
+					panic(err)
+				}
+				done <- true
+				break
+			}
+
 			message := signal.RandSeq(15)
 			fmt.Printf("Sending '%s'\n", message)
+			messagesSent++
 
 			// Send the message as text
 			sendTextErr := dataChannel.SendText(message)
@@ -169,13 +187,20 @@ func main() { //nolint:gocognit
 	if err != nil {
 		panic(err)
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
+	// retry in case the other side is not yet ready
+	for i := 0; i < 10; i++ {
+		resp, postErr := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
+		if err = resp.Body.Close(); err != nil {
+			panic(err)
+		}
+		if postErr == nil {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
 	if err != nil {
 		panic(err)
-	} else if err := resp.Body.Close(); err != nil {
-		panic(err)
 	}
-
-	// Block forever
-	select {}
+	// wait for all sent messages to be received
+	<-done
 }
