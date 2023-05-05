@@ -1256,7 +1256,7 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
 		assert.NoError(t, err)
 
-		vp8WriterA, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID("a"))
+		vp8WriterA, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID("a"), WithSSRC(4039455774))
 		assert.NoError(t, err)
 
 		sender, err := pcOffer.AddTrack(vp8WriterA)
@@ -1280,6 +1280,7 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		assert.Equal(t, "a", parameters.Encodings[0].RID)
 		assert.Equal(t, "b", parameters.Encodings[1].RID)
 		assert.Equal(t, "c", parameters.Encodings[2].RID)
+		assert.Equal(t, 4039455774, parameters.Encodings[0].SSRC)
 
 		var midID, ridID, rsidID uint8
 		for _, extension := range parameters.HeaderExtensions {
@@ -1295,6 +1296,9 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		assert.NotZero(t, midID)
 		assert.NotZero(t, ridID)
 		assert.NotZero(t, rsidID)
+
+		assert.NotZero(t, parameters.Encodings[1].SSRC)
+		assert.NotZero(t, parameters.Encodings[2].SSRC)
 
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
