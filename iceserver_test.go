@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/stun"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
@@ -86,7 +86,7 @@ func TestICEServer_validate(t *testing.T) {
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: ICECredentialTypeOauth,
-			}, &rtcerr.InvalidAccessError{Err: ice.ErrSTUNQuery}},
+			}, &rtcerr.InvalidAccessError{Err: stun.ErrSTUNQuery}},
 		}
 
 		for i, testCase := range testCases {

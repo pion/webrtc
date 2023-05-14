@@ -304,7 +304,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 
 	// Verify that the noop case works
 	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ICEConnectionStateNew) })
 
 	pc.OnTrack(func(t *TrackRemote, r *RTPReceiver) {
 		close(onTrackCalled)
@@ -329,7 +329,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&TrackRemote{}, &RTPReceiver{}) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ICEConnectionStateNew) })
 	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
 
 	<-onTrackCalled

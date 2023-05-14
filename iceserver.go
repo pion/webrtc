@@ -9,7 +9,7 @@ package webrtc
 import (
 	"encoding/json"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/stun"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 )
 
@@ -22,8 +22,8 @@ type ICEServer struct {
 	CredentialType ICECredentialType `json:"credentialType,omitempty"`
 }
 
-func (s ICEServer) parseURL(i int) (*ice.URL, error) {
-	return ice.ParseURL(s.URLs[i])
+func (s ICEServer) parseURL(i int) (*stun.URI, error) {
+	return stun.ParseURI(s.URLs[i])
 }
 
 func (s ICEServer) validate() error {
@@ -31,8 +31,8 @@ func (s ICEServer) validate() error {
 	return err
 }
 
-func (s ICEServer) urls() ([]*ice.URL, error) {
-	urls := []*ice.URL{}
+func (s ICEServer) urls() ([]*stun.URI, error) {
+	urls := []*stun.URI{}
 
 	for i := range s.URLs {
 		url, err := s.parseURL(i)
@@ -40,7 +40,7 @@ func (s ICEServer) urls() ([]*ice.URL, error) {
 			return nil, &rtcerr.InvalidAccessError{Err: err}
 		}
 
-		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
+		if url.Scheme == stun.SchemeTypeTURN || url.Scheme == stun.SchemeTypeTURNS {
 			// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11.3.2)
 			if s.Username == "" || s.Credential == nil {
 				return nil, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials}

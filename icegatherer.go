@@ -13,6 +13,7 @@ import (
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
+	"github.com/pion/stun"
 )
 
 // ICEGatherer gathers local host, server reflexive and relay
@@ -24,7 +25,7 @@ type ICEGatherer struct {
 	log   logging.LeveledLogger
 	state ICEGathererState
 
-	validatedServers []*ice.URL
+	validatedServers []*stun.URI
 	gatherPolicy     ICETransportPolicy
 
 	agent *ice.Agent
@@ -42,7 +43,7 @@ type ICEGatherer struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
-	var validatedServers []*ice.URL
+	var validatedServers []*stun.URI
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
 			url, err := server.urls()
