@@ -146,6 +146,7 @@ Patrice Ferlet <patrice.ferlet@smile.fr>
 Patrick Lange <mail@langep.com>
 Patryk Rogalski <digitalix4@gmail.com>
 Pieere Pi <pihuibin@hotmail.com>
+Pouget-Abadie <thomas.pougetabadie@gmail.com>
 q191201771 <191201771@qq.com>
 Quentin Renard <contact@asticode.com>
 Rafael Viscarra <rafael@viscarra.dev>
