@@ -361,6 +361,8 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	switch srtpProfile {
 	case dtls.SRTP_AEAD_AES_128_GCM:
 		t.srtpProtectionProfile = srtp.ProtectionProfileAeadAes128Gcm
+	case dtls.SRTP_AEAD_AES_256_GCM:
+		t.srtpProtectionProfile = srtp.ProtectionProfileAeadAes256Gcm
 	case dtls.SRTP_AES128_CM_HMAC_SHA1_80:
 		t.srtpProtectionProfile = srtp.ProtectionProfileAes128CmHmacSha1_80
 	default:
