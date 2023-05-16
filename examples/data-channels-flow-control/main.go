@@ -70,7 +70,7 @@ func createOfferer() *webrtc.PeerConnection {
 			err2 := dc.Send(buf)
 			check(err2)
 
-			if dc.BufferedAmount()+uint64(len(buf)) > maxBufferedAmount {
+			if dc.BufferedAmount() > maxBufferedAmount {
 				// Wait until the bufferedAmount becomes lower than the threshold
 				<-sendMoreCh
 			}
