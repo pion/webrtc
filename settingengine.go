@@ -149,6 +149,9 @@ func (e *SettingEngine) SetRelayAcceptanceMinWait(t time.Duration) {
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
 // ICE UDP connections can allocate from. This affects both host candidates,
 // and the local address of server reflexive candidates.
+//
+// When portMin and portMax are left to the 0 default value, pion/ice candidate
+// gatherer replaces them and uses 1 for portMin and 65535 for portMax.
 func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error {
 	if portMax < portMin {
 		return ice.ErrPort
