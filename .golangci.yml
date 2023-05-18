@@ -16,9 +16,8 @@ linters-settings:
               - errors
   forbidigo:
     forbid:
-      - Fatal(f|ln)?$
       - ^fmt.Print(f|ln)?$
-      - ^log.Print(f|ln)?$
+      - ^log.(Panic|Fatal|Print)(f|ln)?$
       - ^os.Exit$
       - ^panic$
       - ^print(ln)?$
