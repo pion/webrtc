@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -250,6 +251,14 @@ func TestSetDTLSEllipticCurves(t *testing.T) {
 		s.dtls.ellipticCurves[0] != elliptic.P256 {
 		t.Errorf("Failed to set DTLS elliptic curves")
 	}
+}
+
+func TestSetDTLSHandShakeTimeout(*testing.T) {
+	s := SettingEngine{}
+
+	s.SetDTLSConnectContextMaker(func() (context.Context, func()) {
+		return context.WithTimeout(context.Background(), 60*time.Second)
+	})
 }
 
 func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {

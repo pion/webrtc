@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"io"
 	"net"
 	"time"
@@ -63,6 +64,7 @@ type SettingEngine struct {
 		insecureSkipHelloVerify bool
 		retransmissionInterval  time.Duration
 		ellipticCurves          []dtlsElliptic.Curve
+		connectContextMaker     func() (context.Context, func())
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -366,6 +368,17 @@ func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 // SetDTLSEllipticCurves sets the elliptic curves for DTLS.
 func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Curve) {
 	e.dtls.ellipticCurves = ellipticCurves
+}
+
+// SetDTLSConnectContextMaker sets the context used during the DTLS Handshake.
+// It can be used to extend or reduce the timeout on the DTLS Handshake.
+// If nil, the default dtls.ConnectContextMaker is used. It can be implemented as following.
+//
+//	func ConnectContextMaker() (context.Context, func()) {
+//		return context.WithTimeout(context.Background(), 30*time.Second)
+//	}
+func (e *SettingEngine) SetDTLSConnectContextMaker(connectContextMaker func() (context.Context, func())) {
+	e.dtls.connectContextMaker = connectContextMaker
 }
 
 // SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
