@@ -2,7 +2,7 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Pion
 Source: https://github.com/pion/
 
-Files: README.md **/README.md AUTHORS.txt renovate.json go.mod go.sum
+Files: README.md DESIGN.md **/README.md AUTHORS.txt renovate.json go.mod go.sum .eslintrc.json package.json examples/examples.json
 Copyright: 2023 The Pion community <https://pion.ly>
 License: MIT
 
