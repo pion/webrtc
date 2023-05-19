@@ -19,6 +19,6 @@ require (
 	github.com/pion/stun v0.5.2
 	github.com/pion/transport/v2 v2.2.0
 	github.com/sclevine/agouti v3.0.0+incompatible
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	golang.org/x/net v0.10.0
 )
