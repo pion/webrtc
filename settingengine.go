@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"context"
+	"crypto/x509"
 	"io"
 	"net"
 	"time"
@@ -61,10 +62,15 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		insecureSkipHelloVerify bool
-		retransmissionInterval  time.Duration
-		ellipticCurves          []dtlsElliptic.Curve
-		connectContextMaker     func() (context.Context, func())
+		insecureSkipHelloVerify   bool
+		disableInsecureSkipVerify bool
+		retransmissionInterval    time.Duration
+		ellipticCurves            []dtlsElliptic.Curve
+		connectContextMaker       func() (context.Context, func())
+		extendedMasterSecret      dtls.ExtendedMasterSecretType
+		clientAuth                *dtls.ClientAuthType
+		clientCAs                 *x509.CertPool
+		rootCAs                   *x509.CertPool
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -368,6 +374,12 @@ func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 	e.dtls.insecureSkipHelloVerify = skip
 }
 
+// SetDTLSDisableInsecureSkipVerify sets the disable skip insecure verify flag for DTLS.
+// This controls whether a client verifies the server's certificate chain and host name.
+func (e *SettingEngine) SetDTLSDisableInsecureSkipVerify(disable bool) {
+	e.dtls.disableInsecureSkipVerify = disable
+}
+
 // SetDTLSEllipticCurves sets the elliptic curves for DTLS.
 func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Curve) {
 	e.dtls.ellipticCurves = ellipticCurves
@@ -382,6 +394,26 @@ func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Cur
 //	}
 func (e *SettingEngine) SetDTLSConnectContextMaker(connectContextMaker func() (context.Context, func())) {
 	e.dtls.connectContextMaker = connectContextMaker
+}
+
+// SetDTLSExtendedMasterSecret sets the extended master secret type for DTLS.
+func (e *SettingEngine) SetDTLSExtendedMasterSecret(extendedMasterSecret dtls.ExtendedMasterSecretType) {
+	e.dtls.extendedMasterSecret = extendedMasterSecret
+}
+
+// SetDTLSClientAuth sets the client auth type for DTLS.
+func (e *SettingEngine) SetDTLSClientAuth(clientAuth dtls.ClientAuthType) {
+	e.dtls.clientAuth = &clientAuth
+}
+
+// SetDTLSClientCAs sets the client CA certificate pool for DTLS certificate verification.
+func (e *SettingEngine) SetDTLSClientCAs(clientCAs *x509.CertPool) {
+	e.dtls.clientCAs = clientCAs
+}
+
+// SetDTLSRootCAs sets the root CA certificate pool for DTLS certificate verification.
+func (e *SettingEngine) SetDTLSRootCAs(rootCAs *x509.CertPool) {
+	e.dtls.rootCAs = rootCAs
 }
 
 // SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
