@@ -316,7 +316,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 			}(),
 			ClientAuth:         dtls.RequireAnyClientCert,
 			LoggerFactory:      t.api.settingEngine.LoggerFactory,
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: !t.api.settingEngine.dtls.disableInsecureSkipVerify,
 		}, nil
 	}
 
@@ -331,10 +331,17 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		dtlsConfig.ReplayProtectionWindow = int(*t.api.settingEngine.replayProtection.DTLS)
 	}
 
+	if t.api.settingEngine.dtls.clientAuth != nil {
+		dtlsConfig.ClientAuth = *t.api.settingEngine.dtls.clientAuth
+	}
+
 	dtlsConfig.FlightInterval = t.api.settingEngine.dtls.retransmissionInterval
 	dtlsConfig.InsecureSkipVerifyHello = t.api.settingEngine.dtls.insecureSkipHelloVerify
 	dtlsConfig.EllipticCurves = t.api.settingEngine.dtls.ellipticCurves
 	dtlsConfig.ConnectContextMaker = t.api.settingEngine.dtls.connectContextMaker
+	dtlsConfig.ExtendedMasterSecret = t.api.settingEngine.dtls.extendedMasterSecret
+	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
+	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
