@@ -34,6 +34,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Increase the UDP receive buffer size
+	// Default UDP buffer sizes vary on different operating systems
+	bufferSize := 300000 // 300KB
+	err = listener.SetReadBuffer(bufferSize)
+	if err != nil {
+		panic(err)
+	}
+
 	defer func() {
 		if err = listener.Close(); err != nil {
 			panic(err)
