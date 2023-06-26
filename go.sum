@@ -66,8 +66,9 @@ github.com/pion/sdp/v3 v3.0.6/go.mod h1:iiFWFpQO8Fy3S5ldclBkpXqmWy02ns78NOKoLLL0
 github.com/pion/srtp/v2 v2.0.15 h1:+tqRtXGsGwHC0G0IUIAzRmdkHvriF79IHVfZGfHrQoA=
 github.com/pion/srtp/v2 v2.0.15/go.mod h1:b/pQOlDrbB0HEH5EUAQXzSYxikFbNcNuKmF8tM0hCtw=
 github.com/pion/stun v0.4.0/go.mod h1:QPsh1/SbXASntw3zkkrIk3ZJVKz4saBY2G7S10P3wCw=
-github.com/pion/stun v0.6.0 h1:JHT/2iyGDPrFWE8NNC15wnddBN8KifsEDw8swQmrEmU=
 github.com/pion/stun v0.6.0/go.mod h1:HPqcfoeqQn9cuaet7AOmB5e5xkObu9DwBdurwLKO9oA=
+github.com/pion/stun v0.6.1 h1:8lp6YejULeHBF8NmV8e2787BogQhduZugh5PdhDyyN4=
+github.com/pion/stun v0.6.1/go.mod h1:/hO7APkX4hZKu/D0f2lHzNyvdkTGtIy3NDmLR7kSz/8=
 github.com/pion/transport v0.14.1 h1:XSM6olwW+o8J4SCmOBb/BpwZypkHeyM0PGFCxNQBr40=
 github.com/pion/transport v0.14.1/go.mod h1:4tGmbk00NeYA3rUa9+n+dzCCoKkcy3YlYb99Jn2fNnI=
 github.com/pion/transport/v2 v2.0.0/go.mod h1:HS2MEBJTwD+1ZI2eSXSvHJx/HnzQqRy2/LXxt6eVMHc=
