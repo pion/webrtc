@@ -71,6 +71,7 @@ funvit <funvit@gmail.com>
 Gabor Pongracz <gabor.pongracz@proemergotech.com>
 Gareth Hayes <gareth.hayes@gmail.com>
 Guilherme <gqgs@protonmail.com>
+Guillaume Denis <gdenispro@gmail.com>
 Hanjun Kim <hallazzang@gmail.com>
 Hendrik Hofstadt <hendrik@nexantic.com>
 Henry <cryptix@riseup.net>
@@ -104,6 +105,8 @@ Kevin Wang <kevmo314@gmail.com>
 Konstantin Chugalinskiy <kchugalinskiy@yandex.ru>
 Konstantin Itskov <konstantin.itskov@kovits.com>
 krishna chiatanya <kittuov@gmail.com>
+Kunal <tekunalogy@gmail.com>
+Kunal Singh <kunalsin9h@gmail.com>
 Kuzmin Vladimir <vova-kyzmin@yandex.ru>
 lawl <github@dumbinter.net>
 Len <len@hpcnt.com>
@@ -168,11 +171,13 @@ Sam Lancia <sam@vaion.com>
 Sean DuBois <duboisea@justin.tv>
 Sean DuBois <duboisea@twitch.tv>
 Sean DuBois <seaduboi@amazon.com>
+Sean DuBois <sean@pion.ly>
 Sean DuBois <sean@siobud.com>
 Sean DuBois <sean_dubois@apple.com>
 Sean Knight <git@seanknight.com>
 Sebastian Waisbrot <seppo0010@gmail.com>
 Sidney San Martín <sidney@s4y.us>
+Simon Cousineau <simon.cousineau@verkada.com>
 Simon Eisenmann <simon@longsleep.org>
 simonacca-fotokite <47634061+simonacca-fotokite@users.noreply.github.com>
 Simone Gotti <simone.gotti@gmail.com>
