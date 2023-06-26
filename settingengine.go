@@ -86,6 +86,7 @@ type SettingEngine struct {
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
 	iceProxyDialer                            proxy.Dialer
+	iceDisableActiveTCP                       bool
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
@@ -346,6 +347,11 @@ func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
 func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
 	e.iceProxyDialer = d
+}
+
+// DisableActiveTCP disables using active TCP for ICE. Active TCP is enabled by default
+func (e *SettingEngine) DisableActiveTCP(isDisabled bool) {
+	e.iceDisableActiveTCP = isDisabled
 }
 
 // DisableMediaEngineCopy stops the MediaEngine from being copied. This allows a user to modify

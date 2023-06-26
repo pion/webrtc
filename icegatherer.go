@@ -121,6 +121,7 @@ func (g *ICEGatherer) createAgent() error {
 		TCPMux:                 g.api.settingEngine.iceTCPMux,
 		UDPMux:                 g.api.settingEngine.iceUDPMux,
 		ProxyDialer:            g.api.settingEngine.iceProxyDialer,
+		DisableActiveTCP:       g.api.settingEngine.iceDisableActiveTCP,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
