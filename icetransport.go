@@ -303,6 +303,16 @@ func (t *ICETransport) State() ICETransportState {
 	return ICETransportState(0)
 }
 
+// GetLocalParameters returns an IceParameters object which provides information
+// uniquely identifying the local peer for the duration of the ICE session.
+func (t *ICETransport) GetLocalParameters() (ICEParameters, error) {
+	if err := t.ensureGatherer(); err != nil {
+		return ICEParameters{}, err
+	}
+
+	return t.gatherer.GetLocalParameters()
+}
+
 func (t *ICETransport) setState(i ICETransportState) {
 	t.state.Store(i)
 }
