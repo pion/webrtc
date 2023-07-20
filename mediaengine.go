@@ -183,6 +183,15 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeAV1, 90000, 0, "", videoRTCPFeedback},
+			PayloadType:        45,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=45", nil},
+			PayloadType:        46,
+		},
+
+		{
 			RTPCodecCapability: RTPCodecCapability{"video/ulpfec", 90000, 0, "", nil},
 			PayloadType:        116,
 		},
