@@ -61,8 +61,31 @@ func main() {
 	iceConnectedCtx, iceConnectedCtxCancel := context.WithCancel(context.Background())
 
 	if haveVideoFile {
+		file, openErr := os.Open(videoFileName)
+		if openErr != nil {
+			panic(openErr)
+		}
+
+		_, header, openErr := ivfreader.NewWith(file)
+		if openErr != nil {
+			panic(openErr)
+		}
+
+		// Determine video codec
+		var trackCodec string
+		switch header.FourCC {
+		case "AV01":
+			trackCodec = webrtc.MimeTypeAV1
+		case "VP90":
+			trackCodec = webrtc.MimeTypeVP9
+		case "VP80":
+			trackCodec = webrtc.MimeTypeVP8
+		default:
+			panic(fmt.Sprintf("Unable to handle FourCC %s", header.FourCC))
+		}
+
 		// Create a video track
-		videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
+		videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: trackCodec}, "video", "pion")
 		if videoTrackErr != nil {
 			panic(videoTrackErr)
 		}
