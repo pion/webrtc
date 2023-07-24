@@ -25,6 +25,10 @@ type API struct {
 }
 
 // NewAPI Creates a new API object for keeping semi-global settings to WebRTC objects
+//
+// WARNING: No Codecs or Interceptors are enabled by default. Unless configured properly a
+// PeerConnection will not be able to transmit media. For an example of how to do that,
+// see the body of the webrtc.NewPeerConnection() function.
 func NewAPI(options ...func(*API)) *API {
 	a := &API{
 		interceptor:         &interceptor.NoOp{},
