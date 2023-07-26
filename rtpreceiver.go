@@ -126,6 +126,15 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 	return tracks
 }
 
+// RTPTransceiver returns the RTPTransceiver this
+// RTPReceiver belongs too, or nil if none
+func (r *RTPReceiver) RTPTransceiver() *RTPTransceiver {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.tr
+}
+
 // configureReceive initialize the track
 func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
 	r.mu.Lock()
