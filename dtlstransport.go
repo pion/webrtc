@@ -342,6 +342,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	dtlsConfig.ExtendedMasterSecret = t.api.settingEngine.dtls.extendedMasterSecret
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
+	dtlsConfig.KeyLogWriter = t.api.settingEngine.dtls.keyLogWriter
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
