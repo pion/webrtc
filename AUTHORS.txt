@@ -102,6 +102,7 @@ juberti <juberti@alphaexplorationco.com>
 Juliusz Chroboczek <jch@irif.fr>
 Justin Okamoto <jdokamoto@gmail.com>
 Justin Okamoto <justmoto@amazon.com>
+Kevin <kevmo314@gmail.com>
 Kevin Staunton-Lambert <kevin.staunton-lambert@metacdn.com>
 Kevin Wang <kevmo314@gmail.com>
 Konstantin Chugalinskiy <kchugalinskiy@yandex.ru>
