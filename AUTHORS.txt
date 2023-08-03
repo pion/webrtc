@@ -60,6 +60,7 @@ Dean Sheather <dean@coder.com>
 decanus <7621705+decanus@users.noreply.github.com>
 Denis <Hixon10@yandex.ru>
 digitalix <digitalix4@gmail.com>
+do-hyung-kim <do_hyung.kim@navercorp.com>
 donotanswer <viktor.ferter@doclerholding.com>
 earle <aguilar@dm.ai>
 Egon Elbre <egonelbre@gmail.com>
@@ -137,6 +138,7 @@ mr-shitij <21.shitijagrawal@gmail.com>
 mxmCherry <mxmCherry@gmail.com>
 Nam V. Do <vannam12a7@gmail.com>
 Nick Mykins <nmykins@digitalocean.com>
+Nicolas Menard <nicolas.p.menard@gmail.com>
 nindolabs <6729798+nindolabs@users.noreply.github.com>
 Norman Rasmussen <norman@rasmussen.co.za>
 notedit <notedit@gmail.com>
