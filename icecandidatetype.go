@@ -95,3 +95,15 @@ func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error)
 		return ICECandidateType(Unknown), err
 	}
 }
+
+// MarshalText implements the encoding.TextMarshaler interface.
+func (t ICECandidateType) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (t *ICECandidateType) UnmarshalText(b []byte) error {
+	var err error
+	*t, err = NewICECandidateType(string(b))
+	return err
+}

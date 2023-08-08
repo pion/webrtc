@@ -12,6 +12,7 @@ Adrian Cable <adrian.cable@gmail.com>
 adwpc <adwpc@hotmail.com>
 aggresss <aggresss@163.com>
 akil <akil@everycrave.me>
+Aleksandr Alekseev <alekseev-dev@yandex-team.ru>
 Aleksandr Razumov <ar@gortc.io>
 aler9 <46489434+aler9@users.noreply.github.com>
 Alex Browne <stephenalexbrowne@gmail.com>

@@ -62,3 +62,14 @@ func (t DataChannelState) String() string {
 		return ErrUnknownType.Error()
 	}
 }
+
+// MarshalText implements encoding.TextMarshaler
+func (t DataChannelState) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler
+func (t *DataChannelState) UnmarshalText(b []byte) error {
+	*t = newDataChannelState(string(b))
+	return nil
+}

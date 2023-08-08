@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -13,7 +14,63 @@ import (
 
 // A Stats object contains a set of statistics copies out of a monitored component
 // of the WebRTC stack at a specific time.
-type Stats interface{}
+type Stats interface {
+	statsMarker()
+}
+
+// UnmarshalStatsJSON unmarshals a Stats object from JSON
+func UnmarshalStatsJSON(b []byte) (Stats, error) {
+	type typeJSON struct {
+		Type StatsType `json:"type"`
+	}
+	typeHolder := typeJSON{}
+
+	err := json.Unmarshal(b, &typeHolder)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json type: %w", err)
+	}
+
+	switch typeHolder.Type {
+	case StatsTypeCodec:
+		return unmarshalCodecStats(b)
+	case StatsTypeInboundRTP:
+		return unmarshalInboundRTPStreamStats(b)
+	case StatsTypeOutboundRTP:
+		return unmarshalOutboundRTPStreamStats(b)
+	case StatsTypeRemoteInboundRTP:
+		return unmarshalRemoteInboundRTPStreamStats(b)
+	case StatsTypeRemoteOutboundRTP:
+		return unmarshalRemoteOutboundRTPStreamStats(b)
+	case StatsTypeCSRC:
+		return unmarshalCSRCStats(b)
+	case StatsTypeMediaSource:
+		return unmarshalMediaSourceStats(b)
+	case StatsTypeMediaPlayout:
+		return unmarshalMediaPlayoutStats(b)
+	case StatsTypePeerConnection:
+		return unmarshalPeerConnectionStats(b)
+	case StatsTypeDataChannel:
+		return unmarshalDataChannelStats(b)
+	case StatsTypeStream:
+		return unmarshalStreamStats(b)
+	case StatsTypeTrack:
+		return unmarshalTrackStats(b)
+	case StatsTypeSender:
+		return unmarshalSenderStats(b)
+	case StatsTypeReceiver:
+		return unmarshalReceiverStats(b)
+	case StatsTypeTransport:
+		return unmarshalTransportStats(b)
+	case StatsTypeCandidatePair:
+		return unmarshalICECandidatePairStats(b)
+	case StatsTypeLocalCandidate, StatsTypeRemoteCandidate:
+		return unmarshalICECandidateStats(b)
+	case StatsTypeCertificate:
+		return unmarshalCertificateStats(b)
+	default:
+		return nil, fmt.Errorf("type: %w", ErrUnknownType)
+	}
+}
 
 // StatsType indicates the type of the object that a Stats object represents.
 type StatsType string
@@ -37,6 +94,12 @@ const (
 	// StatsTypeCSRC is used by RTPContributingSourceStats.
 	StatsTypeCSRC StatsType = "csrc"
 
+	// StatsTypeMediaSource is used by AudioSourceStats or VideoSourceStats depending on kind.
+	StatsTypeMediaSource = "media-source"
+
+	// StatsTypeMediaPlayout is used by AudioPlayoutStats.
+	StatsTypeMediaPlayout StatsType = "media-playout"
+
 	// StatsTypePeerConnection used by PeerConnectionStats.
 	StatsTypePeerConnection StatsType = "peer-connection"
 
@@ -46,10 +109,10 @@ const (
 	// StatsTypeStream is used by MediaStreamStats.
 	StatsTypeStream StatsType = "stream"
 
-	// StatsTypeTrack is used by SenderVideoTrackAttachmentStats and SenderAudioTrackAttachmentStats.
+	// StatsTypeTrack is used by SenderVideoTrackAttachmentStats and SenderAudioTrackAttachmentStats depending on kind.
 	StatsTypeTrack StatsType = "track"
 
-	// StatsTypeSender is used by by the AudioSenderStats or VideoSenderStats depending on kind.
+	// StatsTypeSender is used by the AudioSenderStats or VideoSenderStats depending on kind.
 	StatsTypeSender StatsType = "sender"
 
 	// StatsTypeReceiver is used by the AudioReceiverStats or VideoReceiverStats depending on kind.
@@ -69,6 +132,16 @@ const (
 
 	// StatsTypeCertificate is used by CertificateStats.
 	StatsTypeCertificate StatsType = "certificate"
+)
+
+// MediaKind indicates the kind of media (audio or video)
+type MediaKind string
+
+const (
+	// MediaKindAudio indicates this is audio stats
+	MediaKindAudio MediaKind = "audio"
+	// MediaKindVideo indicates this is video stats
+	MediaKindVideo MediaKind = "video"
 )
 
 // StatsTimestamp is a timestamp represented by the floating point number of
@@ -181,6 +254,17 @@ type CodecStats struct {
 	// Implementation identifies the implementation used. This is useful for diagnosing
 	// interoperability issues.
 	Implementation string `json:"implementation"`
+}
+
+func (s CodecStats) statsMarker() {}
+
+func unmarshalCodecStats(b []byte) (CodecStats, error) {
+	var codecStats CodecStats
+	err := json.Unmarshal(b, &codecStats)
+	if err != nil {
+		return CodecStats{}, fmt.Errorf("unmarshal codec stats: %w", err)
+	}
+	return codecStats, nil
 }
 
 // InboundRTPStreamStats contains statistics for an inbound RTP stream that is
@@ -332,6 +416,17 @@ type InboundRTPStreamStats struct {
 	PerDSCPPacketsReceived map[string]uint32 `json:"perDscpPacketsReceived"`
 }
 
+func (s InboundRTPStreamStats) statsMarker() {}
+
+func unmarshalInboundRTPStreamStats(b []byte) (InboundRTPStreamStats, error) {
+	var inboundRTPStreamStats InboundRTPStreamStats
+	err := json.Unmarshal(b, &inboundRTPStreamStats)
+	if err != nil {
+		return InboundRTPStreamStats{}, fmt.Errorf("unmarshal inbound rtp stream stats: %w", err)
+	}
+	return inboundRTPStreamStats, nil
+}
+
 // QualityLimitationReason lists the reason for limiting the resolution and/or framerate.
 // Only valid for video.
 type QualityLimitationReason string
@@ -477,6 +572,17 @@ type OutboundRTPStreamStats struct {
 	PerDSCPPacketsSent map[string]uint32 `json:"perDscpPacketsSent"`
 }
 
+func (s OutboundRTPStreamStats) statsMarker() {}
+
+func unmarshalOutboundRTPStreamStats(b []byte) (OutboundRTPStreamStats, error) {
+	var outboundRTPStreamStats OutboundRTPStreamStats
+	err := json.Unmarshal(b, &outboundRTPStreamStats)
+	if err != nil {
+		return OutboundRTPStreamStats{}, fmt.Errorf("unmarshal outbound rtp stream stats: %w", err)
+	}
+	return outboundRTPStreamStats, nil
+}
+
 // RemoteInboundRTPStreamStats contains statistics for the remote endpoint's inbound
 // RTP stream corresponding to an outbound stream that is currently sent with this
 // PeerConnection object. It is measured at the remote endpoint and reported in an RTCP
@@ -581,8 +687,19 @@ type RemoteInboundRTPStreamStats struct {
 	// RTCP timestamps in the RTCP Receiver Report (RR) and measured in seconds.
 	RoundTripTime float64 `json:"roundTripTime"`
 
-	// FractionLost is the the fraction packet loss reported for this SSRC.
+	// FractionLost is the fraction packet loss reported for this SSRC.
 	FractionLost float64 `json:"fractionLost"`
+}
+
+func (s RemoteInboundRTPStreamStats) statsMarker() {}
+
+func unmarshalRemoteInboundRTPStreamStats(b []byte) (RemoteInboundRTPStreamStats, error) {
+	var remoteInboundRTPStreamStats RemoteInboundRTPStreamStats
+	err := json.Unmarshal(b, &remoteInboundRTPStreamStats)
+	if err != nil {
+		return RemoteInboundRTPStreamStats{}, fmt.Errorf("unmarshal remote inbound rtp stream stats: %w", err)
+	}
+	return remoteInboundRTPStreamStats, nil
 }
 
 // RemoteOutboundRTPStreamStats contains statistics for the remote endpoint's outbound
@@ -671,6 +788,17 @@ type RemoteOutboundRTPStreamStats struct {
 	RemoteTimestamp StatsTimestamp `json:"remoteTimestamp"`
 }
 
+func (s RemoteOutboundRTPStreamStats) statsMarker() {}
+
+func unmarshalRemoteOutboundRTPStreamStats(b []byte) (RemoteOutboundRTPStreamStats, error) {
+	var remoteOutboundRTPStreamStats RemoteOutboundRTPStreamStats
+	err := json.Unmarshal(b, &remoteOutboundRTPStreamStats)
+	if err != nil {
+		return RemoteOutboundRTPStreamStats{}, fmt.Errorf("unmarshal remote outbound rtp stream stats: %w", err)
+	}
+	return remoteOutboundRTPStreamStats, nil
+}
+
 // RTPContributingSourceStats contains statistics for a contributing source (CSRC) that contributed
 // to an inbound RTP stream.
 type RTPContributingSourceStats struct {
@@ -707,6 +835,211 @@ type RTPContributingSourceStats struct {
 	AudioLevel float64 `json:"audioLevel"`
 }
 
+func (s RTPContributingSourceStats) statsMarker() {}
+
+func unmarshalCSRCStats(b []byte) (RTPContributingSourceStats, error) {
+	var csrcStats RTPContributingSourceStats
+	err := json.Unmarshal(b, &csrcStats)
+	if err != nil {
+		return RTPContributingSourceStats{}, fmt.Errorf("unmarshal csrc stats: %w", err)
+	}
+	return csrcStats, nil
+}
+
+// AudioSourceStats represents an audio track that is attached to one or more senders.
+type AudioSourceStats struct {
+	// Timestamp is the timestamp associated with this object.
+	Timestamp StatsTimestamp `json:"timestamp"`
+
+	// Type is the object's StatsType
+	Type StatsType `json:"type"`
+
+	// ID is a unique id that is associated with the component inspected to produce
+	// this Stats object. Two Stats objects will have the same ID if they were produced
+	// by inspecting the same underlying object.
+	ID string `json:"id"`
+
+	// TrackIdentifier represents the id property of the track.
+	TrackIdentifier string `json:"trackIdentifier"`
+
+	// Kind is "audio"
+	Kind string `json:"kind"`
+
+	// AudioLevel represents the output audio level of the track.
+	//
+	// The value is a value between 0..1 (linear), where 1.0 represents 0 dBov,
+	// 0 represents silence, and 0.5 represents approximately 6 dBSPL change in
+	// the sound pressure level from 0 dBov.
+	//
+	// If the track is sourced from an Receiver, does no audio processing, has a
+	// constant level, and has a volume setting of 1.0, the audio level is expected
+	// to be the same as the audio level of the source SSRC, while if the volume setting
+	// is 0.5, the AudioLevel is expected to be half that value.
+	AudioLevel float64 `json:"audioLevel"`
+
+	// TotalAudioEnergy is the total energy of all the audio samples sent/received
+	// for this object, calculated by duration * Math.pow(energy/maxEnergy, 2) for
+	// each audio sample seen.
+	TotalAudioEnergy float64 `json:"totalAudioEnergy"`
+
+	// TotalSamplesDuration represents the total duration in seconds of all samples
+	// that have sent or received (and thus counted by TotalSamplesSent or TotalSamplesReceived).
+	// Can be used with TotalAudioEnergy to compute an average audio level over different intervals.
+	TotalSamplesDuration float64 `json:"totalSamplesDuration"`
+
+	// EchoReturnLoss is only present while the sender is sending a track sourced from
+	// a microphone where echo cancellation is applied. Calculated in decibels.
+	EchoReturnLoss float64 `json:"echoReturnLoss"`
+
+	// EchoReturnLossEnhancement is only present while the sender is sending a track
+	// sourced from a microphone where echo cancellation is applied. Calculated in decibels.
+	EchoReturnLossEnhancement float64 `json:"echoReturnLossEnhancement"`
+
+	// DroppedSamplesDuration represents the total duration, in seconds, of samples produced by the device that got
+	// dropped before reaching the media source. Only applicable if this media source is backed by an audio capture device.
+	DroppedSamplesDuration float64 `json:"droppedSamplesDuration"`
+
+	// DroppedSamplesEvents is the number of dropped samples events. This counter increases every time a sample is
+	// dropped after a non-dropped sample. That is, multiple consecutive dropped samples will increase
+	// droppedSamplesDuration multiple times but is a single dropped samples event.
+	DroppedSamplesEvents uint64 `json:"droppedSamplesEvents"`
+
+	// TotalCaptureDelay is the total delay, in seconds, for each audio sample between the time the sample was emitted
+	// by the capture device and the sample reaching the source. This can be used together with totalSamplesCaptured to
+	// calculate the average capture delay per sample. Only applicable if the audio source represents an audio capture device.
+	TotalCaptureDelay float64 `json:"totalCaptureDelay"`
+
+	// TotalSamplesCaptured is the total number of captured samples reaching the audio source, i.e. that were not dropped
+	// by the capture pipeline. The frequency of the media source is not necessarily the same as the frequency of encoders
+	// later in the pipeline. Only applicable if the audio source represents an audio capture device.
+	TotalSamplesCaptured uint64 `json:"totalSamplesCaptured"`
+}
+
+func (s AudioSourceStats) statsMarker() {}
+
+// VideoSourceStats represents a video track that is attached to one or more senders.
+type VideoSourceStats struct {
+	// Timestamp is the timestamp associated with this object.
+	Timestamp StatsTimestamp `json:"timestamp"`
+
+	// Type is the object's StatsType
+	Type StatsType `json:"type"`
+
+	// ID is a unique id that is associated with the component inspected to produce
+	// this Stats object. Two Stats objects will have the same ID if they were produced
+	// by inspecting the same underlying object.
+	ID string `json:"id"`
+
+	// TrackIdentifier represents the id property of the track.
+	TrackIdentifier string `json:"trackIdentifier"`
+
+	// Kind is "video"
+	Kind string `json:"kind"`
+
+	// Width is width of the last frame originating from this source in pixels.
+	Width uint32 `json:"width"`
+
+	// Height is height of the last frame originating from this source in pixels.
+	Height uint32 `json:"height"`
+
+	// Frames is the total number of frames originating from this source.
+	Frames uint32 `json:"frames"`
+
+	// FramesPerSecond is the number of frames originating from this source, measured during the last second.
+	FramesPerSecond float64 `json:"framesPerSecond"`
+}
+
+func (s VideoSourceStats) statsMarker() {}
+
+func unmarshalMediaSourceStats(b []byte) (Stats, error) {
+	type kindJSON struct {
+		Kind string `json:"kind"`
+	}
+	kindHolder := kindJSON{}
+
+	err := json.Unmarshal(b, &kindHolder)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json kind: %w", err)
+	}
+
+	switch MediaKind(kindHolder.Kind) {
+	case MediaKindAudio:
+		var mediaSourceStats AudioSourceStats
+		err := json.Unmarshal(b, &mediaSourceStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal audio source stats: %w", err)
+		}
+		return mediaSourceStats, nil
+	case MediaKindVideo:
+		var mediaSourceStats VideoSourceStats
+		err := json.Unmarshal(b, &mediaSourceStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal video source stats: %w", err)
+		}
+		return mediaSourceStats, nil
+	default:
+		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
+	}
+}
+
+// AudioPlayoutStats represents one playout path - if the same playout stats object is referenced by multiple
+// RTCInboundRtpStreamStats this is an indication that audio mixing is happening in which case sample counters in this
+// stats object refer to the samples after mixing. Only applicable if the playout path represents an audio device.
+type AudioPlayoutStats struct {
+	// Timestamp is the timestamp associated with this object.
+	Timestamp StatsTimestamp `json:"timestamp"`
+
+	// Type is the object's StatsType
+	Type StatsType `json:"type"`
+
+	// ID is a unique id that is associated with the component inspected to produce
+	// this Stats object. Two Stats objects will have the same ID if they were produced
+	// by inspecting the same underlying object.
+	ID string `json:"id"`
+
+	// Kind is "audio"
+	Kind string `json:"kind"`
+
+	// SynthesizedSamplesDuration is measured in seconds and is incremented each time an audio sample is synthesized by
+	// this playout path. This metric can be used together with totalSamplesDuration to calculate the percentage of played
+	// out media being synthesized. If the playout path is unable to produce audio samples on time for device playout,
+	// samples are synthesized to be playout out instead. Synthesization typically only happens if the pipeline is
+	// underperforming. Samples synthesized by the RTCInboundRtpStreamStats are not counted for here, but in
+	// InboundRtpStreamStats.concealedSamples.
+	SynthesizedSamplesDuration float64 `json:"synthesizedSamplesDuration"`
+
+	// SynthesizedSamplesEvents is the number of synthesized samples events. This counter increases every time a sample
+	// is synthesized after a non-synthesized sample. That is, multiple consecutive synthesized samples will increase
+	// synthesizedSamplesDuration multiple times but is a single synthesization samples event.
+	SynthesizedSamplesEvents uint64 `json:"synthesizedSamplesEvents"`
+
+	// TotalSamplesDuration represents the total duration in seconds of all samples
+	// that have sent or received (and thus counted by TotalSamplesSent or TotalSamplesReceived).
+	// Can be used with TotalAudioEnergy to compute an average audio level over different intervals.
+	TotalSamplesDuration float64 `json:"totalSamplesDuration"`
+
+	// When audio samples are pulled by the playout device, this counter is incremented with the estimated delay of the
+	// playout path for that audio sample. The playout delay includes the delay from being emitted to the actual time of
+	// playout on the device. This metric can be used together with totalSamplesCount to calculate the average
+	// playout delay per sample.
+	TotalPlayoutDelay float64 `json:"totalPlayoutDelay"`
+
+	// When audio samples are pulled by the playout device, this counter is incremented with the number of samples
+	// emitted for playout.
+	TotalSamplesCount uint64 `json:"totalSamplesCount"`
+}
+
+func (s AudioPlayoutStats) statsMarker() {}
+
+func unmarshalMediaPlayoutStats(b []byte) (Stats, error) {
+	var audioPlayoutStats AudioPlayoutStats
+	err := json.Unmarshal(b, &audioPlayoutStats)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal audio playout stats: %w", err)
+	}
+	return audioPlayoutStats, nil
+}
+
 // PeerConnectionStats contains statistics related to the PeerConnection object.
 type PeerConnectionStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -739,6 +1072,17 @@ type PeerConnectionStats struct {
 	// DataChannelsAccepted represents the number of unique DataChannels signaled
 	// in a "datachannel" event on the PeerConnection.
 	DataChannelsAccepted uint32 `json:"dataChannelsAccepted"`
+}
+
+func (s PeerConnectionStats) statsMarker() {}
+
+func unmarshalPeerConnectionStats(b []byte) (PeerConnectionStats, error) {
+	var pcStats PeerConnectionStats
+	err := json.Unmarshal(b, &pcStats)
+	if err != nil {
+		return PeerConnectionStats{}, fmt.Errorf("unmarshal pc stats: %w", err)
+	}
+	return pcStats, nil
 }
 
 // DataChannelStats contains statistics related to each DataChannel ID.
@@ -784,6 +1128,17 @@ type DataChannelStats struct {
 	BytesReceived uint64 `json:"bytesReceived"`
 }
 
+func (s DataChannelStats) statsMarker() {}
+
+func unmarshalDataChannelStats(b []byte) (DataChannelStats, error) {
+	var dataChannelStats DataChannelStats
+	err := json.Unmarshal(b, &dataChannelStats)
+	if err != nil {
+		return DataChannelStats{}, fmt.Errorf("unmarshal data channel stats: %w", err)
+	}
+	return dataChannelStats, nil
+}
+
 // MediaStreamStats contains statistics related to a specific MediaStream.
 type MediaStreamStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -803,6 +1158,17 @@ type MediaStreamStats struct {
 	// TrackIDs is a list of the identifiers of the stats object representing the
 	// stream's tracks, either ReceiverAudioTrackAttachmentStats or ReceiverVideoTrackAttachmentStats.
 	TrackIDs []string `json:"trackIds"`
+}
+
+func (s MediaStreamStats) statsMarker() {}
+
+func unmarshalStreamStats(b []byte) (MediaStreamStats, error) {
+	var streamStats MediaStreamStats
+	err := json.Unmarshal(b, &streamStats)
+	if err != nil {
+		return MediaStreamStats{}, fmt.Errorf("unmarshal stream stats: %w", err)
+	}
+	return streamStats, nil
 }
 
 // AudioSenderStats represents the stats about one audio sender of a PeerConnection
@@ -832,7 +1198,7 @@ type AudioSenderStats struct {
 	// Ended reflects the "ended" state of the track.
 	Ended bool `json:"ended"`
 
-	// Kind is either "audio" or "video". This reflects the "kind" attribute of the MediaStreamTrack.
+	// Kind is "audio"
 	Kind string `json:"kind"`
 
 	// AudioLevel represents the output audio level of the track.
@@ -879,6 +1245,8 @@ type AudioSenderStats struct {
 	TotalSamplesSent uint64 `json:"totalSamplesSent"`
 }
 
+func (s AudioSenderStats) statsMarker() {}
+
 // SenderAudioTrackAttachmentStats object represents the stats about one attachment
 // of an audio MediaStreamTrack to the PeerConnection object for which one calls GetStats.
 //
@@ -892,6 +1260,8 @@ type AudioSenderStats struct {
 // If the track is detached from the PeerConnection (via removeTrack or via replaceTrack),
 // it continues to appear, but with the "ObjectDeleted" member set to true.
 type SenderAudioTrackAttachmentStats AudioSenderStats
+
+func (s SenderAudioTrackAttachmentStats) statsMarker() {}
 
 // VideoSenderStats represents the stats about one video sender of a PeerConnection
 // object for which one calls GetStats.
@@ -909,6 +1279,9 @@ type VideoSenderStats struct {
 	// this Stats object. Two Stats objects will have the same ID if they were produced
 	// by inspecting the same underlying object.
 	ID string `json:"id"`
+
+	// Kind is "video"
+	Kind string `json:"kind"`
 
 	// FramesCaptured represents the total number of frames captured, before encoding,
 	// for this RTPSender (or for this MediaStreamTrack, if type is "track"). For example,
@@ -940,6 +1313,8 @@ type VideoSenderStats struct {
 	KeyFramesSent uint32 `json:"keyFramesSent"`
 }
 
+func (s VideoSenderStats) statsMarker() {}
+
 // SenderVideoTrackAttachmentStats represents the stats about one attachment of a
 // video MediaStreamTrack to the PeerConnection object for which one calls GetStats.
 //
@@ -954,6 +1329,70 @@ type VideoSenderStats struct {
 // it continues to appear, but with the "ObjectDeleted" member set to true.
 type SenderVideoTrackAttachmentStats VideoSenderStats
 
+func (s SenderVideoTrackAttachmentStats) statsMarker() {}
+
+func unmarshalSenderStats(b []byte) (Stats, error) {
+	type kindJSON struct {
+		Kind string `json:"kind"`
+	}
+	kindHolder := kindJSON{}
+
+	err := json.Unmarshal(b, &kindHolder)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json kind: %w", err)
+	}
+
+	switch MediaKind(kindHolder.Kind) {
+	case MediaKindAudio:
+		var senderStats AudioSenderStats
+		err := json.Unmarshal(b, &senderStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal audio sender stats: %w", err)
+		}
+		return senderStats, nil
+	case MediaKindVideo:
+		var senderStats VideoSenderStats
+		err := json.Unmarshal(b, &senderStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal video sender stats: %w", err)
+		}
+		return senderStats, nil
+	default:
+		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
+	}
+}
+
+func unmarshalTrackStats(b []byte) (Stats, error) {
+	type kindJSON struct {
+		Kind string `json:"kind"`
+	}
+	kindHolder := kindJSON{}
+
+	err := json.Unmarshal(b, &kindHolder)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json kind: %w", err)
+	}
+
+	switch MediaKind(kindHolder.Kind) {
+	case MediaKindAudio:
+		var trackStats SenderAudioTrackAttachmentStats
+		err := json.Unmarshal(b, &trackStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal audio track stats: %w", err)
+		}
+		return trackStats, nil
+	case MediaKindVideo:
+		var trackStats SenderVideoTrackAttachmentStats
+		err := json.Unmarshal(b, &trackStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal video track stats: %w", err)
+		}
+		return trackStats, nil
+	default:
+		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
+	}
+}
+
 // AudioReceiverStats contains audio metrics related to a specific receiver.
 type AudioReceiverStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -966,6 +1405,9 @@ type AudioReceiverStats struct {
 	// this Stats object. Two Stats objects will have the same ID if they were produced
 	// by inspecting the same underlying object.
 	ID string `json:"id"`
+
+	// Kind is "audio"
+	Kind string `json:"kind"`
 
 	// AudioLevel represents the output audio level of the track.
 	//
@@ -1038,6 +1480,8 @@ type AudioReceiverStats struct {
 	ConcealmentEvents uint64 `json:"concealmentEvents"`
 }
 
+func (s AudioReceiverStats) statsMarker() {}
+
 // VideoReceiverStats contains video metrics related to a specific receiver.
 type VideoReceiverStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -1050,6 +1494,9 @@ type VideoReceiverStats struct {
 	// this Stats object. Two Stats objects will have the same ID if they were produced
 	// by inspecting the same underlying object.
 	ID string `json:"id"`
+
+	// Kind is "video"
+	Kind string `json:"kind"`
 
 	// FrameWidth represents the width of the last processed frame for this track.
 	// Before the first frame is processed this attribute is missing.
@@ -1118,6 +1565,39 @@ type VideoReceiverStats struct {
 	FullFramesLost uint32 `json:"fullFramesLost"`
 }
 
+func (s VideoReceiverStats) statsMarker() {}
+
+func unmarshalReceiverStats(b []byte) (Stats, error) {
+	type kindJSON struct {
+		Kind string `json:"kind"`
+	}
+	kindHolder := kindJSON{}
+
+	err := json.Unmarshal(b, &kindHolder)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal json kind: %w", err)
+	}
+
+	switch MediaKind(kindHolder.Kind) {
+	case MediaKindAudio:
+		var receiverStats AudioReceiverStats
+		err := json.Unmarshal(b, &receiverStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal audio receiver stats: %w", err)
+		}
+		return receiverStats, nil
+	case MediaKindVideo:
+		var receiverStats VideoReceiverStats
+		err := json.Unmarshal(b, &receiverStats)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal video receiver stats: %w", err)
+		}
+		return receiverStats, nil
+	default:
+		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
+	}
+}
+
 // TransportStats contains transport statistics related to the PeerConnection object.
 type TransportStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -1177,6 +1657,17 @@ type TransportStats struct {
 	// transport, as defined in the "Profile" column of the IANA DTLS-SRTP protection
 	// profile registry.
 	SRTPCipher string `json:"srtpCipher"`
+}
+
+func (s TransportStats) statsMarker() {}
+
+func unmarshalTransportStats(b []byte) (TransportStats, error) {
+	var transportStats TransportStats
+	err := json.Unmarshal(b, &transportStats)
+	if err != nil {
+		return TransportStats{}, fmt.Errorf("unmarshal transport stats: %w", err)
+	}
+	return transportStats, nil
 }
 
 // StatsICECandidatePairState is the state of an ICE candidate pair used in the
@@ -1363,6 +1854,17 @@ type ICECandidatePairStats struct {
 	ConsentExpiredTimestamp StatsTimestamp `json:"consentExpiredTimestamp"`
 }
 
+func (s ICECandidatePairStats) statsMarker() {}
+
+func unmarshalICECandidatePairStats(b []byte) (ICECandidatePairStats, error) {
+	var iceCandidatePairStats ICECandidatePairStats
+	err := json.Unmarshal(b, &iceCandidatePairStats)
+	if err != nil {
+		return ICECandidatePairStats{}, fmt.Errorf("unmarshal ice candidate pair stats: %w", err)
+	}
+	return iceCandidatePairStats, nil
+}
+
 // ICECandidateStats contains ICE candidate statistics related to the ICETransport objects.
 type ICECandidateStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -1390,7 +1892,10 @@ type ICECandidateStats struct {
 	// it's possible that a connection will be bottlenecked by another type of network.
 	// For example, when using Wi-Fi tethering, the networkType of the relevant candidate
 	// would be "wifi", even when the next hop is over a cellular connection.
-	NetworkType NetworkType `json:"networkType"`
+	//
+	// DEPRECATED. Although it may still work in some browsers, the networkType property was deprecated for
+	// preserving privacy.
+	NetworkType string `json:"networkType,omitempty"`
 
 	// IP is the IP address of the candidate, allowing for IPv4 addresses and
 	// IPv6 addresses, but fully qualified domain names (FQDNs) are not allowed.
@@ -1426,6 +1931,17 @@ type ICECandidateStats struct {
 	Deleted bool `json:"deleted"`
 }
 
+func (s ICECandidateStats) statsMarker() {}
+
+func unmarshalICECandidateStats(b []byte) (ICECandidateStats, error) {
+	var iceCandidateStats ICECandidateStats
+	err := json.Unmarshal(b, &iceCandidateStats)
+	if err != nil {
+		return ICECandidateStats{}, fmt.Errorf("unmarshal ice candidate stats: %w", err)
+	}
+	return iceCandidateStats, nil
+}
+
 // CertificateStats contains information about a certificate used by an ICETransport.
 type CertificateStats struct {
 	// Timestamp is the timestamp associated with this object.
@@ -1452,4 +1968,15 @@ type CertificateStats struct {
 	// in the certificate chain. If the current certificate is at the end of the chain
 	// (i.e. a self-signed certificate), this will not be set.
 	IssuerCertificateID string `json:"issuerCertificateId"`
+}
+
+func (s CertificateStats) statsMarker() {}
+
+func unmarshalCertificateStats(b []byte) (CertificateStats, error) {
+	var certificateStats CertificateStats
+	err := json.Unmarshal(b, &certificateStats)
+	if err != nil {
+		return CertificateStats{}, fmt.Errorf("unmarshal certificate stats: %w", err)
+	}
+	return certificateStats, nil
 }
