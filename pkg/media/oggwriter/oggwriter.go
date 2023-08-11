@@ -149,7 +149,9 @@ const (
 
 func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uint64, pageIndex uint32) []byte {
 	i.lastPayloadSize = len(payload)
-	page := make([]byte, pageHeaderSize+1+i.lastPayloadSize)
+	nSegments := (len(payload) / 255) + 1 // A segment can be at most 255 bytes long.
+
+	page := make([]byte, pageHeaderSize+i.lastPayloadSize+nSegments)
 
 	copy(page[0:], pageHeaderSignature)                 // page headers starts with 'OggS'
 	page[4] = 0                                         // Version
@@ -157,14 +159,23 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 	binary.LittleEndian.PutUint64(page[6:], granulePos) // granule position
 	binary.LittleEndian.PutUint32(page[14:], i.serial)  // Bitstream serial number
 	binary.LittleEndian.PutUint32(page[18:], pageIndex) // Page sequence number
-	page[26] = 1                                        // Number of segments in page, giving always 1 segment
-	page[27] = uint8(i.lastPayloadSize)                 // Segment Table inserting at 27th position since page header length is 27
-	copy(page[28:], payload)                            // inserting at 28th since Segment Table(1) + header length(27)
+	page[26] = uint8(nSegments)                         // Number of segments in page.
+
+	// Filling segment table with the lacing values.
+	// First (nSegments - 1) values will always be 255.
+	for i := 0; i < nSegments-1; i++ {
+		page[pageHeaderSize+i] = 255
+	}
+	// The last value will be the remainder.
+	page[pageHeaderSize+nSegments-1] = uint8(len(payload) % 255)
+
+	copy(page[pageHeaderSize+nSegments:], payload) // Payload goes after the segment table, so at pageHeaderSize+nSegments.
 
 	var checksum uint32
 	for index := range page {
 		checksum = (checksum << 8) ^ i.checksumTable[byte(checksum>>24)^page[index]]
 	}
+
 	binary.LittleEndian.PutUint32(page[22:], checksum) // Checksum - generating for page data and inserting at 22th position into 32 bits
 
 	return page
