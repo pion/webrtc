@@ -133,3 +133,33 @@ func TestOggWriter_EmptyPayload(t *testing.T) {
 
 	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{}}))
 }
+
+func TestOggWriter_LargePayload(t *testing.T) {
+	rawPkt := bytes.Repeat([]byte{0x45}, 1000)
+
+	validPacket := &rtp.Packet{
+		Header: rtp.Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Version:          2,
+			PayloadType:      111,
+			SequenceNumber:   27023,
+			Timestamp:        3653407706,
+			SSRC:             476325762,
+			CSRC:             []uint32{},
+		},
+		Payload: rawPkt,
+	}
+	assert.NoError(t, validPacket.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
+
+	writer, err := NewWith(&bytes.Buffer{}, 48000, 2)
+	assert.NoError(t, err, "OggWriter should be created")
+	assert.NotNil(t, writer, "Writer shouldn't be nil")
+
+	err = writer.WriteRTP(validPacket)
+	assert.NoError(t, err)
+
+	data := writer.createPage(rawPkt, pageHeaderTypeContinuationOfStream, 0, 1)
+	assert.Equal(t, uint8(4), data[26])
+}
