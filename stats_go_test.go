@@ -1069,6 +1069,15 @@ func getTransportStats(t *testing.T, report StatsReport, statsID string) Transpo
 	return transportStats
 }
 
+func getSctpTransportStats(t *testing.T, report StatsReport) SCTPTransportStats {
+	stats, ok := report["sctpTransport"]
+	assert.True(t, ok)
+	transportStats, ok := stats.(SCTPTransportStats)
+	assert.True(t, ok)
+	assert.Equal(t, transportStats.Type, StatsTypeSCTPTransport)
+	return transportStats
+}
+
 func getCertificateStats(t *testing.T, report StatsReport, certificate *Certificate) CertificateStats {
 	certificateStats, ok := report.GetCertificateStats(certificate)
 	assert.True(t, ok)
@@ -1314,8 +1323,8 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
 
-	answerSCTPTransportStats := getTransportStats(t, reportPCAnswer, "sctpTransport")
-	offerSCTPTransportStats := getTransportStats(t, reportPCOffer, "sctpTransport")
+	answerSCTPTransportStats := getSctpTransportStats(t, reportPCAnswer)
+	offerSCTPTransportStats := getSctpTransportStats(t, reportPCOffer)
 	assert.GreaterOrEqual(t, offerSCTPTransportStats.BytesSent, answerSCTPTransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerSCTPTransportStats.BytesSent, offerSCTPTransportStats.BytesReceived)
 
