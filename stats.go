@@ -67,6 +67,8 @@ func UnmarshalStatsJSON(b []byte) (Stats, error) {
 		return unmarshalICECandidateStats(b)
 	case StatsTypeCertificate:
 		return unmarshalCertificateStats(b)
+	case StatsTypeSCTPTransport:
+		return unmarshalSCTPTransportStats(b)
 	default:
 		return nil, fmt.Errorf("type: %w", ErrUnknownType)
 	}
@@ -132,6 +134,9 @@ const (
 
 	// StatsTypeCertificate is used by CertificateStats.
 	StatsTypeCertificate StatsType = "certificate"
+
+	// StatsTypeSCTPTransport is used by SCTPTransportStats
+	StatsTypeSCTPTransport StatsType = "sctp-transport"
 )
 
 // MediaKind indicates the kind of media (audio or video)
@@ -1979,4 +1984,54 @@ func unmarshalCertificateStats(b []byte) (CertificateStats, error) {
 		return CertificateStats{}, fmt.Errorf("unmarshal certificate stats: %w", err)
 	}
 	return certificateStats, nil
+}
+
+// SCTPTransportStats contains information about a certificate used by an SCTPTransport.
+type SCTPTransportStats struct {
+	// Timestamp is the timestamp associated with this object.
+	Timestamp StatsTimestamp `json:"timestamp"`
+
+	// Type is the object's StatsType
+	Type StatsType `json:"type"`
+
+	// ID is a unique id that is associated with the component inspected to produce
+	// this Stats object. Two Stats objects will have the same ID if they were produced
+	// by inspecting the same underlying object.
+	ID string `json:"id"`
+
+	// TransportID is the identifier of the object that was inspected to produce the
+	// RTCTransportStats for the DTLSTransport and ICETransport supporting the SCTP transport.
+	TransportID string `json:"transportId"`
+
+	// SmoothedRoundTripTime is the latest smoothed round-trip time value, corresponding to spinfo_srtt defined in [RFC6458]
+	// but converted to seconds. If there has been no round-trip time measurements yet, this value is undefined.
+	SmoothedRoundTripTime float64 `json:"smoothedRoundTripTime"`
+
+	// CongestionWindow is the latest congestion window, corresponding to spinfo_cwnd defined in [RFC6458].
+	CongestionWindow uint32 `json:"congestionWindow"`
+
+	// ReceiverWindow is the latest receiver window, corresponding to sstat_rwnd defined in [RFC6458].
+	ReceiverWindow uint32 `json:"receiverWindow"`
+
+	// MTU is the latest maximum transmission unit, corresponding to spinfo_mtu defined in [RFC6458].
+	MTU uint32 `json:"mtu"`
+
+	// UNACKData is the number of unacknowledged DATA chunks, corresponding to sstat_unackdata defined in [RFC6458].
+	UNACKData uint32 `json:"unackData"`
+
+	// BytesSent represents the total number of bytes sent on this SCTPTransport
+	BytesSent uint64 `json:"bytesSent"`
+
+	// BytesReceived represents the total number of bytes received on this SCTPTransport
+	BytesReceived uint64 `json:"bytesReceived"`
+}
+
+func (s SCTPTransportStats) statsMarker() {}
+
+func unmarshalSCTPTransportStats(b []byte) (SCTPTransportStats, error) {
+	var sctpTransportStats SCTPTransportStats
+	if err := json.Unmarshal(b, &sctpTransportStats); err != nil {
+		return SCTPTransportStats{}, fmt.Errorf("unmarshal sctp transport stats: %w", err)
+	}
+	return sctpTransportStats, nil
 }
