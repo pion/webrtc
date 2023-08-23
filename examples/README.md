@@ -10,7 +10,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 #### Media API
 * [Reflect](reflect): The reflect example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.
 * [Play from Disk](play-from-disk): The play-from-disk example demonstrates how to send video to your browser from a file saved to disk.
-* [Play from Disk Renegotation](play-from-disk-renegotation): The play-from-disk-renegotation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.
+* [Play from Disk Renegotiation](play-from-disk-renegotiation): The play-from-disk-renegotiation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.
 * [Insertable Streams](insertable-streams): The insertable-streams example demonstrates how Pion can be used to send E2E encrypted video and decrypt via insertable streams in the browser.
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [Broadcast](broadcast): The broadcast example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.

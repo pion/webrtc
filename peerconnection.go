@@ -1039,7 +1039,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	isRenegotation := pc.currentRemoteDescription != nil
+	isRenegotiation := pc.currentRemoteDescription != nil
 
 	if _, err := desc.Unmarshal(); err != nil {
 		return err
@@ -1142,7 +1142,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return err
 	}
 
-	if isRenegotation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
+	if isRenegotiation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
 		// An ICE Restart only happens implicitly for a SetRemoteDescription of type offer
 		if !weOffer {
 			if err = pc.iceTransport.restart(); err != nil {
@@ -1163,7 +1163,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
-	if isRenegotation {
+	if isRenegotiation {
 		if weOffer {
 			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {

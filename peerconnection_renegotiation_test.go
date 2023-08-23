@@ -716,7 +716,7 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 }
 
 // Issue #346, don't start the SCTP Subsystem if the RemoteDescription doesn't contain one
-// Before we would always start it, and re-negotations would fail because SCTP was in flight
+// Before we would always start it, and re-negotiations would fail because SCTP was in flight
 func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	signalPairExcludeDataChannel := func(pcOffer, pcAnswer *PeerConnection) {
 		offer, err := pcOffer.CreateOffer(nil)
@@ -785,7 +785,7 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-func TestAddDataChannelDuringRenegotation(t *testing.T) {
+func TestAddDataChannelDuringRenegotiation(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
