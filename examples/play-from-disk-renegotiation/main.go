@@ -4,7 +4,7 @@
 //go:build !js
 // +build !js
 
-// play-from-disk-renegotation demonstrates Pion WebRTC's renegotiation abilities.
+// play-from-disk-renegotiation demonstrates Pion WebRTC's renegotiation abilities.
 package main
 
 import (

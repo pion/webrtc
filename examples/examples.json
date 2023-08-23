@@ -36,9 +36,9 @@
 		"type": "browser"
 	},
 	{
-		"title": "Play from Disk Renegotation",
+		"title": "Play from Disk Renegotiation",
 		"link": "play-from-disk",
-		"description": "The play-from-disk-renegotation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.",
+		"description": "The play-from-disk-renegotiation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.",
 		"type": "browser"
 	},
 	{
