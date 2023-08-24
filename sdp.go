@@ -699,6 +699,11 @@ func extracICENone(desc *sdp.SessionDescription, log logging.LeveledLogger) ([]I
 		ipaddress = desc.ConnectionInformation.Address.Address
 	}
 
+	if ipaddress == "0.0.0.0" || port == 9 {
+		log.Warnf("*********lisay**********\r\n")
+		log.Warnf("input sdp %v", desc)
+	}
+
 	c, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
 		CandidateID: "",
 		Network:     "udp",

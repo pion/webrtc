@@ -571,12 +571,14 @@ func TestEOF(t *testing.T) {
 		defer lim.Stop()
 
 		settingEngine := &SettingEngine{}
-		// settingEngine.SetInterfaceFilter(func(s string) bool {
-		// 	return s == "eth0"
-		// })
+		settingEngine.SetInterfaceFilter(func(s string) bool {
+			return s == "eth0"
+		})
 		settingEngine.SetNetworkTypes([]NetworkType{
 			NetworkTypeUDP4,
 		})
+
+		settingEngine.SetSDPMediaLevelFingerprints(true)
 
 		// Set up two peer connections.
 		config := Configuration{ICENone: true}
@@ -601,29 +603,29 @@ func TestEOF(t *testing.T) {
 				return
 			}
 
-			log.Debugf("pcb: new datachannel: %s", dc.Label())
-			fmt.Printf("pcb: new datachannel: %s\n", dc.Label())
+			fmt.Printf("pcAnswer: new datachannel: %s\n", dc.Label())
+			// fmt.Printf("pcb: new datachannel: %s\n", dc.Label())
 
 			dcb = dc
 			// Register channel opening handling
 			dcb.OnOpen(func() {
-				log.Debug("pcb: datachannel opened")
-				fmt.Print("pcb: datachannel opened\n")
+				fmt.Printf("pcAnswer: datachannel opened\n")
+				// fmt.Print("pcAnswer: datachannel opened\n")
 			})
 
 			dcb.OnClose(func() {
 				// (2)
-				log.Debug("pcb: data channel closed")
-				fmt.Print("pcb: data channel closed\n")
+				fmt.Printf("pcAnswer: data channel closed\n")
+				// fmt.Print("pcAnswer: data channel closed\n")
 				close(dcbClosedCh)
 			})
 
 			// Register the OnMessage to handle incoming messages
-			log.Debug("pcb: registering onMessage callback")
-			fmt.Print("pcb: registering onMessage callback")
+			// fmt.Printf("pcAnswer: registering onMessage callback")
+			// fmt.Print("pcAnswer: registering onMessage callback")
 			dcb.OnMessage(func(dcMsg DataChannelMessage) {
-				log.Debugf("pcb: received ping: %s", string(dcMsg.Data))
-				fmt.Printf("pcb: received ping: %s\n", string(dcMsg.Data))
+				fmt.Printf("pcAnswer: received ping: %s\n", string(dcMsg.Data))
+				// fmt.Printf("pcAnswer: received ping: %s\n", string(dcMsg.Data))
 				if !reflect.DeepEqual(dcMsg.Data, testData) {
 					t.Error("data mismatch")
 				}
@@ -636,31 +638,30 @@ func TestEOF(t *testing.T) {
 		}
 
 		dca.OnOpen(func() {
-			log.Debug("pca: data channel opened")
-			fmt.Print("pca: data channel opened\n")
-			log.Debugf("pca: sending \"%s\"", string(testData))
-			fmt.Printf("pca: sending \"%s\"\n", string(testData))
+			fmt.Printf("pcOffer: data channel opened\n")
+			// fmt.Print("pca: data channel opened\n")
+			fmt.Printf("pcOffer: sending \"%s\"\n", string(testData))
+			// fmt.Printf("pca: sending \"%s\"\n", string(testData))
 			if err := dca.Send(testData); err != nil {
 				t.Fatal(err)
 			}
-			log.Debug("pca: sent ping")
-			fmt.Print("pca: sent ping\n")
+
 			assert.NoError(t, dca.Close(), "should succeed") // <-- dca closes
 		})
 
 		dca.OnClose(func() {
 			// (1)
-			log.Debug("pca: data channel closed")
-			fmt.Print("pca: data channel closed\n")
+			fmt.Printf("pcOffer: data channel closed\n")
+			// fmt.Print("pca: data channel closed\n")
 			close(dcaClosedCh)
 		})
 
 		// Register the OnMessage to handle incoming messages
-		log.Debug("pca: registering onMessage callback")
-		fmt.Print("pca: registering onMessage callback\n")
+		// fmt.Printf("pcOffer: registering onMessage callback")
+		// fmt.Print("pca: registering onMessage callback\n")
 		dca.OnMessage(func(dcMsg DataChannelMessage) {
-			log.Debugf("pca: received pong: %s", string(dcMsg.Data))
-			fmt.Printf("pca: received pong: %s\n", string(dcMsg.Data))
+			fmt.Printf("pcOffer: received pong: %s\n", string(dcMsg.Data))
+			// fmt.Printf("pca: received pong: %s\n", string(dcMsg.Data))
 			if !reflect.DeepEqual(dcMsg.Data, testData) {
 				t.Error("data mismatch")
 			}
