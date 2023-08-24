@@ -35,8 +35,8 @@ type ICEGatherer struct {
 
 	// Used for GatheringCompletePromise
 	onGatheringCompleteHandler atomic.Value // func()
-
-	api *API
+	ICENone                    bool
+	api                        *API
 }
 
 // NewICEGatherer creates a new NewICEGatherer.
@@ -58,6 +58,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		state:            ICEGathererStateNew,
 		gatherPolicy:     opts.ICEGatherPolicy,
 		validatedServers: validatedServers,
+		ICENone:          opts.ICENone,
 		api:              api,
 		log:              api.settingEngine.LoggerFactory.NewLogger("ice"),
 	}, nil
@@ -95,6 +96,7 @@ func (g *ICEGatherer) createAgent() error {
 	}
 
 	config := &ice.AgentConfig{
+		ICENone:                g.ICENone,
 		Lite:                   g.api.settingEngine.candidates.ICELite,
 		Urls:                   g.validatedServers,
 		PortMin:                g.api.settingEngine.ephemeralUDP.PortMin,

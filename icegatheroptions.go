@@ -7,4 +7,5 @@ package webrtc
 type ICEGatherOptions struct {
 	ICEServers      []ICEServer
 	ICEGatherPolicy ICETransportPolicy
+	ICENone         bool
 }
