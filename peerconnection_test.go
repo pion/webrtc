@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"log"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -45,6 +46,7 @@ func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnectio
 	if err != nil {
 		return err
 	}
+	log.Printf("pcOffer createOffer %v", offer)
 	offerGatheringComplete := GatheringCompletePromise(pcOffer)
 	if err = pcOffer.SetLocalDescription(offer); err != nil {
 		return err
@@ -52,6 +54,7 @@ func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnectio
 	<-offerGatheringComplete
 
 	offer.SDP = modificationFunc(pcOffer.LocalDescription().SDP)
+	log.Printf("pcOffer after gather %v", offer)
 	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
 		return err
 	}
@@ -60,11 +63,13 @@ func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnectio
 	if err != nil {
 		return err
 	}
+	log.Printf("pcAnswer create answer %v", answer)
 	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
 	if err = pcAnswer.SetLocalDescription(answer); err != nil {
 		return err
 	}
 	<-answerGatheringComplete
+	log.Printf("pcAnswer after gather %v", *pcAnswer.LocalDescription())
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
 }
 

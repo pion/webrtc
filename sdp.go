@@ -243,6 +243,18 @@ func getRids(media *sdp.MediaDescription) map[string]string {
 	return rids
 }
 
+func addCandidatesForICENone(candidates []ICECandidate, m *sdp.MediaDescription, iceGatheringState ICEGatheringState) error {
+	for _, c := range candidates {
+		candidate, err := c.toICE()
+		if err != nil {
+			return err
+		}
+		m.ConnectionInformation.Address.Address = candidate.Address()
+		m.MediaName.Port.Value = candidate.Port()
+	}
+	return nil
+}
+
 func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDescription, iceGatheringState ICEGatheringState) error {
 	appendCandidateIfNew := func(c ice.Candidate, attributes []sdp.Attribute) {
 		marshaled := c.Marshal()
@@ -281,7 +293,7 @@ func addCandidatesToMediaDescriptions(candidates []ICECandidate, m *sdp.MediaDes
 	return nil
 }
 
-func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState) error {
+func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dtlsFingerprints []DTLSFingerprint, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole, iceGatheringState ICEGatheringState, iceNone bool) error {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   mediaSectionApplication,
@@ -300,8 +312,11 @@ func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dt
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
-		WithPropertyAttribute("sctp-port:5000").
-		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
+		WithPropertyAttribute("sctp-port:5000")
+
+	if !iceNone {
+		media.WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
+	}
 
 	for _, f := range dtlsFingerprints {
 		media = media.WithFingerprint(f.Algorithm, strings.ToUpper(f.Value))
@@ -317,7 +332,7 @@ func addDataMediaSection(d *sdp.SessionDescription, shouldAddCandidates bool, dt
 	return nil
 }
 
-func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGatherer, iceGatheringState ICEGatheringState) *SessionDescription {
+func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGatherer, iceGatheringState ICEGatheringState, iceNone bool) *SessionDescription {
 	if sessionDescription == nil || i == nil {
 		return sessionDescription
 	}
@@ -330,8 +345,14 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	parsed := sessionDescription.parsed
 	if len(parsed.MediaDescriptions) > 0 {
 		m := parsed.MediaDescriptions[0]
-		if err = addCandidatesToMediaDescriptions(candidates, m, iceGatheringState); err != nil {
-			return sessionDescription
+		if !iceNone {
+			if err = addCandidatesToMediaDescriptions(candidates, m, iceGatheringState); err != nil {
+				return sessionDescription
+			}
+		} else {
+			if err = addCandidatesForICENone(candidates, m, iceGatheringState); err != nil {
+				return sessionDescription
+			}
 		}
 	}
 
@@ -400,6 +421,7 @@ func addTransceiverSDP(
 	dtlsRole sdp.ConnectionRole,
 	iceGatheringState ICEGatheringState,
 	mediaSection mediaSection,
+	iceNone bool,
 ) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
@@ -410,9 +432,12 @@ func addTransceiverSDP(
 	media := sdp.NewJSEPMediaDescription(t.kind.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
-		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
+
+	if !iceNone {
+		media.WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
+	}
 
 	codecs := t.getCodecs()
 	for _, codec := range codecs {
@@ -508,7 +533,7 @@ type mediaSection struct {
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, isExtmapAllowMixed bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
+func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, isExtmapAllowMixed bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState, iceNone bool) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
 
@@ -532,12 +557,17 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 
 		shouldAddID := true
 		shouldAddCandidates := i == 0
+
+		if iceNone {
+			shouldAddCandidates = false
+		}
+
 		if m.data {
-			if err = addDataMediaSection(d, shouldAddCandidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState); err != nil {
+			if err = addDataMediaSection(d, shouldAddCandidates, mediaDtlsFingerprints, m.id, iceParams, candidates, connectionRole, iceGatheringState, iceNone); err != nil {
 				return nil, err
 			}
 		} else {
-			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCandidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m)
+			shouldAddID, err = addTransceiverSDP(d, isPlanB, shouldAddCandidates, mediaDtlsFingerprints, mediaEngine, m.id, iceParams, candidates, connectionRole, iceGatheringState, m, iceNone)
 			if err != nil {
 				return nil, err
 			}
@@ -648,6 +678,53 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 		return "", "", ErrSessionDescriptionInvalidFingerprint
 	}
 	return parts[1], parts[0], nil
+}
+
+func extracICENone(desc *sdp.SessionDescription, log logging.LeveledLogger) ([]ICECandidate, error) {
+	candidates := []ICECandidate{}
+	ipaddress := ""
+	var port int
+
+	for _, m := range desc.MediaDescriptions {
+		if m.MediaName.Media == mediaSectionApplication {
+			port = m.MediaName.Port.Value
+			if m.ConnectionInformation != nil && m.ConnectionInformation.Address != nil {
+				ipaddress = m.ConnectionInformation.Address.Address
+			}
+			break
+		}
+	}
+
+	if ipaddress == "" {
+		ipaddress = desc.ConnectionInformation.Address.Address
+	}
+
+	c, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		CandidateID: "",
+		Network:     "udp",
+		Address:     ipaddress,
+		Port:        port,
+		Component:   1, //default use rtp, 2 is rtcp
+		Priority:    2043278322,
+		Foundation:  "4234997325",
+		TCPType:     ice.TCPTypeUnspecified})
+
+	if err != nil {
+		log.Warnf("Fail to create candidate: %s", err)
+		return nil, err
+	}
+
+	candidate, err2 := newICECandidateFromICE(c)
+
+	if err2 != nil {
+		log.Warnf("Fail to create ICE candidate: %s", err2)
+		return nil, err2
+	}
+
+	//Only one candidate
+	candidates = append(candidates, candidate)
+
+	return candidates, nil
 }
 
 func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
