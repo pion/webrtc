@@ -67,6 +67,7 @@ earle <aguilar@dm.ai>
 Egon Elbre <egonelbre@gmail.com>
 Eric Daniels <eric@erdaniels.com>
 Eric Fontaine <ericfontainejazz@gmail.com>
+Evan Sonderegger <evan@rpy.xyz>
 feixiao <feixiao2020@sina.com>
 Forest Johnson <forest.n.johnson@gmail.com>
 frank <frank@huzhedeMacBook-Pro.local>
@@ -76,6 +77,8 @@ Gareth Hayes <gareth.hayes@gmail.com>
 Guilherme <gqgs@protonmail.com>
 Guillaume Denis <gdenispro@gmail.com>
 Hanjun Kim <hallazzang@gmail.com>
+Hans Gylling <hans.gylling@axis.com>
+Hao <shell0fly@gmail.com>
 Hendrik Hofstadt <hendrik@nexantic.com>
 Henry <cryptix@riseup.net>
 Hongchao Ma <hongchao.ma@synaptop.com>
