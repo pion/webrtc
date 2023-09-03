@@ -6,7 +6,7 @@ package webrtc
 import (
 	"fmt"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 )
 
 func supportedNetworkTypes() []NetworkType {

@@ -10,9 +10,9 @@ import (
 	"net"
 	"sync"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v2/packetio"
+	"github.com/pion/transport/v3/packetio"
 )
 
 // The maximum amount of data that can be buffered before returning errors.

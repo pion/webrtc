@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

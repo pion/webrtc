@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v2/test"
-	"github.com/pion/transport/v2/vnet"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
