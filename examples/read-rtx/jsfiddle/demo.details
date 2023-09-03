@@ -1,0 +1,8 @@
+---
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: read-rtx
+description: Example of using Pion WebRTC to read rtx packet
+authors:
+  - San9H0 <lucian@hpcnt.com> <sea57272@gmail.com>

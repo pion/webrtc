@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"encoding/binary"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ type TrackRemote struct {
 	payloadType PayloadType
 	kind        RTPCodecType
 	ssrc        SSRC
+	rtxSsrc     SSRC
 	codec       RTPCodecParameters
 	params      RTPParameters
 	rid         string
@@ -33,10 +35,11 @@ type TrackRemote struct {
 	peekedAttributes interceptor.Attributes
 }
 
-func newTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
+func newTrackRemote(kind RTPCodecType, ssrc, rtxSsrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
 	return &TrackRemote{
 		kind:     kind,
 		ssrc:     ssrc,
+		rtxSsrc:  rtxSsrc,
 		rid:      rid,
 		receiver: receiver,
 	}
@@ -196,4 +199,42 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 // SetReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
 func (t *TrackRemote) SetReadDeadline(deadline time.Time) error {
 	return t.receiver.setRTPReadDeadline(deadline, t)
+}
+
+// RtxSSRC returns the RTX SSRC for a track, or 0 if track does not have a separate RTX stream
+func (t *TrackRemote) RtxSSRC() SSRC {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.rtxSsrc
+}
+
+// HasRTX returns true if the track has a separate RTX stream
+func (t *TrackRemote) HasRTX() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.rtxSsrc != 0
+}
+
+// ReadRTX returns a packet from a track's RTX stream, along with the original sequence number (OSN).
+// RTX probe packets (with zero RTP payload size) are not retransmissions from the original stream and are returned with 0 as the OSN.
+func (t *TrackRemote) ReadRTX() (uint16, *rtp.Packet, interceptor.Attributes, error) {
+	b := make([]byte, t.receiver.api.settingEngine.getReceiveMTU())
+	i, _, err := t.receiver.readRTX(b, t)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	b = b[:i]
+	r := &rtp.Packet{}
+	if err := r.Unmarshal(b); err != nil {
+		return 0, nil, nil, err
+	}
+
+	originalSequenceNumber := uint16(0)
+	if len(r.Payload) >= 2 {
+		originalSequenceNumber = binary.BigEndian.Uint16(r.Payload[:2])
+		r.Payload = r.Payload[2:]
+	}
+
+	return originalSequenceNumber, r, nil, nil
 }

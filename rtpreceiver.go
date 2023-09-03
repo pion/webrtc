@@ -15,6 +15,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
+	"github.com/pion/transport/v3/packetio"
 	"github.com/pion/webrtc/v3/internal/util"
 )
 
@@ -31,8 +32,9 @@ type trackStreams struct {
 	rtcpReadStream  *srtp.ReadStreamSRTCP
 	rtcpInterceptor interceptor.RTCPReader
 
-	repairReadStream  *srtp.ReadStreamSRTP
-	repairInterceptor interceptor.RTPReader
+	repairReadStream   *srtp.ReadStreamSRTP
+	repairInterceptor  interceptor.RTPReader
+	repairStreamBuffer io.ReadWriteCloser
 
 	repairRtcpReadStream  *srtp.ReadStreamSRTCP
 	repairRtcpInterceptor interceptor.RTCPReader
@@ -145,6 +147,7 @@ func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
 			track: newTrackRemote(
 				r.kind,
 				parameters.Encodings[i].SSRC,
+				parameters.Encodings[i].RTX.SSRC,
 				parameters.Encodings[i].RID,
 				r,
 			),
@@ -403,12 +406,19 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 	track.repairRtcpReadStream = rtcpReadStream
 	track.repairRtcpInterceptor = rtcpInterceptor
 
+	repairBuffer := packetio.NewBuffer()
+	repairBuffer.SetLimitSize(1000 * 1000)
+	track.repairStreamBuffer = repairBuffer
+
 	go func() {
+		defer track.repairStreamBuffer.Close()
 		b := make([]byte, r.api.settingEngine.getReceiveMTU())
 		for {
-			if _, _, readErr := track.repairInterceptor.Read(b, nil); readErr != nil {
+			i, _, readErr := track.repairInterceptor.Read(b, nil)
+			if readErr != nil {
 				return
 			}
+			_, _ = track.repairStreamBuffer.Write(b[:i])
 		}
 	}()
 	return nil
@@ -445,4 +455,15 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 		return t.rtpReadStream.SetReadDeadline(deadline)
 	}
 	return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
+}
+
+func (r *RTPReceiver) readRTX(b []byte, reader *TrackRemote) (int, interceptor.Attributes, error) {
+	<-r.received
+	if t := r.streamsForTrack(reader); t != nil {
+		if t.repairStreamBuffer != nil {
+			n, err := t.repairStreamBuffer.Read(b)
+			return n, nil, err
+		}
+	}
+	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithRtxSSRCTrackStreamNotFound, reader.RtxSSRC())
 }

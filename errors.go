@@ -203,10 +203,11 @@ var (
 	errPeerConnWriteRTCPOpenWriteStream               = errors.New("WriteRTCP failed to open WriteStream")
 	errPeerConnTranscieverMidNil                      = errors.New("cannot find transceiver with mid")
 
-	errRTPReceiverDTLSTransportNil            = errors.New("DTLSTransport must not be nil")
-	errRTPReceiverReceiveAlreadyCalled        = errors.New("Receive has already been called")
-	errRTPReceiverWithSSRCTrackStreamNotFound = errors.New("unable to find stream for Track with SSRC")
-	errRTPReceiverForRIDTrackStreamNotFound   = errors.New("no trackStreams found for RID")
+	errRTPReceiverDTLSTransportNil               = errors.New("DTLSTransport must not be nil")
+	errRTPReceiverReceiveAlreadyCalled           = errors.New("Receive has already been called")
+	errRTPReceiverWithSSRCTrackStreamNotFound    = errors.New("unable to find stream for Track with SSRC")
+	errRTPReceiverWithRtxSSRCTrackStreamNotFound = errors.New("unable to find stream for Track with RtxSSRC")
+	errRTPReceiverForRIDTrackStreamNotFound      = errors.New("no trackStreams found for RID")
 
 	errRTPSenderTrackNil             = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")
