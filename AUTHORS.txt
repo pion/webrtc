@@ -220,6 +220,7 @@ Yuki Igarashi <me@bonprosoft.com>
 yusuke <yusuke.m99@gmail.com>
 Yutaka Takeda <yt0916@gmail.com>
 ZHENK <chengzhenyang@gmail.com>
+zhngs <zhangshuo19991204@163.com>
 zigazeljko <ziga.zeljko@gmail.com>
 Štefan Uram <SterverSVK@users.noreply.github.com>
 박종훈 <jonghun.park.194@gmail.com>
