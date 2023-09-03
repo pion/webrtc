@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/webrtc/v3"
 )
 
