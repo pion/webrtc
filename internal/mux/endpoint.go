@@ -15,14 +15,18 @@ import (
 
 // Endpoint implements net.Conn. It is used to read muxed packets.
 type Endpoint struct {
-	mux    *Mux
-	buffer *packetio.Buffer
+	mux     *Mux
+	buffer  *packetio.Buffer
+	onClose func()
 }
 
 // Close unregisters the endpoint from the Mux
 func (e *Endpoint) Close() (err error) {
-	err = e.close()
-	if err != nil {
+	if e.onClose != nil {
+		e.onClose()
+	}
+
+	if err = e.close(); err != nil {
 		return err
 	}
 
@@ -75,4 +79,10 @@ func (e *Endpoint) SetReadDeadline(time.Time) error {
 // SetWriteDeadline is a stub
 func (e *Endpoint) SetWriteDeadline(time.Time) error {
 	return nil
+}
+
+// SetOnClose is a user set callback that
+// will be executed when `Close` is called
+func (e *Endpoint) SetOnClose(onClose func()) {
+	e.onClose = onClose
 }

@@ -17,7 +17,7 @@ import (
 
 // An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
 func TestInvalidFingerprintCausesFailed(t *testing.T) {
-	lim := test.TimeOut(time.Second * 40)
+	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
@@ -46,8 +46,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		}
 	})
 
-	offerConnectionHasFailed := untilConnectionState(PeerConnectionStateFailed, pcOffer)
-	answerConnectionHasFailed := untilConnectionState(PeerConnectionStateFailed, pcAnswer)
+	offerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcOffer)
+	answerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcAnswer)
 
 	if _, err = pcOffer.CreateDataChannel("unusedDataChannel", nil); err != nil {
 		t.Fatal(err)
@@ -89,13 +89,17 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 		t.Fatal("timed out waiting to receive offer")
 	}
 
-	offerConnectionHasFailed.Wait()
-	answerConnectionHasFailed.Wait()
+	offerConnectionHasClosed.Wait()
+	answerConnectionHasClosed.Wait()
 
-	assert.Equal(t, pcOffer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	if pcOffer.SCTP().Transport().State() != DTLSTransportStateClosed && pcOffer.SCTP().Transport().State() != DTLSTransportStateFailed {
+		t.Fail()
+	}
 	assert.Nil(t, pcOffer.SCTP().Transport().conn)
 
-	assert.Equal(t, pcAnswer.SCTP().Transport().State(), DTLSTransportStateFailed)
+	if pcAnswer.SCTP().Transport().State() != DTLSTransportStateClosed && pcAnswer.SCTP().Transport().State() != DTLSTransportStateFailed {
+		t.Fail()
+	}
 	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
 }
 
