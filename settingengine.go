@@ -17,9 +17,9 @@ import (
 	dtlsElliptic "github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v2"
-	"github.com/pion/transport/v2/packetio"
-	"github.com/pion/transport/v2/vnet"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/packetio"
+	"github.com/pion/transport/v3/vnet"
 	"golang.org/x/net/proxy"
 )
 
