@@ -44,7 +44,8 @@ type DTLSTransport struct {
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
 
-	onStateChangeHandler func(DTLSTransportState)
+	onStateChangeHandler   func(DTLSTransportState)
+	internalOnCloseHandler func()
 
 	conn *dtls.Conn
 
@@ -322,6 +323,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 	var dtlsConn *dtls.Conn
 	dtlsEndpoint := t.iceTransport.newEndpoint(mux.MatchDTLS)
+	dtlsEndpoint.SetOnClose(t.internalOnCloseHandler)
 	role, dtlsConfig, err := prepareTransport()
 	if err != nil {
 		return err

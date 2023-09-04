@@ -2261,6 +2261,16 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		return
 	}
 
+	pc.dtlsTransport.internalOnCloseHandler = func() {
+		pc.log.Info("Closing PeerConnection from DTLS CloseNotify")
+
+		go func() {
+			if pcClosErr := pc.Close(); pcClosErr != nil {
+				pc.log.Warnf("Failed to close PeerConnection from DTLS CloseNotify: %s", pcClosErr)
+			}
+		}()
+	}
+
 	// Start the dtls transport
 	err = pc.dtlsTransport.Start(DTLSParameters{
 		Role:         dtlsRole,

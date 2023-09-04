@@ -24,6 +24,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -329,10 +330,15 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	m := &MediaEngine{}
 	assert.NoError(t, m.RegisterDefaultCodecs())
 
-	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s), WithMediaEngine(m)).newPair(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	pcOffer, pcAnswer, wan := createVNetPair(t)
+
+	keepPackets := &atomicBool{}
+	keepPackets.set(true)
+
+	// Add a filter that monitors the traffic on the router
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		return keepPackets.get()
+	})
 
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
 	if err != nil {
@@ -360,14 +366,11 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 				time.Sleep(time.Second)
 			}
 
-			if pcCloseErr := pcAnswer.Close(); pcCloseErr != nil {
-				haveDisconnected <- pcCloseErr
-			}
+			keepPackets.set(false)
 		}
 	})
 
-	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
+	if err = signalPair(pcOffer, pcAnswer); err != nil {
 		t.Fatal(err)
 	}
 
@@ -383,7 +386,8 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 		}
 	}
 
-	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, pcOffer, pcAnswer)
 }
 
 type undeclaredSsrcLogger struct{ unhandledSimulcastError chan struct{} }
