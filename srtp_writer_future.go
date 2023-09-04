@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
-	"github.com/pion/srtp/v2"
+	"github.com/pion/srtp/v3"
 )
 
 // srtpWriterFuture blocks Read/Write calls until

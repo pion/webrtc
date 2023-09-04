@@ -24,7 +24,7 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
-	"github.com/pion/srtp/v2"
+	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v3/internal/mux"
 	"github.com/pion/webrtc/v3/internal/util"
 	"github.com/pion/webrtc/v3/pkg/rtcerr"
