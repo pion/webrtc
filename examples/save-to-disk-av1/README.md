@@ -10,7 +10,6 @@ You can then send this video back to your browser using [play-from-disk](https:/
 ## Instructions
 ### Download save-to-disk-av1
 ```
-export GO111MODULE=on
 go get github.com/pion/webrtc/v4/examples/save-to-disk-av1
 ```
 
