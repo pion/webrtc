@@ -40,8 +40,8 @@ We've made it easy to run the browser based examples on your local machine.
 
 1. Build and run the example server:
     ``` sh
-    git clone https://github.com/pion/webrtc.git $GOPATH/src/github.com/pion/webrtc
-    cd $GOPATH/src/github.com/pion/webrtc/examples
+    git clone https://github.com/pion/webrtc.git webrtc
+    cd pion/webrtc/examples
     go run examples.go
     ```
 

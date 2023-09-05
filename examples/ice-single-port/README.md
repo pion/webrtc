@@ -11,8 +11,6 @@ multiple PeerConnections to use the same port.
 This example requires you to clone the repo since it is serving static HTML.
 
 ```
-mkdir -p $GOPATH/src/github.com/pion
-cd $GOPATH/src/github.com/pion
 git clone https://github.com/pion/webrtc.git
 cd webrtc/examples/ice-single-port
 ```
