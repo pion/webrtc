@@ -15,7 +15,7 @@ ffmpeg -i $INPUT_FILE -g 30 -b:v 2.5M -s 1280x720  high.ivf
 ### Download bandwidth-estimation-from-disk
 
 ```
-go get github.com/pion/webrtc/v3/examples/bandwidth-estimation-from-disk
+go get github.com/pion/webrtc/v4/examples/bandwidth-estimation-from-disk
 ```
 
 ### Open bandwidth-estimation-from-disk example page

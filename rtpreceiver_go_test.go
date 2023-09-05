@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
 

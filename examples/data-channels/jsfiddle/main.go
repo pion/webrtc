@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"syscall/js"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func main() {
