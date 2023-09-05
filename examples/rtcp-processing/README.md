@@ -11,7 +11,6 @@ also craft messages to influence the media quality.
 ## Instructions
 ### Download rtcp-processing
 ```
-export GO111MODULE=on
 go get github.com/pion/webrtc/v4/examples/rtcp-processing
 ```
 

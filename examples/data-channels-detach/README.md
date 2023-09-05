@@ -5,7 +5,6 @@ The example mirrors the data-channels example.
 
 ## Install
 ```
-export GO111MODULE=on
 go get github.com/pion/webrtc/v4/examples/data-channels-detach
 ```
 

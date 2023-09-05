@@ -8,7 +8,6 @@ is selected.
 ## Instructions
 ### Download simulcast
 ```
-export GO111MODULE=on
 go get github.com/pion/webrtc/v4/examples/simulcast
 ```
 

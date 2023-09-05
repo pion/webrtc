@@ -6,7 +6,6 @@ With this example we have pre-made GStreamer and ffmpeg pipelines, but you can u
 ## Instructions
 ### Download rtp-to-webrtc
 ```
-export GO111MODULE=on
 go get github.com/pion/webrtc/v4/examples/rtp-to-webrtc
 ```
 
