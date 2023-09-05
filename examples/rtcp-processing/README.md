@@ -12,7 +12,7 @@ also craft messages to influence the media quality.
 ### Download rtcp-processing
 ```
 export GO111MODULE=on
-go get github.com/pion/webrtc/v3/examples/rtcp-processing
+go get github.com/pion/webrtc/v4/examples/rtcp-processing
 ```
 
 ### Open rtcp-processing example page

@@ -9,7 +9,7 @@ is selected.
 ### Download simulcast
 ```
 export GO111MODULE=on
-go get github.com/pion/webrtc/v3/examples/simulcast
+go get github.com/pion/webrtc/v4/examples/simulcast
 ```
 
 ### Open simulcast example page
