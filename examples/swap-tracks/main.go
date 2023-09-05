@@ -139,6 +139,11 @@ func main() { // nolint:gocognit
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			done()
 		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			done()
+		}
 	})
 
 	// Create an answer
