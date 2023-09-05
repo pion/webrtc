@@ -9,7 +9,7 @@ In this example we have defined a simple JSON based signaling protocol.
 ## Instructions
 ### Download ortc
 ```
-go get github.com/pion/webrtc/v4/examples/ortc
+go install github.com/pion/webrtc/v4/examples/ortc@latest
 ```
 
 ### Run first client as offerer

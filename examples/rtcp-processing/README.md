@@ -11,7 +11,7 @@ also craft messages to influence the media quality.
 ## Instructions
 ### Download rtcp-processing
 ```
-go get github.com/pion/webrtc/v4/examples/rtcp-processing
+go install github.com/pion/webrtc/v4/examples/rtcp-processing@latest
 ```
 
 ### Open rtcp-processing example page

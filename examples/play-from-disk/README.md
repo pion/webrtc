@@ -15,7 +15,7 @@ ffmpeg -i $INPUT_FILE -c:a libopus -page_duration 20000 -vn output.ogg
 ### Download play-from-disk
 
 ```
-go get github.com/pion/webrtc/v4/examples/play-from-disk
+go install github.com/pion/webrtc/v4/examples/play-from-disk@latest
 ```
 
 ### Open play-from-disk example page
