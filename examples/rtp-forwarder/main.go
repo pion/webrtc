@@ -197,6 +197,12 @@ func main() {
 			fmt.Println("Done forwarding")
 			os.Exit(0)
 		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Done forwarding")
+			os.Exit(0)
+		}
 	})
 
 	// Wait for the offer to be pasted

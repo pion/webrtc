@@ -30,10 +30,12 @@ func saveToDisk(i media.Writer, track *webrtc.TrackRemote) {
 	for {
 		rtpPacket, _, err := track.ReadRTP()
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			return
 		}
 		if err := i.WriteRTP(rtpPacket); err != nil {
-			panic(err)
+			fmt.Println(err)
+			return
 		}
 	}
 }
@@ -113,7 +115,7 @@ func main() {
 
 		if connectionState == webrtc.ICEConnectionStateConnected {
 			fmt.Println("Ctrl+C the remote client to stop the demo")
-		} else if connectionState == webrtc.ICEConnectionStateFailed {
+		} else if connectionState == webrtc.ICEConnectionStateFailed || connectionState == webrtc.ICEConnectionStateClosed {
 			if closeErr := ivfFile.Close(); closeErr != nil {
 				panic(closeErr)
 			}
