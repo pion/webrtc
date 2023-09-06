@@ -400,6 +400,14 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 					return true
 				}
 				track := sender.Track()
+				if track == nil {
+					// Situation when sender's track is nil could happen when
+					// a) replaceTrack(nil) is called
+					// b) removeTrack() is called, changing the transceiver's direction to inactive
+					// As t.Direction() in this branch is either sendrecv or sendonly, we believe (a) option is the case
+					// As calling replaceTrack does not require renegotiation, we skip check for this transceiver
+					continue
+				}
 				if !okMsid || descMsid != track.StreamID()+" "+track.ID() {
 					return true
 				}
