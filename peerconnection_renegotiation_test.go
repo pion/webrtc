@@ -1323,3 +1323,29 @@ func TestNegotiationNeededWithRecvonlyTrack(t *testing.T) {
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
+
+func TestNegotiationNotNeededAfterReplaceTrackNil(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	tr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	assert.NoError(t, tr.Sender().ReplaceTrack(nil))
+
+	assert.False(t, pcOffer.checkNegotiationNeeded())
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
+}
