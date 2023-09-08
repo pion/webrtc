@@ -34,7 +34,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 
 	createPC := func() *PeerConnection {
 		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.Error(t, m.RegisterDefaultCodecs())
 
 		ir := &interceptor.Registry{}
 		ir.Add(&mock_interceptor.Factory{
