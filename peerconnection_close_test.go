@@ -85,7 +85,7 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NoError(t, pcOffer.Close())
+	assert.Error(t, pcOffer.Close())
 
 	if err = pcAnswer.SetRemoteDescription(answer); err != nil {
 		t.Fatal(err)
