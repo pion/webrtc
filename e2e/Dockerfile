@@ -5,7 +5,8 @@ FROM golang:1.17-alpine
 
 RUN apk add --no-cache \
   chromium \
-  chromium-chromedriver
+  chromium-chromedriver \
+  git
 
 ENV CGO_ENABLED=0
 
