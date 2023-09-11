@@ -619,31 +619,22 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	seenComplete := &atomicBool{}
 
 	seenGatheringAndComplete := make(chan interface{})
-	seenClosed := make(chan interface{})
 
 	peerConn, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	var onStateChange func(s ICEGathererState)
-	onStateChange = func(s ICEGathererState) {
+	var onStateChange func(s ICEGatheringState)
+	onStateChange = func(s ICEGatheringState) {
 		// Access to ICEGatherer in the callback must not cause dead lock.
 		peerConn.OnICEGatheringStateChange(onStateChange)
-		if state := peerConn.iceGatherer.State(); state != s {
-			t.Errorf("State change callback argument (%s) and State() (%s) result differs",
-				s, state,
-			)
-		}
 
 		switch s { // nolint:exhaustive
-		case ICEGathererStateClosed:
-			close(seenClosed)
-			return
-		case ICEGathererStateGathering:
+		case ICEGatheringStateGathering:
 			if seenComplete.get() {
 				t.Error("Completed before gathering")
 			}
 			seenGathering.set(true)
-		case ICEGathererStateComplete:
+		case ICEGatheringStateComplete:
 			seenComplete.set(true)
 		}
 
@@ -660,18 +651,10 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	select {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Gathering and Complete were never seen")
-	case <-seenClosed:
-		t.Fatal("Closed before PeerConnection Close")
 	case <-seenGatheringAndComplete:
 	}
 
 	assert.NoError(t, peerConn.Close())
-
-	select {
-	case <-time.After(time.Second * 10):
-		t.Fatal("Closed was never seen")
-	case <-seenClosed:
-	}
 }
 
 // Assert Trickle ICE behaviors

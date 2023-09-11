@@ -454,8 +454,18 @@ func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
 
 // OnICEGatheringStateChange sets an event handler which is invoked when the
 // ICE candidate gathering state has changed.
-func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGathererState)) {
-	pc.iceGatherer.OnStateChange(f)
+func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGatheringState)) {
+	pc.iceGatherer.OnStateChange(
+		func(gathererState ICEGathererState) {
+			switch gathererState {
+			case ICEGathererStateGathering:
+				f(ICEGatheringStateGathering)
+			case ICEGathererStateComplete:
+				f(ICEGatheringStateComplete)
+			default:
+				// Other states ignored
+			}
+		})
 }
 
 // OnTrack sets an event handler which is called when remote track
