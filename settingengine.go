@@ -72,6 +72,7 @@ type SettingEngine struct {
 		clientCAs                 *x509.CertPool
 		rootCAs                   *x509.CertPool
 		keyLogWriter              io.Writer
+		customCipherSuites        func() []dtls.CipherSuite
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -433,4 +434,10 @@ func (e *SettingEngine) SetDTLSKeyLogWriter(writer io.Writer) {
 // Leave this 0 for the default maxReceiveBufferSize.
 func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32) {
 	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
+}
+
+// SetDTLSCustomerCipherSuites allows the user to specify a list of DTLS CipherSuites.
+// This allow usage of Ciphers that are reserved for private usage.
+func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
+	e.dtls.customCipherSuites = customCipherSuites
 }
