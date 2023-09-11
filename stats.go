@@ -1900,7 +1900,7 @@ type ICECandidateStats struct {
 	//
 	// DEPRECATED. Although it may still work in some browsers, the networkType property was deprecated for
 	// preserving privacy.
-	NetworkType NetworkType `json:"networkType,omitempty"`
+	NetworkType string `json:"networkType,omitempty"`
 
 	// IP is the IP address of the candidate, allowing for IPv4 addresses and
 	// IPv6 addresses, but fully qualified domain names (FQDNs) are not allowed.
