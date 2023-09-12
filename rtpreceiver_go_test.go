@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,9 +35,9 @@ func TestSetRTPParameters(t *testing.T) {
 			},
 		},
 		HeaderExtensions: []RTPHeaderExtensionParameter{
-			{URI: "urn:ietf:params:rtp-hdrext:sdes:mid"},
-			{URI: "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"},
-			{URI: "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"},
+			{URI: sdp.SDESMidURI},
+			{URI: sdp.SDESRTPStreamIDURI},
+			{URI: sdesRepairRTPStreamIDURI},
 		},
 	}
 
