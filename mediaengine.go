@@ -286,13 +286,12 @@ func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	switch typ {
-	case RTPCodecTypeVideo:
+	if typ == RTPCodecTypeVideo {
 		for i, v := range m.videoCodecs {
 			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
 			m.videoCodecs[i] = v
 		}
-	case RTPCodecTypeAudio:
+	} else if typ == RTPCodecTypeAudio {
 		for i, v := range m.audioCodecs {
 			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
 			m.audioCodecs[i] = v

@@ -7,9 +7,12 @@ package webrtc
 type DTLSTransportState int
 
 const (
+	// DTLSTransportStateUnknown is the enum's zero-value
+	DTLSTransportStateUnknown DTLSTransportState = iota
+
 	// DTLSTransportStateNew indicates that DTLS has not started negotiating
 	// yet.
-	DTLSTransportStateNew DTLSTransportState = iota + 1
+	DTLSTransportStateNew
 
 	// DTLSTransportStateConnecting indicates that DTLS is in the process of
 	// negotiating a secure connection and verifying the remote fingerprint.
@@ -52,7 +55,7 @@ func newDTLSTransportState(raw string) DTLSTransportState {
 	case dtlsTransportStateFailedStr:
 		return DTLSTransportStateFailed
 	default:
-		return DTLSTransportState(Unknown)
+		return DTLSTransportStateUnknown
 	}
 }
 

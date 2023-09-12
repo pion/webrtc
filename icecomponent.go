@@ -8,12 +8,15 @@ package webrtc
 type ICEComponent int
 
 const (
+	// ICEComponentUnknown is the enum's zero-value
+	ICEComponentUnknown ICEComponent = iota
+
 	// ICEComponentRTP indicates that the ICE Transport is used for RTP (or
 	// RTCP multiplexing), as defined in
 	// https://tools.ietf.org/html/rfc5245#section-4.1.1.1. Protocols
 	// multiplexed with RTP (e.g. data channel) share its component ID. This
 	// represents the component-id value 1 when encoded in candidate-attribute.
-	ICEComponentRTP ICEComponent = iota + 1
+	ICEComponentRTP
 
 	// ICEComponentRTCP indicates that the ICE Transport is used for RTCP as
 	// defined by https://tools.ietf.org/html/rfc5245#section-4.1.1.1. This
@@ -34,7 +37,7 @@ func newICEComponent(raw string) ICEComponent {
 	case iceComponentRTCPStr:
 		return ICEComponentRTCP
 	default:
-		return ICEComponent(Unknown)
+		return ICEComponentUnknown
 	}
 }
 

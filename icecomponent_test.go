@@ -14,7 +14,7 @@ func TestICEComponent(t *testing.T) {
 		componentString   string
 		expectedComponent ICEComponent
 	}{
-		{unknownStr, ICEComponent(Unknown)},
+		{ErrUnknownType.Error(), ICEComponentUnknown},
 		{"rtp", ICEComponentRTP},
 		{"rtcp", ICEComponentRTCP},
 	}
@@ -33,7 +33,7 @@ func TestICEComponent_String(t *testing.T) {
 		state          ICEComponent
 		expectedString string
 	}{
-		{ICEComponent(Unknown), unknownStr},
+		{ICEComponentUnknown, ErrUnknownType.Error()},
 		{ICEComponentRTP, "rtp"},
 		{ICEComponentRTCP, "rtcp"},
 	}

@@ -14,7 +14,7 @@ func TestNewDataChannelState(t *testing.T) {
 		stateString   string
 		expectedState DataChannelState
 	}{
-		{unknownStr, DataChannelState(Unknown)},
+		{ErrUnknownType.Error(), DataChannelStateUnknown},
 		{"connecting", DataChannelStateConnecting},
 		{"open", DataChannelStateOpen},
 		{"closing", DataChannelStateClosing},
@@ -35,7 +35,7 @@ func TestDataChannelState_String(t *testing.T) {
 		state          DataChannelState
 		expectedString string
 	}{
-		{DataChannelState(Unknown), unknownStr},
+		{DataChannelStateUnknown, ErrUnknownType.Error()},
 		{DataChannelStateConnecting, "connecting"},
 		{DataChannelStateOpen, "open"},
 		{DataChannelStateClosing, "closing"},

@@ -16,7 +16,7 @@ func TestDTLSRole_String(t *testing.T) {
 		role           DTLSRole
 		expectedString string
 	}{
-		{DTLSRole(Unknown), unknownStr},
+		{DTLSRoleUnknown, ErrUnknownType.Error()},
 		{DTLSRoleAuto, "auto"},
 		{DTLSRoleClient, "client"},
 		{DTLSRoleServer, "server"},

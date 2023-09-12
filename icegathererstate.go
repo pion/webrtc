@@ -11,9 +11,12 @@ import (
 type ICEGathererState uint32
 
 const (
+	// ICEGathererStateUnknown is the enum's zero-value
+	ICEGathererStateUnknown ICEGathererState = iota
+
 	// ICEGathererStateNew indicates object has been created but
 	// gather() has not been called.
-	ICEGathererStateNew ICEGathererState = iota + 1
+	ICEGathererStateNew
 
 	// ICEGathererStateGathering indicates gather() has been called,
 	// and the ICEGatherer is in the process of gathering candidates.
@@ -38,7 +41,7 @@ func (s ICEGathererState) String() string {
 	case ICEGathererStateClosed:
 		return "closed"
 	default:
-		return unknownStr
+		return ErrUnknownType.Error()
 	}
 }
 

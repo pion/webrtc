@@ -29,7 +29,7 @@ func TestSDPSemantics_String(t *testing.T) {
 	}
 
 	assert.Equal(t,
-		unknownStr,
+		ErrUnknownType.Error(),
 		SDPSemantics(42).String(),
 	)
 

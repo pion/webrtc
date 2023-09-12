@@ -13,9 +13,11 @@ import (
 type RTPCodecType int
 
 const (
+	// RTPCodecTypeUnknown is the enum's zero-value
+	RTPCodecTypeUnknown RTPCodecType = iota
 
 	// RTPCodecTypeAudio indicates this is an audio codec
-	RTPCodecTypeAudio RTPCodecType = iota + 1
+	RTPCodecTypeAudio
 
 	// RTPCodecTypeVideo indicates this is a video codec
 	RTPCodecTypeVideo

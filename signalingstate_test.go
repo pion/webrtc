@@ -15,7 +15,7 @@ func TestNewSignalingState(t *testing.T) {
 		stateString   string
 		expectedState SignalingState
 	}{
-		{unknownStr, SignalingState(Unknown)},
+		{ErrUnknownType.Error(), SignalingStateUnknown},
 		{"stable", SignalingStateStable},
 		{"have-local-offer", SignalingStateHaveLocalOffer},
 		{"have-remote-offer", SignalingStateHaveRemoteOffer},
@@ -38,7 +38,7 @@ func TestSignalingState_String(t *testing.T) {
 		state          SignalingState
 		expectedString string
 	}{
-		{SignalingState(Unknown), unknownStr},
+		{SignalingStateUnknown, ErrUnknownType.Error()},
 		{SignalingStateStable, "stable"},
 		{SignalingStateHaveLocalOffer, "have-local-offer"},
 		{SignalingStateHaveRemoteOffer, "have-remote-offer"},

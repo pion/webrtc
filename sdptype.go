@@ -12,9 +12,11 @@ import (
 type SDPType int
 
 const (
-	// SDPTypeOffer indicates that a description MUST be treated as an SDP
-	// offer.
-	SDPTypeOffer SDPType = iota + 1
+	// SDPTypeUnknown is the enum's zero-value
+	SDPTypeUnknown SDPType = iota
+
+	// SDPTypeOffer indicates that a description MUST be treated as an SDP offer.
+	SDPTypeOffer
 
 	// SDPTypePranswer indicates that a description MUST be treated as an
 	// SDP answer, but not a final answer. A description used as an SDP
@@ -56,7 +58,7 @@ func NewSDPType(raw string) SDPType {
 	case sdpTypeRollbackStr:
 		return SDPTypeRollback
 	default:
-		return SDPType(Unknown)
+		return SDPTypeUnknown
 	}
 }
 

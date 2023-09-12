@@ -12,11 +12,14 @@ import (
 type RTCPMuxPolicy int
 
 const (
+	// RTCPMuxPolicyUnknown is the enum's zero-value
+	RTCPMuxPolicyUnknown RTCPMuxPolicy = iota
+
 	// RTCPMuxPolicyNegotiate indicates to gather ICE candidates for both
 	// RTP and RTCP candidates. If the remote-endpoint is capable of
 	// multiplexing RTCP, multiplex RTCP on the RTP candidates. If it is not,
 	// use both the RTP and RTCP candidates separately.
-	RTCPMuxPolicyNegotiate RTCPMuxPolicy = iota + 1
+	RTCPMuxPolicyNegotiate
 
 	// RTCPMuxPolicyRequire indicates to gather ICE candidates only for
 	// RTP and multiplex RTCP on the RTP candidates. If the remote endpoint is
@@ -37,7 +40,7 @@ func newRTCPMuxPolicy(raw string) RTCPMuxPolicy {
 	case rtcpMuxPolicyRequireStr:
 		return RTCPMuxPolicyRequire
 	default:
-		return RTCPMuxPolicy(Unknown)
+		return RTCPMuxPolicyUnknown
 	}
 }
 

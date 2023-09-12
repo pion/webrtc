@@ -13,12 +13,15 @@ import (
 type ICECandidateType int
 
 const (
+	// ICECandidateTypeUnknown is the enum's zero-value
+	ICECandidateTypeUnknown ICECandidateType = iota
+
 	// ICECandidateTypeHost indicates that the candidate is of Host type as
 	// described in https://tools.ietf.org/html/rfc8445#section-5.1.1.1. A
 	// candidate obtained by binding to a specific port from an IP address on
 	// the host. This includes IP addresses on physical interfaces and logical
 	// ones, such as ones obtained through VPNs.
-	ICECandidateTypeHost ICECandidateType = iota + 1
+	ICECandidateTypeHost
 
 	// ICECandidateTypeSrflx indicates the the candidate is of Server
 	// Reflexive type as described
@@ -60,7 +63,7 @@ func NewICECandidateType(raw string) (ICECandidateType, error) {
 	case iceCandidateTypeRelayStr:
 		return ICECandidateTypeRelay, nil
 	default:
-		return ICECandidateType(Unknown), fmt.Errorf("%w: %s", errICECandidateTypeUnknown, raw)
+		return ICECandidateTypeUnknown, fmt.Errorf("%w: %s", errICECandidateTypeUnknown, raw)
 	}
 }
 
@@ -92,7 +95,7 @@ func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error)
 	default:
 		// NOTE: this should never happen[tm]
 		err := fmt.Errorf("%w: %s", errICEInvalidConvertCandidateType, candidateType.String())
-		return ICECandidateType(Unknown), err
+		return ICECandidateTypeUnknown, err
 	}
 }
 

@@ -14,7 +14,7 @@ func TestNewICERole(t *testing.T) {
 		roleString   string
 		expectedRole ICERole
 	}{
-		{unknownStr, ICERole(Unknown)},
+		{ErrUnknownType.Error(), ICERoleUnknown},
 		{"controlling", ICERoleControlling},
 		{"controlled", ICERoleControlled},
 	}
@@ -33,7 +33,7 @@ func TestICERole_String(t *testing.T) {
 		proto          ICERole
 		expectedString string
 	}{
-		{ICERole(Unknown), unknownStr},
+		{ICERoleUnknown, ErrUnknownType.Error()},
 		{ICERoleControlling, "controlling"},
 		{ICERoleControlled, "controlled"},
 	}

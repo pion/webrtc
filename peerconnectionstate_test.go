@@ -14,7 +14,7 @@ func TestNewPeerConnectionState(t *testing.T) {
 		stateString   string
 		expectedState PeerConnectionState
 	}{
-		{unknownStr, PeerConnectionState(Unknown)},
+		{ErrUnknownType.Error(), PeerConnectionStateUnknown},
 		{"new", PeerConnectionStateNew},
 		{"connecting", PeerConnectionStateConnecting},
 		{"connected", PeerConnectionStateConnected},
@@ -37,7 +37,7 @@ func TestPeerConnectionState_String(t *testing.T) {
 		state          PeerConnectionState
 		expectedString string
 	}{
-		{PeerConnectionState(Unknown), unknownStr},
+		{PeerConnectionStateUnknown, ErrUnknownType.Error()},
 		{PeerConnectionStateNew, "new"},
 		{PeerConnectionStateConnecting, "connecting"},
 		{PeerConnectionStateConnected, "connected"},
