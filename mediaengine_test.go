@@ -195,7 +195,7 @@ a=rtpmap:111 opus/48000/2
 
 		m := MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
-		registerSimulcastHeaderExtensions(&m, RTPCodecTypeAudio)
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio))
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, m.negotiatedVideo)

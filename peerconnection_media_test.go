@@ -36,18 +36,6 @@ var (
 	errNoTransceiverwithMid      = errors.New("no transceiver with mid")
 )
 
-func registerSimulcastHeaderExtensions(m *MediaEngine, codecType RTPCodecType) {
-	for _, extension := range []string{
-		sdp.SDESMidURI,
-		sdp.SDESRTPStreamIDURI,
-		sdesRepairRTPStreamIDURI,
-	} {
-		if err := m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: extension}, codecType); err != nil {
-			panic(err)
-		}
-	}
-}
-
 /*
 Integration test for bi-directional peers
 
@@ -1051,10 +1039,8 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		unhandledSimulcastError := make(chan struct{})
 
 		m := &MediaEngine{}
-		if err := m.RegisterDefaultCodecs(); err != nil {
-			panic(err)
-		}
-		registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		assert.NoError(t, ConfigureSimulcastExtensionHeaders(m))
 
 		pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(SettingEngine{
 			LoggerFactory: &undeclaredSsrcLoggerFactory{unhandledSimulcastError},
@@ -1086,7 +1072,6 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 					filtered += scanner.Text() + "\r\n"
 				}
 			}
-
 			return
 		}))
 
@@ -1228,13 +1213,6 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 	var ridMapLock sync.RWMutex
 	ridMap := map[string]int{}
 
-	// Enable Extension Headers needed for Simulcast
-	m := &MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
-
 	assertRidCorrect := func(t *testing.T) {
 		ridMapLock.Lock()
 		defer ridMapLock.Unlock()
@@ -1260,7 +1238,7 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 	}
 
 	t.Run("RTP Extension Based", func(t *testing.T) {
-		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		pcOffer, pcAnswer, err := newPair()
 		assert.NoError(t, err)
 
 		vp8WriterA, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID("a"))
@@ -1360,14 +1338,7 @@ func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// Enable Extension Headers needed for Simulcast
-	m := &MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
-
-	pcSender, pcReceiver, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+	pcSender, pcReceiver, err := newPair()
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup

@@ -14,7 +14,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 	"github.com/pion/webrtc/v4/examples/internal/signal"
@@ -33,34 +32,8 @@ func main() {
 		},
 	}
 
-	// Enable Extension Headers needed for Simulcast
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(webrtc.RTPHeaderExtensionCapability{URI: extension}, webrtc.RTPCodecTypeVideo); err != nil {
-			panic(err)
-		}
-	}
-
-	// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
-	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
-	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
-	// for each PeerConnection.
-	i := &interceptor.Registry{}
-
-	// Use the default set of Interceptors
-	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
-		panic(err)
-	}
-
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
