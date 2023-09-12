@@ -15,7 +15,7 @@ func TestICECandidateType(t *testing.T) {
 		shouldFail   bool
 		expectedType ICECandidateType
 	}{
-		{unknownStr, true, ICECandidateType(Unknown)},
+		{ErrUnknownType.Error(), true, ICECandidateTypeUnknown},
 		{"host", false, ICECandidateTypeHost},
 		{"srflx", false, ICECandidateTypeSrflx},
 		{"prflx", false, ICECandidateTypePrflx},
@@ -40,7 +40,7 @@ func TestICECandidateType_String(t *testing.T) {
 		cType          ICECandidateType
 		expectedString string
 	}{
-		{ICECandidateType(Unknown), unknownStr},
+		{ICECandidateTypeUnknown, ErrUnknownType.Error()},
 		{ICECandidateTypeHost, "host"},
 		{ICECandidateTypeSrflx, "srflx"},
 		{ICECandidateTypePrflx, "prflx"},

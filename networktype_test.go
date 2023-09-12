@@ -14,7 +14,7 @@ func TestNetworkType_String(t *testing.T) {
 		cType          NetworkType
 		expectedString string
 	}{
-		{NetworkType(Unknown), unknownStr},
+		{NetworkTypeUnknown, ErrUnknownType.Error()},
 		{NetworkTypeUDP4, "udp4"},
 		{NetworkTypeUDP6, "udp6"},
 		{NetworkTypeTCP4, "tcp4"},
@@ -36,7 +36,7 @@ func TestNetworkType(t *testing.T) {
 		shouldFail   bool
 		expectedType NetworkType
 	}{
-		{unknownStr, true, NetworkType(Unknown)},
+		{ErrUnknownType.Error(), true, NetworkTypeUnknown},
 		{"udp4", false, NetworkTypeUDP4},
 		{"udp6", false, NetworkTypeUDP6},
 		{"tcp4", false, NetworkTypeTCP4},

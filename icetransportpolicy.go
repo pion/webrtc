@@ -34,10 +34,8 @@ func NewICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
 	case iceTransportPolicyRelayStr:
 		return ICETransportPolicyRelay
-	case iceTransportPolicyAllStr:
-		return ICETransportPolicyAll
 	default:
-		return ICETransportPolicy(Unknown)
+		return ICETransportPolicyAll
 	}
 }
 

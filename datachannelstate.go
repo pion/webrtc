@@ -7,10 +7,13 @@ package webrtc
 type DataChannelState int
 
 const (
+	// DataChannelStateUnknown is the enum's zero-value
+	DataChannelStateUnknown DataChannelState = iota
+
 	// DataChannelStateConnecting indicates that the data channel is being
 	// established. This is the initial state of DataChannel, whether created
 	// with CreateDataChannel, or dispatched as a part of an DataChannelEvent.
-	DataChannelStateConnecting DataChannelState = iota + 1
+	DataChannelStateConnecting
 
 	// DataChannelStateOpen indicates that the underlying data transport is
 	// established and communication is possible.
@@ -44,7 +47,7 @@ func newDataChannelState(raw string) DataChannelState {
 	case dataChannelStateClosedStr:
 		return DataChannelStateClosed
 	default:
-		return DataChannelState(Unknown)
+		return DataChannelStateUnknown
 	}
 }
 

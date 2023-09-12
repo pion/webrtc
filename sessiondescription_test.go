@@ -21,7 +21,7 @@ func TestSessionDescription_JSON(t *testing.T) {
 		{SessionDescription{Type: SDPTypePranswer, SDP: "sdp"}, `{"type":"pranswer","sdp":"sdp"}`, nil},
 		{SessionDescription{Type: SDPTypeAnswer, SDP: "sdp"}, `{"type":"answer","sdp":"sdp"}`, nil},
 		{SessionDescription{Type: SDPTypeRollback, SDP: "sdp"}, `{"type":"rollback","sdp":"sdp"}`, nil},
-		{SessionDescription{Type: SDPType(Unknown), SDP: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
+		{SessionDescription{Type: SDPTypeUnknown, SDP: "sdp"}, `{"type":"unknown","sdp":"sdp"}`, ErrUnknownType},
 	}
 
 	for i, testCase := range testCases {

@@ -79,7 +79,7 @@ func TestICEServer_validate(t *testing.T) {
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
-				CredentialType: Unknown,
+				CredentialType: ICECredentialTypePassword,
 			}, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}},
 			{ICEServer{
 				URLs:           []string{"stun:google.de?transport=udp"},

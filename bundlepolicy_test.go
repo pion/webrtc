@@ -14,7 +14,7 @@ func TestNewBundlePolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy BundlePolicy
 	}{
-		{unknownStr, BundlePolicy(Unknown)},
+		{ErrUnknownType.Error(), BundlePolicyUnknown},
 		{"balanced", BundlePolicyBalanced},
 		{"max-compat", BundlePolicyMaxCompat},
 		{"max-bundle", BundlePolicyMaxBundle},
@@ -34,7 +34,7 @@ func TestBundlePolicy_String(t *testing.T) {
 		policy         BundlePolicy
 		expectedString string
 	}{
-		{BundlePolicy(Unknown), unknownStr},
+		{BundlePolicyUnknown, ErrUnknownType.Error()},
 		{BundlePolicyBalanced, "balanced"},
 		{BundlePolicyMaxCompat, "max-compat"},
 		{BundlePolicyMaxBundle, "max-bundle"},

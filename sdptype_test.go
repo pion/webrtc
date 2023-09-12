@@ -14,7 +14,7 @@ func TestNewSDPType(t *testing.T) {
 		sdpTypeString   string
 		expectedSDPType SDPType
 	}{
-		{unknownStr, SDPType(Unknown)},
+		{ErrUnknownType.Error(), SDPTypeUnknown},
 		{"offer", SDPTypeOffer},
 		{"pranswer", SDPTypePranswer},
 		{"answer", SDPTypeAnswer},
@@ -35,7 +35,7 @@ func TestSDPType_String(t *testing.T) {
 		sdpType        SDPType
 		expectedString string
 	}{
-		{SDPType(Unknown), unknownStr},
+		{SDPTypeUnknown, ErrUnknownType.Error()},
 		{SDPTypeOffer, "offer"},
 		{SDPTypePranswer, "pranswer"},
 		{SDPTypeAnswer, "answer"},

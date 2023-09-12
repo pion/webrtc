@@ -225,11 +225,11 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 		pc.configuration.Certificates = []Certificate{*certificate}
 	}
 
-	if configuration.BundlePolicy != BundlePolicy(Unknown) {
+	if configuration.BundlePolicy != BundlePolicyUnknown {
 		pc.configuration.BundlePolicy = configuration.BundlePolicy
 	}
 
-	if configuration.RTCPMuxPolicy != RTCPMuxPolicy(Unknown) {
+	if configuration.RTCPMuxPolicy != RTCPMuxPolicyUnknown {
 		pc.configuration.RTCPMuxPolicy = configuration.RTCPMuxPolicy
 	}
 
@@ -237,13 +237,8 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 		pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
 	}
 
-	if configuration.ICETransportPolicy != ICETransportPolicy(Unknown) {
-		pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
-	}
-
-	if configuration.SDPSemantics != SDPSemantics(Unknown) {
-		pc.configuration.SDPSemantics = configuration.SDPSemantics
-	}
+	pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
+	pc.configuration.SDPSemantics = configuration.SDPSemantics
 
 	sanitizedICEServers := configuration.getICEServers()
 	if len(sanitizedICEServers) > 0 {
@@ -549,7 +544,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #5)
-	if configuration.BundlePolicy != BundlePolicy(Unknown) {
+	if configuration.BundlePolicy != BundlePolicyUnknown {
 		if configuration.BundlePolicy != pc.configuration.BundlePolicy {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy}
 		}
@@ -557,7 +552,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #6)
-	if configuration.RTCPMuxPolicy != RTCPMuxPolicy(Unknown) {
+	if configuration.RTCPMuxPolicy != RTCPMuxPolicyUnknown {
 		if configuration.RTCPMuxPolicy != pc.configuration.RTCPMuxPolicy {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy}
 		}
@@ -574,9 +569,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #8)
-	if configuration.ICETransportPolicy != ICETransportPolicy(Unknown) {
-		pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
-	}
+	pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #11)
 	if len(configuration.ICEServers) > 0 {
@@ -879,7 +872,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 	switch {
 	case pc.isClosed.get():
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
-	case NewSDPType(sd.Type.String()) == SDPType(Unknown):
+	case NewSDPType(sd.Type.String()) == SDPTypeUnknown:
 		return &rtcerr.TypeError{Err: fmt.Errorf("%w: '%d' is not a valid enum value of type SDPType", errPeerConnSDPTypeInvalidValue, sd.Type)}
 	}
 
@@ -1092,7 +1085,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 			kind := NewRTPCodecType(media.MediaName.Media)
 			direction := getPeerDirection(media)
-			if kind == 0 || direction == RTPTransceiverDirection(Unknown) {
+			if kind == 0 || direction == RTPTransceiverDirectionUnknown {
 				continue
 			}
 
@@ -1292,7 +1285,7 @@ func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransc
 		}
 
 		direction := getPeerDirection(media)
-		if direction == RTPTransceiverDirection(Unknown) {
+		if direction == RTPTransceiverDirectionUnknown {
 			continue
 		}
 
@@ -2432,7 +2425,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 
 		kind := NewRTPCodecType(media.MediaName.Media)
 		direction := getPeerDirection(media)
-		if kind == 0 || direction == RTPTransceiverDirection(Unknown) {
+		if kind == 0 || direction == RTPTransceiverDirectionUnknown {
 			continue
 		}
 

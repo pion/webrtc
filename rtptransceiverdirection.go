@@ -7,9 +7,12 @@ package webrtc
 type RTPTransceiverDirection int
 
 const (
+	// RTPTransceiverDirectionUnknown is the enum's zero-value
+	RTPTransceiverDirectionUnknown RTPTransceiverDirection = iota
+
 	// RTPTransceiverDirectionSendrecv indicates the RTPSender will offer
 	// to send RTP and the RTPReceiver will offer to receive RTP.
-	RTPTransceiverDirectionSendrecv RTPTransceiverDirection = iota + 1
+	RTPTransceiverDirectionSendrecv
 
 	// RTPTransceiverDirectionSendonly indicates the RTPSender will offer
 	// to send RTP.
@@ -45,7 +48,7 @@ func NewRTPTransceiverDirection(raw string) RTPTransceiverDirection {
 	case rtpTransceiverDirectionInactiveStr:
 		return RTPTransceiverDirectionInactive
 	default:
-		return RTPTransceiverDirection(Unknown)
+		return RTPTransceiverDirectionUnknown
 	}
 }
 

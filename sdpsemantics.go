@@ -36,14 +36,12 @@ const (
 
 func newSDPSemantics(raw string) SDPSemantics {
 	switch raw {
-	case sdpSemanticsUnifiedPlan:
-		return SDPSemanticsUnifiedPlan
 	case sdpSemanticsPlanB:
 		return SDPSemanticsPlanB
 	case sdpSemanticsUnifiedPlanWithFallback:
 		return SDPSemanticsUnifiedPlanWithFallback
 	default:
-		return SDPSemantics(Unknown)
+		return SDPSemanticsUnifiedPlan
 	}
 }
 

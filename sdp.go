@@ -653,11 +653,11 @@ func descriptionPossiblyPlanB(desc *SessionDescription) bool {
 
 func getPeerDirection(media *sdp.MediaDescription) RTPTransceiverDirection {
 	for _, a := range media.Attributes {
-		if direction := NewRTPTransceiverDirection(a.Key); direction != RTPTransceiverDirection(Unknown) {
+		if direction := NewRTPTransceiverDirection(a.Key); direction != RTPTransceiverDirectionUnknown {
 			return direction
 		}
 	}
-	return RTPTransceiverDirection(Unknown)
+	return RTPTransceiverDirectionUnknown
 }
 
 func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
