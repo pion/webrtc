@@ -1660,17 +1660,17 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 			continue
 		}
 
+		pc.dtlsTransport.storeSimulcastStream(stream)
+
 		if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 			pc.log.Warn(ErrSimulcastProbeOverflow.Error())
-			pc.dtlsTransport.storeSimulcastStream(stream)
 			continue
 		}
 
 		go func(rtpStream io.Reader, ssrc SSRC) {
 			if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
-				pc.dtlsTransport.storeSimulcastStream(stream)
 			}
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
 		}(stream, SSRC(ssrc))
