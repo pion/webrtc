@@ -1865,7 +1865,7 @@ func (pc *PeerConnection) RemoveTrack(sender *RTPSender) (err error) {
 	return
 }
 
-func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirection, track TrackLocal) (t *RTPTransceiver, err error) {
+func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirection, track TrackLocal, init ...RTPTransceiverInit) (t *RTPTransceiver, err error) {
 	var (
 		r *RTPReceiver
 		s *RTPSender
@@ -1885,6 +1885,13 @@ func (pc *PeerConnection) newTransceiverFromTrack(direction RTPTransceiverDirect
 	if err != nil {
 		return
 	}
+
+	// Allow RTPTransceiverInit to override SSRC
+	if s != nil && len(s.trackEncodings) == 1 &&
+		len(init) == 1 && len(init[0].SendEncodings) == 1 && init[0].SendEncodings[0].SSRC != 0 {
+		s.trackEncodings[0].ssrc = init[0].SendEncodings[0].SSRC
+	}
+
 	return newRTPTransceiver(r, s, direction, track.Kind(), pc.api), nil
 }
 
@@ -1910,7 +1917,7 @@ func (pc *PeerConnection) AddTransceiverFromKind(kind RTPCodecType, init ...RTPT
 		if err != nil {
 			return nil, err
 		}
-		t, err = pc.newTransceiverFromTrack(direction, track)
+		t, err = pc.newTransceiverFromTrack(direction, track, init...)
 		if err != nil {
 			return nil, err
 		}
@@ -1942,7 +1949,7 @@ func (pc *PeerConnection) AddTransceiverFromTrack(track TrackLocal, init ...RTPT
 		direction = init[0].Direction
 	}
 
-	t, err = pc.newTransceiverFromTrack(direction, track)
+	t, err = pc.newTransceiverFromTrack(direction, track, init...)
 	if err == nil {
 		pc.mu.Lock()
 		pc.addRTPTransceiver(t)

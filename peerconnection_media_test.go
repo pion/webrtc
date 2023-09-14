@@ -152,9 +152,11 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
+		parameters := sender.GetParameters()
+
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: uint32(sender.trackEncodings[0].ssrc), MediaSSRC: uint32(sender.trackEncodings[0].ssrc)}}); routineErr != nil {
+			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: uint32(parameters.Encodings[0].SSRC), MediaSSRC: uint32(parameters.Encodings[0].SSRC)}}); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 
