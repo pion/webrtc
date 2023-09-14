@@ -137,6 +137,7 @@ Michael MacDonald <github@macdonald.cx>
 Michael MacDonald <mike.macdonald@savantsystems.com>
 Michiel De Backker <38858977+backkem@users.noreply.github.com>
 Mike Coleman <mc@fivebats.com>
+Mikhail <mvrogushkov@sberbank.ru>
 Mindgamesnl <matsmoolhuizen@gmail.com>
 mission-liao <missionaryliao@gmail.com>
 mohammadne <mohammadne@mail.ru>
