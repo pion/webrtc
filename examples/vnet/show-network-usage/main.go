@@ -96,7 +96,7 @@ func main() {
 	panicIfError(wan.AddNet(offerVNet))
 
 	offerSettingEngine := webrtc.SettingEngine{}
-	offerSettingEngine.SetVNet(offerVNet)
+	offerSettingEngine.SetNet(offerVNet)
 	offerAPI := webrtc.NewAPI(webrtc.WithSettingEngine(offerSettingEngine))
 
 	// Create a network interface for answerer
@@ -109,7 +109,7 @@ func main() {
 	panicIfError(wan.AddNet(answerVNet))
 
 	answerSettingEngine := webrtc.SettingEngine{}
-	answerSettingEngine.SetVNet(answerVNet)
+	answerSettingEngine.SetNet(answerVNet)
 	answerAPI := webrtc.NewAPI(webrtc.WithSettingEngine(answerSettingEngine))
 
 	// Start the virtual network by calling Start() on the root router

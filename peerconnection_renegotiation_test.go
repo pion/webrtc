@@ -1204,9 +1204,9 @@ func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
 	_, err = offerPC.CreateDataChannel("test", nil)
 	assert.NoError(t, err)
 
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
 
 	offer, err := offerPC.CreateOffer(nil)
@@ -1219,10 +1219,10 @@ func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
 	assert.NoError(t, offerPC.SetRemoteDescription(answer))
 	assert.Equal(t, SignalingStateStable, offerPC.SignalingState())
 
-	tr, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	tr, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
 	assert.NoError(t, tr.SetMid("3"))
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 	_, err = offerPC.CreateOffer(nil)
 	assert.NoError(t, err)
@@ -1257,13 +1257,13 @@ func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendonly,
 	})
 	assert.NoError(t, err)
