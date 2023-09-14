@@ -33,7 +33,7 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	assert.NoError(t, wan.AddNet(offerVNet))
 
 	offerSettingEngine := SettingEngine{}
-	offerSettingEngine.SetVNet(offerVNet)
+	offerSettingEngine.SetNet(offerVNet)
 	offerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
 
 	// Create a network interface for answerer
@@ -46,7 +46,7 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	assert.NoError(t, wan.AddNet(answerVNet))
 
 	answerSettingEngine := SettingEngine{}
-	answerSettingEngine.SetVNet(answerVNet)
+	answerSettingEngine.SetNet(answerVNet)
 	answerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
 
 	// Start the virtual network by calling Start() on the root router
