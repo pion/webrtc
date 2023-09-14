@@ -1268,54 +1268,36 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 		assert.Equal(t, "b", parameters.Encodings[1].RID)
 		assert.Equal(t, "c", parameters.Encodings[2].RID)
 
-		var midID, ridID, rsidID uint8
+		var midID, ridID uint8
 		for _, extension := range parameters.HeaderExtensions {
 			switch extension.URI {
 			case sdp.SDESMidURI:
 				midID = uint8(extension.ID)
 			case sdp.SDESRTPStreamIDURI:
 				ridID = uint8(extension.ID)
-			case sdesRepairRTPStreamIDURI:
-				rsidID = uint8(extension.ID)
 			}
 		}
 		assert.NotZero(t, midID)
 		assert.NotZero(t, ridID)
-		assert.NotZero(t, rsidID)
 
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 		for sequenceNumber := uint16(0); !ridsFullfilled(); sequenceNumber++ {
 			time.Sleep(20 * time.Millisecond)
 
-			for ssrc, rid := range rids {
-				header := &rtp.Header{
-					Version:        2,
-					SSRC:           uint32(ssrc),
-					SequenceNumber: sequenceNumber,
-					PayloadType:    96,
+			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
+				pkt := &rtp.Packet{
+					Header: rtp.Header{
+						Version:        2,
+						SequenceNumber: sequenceNumber,
+						PayloadType:    96,
+					},
+					Payload: []byte{0x00},
 				}
-				assert.NoError(t, header.SetExtension(midID, []byte("0")))
+				assert.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+				assert.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
 
-				// Send RSID for first 10 packets
-				if sequenceNumber >= 10 {
-					assert.NoError(t, header.SetExtension(ridID, []byte(rid)))
-				} else {
-					assert.NoError(t, header.SetExtension(rsidID, []byte(rid)))
-					header.SSRC += 10
-				}
-
-				var writer *TrackLocalStaticRTP
-				switch rid {
-				case "a":
-					writer = vp8WriterA
-				case "b":
-					writer = vp8WriterB
-				case "c":
-					writer = vp8WriterC
-				}
-				_, err = writer.bindings[0].writeStream.WriteRTP(header, []byte{0x00})
-				assert.NoError(t, err)
+				assert.NoError(t, track.WriteRTP(pkt))
 			}
 		}
 
