@@ -232,12 +232,21 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
+		var rtcpInterceptor interceptor.RTCPReader
+
+		r.mu.Lock()
 		for _, t := range r.tracks {
 			if t.track != nil && t.track.rid == rid {
-				return t.rtcpInterceptor.Read(b, a)
+				rtcpInterceptor = t.rtcpInterceptor
 			}
 		}
-		return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+		r.mu.Unlock()
+
+		if rtcpInterceptor == nil {
+			return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+		}
+		return rtcpInterceptor.Read(b, a)
+
 	case <-r.closed:
 		return 0, nil, io.ErrClosedPipe
 	}
