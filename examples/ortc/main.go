@@ -18,6 +18,7 @@ import (
 
 func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
+	port := flag.Int("port", 8080, "http server port")
 	flag.Parse()
 
 	// Everything below is the Pion WebRTC (ORTC) API! Thanks for using it ❤️.
@@ -103,7 +104,13 @@ func main() {
 	// Exchange the information
 	fmt.Println(signal.Encode(s))
 	remoteSignal := Signal{}
-	signal.Decode(signal.MustReadStdin(), &remoteSignal)
+
+	if *isOffer {
+		signalingChan := signal.HTTPSDPServer(*port)
+		signal.Decode(<-signalingChan, &remoteSignal)
+	} else {
+		signal.Decode(signal.MustReadStdin(), &remoteSignal)
+	}
 
 	iceRole := webrtc.ICERoleControlled
 	if *isOffer {

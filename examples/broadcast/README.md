@@ -20,7 +20,7 @@ Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 
 * Click `Publish a Broadcast`
 * Press `Copy browser SDP to clipboard` or copy the `Browser base64 Session Description` string manually
-* Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
+* Run `curl localhost:8080 -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
 * The `broadcast` terminal application will respond with an answer, paste this into the second input field in your browser.
 * Press `Start Session`
 * The connection state will be printed in the terminal and under `logs` in the browser.
@@ -28,7 +28,7 @@ Run `broadcast` OR run `main.go` in `github.com/pion/webrtc/examples/broadcast`
 ### Join the broadcast
 * Click `Join a Broadcast`
 * Copy the string in the first input labelled `Browser base64 Session Description`
-* Run `curl localhost:8080/sdp -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
+* Run `curl localhost:8080 -d "$BROWSER_OFFER"`. `$BROWSER_OFFER` is the value you copied in the last step.
 * The `broadcast` terminal application will respond with an answer, paste this into the second input field in your browser.
 * Press `Start Session`
 * The connection state will be printed in the terminal and under `logs` in the browser.

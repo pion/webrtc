@@ -9,6 +9,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 
@@ -19,7 +20,10 @@ import (
 )
 
 func main() { // nolint:gocognit
-	sdpChan := signal.HTTPSDPServer()
+	port := flag.Int("port", 8080, "http server port")
+	flag.Parse()
+
+	sdpChan := signal.HTTPSDPServer(*port)
 
 	// Everything below is the Pion WebRTC API, thanks for using it ❤️.
 	offer := webrtc.SessionDescription{}
