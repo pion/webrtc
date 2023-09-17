@@ -70,8 +70,7 @@ func main() {
 	})
 
 	// Gather candidates
-	err = gatherer.Gather()
-	if err != nil {
+	if err = gatherer.Gather(); err != nil {
 		panic(err)
 	}
 
@@ -101,6 +100,8 @@ func main() {
 		SCTPCapabilities: sctpCapabilities,
 	}
 
+	iceRole := webrtc.ICERoleControlled
+
 	// Exchange the information
 	fmt.Println(signal.Encode(s))
 	remoteSignal := Signal{}
@@ -108,17 +109,13 @@ func main() {
 	if *isOffer {
 		signalingChan := signal.HTTPSDPServer(*port)
 		signal.Decode(<-signalingChan, &remoteSignal)
+
+		iceRole = webrtc.ICERoleControlling
 	} else {
 		signal.Decode(signal.MustReadStdin(), &remoteSignal)
 	}
 
-	iceRole := webrtc.ICERoleControlled
-	if *isOffer {
-		iceRole = webrtc.ICERoleControlling
-	}
-
-	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
-	if err != nil {
+	if err = ice.SetRemoteCandidates(remoteSignal.ICECandidates); err != nil {
 		panic(err)
 	}
 
@@ -129,14 +126,12 @@ func main() {
 	}
 
 	// Start the DTLS transport
-	err = dtls.Start(remoteSignal.DTLSParameters)
-	if err != nil {
+	if err = dtls.Start(remoteSignal.DTLSParameters); err != nil {
 		panic(err)
 	}
 
 	// Start the SCTP transport
-	err = sctp.Start(remoteSignal.SCTPCapabilities)
-	if err != nil {
+	if err = sctp.Start(remoteSignal.SCTPCapabilities); err != nil {
 		panic(err)
 	}
 
@@ -183,8 +178,7 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 			message := signal.RandSeq(15)
 			fmt.Printf("Sending '%s' \n", message)
 
-			err := channel.SendText(message)
-			if err != nil {
+			if err := channel.SendText(message); err != nil {
 				panic(err)
 			}
 		}
