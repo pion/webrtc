@@ -303,6 +303,8 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
 	d.dataChannel = dc
+	bufferedAmountLowThreshold := d.bufferedAmountLowThreshold
+	onBufferedAmountLow := d.onBufferedAmountLow
 	d.mu.Unlock()
 	d.setReadyState(DataChannelStateOpen)
 
@@ -312,8 +314,8 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	// * already negotiated datachannels should fire OnOpened
 	if d.api.settingEngine.detach.DataChannels || isRemote || isAlreadyNegotiated {
 		// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
-		d.dataChannel.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
-		d.dataChannel.OnBufferedAmountLow(d.onBufferedAmountLow)
+		d.dataChannel.SetBufferedAmountLowThreshold(bufferedAmountLowThreshold)
+		d.dataChannel.OnBufferedAmountLow(onBufferedAmountLow)
 		d.onOpen()
 	} else {
 		dc.OnOpen(func() {
