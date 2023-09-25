@@ -136,6 +136,7 @@ mchlrhw <4028654+mchlrhw@users.noreply.github.com>
 Michael MacDonald <github@macdonald.cx>
 Michael MacDonald <mike.macdonald@savantsystems.com>
 Michiel De Backker <38858977+backkem@users.noreply.github.com>
+midepeter <mosadomipeter@yahoo.com>
 Mike Coleman <mc@fivebats.com>
 Mikhail <mvrogushkov@sberbank.ru>
 Mindgamesnl <matsmoolhuizen@gmail.com>
@@ -200,6 +201,7 @@ Steffen Vogel <post@steffenvogel.de>
 stephanrotolante <stephanrotolante@gmail.com>
 streamer45 <cstcld91@gmail.com>
 Suhas Gaddam <suhas.g.2011@gmail.com>
+sukun <sukunrt@gmail.com>
 Suzuki Takeo <takeo@stko.info>
 sylba2050 <masataka.hisasue@optim.co.jp>
 Tarrence van As <tarrencev@users.noreply.github.com>
