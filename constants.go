@@ -31,6 +31,11 @@ const (
 	generatedCertificateOrigin = "WebRTC"
 
 	sdesRepairRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"
+
+	// Attributes returned when Read() returns an RTX packet from a separate RTX stream (distinct SSRC)
+	attributeRtxPayloadType    = "rtx_payload_type"
+	attributeRtxSsrc           = "rtx_ssrc"
+	attributeRtxSequenceNumber = "rtx_sequence_number"
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {

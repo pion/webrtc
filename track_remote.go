@@ -24,6 +24,7 @@ type TrackRemote struct {
 	payloadType PayloadType
 	kind        RTPCodecType
 	ssrc        SSRC
+	rtxSsrc     SSRC
 	codec       RTPCodecParameters
 	params      RTPParameters
 	rid         string
@@ -33,10 +34,11 @@ type TrackRemote struct {
 	peekedAttributes interceptor.Attributes
 }
 
-func newTrackRemote(kind RTPCodecType, ssrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
+func newTrackRemote(kind RTPCodecType, ssrc, rtxSsrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
 	return &TrackRemote{
 		kind:     kind,
 		ssrc:     ssrc,
+		rtxSsrc:  rtxSsrc,
 		rid:      rid,
 		receiver: receiver,
 	}
@@ -125,13 +127,24 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		}
 	}
 
-	n, attributes, err = r.readRTP(b, t)
-	if err != nil {
-		return
+	// If there's a separate RTX track and an RTX packet is available, return that
+	if rtxPacket, rtxAttributes := r.readRTX(t); rtxPacket != nil {
+		n, err = rtxPacket.MarshalTo(b)
+		attributes = rtxAttributes
+		if err != nil {
+			return 0, nil, err
+		}
+	} else {
+		// If there's no separate RTX track (or there's a separate RTX track but no RTX packet waiting), wait for and return
+		// a packet from the main track
+		n, attributes, err = r.readRTP(b, t)
+		if err != nil {
+			return
+		}
+		err = t.checkAndUpdateTrack(b)
 	}
 
-	err = t.checkAndUpdateTrack(b)
-	return
+	return n, attributes, err
 }
 
 // checkAndUpdateTrack checks payloadType for every incoming packet
@@ -196,4 +209,18 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 // SetReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
 func (t *TrackRemote) SetReadDeadline(deadline time.Time) error {
 	return t.receiver.setRTPReadDeadline(deadline, t)
+}
+
+// RtxSSRC returns the RTX SSRC for a track, or 0 if track does not have a separate RTX stream
+func (t *TrackRemote) RtxSSRC() SSRC {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.rtxSsrc
+}
+
+// HasRTX returns true if the track has a separate RTX stream
+func (t *TrackRemote) HasRTX() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.rtxSsrc != 0
 }

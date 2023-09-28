@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"sync"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v4/internal/util"
 )
@@ -31,11 +33,17 @@ type trackStreams struct {
 	rtcpReadStream  *srtp.ReadStreamSRTCP
 	rtcpInterceptor interceptor.RTCPReader
 
-	repairReadStream  *srtp.ReadStreamSRTP
-	repairInterceptor interceptor.RTPReader
+	repairReadStream    *srtp.ReadStreamSRTP
+	repairInterceptor   interceptor.RTPReader
+	repairStreamChannel chan rtxPacketWithAttributes
 
 	repairRtcpReadStream  *srtp.ReadStreamSRTCP
 	repairRtcpInterceptor interceptor.RTCPReader
+}
+
+type rtxPacketWithAttributes struct {
+	rtxPacket  rtp.Packet
+	attributes interceptor.Attributes
 }
 
 // RTPReceiver allows an application to inspect the receipt of a TrackRemote
@@ -145,6 +153,7 @@ func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
 			track: newTrackRemote(
 				r.kind,
 				parameters.Encodings[i].SSRC,
+				parameters.Encodings[i].RTX.SSRC,
 				parameters.Encodings[i].RID,
 				r,
 			),
@@ -388,8 +397,6 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, streamInfo
 }
 
 // receiveForRtx starts a routine that processes the repair stream
-// These packets aren't exposed to the user yet, but we need to process them for
-// TWCC
 func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *interceptor.StreamInfo, rtpReadStream *srtp.ReadStreamSRTP, rtpInterceptor interceptor.RTPReader, rtcpReadStream *srtp.ReadStreamSRTCP, rtcpInterceptor interceptor.RTCPReader) error {
 	var track *trackStreams
 	if ssrc != 0 && len(r.tracks) == 1 {
@@ -411,12 +418,41 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 	track.repairInterceptor = rtpInterceptor
 	track.repairRtcpReadStream = rtcpReadStream
 	track.repairRtcpInterceptor = rtcpInterceptor
+	track.repairStreamChannel = make(chan rtxPacketWithAttributes)
 
 	go func() {
 		b := make([]byte, r.api.settingEngine.getReceiveMTU())
 		for {
-			if _, _, readErr := track.repairInterceptor.Read(b, nil); readErr != nil {
+			i, attributes, err := track.repairInterceptor.Read(b, nil)
+			if err != nil {
 				return
+			}
+
+			pkt := &rtp.Packet{}
+			if err := pkt.Unmarshal(b[:i]); err != nil {
+				return
+			}
+
+			if len(pkt.Payload) < 2 {
+				// BWE probe packet, ignore
+				continue
+			}
+
+			// RTX packets have a different payload format. Move the OSN in the payload to the RTP header and rewrite the
+			// payload type and SSRC, so that we can return RTX packets to the caller 'transparently' i.e. in the same format
+			// as non-RTX RTP packets
+			attributes.Set(attributeRtxPayloadType, pkt.Header.PayloadType)
+			attributes.Set(attributeRtxSsrc, pkt.Header.SSRC)
+			attributes.Set(attributeRtxSequenceNumber, pkt.Header.SequenceNumber)
+			pkt.Header.PayloadType = uint8(track.track.PayloadType())
+			pkt.Header.SSRC = uint32(track.track.SSRC())
+			pkt.Header.SequenceNumber = binary.BigEndian.Uint16(pkt.Payload[:2])
+			pkt.Payload = pkt.Payload[2:]
+
+			select {
+			case <-r.closed:
+				return
+			case track.repairStreamChannel <- rtxPacketWithAttributes{rtxPacket: *pkt, attributes: attributes}:
 			}
 		}
 	}()
@@ -454,4 +490,26 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 		return t.rtpReadStream.SetReadDeadline(deadline)
 	}
 	return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
+}
+
+// readRTX returns an RTX packet if one is available on the RTX track, otherwise returns nil
+func (r *RTPReceiver) readRTX(reader *TrackRemote) (*rtp.Packet, interceptor.Attributes) {
+	if !reader.HasRTX() {
+		return nil, interceptor.Attributes{}
+	}
+
+	select {
+	case <-r.received:
+	default:
+		return nil, interceptor.Attributes{}
+	}
+
+	if t := r.streamsForTrack(reader); t != nil {
+		select {
+		case rtxPacketReceived := <-t.repairStreamChannel:
+			return &rtxPacketReceived.rtxPacket, rtxPacketReceived.attributes
+		default:
+		}
+	}
+	return nil, interceptor.Attributes{}
 }
