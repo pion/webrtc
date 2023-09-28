@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package null is used to represent values where the 0 value is significant
 // This pattern is common in ECMAScript, this allows us to maintain a matching API
 package null

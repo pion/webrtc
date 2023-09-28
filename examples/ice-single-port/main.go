@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// ice-single-port demonstrates Pion WebRTC's ability to serve many PeerConnections on a single port.
 package main
 
 import (
@@ -9,8 +13,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pion/ice/v2"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/ice/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 var api *webrtc.API //nolint
@@ -96,5 +100,6 @@ func main() {
 	http.HandleFunc("/doSignaling", doSignaling)
 
 	fmt.Println("Open http://localhost:8080 to access this demo")
+	// nolint: gosec
 	panic(http.ListenAndServe(":8080", nil))
 }

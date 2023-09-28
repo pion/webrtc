@@ -1,14 +1,20 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // ICEConnectionState indicates signaling state of the ICE Connection.
 type ICEConnectionState int
 
 const (
+	// ICEConnectionStateUnknown is the enum's zero-value
+	ICEConnectionStateUnknown ICEConnectionState = iota
+
 	// ICEConnectionStateNew indicates that any of the ICETransports are
 	// in the "new" state and none of them are in the "checking", "disconnected"
 	// or "failed" state, or all ICETransports are in the "closed" state, or
 	// there are no transports.
-	ICEConnectionStateNew ICEConnectionState = iota + 1
+	ICEConnectionStateNew
 
 	// ICEConnectionStateChecking indicates that any of the ICETransports
 	// are in the "checking" state and none of them are in the "disconnected"
@@ -68,7 +74,7 @@ func NewICEConnectionState(raw string) ICEConnectionState {
 	case iceConnectionStateClosedStr:
 		return ICEConnectionStateClosed
 	default:
-		return ICEConnectionState(Unknown)
+		return ICEConnectionStateUnknown
 	}
 }
 

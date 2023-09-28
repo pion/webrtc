@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewRTCPMuxPolicy(t *testing.T) {
 		policyString   string
 		expectedPolicy RTCPMuxPolicy
 	}{
-		{unknownStr, RTCPMuxPolicy(Unknown)},
+		{ErrUnknownType.Error(), RTCPMuxPolicyUnknown},
 		{"negotiate", RTCPMuxPolicyNegotiate},
 		{"require", RTCPMuxPolicyRequire},
 	}
@@ -30,7 +33,7 @@ func TestRTCPMuxPolicy_String(t *testing.T) {
 		policy         RTCPMuxPolicy
 		expectedString string
 	}{
-		{RTCPMuxPolicy(Unknown), unknownStr},
+		{RTCPMuxPolicyUnknown, ErrUnknownType.Error()},
 		{RTCPMuxPolicyNegotiate, "negotiate"},
 		{RTCPMuxPolicyRequire, "require"},
 	}

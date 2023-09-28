@@ -1,5 +1,8 @@
 ---
- name: data-channels
- description: Example of using Pion WebRTC to communicate with a web browser using bi-direction DataChannels
- authors:
-   - Sean DuBois
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: data-channels
+description: Example of using Pion WebRTC to communicate with a web browser using bi-direction DataChannels
+authors:
+  - Sean DuBois

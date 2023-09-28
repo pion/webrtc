@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -8,9 +11,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/v2/test"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestDataChannel_ORTC_SCTPTransport(t *testing.T) {
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	stackA, stackB, err := newORTCPair()
+	assert.NoError(t, err)
+
+	getSelectedCandidatePairErrChan := make(chan error)
+	stackB.sctp.OnDataChannel(func(d *DataChannel) {
+		_, getSelectedCandidatePairErr := d.Transport().Transport().ICETransport().GetSelectedCandidatePair()
+		getSelectedCandidatePairErrChan <- getSelectedCandidatePairErr
+	})
+
+	assert.NoError(t, signalORTCPair(stackA, stackB))
+
+	var id uint16 = 1
+	_, err = stackA.api.NewDataChannel(stackA.sctp, &DataChannelParameters{
+		Label: "Foo",
+		ID:    &id,
+	})
+	assert.NoError(t, err)
+
+	assert.NoError(t, <-getSelectedCandidatePairErrChan)
+	assert.NoError(t, stackA.close())
+	assert.NoError(t, stackB.close())
+}
 
 func TestDataChannel_ORTCE2E(t *testing.T) {
 	lim := test.TimeOut(time.Second * 20)

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package fmtp
 
 import (
@@ -26,16 +29,17 @@ func (h *h264FMTP) MimeType() string {
 
 // Match returns true if h and b are compatible fmtp descriptions
 // Based on RFC6184 Section 8.2.2:
-//   The parameters identifying a media format configuration for H.264
-//   are profile-level-id and packetization-mode.  These media format
-//   configuration parameters (except for the level part of profile-
-//   level-id) MUST be used symmetrically; that is, the answerer MUST
-//   either maintain all configuration parameters or remove the media
-//   format (payload type) completely if one or more of the parameter
-//   values are not supported.
-//     Informative note: The requirement for symmetric use does not
-//     apply for the level part of profile-level-id and does not apply
-//     for the other stream properties and capability parameters.
+//
+//	The parameters identifying a media format configuration for H.264
+//	are profile-level-id and packetization-mode.  These media format
+//	configuration parameters (except for the level part of profile-
+//	level-id) MUST be used symmetrically; that is, the answerer MUST
+//	either maintain all configuration parameters or remove the media
+//	format (payload type) completely if one or more of the parameter
+//	values are not supported.
+//	  Informative note: The requirement for symmetric use does not
+//	  apply for the level part of profile-level-id and does not apply
+//	  for the other stream properties and capability parameters.
 func (h *h264FMTP) Match(b FMTP) bool {
 	c, ok := b.(*h264FMTP)
 	if !ok {

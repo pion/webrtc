@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package samplebuilder provides functionality to reconstruct media frames from RTP packets.
 package samplebuilder
 
@@ -6,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media"
 )
 
 // SampleBuilder buffers packets until media frames are complete.
@@ -35,8 +38,16 @@ type SampleBuilder struct {
 	// prepared contains the samples that have been processed to date
 	prepared sampleSequenceLocation
 
+	lastSampleTimestamp *uint32
+
 	// number of packets forced to be dropped
 	droppedPackets uint16
+
+	// number of padding packets detected and dropped (this will be a subset of `droppedPackets`)
+	paddingPackets uint16
+
+	// allows inspecting head packets of each sample and then returns a custom metadata
+	packetHeadHandler func(headPacket interface{}) interface{}
 }
 
 // New constructs a new SampleBuilder.
@@ -185,6 +196,7 @@ const secondToNanoseconds = 1000000000
 // buildSample creates a sample from a valid collection of RTP Packets by
 // walking forwards building a sample if everything looks good clear and
 // update buffer+values
+// nolint: gocognit
 func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if s.active.empty() {
 		s.active = s.filled
@@ -242,7 +254,16 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	// prior to decoding all the packets, check if this packet
 	// would end being disposed anyway
 	if !s.depacketizer.IsPartitionHead(s.buffer[consume.head].Payload) {
+		isPadding := false
+		for i := consume.head; i != consume.tail; i++ {
+			if s.lastSampleTimestamp != nil && *s.lastSampleTimestamp == s.buffer[i].Timestamp && len(s.buffer[i].Payload) == 0 {
+				isPadding = true
+			}
+		}
 		s.droppedPackets += consume.count()
+		if isPadding {
+			s.paddingPackets += consume.count()
+		}
 		s.purgeConsumedLocation(consume, true)
 		s.purgeConsumedBuffers()
 		return nil
@@ -250,11 +271,16 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// merge all the buffers into a sample
 	data := []byte{}
+	var metadata interface{}
 	for i := consume.head; i != consume.tail; i++ {
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
+		if i == consume.head && s.packetHeadHandler != nil {
+			metadata = s.packetHeadHandler(s.depacketizer)
+		}
+
 		data = append(data, p...)
 	}
 	samples := afterTimestamp - sampleTimestamp
@@ -264,9 +290,13 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
+		Metadata:           metadata,
 	}
 
 	s.droppedPackets = 0
+	s.paddingPackets = 0
+	s.lastSampleTimestamp = new(uint32)
+	*s.lastSampleTimestamp = sampleTimestamp
 
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
@@ -325,7 +355,7 @@ func timestampDistance(x, y uint32) uint32 {
 type Option func(o *SampleBuilder)
 
 // WithPartitionHeadChecker is obsolete, it does nothing.
-func WithPartitionHeadChecker(checker interface{}) Option {
+func WithPartitionHeadChecker(interface{}) Option {
 	return func(o *SampleBuilder) {
 	}
 }
@@ -335,6 +365,14 @@ func WithPartitionHeadChecker(checker interface{}) Option {
 func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
 	return func(o *SampleBuilder) {
 		o.packetReleaseHandler = h
+	}
+}
+
+// WithPacketHeadHandler set a head packet handler to allow inspecting
+// the packet to extract certain information and return as custom metadata
+func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
+	return func(o *SampleBuilder) {
+		o.packetHeadHandler = h
 	}
 }
 

@@ -1,5 +1,8 @@
 ---
- name: broadcast
- description: Example of a broadcast using Pion WebRTC
- authors:
-   - Sean DuBois
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: broadcast
+description: Example of a broadcast using Pion WebRTC
+authors:
+  - Sean DuBois

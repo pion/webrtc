@@ -1,14 +1,20 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
-import "github.com/pion/ice/v2"
+import "github.com/pion/ice/v3"
 
 // ICETransportState represents the current state of the ICE transport.
 type ICETransportState int
 
 const (
+	// ICETransportStateUnknown is the enum's zero-value
+	ICETransportStateUnknown ICETransportState = iota
+
 	// ICETransportStateNew indicates the ICETransport is waiting
 	// for remote candidates to be supplied.
-	ICETransportStateNew = iota + 1
+	ICETransportStateNew
 
 	// ICETransportStateChecking indicates the ICETransport has
 	// received at least one remote candidate, and a local and remote
@@ -60,7 +66,7 @@ func (c ICETransportState) String() string {
 	case ICETransportStateClosed:
 		return "closed"
 	default:
-		return unknownStr
+		return ErrUnknownType.Error()
 	}
 }
 
@@ -81,7 +87,7 @@ func newICETransportStateFromICE(i ice.ConnectionState) ICETransportState {
 	case ice.ConnectionStateClosed:
 		return ICETransportStateClosed
 	default:
-		return ICETransportState(Unknown)
+		return ICETransportStateUnknown
 	}
 }
 
@@ -102,6 +108,6 @@ func (c ICETransportState) toICE() ice.ConnectionState {
 	case ICETransportStateClosed:
 		return ice.ConnectionStateClosed
 	default:
-		return ice.ConnectionState(Unknown)
+		return ice.ConnectionStateUnknown
 	}
 }

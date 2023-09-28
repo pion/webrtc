@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package samplebuilder
 
 import (
@@ -6,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,6 +38,12 @@ func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
 		// the tests should be fixed to not assume the bug
 		return true
 	}
+
+	// skip padding
+	if len(payload) < 1 {
+		return false
+	}
+
 	for _, b := range f.headBytes {
 		if payload[0] == b {
 			return true
@@ -43,7 +52,7 @@ func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
 	return false
 }
 
-func (f *fakeDepacketizer) IsPartitionTail(marker bool, payload []byte) bool {
+func (f *fakeDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {
 	return marker
 }
 
@@ -223,6 +232,44 @@ func TestSampleBuilder(t *testing.T) {
 			maxLate:          50,
 			maxLateTimestamp: 2000,
 		},
+		{
+			message: "Sample builder should recognize padding packets",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{1}},               // 1st packet
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 1}, Payload: []byte{2}},               // 2nd packet
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 1, Marker: true}, Payload: []byte{3}}, // 3rd packet
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 1}, Payload: []byte{}},                // Padding packet 1
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 1}, Payload: []byte{}},                // Padding packet 2
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 3}, Payload: []byte{1}},               // 6th packet
+				{Header: rtp.Header{SequenceNumber: 5006, Timestamp: 3, Marker: true}, Payload: []byte{7}}, // 7th packet
+				{Header: rtp.Header{SequenceNumber: 5007, Timestamp: 4}, Payload: []byte{1}},               // 7th packet
+			},
+			withHeadChecker: true,
+			headBytes:       []byte{1},
+			samples: []*media.Sample{
+				{Data: []byte{1, 2, 3}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // first sample
+			},
+			maxLate:          50,
+			maxLateTimestamp: 2000,
+		},
+		{
+			message: "Sample builder should build a sample out of a packet that's both start and end following a run of padding packets",
+			packets: []*rtp.Packet{
+				{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{1}},               // 1st valid packet
+				{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 1, Marker: true}, Payload: []byte{2}}, // 2nd valid packet
+				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 1}, Payload: []byte{}},                // 1st padding packet
+				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 1}, Payload: []byte{}},                // 2nd padding packet
+				{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 2, Marker: true}, Payload: []byte{1}}, // 3rd valid packet
+				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 3}, Payload: []byte{1}},               // 4th valid packet, start of next sample
+			},
+			withHeadChecker: true,
+			headBytes:       []byte{1},
+			samples: []*media.Sample{
+				{Data: []byte{1, 2}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // 1st sample
+			},
+			maxLate:          50,
+			maxLateTimestamp: 2000,
+		},
 	}
 
 	t.Run("Pop", func(t *testing.T) {
@@ -386,6 +433,38 @@ func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
 	}
 }
 
+func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
+	packets := []*rtp.Packet{
+		{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 5}, Payload: []byte{0x01}},
+		{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 5}, Payload: []byte{0x02}},
+		{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 6}, Payload: []byte{0x01}},
+		{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 6}, Payload: []byte{0x02}},
+		{Header: rtp.Header{SequenceNumber: 5004, Timestamp: 7}, Payload: []byte{0x01}},
+	}
+
+	headCount := 0
+	s := New(10, &fakeDepacketizer{}, 1, WithPacketHeadHandler(func(headPacket interface{}) interface{} {
+		headCount++
+		return true
+	}))
+
+	for _, pkt := range packets {
+		s.Push(pkt)
+	}
+
+	for {
+		sample := s.Pop()
+		if sample == nil {
+			break
+		}
+
+		assert.NotNil(t, sample.Metadata, "sample metadata shouldn't be nil")
+		assert.Equal(t, true, sample.Metadata, "sample metadata should've been set to true")
+	}
+
+	assert.Equal(t, 2, headCount, "two sample heads should have been inspected")
+}
+
 func TestPopWithTimestamp(t *testing.T) {
 	t.Run("Crash on nil", func(t *testing.T) {
 		s := New(0, &fakeDepacketizer{}, 1)
@@ -397,7 +476,7 @@ func TestPopWithTimestamp(t *testing.T) {
 
 type truePartitionHeadChecker struct{}
 
-func (f *truePartitionHeadChecker) IsPartitionHead(payload []byte) bool {
+func (f *truePartitionHeadChecker) IsPartitionHead([]byte) bool {
 	return true
 }
 

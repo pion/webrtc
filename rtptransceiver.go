@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -39,7 +42,7 @@ func newRTPTransceiver(
 	t.setReceiver(receiver)
 	t.setSender(sender)
 	t.setDirection(direction)
-	t.setCurrentDirection(RTPTransceiverDirection(Unknown))
+	t.setCurrentDirection(RTPTransceiverDirectionUnknown)
 	return t
 }
 
@@ -190,7 +193,7 @@ func (t *RTPTransceiver) getCurrentDirection() RTPTransceiverDirection {
 	if v, ok := t.currentDirection.Load().(RTPTransceiverDirection); ok {
 		return v
 	}
-	return RTPTransceiverDirection(Unknown)
+	return RTPTransceiverDirectionUnknown
 }
 
 func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error {

@@ -1,5 +1,8 @@
 ---
- name: swap-tracks
- description: Example of how to have Pion swap incoming tracks on a single outgoing track
- authors:
-   - Chad Retz
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: swap-tracks
+description: Example of how to have Pion swap incoming tracks on a single outgoing track
+authors:
+  - Chad Retz

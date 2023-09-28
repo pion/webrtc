@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestICEGathererState_String(t *testing.T) {
 		state          ICEGathererState
 		expectedString string
 	}{
-		{ICEGathererState(Unknown), unknownStr},
+		{ICEGathererStateUnknown, ErrUnknownType.Error()},
 		{ICEGathererStateNew, "new"},
 		{ICEGathererStateGathering, "gathering"},
 		{ICEGathererStateComplete, "complete"},

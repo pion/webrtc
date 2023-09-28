@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
 	"fmt"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 )
 
 func supportedNetworkTypes() []NetworkType {
@@ -19,8 +22,11 @@ func supportedNetworkTypes() []NetworkType {
 type NetworkType int
 
 const (
+	// NetworkTypeUnknown is the enum's zero-value
+	NetworkTypeUnknown NetworkType = iota
+
 	// NetworkTypeUDP4 indicates UDP over IPv4.
-	NetworkTypeUDP4 NetworkType = iota + 1
+	NetworkTypeUDP4
 
 	// NetworkTypeUDP6 indicates UDP over IPv6.
 	NetworkTypeUDP6
@@ -84,7 +90,7 @@ func NewNetworkType(raw string) (NetworkType, error) {
 	case networkTypeTCP6Str:
 		return NetworkTypeTCP6, nil
 	default:
-		return NetworkType(Unknown), fmt.Errorf("%w: %s", errNetworkTypeUnknown, raw)
+		return NetworkTypeUnknown, fmt.Errorf("%w: %s", errNetworkTypeUnknown, raw)
 	}
 }
 
@@ -99,6 +105,6 @@ func getNetworkType(iceNetworkType ice.NetworkType) (NetworkType, error) {
 	case ice.NetworkTypeTCP6:
 		return NetworkTypeTCP6, nil
 	default:
-		return NetworkType(Unknown), fmt.Errorf("%w: %s", errNetworkTypeUnknown, iceNetworkType.String())
+		return NetworkTypeUnknown, fmt.Errorf("%w: %s", errNetworkTypeUnknown, iceNetworkType.String())
 	}
 }

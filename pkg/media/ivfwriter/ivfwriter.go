@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package ivfwriter implements IVF media container writer
 package ivfwriter
 
@@ -9,7 +12,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/rtp/pkg/frame"
+	"github.com/pion/rtp/codecs/av1/frame"
 )
 
 var (

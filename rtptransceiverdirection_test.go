@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewRTPTransceiverDirection(t *testing.T) {
 		directionString   string
 		expectedDirection RTPTransceiverDirection
 	}{
-		{unknownStr, RTPTransceiverDirection(Unknown)},
+		{ErrUnknownType.Error(), RTPTransceiverDirectionUnknown},
 		{"sendrecv", RTPTransceiverDirectionSendrecv},
 		{"sendonly", RTPTransceiverDirectionSendonly},
 		{"recvonly", RTPTransceiverDirectionRecvonly},
@@ -32,7 +35,7 @@ func TestRTPTransceiverDirection_String(t *testing.T) {
 		direction      RTPTransceiverDirection
 		expectedString string
 	}{
-		{RTPTransceiverDirection(Unknown), unknownStr},
+		{RTPTransceiverDirectionUnknown, ErrUnknownType.Error()},
 		{RTPTransceiverDirectionSendrecv, "sendrecv"},
 		{RTPTransceiverDirectionSendonly, "sendonly"},
 		{RTPTransceiverDirectionRecvonly, "recvonly"},

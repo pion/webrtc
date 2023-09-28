@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// rtp-to-webrtc demonstrates how to consume a RTP stream video UDP, and then send to a WebRTC client.
 package main
 
 import (
@@ -9,8 +13,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func main() {
@@ -30,6 +34,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Increase the UDP receive buffer size
+	// Default UDP buffer sizes vary on different operating systems
+	bufferSize := 300000 // 300KB
+	err = listener.SetReadBuffer(bufferSize)
+	if err != nil {
+		panic(err)
+	}
+
 	defer func() {
 		if err = listener.Close(); err != nil {
 			panic(err)

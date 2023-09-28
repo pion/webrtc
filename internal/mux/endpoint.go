@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package mux
 
 import (
@@ -6,20 +9,24 @@ import (
 	"net"
 	"time"
 
-	"github.com/pion/ice/v2"
-	"github.com/pion/transport/v2/packetio"
+	"github.com/pion/ice/v3"
+	"github.com/pion/transport/v3/packetio"
 )
 
 // Endpoint implements net.Conn. It is used to read muxed packets.
 type Endpoint struct {
-	mux    *Mux
-	buffer *packetio.Buffer
+	mux     *Mux
+	buffer  *packetio.Buffer
+	onClose func()
 }
 
 // Close unregisters the endpoint from the Mux
 func (e *Endpoint) Close() (err error) {
-	err = e.close()
-	if err != nil {
+	if e.onClose != nil {
+		e.onClose()
+	}
+
+	if err = e.close(); err != nil {
 		return err
 	}
 
@@ -60,16 +67,22 @@ func (e *Endpoint) RemoteAddr() net.Addr {
 }
 
 // SetDeadline is a stub
-func (e *Endpoint) SetDeadline(t time.Time) error {
+func (e *Endpoint) SetDeadline(time.Time) error {
 	return nil
 }
 
 // SetReadDeadline is a stub
-func (e *Endpoint) SetReadDeadline(t time.Time) error {
+func (e *Endpoint) SetReadDeadline(time.Time) error {
 	return nil
 }
 
 // SetWriteDeadline is a stub
-func (e *Endpoint) SetWriteDeadline(t time.Time) error {
+func (e *Endpoint) SetWriteDeadline(time.Time) error {
 	return nil
+}
+
+// SetOnClose is a user set callback that
+// will be executed when `Close` is called
+func (e *Endpoint) SetOnClose(onClose func()) {
+	e.onClose = onClose
 }

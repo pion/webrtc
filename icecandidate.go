@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
 	"fmt"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 )
 
 // ICECandidate represents a ice candidate

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build js && wasm
 // +build js,wasm
 
@@ -7,8 +10,8 @@ package webrtc
 import (
 	"syscall/js"
 
-	"github.com/pion/ice/v2"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/ice/v3"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
 // PeerConnection represents a WebRTC connection that establishes a
@@ -179,14 +182,14 @@ func (pc *PeerConnection) checkConfiguration(configuration Configuration) error 
 	// }
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #5)
-	if configuration.BundlePolicy != BundlePolicy(Unknown) {
+	if configuration.BundlePolicy != BundlePolicyUnknown {
 		if configuration.BundlePolicy != existingConfig.BundlePolicy {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingBundlePolicy}
 		}
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #6)
-	if configuration.RTCPMuxPolicy != RTCPMuxPolicy(Unknown) {
+	if configuration.RTCPMuxPolicy != RTCPMuxPolicyUnknown {
 		if configuration.RTCPMuxPolicy != existingConfig.RTCPMuxPolicy {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy}
 		}

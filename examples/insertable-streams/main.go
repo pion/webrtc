@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// insertable-streams demonstrates how to use insertable streams with Pion
 package main
 
 import (
@@ -11,14 +15,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
-	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
+	"github.com/pion/webrtc/v4/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
 )
 
 const cipherKey = 0xAA
 
+// nolint:gocognit
 func main() {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -119,6 +124,12 @@ func main() {
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
 		}
 	})

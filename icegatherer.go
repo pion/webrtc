@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -8,8 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/logging"
+	"github.com/pion/stun/v2"
 )
 
 // ICEGatherer gathers local host, server reflexive and relay
@@ -21,7 +25,7 @@ type ICEGatherer struct {
 	log   logging.LeveledLogger
 	state ICEGathererState
 
-	validatedServers []*ice.URL
+	validatedServers []*stun.URI
 	gatherPolicy     ICETransportPolicy
 
 	agent *ice.Agent
@@ -39,7 +43,7 @@ type ICEGatherer struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
-	var validatedServers []*ice.URL
+	var validatedServers []*stun.URI
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
 			url, err := server.urls()
@@ -117,6 +121,7 @@ func (g *ICEGatherer) createAgent() error {
 		TCPMux:                 g.api.settingEngine.iceTCPMux,
 		UDPMux:                 g.api.settingEngine.iceUDPMux,
 		ProxyDialer:            g.api.settingEngine.iceProxyDialer,
+		DisableActiveTCP:       g.api.settingEngine.iceDisableActiveTCP,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
@@ -342,7 +347,6 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
 				Type:          StatsTypeLocalCandidate,
-				NetworkType:   networkType,
 				IP:            candidateStats.IP,
 				Port:          int32(candidateStats.Port),
 				Protocol:      networkType.Protocol(),
@@ -371,7 +375,6 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
 				Type:          StatsTypeRemoteCandidate,
-				NetworkType:   networkType,
 				IP:            candidateStats.IP,
 				Port:          int32(candidateStats.Port),
 				Protocol:      networkType.Protocol(),

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewSCTPTransportState(t *testing.T) {
 		transportStateString   string
 		expectedTransportState SCTPTransportState
 	}{
-		{unknownStr, SCTPTransportState(Unknown)},
+		{ErrUnknownType.Error(), SCTPTransportStateUnknown},
 		{"connecting", SCTPTransportStateConnecting},
 		{"connected", SCTPTransportStateConnected},
 		{"closed", SCTPTransportStateClosed},
@@ -31,7 +34,7 @@ func TestSCTPTransportState_String(t *testing.T) {
 		transportState SCTPTransportState
 		expectedString string
 	}{
-		{SCTPTransportState(Unknown), unknownStr},
+		{SCTPTransportStateUnknown, ErrUnknownType.Error()},
 		{SCTPTransportStateConnecting, "connecting"},
 		{SCTPTransportStateConnected, "connected"},
 		{SCTPTransportStateClosed, "closed"},

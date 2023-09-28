@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// play-from-disk demonstrates how to send video and/or audio to your browser from files saved to disk.
 package main
 
 import (
@@ -11,11 +15,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
-	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
-	"github.com/pion/webrtc/v3/pkg/media/oggreader"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
+	"github.com/pion/webrtc/v4/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
+	"github.com/pion/webrtc/v4/pkg/media/oggreader"
 )
 
 const (
@@ -24,6 +28,7 @@ const (
 	oggPageDuration = time.Millisecond * 20
 )
 
+// nolint:gocognit
 func main() {
 	// Assert that we have an audio or video file
 	_, err := os.Stat(videoFileName)
@@ -56,8 +61,31 @@ func main() {
 	iceConnectedCtx, iceConnectedCtxCancel := context.WithCancel(context.Background())
 
 	if haveVideoFile {
+		file, openErr := os.Open(videoFileName)
+		if openErr != nil {
+			panic(openErr)
+		}
+
+		_, header, openErr := ivfreader.NewWith(file)
+		if openErr != nil {
+			panic(openErr)
+		}
+
+		// Determine video codec
+		var trackCodec string
+		switch header.FourCC {
+		case "AV01":
+			trackCodec = webrtc.MimeTypeAV1
+		case "VP90":
+			trackCodec = webrtc.MimeTypeVP9
+		case "VP80":
+			trackCodec = webrtc.MimeTypeVP8
+		default:
+			panic(fmt.Sprintf("Unable to handle FourCC %s", header.FourCC))
+		}
+
 		// Create a video track
-		videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
+		videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: trackCodec}, "video", "pion")
 		if videoTrackErr != nil {
 			panic(videoTrackErr)
 		}
@@ -208,6 +236,12 @@ func main() {
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
 		}
 	})

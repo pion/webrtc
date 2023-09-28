@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// custom-logger is an example of how the Pion API provides an customizable logging API
 package main
 
 import (
@@ -8,7 +12,7 @@ import (
 	"os"
 
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 // Everything below is the Pion WebRTC API! Thanks for using it ❤️.
@@ -19,8 +23,8 @@ import (
 type customLogger struct{}
 
 // Print all messages except trace
-func (c customLogger) Trace(msg string)                          {}
-func (c customLogger) Tracef(format string, args ...interface{}) {}
+func (c customLogger) Trace(string)                  {}
+func (c customLogger) Tracef(string, ...interface{}) {}
 
 func (c customLogger) Debug(msg string) { fmt.Printf("customLogger Debug: %s\n", msg) }
 func (c customLogger) Debugf(format string, args ...interface{}) {
@@ -94,6 +98,12 @@ func main() {
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
 		}
 	})

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewDTLSTransportState(t *testing.T) {
 		stateString   string
 		expectedState DTLSTransportState
 	}{
-		{unknownStr, DTLSTransportState(Unknown)},
+		{ErrUnknownType.Error(), DTLSTransportStateUnknown},
 		{"new", DTLSTransportStateNew},
 		{"connecting", DTLSTransportStateConnecting},
 		{"connected", DTLSTransportStateConnected},
@@ -33,7 +36,7 @@ func TestDTLSTransportState_String(t *testing.T) {
 		state          DTLSTransportState
 		expectedString string
 	}{
-		{DTLSTransportState(Unknown), unknownStr},
+		{DTLSTransportStateUnknown, ErrUnknownType.Error()},
 		{DTLSTransportStateNew, "new"},
 		{DTLSTransportStateConnecting, "connecting"},
 		{DTLSTransportStateConnected, "connected"},

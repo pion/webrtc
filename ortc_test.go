@@ -1,10 +1,13 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
 package webrtc
 
 import (
-	"github.com/pion/webrtc/v3/internal/util"
+	"github.com/pion/webrtc/v4/internal/util"
 )
 
 type testORTCStack struct {

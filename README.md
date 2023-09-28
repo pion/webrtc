@@ -13,9 +13,9 @@
   <a href="https://github.com/pion/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pion/webrtc/test.yaml">
-  <a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://pkg.go.dev/badge/github.com/pion/webrtc/v3.svg" alt="Go Reference"></a>
+  <a href="https://pkg.go.dev/github.com/pion/webrtc/v4"><img src="https://pkg.go.dev/badge/github.com/pion/webrtc/v4.svg" alt="Go Reference"></a>
   <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
-  <a href="https://goreportcard.com/report/github.com/pion/webrtc/v3"><img src="https://goreportcard.com/badge/github.com/pion/webrtc/v3" alt="Go Report Card"></a>
+  <a href="https://goreportcard.com/report/github.com/pion/webrtc/v4"><img src="https://goreportcard.com/badge/github.com/pion/webrtc/v4" alt="Go Report Card"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 <br>
@@ -30,7 +30,7 @@
 
 **[awesome-pion](https://github.com/pion/awesome-pion)** contains projects that have used Pion, and serve as real world examples of usage.
 
-**[GoDoc](https://pkg.go.dev/github.com/pion/webrtc/v3)** is an auto generated API reference. All our Public APIs are commented.
+**[GoDoc](https://pkg.go.dev/github.com/pion/webrtc/v4)** is an auto generated API reference. All our Public APIs are commented.
 
 **[FAQ](https://github.com/pion/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in [Slack](https://pion.ly/slack) we are always looking to expand it.
 
@@ -60,7 +60,7 @@ This book is vendor agnostic and will not have any Pion specific information.
 * Send/Receive audio and video
 * Renegotiation
 * Plan-B and Unified Plan
-* [SettingEngine](https://pkg.go.dev/github.com/pion/webrtc/v3#SettingEngine) for Pion specific extensions
+* [SettingEngine](https://pkg.go.dev/github.com/pion/webrtc/v4#SettingEngine) for Pion specific extensions
 
 
 #### Connectivity

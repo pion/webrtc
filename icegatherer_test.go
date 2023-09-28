@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -9,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v2"
-	"github.com/pion/transport/v2/test"
+	"github.com/pion/ice/v3"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
 

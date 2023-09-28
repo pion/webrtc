@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -11,8 +14,8 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
-	"github.com/pion/srtp/v2"
-	"github.com/pion/webrtc/v3/internal/util"
+	"github.com/pion/srtp/v3"
+	"github.com/pion/webrtc/v4/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -123,6 +126,15 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 	return tracks
 }
 
+// RTPTransceiver returns the RTPTransceiver this
+// RTPReceiver belongs too, or nil if none
+func (r *RTPReceiver) RTPTransceiver() *RTPTransceiver {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.tr
+}
+
 // configureReceive initialize the track
 func (r *RTPReceiver) configureReceive(parameters RTPReceiveParameters) {
 	r.mu.Lock()
@@ -220,12 +232,21 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
+		var rtcpInterceptor interceptor.RTCPReader
+
+		r.mu.Lock()
 		for _, t := range r.tracks {
 			if t.track != nil && t.track.rid == rid {
-				return t.rtcpInterceptor.Read(b, a)
+				rtcpInterceptor = t.rtcpInterceptor
 			}
 		}
-		return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+		r.mu.Unlock()
+
+		if rtcpInterceptor == nil {
+			return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+		}
+		return rtcpInterceptor.Read(b, a)
+
 	case <-r.closed:
 		return 0, nil, io.ErrClosedPipe
 	}
@@ -407,10 +428,7 @@ func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if err := r.tracks[0].rtcpReadStream.SetReadDeadline(t); err != nil {
-		return err
-	}
-	return nil
+	return r.tracks[0].rtcpReadStream.SetReadDeadline(t)
 }
 
 // SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid will block before returning. 0 is forever.

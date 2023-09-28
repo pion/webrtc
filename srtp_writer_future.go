@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -10,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
-	"github.com/pion/srtp/v2"
+	"github.com/pion/srtp/v3"
 )
 
 // srtpWriterFuture blocks Read/Write calls until

@@ -1,13 +1,19 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // ICEGatheringState describes the state of the candidate gathering process.
 type ICEGatheringState int
 
 const (
+	// ICEGatheringStateUnknown is the enum's zero-value
+	ICEGatheringStateUnknown ICEGatheringState = iota
+
 	// ICEGatheringStateNew indicates that any of the ICETransports are
 	// in the "new" gathering state and none of the transports are in the
 	// "gathering" state, or there are no transports.
-	ICEGatheringStateNew ICEGatheringState = iota + 1
+	ICEGatheringStateNew
 
 	// ICEGatheringStateGathering indicates that any of the ICETransports
 	// are in the "gathering" state.
@@ -35,7 +41,7 @@ func NewICEGatheringState(raw string) ICEGatheringState {
 	case iceGatheringStateCompleteStr:
 		return ICEGatheringStateComplete
 	default:
-		return ICEGatheringState(Unknown)
+		return ICEGatheringStateUnknown
 	}
 }
 

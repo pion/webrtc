@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -10,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v3/internal/mux"
+	"github.com/pion/webrtc/v4/internal/mux"
 )
 
 // ICETransport allows an application access to information about the ICE
@@ -298,6 +301,16 @@ func (t *ICETransport) State() ICETransportState {
 		return v
 	}
 	return ICETransportState(0)
+}
+
+// GetLocalParameters returns an IceParameters object which provides information
+// uniquely identifying the local peer for the duration of the ICE session.
+func (t *ICETransport) GetLocalParameters() (ICEParameters, error) {
+	if err := t.ensureGatherer(); err != nil {
+		return ICEParameters{}, err
+	}
+
+	return t.gatherer.GetLocalParameters()
 }
 
 func (t *ICETransport) setState(i ICETransportState) {

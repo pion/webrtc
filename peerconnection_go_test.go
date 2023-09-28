@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -19,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v2/test"
-	"github.com/pion/transport/v2/vnet"
-	"github.com/pion/webrtc/v3/internal/util"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -301,7 +304,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 
 	// Verify that the noop case works
 	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ICEConnectionStateNew) })
 
 	pc.OnTrack(func(t *TrackRemote, r *RTPReceiver) {
 		close(onTrackCalled)
@@ -326,7 +329,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 
 	// Verify that the set handlers are called
 	assert.NotPanics(t, func() { pc.onTrack(&TrackRemote{}, &RTPReceiver{}) })
-	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ice.ConnectionStateNew) })
+	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ICEConnectionStateNew) })
 	assert.NotPanics(t, func() { go pc.onDataChannelHandler(&DataChannel{api: api}) })
 
 	<-onTrackCalled
@@ -616,31 +619,22 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	seenComplete := &atomicBool{}
 
 	seenGatheringAndComplete := make(chan interface{})
-	seenClosed := make(chan interface{})
 
 	peerConn, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	var onStateChange func(s ICEGathererState)
-	onStateChange = func(s ICEGathererState) {
+	var onStateChange func(s ICEGatheringState)
+	onStateChange = func(s ICEGatheringState) {
 		// Access to ICEGatherer in the callback must not cause dead lock.
 		peerConn.OnICEGatheringStateChange(onStateChange)
-		if state := peerConn.iceGatherer.State(); state != s {
-			t.Errorf("State change callback argument (%s) and State() (%s) result differs",
-				s, state,
-			)
-		}
 
 		switch s { // nolint:exhaustive
-		case ICEGathererStateClosed:
-			close(seenClosed)
-			return
-		case ICEGathererStateGathering:
+		case ICEGatheringStateGathering:
 			if seenComplete.get() {
 				t.Error("Completed before gathering")
 			}
 			seenGathering.set(true)
-		case ICEGathererStateComplete:
+		case ICEGatheringStateComplete:
 			seenComplete.set(true)
 		}
 
@@ -657,18 +651,10 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	select {
 	case <-time.After(time.Second * 10):
 		t.Fatal("Gathering and Complete were never seen")
-	case <-seenClosed:
-		t.Fatal("Closed before PeerConnection Close")
 	case <-seenGatheringAndComplete:
 	}
 
 	assert.NoError(t, peerConn.Close())
-
-	select {
-	case <-time.After(time.Second * 10):
-		t.Fatal("Closed was never seen")
-	case <-seenClosed:
-	}
 }
 
 // Assert Trickle ICE behaviors

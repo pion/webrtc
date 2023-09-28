@@ -9,8 +9,7 @@ In this example we have defined a simple JSON based signaling protocol.
 ## Instructions
 ### Download ortc
 ```
-export GO111MODULE=on
-go get github.com/pion/webrtc/v3/examples/ortc
+go install github.com/pion/webrtc/v4/examples/ortc@latest
 ```
 
 ### Run first client as offerer
@@ -19,7 +18,13 @@ go get github.com/pion/webrtc/v3/examples/ortc
 ## Run the second client as answerer
 Run the second client. This should be launched with the message you copied in the previous step as stdin.
 
-`echo BASE64_MESSAGE_YOU_COPIED | ortc`
+`echo $BASE64_MESSAGE_YOU_COPIED | ortc`
+
+This will emit another base64 message. Copy this new message.
+
+## Send base64 message to first client via CURL
+
+* Run `curl localhost:8080 -d "BASE64_MESSAGE_YOU_COPIED"`. `BASE64_MESSAGE_YOU_COPIED` is the value you copied in the last step.
 
 ### Enjoy
 If everything worked you will see `Data channel 'Foo'-'' open.` in each terminal.

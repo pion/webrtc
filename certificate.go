@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -18,7 +21,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
 // Certificate represents a x509Cert used to authenticate WebRTC communications.
@@ -105,10 +108,12 @@ func (c Certificate) GetFingerprints() ([]DTLSFingerprint, error) {
 	for _, algo := range fingerprintAlgorithms {
 		name, err := fingerprint.StringFromHash(algo)
 		if err != nil {
+			// nolint
 			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		value, err := fingerprint.Fingerprint(c.x509Cert, algo)
 		if err != nil {
+			// nolint
 			return nil, fmt.Errorf("%w: %v", ErrFailedToGenerateCertificateFingerprint, err)
 		}
 		res[i] = DTLSFingerprint{

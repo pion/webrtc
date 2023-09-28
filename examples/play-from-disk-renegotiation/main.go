@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// play-from-disk-renegotiation demonstrates Pion WebRTC's renegotiation abilities.
 package main
 
 import (
@@ -12,9 +16,9 @@ import (
 	"time"
 
 	"github.com/pion/randutil"
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/pkg/media/ivfreader"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
 )
 
 var peerConnection *webrtc.PeerConnection //nolint
@@ -136,6 +140,12 @@ func main() {
 			fmt.Println("Peer Connection has gone to failed exiting")
 			os.Exit(0)
 		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
+			os.Exit(0)
+		}
 	})
 
 	http.Handle("/", http.FileServer(http.Dir(".")))
@@ -145,6 +155,7 @@ func main() {
 
 	go func() {
 		fmt.Println("Open http://localhost:8080 to access this demo")
+		// nolint: gosec
 		panic(http.ListenAndServe(":8080", nil))
 	}()
 

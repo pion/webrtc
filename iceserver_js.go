@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build js && wasm
 // +build js,wasm
 
@@ -6,7 +9,7 @@ package webrtc
 import (
 	"errors"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 )
 
 // ICEServer describes a single STUN and TURN server that can be used by

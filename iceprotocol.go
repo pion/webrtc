@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -10,8 +13,11 @@ import (
 type ICEProtocol int
 
 const (
+	// ICEProtocolUnknown is the enum's zero-value
+	ICEProtocolUnknown ICEProtocol = iota
+
 	// ICEProtocolUDP indicates the URL uses a UDP transport.
-	ICEProtocolUDP ICEProtocol = iota + 1
+	ICEProtocolUDP
 
 	// ICEProtocolTCP indicates the URL uses a TCP transport.
 	ICEProtocolTCP
@@ -31,7 +37,7 @@ func NewICEProtocol(raw string) (ICEProtocol, error) {
 	case strings.EqualFold(iceProtocolTCPStr, raw):
 		return ICEProtocolTCP, nil
 	default:
-		return ICEProtocol(Unknown), fmt.Errorf("%w: %s", errICEProtocolUnknown, raw)
+		return ICEProtocolUnknown, fmt.Errorf("%w: %s", errICEProtocolUnknown, raw)
 	}
 }
 

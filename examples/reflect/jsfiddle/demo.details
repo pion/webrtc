@@ -1,5 +1,8 @@
 ---
- name: reflect
- description: Example of how to have Pion send back to the user exactly what it receives using the same PeerConnection.
- authors:
-   - Sean DuBois
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: reflect
+description: Example of how to have Pion send back to the user exactly what it receives using the same PeerConnection.
+authors:
+  - Sean DuBois

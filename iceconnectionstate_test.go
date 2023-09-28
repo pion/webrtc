@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewICEConnectionState(t *testing.T) {
 		stateString   string
 		expectedState ICEConnectionState
 	}{
-		{unknownStr, ICEConnectionState(Unknown)},
+		{ErrUnknownType.Error(), ICEConnectionStateUnknown},
 		{"new", ICEConnectionStateNew},
 		{"checking", ICEConnectionStateChecking},
 		{"connected", ICEConnectionStateConnected},
@@ -35,7 +38,7 @@ func TestICEConnectionState_String(t *testing.T) {
 		state          ICEConnectionState
 		expectedString string
 	}{
-		{ICEConnectionState(Unknown), unknownStr},
+		{ICEConnectionStateUnknown, ErrUnknownType.Error()},
 		{ICEConnectionStateNew, "new"},
 		{ICEConnectionStateChecking, "checking"},
 		{ICEConnectionStateConnected, "connected"},

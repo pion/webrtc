@@ -1,18 +1,23 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
 	"strings"
 
-	"github.com/pion/webrtc/v3/internal/fmtp"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // RTPCodecType determines the type of a codec
 type RTPCodecType int
 
 const (
+	// RTPCodecTypeUnknown is the enum's zero-value
+	RTPCodecTypeUnknown RTPCodecType = iota
 
 	// RTPCodecTypeAudio indicates this is an audio codec
-	RTPCodecTypeAudio RTPCodecType = iota + 1
+	RTPCodecTypeAudio
 
 	// RTPCodecTypeVideo indicates this is a video codec
 	RTPCodecTypeVideo
@@ -21,7 +26,7 @@ const (
 func (t RTPCodecType) String() string {
 	switch t {
 	case RTPCodecTypeAudio:
-		return "audio"
+		return "audio" //nolint: goconst
 	case RTPCodecTypeVideo:
 		return "video" //nolint: goconst
 	default:

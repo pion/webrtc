@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -13,7 +16,7 @@ import (
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
 	"github.com/pion/sctp"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
 const sctpMaxChannels = uint16(65535)
@@ -92,7 +95,7 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *SCTPTransport) Start(remoteCaps SCTPCapabilities) error {
+func (r *SCTPTransport) Start(SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
 	}
@@ -224,7 +227,7 @@ ACCEPT:
 			Ordered:           ordered,
 			MaxPacketLifeTime: maxPacketLifeTime,
 			MaxRetransmits:    maxRetransmits,
-		}, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
+		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
 		if err != nil {
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)
@@ -359,9 +362,9 @@ func (r *SCTPTransport) State() SCTPTransportState {
 func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
 
-	stats := TransportStats{
+	stats := SCTPTransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeTransport,
+		Type:      StatsTypeSCTPTransport,
 		ID:        "sctpTransport",
 	}
 
@@ -369,6 +372,10 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	if association != nil {
 		stats.BytesSent = association.BytesSent()
 		stats.BytesReceived = association.BytesReceived()
+		stats.SmoothedRoundTripTime = association.SRTT() * 0.001 // convert milliseconds to seconds
+		stats.CongestionWindow = association.CWND()
+		stats.ReceiverWindow = association.RWND()
+		stats.MTU = association.MTU()
 	}
 
 	collector.Collect(stats.ID, stats)

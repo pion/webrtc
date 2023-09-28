@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -12,7 +15,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 )
@@ -40,8 +43,12 @@ func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
 	return nil
 }
 
-func trackDetailsForRID(trackDetails []trackDetails, rid string) *trackDetails {
+func trackDetailsForRID(trackDetails []trackDetails, mid, rid string) *trackDetails {
 	for i := range trackDetails {
+		if trackDetails[i].mid != mid {
+			continue
+		}
+
 		for j := range trackDetails[i].rids {
 			if trackDetails[i].rids[j] == rid {
 				return &trackDetails[i]
@@ -505,8 +512,39 @@ type mediaSection struct {
 	extensions   map[string]int
 }
 
+func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
+	if matchBundleGroup == nil {
+		return func(midValue string) bool {
+			return true
+		}
+	}
+	bundleTags := strings.Split(*matchBundleGroup, " ")
+	return func(midValue string) bool {
+		for _, tag := range bundleTags {
+			if tag == midValue {
+				return true
+			}
+		}
+		return false
+	}
+}
+
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTLSFingerprint, mediaDescriptionFingerprint bool, isICELite bool, isExtmapAllowMixed bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
+func populateSDP(
+	d *sdp.SessionDescription,
+	isPlanB bool,
+	dtlsFingerprints []DTLSFingerprint,
+	mediaDescriptionFingerprint bool,
+	isICELite bool,
+	isExtmapAllowMixed bool,
+	mediaEngine *MediaEngine,
+	connectionRole sdp.ConnectionRole,
+	candidates []ICECandidate,
+	iceParams ICEParameters,
+	mediaSections []mediaSection,
+	iceGatheringState ICEGatheringState,
+	matchBundleGroup *string,
+) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
 
@@ -516,6 +554,8 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 
 	bundleValue := "BUNDLE"
 	bundleCount := 0
+
+	bundleMatch := bundleMatchFromRemote(matchBundleGroup)
 	appendBundle := func(midValue string) {
 		bundleValue += " " + midValue
 		bundleCount++
@@ -542,7 +582,11 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		}
 
 		if shouldAddID {
-			appendBundle(m.id)
+			if bundleMatch(m.id) {
+				appendBundle(m.id)
+			} else {
+				d.MediaDescriptions[len(d.MediaDescriptions)-1].MediaName.Port = sdp.RangedPort{Value: 0}
+			}
 		}
 	}
 
@@ -561,7 +605,10 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, dtlsFingerprints []DTL
 		d = d.WithPropertyAttribute(sdp.AttrKeyExtMapAllowMixed)
 	}
 
-	return d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue), nil
+	if bundleCount > 0 {
+		d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+	}
+	return d, nil
 }
 
 func getMidValue(media *sdp.MediaDescription) string {
@@ -611,11 +658,11 @@ func descriptionPossiblyPlanB(desc *SessionDescription) bool {
 
 func getPeerDirection(media *sdp.MediaDescription) RTPTransceiverDirection {
 	for _, a := range media.Attributes {
-		if direction := NewRTPTransceiverDirection(a.Key); direction != RTPTransceiverDirection(Unknown) {
+		if direction := NewRTPTransceiverDirection(a.Key); direction != RTPTransceiverDirectionUnknown {
 			return direction
 		}
 	}
-	return RTPTransceiverDirection(Unknown)
+	return RTPTransceiverDirectionUnknown
 }
 
 func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {

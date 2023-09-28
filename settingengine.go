@@ -1,20 +1,24 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
 package webrtc
 
 import (
+	"context"
+	"crypto/x509"
 	"io"
 	"net"
 	"time"
 
 	"github.com/pion/dtls/v2"
 	dtlsElliptic "github.com/pion/dtls/v2/pkg/crypto/elliptic"
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v2"
-	"github.com/pion/transport/v2/packetio"
-	"github.com/pion/transport/v2/vnet"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/packetio"
 	"golang.org/x/net/proxy"
 )
 
@@ -57,9 +61,17 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		insecureSkipHelloVerify bool
-		retransmissionInterval  time.Duration
-		ellipticCurves          []dtlsElliptic.Curve
+		insecureSkipHelloVerify   bool
+		disableInsecureSkipVerify bool
+		retransmissionInterval    time.Duration
+		ellipticCurves            []dtlsElliptic.Curve
+		connectContextMaker       func() (context.Context, func())
+		extendedMasterSecret      dtls.ExtendedMasterSecretType
+		clientAuth                *dtls.ClientAuthType
+		clientCAs                 *x509.CertPool
+		rootCAs                   *x509.CertPool
+		keyLogWriter              io.Writer
+		customCipherSuites        func() []dtls.CipherSuite
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -75,6 +87,7 @@ type SettingEngine struct {
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
 	iceProxyDialer                            proxy.Dialer
+	iceDisableActiveTCP                       bool
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
@@ -144,6 +157,9 @@ func (e *SettingEngine) SetRelayAcceptanceMinWait(t time.Duration) {
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that
 // ICE UDP connections can allocate from. This affects both host candidates,
 // and the local address of server reflexive candidates.
+//
+// When portMin and portMax are left to the 0 default value, pion/ice candidate
+// gatherer replaces them and uses 1 for portMin and 65535 for portMax.
 func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error {
 	if portMax < portMin {
 		return ice.ErrPort
@@ -237,16 +253,6 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	return nil
 }
 
-// SetVNet sets the VNet instance that is passed to pion/ice
-//
-// VNet is a virtual network layer for Pion, allowing users to simulate
-// different topologies, latency, loss and jitter. This can be useful for
-// learning WebRTC concepts or testing your application in a lab environment
-// Deprecated: Please use SetNet()
-func (e *SettingEngine) SetVNet(vnet *vnet.Net) {
-	e.SetNet(vnet)
-}
-
 // SetNet sets the Net instance that is passed to pion/ice
 //
 // Net is an network interface layer for Pion, allowing users to replace
@@ -334,6 +340,11 @@ func (e *SettingEngine) SetICEProxyDialer(d proxy.Dialer) {
 	e.iceProxyDialer = d
 }
 
+// DisableActiveTCP disables using active TCP for ICE. Active TCP is enabled by default
+func (e *SettingEngine) DisableActiveTCP(isDisabled bool) {
+	e.iceDisableActiveTCP = isDisabled
+}
+
 // DisableMediaEngineCopy stops the MediaEngine from being copied. This allows a user to modify
 // the MediaEngine after the PeerConnection has been constructed. This is useful if you wish to
 // modify codecs after signaling. Make sure not to share MediaEngines between PeerConnections.
@@ -360,13 +371,62 @@ func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 	e.dtls.insecureSkipHelloVerify = skip
 }
 
+// SetDTLSDisableInsecureSkipVerify sets the disable skip insecure verify flag for DTLS.
+// This controls whether a client verifies the server's certificate chain and host name.
+func (e *SettingEngine) SetDTLSDisableInsecureSkipVerify(disable bool) {
+	e.dtls.disableInsecureSkipVerify = disable
+}
+
 // SetDTLSEllipticCurves sets the elliptic curves for DTLS.
 func (e *SettingEngine) SetDTLSEllipticCurves(ellipticCurves ...dtlsElliptic.Curve) {
 	e.dtls.ellipticCurves = ellipticCurves
+}
+
+// SetDTLSConnectContextMaker sets the context used during the DTLS Handshake.
+// It can be used to extend or reduce the timeout on the DTLS Handshake.
+// If nil, the default dtls.ConnectContextMaker is used. It can be implemented as following.
+//
+//	func ConnectContextMaker() (context.Context, func()) {
+//		return context.WithTimeout(context.Background(), 30*time.Second)
+//	}
+func (e *SettingEngine) SetDTLSConnectContextMaker(connectContextMaker func() (context.Context, func())) {
+	e.dtls.connectContextMaker = connectContextMaker
+}
+
+// SetDTLSExtendedMasterSecret sets the extended master secret type for DTLS.
+func (e *SettingEngine) SetDTLSExtendedMasterSecret(extendedMasterSecret dtls.ExtendedMasterSecretType) {
+	e.dtls.extendedMasterSecret = extendedMasterSecret
+}
+
+// SetDTLSClientAuth sets the client auth type for DTLS.
+func (e *SettingEngine) SetDTLSClientAuth(clientAuth dtls.ClientAuthType) {
+	e.dtls.clientAuth = &clientAuth
+}
+
+// SetDTLSClientCAs sets the client CA certificate pool for DTLS certificate verification.
+func (e *SettingEngine) SetDTLSClientCAs(clientCAs *x509.CertPool) {
+	e.dtls.clientCAs = clientCAs
+}
+
+// SetDTLSRootCAs sets the root CA certificate pool for DTLS certificate verification.
+func (e *SettingEngine) SetDTLSRootCAs(rootCAs *x509.CertPool) {
+	e.dtls.rootCAs = rootCAs
+}
+
+// SetDTLSKeyLogWriter sets the destination of the TLS key material for debugging.
+// Logging key material compromises security and should only be use for debugging.
+func (e *SettingEngine) SetDTLSKeyLogWriter(writer io.Writer) {
+	e.dtls.keyLogWriter = writer
 }
 
 // SetSCTPMaxReceiveBufferSize sets the maximum receive buffer size.
 // Leave this 0 for the default maxReceiveBufferSize.
 func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32) {
 	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
+}
+
+// SetDTLSCustomerCipherSuites allows the user to specify a list of DTLS CipherSuites.
+// This allow usage of Ciphers that are reserved for private usage.
+func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
+	e.dtls.customCipherSuites = customCipherSuites
 }

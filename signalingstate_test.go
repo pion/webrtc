@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
 	"testing"
 
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +15,7 @@ func TestNewSignalingState(t *testing.T) {
 		stateString   string
 		expectedState SignalingState
 	}{
-		{unknownStr, SignalingState(Unknown)},
+		{ErrUnknownType.Error(), SignalingStateUnknown},
 		{"stable", SignalingStateStable},
 		{"have-local-offer", SignalingStateHaveLocalOffer},
 		{"have-remote-offer", SignalingStateHaveRemoteOffer},
@@ -35,7 +38,7 @@ func TestSignalingState_String(t *testing.T) {
 		state          SignalingState
 		expectedString string
 	}{
-		{SignalingState(Unknown), unknownStr},
+		{SignalingStateUnknown, ErrUnknownType.Error()},
 		{SignalingStateStable, "stable"},
 		{SignalingStateHaveLocalOffer, "have-local-offer"},
 		{SignalingStateHaveRemoteOffer, "have-remote-offer"},

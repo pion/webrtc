@@ -1,5 +1,8 @@
 ---
- name: rtp-forwarder
- description: Example of using Pion WebRTC to forward WebRTC streams via RTP
- authors:
-   - Quentin Renard
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: rtp-forwarder
+description: Example of using Pion WebRTC to forward WebRTC streams via RTP
+authors:
+  - Quentin Renard

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package media provides media writer and filters
 package media
 
@@ -14,6 +17,7 @@ type Sample struct {
 	Duration           time.Duration
 	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
+	Metadata           interface{}
 }
 
 // Writer defines an interface to handle

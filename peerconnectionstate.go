@@ -1,14 +1,20 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // PeerConnectionState indicates the state of the PeerConnection.
 type PeerConnectionState int
 
 const (
+	// PeerConnectionStateUnknown is the enum's zero-value
+	PeerConnectionStateUnknown PeerConnectionState = iota
+
 	// PeerConnectionStateNew indicates that any of the ICETransports or
 	// DTLSTransports are in the "new" state and none of the transports are
 	// in the "connecting", "checking", "failed" or "disconnected" state, or
 	// all transports are in the "closed" state, or there are no transports.
-	PeerConnectionStateNew PeerConnectionState = iota + 1
+	PeerConnectionStateNew
 
 	// PeerConnectionStateConnecting indicates that any of the
 	// ICETransports or DTLSTransports are in the "connecting" or
@@ -59,7 +65,7 @@ func newPeerConnectionState(raw string) PeerConnectionState {
 	case peerConnectionStateClosedStr:
 		return PeerConnectionStateClosed
 	default:
-		return PeerConnectionState(Unknown)
+		return PeerConnectionStateUnknown
 	}
 }
 

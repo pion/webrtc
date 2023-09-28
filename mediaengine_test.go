@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -10,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v2/test"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -192,7 +195,7 @@ a=rtpmap:111 opus/48000/2
 
 		m := MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
-		registerSimulcastHeaderExtensions(&m, RTPCodecTypeAudio)
+		assert.NoError(t, m.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio))
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, m.negotiatedVideo)

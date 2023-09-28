@@ -5,11 +5,12 @@ If you wish to save VP8 and Opus instead of AV1 see [save-to-disk](https://githu
 
 If you wish to save VP8/Opus inside the same file see [save-to-webm](https://github.com/pion/example-webrtc-applications/tree/master/save-to-webm)
 
+You can then send this video back to your browser using [play-from-disk](https://github.com/pion/example-webrtc-applications/tree/master/play-from-disk)
+
 ## Instructions
 ### Download save-to-disk-av1
 ```
-export GO111MODULE=on
-go get github.com/pion/webrtc/v3/examples/save-to-disk-av1
+go install github.com/pion/webrtc/v4/examples/save-to-disk-av1@latest
 ```
 
 ### Open save-to-disk-av1 example page

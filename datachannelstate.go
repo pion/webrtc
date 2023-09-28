@@ -1,13 +1,19 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // DataChannelState indicates the state of a data channel.
 type DataChannelState int
 
 const (
+	// DataChannelStateUnknown is the enum's zero-value
+	DataChannelStateUnknown DataChannelState = iota
+
 	// DataChannelStateConnecting indicates that the data channel is being
 	// established. This is the initial state of DataChannel, whether created
 	// with CreateDataChannel, or dispatched as a part of an DataChannelEvent.
-	DataChannelStateConnecting DataChannelState = iota + 1
+	DataChannelStateConnecting
 
 	// DataChannelStateOpen indicates that the underlying data transport is
 	// established and communication is possible.
@@ -41,7 +47,7 @@ func newDataChannelState(raw string) DataChannelState {
 	case dataChannelStateClosedStr:
 		return DataChannelStateClosed
 	default:
-		return DataChannelState(Unknown)
+		return DataChannelStateUnknown
 	}
 }
 
@@ -58,4 +64,15 @@ func (t DataChannelState) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (t DataChannelState) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler
+func (t *DataChannelState) UnmarshalText(b []byte) error {
+	*t = newDataChannelState(string(b))
+	return nil
 }

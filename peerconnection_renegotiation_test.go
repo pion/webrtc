@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -16,10 +19,10 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v2/test"
-	"github.com/pion/webrtc/v3/internal/util"
-	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v4/pkg/media"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -713,7 +716,7 @@ func TestPeerConnection_Renegotiation_SetLocalDescription(t *testing.T) {
 }
 
 // Issue #346, don't start the SCTP Subsystem if the RemoteDescription doesn't contain one
-// Before we would always start it, and re-negotations would fail because SCTP was in flight
+// Before we would always start it, and re-negotiations would fail because SCTP was in flight
 func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	signalPairExcludeDataChannel := func(pcOffer, pcAnswer *PeerConnection) {
 		offer, err := pcOffer.CreateOffer(nil)
@@ -782,7 +785,7 @@ func TestPeerConnection_Renegotiation_NoApplication(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-func TestAddDataChannelDuringRenegotation(t *testing.T) {
+func TestAddDataChannelDuringRenegotiation(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
@@ -1011,12 +1014,6 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	m := &MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	registerSimulcastHeaderExtensions(m, RTPCodecTypeVideo)
-
 	originalRids := []string{"a", "b", "c"}
 	signalWithRids := func(sessionDescription string, rids []string) string {
 		sessionDescription = strings.SplitAfter(sessionDescription, "a=end-of-candidates\r\n")[0]
@@ -1078,7 +1075,7 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 
 	t.Run("Disable Transceiver", func(t *testing.T) {
 		trackMap = map[string]*TrackRemote{}
-		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		pcOffer, pcAnswer, err := newPair()
 		assert.NoError(t, err)
 
 		vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
@@ -1111,7 +1108,7 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 
 	t.Run("Change RID", func(t *testing.T) {
 		trackMap = map[string]*TrackRemote{}
-		pcOffer, pcAnswer, err := NewAPI(WithMediaEngine(m)).newPair(Configuration{})
+		pcOffer, pcAnswer, err := newPair()
 		assert.NoError(t, err)
 
 		vp8Writer, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
@@ -1207,9 +1204,9 @@ func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
 	_, err = offerPC.CreateDataChannel("test", nil)
 	assert.NoError(t, err)
 
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
 
 	offer, err := offerPC.CreateOffer(nil)
@@ -1222,10 +1219,10 @@ func TestPeerConnection_Renegotiation_MidConflict(t *testing.T) {
 	assert.NoError(t, offerPC.SetRemoteDescription(answer))
 	assert.Equal(t, SignalingStateStable, offerPC.SignalingState())
 
-	tr, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	tr, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
 	assert.NoError(t, tr.SetMid("3"))
-	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 	_, err = offerPC.CreateOffer(nil)
 	assert.NoError(t, err)
@@ -1260,13 +1257,13 @@ func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RtpTransceiverInit{
+	_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendonly,
 	})
 	assert.NoError(t, err)
@@ -1319,4 +1316,30 @@ func TestNegotiationNeededWithRecvonlyTrack(t *testing.T) {
 	wg.Wait()
 
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestNegotiationNotNeededAfterReplaceTrackNil(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	tr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	assert.NoError(t, tr.Sender().ReplaceTrack(nil))
+
+	assert.False(t, pcOffer.checkNegotiationNeeded())
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }

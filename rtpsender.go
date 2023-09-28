@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -13,7 +16,7 @@ import (
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3/internal/util"
+	"github.com/pion/webrtc/v4/internal/util"
 )
 
 type trackEncoding struct {
@@ -24,7 +27,7 @@ type trackEncoding struct {
 	rtcpInterceptor interceptor.RTCPReader
 	streamInfo      interceptor.StreamInfo
 
-	context TrackLocalContext
+	context *baseTrackLocalContext
 
 	ssrc SSRC
 }
@@ -108,6 +111,9 @@ func (r *RTPSender) Transport() *DTLSTransport {
 }
 
 func (r *RTPSender) getParameters() RTPSendParameters {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	var encodings []RTPEncodingParameters
 	for _, trackEncoding := range r.trackEncodings {
 		var rid string
@@ -193,19 +199,10 @@ func (r *RTPSender) AddEncoding(track TrackLocal) error {
 }
 
 func (r *RTPSender) addEncoding(track TrackLocal) {
-	ssrc := SSRC(randutil.NewMathRandomGenerator().Uint32())
 	trackEncoding := &trackEncoding{
-		track:      track,
-		srtpStream: &srtpWriterFuture{ssrc: ssrc},
-		ssrc:       ssrc,
+		track: track,
+		ssrc:  SSRC(randutil.NewMathRandomGenerator().Uint32()),
 	}
-	trackEncoding.srtpStream.rtpSender = r
-	trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
-		interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-			n, err = trackEncoding.srtpStream.Read(in)
-			return n, a, err
-		}),
-	)
 
 	r.trackEncodings = append(r.trackEncodings, trackEncoding)
 }
@@ -239,13 +236,13 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	}
 
 	var replacedTrack TrackLocal
-	var context *TrackLocalContext
+	var context *baseTrackLocalContext
 	if len(r.trackEncodings) != 0 {
 		replacedTrack = r.trackEncodings[0].track
-		context = &r.trackEncodings[0].context
+		context = r.trackEncodings[0].context
 	}
 	if r.hasSent() && replacedTrack != nil {
-		if err := replacedTrack.Unbind(*context); err != nil {
+		if err := replacedTrack.Unbind(context); err != nil {
 			return err
 		}
 	}
@@ -255,16 +252,16 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		return nil
 	}
 
-	codec, err := track.Bind(TrackLocalContext{
-		id:              context.id,
+	codec, err := track.Bind(&baseTrackLocalContext{
+		id:              context.ID(),
 		params:          r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
-		ssrc:            context.ssrc,
-		writeStream:     context.writeStream,
-		rtcpInterceptor: context.rtcpInterceptor,
+		ssrc:            context.SSRC(),
+		writeStream:     context.WriteStream(),
+		rtcpInterceptor: context.RTCPReader(),
 	})
 	if err != nil {
 		// Re-bind the original track
-		if _, reBindErr := replacedTrack.Bind(*context); reBindErr != nil {
+		if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
 			return reBindErr
 		}
 
@@ -292,9 +289,14 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderTrackRemoved
 	}
 
-	for idx, trackEncoding := range r.trackEncodings {
+	for idx := range r.trackEncodings {
+		trackEncoding := r.trackEncodings[idx]
+		srtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].SSRC, rtpSender: r}
 		writeStream := &interceptorToTrackLocalWriter{}
-		trackEncoding.context = TrackLocalContext{
+
+		trackEncoding.srtpStream = srtpStream
+		trackEncoding.ssrc = parameters.Encodings[idx].SSRC
+		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
 			params:          r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
 			ssrc:            parameters.Encodings[idx].SSRC,
@@ -315,13 +317,21 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
 		)
-		srtpStream := trackEncoding.srtpStream
+
+		trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
+			interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+				n, err = trackEncoding.srtpStream.Read(in)
+				return n, a, err
+			}),
+		)
+
 		rtpInterceptor := r.api.interceptor.BindLocalStream(
 			&trackEncoding.streamInfo,
 			interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
 				return srtpStream.WriteRTP(header, payload)
 			}),
 		)
+
 		writeStream.interceptor.Store(rtpInterceptor)
 	}
 
@@ -352,7 +362,9 @@ func (r *RTPSender) Stop() error {
 	errs := []error{}
 	for _, trackEncoding := range r.trackEncodings {
 		r.api.interceptor.UnbindLocalStream(&trackEncoding.streamInfo)
-		errs = append(errs, trackEncoding.srtpStream.Close())
+		if trackEncoding.srtpStream != nil {
+			errs = append(errs, trackEncoding.srtpStream.Close())
+		}
 	}
 
 	return util.FlattenErrs(errs)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
 linters-settings:
   govet:
     check-shadowing: true
@@ -10,7 +13,14 @@ linters-settings:
       modules:
         - github.com/pkg/errors:
             recommendations:
-            - errors
+              - errors
+  forbidigo:
+    forbid:
+      - ^fmt.Print(f|ln)?$
+      - ^log.(Panic|Fatal|Print)(f|ln)?$
+      - ^os.Exit$
+      - ^panic$
+      - ^print(ln)?$
 
 linters:
   enable:
@@ -29,6 +39,7 @@ linters:
     - errorlint        # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - exhaustive       # check exhaustiveness of enum switch statements
     - exportloopref    # checks for pointers to enclosing loop variables
+    - forbidigo        # Forbids identifiers
     - forcetypeassert  # finds forced type assertions
     - gci              # Gci control golang package import order and make it always deterministic.
     - gochecknoglobals # Checks that no globals are present in Go code
@@ -73,7 +84,6 @@ linters:
     - containedctx     # containedctx is a linter that detects struct contained context.Context field
     - cyclop           # checks function and package cyclomatic complexity
     - exhaustivestruct # Checks if all struct's fields are initialized
-    - forbidigo        # Forbids identifiers
     - funlen           # Tool for detection of long functions
     - gocyclo          # Computes and checks the cyclomatic complexity of functions
     - godot            # Check if comments end in a period
@@ -105,12 +115,23 @@ issues:
     - path: _test\.go
       linters:
         - gocognit
+        - forbidigo
 
     # Allow complex main function in examples
     - path: examples
       text: "of func `main` is high"
       linters:
         - gocognit
+    
+    # Allow forbidden identifiers in examples
+    - path: examples
+      linters:
+        - forbidigo
+
+    # Allow forbidden identifiers in CLI commands
+    - path: cmd
+      linters:
+        - forbidigo
 
 run:
   skip-dirs-use-default: false

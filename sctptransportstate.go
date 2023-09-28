@@ -1,13 +1,19 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // SCTPTransportState indicates the state of the SCTP transport.
 type SCTPTransportState int
 
 const (
+	// SCTPTransportStateUnknown is the enum's zero-value
+	SCTPTransportStateUnknown SCTPTransportState = iota
+
 	// SCTPTransportStateConnecting indicates the SCTPTransport is in the
 	// process of negotiating an association. This is the initial state of the
 	// SCTPTransportState when an SCTPTransport is created.
-	SCTPTransportStateConnecting SCTPTransportState = iota + 1
+	SCTPTransportStateConnecting
 
 	// SCTPTransportStateConnected indicates the negotiation of an
 	// association is completed.
@@ -36,7 +42,7 @@ func newSCTPTransportState(raw string) SCTPTransportState {
 	case sctpTransportStateClosedStr:
 		return SCTPTransportStateClosed
 	default:
-		return SCTPTransportState(Unknown)
+		return SCTPTransportStateUnknown
 	}
 }
 

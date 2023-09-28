@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// simulcast demonstrates of how to handle incoming track with multiple simulcast rtp streams and show all them back.
 package main
 
 import (
@@ -10,12 +14,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
+// nolint:gocognit
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
@@ -28,34 +32,8 @@ func main() {
 		},
 	}
 
-	// Enable Extension Headers needed for Simulcast
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	for _, extension := range []string{
-		"urn:ietf:params:rtp-hdrext:sdes:mid",
-		"urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id",
-		"urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id",
-	} {
-		if err := m.RegisterHeaderExtension(webrtc.RTPHeaderExtensionCapability{URI: extension}, webrtc.RTPCodecTypeVideo); err != nil {
-			panic(err)
-		}
-	}
-
-	// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
-	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
-	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
-	// for each PeerConnection.
-	i := &interceptor.Registry{}
-
-	// Use the default set of Interceptors
-	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
-		panic(err)
-	}
-
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(config)
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
@@ -158,6 +136,12 @@ func main() {
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
+			os.Exit(0)
+		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
 		}
 	})

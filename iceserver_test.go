@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -7,8 +10,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/pion/ice/v2"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/stun/v2"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -76,14 +79,14 @@ func TestICEServer_validate(t *testing.T) {
 				URLs:           []string{"turn:192.158.29.39?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
-				CredentialType: Unknown,
+				CredentialType: ICECredentialTypePassword,
 			}, &rtcerr.InvalidAccessError{Err: ErrTurnCredentials}},
 			{ICEServer{
 				URLs:           []string{"stun:google.de?transport=udp"},
 				Username:       "unittest",
 				Credential:     false,
 				CredentialType: ICECredentialTypeOauth,
-			}, &rtcerr.InvalidAccessError{Err: ice.ErrSTUNQuery}},
+			}, &rtcerr.InvalidAccessError{Err: stun.ErrSTUNQuery}},
 		}
 
 		for i, testCase := range testCases {

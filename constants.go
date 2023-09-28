@@ -1,13 +1,11 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import "github.com/pion/dtls/v2"
 
 const (
-	// Unknown defines default public constant to use for "enum" like struct
-	// comparisons when no value was defined.
-	Unknown    = iota
-	unknownStr = "unknown"
-
 	// Equal to UDP MTU
 	receiveMTU = 1460
 
@@ -36,5 +34,5 @@ const (
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {
-	return []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_128_GCM, dtls.SRTP_AES128_CM_HMAC_SHA1_80}
+	return []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_256_GCM, dtls.SRTP_AEAD_AES_128_GCM, dtls.SRTP_AES128_CM_HMAC_SHA1_80}
 }

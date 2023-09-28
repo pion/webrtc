@@ -1,15 +1,19 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
 package webrtc
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
-	"github.com/pion/transport/v2/test"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -247,6 +251,14 @@ func TestSetDTLSEllipticCurves(t *testing.T) {
 		s.dtls.ellipticCurves[0] != elliptic.P256 {
 		t.Errorf("Failed to set DTLS elliptic curves")
 	}
+}
+
+func TestSetDTLSHandShakeTimeout(*testing.T) {
+	s := SettingEngine{}
+
+	s.SetDTLSConnectContextMaker(func() (context.Context, func()) {
+		return context.WithTimeout(context.Background(), 60*time.Second)
+	})
 }
 
 func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {

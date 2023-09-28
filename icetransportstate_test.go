@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
 	"testing"
 
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +15,7 @@ func TestICETransportState_String(t *testing.T) {
 		state          ICETransportState
 		expectedString string
 	}{
-		{ICETransportState(Unknown), unknownStr},
+		{ICETransportStateUnknown, ErrUnknownType.Error()},
 		{ICETransportStateNew, "new"},
 		{ICETransportStateChecking, "checking"},
 		{ICETransportStateConnected, "connected"},
@@ -36,7 +39,7 @@ func TestICETransportState_Convert(t *testing.T) {
 		native ICETransportState
 		ice    ice.ConnectionState
 	}{
-		{ICETransportState(Unknown), ice.ConnectionState(Unknown)},
+		{ICETransportStateUnknown, ice.ConnectionStateUnknown},
 		{ICETransportStateNew, ice.ConnectionStateNew},
 		{ICETransportStateChecking, ice.ConnectionStateChecking},
 		{ICETransportStateConnected, ice.ConnectionStateConnected},

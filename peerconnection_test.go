@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -8,8 +11,8 @@ import (
 	"time"
 
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v2/test"
-	"github.com/pion/webrtc/v3/pkg/rtcerr"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -750,4 +753,42 @@ func TestTransportChain(t *testing.T) {
 	assert.NotNil(t, offer.SCTP().Transport().ICETransport())
 
 	closePairNow(t, offer, answer)
+}
+
+// Assert that the PeerConnection closes via DTLS (and not ICE)
+func TestDTLSClose(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+
+	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+	peerConnectionsConnected.Wait()
+	assert.NoError(t, pcOffer.Close())
 }

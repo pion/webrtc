@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// ortc demonstrates Pion WebRTC's ORTC capabilities.
 package main
 
 import (
@@ -8,12 +12,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
+	port := flag.Int("port", 8080, "http server port")
 	flag.Parse()
 
 	// Everything below is the Pion WebRTC (ORTC) API! Thanks for using it ❤️.
@@ -65,8 +70,7 @@ func main() {
 	})
 
 	// Gather candidates
-	err = gatherer.Gather()
-	if err != nil {
+	if err = gatherer.Gather(); err != nil {
 		panic(err)
 	}
 
@@ -96,18 +100,22 @@ func main() {
 		SCTPCapabilities: sctpCapabilities,
 	}
 
+	iceRole := webrtc.ICERoleControlled
+
 	// Exchange the information
 	fmt.Println(signal.Encode(s))
 	remoteSignal := Signal{}
-	signal.Decode(signal.MustReadStdin(), &remoteSignal)
 
-	iceRole := webrtc.ICERoleControlled
 	if *isOffer {
+		signalingChan := signal.HTTPSDPServer(*port)
+		signal.Decode(<-signalingChan, &remoteSignal)
+
 		iceRole = webrtc.ICERoleControlling
+	} else {
+		signal.Decode(signal.MustReadStdin(), &remoteSignal)
 	}
 
-	err = ice.SetRemoteCandidates(remoteSignal.ICECandidates)
-	if err != nil {
+	if err = ice.SetRemoteCandidates(remoteSignal.ICECandidates); err != nil {
 		panic(err)
 	}
 
@@ -118,14 +126,12 @@ func main() {
 	}
 
 	// Start the DTLS transport
-	err = dtls.Start(remoteSignal.DTLSParameters)
-	if err != nil {
+	if err = dtls.Start(remoteSignal.DTLSParameters); err != nil {
 		panic(err)
 	}
 
 	// Start the SCTP transport
-	err = sctp.Start(remoteSignal.SCTPCapabilities)
-	if err != nil {
+	if err = sctp.Start(remoteSignal.SCTPCapabilities); err != nil {
 		panic(err)
 	}
 
@@ -172,8 +178,7 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 			message := signal.RandSeq(15)
 			fmt.Printf("Sending '%s' \n", message)
 
-			err := channel.SendText(message)
-			if err != nil {
+			if err := channel.SendText(message); err != nil {
 				panic(err)
 			}
 		}

@@ -10,7 +10,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 #### Media API
 * [Reflect](reflect): The reflect example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.
 * [Play from Disk](play-from-disk): The play-from-disk example demonstrates how to send video to your browser from a file saved to disk.
-* [Play from Disk Renegotation](play-from-disk-renegotation): The play-from-disk-renegotation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.
+* [Play from Disk Renegotiation](play-from-disk-renegotiation): The play-from-disk-renegotiation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.
 * [Insertable Streams](insertable-streams): The insertable-streams example demonstrates how Pion can be used to send E2E encrypted video and decrypt via insertable streams in the browser.
 * [Save to Disk](save-to-disk): The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.
 * [Broadcast](broadcast): The broadcast example demonstrates how to broadcast a video to multiple peers. A broadcaster uploads the video once and the server forwards it to all other peers.
@@ -40,9 +40,8 @@ We've made it easy to run the browser based examples on your local machine.
 
 1. Build and run the example server:
     ``` sh
-    GO111MODULE=on go get github.com/pion/webrtc/v3
-    git clone https://github.com/pion/webrtc.git $GOPATH/src/github.com/pion/webrtc
-    cd $GOPATH/src/github.com/pion/webrtc/examples
+    git clone https://github.com/pion/webrtc.git webrtc
+    cd pion/webrtc/examples
     go run examples.go
     ```
 

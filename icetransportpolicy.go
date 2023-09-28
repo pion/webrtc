@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -31,10 +34,8 @@ func NewICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
 	case iceTransportPolicyRelayStr:
 		return ICETransportPolicyRelay
-	case iceTransportPolicyAllStr:
-		return ICETransportPolicyAll
 	default:
-		return ICETransportPolicy(Unknown)
+		return ICETransportPolicyAll
 	}
 }
 

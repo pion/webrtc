@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,7 +14,7 @@ func TestNewDataChannelState(t *testing.T) {
 		stateString   string
 		expectedState DataChannelState
 	}{
-		{unknownStr, DataChannelState(Unknown)},
+		{ErrUnknownType.Error(), DataChannelStateUnknown},
 		{"connecting", DataChannelStateConnecting},
 		{"open", DataChannelStateOpen},
 		{"closing", DataChannelStateClosing},
@@ -32,7 +35,7 @@ func TestDataChannelState_String(t *testing.T) {
 		state          DataChannelState
 		expectedString string
 	}{
-		{DataChannelState(Unknown), unknownStr},
+		{DataChannelStateUnknown, ErrUnknownType.Error()},
 		{DataChannelStateConnecting, "connecting"},
 		{DataChannelStateOpen, "open"},
 		{DataChannelStateClosing, "closing"},

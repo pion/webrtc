@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
@@ -13,7 +16,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/sdp/v3"
-	"github.com/pion/webrtc/v3/internal/fmtp"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 const (
@@ -55,8 +58,7 @@ type mediaEngineHeaderExtension struct {
 }
 
 // A MediaEngine defines the codecs supported by a PeerConnection, and the
-// configuration of those codecs. A MediaEngine must not be shared between
-// PeerConnections.
+// configuration of those codecs.
 type MediaEngine struct {
 	// If we have attempted to negotiate a codec type yet.
 	negotiatedVideo, negotiatedAudio bool
@@ -109,47 +111,29 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", videoRTCPFeedback},
-			PayloadType:        98,
-		},
-		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
-			PayloadType:        99,
-		},
-
-		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=1", videoRTCPFeedback},
-			PayloadType:        100,
-		},
-		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=100", nil},
-			PayloadType:        101,
-		},
-
-		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", videoRTCPFeedback},
 			PayloadType:        102,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=102", nil},
-			PayloadType:        121,
+			PayloadType:        103,
 		},
 
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
-			PayloadType:        127,
+			PayloadType:        104,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=127", nil},
-			PayloadType:        120,
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=104", nil},
+			PayloadType:        105,
 		},
 
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", videoRTCPFeedback},
-			PayloadType:        125,
+			PayloadType:        106,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=125", nil},
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=106", nil},
 			PayloadType:        107,
 		},
 
@@ -163,26 +147,57 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f", videoRTCPFeedback},
 			PayloadType:        127,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=127", nil},
-			PayloadType:        120,
+			PayloadType:        125,
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640032", videoRTCPFeedback},
-			PayloadType:        123,
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f", videoRTCPFeedback},
+			PayloadType:        39,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=123", nil},
-			PayloadType:        118,
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=39", nil},
+			PayloadType:        40,
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/ulpfec", 90000, 0, "", nil},
-			PayloadType:        116,
+			RTPCodecCapability: RTPCodecCapability{MimeTypeAV1, 90000, 0, "", videoRTCPFeedback},
+			PayloadType:        45,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=45", nil},
+			PayloadType:        46,
+		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", videoRTCPFeedback},
+			PayloadType:        98,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
+			PayloadType:        99,
+		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=2", videoRTCPFeedback},
+			PayloadType:        100,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=100", nil},
+			PayloadType:        101,
+		},
+
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f", videoRTCPFeedback},
+			PayloadType:        112,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=112", nil},
+			PayloadType:        113,
 		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
@@ -271,13 +286,12 @@ func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	switch typ {
-	case RTPCodecTypeVideo:
+	if typ == RTPCodecTypeVideo {
 		for i, v := range m.videoCodecs {
 			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
 			m.videoCodecs[i] = v
 		}
-	case RTPCodecTypeAudio:
+	} else if typ == RTPCodecTypeAudio {
 		for i, v := range m.audioCodecs {
 			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
 			m.audioCodecs[i] = v

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
+// pion-to-pion is an example of two pion instances communicating directly!
 package main
 
 import (
@@ -11,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/examples/internal/signal"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func signalCandidate(addr string, c *webrtc.ICECandidate) error {
@@ -23,11 +27,7 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 		return err
 	}
 
-	if closeErr := resp.Body.Close(); closeErr != nil {
-		return closeErr
-	}
-
-	return nil
+	return resp.Body.Close()
 }
 
 func main() { // nolint:gocognit
@@ -147,6 +147,12 @@ func main() { // nolint:gocognit
 			fmt.Println("Peer Connection has gone to failed exiting")
 			os.Exit(0)
 		}
+
+		if s == webrtc.PeerConnectionStateClosed {
+			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
+			fmt.Println("Peer Connection has gone to closed exiting")
+			os.Exit(0)
+		}
 	})
 
 	// Register data channel creation handling
@@ -176,5 +182,6 @@ func main() { // nolint:gocognit
 	})
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
+	// nolint: gosec
 	panic(http.ListenAndServe(*answerAddr, nil))
 }

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 // ICERole describes the role ice.Agent is playing in selecting the
@@ -5,11 +8,14 @@ package webrtc
 type ICERole int
 
 const (
+	// ICERoleUnknown is the enum's zero-value
+	ICERoleUnknown ICERole = iota
+
 	// ICERoleControlling indicates that the ICE agent that is responsible
 	// for selecting the final choice of candidate pairs and signaling them
 	// through STUN and an updated offer, if needed. In any session, one agent
 	// is always controlling. The other is the controlled agent.
-	ICERoleControlling ICERole = iota + 1
+	ICERoleControlling
 
 	// ICERoleControlled indicates that an ICE agent that waits for the
 	// controlling agent to select the final choice of candidate pairs.
@@ -29,7 +35,7 @@ func newICERole(raw string) ICERole {
 	case iceRoleControlledStr:
 		return ICERoleControlled
 	default:
-		return ICERole(Unknown)
+		return ICERoleUnknown
 	}
 }
 
@@ -42,4 +48,15 @@ func (t ICERole) String() string {
 	default:
 		return ErrUnknownType.Error()
 	}
+}
+
+// MarshalText implements encoding.TextMarshaler
+func (t ICERole) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler
+func (t *ICERole) UnmarshalText(b []byte) error {
+	*t = newICERole(string(b))
+	return nil
 }

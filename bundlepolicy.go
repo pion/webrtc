@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 package webrtc
 
 import (
@@ -11,11 +14,14 @@ import (
 type BundlePolicy int
 
 const (
+	// BundlePolicyUnknown is the enum's zero-value
+	BundlePolicyUnknown BundlePolicy = iota
+
 	// BundlePolicyBalanced indicates to gather ICE candidates for each
 	// media type in use (audio, video, and data). If the remote endpoint is
 	// not bundle-aware, negotiate only one audio and video track on separate
 	// transports.
-	BundlePolicyBalanced BundlePolicy = iota + 1
+	BundlePolicyBalanced
 
 	// BundlePolicyMaxCompat indicates to gather ICE candidates for each
 	// track. If the remote endpoint is not bundle-aware, negotiate all media
@@ -44,7 +50,7 @@ func newBundlePolicy(raw string) BundlePolicy {
 	case bundlePolicyMaxBundleStr:
 		return BundlePolicyMaxBundle
 	default:
-		return BundlePolicy(Unknown)
+		return BundlePolicyUnknown
 	}
 }
 

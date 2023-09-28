@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:build !js
 // +build !js
 
+// ice-tcp demonstrates Pion WebRTC's ICE TCP abilities.
 package main
 
 import (
@@ -12,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 var api *webrtc.API //nolint
@@ -106,5 +110,6 @@ func main() {
 	http.HandleFunc("/doSignaling", doSignaling)
 
 	fmt.Println("Open http://localhost:8080 to access this demo")
+	// nolint: gosec
 	panic(http.ListenAndServe(":8080", nil))
 }
