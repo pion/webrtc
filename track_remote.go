@@ -128,12 +128,10 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
-	if rtxPacket, rtxAttributes := r.readRTX(t); rtxPacket != nil {
-		n, err = rtxPacket.MarshalTo(b)
-		attributes = rtxAttributes
-		if err != nil {
-			return 0, nil, err
-		}
+	if rtxPacketReceived := r.readRTX(t); rtxPacketReceived != nil {
+		n = copy(b, rtxPacketReceived.pkt)
+		attributes = rtxPacketReceived.attributes
+		err = nil
 	} else {
 		// If there's no separate RTX track (or there's a separate RTX track but no RTX packet waiting), wait for and return
 		// a packet from the main track
