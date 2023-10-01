@@ -8,6 +8,7 @@ Aaron Boushley <boushley@pretzelaux.com>
 Aaron France <aaron.l.france@gmail.com>
 Adam Kiss <masterada@gmail.com>
 Aditya Kumar <k.aditya00@gmail.com>
+Adrian Cable <6544927+adriancable@users.noreply.github.com>
 Adrian Cable <adrian.cable@gmail.com>
 adwpc <adwpc@hotmail.com>
 aggresss <aggresss@163.com>
@@ -200,6 +201,7 @@ Steffen Vogel <post@steffenvogel.de>
 stephanrotolante <stephanrotolante@gmail.com>
 streamer45 <cstcld91@gmail.com>
 Suhas Gaddam <suhas.g.2011@gmail.com>
+sukun <sukunrt@gmail.com>
 Suzuki Takeo <takeo@stko.info>
 sylba2050 <masataka.hisasue@optim.co.jp>
 Tarrence van As <tarrencev@users.noreply.github.com>
