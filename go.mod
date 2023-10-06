@@ -21,5 +21,5 @@ require (
 	github.com/pion/transport/v3 v3.0.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/net v0.14.0
+	golang.org/x/net v0.16.0
 )
