@@ -463,9 +463,9 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 				continue
 			}
 
-			attributes.Set(attributeRtxPayloadType, b[1]&0x7F)
-			attributes.Set(attributeRtxSequenceNumber, binary.BigEndian.Uint16(b[2:4]))
-			attributes.Set(attributeRtxSsrc, binary.BigEndian.Uint32(b[8:12]))
+			attributes.Set(AttributeRtxPayloadType, b[1]&0x7F)
+			attributes.Set(AttributeRtxSequenceNumber, binary.BigEndian.Uint16(b[2:4]))
+			attributes.Set(AttributeRtxSsrc, binary.BigEndian.Uint32(b[8:12]))
 
 			b[1] = (b[1] & 0x80) | uint8(track.track.PayloadType())
 			b[2] = b[headerLength]
