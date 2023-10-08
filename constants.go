@@ -32,10 +32,12 @@ const (
 
 	sdesRepairRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"
 
-	// Attributes returned when Read() returns an RTX packet from a separate RTX stream (distinct SSRC)
-	attributeRtxPayloadType    = "rtx_payload_type"
-	attributeRtxSsrc           = "rtx_ssrc"
-	attributeRtxSequenceNumber = "rtx_sequence_number"
+	// AttributeRtxPayloadType is the interceptor attribute added when Read() returns an RTX packet containing the RTX stream payload type
+	AttributeRtxPayloadType = "rtx_payload_type"
+	// AttributeRtxSsrc is the interceptor attribute added when Read() returns an RTX packet containing the RTX stream SSRC
+	AttributeRtxSsrc = "rtx_ssrc"
+	// AttributeRtxSequenceNumber is the interceptor attribute added when Read() returns an RTX packet containing the RTX stream sequence number
+	AttributeRtxSequenceNumber = "rtx_sequence_number"
 )
 
 func defaultSrtpProtectionProfiles() []dtls.SRTPProtectionProfile {
