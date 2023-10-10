@@ -2,6 +2,7 @@
 package samplebuilder
 
 import (
+	"math"
 	"time"
 
 	"github.com/pion/rtp"
@@ -22,10 +23,14 @@ type SampleBuilder struct {
 	packets    []packet
 	head, tail uint16
 
-	maxLate              uint16
+	maxLate          uint16
+	maxLateTimestamp uint32 // max timestamp between old and new timestamps before dropping packets
+
 	depacketizer         rtp.Depacketizer
 	packetReleaseHandler func(*rtp.Packet)
 	sampleRate           uint32
+
+	buffer [math.MaxUint16 + 1]*rtp.Packet
 
 	// indicates whether the lastSeqno field is valid
 	lastSeqnoValid bool
@@ -36,6 +41,8 @@ type SampleBuilder struct {
 	lastTimestampValid bool
 	// the timestamp of the last popped packet, if any.
 	lastTimestamp uint32
+
+	packetHeadHandler func(headPacket interface{}) interface{}
 }
 
 // New constructs a new SampleBuilder.
@@ -480,4 +487,32 @@ func (s *SampleBuilder) Pop() *media.Sample {
 // guaranteed to be empty.
 func (s *SampleBuilder) ForcePopWithTimestamp() (*media.Sample, uint32) {
 	return s.pop(true)
+}
+
+func seqnumDistance(x, y uint16) uint16 {
+	diff := int16(x - y)
+	if diff < 0 {
+		return uint16(-diff)
+	}
+
+	return uint16(diff)
+}
+
+func WithMaxTimeDelay(maxLateDuration time.Duration) Option {
+	return func(o *SampleBuilder) {
+		totalMills := maxLateDuration.Milliseconds()
+		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMills / 1000)
+	}
+}
+
+func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
+	return func(o *SampleBuilder) {
+		o.packetHeadHandler = h
+	}
+}
+
+func WithPartitionHeadChecker(interface{}) Option {
+	return func(o *SampleBuilder) {
+
+	}
 }

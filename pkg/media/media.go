@@ -12,8 +12,11 @@ import (
 
 // A Sample contains encoded media and timing information
 type Sample struct {
-	Data               []byte
-	Timestamp          time.Time
+	Data      []byte
+	Timestamp time.Time
+
+	// Duration has been deprecated since it is difficult to compute correctly
+	// in all cases and using the timeStamp is the right thing to use
 	Duration           time.Duration
 	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
