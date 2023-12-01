@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/stretchr/testify/assert"
@@ -52,14 +53,12 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	// Start the virtual network by calling Start() on the root router
 	assert.NoError(t, wan.Start())
 
-	offerMediaEngine := &MediaEngine{}
-	assert.NoError(t, offerMediaEngine.RegisterDefaultCodecs())
-	offerPeerConnection, err := NewAPI(WithSettingEngine(offerSettingEngine), WithMediaEngine(offerMediaEngine)).NewPeerConnection(Configuration{})
+	offerInterceptorRegistry := &interceptor.Registry{}
+	offerPeerConnection, err := NewAPI(WithSettingEngine(offerSettingEngine), WithInterceptorRegistry(offerInterceptorRegistry)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	answerMediaEngine := &MediaEngine{}
-	assert.NoError(t, answerMediaEngine.RegisterDefaultCodecs())
-	answerPeerConnection, err := NewAPI(WithSettingEngine(answerSettingEngine), WithMediaEngine(answerMediaEngine)).NewPeerConnection(Configuration{})
+	answerInterceptorRegistry := &interceptor.Registry{}
+	answerPeerConnection, err := NewAPI(WithSettingEngine(answerSettingEngine), WithInterceptorRegistry(answerInterceptorRegistry)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	return offerPeerConnection, answerPeerConnection, wan
