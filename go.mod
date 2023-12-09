@@ -11,7 +11,7 @@ require (
 	github.com/pion/interceptor v0.1.25
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
-	github.com/pion/rtcp v1.2.12
+	github.com/pion/rtcp v1.2.13
 	github.com/pion/rtp v1.8.3
 	github.com/pion/sctp v1.8.9
 	github.com/pion/sdp/v3 v3.0.6
