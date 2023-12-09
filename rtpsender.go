@@ -237,21 +237,26 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 
 	var replacedTrack TrackLocal
 	var context *baseTrackLocalContext
-	if len(r.trackEncodings) != 0 {
-		replacedTrack = r.trackEncodings[0].track
-		context = r.trackEncodings[0].context
-	}
-	if r.hasSent() && replacedTrack != nil {
-		if err := replacedTrack.Unbind(context); err != nil {
-			return err
+	for _, e := range r.trackEncodings {
+		replacedTrack = e.track
+		context = e.context
+
+		if r.hasSent() && replacedTrack != nil {
+			if err := replacedTrack.Unbind(context); err != nil {
+				return err
+			}
+		}
+
+		if !r.hasSent() || track == nil {
+			e.track = track
 		}
 	}
 
 	if !r.hasSent() || track == nil {
-		r.trackEncodings[0].track = track
 		return nil
 	}
 
+	// If we reach this point in the routine, there is only 1 track encoding
 	codec, err := track.Bind(&baseTrackLocalContext{
 		id:              context.ID(),
 		params:          r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
@@ -274,6 +279,7 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 	}
 
 	r.trackEncodings[0].track = track
+
 	return nil
 }
 

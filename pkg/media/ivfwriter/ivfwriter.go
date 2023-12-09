@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/rtp/pkg/frame"
+	"github.com/pion/rtp/codecs/av1/frame"
 )
 
 var (
