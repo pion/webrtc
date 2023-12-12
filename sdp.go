@@ -232,12 +232,30 @@ func trackDetailsToRTPReceiveParameters(t *trackDetails) RTPReceiveParameters {
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) map[string]string {
-	rids := map[string]string{}
+func getRids(media *sdp.MediaDescription) map[string]*simulcastRid {
+	rids := map[string]*simulcastRid{}
+	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids[split[0]] = attr.Value
+			rids[split[0]] = &simulcastRid{attrValue: attr.Value}
+		} else if attr.Key == sdpAttributeSimulcast {
+			simulcastAttr = attr.Value
+		}
+	}
+	// process paused stream like "a=simulcast:send 1;~2;~3"
+	if simulcastAttr != "" {
+		if space := strings.Index(simulcastAttr, " "); space > 0 {
+			simulcastAttr = simulcastAttr[space+1:]
+		}
+		ridStates := strings.Split(simulcastAttr, ";")
+		for _, ridState := range ridStates {
+			if ridState[:1] == "~" {
+				rid := ridState[1:]
+				if r, ok := rids[rid]; ok {
+					r.paused = true
+				}
+			}
 		}
 	}
 	return rids
@@ -379,7 +397,7 @@ func addSenderSDP(
 				sendRids = append(sendRids, encoding.RID)
 			}
 			// Simulcast
-			media.WithValueAttribute("simulcast", "send "+strings.Join(sendRids, ";"))
+			media.WithValueAttribute(sdpAttributeSimulcast, "send "+strings.Join(sendRids, ";"))
 		}
 
 		if !isPlanB {
@@ -475,10 +493,13 @@ func addTransceiverSDP(
 
 		for rid := range mediaSection.ridMap {
 			media.WithValueAttribute(sdpAttributeRid, rid+" recv")
+			if mediaSection.ridMap[rid].paused {
+				rid = "~" + rid
+			}
 			recvRids = append(recvRids, rid)
 		}
 		// Simulcast
-		media.WithValueAttribute("simulcast", "recv "+strings.Join(recvRids, ";"))
+		media.WithValueAttribute(sdpAttributeSimulcast, "recv "+strings.Join(recvRids, ";"))
 	}
 
 	addSenderSDP(mediaSection, isPlanB, media)
@@ -500,11 +521,16 @@ func addTransceiverSDP(
 	return true, nil
 }
 
+type simulcastRid struct {
+	attrValue string
+	paused    bool
+}
+
 type mediaSection struct {
 	id           string
 	transceivers []*RTPTransceiver
 	data         bool
-	ridMap       map[string]string
+	ridMap       map[string]*simulcastRid
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {

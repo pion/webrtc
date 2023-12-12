@@ -381,8 +381,14 @@ func TestPopulateSDP(t *testing.T) {
 
 		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
-		ridMap := map[string]string{
-			"ridkey": "some",
+		ridMap := map[string]*simulcastRid{
+			"ridkey": {
+				attrValue: "some",
+			},
+			"ridPaused": {
+				attrValue: "some2",
+				paused:    true,
+			},
 		}
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, ridMap: ridMap}}
 
@@ -392,21 +398,20 @@ func TestPopulateSDP(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
-		var found bool
+		var ridFound int
 		for _, desc := range offerSdp.MediaDescriptions {
 			if desc.MediaName.Media != "video" {
 				continue
 			}
-			for _, a := range desc.Attributes {
-				if a.Key == sdpAttributeRid {
-					if strings.Contains(a.Value, "ridkey") {
-						found = true
-						break
-					}
-				}
+			ridInSDP := getRids(desc)
+			if ridKey, ok := ridInSDP["ridkey"]; ok && !ridKey.paused {
+				ridFound++
+			}
+			if ridPaused, ok := ridInSDP["ridPaused"]; ok && ridPaused.paused {
+				ridFound++
 			}
 		}
-		assert.Equal(t, true, found, "Rid key should be present")
+		assert.Equal(t, 2, ridFound, "All rid keys should be present")
 	})
 	t.Run("SetCodecPreferences", func(t *testing.T) {
 		se := SettingEngine{}
