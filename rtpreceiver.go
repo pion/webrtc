@@ -72,7 +72,7 @@ type RTPReceiver struct {
 	rtxPool sync.Pool
 }
 
-// NewRTPReceiver constructs a new RTPReceiver
+// NewRTPReceiver constructs a new RTPReceiver //
 func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RTPReceiver, error) {
 	if transport == nil {
 		return nil, errRTPReceiverDTLSTransportNil
