@@ -212,6 +212,38 @@ a=rtpmap:111 opus/48000/2
 		assert.False(t, midVideoEnabled)
 	})
 
+	t.Run("Different Header Extensions on same codec", func(t *testing.T) {
+		const headerExtensions = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=rtpmap:111 opus/48000/2
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+a=extmap:7 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=rtpmap:111 opus/48000/2
+`
+
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterDefaultCodecs())
+		registerSimulcastHeaderExtensions(&m, RTPCodecTypeAudio)
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(headerExtensions)))
+
+		assert.False(t, m.negotiatedVideo)
+		assert.True(t, m.negotiatedAudio)
+
+		absID, absAudioEnabled, absVideoEnabled := m.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
+		assert.Equal(t, absID, 0)
+		assert.False(t, absAudioEnabled)
+		assert.False(t, absVideoEnabled)
+
+		midID, midAudioEnabled, midVideoEnabled := m.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
+		assert.Equal(t, midID, 7)
+		assert.True(t, midAudioEnabled)
+		assert.False(t, midVideoEnabled)
+	})
+
 	t.Run("Prefers exact codec matches", func(t *testing.T) {
 		const profileLevels = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
@@ -368,6 +400,40 @@ a=fmtp:97 apt=96
 		_, _, err := m.getCodecByPayload(97)
 		assert.ErrorIs(t, err, ErrCodecNotFound)
 	})
+
+	t.Run("Multiple codecs same kind", func(t *testing.T) {
+		const mixedCodecs = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 60323 UDP/TLS/RTP/SAVPF 96
+a=rtpmap:96 VP9/90000
+m=video 60323 UDP/TLS/RTP/SAVPF 94
+a=rtpmap:94 VP8/90000
+`
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "", nil},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo))
+
+		assert.NoError(t, m.updateFromRemoteDescription(mustParse(mixedCodecs)))
+		assert.True(t, m.negotiatedVideo)
+
+		vp8Codec, _, err := m.getCodecByPayload(94)
+		assert.NoError(t, err)
+		assert.Equal(t, vp8Codec.MimeType, MimeTypeVP8)
+
+		vp9Codec, _, err := m.getCodecByPayload(96)
+		assert.NoError(t, err)
+		assert.Equal(t, vp9Codec.MimeType, MimeTypeVP9)
+
+	})
+
 }
 
 func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
