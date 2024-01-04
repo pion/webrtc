@@ -22,4 +22,4 @@ jobs:
   tidy:
     uses: pion/.goassets/.github/workflows/tidy-check.reusable.yml@master
     with:
-      go-version: '1.20' # auto-update/latest-go-version
+      go-version: '1.21' # auto-update/latest-go-version
