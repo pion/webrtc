@@ -23,7 +23,7 @@ jobs:
     uses: pion/.goassets/.github/workflows/test.reusable.yml@master
     strategy:
       matrix:
-        go: ['1.20', '1.19'] # auto-update/supported-go-version-list
+        go: ['1.21', '1.20'] # auto-update/supported-go-version-list
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
@@ -32,7 +32,7 @@ jobs:
     uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@master
     strategy:
       matrix:
-        go: ['1.20', '1.19'] # auto-update/supported-go-version-list
+        go: ['1.21', '1.20'] # auto-update/supported-go-version-list
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
