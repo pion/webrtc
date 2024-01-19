@@ -820,10 +820,7 @@ func codecsFromMediaDescription(m *sdp.MediaDescription) (out []RTPCodecParamete
 
 		codec, err := s.GetCodecForPayloadType(uint8(payloadType))
 		if err != nil {
-			if payloadType == 0 {
-				continue
-			}
-			return nil, err
+			continue
 		}
 
 		channels := uint16(0)
@@ -847,6 +844,9 @@ func codecsFromMediaDescription(m *sdp.MediaDescription) (out []RTPCodecParamete
 			RTPCodecCapability: RTPCodecCapability{m.MediaName.Media + "/" + codec.Name, codec.ClockRate, channels, codec.Fmtp, feedback},
 			PayloadType:        PayloadType(payloadType),
 		})
+	}
+	if out == nil {
+		return nil, fmt.Errorf("no valid codecs found")
 	}
 
 	return out, nil
