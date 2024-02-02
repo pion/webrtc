@@ -2083,7 +2083,12 @@ func (pc *PeerConnection) Close() error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
 	closeErrs = append(closeErrs, pc.dtlsTransport.Stop())
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8)
+	if pc.iceGatherer != nil {
+		closeErrs = append(closeErrs, pc.iceGatherer.Close())
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #9, #10)
 	if pc.iceTransport != nil {
 		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
