@@ -1280,7 +1280,28 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-		for sequenceNumber := uint16(0); !ridsFullfilled(); sequenceNumber++ {
+		// padding only packets should not affect simulcast probe
+		var sequenceNumber uint16
+		for sequenceNumber = 0; sequenceNumber < simulcastProbeCount+10; sequenceNumber++ {
+			time.Sleep(20 * time.Millisecond)
+
+			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
+				pkt := &rtp.Packet{
+					Header: rtp.Header{
+						Version:        2,
+						SequenceNumber: sequenceNumber,
+						PayloadType:    96,
+						Padding:        true,
+					},
+					Payload: []byte{0x00, 0x02},
+				}
+
+				assert.NoError(t, track.WriteRTP(pkt))
+			}
+		}
+		assert.False(t, ridsFullfilled(), "Simulcast probe should not be fulfilled by padding only packets")
+
+		for ; !ridsFullfilled(); sequenceNumber++ {
 			time.Sleep(20 * time.Millisecond)
 
 			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
