@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -197,9 +198,13 @@ func (t *ICETransport) Stop() error {
 	}
 
 	if t.mux != nil {
-		return t.mux.Close()
+		if err := t.mux.Close(); err != nil && !errors.Is(err, ice.ErrClosed) {
+			return err
+		}
 	} else if t.gatherer != nil {
-		return t.gatherer.Close()
+		if err := t.gatherer.Close(); err != nil && !errors.Is(err, ice.ErrClosed) {
+			return err
+		}
 	}
 	return nil
 }
