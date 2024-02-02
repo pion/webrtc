@@ -192,7 +192,7 @@ func (g *ICEGatherer) Close() error {
 
 	if g.agent == nil {
 		return nil
-	} else if err := g.agent.Close(); err != nil {
+	} else if err := g.agent.Close(); err != nil && err != ice.ErrClosed {
 		return err
 	}
 
