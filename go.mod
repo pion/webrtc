@@ -6,7 +6,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/datachannel v1.5.5
-	github.com/pion/dtls/v2 v2.2.8
+	github.com/pion/dtls/v2 v2.2.10
 	github.com/pion/ice/v3 v3.0.2
 	github.com/pion/interceptor v0.1.25
 	github.com/pion/logging v0.2.2
@@ -17,7 +17,6 @@ require (
 	github.com/pion/sdp/v3 v3.0.6
 	github.com/pion/srtp/v3 v3.0.1
 	github.com/pion/stun/v2 v2.0.0
-	github.com/pion/transport/v2 v2.2.4 // indirect
 	github.com/pion/transport/v3 v3.0.1
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.8.4
