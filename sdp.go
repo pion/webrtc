@@ -128,6 +128,12 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 						}
 						rtxRepairFlows[rtxRepairFlow] = baseSsrc
 						tracksInMediaSection = filterTrackWithSSRC(tracksInMediaSection, SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
+						for i := range tracksInMediaSection {
+							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
+								repairSsrc := SSRC(rtxRepairFlow)
+								tracksInMediaSection[i].repairSsrc = &repairSsrc
+							}
+						}
 					}
 				}
 
