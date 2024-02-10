@@ -325,7 +325,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		)
 
 		trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
-			interceptor.RTPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+			interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
 				n, err = trackEncoding.srtpStream.Read(in)
 				return n, a, err
 			}),
