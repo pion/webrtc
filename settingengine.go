@@ -92,6 +92,7 @@ type SettingEngine struct {
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
+	trackLocalRtx                             bool
 }
 
 // getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default
@@ -436,4 +437,9 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 // This allow usage of Ciphers that are reserved for private usage.
 func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
 	e.dtls.customCipherSuites = customCipherSuites
+}
+
+// SetTrackLocalRtx allows track local use RTX.
+func (e *SettingEngine) SetTrackLocalRtx(enable bool) {
+	e.trackLocalRtx = enable
 }

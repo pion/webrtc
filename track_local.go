@@ -44,8 +44,9 @@ type TrackLocalContext interface {
 }
 
 type baseTrackLocalContext struct {
-	id              string
-	params          RTPParameters
+	id     string
+	params RTPParameters
+
 	ssrc            SSRC
 	writeStream     TrackLocalWriter
 	rtcpInterceptor interceptor.RTCPReader
