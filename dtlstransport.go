@@ -236,6 +236,11 @@ func (t *DTLSTransport) startSRTP() error {
 	return nil
 }
 
+// GetSRTPSession returns the SRTP session
+func (t *DTLSTransport) GetSRTPSession() (*srtp.SessionSRTP, error) {
+       return t.getSRTPSession()
+}
+
 func (t *DTLSTransport) getSRTPSession() (*srtp.SessionSRTP, error) {
 	if value, ok := t.srtpSession.Load().(*srtp.SessionSRTP); ok {
 		return value, nil
