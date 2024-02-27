@@ -84,8 +84,8 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 7}, Payload: []byte{0x03}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
-				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 6},
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 5}},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 6, RTPHeader: &rtp.Header{SequenceNumber: 5001, Timestamp: 6}},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 0,
@@ -102,7 +102,7 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5},
+				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}},
 			},
 			maxLate:          5,
 			maxLateTimestamp: 0,
@@ -134,8 +134,8 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5012, Timestamp: 17}, Payload: []byte{0x07}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5},
-				{Data: []byte{0x02}, Duration: time.Second * 2, PacketTimestamp: 7, PrevDroppedPackets: 1},
+				{Data: []byte{0x01}, Duration: time.Second * 2, PacketTimestamp: 5, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 5, Marker: true}},
+				{Data: []byte{0x02}, Duration: time.Second * 2, PacketTimestamp: 7, PrevDroppedPackets: 1, RTPHeader: &rtp.Header{SequenceNumber: 5002, Timestamp: 7, Marker: true}},
 			},
 			maxLate:          5,
 			maxLateTimestamp: 0,
@@ -149,8 +149,8 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5003, Timestamp: 7}, Payload: []byte{0x04}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5},
-				{Data: []byte{0x02, 0x03}, Duration: time.Second, PacketTimestamp: 6},
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 5, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 5}},
+				{Data: []byte{0x02, 0x03}, Duration: time.Second, PacketTimestamp: 6, RTPHeader: &rtp.Header{SequenceNumber: 5001, Timestamp: 6}},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 0,
@@ -203,11 +203,11 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5005, Timestamp: 6}, Payload: []byte{0x06}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 1},
-				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 2},
-				{Data: []byte{0x03}, Duration: time.Second, PacketTimestamp: 3},
-				{Data: []byte{0x04}, Duration: time.Second, PacketTimestamp: 4},
-				{Data: []byte{0x05}, Duration: time.Second, PacketTimestamp: 5},
+				{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 1, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 1}},
+				{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 2, RTPHeader: &rtp.Header{SequenceNumber: 5001, Timestamp: 2}},
+				{Data: []byte{0x03}, Duration: time.Second, PacketTimestamp: 3, RTPHeader: &rtp.Header{SequenceNumber: 5002, Timestamp: 3}},
+				{Data: []byte{0x04}, Duration: time.Second, PacketTimestamp: 4, RTPHeader: &rtp.Header{SequenceNumber: 5003, Timestamp: 4}},
+				{Data: []byte{0x05}, Duration: time.Second, PacketTimestamp: 5, RTPHeader: &rtp.Header{SequenceNumber: 5004, Timestamp: 5}},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 0,
@@ -225,7 +225,7 @@ func TestSampleBuilder(t *testing.T) {
 				{Header: rtp.Header{SequenceNumber: 5017, Timestamp: 7001}, Payload: []byte{0x05}},
 			},
 			samples: []*media.Sample{
-				{Data: []byte{0x04, 0x05}, Duration: time.Second * time.Duration(2), PacketTimestamp: 4000, PrevDroppedPackets: 13},
+				{Data: []byte{0x04, 0x05}, Duration: time.Second * time.Duration(2), PacketTimestamp: 4000, PrevDroppedPackets: 13, RTPHeader: &rtp.Header{SequenceNumber: 5013, Timestamp: 4000}},
 			},
 			withHeadChecker:  true,
 			headBytes:        []byte{0x04},
@@ -247,7 +247,7 @@ func TestSampleBuilder(t *testing.T) {
 			withHeadChecker: true,
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
-				{Data: []byte{1, 2, 3}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // first sample
+				{Data: []byte{1, 2, 3}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 1}}, // first sample
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
@@ -265,7 +265,7 @@ func TestSampleBuilder(t *testing.T) {
 			withHeadChecker: true,
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
-				{Data: []byte{1, 2}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // 1st sample
+				{Data: []byte{1, 2}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 1}}, // 1st sample
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
@@ -309,18 +309,18 @@ func TestSampleBuilderMaxLate(t *testing.T) {
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 0, Timestamp: 1}, Payload: []byte{0x01}})
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 2}, Payload: []byte{0x01}})
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 3}, Payload: []byte{0x01}})
-	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 1}, s.Pop(), "Failed to build samples before gap")
+	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 1, RTPHeader: &rtp.Header{SequenceNumber: 0, Timestamp: 1}}, s.Pop(), "Failed to build samples before gap")
 
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 500}, Payload: []byte{0x02}})
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 501}, Payload: []byte{0x02}})
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 502}, Payload: []byte{0x02}})
 
-	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 2}, s.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 2, RTPHeader: &rtp.Header{SequenceNumber: 1, Timestamp: 2}}, s.Pop(), "Failed to build samples after large gap")
 	assert.Equal((*media.Sample)(nil), s.Pop(), "Failed to build samples after large gap")
 
 	s.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 6000, Timestamp: 600}, Payload: []byte{0x03}})
-	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 500, PrevDroppedPackets: 4998}, s.Pop(), "Failed to build samples after large gap")
-	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 501}, s.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 500, PrevDroppedPackets: 4998, RTPHeader: &rtp.Header{SequenceNumber: 5000, Timestamp: 500}}, s.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 501, RTPHeader: &rtp.Header{SequenceNumber: 5001, Timestamp: 501}}, s.Pop(), "Failed to build samples after large gap")
 }
 
 func TestSeqnumDistance(t *testing.T) {

@@ -18,6 +18,7 @@ type Sample struct {
 	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
 	Metadata           interface{}
+	RTPHeader          *rtp.Header
 }
 
 // Writer defines an interface to handle

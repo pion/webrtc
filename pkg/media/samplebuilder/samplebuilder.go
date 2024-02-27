@@ -272,13 +272,17 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	// merge all the buffers into a sample
 	data := []byte{}
 	var metadata interface{}
+	var rtpHeader rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
-		if i == consume.head && s.packetHeadHandler != nil {
-			metadata = s.packetHeadHandler(s.depacketizer)
+		if i == consume.head {
+			if s.packetHeadHandler != nil {
+				metadata = s.packetHeadHandler(s.depacketizer)
+			}
+			rtpHeader = s.buffer[i].Header.Clone()
 		}
 
 		data = append(data, p...)
@@ -291,6 +295,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
 		Metadata:           metadata,
+		RTPHeader:          &rtpHeader,
 	}
 
 	s.droppedPackets = 0
