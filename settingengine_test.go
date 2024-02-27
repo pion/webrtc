@@ -269,3 +269,12 @@ func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {
 	s.SetSCTPMaxReceiveBufferSize(expSize)
 	assert.Equal(t, expSize, s.sctp.maxReceiveBufferSize)
 }
+
+func TestSetSCTPRTOMax(t *testing.T) {
+	s := SettingEngine{}
+	assert.Equal(t, time.Duration(0), s.sctp.rtoMax)
+
+	expSize := time.Second
+	s.SetSCTPRTOMax(expSize)
+	assert.Equal(t, expSize, s.sctp.rtoMax)
+}
