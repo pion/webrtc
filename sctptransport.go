@@ -58,6 +58,8 @@ type SCTPTransport struct {
 
 	api *API
 	log logging.LeveledLogger
+	// maximum retransmission timeout
+	rtoMax float64
 }
 
 // NewSCTPTransport creates a new SCTPTransport.
@@ -105,12 +107,13 @@ func (r *SCTPTransport) Start(SCTPCapabilities) error {
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
 		return errSCTPTransportDTLS
 	}
-
+	rtoMax := float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond)
 	sctpAssociation, err := sctp.Client(sctp.Config{
 		NetConn:              dtlsTransport.conn,
 		MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
 		EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		LoggerFactory:        r.api.settingEngine.LoggerFactory,
+		RTOMax:               rtoMax,
 	})
 	if err != nil {
 		return err
