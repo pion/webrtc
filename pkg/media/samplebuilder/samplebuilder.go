@@ -144,10 +144,10 @@ func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation, fo
 
 // purgeBuffers flushes all buffers that are already consumed or those buffers
 // that are too late to consume.
-func (s *SampleBuilder) purgeBuffers() {
+func (s *SampleBuilder) purgeBuffers(flush bool) {
 	s.purgeConsumedBuffers()
 
-	for (s.tooOld(s.filled) || (s.filled.count() > s.maxLate)) && s.filled.hasData() {
+	for (s.tooOld(s.filled) || (s.filled.count() > s.maxLate) || flush) && s.filled.hasData() {
 		if s.active.empty() {
 			// refill the active based on the filled packets
 			s.active = s.filled
@@ -188,7 +188,12 @@ func (s *SampleBuilder) Push(p *rtp.Packet) {
 	case slCompareInside:
 		break
 	}
-	s.purgeBuffers()
+	s.purgeBuffers(false)
+}
+
+// Flush marks all samples in the buffer to be popped.
+func (s *SampleBuilder) Flush() {
+	s.purgeBuffers(true)
 }
 
 const secondToNanoseconds = 1000000000

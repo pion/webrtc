@@ -509,6 +509,45 @@ func TestSampleBuilderData(t *testing.T) {
 	assert.Equal(t, j, 0x1FFFF)
 }
 
+func TestSampleBuilder_Flush(t *testing.T) {
+	s := New(50, &fakeDepacketizer{
+		headChecker: true,
+		headBytes:   []byte{0x01},
+	}, 1)
+
+	s.Push(&rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 999, Timestamp: 0},
+		Payload: []byte{0x00},
+	}) // Invalid packet
+	// Gap preventing below packets to be processed
+	s.Push(&rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 1001, Timestamp: 1, Marker: true},
+		Payload: []byte{0x01, 0x11},
+	}) // Valid packet
+	s.Push(&rtp.Packet{
+		Header:  rtp.Header{SequenceNumber: 1011, Timestamp: 10, Marker: true},
+		Payload: []byte{0x01, 0x12},
+	}) // Valid packet
+
+	if sample := s.Pop(); sample != nil {
+		t.Fatal("Unexpected sample is retuned. Test precondition may be broken")
+	}
+
+	s.Flush()
+
+	samples := []*media.Sample{}
+	for sample := s.Pop(); sample != nil; sample = s.Pop() {
+		samples = append(samples, sample)
+	}
+
+	expected := []*media.Sample{
+		{Data: []byte{0x01, 0x11}, Duration: 9 * time.Second, PacketTimestamp: 1, PrevDroppedPackets: 2, RTPHeader: &rtp.Header{SequenceNumber: 1001, Timestamp: 1, Marker: true}},
+		{Data: []byte{0x01, 0x12}, Duration: 0, PacketTimestamp: 10, PrevDroppedPackets: 9, RTPHeader: &rtp.Header{SequenceNumber: 1011, Timestamp: 10, Marker: true}},
+	}
+
+	assert.Equal(t, expected, samples)
+}
+
 func BenchmarkSampleBuilderSequential(b *testing.B) {
 	s := New(100, &fakeDepacketizer{}, 1)
 	b.ResetTimer()
