@@ -305,6 +305,8 @@ func (s *SampleBuilder) Pop() *media.Sample {
 // PopWithTimestamp compiles pushed RTP packets into media samples and then
 // returns the next valid sample with its associated RTP timestamp (or nil, 0 if
 // no sample is compiled).
+//
+// Deprecated: PopWithTimestamp will be removed in v4. Use Sample.PacketTimestamp field instead.
 func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
 	sample := s.Pop()
 	if sample == nil {
