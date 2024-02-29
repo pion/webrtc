@@ -334,17 +334,6 @@ func (s *SampleBuilder) Pop() *media.Sample {
 	return result
 }
 
-// PopWithTimestamp compiles pushed RTP packets into media samples and then
-// returns the next valid sample with its associated RTP timestamp (or nil, 0 if
-// no sample is compiled).
-func (s *SampleBuilder) PopWithTimestamp() (*media.Sample, uint32) {
-	sample := s.Pop()
-	if sample == nil {
-		return nil, 0
-	}
-	return sample, sample.PacketTimestamp
-}
-
 // seqnumDistance computes the distance between two sequence numbers
 func seqnumDistance(x, y uint16) uint16 {
 	diff := int16(x - y)

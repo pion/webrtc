@@ -490,15 +490,6 @@ func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
 	assert.Equal(t, 2, headCount, "two sample heads should have been inspected")
 }
 
-func TestPopWithTimestamp(t *testing.T) {
-	t.Run("Crash on nil", func(t *testing.T) {
-		s := New(0, &fakeDepacketizer{}, 1)
-		sample, timestamp := s.PopWithTimestamp()
-		assert.Nil(t, sample)
-		assert.Equal(t, uint32(0), timestamp)
-	})
-}
-
 type truePartitionHeadChecker struct{}
 
 func (f *truePartitionHeadChecker) IsPartitionHead([]byte) bool {
@@ -520,11 +511,11 @@ func TestSampleBuilderData(t *testing.T) {
 		}
 		s.Push(&p)
 		for {
-			sample, ts := s.PopWithTimestamp()
+			sample := s.Pop()
 			if sample == nil {
 				break
 			}
-			assert.Equal(t, ts, uint32(j+42), "timestamp")
+			assert.Equal(t, sample.PacketTimestamp, uint32(j+42), "timestamp")
 			assert.Equal(t, len(sample.Data), 1, "data length")
 			assert.Equal(t, byte(j), sample.Data[0], "data")
 			j++
