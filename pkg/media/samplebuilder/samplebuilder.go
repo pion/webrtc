@@ -48,6 +48,9 @@ type SampleBuilder struct {
 
 	// allows inspecting head packets of each sample and then returns a custom metadata
 	packetHeadHandler func(headPacket interface{}) interface{}
+
+	// return array of RTP headers as Sample.RTPHeaders
+	returnRTPHeaders bool
 }
 
 // New constructs a new SampleBuilder.
@@ -277,17 +280,18 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	// merge all the buffers into a sample
 	data := []byte{}
 	var metadata interface{}
-	var rtpHeader rtp.Header
+	var rtpHeaders []*rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
 		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
-		if i == consume.head {
-			if s.packetHeadHandler != nil {
-				metadata = s.packetHeadHandler(s.depacketizer)
-			}
-			rtpHeader = s.buffer[i].Header.Clone()
+		if i == consume.head && s.packetHeadHandler != nil {
+			metadata = s.packetHeadHandler(s.depacketizer)
+		}
+		if s.returnRTPHeaders {
+			h := s.buffer[i].Header.Clone()
+			rtpHeaders = append(rtpHeaders, &h)
 		}
 
 		data = append(data, p...)
@@ -300,7 +304,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
 		Metadata:           metadata,
-		RTPHeader:          &rtpHeader,
+		RTPHeaders:         rtpHeaders,
 	}
 
 	s.droppedPackets = 0
@@ -392,5 +396,13 @@ func WithMaxTimeDelay(maxLateDuration time.Duration) Option {
 	return func(o *SampleBuilder) {
 		totalMillis := maxLateDuration.Milliseconds()
 		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMillis / 1000)
+	}
+}
+
+// WithRTPHeaders enables to collect RTP headers forming a Sample.
+// Useful for accessing RTP extensions associated to the Sample.
+func WithRTPHeaders(enable bool) Option {
+	return func(o *SampleBuilder) {
+		o.returnRTPHeaders = enable
 	}
 }
