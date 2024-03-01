@@ -229,6 +229,13 @@ func (s *TrackLocalStaticSample) Codec() RTPCodecCapability {
 	return s.rtpTrack.Codec()
 }
 
+func (s *TrackLocalStaticSample) SetPacketizer(p rtp.Packetizer) {
+	s.rtpTrack.mu.RLock()
+	defer s.rtpTrack.mu.RUnlock()
+
+	s.packetizer = p
+}
+
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.
 // If so it setups all the state (SSRC and PayloadType) to have a call
