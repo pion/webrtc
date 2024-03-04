@@ -1512,3 +1512,48 @@ func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
 
 	closePairNow(t, pcSender, pcReceiver)
 }
+
+// Check that PayloadType of 0 is handled correctly. At one point
+// we incorrectly assumed 0 meant an invalid stream and wouldn't update things
+// properly
+func TestPeerConnection_Zero_PayloadType(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	require.NoError(t, err)
+
+	audioTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypePCMU}, "audio", "audio")
+	require.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(audioTrack)
+	require.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	onTrackFired, onTrackFiredCancel := context.WithCancel(context.Background())
+	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		require.Equal(t, track.Codec().MimeType, MimeTypePCMU)
+		onTrackFiredCancel()
+	})
+
+	go func() {
+		ticker := time.NewTicker(20 * time.Millisecond)
+		defer ticker.Stop()
+
+		select {
+		case <-onTrackFired.Done():
+			return
+		case <-ticker.C:
+			if routineErr := audioTrack.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+				fmt.Println(routineErr)
+			}
+		}
+	}()
+
+	<-onTrackFired.Done()
+	closePairNow(t, pcOffer, pcAnswer)
+}
