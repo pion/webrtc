@@ -692,3 +692,57 @@ func TestDataChannel_Dial(t *testing.T) {
 		closePair(t, offerPC, answerPC, done)
 	})
 }
+
+func TestDetachRemovesDatachannelReference(t *testing.T) {
+	// Use Detach data channels mode
+	s := SettingEngine{}
+	s.DetachDataChannels()
+	api := NewAPI(WithSettingEngine(s))
+
+	// Set up two peer connections.
+	config := Configuration{}
+	pca, err := api.NewPeerConnection(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pcb, err := api.NewPeerConnection(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer closePairNow(t, pca, pcb)
+
+	dcChan := make(chan *DataChannel, 1)
+	pcb.OnDataChannel(func(d *DataChannel) {
+		d.OnOpen(func() {
+			if _, detachErr := d.Detach(); detachErr != nil {
+				t.Error(detachErr)
+			}
+
+			dcChan <- d
+		})
+	})
+
+	if err = signalPair(pca, pcb); err != nil {
+		t.Fatal(err)
+	}
+
+	attached, err := pca.CreateDataChannel("", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	open := make(chan struct{}, 1)
+	attached.OnOpen(func() {
+		open <- struct{}{}
+	})
+	<-open
+
+	d := <-dcChan
+	d.sctpTransport.lock.RLock()
+	defer d.sctpTransport.lock.RUnlock()
+	for _, dc := range d.sctpTransport.dataChannels[:cap(d.sctpTransport.dataChannels)] {
+		if dc == d {
+			t.Errorf("expected sctpTransport to drop reference to datachannel")
+		}
+	}
+}

@@ -52,6 +52,7 @@ type SCTPTransport struct {
 
 	// DataChannels
 	dataChannels          []*DataChannel
+	dataChannelIDsUsed    map[uint16]struct{}
 	dataChannelsOpened    uint32
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
@@ -65,10 +66,11 @@ type SCTPTransport struct {
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
-		dtlsTransport: dtls,
-		state:         SCTPTransportStateConnecting,
-		api:           api,
-		log:           api.settingEngine.LoggerFactory.NewLogger("ortc"),
+		dtlsTransport:      dtls,
+		state:              SCTPTransportStateConnecting,
+		api:                api,
+		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
+		dataChannelIDsUsed: make(map[uint16]struct{}),
 	}
 
 	res.updateMessageSize()
@@ -287,6 +289,13 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.lock.Lock()
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
+	if dc.ID() != nil {
+		r.dataChannelIDsUsed[*dc.ID()] = struct{}{}
+	} else {
+		// This cannot happen, the constructor for this datachannel in the caller
+		// takes a pointer to the id.
+		r.log.Errorf("accepted data channel with no ID")
+	}
 	handler := r.onDataChannelHandler
 	r.lock.Unlock()
 
@@ -393,21 +402,12 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	// Create map of ids so we can compare without double-looping each time.
-	idsMap := make(map[uint16]struct{}, len(r.dataChannels))
-	for _, dc := range r.dataChannels {
-		if dc.ID() == nil {
-			continue
-		}
-
-		idsMap[*dc.ID()] = struct{}{}
-	}
-
 	for ; id < max-1; id += 2 {
-		if _, ok := idsMap[id]; ok {
+		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
 		*idOut = &id
+		r.dataChannelIDsUsed[id] = struct{}{}
 		return nil
 	}
 
