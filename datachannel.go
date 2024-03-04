@@ -420,7 +420,6 @@ func (d *DataChannel) ensureOpen() error {
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 
 	if !d.api.settingEngine.detach.DataChannels {
 		return nil, errDetachNotEnabled
@@ -432,7 +431,28 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 
 	d.detachCalled = true
 
-	return d.dataChannel, nil
+	dataChannel := d.dataChannel
+	d.mu.Unlock()
+
+	// Remove the reference from SCTPTransport so that the datachannel
+	// can be garbage collected on close
+	d.sctpTransport.lock.Lock()
+	n := len(d.sctpTransport.dataChannels)
+	j := 0
+	for i := 0; i < n; i++ {
+		if d == d.sctpTransport.dataChannels[i] {
+			continue
+		}
+		d.sctpTransport.dataChannels[j] = d.sctpTransport.dataChannels[i]
+		j++
+	}
+	for i := j; i < n; i++ {
+		d.sctpTransport.dataChannels[i] = nil
+	}
+	d.sctpTransport.dataChannels = d.sctpTransport.dataChannels[:j]
+	d.sctpTransport.lock.Unlock()
+
+	return dataChannel, nil
 }
 
 // Close Closes the DataChannel. It may be called regardless of whether
