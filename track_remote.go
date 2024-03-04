@@ -153,7 +153,8 @@ func (t *TrackRemote) checkAndUpdateTrack(b []byte) error {
 		return errRTPTooShort
 	}
 
-	if payloadType := PayloadType(b[1] & rtpPayloadTypeBitmask); payloadType != t.PayloadType() {
+	payloadType := PayloadType(b[1] & rtpPayloadTypeBitmask)
+	if payloadType != t.PayloadType() || len(t.params.Codecs) == 0 {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 
