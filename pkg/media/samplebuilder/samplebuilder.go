@@ -357,12 +357,6 @@ func timestampDistance(x, y uint32) uint32 {
 // An Option configures a SampleBuilder.
 type Option func(o *SampleBuilder)
 
-// WithPartitionHeadChecker is obsolete, it does nothing.
-func WithPartitionHeadChecker(interface{}) Option {
-	return func(o *SampleBuilder) {
-	}
-}
-
 // WithPacketReleaseHandler set a callback when the builder is about to release
 // some packet.
 func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {

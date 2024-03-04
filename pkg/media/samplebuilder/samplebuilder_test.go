@@ -27,6 +27,7 @@ type sampleBuilderTest struct {
 type fakeDepacketizer struct {
 	headChecker bool
 	headBytes   []byte
+	alwaysHead  bool
 }
 
 func (f *fakeDepacketizer) Unmarshal(r []byte) ([]byte, error) {
@@ -43,6 +44,10 @@ func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
 	// skip padding
 	if len(payload) < 1 {
 		return false
+	}
+
+	if f.alwaysHead {
+		return true
 	}
 
 	for _, b := range f.headBytes {
@@ -490,16 +495,11 @@ func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
 	assert.Equal(t, 2, headCount, "two sample heads should have been inspected")
 }
 
-type truePartitionHeadChecker struct{}
-
-func (f *truePartitionHeadChecker) IsPartitionHead([]byte) bool {
-	return true
-}
-
 func TestSampleBuilderData(t *testing.T) {
-	s := New(10, &fakeDepacketizer{}, 1,
-		WithPartitionHeadChecker(&truePartitionHeadChecker{}),
-	)
+	s := New(10, &fakeDepacketizer{
+		headChecker: true,
+		alwaysHead:  true,
+	}, 1)
 	j := 0
 	for i := 0; i < 0x20000; i++ {
 		p := rtp.Packet{
