@@ -1005,7 +1005,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	desc.parsed = &sdp.SessionDescription{}
-	if err := desc.parsed.Unmarshal([]byte(desc.SDP)); err != nil {
+	if err := desc.parsed.UnmarshalString(desc.SDP); err != nil {
 		return err
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
