@@ -23,7 +23,7 @@ const (
 	// ones, such as ones obtained through VPNs.
 	ICECandidateTypeHost
 
-	// ICECandidateTypeSrflx indicates the the candidate is of Server
+	// ICECandidateTypeSrflx indicates the candidate is of Server
 	// Reflexive type as described
 	// https://tools.ietf.org/html/rfc8445#section-5.1.1.2. A candidate type
 	// whose IP address and port are a binding allocated by a NAT for an ICE
@@ -37,7 +37,7 @@ const (
 	// NAT to its peer.
 	ICECandidateTypePrflx
 
-	// ICECandidateTypeRelay indicates the the candidate is of Relay type as
+	// ICECandidateTypeRelay indicates the candidate is of Relay type as
 	// described in https://tools.ietf.org/html/rfc8445#section-5.1.1.2. A
 	// candidate type obtained from a relay server, such as a TURN server.
 	ICECandidateTypeRelay
