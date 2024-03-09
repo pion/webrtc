@@ -81,7 +81,7 @@ type Packet struct {
 	Offset time.Duration
 	// IsRTCP is true if the payload is RTCP, false if the payload is RTP
 	IsRTCP bool
-	// Payload is the binary RTP or or RTCP payload. The contents may not parse
+	// Payload is the binary RTP or RTCP payload. The contents may not parse
 	// as a valid packet if the contents have been truncated.
 	Payload []byte
 }
