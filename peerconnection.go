@@ -495,7 +495,7 @@ func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 
 func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
 	pc.connectionState.Store(cs)
-	pc.log.Infof("peer connection state changed: %s", cs)
+	pc.log.Infof("peer connection state changed: %s %p", cs, pc)
 	if handler, ok := pc.onConnectionStateChangeHandler.Load().(func(PeerConnectionState)); ok && handler != nil {
 		ch := make(chan struct{})
 		go func() {
@@ -2277,6 +2277,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
+	fmt.Println("DTLS Completed", pc.api.settingEngine.candidates.UsernameFragment)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 	if err != nil {
 		pc.log.Warnf("Failed to start manager: %s", err)
