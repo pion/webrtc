@@ -497,7 +497,12 @@ func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
 	pc.connectionState.Store(cs)
 	pc.log.Infof("peer connection state changed: %s", cs)
 	if handler, ok := pc.onConnectionStateChangeHandler.Load().(func(PeerConnectionState)); ok && handler != nil {
-		go handler(cs)
+		ch := make(chan struct{})
+		go func() {
+			handler(cs)
+			close(ch)
+		}()
+		<-ch
 	}
 }
 
