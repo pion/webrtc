@@ -347,9 +347,13 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
 	if role == DTLSRoleClient {
+		fmt.Printf("DTLSClient started %v\n", t.api.settingEngine.candidates.UsernameFragment)
 		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsConfig)
+		fmt.Printf("DTLSClient completed %v %v\n", t.api.settingEngine.candidates.UsernameFragment, err)
 	} else {
+		fmt.Printf("DTLSServer started %v\n", t.api.settingEngine.candidates.UsernameFragment)
 		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsConfig)
+		fmt.Printf("DTLSServer completed %v %v\n", t.api.settingEngine.candidates.UsernameFragment, err)
 	}
 
 	// Re-take the lock, nothing beyond here is blocking
