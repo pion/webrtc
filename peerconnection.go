@@ -510,7 +510,13 @@ func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
 	pc.connectionState.Store(cs)
 	pc.log.Infof("peer connection state changed: %s", cs)
 	if handler, ok := pc.onConnectionStateChangeHandler.Load().(func(PeerConnectionState)); ok && handler != nil {
-		go handler(cs)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			handler(cs)
+			wg.Done()
+		}()
+		wg.Wait()
 	}
 }
 
