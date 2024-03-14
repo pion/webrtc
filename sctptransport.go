@@ -235,7 +235,7 @@ ACCEPT:
 			return
 		}
 
-		<-r.onDataChannel(rtcDC)
+		r.onDataChannel(rtcDC)
 		rtcDC.handleOpen(dc, true, dc.Config.Negotiated)
 
 		r.lock.Lock()
@@ -283,27 +283,18 @@ func (r *SCTPTransport) OnDataChannelOpened(f func(*DataChannel)) {
 	r.onDataChannelOpenedHandler = f
 }
 
-func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
+func (r *SCTPTransport) onDataChannel(dc *DataChannel) {
 	r.lock.Lock()
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
 	handler := r.onDataChannelHandler
 	r.lock.Unlock()
 
-	done = make(chan struct{})
-	if handler == nil || dc == nil {
-		close(done)
-		return
-	}
-
 	// Run this synchronously to allow setup done in onDataChannelFn()
 	// to complete before datachannel event handlers might be called.
-	go func() {
+	if handler != nil {
 		handler(dc)
-		close(done)
-	}()
-
-	return
+	}
 }
 
 func (r *SCTPTransport) updateMessageSize() {
