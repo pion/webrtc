@@ -388,9 +388,9 @@ func TestPeerConnection_PropertyGetters(t *testing.T) {
 		currentRemoteDescription: &SessionDescription{},
 		pendingRemoteDescription: &SessionDescription{},
 		signalingState:           SignalingStateHaveLocalOffer,
+		connectionState:          PeerConnectionStateConnecting,
 	}
 	pc.iceConnectionState.Store(ICEConnectionStateChecking)
-	pc.connectionState.Store(PeerConnectionStateConnecting)
 
 	assert.Equal(t, pc.currentLocalDescription, pc.CurrentLocalDescription(), "should match")
 	assert.Equal(t, pc.pendingLocalDescription, pc.PendingLocalDescription(), "should match")
@@ -398,7 +398,7 @@ func TestPeerConnection_PropertyGetters(t *testing.T) {
 	assert.Equal(t, pc.pendingRemoteDescription, pc.PendingRemoteDescription(), "should match")
 	assert.Equal(t, pc.signalingState, pc.SignalingState(), "should match")
 	assert.Equal(t, pc.iceConnectionState.Load(), pc.ICEConnectionState(), "should match")
-	assert.Equal(t, pc.connectionState.Load(), pc.ConnectionState(), "should match")
+	assert.Equal(t, pc.connectionState, pc.ConnectionState(), "should match")
 }
 
 func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
@@ -1576,33 +1576,26 @@ func TestPeerConnectionState(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, PeerConnectionStateNew, pc.ConnectionState())
 
-	pc.updateConnectionState(ICEConnectionStateChecking, DTLSTransportStateNew)
-	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnecting, pc.getConnectionState(ICEConnectionStateChecking, DTLSTransportStateNew))
 
-	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateNew)
-	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnecting, pc.getConnectionState(ICEConnectionStateConnected, DTLSTransportStateNew))
 
-	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnecting)
-	assert.Equal(t, PeerConnectionStateConnecting, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnecting, pc.getConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnecting))
 
-	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnected)
-	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnected, pc.getConnectionState(ICEConnectionStateConnected, DTLSTransportStateConnected))
 
-	pc.updateConnectionState(ICEConnectionStateCompleted, DTLSTransportStateConnected)
-	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnected, pc.getConnectionState(ICEConnectionStateCompleted, DTLSTransportStateConnected))
 
-	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateClosed)
-	assert.Equal(t, PeerConnectionStateConnected, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateConnected, pc.getConnectionState(ICEConnectionStateConnected, DTLSTransportStateClosed))
 
-	pc.updateConnectionState(ICEConnectionStateDisconnected, DTLSTransportStateConnected)
-	assert.Equal(t, PeerConnectionStateDisconnected, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateDisconnected, pc.getConnectionState(ICEConnectionStateDisconnected, DTLSTransportStateConnected))
 
-	pc.updateConnectionState(ICEConnectionStateFailed, DTLSTransportStateConnected)
-	assert.Equal(t, PeerConnectionStateFailed, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateFailed, pc.getConnectionState(ICEConnectionStateFailed, DTLSTransportStateConnected))
 
-	pc.updateConnectionState(ICEConnectionStateConnected, DTLSTransportStateFailed)
-	assert.Equal(t, PeerConnectionStateFailed, pc.ConnectionState())
+	assert.Equal(t, PeerConnectionStateFailed, pc.getConnectionState(ICEConnectionStateConnected, DTLSTransportStateFailed))
 
 	assert.NoError(t, pc.Close())
 	assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
 }
+
+

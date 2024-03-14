@@ -14,6 +14,7 @@ import (
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer)
@@ -791,4 +792,25 @@ func TestDTLSClose(t *testing.T) {
 
 	peerConnectionsConnected.Wait()
 	assert.NoError(t, pcOffer.Close())
+}
+
+func TestPeerConnectionStateIceAgentUpdate(t *testing.T) {
+	offer, answer, err := newPair()
+	require.NoError(t, err)
+	defer answer.Close()
+
+	closed := make(chan struct{})
+	offer.OnConnectionStateChange(func(cs PeerConnectionState) {
+		if cs == PeerConnectionStateConnecting {
+			offer.Close()
+			close(closed)
+		}
+	})
+	require.NoError(t, signalPair(offer, answer))
+	select {
+	case <-closed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("didn't receive close connection update")
+	}
+	require.Equal(t, PeerConnectionStateClosed, offer.ConnectionState())
 }

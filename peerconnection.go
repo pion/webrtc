@@ -51,7 +51,12 @@ type PeerConnection struct {
 	pendingRemoteDescription *SessionDescription
 	signalingState           SignalingState
 	iceConnectionState       atomic.Value // ICEConnectionState
-	connectionState          atomic.Value // PeerConnectionState
+
+	connStateMx     sync.RWMutex
+	connectionState PeerConnectionState // PeerConnectionState
+	// connectionStateNotifications runs OnConnectionStateUpdate callbacks sequentially
+	// guaranteeing the ordering of the updates.
+	connectionStateNotifications *operations
 
 	idpLoginURL *string
 
@@ -125,20 +130,21 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		ops:                    newOperations(),
-		isClosed:               &atomicBool{},
-		isNegotiationNeeded:    &atomicBool{},
-		negotiationNeededState: negotiationNeededStateEmpty,
-		lastOffer:              "",
-		lastAnswer:             "",
-		greaterMid:             -1,
-		signalingState:         SignalingStateStable,
+		ops:                          newOperations(),
+		isClosed:                     &atomicBool{},
+		isNegotiationNeeded:          &atomicBool{},
+		negotiationNeededState:       negotiationNeededStateEmpty,
+		lastOffer:                    "",
+		lastAnswer:                   "",
+		greaterMid:                   -1,
+		signalingState:               SignalingStateStable,
+		connectionStateNotifications: newOperations(),
+		connectionState:              PeerConnectionStateNew,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
-	pc.connectionState.Store(PeerConnectionStateNew)
 
 	i, err := api.interceptorRegistry.Build("")
 	if err != nil {
@@ -507,10 +513,10 @@ func (pc *PeerConnection) OnConnectionStateChange(f func(PeerConnectionState)) {
 }
 
 func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
-	pc.connectionState.Store(cs)
-	pc.log.Infof("peer connection state changed: %s", cs)
 	if handler, ok := pc.onConnectionStateChangeHandler.Load().(func(PeerConnectionState)); ok && handler != nil {
-		handler(cs)
+		pc.connectionStateNotifications.Enqueue(func() {
+			handler(cs)
+		})
 	}
 }
 
@@ -746,7 +752,20 @@ func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 
 // Update the PeerConnectionState given the state of relevant transports
 // https://www.w3.org/TR/webrtc/#rtcpeerconnectionstate-enum
-func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnectionState, dtlsTransportState DTLSTransportState) {
+func (pc *PeerConnection) updateConnectionState() {
+	pc.connStateMx.Lock()
+	defer pc.connStateMx.Unlock()
+
+	cs := pc.getConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+	if cs == pc.connectionState {
+		return
+	}
+	pc.connectionState = cs
+	pc.log.Infof("peer connection state changed: %s", cs)
+	pc.onConnectionStateChange(cs)
+}
+
+func (pc *PeerConnection) getConnectionState(iceConnectionState ICEConnectionState, dtlsTransportState DTLSTransportState) PeerConnectionState {
 	connectionState := PeerConnectionStateNew
 	switch {
 	// The RTCPeerConnection object's [[IsClosed]] slot is true.
@@ -780,12 +799,7 @@ func (pc *PeerConnection) updateConnectionState(iceConnectionState ICEConnection
 		(dtlsTransportState == DTLSTransportStateConnected || dtlsTransportState == DTLSTransportStateClosed):
 		connectionState = PeerConnectionStateConnected
 	}
-
-	if pc.connectionState.Load() == connectionState {
-		return
-	}
-
-	pc.onConnectionStateChange(connectionState)
+	return connectionState
 }
 
 func (pc *PeerConnection) createICETransport() *ICETransport {
@@ -812,7 +826,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 			return
 		}
 		pc.onICEConnectionStateChange(cs)
-		pc.updateConnectionState(cs, pc.dtlsTransport.State())
+		pc.updateConnectionState()
 	})
 
 	return t
@@ -2113,7 +2127,7 @@ func (pc *PeerConnection) Close() error {
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+	pc.updateConnectionState()
 
 	return util.FlattenErrs(closeErrs)
 }
@@ -2201,10 +2215,9 @@ func (pc *PeerConnection) ICEGatheringState() ICEGatheringState {
 // ConnectionState attribute returns the connection state of the
 // PeerConnection instance.
 func (pc *PeerConnection) ConnectionState() PeerConnectionState {
-	if state, ok := pc.connectionState.Load().(PeerConnectionState); ok {
-		return state
-	}
-	return PeerConnectionState(0)
+	pc.connStateMx.RLock()
+	defer pc.connStateMx.RUnlock()
+	return pc.connectionState
 }
 
 // GetStats return data providing statistics about the overall connection
@@ -2300,7 +2313,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+	pc.updateConnectionState()
 	if err != nil {
 		pc.log.Warnf("Failed to start manager: %s", err)
 		return
