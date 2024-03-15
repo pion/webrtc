@@ -801,7 +801,7 @@ func TestPeerConnectionStateIceAgentUpdate(t *testing.T) {
 
 	closed := make(chan struct{})
 	offer.OnConnectionStateChange(func(cs PeerConnectionState) {
-		if cs == PeerConnectionStateConnecting {
+		if cs == PeerConnectionStateConnecting || cs == PeerConnectionStateConnected {
 			offer.Close()
 			close(closed)
 		}
