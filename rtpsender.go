@@ -20,16 +20,18 @@ import (
 )
 
 type trackEncoding struct {
-	track TrackLocal
+	track   TrackLocal
+	context *baseTrackLocalContext
 
-	srtpStream *srtpWriterFuture
-
+	ssrc            SSRC
+	srtpStream      *srtpWriterFuture
 	rtcpInterceptor interceptor.RTCPReader
 	streamInfo      interceptor.StreamInfo
 
-	context *baseTrackLocalContext
-
-	ssrc SSRC
+	rtxSsrc            SSRC
+	rtxSrtpStream      *srtpWriterFuture
+	rtxRtcpInterceptor interceptor.RTCPReader
+	rtxStreamInfo      interceptor.StreamInfo
 }
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
@@ -125,6 +127,7 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 				RID:         rid,
 				SSRC:        trackEncoding.ssrc,
 				PayloadType: r.payloadType,
+				RTX:         RTPRtxParameters{SSRC: trackEncoding.rtxSsrc},
 			},
 		})
 	}
@@ -202,6 +205,16 @@ func (r *RTPSender) addEncoding(track TrackLocal) {
 	trackEncoding := &trackEncoding{
 		track: track,
 		ssrc:  SSRC(randutil.NewMathRandomGenerator().Uint32()),
+	}
+
+	if r.api.settingEngine.trackLocalRtx {
+		codecs := r.api.mediaEngine.getCodecsByKind(track.Kind())
+		for _, c := range codecs {
+			if _, matchType := codecParametersAssociatedSearch(c, codecs); matchType != codecMatchNone {
+				trackEncoding.rtxSsrc = SSRC(randutil.NewMathRandomGenerator().Uint32())
+				break
+			}
+		}
 	}
 
 	r.trackEncodings = append(r.trackEncodings, trackEncoding)
@@ -339,6 +352,38 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		)
 
 		writeStream.interceptor.Store(rtpInterceptor)
+
+		if rtxCodec, matchType := codecParametersAssociatedSearch(codec, r.api.mediaEngine.getCodecsByKind(r.kind)); matchType == codecMatchExact &&
+			parameters.Encodings[idx].RTX.SSRC != 0 {
+
+			rtxSrtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].RTX.SSRC, rtpSender: r}
+
+			trackEncoding.rtxSrtpStream = rtxSrtpStream
+			trackEncoding.rtxSsrc = parameters.Encodings[idx].RTX.SSRC
+
+			trackEncoding.rtxStreamInfo = *createStreamInfo(
+				r.id+"_rtx",
+				parameters.Encodings[idx].RTX.SSRC,
+				rtxCodec.PayloadType,
+				rtxCodec.RTPCodecCapability,
+				parameters.HeaderExtensions,
+			)
+			trackEncoding.rtxStreamInfo.Attributes.Set("apt_ssrc", uint32(parameters.Encodings[idx].SSRC))
+
+			trackEncoding.rtxRtcpInterceptor = r.api.interceptor.BindRTCPReader(
+				interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+					n, err = trackEncoding.rtxSrtpStream.Read(in)
+					return n, a, err
+				}),
+			)
+
+			r.api.interceptor.BindLocalStream(
+				&trackEncoding.rtxStreamInfo,
+				interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+					return rtxSrtpStream.WriteRTP(header, payload)
+				}),
+			)
+		}
 	}
 
 	close(r.sendCalled)
@@ -371,6 +416,10 @@ func (r *RTPSender) Stop() error {
 		if trackEncoding.srtpStream != nil {
 			errs = append(errs, trackEncoding.srtpStream.Close())
 		}
+		if trackEncoding.rtxSrtpStream != nil {
+			r.api.interceptor.UnbindLocalStream(&trackEncoding.rtxStreamInfo)
+			errs = append(errs, trackEncoding.rtxSrtpStream.Close())
+		}
 	}
 
 	return util.FlattenErrs(errs)
@@ -390,6 +439,36 @@ func (r *RTPSender) Read(b []byte) (n int, a interceptor.Attributes, err error) 
 func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, r.api.settingEngine.getReceiveMTU())
 	i, attributes, err := r.Read(b)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pkts, err := rtcp.Unmarshal(b[:i])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pkts, attributes, nil
+}
+
+// ReadRtx reads incoming RTX Stream RTCP for this RTPSender
+func (r *RTPSender) ReadRtx(b []byte) (n int, a interceptor.Attributes, err error) {
+	if r.trackEncodings[0].rtxRtcpInterceptor == nil {
+		return 0, nil, io.ErrNoProgress
+	}
+
+	select {
+	case <-r.sendCalled:
+		return r.trackEncodings[0].rtxRtcpInterceptor.Read(b, a)
+	case <-r.stopCalled:
+		return 0, nil, io.ErrClosedPipe
+	}
+}
+
+// ReadRtxRTCP is a convenience method that wraps ReadRtx and unmarshals for you.
+func (r *RTPSender) ReadRtxRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
+	b := make([]byte, r.api.settingEngine.getReceiveMTU())
+	i, attributes, err := r.ReadRtx(b)
 	if err != nil {
 		return nil, nil, err
 	}
