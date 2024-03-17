@@ -252,7 +252,7 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	var onTrackFiredLock sync.Mutex
 	onTrackFired := false
 
-	pcAnswer.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
+	pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {
 		onTrackFiredLock.Lock()
 		defer onTrackFiredLock.Unlock()
 		onTrackFired = true
@@ -327,7 +327,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	keepPackets.set(true)
 
 	// Add a filter that monitors the traffic on the router
-	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+	wan.AddChunkFilter(func(vnet.Chunk) bool {
 		return keepPackets.get()
 	})
 
@@ -438,7 +438,7 @@ func TestUndeclaredSSRC(t *testing.T) {
 		assert.NoError(t, err)
 
 		onTrackFired := make(chan struct{})
-		pcAnswer.OnTrack(func(trackRemote *TrackRemote, r *RTPReceiver) {
+		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
 			assert.Equal(t, trackRemote.StreamID(), vp8Writer.StreamID())
 			assert.Equal(t, trackRemote.ID(), vp8Writer.ID())
 			close(onTrackFired)
@@ -793,7 +793,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 
 		var onTrackWaitGroup sync.WaitGroup
 		onTrackWaitGroup.Add(trackCount)
-		pcAnswer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
+		pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {
 			onTrackWaitGroup.Done()
 		})
 
@@ -1422,7 +1422,7 @@ func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
 	pcSender.OnConnectionStateChange(connectionStateChangeHandler)
 	pcReceiver.OnConnectionStateChange(connectionStateChangeHandler)
 
-	pcReceiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+	pcReceiver.OnTrack(func(*TrackRemote, *RTPReceiver) {
 		defer wg.Done()
 	})
 

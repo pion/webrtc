@@ -333,7 +333,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 
 		rtpInterceptor := r.api.interceptor.BindLocalStream(
 			&trackEncoding.streamInfo,
-			interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+			interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, _ interceptor.Attributes) (int, error) {
 				return srtpStream.WriteRTP(header, payload)
 			}),
 		)

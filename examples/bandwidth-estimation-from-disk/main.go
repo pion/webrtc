@@ -74,7 +74,7 @@ func main() {
 	}
 
 	estimatorChan := make(chan cc.BandwidthEstimator, 1)
-	congestionController.OnNewPeerConnection(func(id string, estimator cc.BandwidthEstimator) {
+	congestionController.OnNewPeerConnection(func(id string, estimator cc.BandwidthEstimator) { //nolint: revive
 		estimatorChan <- estimator
 	})
 

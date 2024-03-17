@@ -131,7 +131,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler will forward data to
 	// our UDP listeners.
 	// In your application this is where you would handle/process audio/video
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
 		// Retrieve udp connection
 		c, ok := udpConns[track.Kind().String()]
 		if !ok {

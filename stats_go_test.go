@@ -1241,7 +1241,7 @@ func TestPeerConnection_GetStats(t *testing.T) {
 		d.OnOpen(func() {
 			answerDCChan <- d
 		})
-		d.OnMessage(func(m DataChannelMessage) {
+		d.OnMessage(func(DataChannelMessage) {
 			dcWait.Done()
 		})
 	})

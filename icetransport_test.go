@@ -75,7 +75,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	})
 
 	senderCalledCandidateChange := int32(0)
-	pcOffer.SCTP().Transport().ICETransport().OnSelectedCandidatePairChange(func(pair *ICECandidatePair) {
+	pcOffer.SCTP().Transport().ICETransport().OnSelectedCandidatePairChange(func(*ICECandidatePair) {
 		atomic.StoreInt32(&senderCalledCandidateChange, 1)
 	})
 

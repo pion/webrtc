@@ -83,7 +83,7 @@ func main() { // nolint:gocognit
 	localTrackChan := make(chan *webrtc.TrackLocalStaticRTP)
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
-	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
 		// Create a local track, all our SFU clients will be fed via this track
 		localTrack, newTrackErr := webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "video", "pion")
 		if newTrackErr != nil {

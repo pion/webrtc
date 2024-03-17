@@ -84,7 +84,7 @@ func main() { // nolint:gocognit
 	packets := make(chan *rtp.Packet, 60)
 
 	// Set a handler for when a new remote track starts
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
 		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().MimeType)
 		trackNum := trackCount
 		trackCount++

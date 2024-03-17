@@ -121,7 +121,7 @@ func main() {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
 		codec := track.Codec()
 		if strings.EqualFold(codec.MimeType, webrtc.MimeTypeOpus) {
 			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")

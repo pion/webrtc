@@ -541,7 +541,7 @@ type mediaSection struct {
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 	if matchBundleGroup == nil {
-		return func(midValue string) bool {
+		return func(string) bool {
 			return true
 		}
 	}

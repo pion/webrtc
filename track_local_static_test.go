@@ -149,7 +149,7 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 	assert.NoError(t, err)
 
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
-	offerer.OnTrack(func(track *TrackRemote, r *RTPReceiver) {
+	offerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
 		assert.Equal(t, track.PayloadType(), PayloadType(100))
 		assert.Equal(t, track.Codec().RTPCodecCapability.MimeType, "video/VP8")
 

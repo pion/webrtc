@@ -130,11 +130,11 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	t.Run("Server", func(t *testing.T) {
+	t.Run("Server", func(*testing.T) {
 		runTest(DTLSRoleServer)
 	})
 
-	t.Run("Client", func(t *testing.T) {
+	t.Run("Client", func(*testing.T) {
 		runTest(DTLSRoleClient)
 	})
 }

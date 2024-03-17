@@ -42,7 +42,7 @@ func TestSetRTPParameters(t *testing.T) {
 	}
 
 	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
-	receiver.OnTrack(func(trackRemote *TrackRemote, r *RTPReceiver) {
+	receiver.OnTrack(func(_ *TrackRemote, r *RTPReceiver) {
 		r.SetRTPParameters(p)
 
 		incomingTrackCodecs := r.Track().Codec()

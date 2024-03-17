@@ -135,7 +135,7 @@ func TestDataChannel_Open(t *testing.T) {
 			d.OnOpen(func() {
 				openCalls <- true
 			})
-			d.OnMessage(func(msg DataChannelMessage) {
+			d.OnMessage(func(DataChannelMessage) {
 				go func() {
 					// Wait a little bit to ensure all messages are processed.
 					time.Sleep(100 * time.Millisecond)
@@ -191,7 +191,7 @@ func TestDataChannel_Open(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		answerDC.OnMessage(func(msg DataChannelMessage) {
+		answerDC.OnMessage(func(DataChannelMessage) {
 			go func() {
 				// Wait a little bit to ensure all messages are processed.
 				time.Sleep(100 * time.Millisecond)
@@ -237,7 +237,7 @@ func TestDataChannel_Send(t *testing.T) {
 			if d.Label() != expectedLabel {
 				return
 			}
-			d.OnMessage(func(msg DataChannelMessage) {
+			d.OnMessage(func(DataChannelMessage) {
 				e := d.Send([]byte("Pong"))
 				if e != nil {
 					t.Fatalf("Failed to send string on data channel")
@@ -259,7 +259,7 @@ func TestDataChannel_Send(t *testing.T) {
 				t.Fatalf("Failed to send string on data channel")
 			}
 		})
-		dc.OnMessage(func(msg DataChannelMessage) {
+		dc.OnMessage(func(DataChannelMessage) {
 			done <- true
 		})
 
@@ -288,7 +288,7 @@ func TestDataChannel_Send(t *testing.T) {
 			if d.Label() != expectedLabel {
 				return
 			}
-			d.OnMessage(func(msg DataChannelMessage) {
+			d.OnMessage(func(DataChannelMessage) {
 				e := d.Send([]byte("Pong"))
 				if e != nil {
 					t.Fatalf("Failed to send string on data channel")
@@ -309,7 +309,7 @@ func TestDataChannel_Send(t *testing.T) {
 
 					assert.True(t, dc.Ordered(), "Ordered should be set to true")
 
-					dc.OnMessage(func(msg DataChannelMessage) {
+					dc.OnMessage(func(DataChannelMessage) {
 						done <- true
 					})
 
@@ -477,7 +477,7 @@ func TestDataChannelParameters(t *testing.T) {
 
 			t.Fatal("OnDataChannel must not be fired when negotiated == true")
 		})
-		offerPC.OnDataChannel(func(d *DataChannel) {
+		offerPC.OnDataChannel(func(*DataChannel) {
 			t.Fatal("OnDataChannel must not be fired when negotiated == true")
 		})
 

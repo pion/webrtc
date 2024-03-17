@@ -470,7 +470,7 @@ func TestMultipleOfferAnswer(t *testing.T) {
 	if err != nil {
 		t.Errorf("New PeerConnection: got error: %v", err)
 	}
-	secondPeerConn.OnICECandidate(func(i *ICECandidate) {
+	secondPeerConn.OnICECandidate(func(*ICECandidate) {
 	})
 
 	if _, err = secondPeerConn.CreateOffer(nil); err != nil {
@@ -566,7 +566,7 @@ func TestMultipleCreateChannel(t *testing.T) {
 	pcOffer, _ := NewPeerConnection(Configuration{})
 	pcAnswer, _ := NewPeerConnection(Configuration{})
 
-	pcAnswer.OnDataChannel(func(d *DataChannel) {
+	pcAnswer.OnDataChannel(func(*DataChannel) {
 		wg.Done()
 	})
 

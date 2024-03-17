@@ -52,7 +52,7 @@ func TestDataChannel_EventHandlers(t *testing.T) {
 		close(onOpenCalled)
 	})
 
-	dc.OnMessage(func(p DataChannelMessage) {
+	dc.OnMessage(func(DataChannelMessage) {
 		close(onMessageCalled)
 	})
 
@@ -222,7 +222,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				}
 			})
 
-			answerDC.OnMessage(func(msg DataChannelMessage) {
+			answerDC.OnMessage(func(DataChannelMessage) {
 				atomic.AddUint32(&nAnswerReceived, 1)
 			})
 			assert.True(t, answerDC.Ordered(), "Ordered should be set to true")
@@ -259,7 +259,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 			}
 		})
 
-		offerDC.OnMessage(func(msg DataChannelMessage) {
+		offerDC.OnMessage(func(DataChannelMessage) {
 			atomic.AddUint32(&nOfferReceived, 1)
 		})
 
@@ -309,7 +309,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 				return
 			}
 			var nPacketsReceived int
-			d.OnMessage(func(msg DataChannelMessage) {
+			d.OnMessage(func(DataChannelMessage) {
 				nPacketsReceived++
 
 				if nPacketsReceived == 10 {
@@ -347,7 +347,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 			}
 		})
 
-		dc.OnMessage(func(msg DataChannelMessage) {
+		dc.OnMessage(func(DataChannelMessage) {
 		})
 
 		err = signalPair(offerPC, answerPC)

@@ -80,7 +80,7 @@ func main() { // nolint:gocognit
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
 	// This allows us to add ICE candidates faster, we don't have to wait for STUN or TURN
 	// candidates which may be slower
-	http.HandleFunc("/candidate", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/candidate", func(w http.ResponseWriter, r *http.Request) { //nolint: revive
 		candidate, candidateErr := ioutil.ReadAll(r.Body)
 		if candidateErr != nil {
 			panic(candidateErr)
@@ -91,7 +91,7 @@ func main() { // nolint:gocognit
 	})
 
 	// A HTTP handler that processes a SessionDescription given to us from the other Pion process
-	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) { // nolint: revive
 		sdp := webrtc.SessionDescription{}
 		if err := json.NewDecoder(r.Body).Decode(&sdp); err != nil {
 			panic(err)

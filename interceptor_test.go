@@ -80,7 +80,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	assert.NoError(t, err)
 
 	seenRTP, seenRTPCancel := context.WithCancel(context.Background())
-	answerer.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
+	answerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
 		p, attributes, readErr := track.ReadRTP()
 		assert.NoError(t, readErr)
 
@@ -136,18 +136,18 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 			atomic.AddUint32(&cntBindRTCPWriter, 1)
 			return writer
 		},
-		BindLocalStreamFn: func(i *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
+		BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
 			atomic.AddUint32(&cntBindLocalStream, 1)
 			return writer
 		},
-		UnbindLocalStreamFn: func(i *interceptor.StreamInfo) {
+		UnbindLocalStreamFn: func(*interceptor.StreamInfo) {
 			atomic.AddUint32(&cntUnbindLocalStream, 1)
 		},
-		BindRemoteStreamFn: func(i *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+		BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
 			atomic.AddUint32(&cntBindRemoteStream, 1)
 			return reader
 		},
-		UnbindRemoteStreamFn: func(i *interceptor.StreamInfo) {
+		UnbindRemoteStreamFn: func(_ *interceptor.StreamInfo) {
 			atomic.AddUint32(&cntUnbindRemoteStream, 1)
 		},
 		CloseFn: func() error {

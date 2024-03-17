@@ -306,11 +306,11 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	assert.NotPanics(t, func() { pc.onTrack(nil, nil) })
 	assert.NotPanics(t, func() { pc.onICEConnectionStateChange(ICEConnectionStateNew) })
 
-	pc.OnTrack(func(t *TrackRemote, r *RTPReceiver) {
+	pc.OnTrack(func(*TrackRemote, *RTPReceiver) {
 		close(onTrackCalled)
 	})
 
-	pc.OnICEConnectionStateChange(func(cs ICEConnectionState) {
+	pc.OnICEConnectionStateChange(func(ICEConnectionState) {
 		close(onICEConnectionStateChangeCalled)
 	})
 
@@ -601,15 +601,15 @@ func TestPeerConnection_IceLite(t *testing.T) {
 		closePairNow(t, offerPC, answerPC)
 	}
 
-	t.Run("Offerer", func(t *testing.T) {
+	t.Run("Offerer", func(*testing.T) {
 		connectTwoAgents(true, false)
 	})
 
-	t.Run("Answerer", func(t *testing.T) {
+	t.Run("Answerer", func(*testing.T) {
 		connectTwoAgents(false, true)
 	})
 
-	t.Run("Both", func(t *testing.T) {
+	t.Run("Both", func(*testing.T) {
 		connectTwoAgents(true, true)
 	})
 }
@@ -808,7 +808,7 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
-	pcAnswer.OnDataChannel(func(d *DataChannel) {
+	pcAnswer.OnDataChannel(func(*DataChannel) {
 		onDataChannelCancel()
 	})
 	<-onDataChannel.Done()
@@ -941,7 +941,7 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	keepPackets.set(true)
 
 	// Add a filter that monitors the traffic on the router
-	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+	wan.AddChunkFilter(func(vnet.Chunk) bool {
 		return keepPackets.get()
 	})
 
@@ -1361,21 +1361,21 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 	assert.NoError(t, err)
 
 	pc.onSignalingStateChange(SignalingStateStable)
-	pc.OnSignalingStateChange(func(ss SignalingState) {
+	pc.OnSignalingStateChange(func(SignalingState) {
 		t.Error("OnSignalingStateChange called")
 	})
 	pc.OnSignalingStateChange(nil)
 	pc.onSignalingStateChange(SignalingStateStable)
 
 	pc.onConnectionStateChange(PeerConnectionStateNew)
-	pc.OnConnectionStateChange(func(pcs PeerConnectionState) {
+	pc.OnConnectionStateChange(func(PeerConnectionState) {
 		t.Error("OnConnectionStateChange called")
 	})
 	pc.OnConnectionStateChange(nil)
 	pc.onConnectionStateChange(PeerConnectionStateNew)
 
 	pc.onICEConnectionStateChange(ICEConnectionStateNew)
-	pc.OnICEConnectionStateChange(func(ics ICEConnectionState) {
+	pc.OnICEConnectionStateChange(func(ICEConnectionState) {
 		t.Error("OnConnectionStateChange called")
 	})
 	pc.OnICEConnectionStateChange(nil)
