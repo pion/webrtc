@@ -83,15 +83,15 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeG722, 8000, 0, "", nil},
-			PayloadType:        9,
+			PayloadType:        rtp.PayloadTypeG722,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypePCMU, 8000, 0, "", nil},
-			PayloadType:        0,
+			PayloadType:        rtp.PayloadTypePCMU,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypePCMA, 8000, 0, "", nil},
-			PayloadType:        8,
+			PayloadType:        rtp.PayloadTypePCMA,
 		},
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeAudio); err != nil {
