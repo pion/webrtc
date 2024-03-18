@@ -63,8 +63,8 @@ github.com/pion/rtp v1.8.2/go.mod h1:pBGHaFt/yW7bf1jjWAoUjpSNoDnw98KTMg+jWWvziqU
 github.com/pion/rtp v1.8.3 h1:VEHxqzSVQxCkKDSHro5/4IUUG1ea+MFdqR2R3xSpNU8=
 github.com/pion/rtp v1.8.3/go.mod h1:pBGHaFt/yW7bf1jjWAoUjpSNoDnw98KTMg+jWWvziqU=
 github.com/pion/sctp v1.8.5/go.mod h1:SUFFfDpViyKejTAdwD1d/HQsCu+V/40cCs2nZIvC3s0=
-github.com/pion/sctp v1.8.12 h1:2VX50pedElH+is6FI+OKyRTeN5oy4mrk2HjnGa3UCmY=
-github.com/pion/sctp v1.8.12/go.mod h1:cMLT45jqw3+jiJCrtHVwfQLnfR0MGZ4rgOJwUOIqLkI=
+github.com/pion/sctp v1.8.13 h1:YUJR44pWM2FPUhkl8l+vDyF2EDE3aTWtr3c+LDhCRcQ=
+github.com/pion/sctp v1.8.13/go.mod h1:YKSgO/bO/6aOMP9LCie1DuD7m+GamiK2yIiPM6vH+GA=
 github.com/pion/sdp/v3 v3.0.8 h1:yd/wkrS0nzXEAb+uwv1TL3SG/gzsTiXHVOtXtD7EKl0=
 github.com/pion/sdp/v3 v3.0.8/go.mod h1:B5xmvENq5IXJimIO4zfp6LAe1fD9N+kFv+V/1lOdz8M=
 github.com/pion/srtp/v3 v3.0.1 h1:AkIQRIZ+3tAOJMQ7G301xtrD1vekQbNeRO7eY1K8ZHk=
