@@ -434,7 +434,7 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
 }
 
-// SetSCTPZeroChecksum enables the zero checksum feature in SCTP.
+// EnableSCTPZeroChecksum controls the zero checksum feature in SCTP.
 // This removes the need to checksum every incoming/outgoing packet and will reduce
 // latency and CPU usage. This feature is not backwards compatible so is disabled by default
 func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
