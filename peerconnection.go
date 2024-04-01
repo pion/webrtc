@@ -2298,6 +2298,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 	if err != nil {
 		return nil, err
 	}
+	d.Attributes = append(d.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -2370,6 +2371,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	if err != nil {
 		return nil, err
 	}
+	d.Attributes = append(d.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
