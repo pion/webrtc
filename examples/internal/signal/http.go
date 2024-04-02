@@ -5,7 +5,7 @@ package signal
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 )
@@ -14,7 +14,7 @@ import (
 func HTTPSDPServer(port int) chan string {
 	sdpChan := make(chan string)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		fmt.Fprintf(w, "done")
 		sdpChan <- string(body)
 	})
