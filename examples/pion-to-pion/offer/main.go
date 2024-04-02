@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -81,7 +81,7 @@ func main() { //nolint:gocognit
 	// This allows us to add ICE candidates faster, we don't have to wait for STUN or TURN
 	// candidates which may be slower
 	http.HandleFunc("/candidate", func(w http.ResponseWriter, r *http.Request) { //nolint: revive
-		candidate, candidateErr := ioutil.ReadAll(r.Body)
+		candidate, candidateErr := io.ReadAll(r.Body)
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
