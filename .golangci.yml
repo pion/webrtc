@@ -3,7 +3,8 @@
 
 linters-settings:
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   misspell:
     locale: US
   exhaustive:
@@ -110,6 +111,7 @@ linters:
 
 issues:
   exclude-use-default: false
+  exclude-dirs-use-default: false
   exclude-rules:
     # Allow complex tests and examples, better to be self contained
     - path: (examples|main\.go|_test\.go)
@@ -121,6 +123,3 @@ issues:
     - path: cmd
       linters:
         - forbidigo
-
-run:
-  skip-dirs-use-default: false
