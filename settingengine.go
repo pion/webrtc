@@ -41,6 +41,7 @@ type SettingEngine struct {
 		ICESrflxAcceptanceMinWait *time.Duration
 		ICEPrflxAcceptanceMinWait *time.Duration
 		ICERelayAcceptanceMinWait *time.Duration
+		ICESTUNGatherTimeout      *time.Duration
 	}
 	candidates struct {
 		ICELite                  bool
@@ -155,6 +156,11 @@ func (e *SettingEngine) SetPrflxAcceptanceMinWait(t time.Duration) {
 // SetRelayAcceptanceMinWait sets the ICERelayAcceptanceMinWait
 func (e *SettingEngine) SetRelayAcceptanceMinWait(t time.Duration) {
 	e.timeout.ICERelayAcceptanceMinWait = &t
+}
+
+// SetSTUNGatherTimeout sets the ICESTUNGatherTimeout
+func (e *SettingEngine) SetSTUNGatherTimeout(t time.Duration) {
+	e.timeout.ICESTUNGatherTimeout = &t
 }
 
 // SetEphemeralUDPPortRange limits the pool of ephemeral ports that

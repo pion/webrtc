@@ -108,6 +108,7 @@ func (g *ICEGatherer) createAgent() error {
 		SrflxAcceptanceMinWait: g.api.settingEngine.timeout.ICESrflxAcceptanceMinWait,
 		PrflxAcceptanceMinWait: g.api.settingEngine.timeout.ICEPrflxAcceptanceMinWait,
 		RelayAcceptanceMinWait: g.api.settingEngine.timeout.ICERelayAcceptanceMinWait,
+		STUNGatherTimeout:      g.api.settingEngine.timeout.ICESTUNGatherTimeout,
 		InterfaceFilter:        g.api.settingEngine.candidates.InterfaceFilter,
 		IPFilter:               g.api.settingEngine.candidates.IPFilter,
 		NAT1To1IPs:             g.api.settingEngine.candidates.NAT1To1IPs,
