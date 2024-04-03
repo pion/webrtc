@@ -22,3 +22,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.20.0
 )
+
+// SCTP ZeroChecksum implementation has a interoperability bug
+// 3.2.28 can only work against itself, not other versions of webrtc
+retract v3.2.28
