@@ -271,6 +271,42 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		}
 		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, s)))
 	})
+
+	t.Run("ssrc-group after ssrc", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:rtx_trk_label rtx_trck_guid"},
+						{Key: "ssrc-group", Value: "FID 3000 4000"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "1"},
+						{Key: "sendrecv"},
+						{Key: "ssrc-group", Value: "FID 5000 6000"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "6000 msid:rtx_trk_label rtx_trck_guid"},
+					},
+				},
+			},
+		}
+
+		tracks := trackDetailsFromSDP(nil, s)
+		assert.Equal(t, 2, len(tracks))
+		assert.Equal(t, SSRC(4000), *tracks[0].repairSsrc)
+		assert.Equal(t, SSRC(6000), *tracks[1].repairSsrc)
+	})
 }
 
 func TestHaveApplicationMediaSection(t *testing.T) {
