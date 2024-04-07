@@ -77,7 +77,7 @@ func (h *Header) Unmarshal(d []byte) error {
 // (relative to the Start of the recording in Header). The Payload may contain
 // truncated packets to support logging just the headers of RTP/RTCP packets.
 type Packet struct {
-	// Offset is the time since the start of recording in millseconds
+	// Offset is the time since the start of recording in milliseconds
 	Offset time.Duration
 	// IsRTCP is true if the payload is RTCP, false if the payload is RTP
 	IsRTCP bool
