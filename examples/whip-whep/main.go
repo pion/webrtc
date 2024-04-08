@@ -4,7 +4,7 @@
 //go:build !js
 // +build !js
 
-// whip-whep demonstrates how to use the WHIP/WHEP specifications to exhange SPD descriptions and stream media to a WebRTC client in the browser or OBS
+// whip-whep demonstrates how to use the WHIP/WHEP specifications to exchange SPD descriptions and stream media to a WebRTC client in the browser or OBS
 package main
 
 import (

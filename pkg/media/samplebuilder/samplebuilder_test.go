@@ -550,7 +550,7 @@ func TestSampleBuilder_Flush(t *testing.T) {
 	}) // Valid packet
 
 	if sample := s.Pop(); sample != nil {
-		t.Fatal("Unexpected sample is retuned. Test precondition may be broken")
+		t.Fatal("Unexpected sample is returned. Test precondition may be broken")
 	}
 
 	s.Flush()
