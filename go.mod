@@ -15,7 +15,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.9
 	github.com/pion/srtp/v2 v2.0.18
 	github.com/pion/stun v0.6.1
-	github.com/pion/transport/v2 v2.2.3
+	github.com/pion/transport/v2 v2.2.4
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.22.0
