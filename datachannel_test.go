@@ -363,7 +363,12 @@ func TestDataChannel_Close(t *testing.T) {
 	})
 
 	t.Run("Close after PeerConnection With Mux Closed", func(t *testing.T) {
-		offerPC, answerPC, err := newPairWithMux()
+		mux, err := ice.NewMultiUDPMuxFromPort(8443)
+		if err != nil {
+			panic(err)
+		}
+
+		offerPC, answerPC, err := newPairWithMux(mux)
 		assert.NoError(t, err)
 
 		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
@@ -371,6 +376,10 @@ func TestDataChannel_Close(t *testing.T) {
 
 		closePairNow(t, offerPC, answerPC)
 		assert.NoError(t, dc.Close())
+
+		// close the mux here just a test, it is confirmed when close the mux the go routine won't be leaks
+		// but in SFU context, as explain in the issue https://github.com/pion/webrtc/issues/2738 the mux is never closed.
+		// assert.NoError(t, mux.Close())
 	})
 }
 
@@ -529,31 +538,4 @@ func TestDataChannelParameters(t *testing.T) {
 
 		closeReliabilityParamTest(t, offerPC, answerPC, done)
 	})
-}
-
-func newPairWithMux() (*PeerConnection, *PeerConnection, error) {
-	settingEngine := SettingEngine{}
-
-	// Configure our SettingEngine to use our UDPMux. By default a PeerConnection has
-	// no global state. The API+SettingEngine allows the user to share state between them.
-	// In this case we are sharing our listening port across many.
-	// Listen on UDP Port 8443, will be used for all WebRTC traffic
-	mux, err := ice.NewMultiUDPMuxFromPort(8443)
-	if err != nil {
-		panic(err)
-	}
-
-	settingEngine.SetICEUDPMux(mux)
-	api := NewAPI(WithSettingEngine(settingEngine))
-	pca, err := api.NewPeerConnection(Configuration{})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pcb, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return pca, pcb, nil
 }
