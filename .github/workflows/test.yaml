@@ -27,6 +27,7 @@ jobs:
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
+      codecov-token: ${{ env.CODECOV_TOKEN }}
 
   test-i386:
     uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@master
@@ -41,3 +42,4 @@ jobs:
     uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
     with:
       go-version: "1.22" # auto-update/latest-go-version
+      codecov-token: ${{ env.CODECOV_TOKEN }}
