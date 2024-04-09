@@ -19,6 +19,14 @@ on:
   pull_request:
 
 jobs:
+  get-env-vars:
+    name: Get Environment vars
+    runs-on: ubuntu-latest
+    outputs:
+      CODECOV_TOKEN: ${{ env.CODECOV_TOKEN }}
+    steps:
+      - run: echo "noop"
+
   test:
     uses: pion/.goassets/.github/workflows/test.reusable.yml@master
     strategy:
@@ -27,6 +35,7 @@ jobs:
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
+      codecov-token: ${{  needs.get-env.outputs.CODECOV_TOKEN }}
 
   test-i386:
     uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@master
@@ -41,3 +50,4 @@ jobs:
     uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
     with:
       go-version: "1.22" # auto-update/latest-go-version
+      codecov-token: ${{  needs.get-env.outputs.CODECOV_TOKEN }}
