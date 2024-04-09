@@ -304,3 +304,28 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 
 	return util.FlattenErrs(writeErrs)
 }
+
+// GeneratePadding writes padding-only samples to the TrackLocalStaticSample
+// If one PeerConnection fails the packets will still be sent to
+// all PeerConnections. The error message will contain the ID of the failed
+// PeerConnections so you can remove them
+func (s *TrackLocalStaticSample) GeneratePadding(samples uint32) error {
+	s.rtpTrack.mu.RLock()
+	p := s.packetizer
+	s.rtpTrack.mu.RUnlock()
+
+	if p == nil {
+		return nil
+	}
+
+	packets := p.GeneratePadding(samples)
+
+	writeErrs := []error{}
+	for _, p := range packets {
+		if err := s.rtpTrack.WriteRTP(p); err != nil {
+			writeErrs = append(writeErrs, err)
+		}
+	}
+
+	return util.FlattenErrs(writeErrs)
+}
