@@ -43,15 +43,6 @@ type trackStreams struct {
 type rtxPacketWithAttributes struct {
 	pkt        []byte
 	attributes interceptor.Attributes
-	pool       *sync.Pool
-}
-
-func (p *rtxPacketWithAttributes) release() {
-	if p.pkt != nil {
-		b := p.pkt[:cap(p.pkt)]
-		p.pool.Put(b) // nolint:staticcheck
-		p.pkt = nil
-	}
 }
 
 // RTPReceiver allows an application to inspect the receipt of a TrackRemote
@@ -68,8 +59,6 @@ type RTPReceiver struct {
 
 	// A reference to the associated api object
 	api *API
-
-	rtxPool sync.Pool
 }
 
 // NewRTPReceiver constructs a new RTPReceiver
@@ -85,9 +74,6 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		closed:    make(chan interface{}),
 		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
-		rtxPool: sync.Pool{New: func() interface{} {
-			return make([]byte, api.settingEngine.getReceiveMTU())
-		}},
 	}
 
 	return r, nil
@@ -434,11 +420,10 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 	track.repairStreamChannel = make(chan rtxPacketWithAttributes)
 
 	go func() {
+		b := make([]byte, r.api.settingEngine.getReceiveMTU())
 		for {
-			b := r.rtxPool.Get().([]byte) // nolint:forcetypeassert
 			i, attributes, err := track.repairInterceptor.Read(b, nil)
 			if err != nil {
-				r.rtxPool.Put(b) // nolint:staticcheck
 				return
 			}
 
@@ -459,7 +444,6 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 
 			if i-int(headerLength)-paddingLength < 2 {
 				// BWE probe packet, ignore
-				r.rtxPool.Put(b) // nolint:staticcheck
 				continue
 			}
 
@@ -475,9 +459,8 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 
 			select {
 			case <-r.closed:
-				r.rtxPool.Put(b) // nolint:staticcheck
 				return
-			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes, pool: &r.rtxPool}:
+			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes}:
 			}
 		}
 	}()
