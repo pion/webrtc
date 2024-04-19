@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
+	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v4/internal/util"
 )
@@ -41,7 +42,7 @@ type trackStreams struct {
 }
 
 type rtxPacketWithAttributes struct {
-	pkt        []byte
+	rtxPacket  rtp.Packet
 	attributes interceptor.Attributes
 }
 
@@ -427,40 +428,31 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 				return
 			}
 
-			// RTX packets have a different payload format. Move the OSN in the payload to the RTP header and rewrite the
-			// payload type and SSRC, so that we can return RTX packets to the caller 'transparently' i.e. in the same format
-			// as non-RTX RTP packets
-			hasExtension := b[0]&0b10000 > 0
-			hasPadding := b[0]&0b100000 > 0
-			csrcCount := b[0] & 0b1111
-			headerLength := uint16(12 + (4 * csrcCount))
-			paddingLength := 0
-			if hasExtension {
-				headerLength += 4 * (1 + binary.BigEndian.Uint16(b[headerLength+2:headerLength+4]))
-			}
-			if hasPadding {
-				paddingLength = int(b[i-1])
+			pkt := &rtp.Packet{}
+			if err := pkt.Unmarshal(b[:i]); err != nil {
+				return
 			}
 
-			if i-int(headerLength)-paddingLength < 2 {
+			if len(pkt.Payload) < 2 {
 				// BWE probe packet, ignore
 				continue
 			}
 
-			attributes.Set(attributeRtxPayloadType, b[1]&0x7F)
-			attributes.Set(attributeRtxSequenceNumber, binary.BigEndian.Uint16(b[2:4]))
-			attributes.Set(attributeRtxSsrc, binary.BigEndian.Uint32(b[8:12]))
-
-			b[1] = (b[1] & 0x80) | uint8(track.track.PayloadType())
-			b[2] = b[headerLength]
-			b[3] = b[headerLength+1]
-			binary.BigEndian.PutUint32(b[8:12], uint32(track.track.SSRC()))
-			copy(b[headerLength:i-2], b[headerLength+2:i])
+			// RTX packets have a different payload format. Move the OSN in the payload to the RTP header and rewrite the
+			// payload type and SSRC, so that we can return RTX packets to the caller 'transparently' i.e. in the same format
+			// as non-RTX RTP packets
+			attributes.Set(attributeRtxPayloadType, pkt.Header.PayloadType)
+			attributes.Set(attributeRtxSsrc, pkt.Header.SSRC)
+			attributes.Set(attributeRtxSequenceNumber, pkt.Header.SequenceNumber)
+			pkt.Header.PayloadType = uint8(track.track.PayloadType())
+			pkt.Header.SSRC = uint32(track.track.SSRC())
+			pkt.Header.SequenceNumber = binary.BigEndian.Uint16(pkt.Payload[:2])
+			pkt.Payload = pkt.Payload[2:]
 
 			select {
 			case <-r.closed:
 				return
-			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes}:
+			case track.repairStreamChannel <- rtxPacketWithAttributes{rtxPacket: *pkt, attributes: attributes}:
 			}
 		}
 	}()
@@ -501,23 +493,23 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 }
 
 // readRTX returns an RTX packet if one is available on the RTX track, otherwise returns nil
-func (r *RTPReceiver) readRTX(reader *TrackRemote) *rtxPacketWithAttributes {
+func (r *RTPReceiver) readRTX(reader *TrackRemote) (*rtp.Packet, interceptor.Attributes) {
 	if !reader.HasRTX() {
-		return nil
+		return nil, interceptor.Attributes{}
 	}
 
 	select {
 	case <-r.received:
 	default:
-		return nil
+		return nil, interceptor.Attributes{}
 	}
 
 	if t := r.streamsForTrack(reader); t != nil {
 		select {
 		case rtxPacketReceived := <-t.repairStreamChannel:
-			return &rtxPacketReceived
+			return &rtxPacketReceived.rtxPacket, rtxPacketReceived.attributes
 		default:
 		}
 	}
-	return nil
+	return nil, interceptor.Attributes{}
 }
