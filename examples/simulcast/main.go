@@ -64,14 +64,18 @@ func main() {
 	}
 	outputTracks["f"] = outputTrack
 
-	// Add this newly created track to the PeerConnection
-	if _, err = peerConnection.AddTrack(outputTracks["q"]); err != nil {
+	if _, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly}); err != nil {
 		panic(err)
 	}
-	if _, err = peerConnection.AddTrack(outputTracks["h"]); err != nil {
+
+	// Add this newly created track to the PeerConnection to send back video
+	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["q"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
 		panic(err)
 	}
-	if _, err = peerConnection.AddTrack(outputTracks["f"]); err != nil {
+	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["h"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
+		panic(err)
+	}
+	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["f"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
 		panic(err)
 	}
 
