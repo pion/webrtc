@@ -409,6 +409,10 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 		for i := range r.tracks {
 			if r.tracks[i].track.RID() == rsid {
 				track = &r.tracks[i]
+				if track.track.RtxSSRC() == 0 {
+					track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
+				}
+				break
 			}
 		}
 	}

@@ -223,3 +223,9 @@ func (t *TrackRemote) HasRTX() bool {
 	defer t.mu.RUnlock()
 	return t.rtxSsrc != 0
 }
+
+func (t *TrackRemote) setRtxSSRC(ssrc SSRC) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rtxSsrc = ssrc
+}
