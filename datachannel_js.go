@@ -115,7 +115,7 @@ func (d *DataChannel) SendText(s string) (err error) {
 // Before calling Detach you have to enable this behavior by calling
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
-// Please reffer to the data-channels-detach example and the
+// Please refer to the data-channels-detach example and the
 // pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {

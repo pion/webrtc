@@ -236,7 +236,7 @@ func (d *DataChannel) onOpen() {
 }
 
 // OnDial sets an event handler which is invoked when the
-// peer has been dialed, but before said peer has responsed
+// peer has been dialed, but before said peer has responded
 func (d *DataChannel) OnDial(f func()) {
 	d.mu.Lock()
 	d.dialHandlerOnce = sync.Once{}

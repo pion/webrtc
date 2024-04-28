@@ -85,7 +85,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 		tracksInMediaSection := []trackDetails{}
 		rtxRepairFlows := map[uint64]uint64{}
 
-		// Plan B can have multiple tracks in a signle media section
+		// Plan B can have multiple tracks in a single media section
 		streamID := ""
 		trackID := ""
 
