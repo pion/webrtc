@@ -127,7 +127,7 @@ func ConfigureCongestionControlFeedback(mediaEngine *MediaEngine, interceptorReg
 	return nil
 }
 
-// ConfigureSimulcastExtensionHeaders enables the RTP Extenison Headers needed for Simulcast
+// ConfigureSimulcastExtensionHeaders enables the RTP Extension Headers needed for Simulcast
 func ConfigureSimulcastExtensionHeaders(mediaEngine *MediaEngine) error {
 	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeVideo); err != nil {
 		return err

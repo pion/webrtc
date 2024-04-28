@@ -1606,7 +1606,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 	assert.Greater(t, rtxPacketRead.Load(), int32(0), "no rtx packet read")
 }
 
-// Everytime we receieve a new SSRC we probe it and try to determine the proper way to handle it.
+// Everytime we receive a new SSRC we probe it and try to determine the proper way to handle it.
 // In most cases a Track explicitly declares a SSRC and a OnTrack is fired. In two cases we don't
 // know the SSRC ahead of time
 // * Undeclared SSRC in a single media section (https://github.com/pion/webrtc/issues/880)

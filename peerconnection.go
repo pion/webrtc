@@ -1326,7 +1326,7 @@ func runIfNewReceiver(
 	return false
 }
 
-// configurepRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
+// configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
 func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
 	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
 
