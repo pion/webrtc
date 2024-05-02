@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
+	"github.com/pion/ice/v2"
+	"github.com/pion/stun"
 	"github.com/pion/transport/v2/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -268,4 +270,33 @@ func TestSetSCTPMaxReceiverBufferSize(t *testing.T) {
 	expSize := uint32(4 * 1024 * 1024)
 	s.SetSCTPMaxReceiveBufferSize(expSize)
 	assert.Equal(t, expSize, s.sctp.maxReceiveBufferSize)
+}
+
+func TestSetICEBindingRequestHandler(t *testing.T) {
+	seenICEControlled, seenICEControlledCancel := context.WithCancel(context.Background())
+	seenICEControlling, seenICEControllingCancel := context.WithCancel(context.Background())
+
+	s := SettingEngine{}
+	s.SetICEBindingRequestHandler(func(m *stun.Message, _, _ ice.Candidate, _ *ice.CandidatePair) bool {
+		for _, a := range m.Attributes {
+			switch a.Type {
+			case stun.AttrICEControlled:
+				seenICEControlledCancel()
+			case stun.AttrICEControlling:
+				seenICEControllingCancel()
+			default:
+			}
+		}
+
+		return false
+	})
+
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	<-seenICEControlled.Done()
+	<-seenICEControlling.Done()
+	closePairNow(t, pcOffer, pcAnswer)
 }

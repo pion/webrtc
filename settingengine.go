@@ -17,6 +17,7 @@ import (
 	dtlsElliptic "github.com/pion/dtls/v2/pkg/crypto/elliptic"
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
+	"github.com/pion/stun"
 	"github.com/pion/transport/v2"
 	"github.com/pion/transport/v2/packetio"
 	"github.com/pion/transport/v2/vnet"
@@ -89,6 +90,7 @@ type SettingEngine struct {
 	iceUDPMux                                 ice.UDPMux
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
+	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
@@ -441,4 +443,13 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 // latency and CPU usage. This feature is not backwards compatible so is disabled by default
 func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 	e.sctp.enableZeroChecksum = isEnabled
+}
+
+// SetICEBindingRequestHandler sets a callback that is fired on a STUN BindingRequest
+// This allows users to do things like
+// - Log incoming Binding Requests for debugging
+// - Implement draft-thatcher-ice-renomination
+// - Implement custom CandidatePair switching logic
+func (e *SettingEngine) SetICEBindingRequestHandler(bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool) {
+	e.iceBindingRequestHandler = bindingRequestHandler
 }
