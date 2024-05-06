@@ -199,6 +199,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=112", nil},
 			PayloadType:        113,
 		},
+		/*
+			{
+				RTPCodecCapability: RTPCodecCapability{"video/flexfec-03", 90000, 0, "repair-window=200ms", nil},
+				PayloadType:        122,
+			},
+		*/
 	} {
 		if err := m.RegisterCodec(codec, RTPCodecTypeVideo); err != nil {
 			return err

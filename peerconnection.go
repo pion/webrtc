@@ -809,6 +809,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 
 // CreateAnswer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, error) {
+	specialLog("[PEERCONNECTION] createAnswer()")
 	useIdentity := pc.idpLoginURL != nil
 	remoteDesc := pc.RemoteDescription()
 	switch {
@@ -852,6 +853,8 @@ func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, erro
 		SDP:    string(sdpBytes),
 		parsed: d,
 	}
+	specialLog("[PEERCONNECTION] SDP answer:")
+	specialLog(desc.SDP)
 	pc.lastAnswer = desc.SDP
 	return desc, nil
 }
@@ -1035,6 +1038,7 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { //nolint:gocognit,gocyclo
+	specialLog("[PEERCONNECTION] SetRemoteDescription()")
 	if pc.isClosed.get() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
@@ -1218,6 +1222,9 @@ func (pc *PeerConnection) configureReceiver(incoming trackDetails, receiver *RTP
 	// set track id and label early so they can be set as new track information
 	// is received from the SDP.
 	for i := range receiver.tracks {
+		specialLog("----------------------")
+		specialLog("[PEERCONNECTION] configureReceiver: track.id ", incoming.id)
+		specialLog("[PEERCONNECTION] configureReceiver: track.streamID ", incoming.streamID)
 		receiver.tracks[i].track.mu.Lock()
 		receiver.tracks[i].track.id = incoming.id
 		receiver.tracks[i].track.streamID = incoming.streamID
@@ -1226,6 +1233,7 @@ func (pc *PeerConnection) configureReceiver(incoming trackDetails, receiver *RTP
 }
 
 func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPReceiver) {
+	specialLog("[PEERCONNECTION] startReceiver()")
 	if err := receiver.startReceive(trackDetailsToRTPReceiveParameters(&incoming)); err != nil {
 		pc.log.Warnf("RTPReceiver Receive failed %s", err)
 		return
@@ -1237,6 +1245,13 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		}
 
 		go func(track *TrackRemote) {
+			specialLog("------------------------------")
+			specialLog("[receiver func] track.ssrc ", track.ssrc)
+			specialLog("[receiver func] track.id ", track.id)
+			specialLog("[receiver func] track.kind ", track.kind)
+			specialLog("[receiver func] track.codec ", track.codec)
+			specialLog("[receiver func] track.payloadType ", track.payloadType)
+			specialLog("[receiver func] trac.params", track.params)
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 			n, _, err := track.peek(b)
 			if err != nil {
@@ -1328,6 +1343,8 @@ func runIfNewReceiver(
 
 // configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
 func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) { //nolint:gocognit
+	specialLog("[configureRTPReceivers()] =============================")
+
 	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
 
 	if isRenegotiation {
@@ -1405,6 +1422,12 @@ func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc
 	}
 
 	for _, incomingTrack := range filteredTracks {
+		specialLog("[PEERCONNECTION] configureRTPReceivers(): incomingTrack.id = ", incomingTrack.id)
+		specialLog("[PEERCONNECTION] configureRTPReceivers(): incomingTrack.kind = ", incomingTrack.kind)
+		specialLog("[PEERCONNECTION] configureRTPReceivers(): incomingTrack.mid = ", incomingTrack.mid)
+		specialLog("[PEERCONNECTION] configureRTPReceivers(): incomingTrack.ssrcs = ", incomingTrack.ssrcs)
+		specialLog("[PEERCONNECTION] configureRTPReceivers(): incomingTrack.repairSsrc = ", incomingTrack.repairSsrc)
+
 		_ = runIfNewReceiver(incomingTrack, localTransceivers, pc.configureReceiver)
 	}
 }
@@ -1453,7 +1476,11 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 
 // startRTPSenders starts all outbound RTP streams
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
+	specialLog("[PEERCONNECTION] startRTPSenders()")
 	for _, transceiver := range currentTransceivers {
+		specialLog("[PEERCONNECTION] startRTPSender() -> transceiver.kind = ", transceiver.kind)
+		specialLog("[PEERCONNECTION] startRTPSender() -> transceiver.kind = ", transceiver.mid)
+		specialLog("[PEERCONNECTION] startRTPSender() -> transceiver.codecs = ", transceiver.codecs)
 		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() {
 			err := sender.Send(sender.GetParameters())
 			if err != nil {
@@ -2387,6 +2414,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(transceivers []*RTPTransceiver, u
 // this is used everytime we have a RemoteDescription
 // nolint: gocyclo
 func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, useIdentity bool, includeUnmatched bool, connectionRole sdp.ConnectionRole) (*sdp.SessionDescription, error) { //nolint:gocognit
+	specialLog("[PEERCONNECTION] generateMatchedSDP()")
 	d, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
@@ -2412,14 +2440,23 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 	localTransceivers := append([]*RTPTransceiver{}, transceivers...)
 
 	detectedPlanB := descriptionIsPlanB(remoteDescription, pc.log)
-	if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
-		detectedPlanB = descriptionPossiblyPlanB(remoteDescription)
-	}
+	specialLog("[PEERCONNECTION] descriptionIsPlanB = ", strconv.FormatBool(detectedPlanB))
+
+	/*
+		if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
+			detectedPlanB = descriptionPossiblyPlanB(remoteDescription)
+			specialLog("[PEERCONNECTION] descriptionPossiblyPlanB:")
+			specialLog(detectedPlanB)
+		}
+	*/
 
 	mediaSections := []mediaSection{}
 	alreadyHaveApplicationMediaSection := false
 	for _, media := range remoteDescription.parsed.MediaDescriptions {
 		midValue := getMidValue(media)
+		specialLog("[PEERCONNECTION] remoteDesc.mediaDesc -> midValue = ", midValue)
+		specialLog("[PEERCONNECTION] remoteDesc.mediaDesc -> mediaName = ", media.MediaName.Media)
+		specialLog("[PEERCONNECTION] remoteDesc.mediaDesc -> mediaName = ", media.MediaName.String())
 		if midValue == "" {
 			return nil, errPeerConnRemoteDescriptionWithoutMidValue
 		}
@@ -2431,7 +2468,9 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 		}
 
 		kind := NewRTPCodecType(media.MediaName.Media)
+		specialLog("[PEERCONNECTION] mediaDesc -> kind = ", kind.String())
 		direction := getPeerDirection(media)
+		specialLog("[PEERCONNECTION] mediaDesc -> direction = ", direction.String())
 		if kind == 0 || direction == RTPTransceiverDirectionUnknown {
 			continue
 		}
@@ -2447,6 +2486,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			// media entry with all matching local transceivers
 			mediaTransceivers := []*RTPTransceiver{}
 			for {
+				specialLog("[PEERCONNECTION] Finding a batch of sender transceivers")
 				// keep going until we can't get any more
 				t, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 				if t == nil {
@@ -2475,7 +2515,14 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 				sender.setNegotiated()
 			}
 			mediaTransceivers := []*RTPTransceiver{t}
+			for _, mediaTransceiver := range mediaTransceivers {
+				specialLog("[PEERCONNECTION] mediaTransceiver:")
+				specialLog(mediaTransceiver)
+			}
+
 			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, ridMap: getRids(media)})
+			specialLog("[PEERCONNECTION] mediaSections:")
+			specialLog(mediaSections)
 		}
 	}
 

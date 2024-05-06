@@ -165,6 +165,8 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 	for _, b := range s.bindings {
 		p.Header.SSRC = uint32(b.ssrc)
 		p.Header.PayloadType = uint8(b.payloadType)
+		//specialLog("[WEBRTC] writeRTP() -> SSRC -> ", p.Header.SSRC)
+		//specialLog("[WEBRTC] writeRTP() -> PayloadType -> ", p.Header.PayloadType)
 		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}

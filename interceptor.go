@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/flexfec"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
 	"github.com/pion/interceptor/pkg/rfc8888"
@@ -27,6 +28,10 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 	}
 
 	if err := ConfigureRTCPReports(interceptorRegistry); err != nil {
+		return err
+	}
+	specialLog("[INTERCEPTOR] CONFIGURING THE FEC SENDER")
+	if err := ConfigureFECSender(mediaEngine, interceptorRegistry); err != nil {
 		return err
 	}
 
@@ -138,6 +143,17 @@ func ConfigureSimulcastExtensionHeaders(mediaEngine *MediaEngine) error {
 	}
 
 	return mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdesRepairRTPStreamIDURI}, RTPCodecTypeVideo)
+}
+
+func ConfigureFECSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
+	fecInterceptor, err := flexfec.NewFecInterceptor()
+
+	if err != nil {
+		return err
+	}
+
+	interceptorRegistry.Add(fecInterceptor)
+	return nil
 }
 
 type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }

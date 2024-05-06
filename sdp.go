@@ -84,6 +84,7 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 	for _, media := range s.MediaDescriptions {
 		tracksInMediaSection := []trackDetails{}
 		rtxRepairFlows := map[uint64]uint64{}
+		fecRepairFlows := map[uint64]uint64{}
 
 		// Plan B can have multiple tracks in a single media section
 		streamID := ""
@@ -134,6 +135,28 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 								tracksInMediaSection[i].repairSsrc = &repairSsrc
 							}
 						}
+					}
+				}
+				specialLog("[trackDetails...] split: " + split[0])
+
+				if split[0] == "FEC-FR" {
+					// Add fec ssrcs to blacklist, to avoid adding them as tracks
+					// Essentially lines like `a=ssrc-group:FEC-FR 2231627014 632943048` are processed by this section
+					// as this declares that the second SSRC (632943048) is a fec repair flow (RFC4588) for the first
+					// (2231627014) as specified in RFC5576
+					if len(split) == 3 {
+						baseSsrc, err := strconv.ParseUint(split[1], 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+							continue
+						}
+						fecRepairFlow, err := strconv.ParseUint(split[2], 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+							continue
+						}
+						fecRepairFlows[fecRepairFlow] = baseSsrc
+						tracksInMediaSection = filterTrackWithSSRC(tracksInMediaSection, SSRC(fecRepairFlow))
 					}
 				}
 
@@ -649,21 +672,37 @@ func getMidValue(media *sdp.MediaDescription) string {
 
 // SessionDescription contains a MediaSection with Multiple SSRCs, it is Plan-B
 func descriptionIsPlanB(desc *SessionDescription, log logging.LeveledLogger) bool {
-	if desc == nil || desc.parsed == nil {
-		return false
-	}
-
-	// Store all MIDs that already contain a track
-	midWithTrack := map[string]bool{}
-
-	for _, trackDetail := range trackDetailsFromSDP(log, desc.parsed) {
-		if _, ok := midWithTrack[trackDetail.mid]; ok {
-			return true
-		}
-		midWithTrack[trackDetail.mid] = true
-	}
-
+	// To get a working FlexFEC implementation, we are focusing on unified plan for now.
+	// From what I remember, the spec is not very clear on how flex fec works with plan B.
 	return false
+	/*
+	   	if desc == nil || desc.parsed == nil {
+	   		return false
+	   	}
+
+	   // Store all MIDs that already contain a track
+	   midWithTrack := map[string]bool{}
+
+	   	for _, trackDetail := range trackDetailsFromSDP(log, desc.parsed) {
+	   		specialLog("--------trackDetails--------")
+	   		specialLog("trackDetail.streamID: " + trackDetail.streamID)
+	   		specialLog("trackDetail.mid: " + trackDetail.mid)
+	   		specialLog("trackDetail.id: " + trackDetail.id)
+	   		specialLog("trackDetail.kind: " + trackDetail.kind.String())
+
+	   		if trackDetail.repairSsrc != nil {
+	   			specialLog("trackDetail.repairSsrc: ")
+	   			specialLog(*trackDetail.repairSsrc)
+	   		}
+
+	   		if _, ok := midWithTrack[trackDetail.mid]; ok {
+	   			return true
+	   		}
+	   		midWithTrack[trackDetail.mid] = true
+	   	}
+
+	   return false
+	*/
 }
 
 // SessionDescription contains a MediaSection with name `audio`, `video` or `data`

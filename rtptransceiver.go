@@ -238,6 +238,10 @@ func findByMid(mid string, localTransceivers []*RTPTransceiver) (*RTPTransceiver
 // Given a direction+type pluck a transceiver from the passed list
 // if no entry satisfies the requested type+direction return a inactive Transceiver
 func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransceiverDirection, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
+
+	fmt.Printf("[satisfy] remoteDirection: %v\n", remoteDirection)
+	fmt.Printf("[satisfy] remoteKind: %v\n", remoteKind)
+
 	// Get direction order from most preferred to least
 	getPreferredDirections := func() []RTPTransceiverDirection {
 		switch remoteDirection {
@@ -255,12 +259,16 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 	for _, possibleDirection := range getPreferredDirections() {
 		for i := range localTransceivers {
 			t := localTransceivers[i]
+			specialLog("[satisfy] localTrancsceiver: %v\n", t)
+			specialLog("[satisfy] localTransceiver.Mid: " + t.Mid())
+			specialLog("[satisfy] localTransceiver.kind: " + t.kind.String())
 			if t.Mid() == "" && t.kind == remoteKind && possibleDirection == t.Direction() {
 				return t, append(localTransceivers[:i], localTransceivers[i+1:]...)
 			}
 		}
 	}
 
+	specialLog("[satisfyTypeAndDir] didn't find anything sadly")
 	return nil, localTransceivers
 }
 

@@ -244,6 +244,17 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
+		specialLog("[rtpreceiver] r.tracks[0] = ", r.tracks[0])
+		specialLog("[rtpreceiver] r.tracks[0].track = ", r.tracks[0].track)
+		specialLog("[rtpreceiver] r.tracks[0].streamInfo = ", r.tracks[0].streamInfo)
+		specialLog("[rtpreceiver] r.tracks[0] interceptor? => ", r.tracks[0].rtcpInterceptor)
+		specialLog("[rtpreceiver] interceptor.attributes param = ", a)
+
+		if r.tracks[0].rtcpInterceptor == nil {
+			// I don't know what this phantom track is
+			specialLog("PHANTOM TRACK!!!!")
+			return
+		}
 		return r.tracks[0].rtcpInterceptor.Read(b, a)
 	case <-r.closed:
 		return 0, nil, io.ErrClosedPipe
