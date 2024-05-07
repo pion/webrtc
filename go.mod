@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/pion/datachannel v1.5.6
-	github.com/pion/dtls/v2 v2.2.10
+	github.com/pion/dtls/v2 v2.2.11
 	github.com/pion/ice/v3 v3.0.7
 	github.com/pion/interceptor v0.1.29
 	github.com/pion/logging v0.2.2
