@@ -577,6 +577,38 @@ func (d *DataChannel) BufferedAmountLowThreshold() uint64 {
 	return d.dataChannel.BufferedAmountLowThreshold()
 }
 
+// BytesReceived returns the number of bytes received
+func (d *DataChannel) BytesReceived() uint64 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.dataChannel.BytesReceived()
+}
+
+// BytesSent returns the number of bytes sent
+func (d *DataChannel) BytesSent() uint64 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.dataChannel.BytesSent()
+}
+
+// MessagesSent returns the number of messages sent
+func (d *DataChannel) MessagesSent() uint32 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.dataChannel.MessagesSent()
+}
+
+// MessagesReceived returns the number of messages received
+func (d *DataChannel) MessagesReceived() uint32 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.dataChannel.MessagesReceived()
+}
+
 // SetBufferedAmountLowThreshold is used to update the threshold.
 // See BufferedAmountLowThreshold().
 func (d *DataChannel) SetBufferedAmountLowThreshold(th uint64) {
