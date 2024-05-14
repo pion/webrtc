@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
@@ -1397,23 +1398,40 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
+	m := &MediaEngine{}
+	err := m.RegisterDefaultCodecs()
+	require.NoError(t, err)
+
+	i := &interceptor.Registry{}
+	err = RegisterDefaultInterceptors(m, i)
+	require.NoError(t, err)
+
+	err = ConfigureSimulcastExtensionHeaders(m)
+	require.NoError(t, err)
+
+	api := NewAPI(WithMediaEngine(m), WithInterceptorRegistry(i))
+
+	pcOffer, err := api.NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+
+	pcAnswer, err := api.NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+
 	rids := []string{"a", "b"}
-	pcOffer, pcAnswer, err := newPair()
-	assert.NoError(t, err)
 
 	vp8WriterAStatic, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[0]))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	vp8WriterBStatic, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[1]))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	vp8WriterA, vp8WriterB := &simulcastTestTrackLocal{vp8WriterAStatic}, &simulcastTestTrackLocal{vp8WriterBStatic}
 
 	sender, err := pcOffer.AddTrack(vp8WriterA)
-	assert.NoError(t, err)
-	assert.NotNil(t, sender)
+	require.NoError(t, err)
+	require.NotNil(t, sender)
 
-	assert.NoError(t, sender.AddEncoding(vp8WriterB))
+	require.NoError(t, sender.AddEncoding(vp8WriterB))
 
 	var ridMapLock sync.RWMutex
 	ridMap := map[string]int{}
@@ -1461,8 +1479,8 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 	})
 
 	parameters := sender.GetParameters()
-	assert.Equal(t, "a", parameters.Encodings[0].RID)
-	assert.Equal(t, "b", parameters.Encodings[1].RID)
+	require.Equal(t, "a", parameters.Encodings[0].RID)
+	require.Equal(t, "b", parameters.Encodings[1].RID)
 
 	var midID, ridID, rsid uint8
 	for _, extension := range parameters.HeaderExtensions {
@@ -1475,9 +1493,9 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 			rsid = uint8(extension.ID)
 		}
 	}
-	assert.NotZero(t, midID)
-	assert.NotZero(t, ridID)
-	assert.NotZero(t, rsid)
+	require.NotZero(t, midID)
+	require.NotZero(t, ridID)
+	require.NotZero(t, rsid)
 
 	err = signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
 		// Original chrome sdp contains no ssrc info https://pastebin.com/raw/JTjX6zg6
@@ -1485,7 +1503,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 		res := re.ReplaceAllString(sdp, "")
 		return res
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// padding only packets should not affect simulcast probe
 	var sequenceNumber uint16
