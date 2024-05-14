@@ -109,6 +109,19 @@ func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *intercep
 	return nil
 }
 
+// ConfigureSimulcastExtensionHeaders enables the RTP Extension Headers needed for Simulcast
+func ConfigureSimulcastExtensionHeaders(mediaEngine *MediaEngine) error {
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeVideo); err != nil {
+		return err
+	}
+
+	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESRTPStreamIDURI}, RTPCodecTypeVideo); err != nil {
+		return err
+	}
+
+	return mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdesRepairRTPStreamIDURI}, RTPCodecTypeVideo)
+}
+
 type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }
 
 func (i *interceptorToTrackLocalWriter) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
