@@ -1823,7 +1823,8 @@ func TestPeerConnection_Zero_PayloadType(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	require.NoError(t, err)
 
-	audioTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypePCMU}, "audio", "audio")
+	audioTrack, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypePCMU, ClockRate: 8000}, "audio", "audio")
 	require.NoError(t, err)
 
 	_, err = pcOffer.AddTrack(audioTrack)
