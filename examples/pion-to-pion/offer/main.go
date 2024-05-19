@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func signalCandidate(addr string, c *webrtc.ICECandidate) error {
@@ -145,12 +145,14 @@ func main() { //nolint:gocognit
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
 
 		for range time.NewTicker(5 * time.Second).C {
-			message := signal.RandSeq(15)
-			fmt.Printf("Sending '%s'\n", message)
+			message, sendTextErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+			if sendTextErr != nil {
+				panic(sendTextErr)
+			}
 
 			// Send the message as text
-			sendTextErr := dataChannel.SendText(message)
-			if sendTextErr != nil {
+			fmt.Printf("Sending '%s'\n", message)
+			if sendTextErr = dataChannel.SendText(message); sendTextErr != nil {
 				panic(sendTextErr)
 			}
 		}
