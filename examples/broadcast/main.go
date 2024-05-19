@@ -8,26 +8,29 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"strconv"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
 	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 func main() { // nolint:gocognit
 	port := flag.Int("port", 8080, "http server port")
 	flag.Parse()
 
-	sdpChan := signal.HTTPSDPServer(*port)
+	sdpChan := httpSDPServer(*port)
 
 	// Everything below is the Pion WebRTC API, thanks for using it ❤️.
 	offer := webrtc.SessionDescription{}
-	signal.Decode(<-sdpChan, &offer)
+	decode(<-sdpChan, &offer)
 	fmt.Println("")
 
 	peerConnectionConfig := webrtc.Configuration{
@@ -132,7 +135,7 @@ func main() { // nolint:gocognit
 	<-gatherComplete
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
-	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
+	fmt.Println(encode(peerConnection.LocalDescription()))
 
 	localTrack := <-localTrackChan
 	for {
@@ -140,7 +143,7 @@ func main() { // nolint:gocognit
 		fmt.Println("Curl an base64 SDP to start sendonly peer connection")
 
 		recvOnlyOffer := webrtc.SessionDescription{}
-		signal.Decode(<-sdpChan, &recvOnlyOffer)
+		decode(<-sdpChan, &recvOnlyOffer)
 
 		// Create a new PeerConnection
 		peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfig)
@@ -192,6 +195,45 @@ func main() { // nolint:gocognit
 		<-gatherComplete
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser
-		fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
+		fmt.Println(encode(peerConnection.LocalDescription()))
 	}
+}
+
+// JSON encode + base64 a SessionDescription
+func encode(obj *webrtc.SessionDescription) string {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// Decode a base64 and unmarshal JSON into a SessionDescription
+func decode(in string, obj *webrtc.SessionDescription) {
+	b, err := base64.StdEncoding.DecodeString(in)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = json.Unmarshal(b, obj); err != nil {
+		panic(err)
+	}
+}
+
+// httpSDPServer starts a HTTP Server that consumes SDPs
+func httpSDPServer(port int) chan string {
+	sdpChan := make(chan string)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		fmt.Fprintf(w, "done")
+		sdpChan <- string(body)
+	})
+
+	go func() {
+		// nolint: gosec
+		panic(http.ListenAndServe(":"+strconv.Itoa(port), nil))
+	}()
+
+	return sdpChan
 }

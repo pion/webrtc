@@ -8,15 +8,20 @@
 package main
 
 import (
+	"bufio"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/examples/internal/signal"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
 )
@@ -142,16 +147,16 @@ func main() {
 	iceRole := webrtc.ICERoleControlled
 
 	// Exchange the information
-	fmt.Println(signal.Encode(s))
+	fmt.Println(encode(&s))
 	remoteSignal := Signal{}
 
 	if *isOffer {
-		signalingChan := signal.HTTPSDPServer(*port)
-		signal.Decode(<-signalingChan, &remoteSignal)
+		signalingChan := httpSDPServer(*port)
+		decode(<-signalingChan, &remoteSignal)
 
 		iceRole = webrtc.ICERoleControlling
 	} else {
-		signal.Decode(signal.MustReadStdin(), &remoteSignal)
+		decode(readUntilNewline(), &remoteSignal)
 	}
 
 	if err = ice.SetRemoteCandidates(remoteSignal.ICECandidates); err != nil {
@@ -243,4 +248,63 @@ type Signal struct {
 	ICEParameters     webrtc.ICEParameters     `json:"iceParameters"`
 	DTLSParameters    webrtc.DTLSParameters    `json:"dtlsParameters"`
 	RTPSendParameters webrtc.RTPSendParameters `json:"rtpSendParameters"`
+}
+
+// Read from stdin until we get a newline
+func readUntilNewline() (in string) {
+	var err error
+
+	r := bufio.NewReader(os.Stdin)
+	for {
+		in, err = r.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			panic(err)
+		}
+
+		if in = strings.TrimSpace(in); len(in) > 0 {
+			break
+		}
+	}
+
+	fmt.Println("")
+	return
+}
+
+// JSON encode + base64 a SessionDescription
+func encode(obj *Signal) string {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// Decode a base64 and unmarshal JSON into a SessionDescription
+func decode(in string, obj *Signal) {
+	b, err := base64.StdEncoding.DecodeString(in)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = json.Unmarshal(b, obj); err != nil {
+		panic(err)
+	}
+}
+
+// httpSDPServer starts a HTTP Server that consumes SDPs
+func httpSDPServer(port int) chan string {
+	sdpChan := make(chan string)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		fmt.Fprintf(w, "done")
+		sdpChan <- string(body)
+	})
+
+	go func() {
+		// nolint: gosec
+		panic(http.ListenAndServe(":"+strconv.Itoa(port), nil))
+	}()
+
+	return sdpChan
 }
