@@ -5,6 +5,8 @@ package samplebuilder
 
 import (
 	"fmt"
+	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -527,6 +529,45 @@ func TestSampleBuilderData(t *testing.T) {
 	}
 	// only the last packet should be dropped
 	assert.Equal(t, j, 0x1FFFF)
+}
+
+func TestSampleBuilderPacketUnreference(t *testing.T) {
+	s := New(10, &fakeDepacketizer{
+		headChecker: true,
+	}, 1)
+
+	var refs int64
+	finalizer := func(*rtp.Packet) {
+		atomic.AddInt64(&refs, -1)
+	}
+
+	for i := 0; i < 0x20000; i++ {
+		atomic.AddInt64(&refs, 1)
+		p := rtp.Packet{
+			Header: rtp.Header{
+				SequenceNumber: uint16(i),
+				Timestamp:      uint32(i + 42),
+			},
+			Payload: []byte{byte(i)},
+		}
+		runtime.SetFinalizer(&p, finalizer)
+		s.Push(&p)
+		for {
+			sample := s.Pop()
+			if sample == nil {
+				break
+			}
+		}
+	}
+
+	runtime.GC()
+	time.Sleep(10 * time.Millisecond)
+
+	remainedRefs := atomic.LoadInt64(&refs)
+	runtime.KeepAlive(s)
+
+	// only the last packet should be still referenced
+	assert.Equal(t, int64(1), remainedRefs)
 }
 
 func TestSampleBuilder_Flush(t *testing.T) {
