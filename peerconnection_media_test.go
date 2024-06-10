@@ -1752,26 +1752,28 @@ func TestPeerConnection_Zero_PayloadType(t *testing.T) {
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-	onTrackFired, onTrackFiredCancel := context.WithCancel(context.Background())
+	trackFired := make(chan struct{})
+
 	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
 		require.Equal(t, track.Codec().MimeType, MimeTypePCMU)
-		onTrackFiredCancel()
+		close(trackFired)
 	})
 
-	go func() {
+	func() {
 		ticker := time.NewTicker(20 * time.Millisecond)
 		defer ticker.Stop()
 
-		select {
-		case <-onTrackFired.Done():
-			return
-		case <-ticker.C:
-			if routineErr := audioTrack.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
-				fmt.Println(routineErr)
+		for {
+			select {
+			case <-trackFired:
+				return
+			case <-ticker.C:
+				if routineErr := audioTrack.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+					fmt.Println(routineErr)
+				}
 			}
 		}
 	}()
 
-	<-onTrackFired.Done()
 	closePairNow(t, pcOffer, pcAnswer)
 }
