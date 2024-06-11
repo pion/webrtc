@@ -307,6 +307,16 @@ func (pc *PeerConnection) onNegotiationNeeded() {
 }
 
 func (pc *PeerConnection) negotiationNeededOp() {
+	// non-canon, reset needed state machine and run again if there was a request
+	defer func() {
+		pc.mu.Lock()
+		defer pc.mu.Unlock()
+		if pc.negotiationNeededState == negotiationNeededStateQueue {
+			defer pc.onNegotiationNeeded()
+		}
+		pc.negotiationNeededState = negotiationNeededStateEmpty
+	}()
+
 	// Don't run NegotiatedNeeded checks if OnNegotiationNeeded is not set
 	if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); !ok || handler == nil {
 		return
@@ -322,16 +332,6 @@ func (pc *PeerConnection) negotiationNeededOp() {
 		pc.ops.Enqueue(pc.negotiationNeededOp)
 		return
 	}
-
-	// non-canon, run again if there was a request
-	defer func() {
-		pc.mu.Lock()
-		defer pc.mu.Unlock()
-		if pc.negotiationNeededState == negotiationNeededStateQueue {
-			defer pc.onNegotiationNeeded()
-		}
-		pc.negotiationNeededState = negotiationNeededStateEmpty
-	}()
 
 	// Step 2.3
 	if pc.SignalingState() != SignalingStateStable {
