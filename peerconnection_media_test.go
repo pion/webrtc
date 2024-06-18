@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
+	mock_interceptor "github.com/pion/interceptor/pkg/mock"
 	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
@@ -1045,11 +1047,33 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 		m := &MediaEngine{}
 		assert.NoError(t, m.RegisterDefaultCodecs())
+		ir := &interceptor.Registry{}
+
+		trackReadDone := make(chan struct{})
+		ir.Add(&mock_interceptor.Factory{
+			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
+				return &mock_interceptor.Interceptor{
+					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+						count := int64(0)
+						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+							if a == nil {
+								a = interceptor.Attributes{}
+							}
+							if atomic.AddInt64(&count, 1) > 5 {
+								// confirm read before sending any more packets for probing
+								<-trackReadDone
+							}
+							return reader.Read(b, a)
+						})
+					},
+				}, nil
+			},
+		})
 		assert.NoError(t, ConfigureSimulcastExtensionHeaders(m))
 
 		pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(SettingEngine{
 			LoggerFactory: &undeclaredSsrcLoggerFactory{unhandledSimulcastError},
-		}), WithMediaEngine(m)).newPair(Configuration{})
+		}), WithMediaEngine(m), WithInterceptorRegistry(ir)).newPair(Configuration{})
 		assert.NoError(t, err)
 
 		firstTrack, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "firstTrack", "firstTrack")
@@ -1093,26 +1117,24 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 
+		// establish undeclared SSRC (half number of probes)
 		for ; sequenceNumber <= 5; sequenceNumber++ {
 			sendRTPPacket()
 		}
-
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 		trackRemoteChan := make(chan *TrackRemote, 1)
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
 			trackRemoteChan <- trackRemote
 		})
 
-		trackRemote := func() *TrackRemote {
-			for {
-				select {
-				case t := <-trackRemoteChan:
-					return t
-				default:
-					sendRTPPacket()
-				}
-			}
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+		trackRemote := <-trackRemoteChan
+
+		go func() {
+			_, _, err = trackRemote.Read(make([]byte, 1500))
+			assert.NoError(t, err)
+			close(trackReadDone)
 		}()
 
 		func() {
@@ -1126,8 +1148,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			}
 		}()
 
-		_, _, err = trackRemote.Read(make([]byte, 1500))
-		assert.NoError(t, err)
+		<-trackReadDone
 
 		closePairNow(t, pcOffer, pcAnswer)
 	})
@@ -1755,6 +1776,8 @@ func TestPeerConnection_Zero_PayloadType(t *testing.T) {
 	trackFired := make(chan struct{})
 
 	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, err = track.Read(make([]byte, 1500))
+		assert.NoError(t, err)
 		require.Equal(t, track.Codec().MimeType, MimeTypePCMU)
 		close(trackFired)
 	})

@@ -29,9 +29,7 @@ type TrackRemote struct {
 	params      RTPParameters
 	rid         string
 
-	receiver         *RTPReceiver
-	peeked           []byte
-	peekedAttributes interceptor.Attributes
+	receiver *RTPReceiver
 }
 
 func newTrackRemote(kind RTPCodecType, ssrc, rtxSsrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
@@ -107,25 +105,7 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, err error) {
 	t.mu.RLock()
 	r := t.receiver
-	peeked := t.peeked != nil
 	t.mu.RUnlock()
-
-	if peeked {
-		t.mu.Lock()
-		data := t.peeked
-		attributes = t.peekedAttributes
-
-		t.peeked = nil
-		t.peekedAttributes = nil
-		t.mu.Unlock()
-		// someone else may have stolen our packet when we
-		// released the lock.  Deal with it.
-		if data != nil {
-			n = copy(b, data)
-			err = t.checkAndUpdateTrack(b)
-			return
-		}
-	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
 	if rtxPacketReceived := r.readRTX(t); rtxPacketReceived != nil {
@@ -185,25 +165,6 @@ func (t *TrackRemote) ReadRTP() (*rtp.Packet, interceptor.Attributes, error) {
 		return nil, nil, err
 	}
 	return r, attributes, nil
-}
-
-// peek is like Read, but it doesn't discard the packet read
-func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error) {
-	n, a, err = t.Read(b)
-	if err != nil {
-		return
-	}
-
-	t.mu.Lock()
-	// this might overwrite data if somebody peeked between the Read
-	// and us getting the lock.  Oh well, we'll just drop a packet in
-	// that case.
-	data := make([]byte, n)
-	n = copy(data, b[:n])
-	t.peeked = data
-	t.peekedAttributes = a
-	t.mu.Unlock()
-	return
 }
 
 // SetReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
