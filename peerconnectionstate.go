@@ -84,14 +84,3 @@ func (t PeerConnectionState) String() string {
 		return ErrUnknownType.Error()
 	}
 }
-
-type negotiationNeededState int
-
-const (
-	// NegotiationNeededStateEmpty not running and queue is empty
-	negotiationNeededStateEmpty = iota
-	// NegotiationNeededStateEmpty running and queue is empty
-	negotiationNeededStateRun
-	// NegotiationNeededStateEmpty running and queue
-	negotiationNeededStateQueue
-)
