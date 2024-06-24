@@ -294,6 +294,12 @@ func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
 // onNegotiationNeeded enqueues negotiationNeededOp if necessary
 // caller of this method should hold `pc.mu` lock
 func (pc *PeerConnection) onNegotiationNeeded() {
+	// BEGIN uncomment to cause TestRenegotationOverDataChannel to pass
+	// if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); !ok || handler == nil {
+	// 	return
+	// }
+	// END uncomment to cause TestRenegotationOverDataChannel to pass
+
 	// https://w3c.github.io/webrtc-pc/#updating-the-negotiation-needed-flag
 	// non-canon step 1
 	if pc.negotiationNeededState == negotiationNeededStateRun {
