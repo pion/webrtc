@@ -17,7 +17,8 @@ func (h *vp9FMTP) Match(b FMTP) bool {
 		return false
 	}
 
-	// draft-ietf-payload-vp9-16:
+	// RTP Payload Format for VP9 Video - draft-ietf-payload-vp9-16
+	// https://datatracker.ietf.org/doc/html/draft-ietf-payload-vp9-16
 	// If no profile-id is present, Profile 0 MUST be inferred
 	hProfileID, ok := h.parameters["profile-id"]
 	if !ok {
