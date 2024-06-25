@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -359,6 +360,26 @@ func TestDataChannel_Close(t *testing.T) {
 
 		assert.NoError(t, dc.Close())
 		closePairNow(t, offerPC, answerPC)
+	})
+
+	t.Run("Close after PeerConnection With Mux Closed", func(t *testing.T) {
+		mux, err := ice.NewMultiUDPMuxFromPort(8443)
+		if err != nil {
+			panic(err)
+		}
+
+		offerPC, answerPC, err := newPairWithMux(mux)
+		assert.NoError(t, err)
+
+		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+		assert.NoError(t, err)
+
+		closePairNow(t, offerPC, answerPC)
+		assert.NoError(t, dc.Close())
+
+		// close the mux here just a test, it is confirmed when close the mux the go routine won't be leaks
+		// but in SFU context, as explain in the issue https://github.com/pion/webrtc/issues/2738 the mux is never closed.
+		// assert.NoError(t, mux.Close())
 	})
 }
 
