@@ -8,6 +8,22 @@ import (
 	"strings"
 )
 
+func parseParameters(line string) map[string]string {
+	parameters := make(map[string]string)
+
+	for _, p := range strings.Split(line, ";") {
+		pp := strings.SplitN(strings.TrimSpace(p), "=", 2)
+		key := strings.ToLower(pp[0])
+		var value string
+		if len(pp) > 1 {
+			value = pp[1]
+		}
+		parameters[key] = value
+	}
+
+	return parameters
+}
+
 // FMTP interface for implementing custom
 // FMTP parsers based on MimeType
 type FMTP interface {
@@ -23,29 +39,30 @@ type FMTP interface {
 }
 
 // Parse parses an fmtp string based on the MimeType
-func Parse(mimetype, line string) FMTP {
+func Parse(mimeType, line string) FMTP {
 	var f FMTP
 
-	parameters := make(map[string]string)
-
-	for _, p := range strings.Split(line, ";") {
-		pp := strings.SplitN(strings.TrimSpace(p), "=", 2)
-		key := strings.ToLower(pp[0])
-		var value string
-		if len(pp) > 1 {
-			value = pp[1]
-		}
-		parameters[key] = value
-	}
+	parameters := parseParameters(line)
 
 	switch {
-	case strings.EqualFold(mimetype, "video/h264"):
+	case strings.EqualFold(mimeType, "video/h264"):
 		f = &h264FMTP{
 			parameters: parameters,
 		}
+
+	case strings.EqualFold(mimeType, "video/vp9"):
+		f = &vp9FMTP{
+			parameters: parameters,
+		}
+
+	case strings.EqualFold(mimeType, "video/av1"):
+		f = &av1FMTP{
+			parameters: parameters,
+		}
+
 	default:
 		f = &genericFMTP{
-			mimeType:   mimetype,
+			mimeType:   mimeType,
 			parameters: parameters,
 		}
 	}

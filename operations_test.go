@@ -4,19 +4,31 @@
 package webrtc
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOperations_Enqueue(t *testing.T) {
-	ops := newOperations()
-	for i := 0; i < 100; i++ {
+	updateNegotiationNeededFlagOnEmptyChain := &atomicBool{}
+	onNegotiationNeededCalledCount := 0
+	var onNegotiationNeededCalledCountMu sync.Mutex
+	ops := newOperations(updateNegotiationNeededFlagOnEmptyChain, func() {
+		onNegotiationNeededCalledCountMu.Lock()
+		onNegotiationNeededCalledCount++
+		onNegotiationNeededCalledCountMu.Unlock()
+	})
+	for resultSet := 0; resultSet < 100; resultSet++ {
 		results := make([]int, 16)
+		resultSetCopy := resultSet
 		for i := range results {
 			func(j int) {
 				ops.Enqueue(func() {
 					results[j] = j * j
+					if resultSetCopy > 50 {
+						updateNegotiationNeededFlagOnEmptyChain.set(true)
+					}
 				})
 			}(i)
 		}
@@ -26,9 +38,13 @@ func TestOperations_Enqueue(t *testing.T) {
 		assert.Equal(t, len(expected), len(results))
 		assert.Equal(t, expected, results)
 	}
+	onNegotiationNeededCalledCountMu.Lock()
+	defer onNegotiationNeededCalledCountMu.Unlock()
+	assert.NotEqual(t, onNegotiationNeededCalledCount, 0)
 }
 
 func TestOperations_Done(*testing.T) {
-	ops := newOperations()
+	ops := newOperations(&atomicBool{}, func() {
+	})
 	ops.Done()
 }
