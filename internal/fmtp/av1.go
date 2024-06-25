@@ -17,7 +17,8 @@ func (h *av1FMTP) Match(b FMTP) bool {
 		return false
 	}
 
-	// AV1 RTP specification:
+	// RTP Payload Format For AV1 (v1.0)
+	// https://aomediacodec.github.io/av1-rtp-spec/
 	// If the profile parameter is not present, it MUST be inferred to be 0 (“Main” profile).
 	hProfile, ok := h.parameters["profile"]
 	if !ok {
