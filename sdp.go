@@ -709,8 +709,13 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
 		return "", "", ErrSessionDescriptionNoFingerprint
 	}
 
-	for _, m := range fingerprints {
-		if m != fingerprints[0] {
+	// https://github.com/pion/webrtc/issues/2621
+	groupAttribue, _ := desc.Attribute(sdp.AttrKeyGroup)
+
+	isBundled := strings.Contains(groupAttribue, "BUNDLE")
+
+	if !isBundled {
+		if len(fingerprints) != 1 {
 			return "", "", ErrSessionDescriptionConflictingFingerprints
 		}
 	}
@@ -769,14 +774,15 @@ func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) 
 		return "", "", nil, ErrSessionDescriptionMissingIcePwd
 	}
 
-	for _, m := range remoteUfrags {
-		if m != remoteUfrags[0] {
-			return "", "", nil, ErrSessionDescriptionConflictingIceUfrag
-		}
-	}
+	// https://github.com/pion/webrtc/issues/2621
+	groupAttribue, _ := desc.Attribute(sdp.AttrKeyGroup)
 
-	for _, m := range remotePwds {
-		if m != remotePwds[0] {
+	isBundled := strings.Contains(groupAttribue, "BUNDLE")
+
+	if !isBundled {
+		if len(remoteUfrags) != 1 {
+			return "", "", nil, ErrSessionDescriptionConflictingIceUfrag
+		} else if len(remotePwds) != 1 {
 			return "", "", nil, ErrSessionDescriptionConflictingIcePwd
 		}
 	}

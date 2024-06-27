@@ -1399,6 +1399,7 @@ func TestTransceiverCreatedByRemoteSdpHasSameCodecOrderAsRemote(t *testing.T) {
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
+a=group:BUNDLE video-0 video-1
 m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
@@ -1459,6 +1460,7 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
+a=group:BUNDLE video-0 video-1
 m=video 60323 UDP/TLS/RTP/SAVPF 98 106
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
