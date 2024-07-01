@@ -7,6 +7,8 @@
 package webrtc
 
 import (
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,4 +180,104 @@ func TestPeerConnection_Close_DuringICE(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Error("pcOffer.Close() Timeout")
 	}
+}
+
+func TestPeerConnection_CloseWithIncomingMessages(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := CheckRoutinesIntolerant(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dcAnswer *DataChannel
+	answerDataChannelOpened := make(chan struct{})
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		// Make sure this is the data channel we were looking for. (Not the one
+		// created in signalPair).
+		if d.Label() != "data" {
+			return
+		}
+		dcAnswer = d
+		close(answerDataChannelOpened)
+	})
+
+	dcOffer, err := pcOffer.CreateDataChannel("data", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offerDataChannelOpened := make(chan struct{})
+	dcOffer.OnOpen(func() {
+		close(offerDataChannelOpened)
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-offerDataChannelOpened
+	<-answerDataChannelOpened
+
+	msgNum := 0
+	dcOffer.OnMessage(func(_ DataChannelMessage) {
+		t.Log("msg", msgNum)
+		msgNum++
+	})
+
+	// send 50 messages, then close pcOffer, and then send another 50
+	for i := 0; i < 100; i++ {
+		if i == 50 {
+			err = pcOffer.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		_ = dcAnswer.Send([]byte("hello!"))
+	}
+
+	err = pcAnswer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// CheckRoutinesIntolerant is used to check for leaked go-routines.
+// It differs from test.CheckRoutines in that it won't wait at all
+// for lingering goroutines. This is helpful for tests that need
+// to ensure clean closure of resources.
+func CheckRoutinesIntolerant(t *testing.T) func() {
+	return func() {
+		routines := getRoutines()
+		if len(routines) == 0 {
+			return
+		}
+		t.Fatalf("%s: \n%s", "Unexpected routines on test end", strings.Join(routines, "\n\n")) // nolint
+	}
+}
+
+func getRoutines() []string {
+	buf := make([]byte, 2<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	return filterRoutines(strings.Split(string(buf), "\n\n"))
+}
+
+func filterRoutines(routines []string) []string {
+	result := []string{}
+	for _, stack := range routines {
+		if stack == "" || // Empty
+			strings.Contains(stack, "testing.Main(") || // Tests
+			strings.Contains(stack, "testing.(*T).Run(") || // Test run
+			strings.Contains(stack, "getRoutines(") { // This routine
+			continue
+		}
+		result = append(result, stack)
+	}
+	return result
 }

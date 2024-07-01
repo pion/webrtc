@@ -40,6 +40,7 @@ type DataChannel struct {
 	readyState                 atomic.Value // DataChannelState
 	bufferedAmountLowThreshold uint64
 	detachCalled               bool
+	readLoopActive             chan struct{}
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -327,6 +328,7 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	defer d.mu.Unlock()
 
 	if !d.api.settingEngine.detach.DataChannels {
+		d.readLoopActive = make(chan struct{})
 		go d.readLoop()
 	}
 }
@@ -356,6 +358,7 @@ var rlBufPool = sync.Pool{New: func() interface{} {
 }}
 
 func (d *DataChannel) readLoop() {
+	defer close(d.readLoopActive)
 	for {
 		buffer := rlBufPool.Get().([]byte) //nolint:forcetypeassert
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
@@ -438,6 +441,22 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // Close Closes the DataChannel. It may be called regardless of whether
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
+	return d.close(false)
+}
+
+// Normally, close only stops writes from happening, so waitForReadsDone=true
+// will wait for reads to be finished based on underlying SCTP association
+// closure or a SCTP reset stream from the other side. This is safe to call
+// with waitForReadsDone=true after tearing down a PeerConnection but not
+// necessarily before. For example, if you used a vnet and dropped all packets
+// right before closing the DataChannel, you'd need never see a reset stream.
+func (d *DataChannel) close(waitForReadsDone bool) error {
+	if waitForReadsDone && d.readLoopActive != nil {
+		defer func() {
+			<-d.readLoopActive
+		}()
+	}
+
 	d.mu.Lock()
 	haveSctpTransport := d.dataChannel != nil
 	d.mu.Unlock()
