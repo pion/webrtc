@@ -1228,21 +1228,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 			return
 		}
 
-		go func(track *TrackRemote) {
-			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-			n, _, err := track.peek(b)
-			if err != nil {
-				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
-				return
-			}
-
-			if err = track.checkAndUpdateTrack(b[:n]); err != nil {
-				pc.log.Warnf("Failed to set codec settings for track SSRC %d (%s)", track.SSRC(), err)
-				return
-			}
-
-			pc.onTrack(track, receiver)
-		}(t)
+		pc.onTrack(t, receiver)
 	}
 }
 

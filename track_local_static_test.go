@@ -150,6 +150,8 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	offerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, err = track.Read(make([]byte, 1500))
+		assert.NoError(t, err)
 		assert.Equal(t, track.PayloadType(), PayloadType(100))
 		assert.Equal(t, track.Codec().RTPCodecCapability.MimeType, "video/VP8")
 
@@ -284,6 +286,8 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 
 	offerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, err = track.Read(make([]byte, 1500))
+		assert.NoError(t, err)
 		assert.Equal(t, track.PayloadType(), PayloadType(100))
 		assert.Equal(t, track.Codec().RTPCodecCapability.MimeType, "video/VP8")
 

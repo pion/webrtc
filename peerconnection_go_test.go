@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/pion/ice/v3"
-	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -1000,9 +999,11 @@ func TestICERestart_Error_Handling(t *testing.T) {
 }
 
 type trackRecords struct {
-	mu               sync.Mutex
-	trackIDs         map[string]struct{}
-	receivedTrackIDs map[string]struct{}
+	mu                      sync.Mutex
+	trackIDs                map[string]struct{}
+	receivedTrackIDs        map[string]struct{}
+	onAllTracksReceived     chan struct{}
+	onAllTracksReceivedOnce sync.Once
 }
 
 func (r *trackRecords) newTrack() (*TrackLocalStaticRTP, error) {
@@ -1019,6 +1020,11 @@ func (r *trackRecords) handleTrack(t *TrackRemote, _ *RTPReceiver) {
 	if _, exist := r.trackIDs[tID]; exist {
 		r.receivedTrackIDs[tID] = struct{}{}
 	}
+	if len(r.receivedTrackIDs) == len(r.trackIDs) {
+		r.onAllTracksReceivedOnce.Do(func() {
+			close(r.onAllTracksReceived)
+		})
+	}
 }
 
 func (r *trackRecords) remains() int {
@@ -1032,32 +1038,16 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 	var (
 		api   = NewAPI()
 		tRecs = &trackRecords{
-			trackIDs:         make(map[string]struct{}),
-			receivedTrackIDs: make(map[string]struct{}),
+			trackIDs:            make(map[string]struct{}),
+			receivedTrackIDs:    make(map[string]struct{}),
+			onAllTracksReceived: make(chan struct{}),
 		}
-		tracks          = []*TrackLocalStaticRTP{}
 		trackCount      = 256
 		pingInterval    = 1 * time.Second
 		noiseInterval   = 100 * time.Microsecond
 		timeoutDuration = 20 * time.Second
-		rawPkt          = []byte{
-			0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
-			0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
-		}
-		samplePkt = &rtp.Packet{
-			Header: rtp.Header{
-				Marker:           true,
-				Extension:        false,
-				ExtensionProfile: 1,
-				Version:          2,
-				SequenceNumber:   27023,
-				Timestamp:        3653407706,
-				CSRC:             []uint32{},
-			},
-			Payload: rawPkt[20:],
-		}
-		connected = make(chan struct{})
-		stopped   = make(chan struct{})
+		connected       = make(chan struct{})
+		stopped         = make(chan struct{})
 	)
 	assert.NoError(t, api.mediaEngine.RegisterDefaultCodecs())
 	offerPC, answerPC, err := api.newPair(Configuration{})
@@ -1068,7 +1058,6 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = offerPC.AddTrack(track)
 		assert.NoError(t, err)
-		tracks = append(tracks, track)
 	}
 	answerPC.OnTrack(tRecs.handleTrack)
 	offerPC.OnICEConnectionStateChange(func(s ICEConnectionState) {
@@ -1090,12 +1079,8 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		}
 	}()
 	assert.NoError(t, signalPair(offerPC, answerPC))
-	// Send a RTP packets to each track to trigger track event after connected.
 	<-connected
-	time.Sleep(1 * time.Second)
-	for _, track := range tracks {
-		assert.NoError(t, track.WriteRTP(samplePkt))
-	}
+
 	// Ping trackRecords to see if any track event not received yet.
 	tooLong := time.After(timeoutDuration)
 	for {
