@@ -8,127 +8,513 @@ import (
 	"testing"
 )
 
-func TestGenericParseFmtp(t *testing.T) {
-	testCases := map[string]struct {
-		input    string
-		expected FMTP
+func TestParseParameters(t *testing.T) {
+	for _, ca := range []struct {
+		name       string
+		line       string
+		parameters map[string]string
 	}{
-		"OneParam": {
-			input: "key-name=value",
-			expected: &genericFMTP{
-				mimeType: "generic",
-				parameters: map[string]string{
-					"key-name": "value",
-				},
+		{
+			"one param",
+			"key-name=value",
+			map[string]string{
+				"key-name": "value",
 			},
 		},
-		"OneParamWithWhiteSpeces": {
-			input: "\tkey-name=value ",
-			expected: &genericFMTP{
-				mimeType: "generic",
-				parameters: map[string]string{
-					"key-name": "value",
-				},
+		{
+			"one param with white spaces",
+			"\tkey-name=value ",
+			map[string]string{
+				"key-name": "value",
 			},
 		},
-		"TwoParams": {
-			input: "key-name=value;key2=value2",
-			expected: &genericFMTP{
-				mimeType: "generic",
-				parameters: map[string]string{
-					"key-name": "value",
-					"key2":     "value2",
-				},
+		{
+			"two params",
+			"key-name=value;key2=value2",
+			map[string]string{
+				"key-name": "value",
+				"key2":     "value2",
 			},
 		},
-		"TwoParamsWithWhiteSpeces": {
-			input: "key-name=value;  \n\tkey2=value2 ",
-			expected: &genericFMTP{
-				mimeType: "generic",
-				parameters: map[string]string{
-					"key-name": "value",
-					"key2":     "value2",
-				},
+		{
+			"two params with white spaces",
+			"key-name=value;  \n\tkey2=value2 ",
+			map[string]string{
+				"key-name": "value",
+				"key2":     "value2",
 			},
 		},
-	}
-	for name, testCase := range testCases {
-		testCase := testCase
-		t.Run(name, func(t *testing.T) {
-			f := Parse("generic", testCase.input)
-			if !reflect.DeepEqual(testCase.expected, f) {
-				t.Errorf("Expected Fmtp params: %v, got: %v", testCase.expected, f)
-			}
-
-			if f.MimeType() != "generic" {
-				t.Errorf("Expected MimeType of generic, got: %s", f.MimeType())
+	} {
+		t.Run(ca.name, func(t *testing.T) {
+			parameters := parseParameters(ca.line)
+			if !reflect.DeepEqual(parameters, ca.parameters) {
+				t.Errorf("expected '%v', got '%v'", ca.parameters, parameters)
 			}
 		})
 	}
 }
 
-func TestGenericFmtpCompare(t *testing.T) {
+func TestParse(t *testing.T) {
+	for _, ca := range []struct {
+		name     string
+		mimeType string
+		line     string
+		expected FMTP
+	}{
+		{
+			"generic",
+			"generic",
+			"key-name=value",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key-name": "value",
+				},
+			},
+		},
+		{
+			"generic case normalization",
+			"generic",
+			"Key=value",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key": "value",
+				},
+			},
+		},
+		{
+			"h264",
+			"video/h264",
+			"key-name=value",
+			&h264FMTP{
+				parameters: map[string]string{
+					"key-name": "value",
+				},
+			},
+		},
+		{
+			"vp9",
+			"video/vp9",
+			"key-name=value",
+			&vp9FMTP{
+				parameters: map[string]string{
+					"key-name": "value",
+				},
+			},
+		},
+		{
+			"av1",
+			"video/av1",
+			"key-name=value",
+			&av1FMTP{
+				parameters: map[string]string{
+					"key-name": "value",
+				},
+			},
+		},
+	} {
+		t.Run(ca.name, func(t *testing.T) {
+			f := Parse(ca.mimeType, ca.line)
+			if !reflect.DeepEqual(ca.expected, f) {
+				t.Errorf("expected '%v', got '%v'", ca.expected, f)
+			}
+
+			if f.MimeType() != ca.mimeType {
+				t.Errorf("Expected '%v', got '%s'", ca.mimeType, f.MimeType())
+			}
+		})
+	}
+}
+
+func TestMatch(t *testing.T) {
 	consistString := map[bool]string{true: "consist", false: "inconsist"}
 
-	testCases := map[string]struct {
-		a, b    string
+	for _, ca := range []struct {
+		name    string
+		a       FMTP
+		b       FMTP
 		consist bool
 	}{
-		"Equal": {
-			a:       "key1=value1;key2=value2;key3=value3",
-			b:       "key1=value1;key2=value2;key3=value3",
-			consist: true,
+		{
+			"generic equal",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			true,
 		},
-		"EqualWithWhitespaceVariants": {
-			a:       "key1=value1;key2=value2;key3=value3",
-			b:       "  key1=value1;  \nkey2=value2;\t\nkey3=value3",
-			consist: true,
+		{
+			"generic one extra param",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+					"key4": "value4",
+				},
+			},
+			true,
 		},
-		"EqualWithCase": {
-			a:       "key1=value1;key2=value2;key3=value3",
-			b:       "key1=value1;key2=Value2;Key3=value3",
-			consist: true,
+		{
+			"generic inconsistent different kind",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&h264FMTP{},
+			false,
 		},
-		"OneHasExtraParam": {
-			a:       "key1=value1;key2=value2;key3=value3",
-			b:       "key1=value1;key2=value2;key3=value3;key4=value4",
-			consist: true,
+		{
+			"generic inconsistent different mime type",
+			&genericFMTP{
+				mimeType: "generic1",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType: "generic2",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			false,
 		},
-		"Inconsistent": {
-			a:       "key1=value1;key2=value2;key3=value3",
-			b:       "key1=value1;key2=different_value;key3=value3",
-			consist: false,
+		{
+			"generic inconsistent different parameters",
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "different_value",
+					"key3": "value3",
+				},
+			},
+			false,
 		},
-		"Inconsistent_OneHasExtraParam": {
-			a:       "key1=value1;key2=value2;key3=value3;key4=value4",
-			b:       "key1=value1;key2=different_value;key3=value3",
-			consist: false,
+		{
+			"h264 equal",
+			&h264FMTP{
+				parameters: map[string]string{
+					"level-asymmetry-allowed": "1",
+					"packetization-mode":      "1",
+					"profile-level-id":        "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"level-asymmetry-allowed": "1",
+					"packetization-mode":      "1",
+					"profile-level-id":        "42e01f",
+				},
+			},
+			true,
 		},
-	}
-	for name, testCase := range testCases {
-		testCase := testCase
-		check := func(t *testing.T, a, b string) {
-			aa := Parse("", a)
-			bb := Parse("", b)
-			c := aa.Match(bb)
-			if c != testCase.consist {
+		{
+			"h264 one extra param",
+			&h264FMTP{
+				parameters: map[string]string{
+					"level-asymmetry-allowed": "1",
+					"packetization-mode":      "1",
+					"profile-level-id":        "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			true,
+		},
+		{
+			"h264 different profile level ids version",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e029",
+				},
+			},
+			true,
+		},
+		{
+			"h264 inconsistent different kind",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "0",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			&genericFMTP{},
+			false,
+		},
+		{
+			"h264 inconsistent different parameters",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "0",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			false,
+		},
+		{
+			"h264 inconsistent missing packetization mode",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "0",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"profile-level-id": "42e01f",
+				},
+			},
+			false,
+		},
+		{
+			"h264 inconsistent missing profile level id",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e01f",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+				},
+			},
+			false,
+		},
+		{
+			"h264 inconsistent invalid profile level id",
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "42e029",
+				},
+			},
+			&h264FMTP{
+				parameters: map[string]string{
+					"packetization-mode": "1",
+					"profile-level-id":   "41e029",
+				},
+			},
+			false,
+		},
+		{
+			"vp9 equal",
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "1",
+				},
+			},
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "1",
+				},
+			},
+			true,
+		},
+		{
+			"vp9 missing profile",
+			&vp9FMTP{
+				parameters: map[string]string{},
+			},
+			&vp9FMTP{
+				parameters: map[string]string{},
+			},
+			true,
+		},
+		{
+			"vp9 inferred profile",
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "0",
+				},
+			},
+			&vp9FMTP{
+				parameters: map[string]string{},
+			},
+			true,
+		},
+		{
+			"vp9 inconsistent different kind",
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "0",
+				},
+			},
+			&genericFMTP{},
+			false,
+		},
+		{
+			"vp9 inconsistent different profile",
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "0",
+				},
+			},
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "1",
+				},
+			},
+			false,
+		},
+		{
+			"vp9 inconsistent different inferred profile",
+			&vp9FMTP{
+				parameters: map[string]string{},
+			},
+			&vp9FMTP{
+				parameters: map[string]string{
+					"profile-id": "1",
+				},
+			},
+			false,
+		},
+		{
+			"av1 equal",
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "1",
+				},
+			},
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "1",
+				},
+			},
+			true,
+		},
+		{
+			"av1 missing profile",
+			&av1FMTP{
+				parameters: map[string]string{},
+			},
+			&av1FMTP{
+				parameters: map[string]string{},
+			},
+			true,
+		},
+		{
+			"av1 inferred profile",
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "0",
+				},
+			},
+			&av1FMTP{
+				parameters: map[string]string{},
+			},
+			true,
+		},
+		{
+			"av1 inconsistent different kind",
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "0",
+				},
+			},
+			&genericFMTP{},
+			false,
+		},
+		{
+			"av1 inconsistent different profile",
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "0",
+				},
+			},
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "1",
+				},
+			},
+			false,
+		},
+		{
+			"av1 inconsistent different inferred profile",
+			&av1FMTP{
+				parameters: map[string]string{},
+			},
+			&av1FMTP{
+				parameters: map[string]string{
+					"profile": "1",
+				},
+			},
+			false,
+		},
+	} {
+		t.Run(ca.name, func(t *testing.T) {
+			c := ca.a.Match(ca.b)
+			if c != ca.consist {
 				t.Errorf(
 					"'%s' and '%s' are expected to be %s, but treated as %s",
-					a, b, consistString[testCase.consist], consistString[c],
+					ca.a, ca.b, consistString[ca.consist], consistString[c],
 				)
 			}
 
-			// test reverse case here
-			c = bb.Match(aa)
-			if c != testCase.consist {
+			c = ca.b.Match(ca.a)
+			if c != ca.consist {
 				t.Errorf(
 					"'%s' and '%s' are expected to be %s, but treated as %s",
-					a, b, consistString[testCase.consist], consistString[c],
+					ca.a, ca.b, consistString[ca.consist], consistString[c],
 				)
 			}
-		}
-		t.Run(name, func(t *testing.T) {
-			check(t, testCase.a, testCase.b)
 		})
 	}
 }

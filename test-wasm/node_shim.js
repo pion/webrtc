@@ -4,7 +4,7 @@
 // This file adds RTCPeerConnection to the global context, making Node.js more
 // closely match the browser API for WebRTC.
 
-const wrtc = require('wrtc')
+const wrtc = require('@roamhq/wrtc')
 
 global.window = {
   RTCPeerConnection: wrtc.RTCPeerConnection
