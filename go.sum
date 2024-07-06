@@ -43,8 +43,8 @@ github.com/pion/datachannel v1.5.6/go.mod h1:1eKT6Q85pRnr2mHiWHxJwO50SfZRtWHTsNI
 github.com/pion/dtls/v2 v2.2.7/go.mod h1:8WiMkebSHFD0T+dIU+UeBaoV7kDhOW5oDCzZ7WZ/F9s=
 github.com/pion/dtls/v2 v2.2.11 h1:9U/dpCYl1ySttROPWJgqWKEylUdT0fXp/xst6JwY5Ks=
 github.com/pion/dtls/v2 v2.2.11/go.mod h1:d9SYc9fch0CqK90mRk1dC7AkzzpwJj6u2GU3u+9pqFE=
-github.com/pion/ice/v3 v3.0.8 h1:GtoHjsSdcFmF+cCByHODNEMFBwWIngw851XgpsnlO88=
-github.com/pion/ice/v3 v3.0.8/go.mod h1:aSHw7r4guKNumxc5dCWfzWga+qtz1ki/nnpHfJTSLTs=
+github.com/pion/ice/v3 v3.0.9 h1:AAJQSCJa5qqDJ2pe9TOH4YTamP5m7PJeoQ58ey3McFg=
+github.com/pion/ice/v3 v3.0.9/go.mod h1:aSHw7r4guKNumxc5dCWfzWga+qtz1ki/nnpHfJTSLTs=
 github.com/pion/interceptor v0.1.29 h1:39fsnlP1U8gw2JzOFWdfCU82vHvhW9o0rZnZF56wF+M=
 github.com/pion/interceptor v0.1.29/go.mod h1:ri+LGNjRUc5xUNtDEPzfdkmSqISixVTBF/z/Zms/6T4=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
