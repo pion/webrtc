@@ -1606,3 +1606,37 @@ func TestPeerConnectionState(t *testing.T) {
 	assert.NoError(t, pc.Close())
 	assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
 }
+
+func TestPeerConnectionDeadlock(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	closeHdlr := func(peerConnection *PeerConnection) {
+		peerConnection.OnICEConnectionStateChange(func(i ICEConnectionState) {
+			if i == ICEConnectionStateFailed || i == ICEConnectionStateClosed {
+				if err := peerConnection.Close(); err != nil {
+					assert.NoError(t, err)
+				}
+			}
+		})
+	}
+
+	pcOffer, pcAnswer, err := NewAPI().newPair(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	pcAnswer.OnDataChannel(func(*DataChannel) {
+		onDataChannelCancel()
+	})
+	<-onDataChannel.Done()
+
+	closeHdlr(pcOffer)
+	closeHdlr(pcAnswer)
+
+	closePairNow(t, pcOffer, pcAnswer)
+}
