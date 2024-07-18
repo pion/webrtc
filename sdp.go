@@ -487,6 +487,11 @@ func addTransceiverSDP(
 
 	parameters := mediaEngine.getRTPParametersByKind(t.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
+		if mediaSection.matchExtensions != nil {
+			if _, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled {
+				continue
+			}
+		}
 		extURL, err := url.Parse(rtpExtension.URI)
 		if err != nil {
 			return false, err
@@ -533,10 +538,11 @@ type simulcastRid struct {
 }
 
 type mediaSection struct {
-	id           string
-	transceivers []*RTPTransceiver
-	data         bool
-	ridMap       map[string]*simulcastRid
+	id              string
+	transceivers    []*RTPTransceiver
+	data            bool
+	matchExtensions map[string]int
+	ridMap          map[string]*simulcastRid
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {

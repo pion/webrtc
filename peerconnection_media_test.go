@@ -1090,6 +1090,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			return
 		}))
 
+		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+		peerConnectionConnected.Wait()
+
 		sequenceNumber := uint16(0)
 		sendRTPPacket := func() {
 			sequenceNumber++
@@ -1107,12 +1110,12 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			sendRTPPacket()
 		}
 
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
 		trackRemoteChan := make(chan *TrackRemote, 1)
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
 			trackRemoteChan <- trackRemote
 		})
+
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 		trackRemote := func() *TrackRemote {
 			for {

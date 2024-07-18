@@ -456,6 +456,30 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 	return matchType, nil
 }
 
+// Update header extensions from a remote media section
+func (m *MediaEngine) updateHeaderExtensionFromMediaSection(media *sdp.MediaDescription) error {
+	var typ RTPCodecType
+	switch {
+	case strings.EqualFold(media.MediaName.Media, "audio"):
+		typ = RTPCodecTypeAudio
+	case strings.EqualFold(media.MediaName.Media, "video"):
+		typ = RTPCodecTypeVideo
+	default:
+		return nil
+	}
+	extensions, err := rtpExtensionsFromMediaDescription(media)
+	if err != nil {
+		return err
+	}
+
+	for extension, id := range extensions {
+		if err = m.updateHeaderExtension(id, extension, typ); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Look up a header extension and enable if it exists
 func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCodecType) error {
 	if m.negotiatedHeaderExtensions == nil {
@@ -499,14 +523,27 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
+
 		switch {
-		case !m.negotiatedAudio && strings.EqualFold(media.MediaName.Media, "audio"):
-			m.negotiatedAudio = true
+		case strings.EqualFold(media.MediaName.Media, "audio"):
 			typ = RTPCodecTypeAudio
-		case !m.negotiatedVideo && strings.EqualFold(media.MediaName.Media, "video"):
-			m.negotiatedVideo = true
+		case strings.EqualFold(media.MediaName.Media, "video"):
 			typ = RTPCodecTypeVideo
+		}
+
+		switch {
+		case !m.negotiatedAudio && typ == RTPCodecTypeAudio:
+			m.negotiatedAudio = true
+		case !m.negotiatedVideo && typ == RTPCodecTypeVideo:
+			m.negotiatedVideo = true
 		default:
+			// update header extesions from remote sdp if codec is negotiated, Firefox
+			// would send updated header extension in renegotiation.
+			// e.g. publish first track without simucalst ->negotiated-> publish second track with simucalst
+			// then the two media secontions have different rtp header extensions in offer
+			if err := m.updateHeaderExtensionFromMediaSection(media); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -542,15 +579,8 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			continue
 		}
 
-		extensions, err := rtpExtensionsFromMediaDescription(media)
-		if err != nil {
+		if err := m.updateHeaderExtensionFromMediaSection(media); err != nil {
 			return err
-		}
-
-		for extension, id := range extensions {
-			if err = m.updateHeaderExtension(id, extension, typ); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
