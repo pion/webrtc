@@ -13,7 +13,7 @@ require (
 	github.com/pion/rtp v1.8.7
 	github.com/pion/sctp v1.8.19
 	github.com/pion/sdp/v3 v3.0.9
-	github.com/pion/srtp/v3 v3.0.2
+	github.com/pion/srtp/v3 v3.0.3
 	github.com/pion/stun/v2 v2.0.0
 	github.com/pion/transport/v3 v3.0.2
 	github.com/sclevine/agouti v3.0.0+incompatible
