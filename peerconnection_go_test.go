@@ -1030,7 +1030,6 @@ func (r *trackRecords) remains() int {
 // This test assure that all track events emits.
 func TestPeerConnection_MassiveTracks(t *testing.T) {
 	var (
-		api   = NewAPI()
 		tRecs = &trackRecords{
 			trackIDs:         make(map[string]struct{}),
 			receivedTrackIDs: make(map[string]struct{}),
@@ -1059,8 +1058,7 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		connected = make(chan struct{})
 		stopped   = make(chan struct{})
 	)
-	assert.NoError(t, api.mediaEngine.RegisterDefaultCodecs())
-	offerPC, answerPC, err := api.newPair(Configuration{})
+	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 	// Create massive tracks.
 	for range make([]struct{}, trackCount) {

@@ -26,9 +26,6 @@ func Test_ORTC_Media(t *testing.T) {
 	stackA, stackB, err := newORTCPair()
 	assert.NoError(t, err)
 
-	assert.NoError(t, stackA.api.mediaEngine.RegisterDefaultCodecs())
-	assert.NoError(t, stackB.api.mediaEngine.RegisterDefaultCodecs())
-
 	assert.NoError(t, signalORTCPair(stackA, stackB))
 
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")

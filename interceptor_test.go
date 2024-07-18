@@ -33,9 +33,6 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	defer report()
 
 	createPC := func() *PeerConnection {
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
-
 		ir := &interceptor.Registry{}
 		ir.Add(&mock_interceptor.Factory{
 			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
@@ -64,7 +61,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 			},
 		})
 
-		pc, err := NewAPI(WithMediaEngine(m), WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
+		pc, err := NewAPI(WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
 		return pc
@@ -115,9 +112,6 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	m := &MediaEngine{}
-	assert.NoError(t, m.RegisterDefaultCodecs())
-
 	var (
 		cntBindRTCPReader     uint32
 		cntBindRTCPWriter     uint32
@@ -160,7 +154,7 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) { return mockInterceptor, nil },
 	})
 
-	sender, receiver, err := NewAPI(WithMediaEngine(m), WithInterceptorRegistry(ir)).newPair(Configuration{})
+	sender, receiver, err := NewAPI(WithInterceptorRegistry(ir)).newPair(Configuration{})
 	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")

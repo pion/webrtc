@@ -29,10 +29,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 	s := SettingEngine{}
 	s.DisableSRTPReplayProtection(true)
 
-	m := &MediaEngine{}
-	assert.NoError(t, m.RegisterDefaultCodecs())
-
-	sender, receiver, err := NewAPI(WithMediaEngine(m), WithSettingEngine(s)).newPair(Configuration{})
+	sender, receiver, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
 	assert.NoError(t, err)
 
 	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")

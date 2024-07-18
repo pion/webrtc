@@ -31,12 +31,9 @@ func TestNewAPI(t *testing.T) {
 func TestNewAPI_Options(t *testing.T) {
 	s := SettingEngine{}
 	s.DetachDataChannels()
-	m := MediaEngine{}
-	assert.NoError(t, m.RegisterDefaultCodecs())
 
 	api := NewAPI(
 		WithSettingEngine(s),
-		WithMediaEngine(&m),
 	)
 
 	if !api.settingEngine.detach.DataChannels {
