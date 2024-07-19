@@ -1520,7 +1520,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
 					Padding:        true,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00, 0x02},
 			}
@@ -1539,7 +1539,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					Version:        2,
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00},
 			}
@@ -1583,7 +1583,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					Version:        2,
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00},
 			}
