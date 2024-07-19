@@ -68,7 +68,8 @@ type PeerConnection struct {
 	// should be defined (see JSEP 3.4.1).
 	greaterMid int
 
-	rtpTransceivers []*RTPTransceiver
+	rtpTransceivers        []*RTPTransceiver
+	nonMediaBandwidthProbe atomic.Value // RTPReceiver
 
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler atomic.Value // func(ICEConnectionState)
@@ -1524,6 +1525,32 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 	return true, nil
 }
 
+// Chrome sends probing traffic on SSRC 0. This reads the packets to ensure that we properly
+// generate TWCC reports for it. Since this isn't actually media we don't pass this to the user
+func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
+	nonMediaBandwidthProbe, err := pc.api.NewRTPReceiver(RTPCodecTypeVideo, pc.dtlsTransport)
+	if err != nil {
+		pc.log.Errorf("handleNonMediaBandwidthProbe failed to create RTPReceiver: %v", err)
+		return
+	}
+
+	if err = nonMediaBandwidthProbe.Receive(RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{}}},
+	}); err != nil {
+		pc.log.Errorf("handleNonMediaBandwidthProbe failed to start RTPReceiver: %v", err)
+		return
+	}
+
+	pc.nonMediaBandwidthProbe.Store(nonMediaBandwidthProbe)
+	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
+	for {
+		if _, _, err = nonMediaBandwidthProbe.readRTP(b, nonMediaBandwidthProbe.Track()); err != nil {
+			pc.log.Tracef("handleNonMediaBandwidthProbe read exiting: %v", err)
+			return
+		}
+	}
+}
+
 func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
@@ -1653,6 +1680,11 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 			if err = stream.Close(); err != nil {
 				pc.log.Warnf("Failed to close RTP stream %v", err)
 			}
+			continue
+		}
+
+		if ssrc == 0 {
+			go pc.handleNonMediaBandwidthProbe()
 			continue
 		}
 
@@ -2071,6 +2103,9 @@ func (pc *PeerConnection) Close() error {
 		if !t.stopped {
 			closeErrs = append(closeErrs, t.Stop())
 		}
+	}
+	if nonMediaBandwidthProbe, ok := pc.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
+		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop())
 	}
 	pc.mu.Unlock()
 
