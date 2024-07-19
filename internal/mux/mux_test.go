@@ -154,3 +154,36 @@ func BenchmarkDispatch(b *testing.B) {
 		}
 	}
 }
+
+func TestPendingQueue(t *testing.T) {
+	factory := logging.NewDefaultLoggerFactory()
+	factory.DefaultLogLevel = logging.LogLevelDebug
+	m := &Mux{
+		endpoints: make(map[*Endpoint]MatchFunc),
+		log:       factory.NewLogger("mux"),
+	}
+
+	// Assert empty packets don't end up in queue
+	require.NoError(t, m.dispatch([]byte{}))
+	require.Equal(t, len(m.pendingPackets), 0)
+
+	// Test Happy Case
+	inBuffer := []byte{20, 1, 2, 3, 4}
+	outBuffer := make([]byte, len(inBuffer))
+
+	require.NoError(t, m.dispatch(inBuffer))
+
+	endpoint := m.NewEndpoint(MatchDTLS)
+	require.NotNil(t, endpoint)
+
+	_, err := endpoint.Read(outBuffer)
+	require.NoError(t, err)
+
+	require.Equal(t, outBuffer, inBuffer)
+
+	// Assert limit on pendingPackets
+	for i := 0; i <= 100; i++ {
+		require.NoError(t, m.dispatch([]byte{64, 65, 66}))
+	}
+	require.Equal(t, len(m.pendingPackets), maxPendingPackets)
+}
