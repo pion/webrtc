@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2/pkg/crypto/elliptic"
+	"github.com/pion/ice/v3"
+	"github.com/pion/stun/v2"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -277,4 +279,33 @@ func TestSetSCTPRTOMax(t *testing.T) {
 	expSize := time.Second
 	s.SetSCTPRTOMax(expSize)
 	assert.Equal(t, expSize, s.sctp.rtoMax)
+}
+
+func TestSetICEBindingRequestHandler(t *testing.T) {
+	seenICEControlled, seenICEControlledCancel := context.WithCancel(context.Background())
+	seenICEControlling, seenICEControllingCancel := context.WithCancel(context.Background())
+
+	s := SettingEngine{}
+	s.SetICEBindingRequestHandler(func(m *stun.Message, _, _ ice.Candidate, _ *ice.CandidatePair) bool {
+		for _, a := range m.Attributes {
+			switch a.Type {
+			case stun.AttrICEControlled:
+				seenICEControlledCancel()
+			case stun.AttrICEControlling:
+				seenICEControllingCancel()
+			default:
+			}
+		}
+
+		return false
+	})
+
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	<-seenICEControlled.Done()
+	<-seenICEControlling.Done()
+	closePairNow(t, pcOffer, pcAnswer)
 }

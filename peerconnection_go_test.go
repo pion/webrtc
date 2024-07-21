@@ -1030,7 +1030,6 @@ func (r *trackRecords) remains() int {
 // This test assure that all track events emits.
 func TestPeerConnection_MassiveTracks(t *testing.T) {
 	var (
-		api   = NewAPI()
 		tRecs = &trackRecords{
 			trackIDs:         make(map[string]struct{}),
 			receivedTrackIDs: make(map[string]struct{}),
@@ -1059,8 +1058,7 @@ func TestPeerConnection_MassiveTracks(t *testing.T) {
 		connected = make(chan struct{})
 		stopped   = make(chan struct{})
 	)
-	assert.NoError(t, api.mediaEngine.RegisterDefaultCodecs())
-	offerPC, answerPC, err := api.newPair(Configuration{})
+	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 	// Create massive tracks.
 	for range make([]struct{}, trackCount) {
@@ -1607,4 +1605,38 @@ func TestPeerConnectionState(t *testing.T) {
 
 	assert.NoError(t, pc.Close())
 	assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
+}
+
+func TestPeerConnectionDeadlock(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	closeHdlr := func(peerConnection *PeerConnection) {
+		peerConnection.OnICEConnectionStateChange(func(i ICEConnectionState) {
+			if i == ICEConnectionStateFailed || i == ICEConnectionStateClosed {
+				if err := peerConnection.Close(); err != nil {
+					assert.NoError(t, err)
+				}
+			}
+		})
+	}
+
+	pcOffer, pcAnswer, err := NewAPI().newPair(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	pcAnswer.OnDataChannel(func(*DataChannel) {
+		onDataChannelCancel()
+	})
+	<-onDataChannel.Done()
+
+	closeHdlr(pcOffer)
+	closeHdlr(pcAnswer)
+
+	closePairNow(t, pcOffer, pcAnswer)
 }

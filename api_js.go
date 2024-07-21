@@ -6,7 +6,7 @@
 
 package webrtc
 
-// API bundles the global funcions of the WebRTC and ORTC API.
+// API bundles the global functions of the WebRTC and ORTC API.
 type API struct {
 	settingEngine *SettingEngine
 }

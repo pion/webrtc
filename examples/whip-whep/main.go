@@ -193,5 +193,5 @@ func writeAnswer(w http.ResponseWriter, peerConnection *webrtc.PeerConnection, o
 	w.WriteHeader(http.StatusCreated)
 
 	// Write Answer with Candidates as HTTP Response
-	fmt.Fprint(w, peerConnection.LocalDescription().SDP)
+	fmt.Fprint(w, peerConnection.LocalDescription().SDP) //nolint: errcheck
 }

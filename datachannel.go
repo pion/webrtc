@@ -236,7 +236,7 @@ func (d *DataChannel) onOpen() {
 }
 
 // OnDial sets an event handler which is invoked when the
-// peer has been dialed, but before said peer has responsed
+// peer has been dialed, but before said peer has responded
 func (d *DataChannel) OnDial(f func()) {
 	d.mu.Lock()
 	d.dialHandlerOnce = sync.Once{}
@@ -349,18 +349,11 @@ func (d *DataChannel) onError(err error) {
 	}
 }
 
-// See https://github.com/pion/webrtc/issues/1516
-// nolint:gochecknoglobals
-var rlBufPool = sync.Pool{New: func() interface{} {
-	return make([]byte, dataChannelBufferSize)
-}}
-
 func (d *DataChannel) readLoop() {
+	buffer := make([]byte, dataChannelBufferSize)
 	for {
-		buffer := rlBufPool.Get().([]byte) //nolint:forcetypeassert
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
-			rlBufPool.Put(buffer) // nolint:staticcheck
 			d.setReadyState(DataChannelStateClosed)
 			if !errors.Is(err, io.EOF) {
 				d.onError(err)
@@ -371,8 +364,6 @@ func (d *DataChannel) readLoop() {
 
 		m := DataChannelMessage{Data: make([]byte, n), IsString: isString}
 		copy(m.Data, buffer[:n])
-		// The 'staticcheck' pragma is a false positive on the part of the CI linter.
-		rlBufPool.Put(buffer) // nolint:staticcheck
 
 		// NB: Why was DataChannelMessage not passed as a pointer value?
 		d.onMessage(m) // nolint:staticcheck

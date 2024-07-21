@@ -46,10 +46,12 @@ func TestOggReader_ParseNextPage(t *testing.T) {
 	reader, _, err := NewWith(ogg)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
+	assert.Equal(t, int64(47), reader.bytesReadSuccesfully)
 
 	payload, _, err := reader.ParseNextPage()
 	assert.Equal(t, []byte{0x98, 0x36, 0xbe, 0x88, 0x9e}, payload)
 	assert.NoError(t, err)
+	assert.Equal(t, int64(80), reader.bytesReadSuccesfully)
 
 	_, _, err = reader.ParseNextPage()
 	assert.Equal(t, err, io.EOF)

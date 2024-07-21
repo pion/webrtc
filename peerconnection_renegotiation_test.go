@@ -603,7 +603,6 @@ func TestPeerConnection_Renegotiation_Trickle(t *testing.T) {
 	settingEngine := SettingEngine{}
 
 	api := NewAPI(WithSettingEngine(settingEngine))
-	assert.NoError(t, api.mediaEngine.RegisterDefaultCodecs())
 
 	// Invalid STUN server on purpose, will stop ICE Gathering from completing in time
 	pcOffer, pcAnswer, err := api.newPair(Configuration{
@@ -1047,7 +1046,7 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 			for ssrc, rid := range rids {
 				header := &rtp.Header{
 					Version:        2,
-					SSRC:           uint32(ssrc),
+					SSRC:           uint32(ssrc + 1),
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
 				}

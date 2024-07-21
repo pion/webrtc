@@ -5,13 +5,18 @@
 package main
 
 import (
+	"bufio"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/examples/internal/signal"
 )
 
 const messageSize = 15
@@ -94,7 +99,7 @@ func main() {
 
 	// Wait for the offer to be pasted
 	offer := webrtc.SessionDescription{}
-	signal.Decode(signal.MustReadStdin(), &offer)
+	decode(readUntilNewline(), &offer)
 
 	// Set the remote SessionDescription
 	err = peerConnection.SetRemoteDescription(offer)
@@ -123,7 +128,7 @@ func main() {
 	<-gatherComplete
 
 	// Output the answer in base64 so we can paste it in browser
-	fmt.Println(signal.Encode(*peerConnection.LocalDescription()))
+	fmt.Println(encode(peerConnection.LocalDescription()))
 
 	// Block forever
 	select {}
@@ -146,12 +151,56 @@ func ReadLoop(d io.Reader) {
 // WriteLoop shows how to write to the datachannel directly
 func WriteLoop(d io.Writer) {
 	for range time.NewTicker(5 * time.Second).C {
-		message := signal.RandSeq(messageSize)
-		fmt.Printf("Sending %s \n", message)
-
-		_, err := d.Write([]byte(message))
+		message, err := randutil.GenerateCryptoRandomString(messageSize, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 		if err != nil {
 			panic(err)
 		}
+
+		fmt.Printf("Sending %s \n", message)
+		if _, err := d.Write([]byte(message)); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// Read from stdin until we get a newline
+func readUntilNewline() (in string) {
+	var err error
+
+	r := bufio.NewReader(os.Stdin)
+	for {
+		in, err = r.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			panic(err)
+		}
+
+		if in = strings.TrimSpace(in); len(in) > 0 {
+			break
+		}
+	}
+
+	fmt.Println("")
+	return
+}
+
+// JSON encode + base64 a SessionDescription
+func encode(obj *webrtc.SessionDescription) string {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// Decode a base64 and unmarshal JSON into a SessionDescription
+func decode(in string, obj *webrtc.SessionDescription) {
+	b, err := base64.StdEncoding.DecodeString(in)
+	if err != nil {
+		panic(err)
+	}
+
+	if err = json.Unmarshal(b, obj); err != nil {
+		panic(err)
 	}
 }

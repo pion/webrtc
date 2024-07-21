@@ -201,7 +201,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 
 		var t *trackStreams
 		for idx, ts := range r.tracks {
-			if ts.track != nil && parameters.Encodings[i].SSRC != 0 && ts.track.SSRC() == parameters.Encodings[i].SSRC {
+			if ts.track != nil && ts.track.SSRC() == parameters.Encodings[i].SSRC {
 				t = &r.tracks[idx]
 				break
 			}
@@ -210,12 +210,10 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 			return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, parameters.Encodings[i].SSRC)
 		}
 
-		if parameters.Encodings[i].SSRC != 0 {
-			t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
-			var err error
-			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
-				return err
-			}
+		t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
+		var err error
+		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
+			return err
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
@@ -418,6 +416,10 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 		for i := range r.tracks {
 			if r.tracks[i].track.RID() == rsid {
 				track = &r.tracks[i]
+				if track.track.RtxSSRC() == 0 {
+					track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
+				}
+				break
 			}
 		}
 	}

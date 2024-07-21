@@ -4,7 +4,7 @@ This example modifies the video with a single-byte XOR cipher before sending, an
 decrypts in Javascript.
 
 insertable-streams allows the browser to process encoded video. You could implement
-E2E encyption, add metadata or insert a completely different video feed!
+E2E encryption, add metadata or insert a completely different video feed!
 
 ## Instructions
 ### Create IVF named `output.ivf` that contains a VP8 track
