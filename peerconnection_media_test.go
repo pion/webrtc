@@ -1335,7 +1335,7 @@ func TestPeerConnection_Simulcast(t *testing.T) {
 			for ssrc, rid := range rids {
 				header := &rtp.Header{
 					Version:        2,
-					SSRC:           uint32(ssrc),
+					SSRC:           uint32(ssrc + 1),
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
 				}
