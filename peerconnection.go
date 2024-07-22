@@ -1472,11 +1472,23 @@ func (pc *PeerConnection) startSCTP() {
 }
 
 func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *SessionDescription) (handled bool, err error) {
-	if len(remoteDescription.parsed.MediaDescriptions) != 1 {
+	mediaIdx := -1
+	// find first and only audio/video media description; otherwise fail.
+	// DataChannels do not count.
+	for idx, mediaDesc := range remoteDescription.parsed.MediaDescriptions {
+		switch mediaDesc.MediaName.Media {
+		case RTPCodecTypeVideo.String(), RTPCodecTypeAudio.String():
+			if mediaIdx != -1 { // more than one media
+				return false, nil
+			}
+			mediaIdx = idx
+		}
+	}
+	if mediaIdx == -1 {
 		return false, nil
 	}
 
-	onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
+	onlyMediaSection := remoteDescription.parsed.MediaDescriptions[mediaIdx]
 	streamID := ""
 	id := ""
 	hasRidAttribute := false
@@ -1569,7 +1581,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		}
 	}
 
-	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
+	// If the remote SDP was only one media (non-datachannel) section the ssrc doesn't
+	// have to be explicitly declared
 	if handled, err := pc.handleUndeclaredSSRC(ssrc, remoteDescription); handled || err != nil {
 		return err
 	}
@@ -1608,6 +1621,24 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 	if err != nil {
 		return err
 	}
+	var handled bool
+	defer func() {
+		if !handled {
+			if readStream != rtpStream {
+				// if they are the same, it has already been added to our simulcast streams
+				// to be closed later
+				if err := readStream.Close(); err != nil {
+					pc.log.Tracef("error closing readStream for unhandled SSRC %d: %v", ssrc, err)
+				}
+			}
+			if err := rtcpReadStream.Close(); err != nil {
+				// if we accepted this RTCP stream earlier, this may result in a close error, but that's
+				// okay. A better way to do this would be to have streamsForSSRC expose what is newly
+				// opened.
+				pc.log.Tracef("error closing rtcpReadStream for unhandled SSRC %d: %v", ssrc, err)
+			}
+		}
+	}()
 
 	var mid, rid, rsid string
 	var paddingOnly bool
@@ -1639,13 +1670,18 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 			if rsid != "" {
 				receiver.mu.Lock()
 				defer receiver.mu.Unlock()
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				if err := receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor); err != nil {
+					return err
+				}
+				handled = true
+				return nil
 			}
 
 			track, err := receiver.receiveForRid(rid, params, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
 			if err != nil {
 				return err
 			}
+			handled = true
 			pc.onTrack(track, receiver)
 			return nil
 		}
