@@ -1670,25 +1670,41 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 			return
 		}
 
-		stream, ssrc, err := srtpSession.AcceptStream()
+		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+		if err != nil {
+			pc.log.Warnf("undeclaredMediaProcessor failed to open SrtcpSession: %v", err)
+			return
+		}
+
+		srtpReadStream, ssrc, err := srtpSession.AcceptStream()
 		if err != nil {
 			pc.log.Warnf("Failed to accept RTP %v", err)
 			return
 		}
 
+		// open accompanying srtcp stream
+		srtcpReadStream, err := srtcpSession.OpenReadStream(ssrc)
+		if err != nil {
+			pc.log.Warnf("Failed to open RTCP stream for %d: %v", ssrc, err)
+			return
+		}
+
 		if pc.isClosed.get() {
-			if err = stream.Close(); err != nil {
+			if err = srtpReadStream.Close(); err != nil {
 				pc.log.Warnf("Failed to close RTP stream %v", err)
+			}
+			if err = srtcpReadStream.Close(); err != nil {
+				pc.log.Warnf("Failed to close RTCP stream %v", err)
 			}
 			continue
 		}
+
+		pc.dtlsTransport.storeSimulcastStream(srtpReadStream, srtcpReadStream)
 
 		if ssrc == 0 {
 			go pc.handleNonMediaBandwidthProbe()
 			continue
 		}
-
-		pc.dtlsTransport.storeSimulcastStream(stream)
 
 		if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
@@ -1701,7 +1717,7 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
 			}
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
-		}(stream, SSRC(ssrc))
+		}(srtpReadStream, SSRC(ssrc))
 	}
 }
 
