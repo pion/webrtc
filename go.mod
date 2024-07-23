@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/pion/datachannel v1.5.8
 	github.com/pion/dtls/v2 v2.2.12
-	github.com/pion/ice/v2 v2.3.29
+	github.com/pion/ice/v2 v2.3.31
 	github.com/pion/interceptor v0.1.29
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
@@ -15,7 +15,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.9
 	github.com/pion/srtp/v2 v2.0.20
 	github.com/pion/stun v0.6.1
-	github.com/pion/transport/v2 v2.2.4
+	github.com/pion/transport/v2 v2.2.8
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.22.0
@@ -29,6 +29,7 @@ require (
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/wlynxg/anet v0.0.3 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
