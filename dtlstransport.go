@@ -51,13 +51,18 @@ type DTLSTransport struct {
 
 	srtpSession, srtcpSession   atomic.Value
 	srtpEndpoint, srtcpEndpoint *mux.Endpoint
-	simulcastStreams            []*srtp.ReadStreamSRTP
+	simulcastStreams            []simulcastStreamPair
 	srtpReady                   chan struct{}
 
 	dtlsMatcher mux.MatchFunc
 
 	api *API
 	log logging.LeveledLogger
+}
+
+type simulcastStreamPair struct {
+	srtp  *srtp.ReadStreamSRTP
+	srtcp *srtp.ReadStreamSRTCP
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
@@ -436,7 +441,8 @@ func (t *DTLSTransport) Stop() error {
 	}
 
 	for i := range t.simulcastStreams {
-		closeErrs = append(closeErrs, t.simulcastStreams[i].Close())
+		closeErrs = append(closeErrs, t.simulcastStreams[i].srtp.Close())
+		closeErrs = append(closeErrs, t.simulcastStreams[i].srtcp.Close())
 	}
 
 	if t.conn != nil {
@@ -477,11 +483,11 @@ func (t *DTLSTransport) ensureICEConn() error {
 	return nil
 }
 
-func (t *DTLSTransport) storeSimulcastStream(s *srtp.ReadStreamSRTP) {
+func (t *DTLSTransport) storeSimulcastStream(srtpReadStream *srtp.ReadStreamSRTP, srtcpReadStream *srtp.ReadStreamSRTCP) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.simulcastStreams = append(t.simulcastStreams, s)
+	t.simulcastStreams = append(t.simulcastStreams, simulcastStreamPair{srtpReadStream, srtcpReadStream})
 }
 
 func (t *DTLSTransport) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
