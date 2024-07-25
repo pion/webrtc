@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/dtls/v2"
-	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v3/pkg/crypto/fingerprint"
 	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
@@ -284,7 +284,7 @@ func (t *DTLSTransport) role() DTLSRole {
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
-func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
+func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint: gocognit
 	// Take lock and prepare connection, we must not hold the lock
 	// when connecting
 	prepareTransport := func() (DTLSRole, *dtls.Config, error) {
@@ -346,7 +346,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	dtlsConfig.FlightInterval = t.api.settingEngine.dtls.retransmissionInterval
 	dtlsConfig.InsecureSkipVerifyHello = t.api.settingEngine.dtls.insecureSkipHelloVerify
 	dtlsConfig.EllipticCurves = t.api.settingEngine.dtls.ellipticCurves
-	dtlsConfig.ConnectContextMaker = t.api.settingEngine.dtls.connectContextMaker
 	dtlsConfig.ExtendedMasterSecret = t.api.settingEngine.dtls.extendedMasterSecret
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
@@ -355,9 +354,18 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
 	if role == DTLSRoleClient {
-		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
 	} else {
-		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
+	}
+
+	if err == nil {
+		if t.api.settingEngine.dtls.connectContextMaker != nil {
+			handshakeCtx, _ := t.api.settingEngine.dtls.connectContextMaker()
+			err = dtlsConn.HandshakeContext(handshakeCtx)
+		} else {
+			err = dtlsConn.Handshake()
+		}
 	}
 
 	// Re-take the lock, nothing beyond here is blocking

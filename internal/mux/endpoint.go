@@ -44,6 +44,13 @@ func (e *Endpoint) Read(p []byte) (int, error) {
 	return e.buffer.Read(p)
 }
 
+// ReadFrom reads a packet of len(p) bytes from the underlying conn
+// that are matched by the associated MuxFunc
+func (e *Endpoint) ReadFrom(p []byte) (int, net.Addr, error) {
+	i, err := e.Read(p)
+	return i, nil, err
+}
+
 // Write writes len(p) bytes to the underlying conn
 func (e *Endpoint) Write(p []byte) (int, error) {
 	n, err := e.mux.nextConn.Write(p)
@@ -54,6 +61,11 @@ func (e *Endpoint) Write(p []byte) (int, error) {
 	}
 
 	return n, err
+}
+
+// WriteTo writes len(p) bytes to the underlying conn
+func (e *Endpoint) WriteTo(p []byte, _ net.Addr) (int, error) {
+	return e.Write(p)
 }
 
 // LocalAddr is a stub
