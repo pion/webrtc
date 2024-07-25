@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/pion/datachannel v1.5.8
-	github.com/pion/dtls/v2 v2.2.12
+	github.com/pion/dtls/v3 v3.0.0
 	github.com/pion/ice/v3 v3.0.13
 	github.com/pion/interceptor v0.1.29
 	github.com/pion/logging v0.2.2
@@ -26,6 +26,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
+	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/transport/v2 v2.2.8 // indirect
 	github.com/pion/turn/v3 v3.0.3 // indirect

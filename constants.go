@@ -3,7 +3,7 @@
 
 package webrtc
 
-import "github.com/pion/dtls/v2"
+import "github.com/pion/dtls/v3"
 
 const (
 	// Equal to UDP MTU
