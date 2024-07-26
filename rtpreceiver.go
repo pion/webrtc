@@ -424,7 +424,7 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 	track.repairInterceptor = rtpInterceptor
 	track.repairRtcpReadStream = rtcpReadStream
 	track.repairRtcpInterceptor = rtcpInterceptor
-	track.repairStreamChannel = make(chan rtxPacketWithAttributes)
+	track.repairStreamChannel = make(chan rtxPacketWithAttributes, 50)
 
 	go func() {
 		for {
@@ -474,6 +474,8 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 				r.rtxPool.Put(b) // nolint:staticcheck
 				return
 			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes, pool: &r.rtxPool}:
+			default:
+				// skip the RTX packet if the repair stream channel is full, could be blocked in the application's read loop
 			}
 		}
 	}()
