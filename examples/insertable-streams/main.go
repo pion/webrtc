@@ -89,7 +89,8 @@ func main() {
 		// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
 		// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
 		ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
-		for ; true; <-ticker.C {
+		defer ticker.Stop()
+		for range ticker.C {
 			frame, _, ivfErr := ivf.ParseNextFrame()
 			if errors.Is(ivfErr, io.EOF) {
 				fmt.Printf("All frames parsed and sent")

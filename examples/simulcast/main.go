@@ -113,6 +113,7 @@ func main() {
 		rid := track.RID()
 		go func() {
 			ticker := time.NewTicker(3 * time.Second)
+			defer ticker.Stop()
 			for range ticker.C {
 				fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
 				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {

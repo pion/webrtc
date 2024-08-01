@@ -1000,6 +1000,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		assert.NoError(t, err)
 
 		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
 		testFinished := make(chan struct{})
 		seenFiveStreams, seenFiveStreamsCancel := context.WithCancel(context.Background())
 

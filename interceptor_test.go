@@ -92,6 +92,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 
 	func() {
 		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-seenRTP.Done():
@@ -252,7 +253,9 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 
 	go func() {
 		sequenceNumber := uint16(0)
-		for range time.NewTicker(time.Millisecond * 20).C {
+		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
+		for range ticker.C {
 			track.mu.Lock()
 			if len(track.bindings) == 1 {
 				_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{

@@ -163,7 +163,9 @@ func main() { // nolint:gocognit
 		d.OnOpen(func() {
 			fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", d.Label(), d.ID())
 
-			for range time.NewTicker(5 * time.Second).C {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
 				message, sendTextErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 				if sendTextErr != nil {
 					panic(sendTextErr)

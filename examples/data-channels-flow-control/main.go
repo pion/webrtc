@@ -113,7 +113,9 @@ func createAnswerer() *webrtc.PeerConnection {
 			since := time.Now()
 
 			// Start printing out the observed throughput
-			for range time.NewTicker(1000 * time.Millisecond).C {
+			ticker := time.NewTicker(1000 * time.Millisecond)
+			defer ticker.Stop()
+			for range ticker.C {
 				bps := float64(atomic.LoadUint64(&totalBytesReceived)*8) / time.Since(since).Seconds()
 				log.Printf("Throughput: %.03f Mbps", bps/1024/1024)
 			}
