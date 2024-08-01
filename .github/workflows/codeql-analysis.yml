@@ -20,6 +20,7 @@ on:
   pull_request:
     branches:
       - master
+      - v3
     paths:
       - '**.go'
 

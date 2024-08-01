@@ -17,6 +17,7 @@ on:
   push:
     branches:
       - master
+      - v3
 
 jobs:
   tidy:
