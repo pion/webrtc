@@ -202,8 +202,8 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) (
 				id:       trackID,
 				rids:     []string{},
 			}
-			for rid := range rids {
-				simulcastTrack.rids = append(simulcastTrack.rids, rid)
+			for _, rid := range rids {
+				simulcastTrack.rids = append(simulcastTrack.rids, rid.id)
 			}
 
 			tracksInMediaSection = []trackDetails{simulcastTrack}
@@ -238,13 +238,13 @@ func trackDetailsToRTPReceiveParameters(t *trackDetails) RTPReceiveParameters {
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) map[string]*simulcastRid {
-	rids := map[string]*simulcastRid{}
+func getRids(media *sdp.MediaDescription) []*simulcastRid {
+	rids := []*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids[split[0]] = &simulcastRid{attrValue: attr.Value}
+			rids = append(rids, &simulcastRid{id: split[0], attrValue: attr.Value})
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -257,9 +257,12 @@ func getRids(media *sdp.MediaDescription) map[string]*simulcastRid {
 		ridStates := strings.Split(simulcastAttr, ";")
 		for _, ridState := range ridStates {
 			if ridState[:1] == "~" {
-				rid := ridState[1:]
-				if r, ok := rids[rid]; ok {
-					r.paused = true
+				ridID := ridState[1:]
+				for _, rid := range rids {
+					if rid.id == ridID {
+						rid.paused = true
+						break
+					}
 				}
 			}
 		}
@@ -499,15 +502,16 @@ func addTransceiverSDP(
 		media.WithExtMap(sdp.ExtMap{Value: rtpExtension.ID, URI: extURL})
 	}
 
-	if len(mediaSection.ridMap) > 0 {
-		recvRids := make([]string, 0, len(mediaSection.ridMap))
+	if len(mediaSection.rids) > 0 {
+		recvRids := make([]string, 0, len(mediaSection.rids))
 
-		for rid := range mediaSection.ridMap {
-			media.WithValueAttribute(sdpAttributeRid, rid+" recv")
-			if mediaSection.ridMap[rid].paused {
-				rid = "~" + rid
+		for _, rid := range mediaSection.rids {
+			ridID := rid.id
+			media.WithValueAttribute(sdpAttributeRid, ridID+" recv")
+			if rid.paused {
+				ridID = "~" + ridID
 			}
-			recvRids = append(recvRids, rid)
+			recvRids = append(recvRids, ridID)
 		}
 		// Simulcast
 		media.WithValueAttribute(sdpAttributeSimulcast, "recv "+strings.Join(recvRids, ";"))
@@ -533,6 +537,7 @@ func addTransceiverSDP(
 }
 
 type simulcastRid struct {
+	id        string
 	attrValue string
 	paused    bool
 }
@@ -542,7 +547,7 @@ type mediaSection struct {
 	transceivers    []*RTPTransceiver
 	data            bool
 	matchExtensions map[string]int
-	ridMap          map[string]*simulcastRid
+	rids            []*simulcastRid
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {

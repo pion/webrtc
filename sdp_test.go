@@ -381,16 +381,18 @@ func TestPopulateSDP(t *testing.T) {
 
 		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
-		ridMap := map[string]*simulcastRid{
-			"ridkey": {
+		rids := []*simulcastRid{
+			{
+				id:        "ridkey",
 				attrValue: "some",
 			},
-			"ridPaused": {
+			{
+				id:        "ridPaused",
 				attrValue: "some2",
 				paused:    true,
 			},
 		}
-		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, ridMap: ridMap}}
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, rids: rids}}
 
 		d := &sdp.SessionDescription{}
 
@@ -403,12 +405,14 @@ func TestPopulateSDP(t *testing.T) {
 			if desc.MediaName.Media != "video" {
 				continue
 			}
-			ridInSDP := getRids(desc)
-			if ridKey, ok := ridInSDP["ridkey"]; ok && !ridKey.paused {
-				ridFound++
-			}
-			if ridPaused, ok := ridInSDP["ridPaused"]; ok && ridPaused.paused {
-				ridFound++
+			ridsInSDP := getRids(desc)
+			for _, rid := range ridsInSDP {
+				if rid.id == "ridkey" && !rid.paused {
+					ridFound++
+				}
+				if rid.id == "ridPaused" && rid.paused {
+					ridFound++
+				}
 			}
 		}
 		assert.Equal(t, 2, ridFound, "All rid keys should be present")
@@ -631,7 +635,14 @@ func TestGetRIDs(t *testing.T) {
 	rids := getRids(m[0])
 
 	assert.NotEmpty(t, rids, "Rid mapping should be present")
-	if _, ok := rids["f"]; !ok {
+	found := false
+	for _, rid := range rids {
+		if rid.id == "f" {
+			found = true
+			break
+		}
+	}
+	if !found {
 		assert.Fail(t, "rid values should contain 'f'")
 	}
 }

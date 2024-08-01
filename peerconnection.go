@@ -2500,7 +2500,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			mediaTransceivers := []*RTPTransceiver{t}
 
 			extensions, _ := rtpExtensionsFromMediaDescription(media)
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, ridMap: getRids(media)})
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, rids: getRids(media)})
 		}
 	}
 
