@@ -159,7 +159,9 @@ func ReadLoop(d io.Reader) {
 
 // WriteLoop shows how to write to the datachannel directly
 func WriteLoop(d io.Writer) {
-	for range time.NewTicker(5 * time.Second).C {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
 		message, err := randutil.GenerateCryptoRandomString(messageSize, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 		if err != nil {
 			handleError(err)
