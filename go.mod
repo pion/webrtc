@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/pion/datachannel v1.5.8
 	github.com/pion/dtls/v3 v3.0.0
-	github.com/pion/ice/v3 v3.0.13
+	github.com/pion/ice/v3 v3.0.15
 	github.com/pion/interceptor v0.1.29
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
@@ -15,7 +15,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.9
 	github.com/pion/srtp/v3 v3.0.3
 	github.com/pion/stun/v2 v2.0.0
-	github.com/pion/transport/v3 v3.0.6
+	github.com/pion/transport/v3 v3.0.7
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/net v0.27.0
