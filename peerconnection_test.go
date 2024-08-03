@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v3"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
@@ -20,6 +21,24 @@ import (
 // *without* using an api (i.e. using the default settings).
 func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	pca, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pcb, err := NewPeerConnection(Configuration{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pca, pcb, nil
+}
+
+func newPairWithMux(mux *ice.MultiUDPMuxDefault) (*PeerConnection, *PeerConnection, error) {
+	settingEngine := SettingEngine{}
+
+	settingEngine.SetICEUDPMux(mux)
+	api := NewAPI(WithSettingEngine(settingEngine))
+	pca, err := api.NewPeerConnection(Configuration{})
 	if err != nil {
 		return nil, nil, err
 	}
