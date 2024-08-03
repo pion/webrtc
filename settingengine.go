@@ -97,6 +97,7 @@ type SettingEngine struct {
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
+	distinctSSRCRTX                           bool
 }
 
 // getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default
@@ -468,4 +469,9 @@ func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 // - Implement custom CandidatePair switching logic
 func (e *SettingEngine) SetICEBindingRequestHandler(bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool) {
 	e.iceBindingRequestHandler = bindingRequestHandler
+}
+
+// SetDistinctSSRCRTX configures if RTX should be sent with distinct SSRC instead of in-band.
+func (e *SettingEngine) SetDistinctSSRCRTX(distinctSSRCRTX bool) {
+	e.distinctSSRCRTX = distinctSSRCRTX
 }
