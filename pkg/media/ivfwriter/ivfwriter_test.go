@@ -5,6 +5,7 @@ package ivfwriter
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"testing"
 
@@ -257,19 +258,25 @@ func TestIVFWriter_AV1(t *testing.T) {
 	t.Run("Unfragmented", func(t *testing.T) {
 		buffer := &bytes.Buffer{}
 
-		writer, err := NewWith(buffer, WithCodec(mimeTypeAV1))
-		assert.NoError(t, err)
+		expectedTimestamp := uint32(3653407706)
 
-		assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{0x00, 0x01, 0xFF}}))
-		assert.NoError(t, writer.Close())
-		assert.Equal(t, buffer.Bytes(), []byte{
+		// the timestamp is an uint32, 4 bytes from offset 36
+		expectedPayloadWithTimestamp := []byte{
 			0x44, 0x4b, 0x49, 0x46, 0x0, 0x0, 0x20,
 			0x0, 0x41, 0x56, 0x30, 0x31, 0x80, 0x2,
 			0xe0, 0x1, 0x1e, 0x0, 0x0, 0x0, 0x1, 0x0,
 			0x0, 0x0, 0x84, 0x3, 0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-			0x0, 0x0, 0x0, 0x0, 0x0, 0xff,
-		})
+			0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0xda, 0x93, 0xc2,
+			0xd9, 0x0, 0x0, 0x0, 0x0, 0xff,
+		}
+
+		writer, err := NewWith(buffer, WithCodec(mimeTypeAV1))
+		assert.NoError(t, err)
+
+		assert.NoError(t, writer.WriteRTP(&rtp.Packet{Header: rtp.Header{Timestamp: expectedTimestamp}, Payload: []byte{0x00, 0x01, 0xFF}}))
+		assert.NoError(t, writer.Close())
+		assert.Equal(t, expectedPayloadWithTimestamp, buffer.Bytes())
+		assert.Equal(t, expectedTimestamp, binary.LittleEndian.Uint32(expectedPayloadWithTimestamp[36:40]))
 	})
 
 	t.Run("Fragmented", func(t *testing.T) {
