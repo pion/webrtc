@@ -28,8 +28,7 @@ type TrackLocalContext interface {
 	// both PeerConnections and the SSRC/PayloadTypes
 	HeaderExtensions() []RTPHeaderExtensionParameter
 
-	// SSRC requires the negotiated SSRC of this track
-	// This track may have multiple if RTX is enabled
+	// SSRC requires the negotiated SSRC of this track.
 	SSRC() SSRC
 
 	// WriteStream returns the WriteStream for this TrackLocal. The implementer writes the outbound
@@ -63,8 +62,7 @@ func (t *baseTrackLocalContext) HeaderExtensions() []RTPHeaderExtensionParameter
 	return t.params.HeaderExtensions
 }
 
-// SSRC requires the negotiated SSRC of this track
-// This track may have multiple if RTX is enabled
+// SSRC requires the negotiated SSRC of this track.
 func (t *baseTrackLocalContext) SSRC() SSRC {
 	return t.ssrc
 }
@@ -111,4 +109,9 @@ type TrackLocal interface {
 
 	// Kind controls if this TrackLocal is audio or video
 	Kind() RTPCodecType
+
+	// RTXTrackLocal returns the retransmission TrackLocal for this TrackLocal.
+	// If this TrackLocal does not have an RTX TrackLocal or is an RTX TrackLocal itself,
+	// this will return nil.
+	RTXTrackLocal() TrackLocal
 }

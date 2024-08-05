@@ -30,6 +30,8 @@ type trackEncoding struct {
 	context *baseTrackLocalContext
 
 	ssrc SSRC
+
+	rtx *trackEncoding
 }
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
@@ -199,12 +201,19 @@ func (r *RTPSender) AddEncoding(track TrackLocal) error {
 }
 
 func (r *RTPSender) addEncoding(track TrackLocal) {
-	trackEncoding := &trackEncoding{
+	baseTrackEncoding := &trackEncoding{
 		track: track,
 		ssrc:  SSRC(randutil.NewMathRandomGenerator().Uint32()),
 	}
 
-	r.trackEncodings = append(r.trackEncodings, trackEncoding)
+	if r.api.settingEngine.distinctSSRCRTX {
+		baseTrackEncoding.rtx = &trackEncoding{
+			track: track,
+			ssrc:  SSRC(randutil.NewMathRandomGenerator().Uint32()),
+		}
+	}
+
+	r.trackEncodings = append(r.trackEncodings, baseTrackEncoding)
 }
 
 // Track returns the RTCRtpTransceiver track, or nil
@@ -339,6 +348,63 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		)
 
 		writeStream.interceptor.Store(rtpInterceptor)
+
+		if trackEncoding.rtx != nil {
+			// also handle the rtx track. check the sdp for the associated
+			// a=fmtp:<pt> apt=<rtx-pt> line (see https://datatracker.ietf.org/doc/html/rfc4588#section-8.1)
+
+			codecs := r.api.mediaEngine.getCodecsByKind(trackEncoding.track.Kind())
+			var rtxCodec *RTPCodecParameters
+			for _, c := range codecs {
+				if fmt.Sprintf("apt=%d", c.PayloadType) == codec.SDPFmtpLine {
+					rtxCodec = &c
+					break
+				}
+			}
+
+			if rtxCodec == nil {
+				return fmt.Errorf("no RTX codec found for %s", codec.SDPFmtpLine)
+			}
+
+			rtxSRTPStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].RTX.SSRC, rtpSender: r}
+			rtxWriteStream := &interceptorToTrackLocalWriter{}
+
+			trackEncoding.rtx.srtpStream = rtxSRTPStream
+			trackEncoding.rtx.ssrc = parameters.Encodings[idx].RTX.SSRC
+			trackEncoding.rtx.context = &baseTrackLocalContext{
+				id:              r.id,
+				params:          r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
+				ssrc:            parameters.Encodings[idx].RTX.SSRC,
+				writeStream:     rtxWriteStream,
+				rtcpInterceptor: trackEncoding.rtcpInterceptor,
+			}
+
+			trackEncoding.rtx.context.params.Codecs = []RTPCodecParameters{*rtxCodec}
+
+			trackEncoding.rtx.streamInfo = *createStreamInfo(
+				fmt.Sprintf("%s-rtx", r.id),
+				parameters.Encodings[idx].RTX.SSRC,
+				rtxCodec.PayloadType,
+				rtxCodec.RTPCodecCapability,
+				parameters.HeaderExtensions,
+			)
+
+			trackEncoding.rtx.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
+				interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+					n, err = trackEncoding.rtx.srtpStream.Read(in)
+					return n, a, err
+				}),
+			)
+
+			rtxRTPInterceptor := r.api.interceptor.BindLocalStream(
+				&trackEncoding.rtx.streamInfo,
+				interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, _ interceptor.Attributes) (int, error) {
+					return rtxSRTPStream.WriteRTP(header, payload)
+				}),
+			)
+
+			rtxWriteStream.interceptor.Store(rtxRTPInterceptor)
+		}
 	}
 
 	close(r.sendCalled)
