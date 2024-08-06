@@ -56,6 +56,8 @@ type PeerConnection struct {
 	idpLoginURL *string
 
 	isClosed                                *atomicBool
+	isGracefulClosed                        *atomicBool
+	isGracefulClosedDone                    chan struct{}
 	isNegotiationNeeded                     *atomicBool
 	updateNegotiationNeededFlagOnEmptyChain *atomicBool
 
@@ -128,6 +130,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			ICECandidatePoolSize: 0,
 		},
 		isClosed:                                &atomicBool{},
+		isGracefulClosed:                        &atomicBool{},
+		isGracefulClosedDone:                    make(chan struct{}),
 		isNegotiationNeeded:                     &atomicBool{},
 		updateNegotiationNeededFlagOnEmptyChain: &atomicBool{},
 		lastOffer:                               "",
@@ -2082,12 +2086,33 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
-// Close ends the PeerConnection
+// Close ends the PeerConnection.
 func (pc *PeerConnection) Close() error {
+	return pc.close(false /* shouldGracefullyClose */)
+}
+
+// GracefulClose ends the PeerConnection. It also waits
+// for any goroutines it started to complete. This is only safe to call outside of
+// PeerConnection callbacks or if in a callback, in its own goroutine.
+func (pc *PeerConnection) GracefulClose() error {
+	return pc.close(true /* shouldGracefullyClose */)
+}
+
+func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	alreadyGracefullyClosed := shouldGracefullyClose && pc.isGracefulClosed.swap(true)
 	if pc.isClosed.swap(true) {
+		if alreadyGracefullyClosed {
+			// similar but distinct condition where we may be waiting for some
+			// other graceful close to finish. Incorrectly using isClosed may
+			// leak a goroutine.
+			<-pc.isGracefulClosedDone
+		}
 		return nil
+	}
+	if shouldGracefullyClose && !alreadyGracefullyClosed {
+		defer close(pc.isGracefulClosedDone)
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
@@ -2132,11 +2157,27 @@ func (pc *PeerConnection) Close() error {
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
 	if pc.iceTransport != nil {
-		closeErrs = append(closeErrs, pc.iceTransport.Stop())
+		if shouldGracefullyClose {
+			// note that it isn't canon to stop gracefully
+			closeErrs = append(closeErrs, pc.iceTransport.GracefulStop())
+		} else {
+			closeErrs = append(closeErrs, pc.iceTransport.Stop())
+		}
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+
+	if shouldGracefullyClose {
+		pc.ops.GracefulClose()
+
+		// note that it isn't canon to stop gracefully
+		pc.sctpTransport.lock.Lock()
+		for _, d := range pc.sctpTransport.dataChannels {
+			closeErrs = append(closeErrs, d.GracefulClose())
+		}
+		pc.sctpTransport.lock.Unlock()
+	}
 
 	return util.FlattenErrs(closeErrs)
 }

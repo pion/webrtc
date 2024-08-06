@@ -16,6 +16,7 @@ import (
 	"github.com/pion/ice/v2"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v3/internal/mux"
+	"github.com/pion/webrtc/v3/internal/util"
 )
 
 // ICETransport allows an application access to information about the ICE
@@ -187,6 +188,17 @@ func (t *ICETransport) restart() error {
 
 // Stop irreversibly stops the ICETransport.
 func (t *ICETransport) Stop() error {
+	return t.stop(false /* shouldGracefullyClose */)
+}
+
+// GracefulStop irreversibly stops the ICETransport. It also waits
+// for any goroutines it started to complete. This is only safe to call outside of
+// ICETransport callbacks or if in a callback, in its own goroutine.
+func (t *ICETransport) GracefulStop() error {
+	return t.stop(true /* shouldGracefullyClose */)
+}
+
+func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -197,8 +209,18 @@ func (t *ICETransport) Stop() error {
 	}
 
 	if t.mux != nil {
-		return t.mux.Close()
+		var closeErrs []error
+		if shouldGracefullyClose && t.gatherer != nil {
+			// we can't access icegatherer/icetransport.Close via
+			// mux's net.Conn Close so we call it earlier here.
+			closeErrs = append(closeErrs, t.gatherer.GracefulClose())
+		}
+		closeErrs = append(closeErrs, t.mux.Close())
+		return util.FlattenErrs(closeErrs)
 	} else if t.gatherer != nil {
+		if shouldGracefullyClose {
+			return t.gatherer.GracefulClose()
+		}
 		return t.gatherer.Close()
 	}
 	return nil

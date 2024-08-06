@@ -40,6 +40,8 @@ type DataChannel struct {
 	readyState                 atomic.Value // DataChannelState
 	bufferedAmountLowThreshold uint64
 	detachCalled               bool
+	readLoopActive             chan struct{}
+	isGracefulClosed           bool
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -225,6 +227,10 @@ func (d *DataChannel) OnOpen(f func()) {
 func (d *DataChannel) onOpen() {
 	d.mu.RLock()
 	handler := d.onOpenHandler
+	if d.isGracefulClosed {
+		d.mu.RUnlock()
+		return
+	}
 	d.mu.RUnlock()
 
 	if handler != nil {
@@ -252,6 +258,10 @@ func (d *DataChannel) OnDial(f func()) {
 func (d *DataChannel) onDial() {
 	d.mu.RLock()
 	handler := d.onDialHandler
+	if d.isGracefulClosed {
+		d.mu.RUnlock()
+		return
+	}
 	d.mu.RUnlock()
 
 	if handler != nil {
@@ -261,6 +271,10 @@ func (d *DataChannel) onDial() {
 
 // OnClose sets an event handler which is invoked when
 // the underlying data transport has been closed.
+// Note: Due to backwards compatibility, there is a chance that
+// OnClose can be called, even if the GracefulClose is used.
+// If this is the case for you, you can deregister OnClose
+// prior to GracefulClose.
 func (d *DataChannel) OnClose(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -292,6 +306,10 @@ func (d *DataChannel) OnMessage(f func(msg DataChannelMessage)) {
 func (d *DataChannel) onMessage(msg DataChannelMessage) {
 	d.mu.RLock()
 	handler := d.onMessageHandler
+	if d.isGracefulClosed {
+		d.mu.RUnlock()
+		return
+	}
 	d.mu.RUnlock()
 
 	if handler == nil {
@@ -302,6 +320,10 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
+	if d.isGracefulClosed {
+		d.mu.Unlock()
+		return
+	}
 	d.dataChannel = dc
 	bufferedAmountLowThreshold := d.bufferedAmountLowThreshold
 	onBufferedAmountLow := d.onBufferedAmountLow
@@ -326,7 +348,12 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	if d.isGracefulClosed {
+		return
+	}
+
 	if !d.api.settingEngine.detach.DataChannels {
+		d.readLoopActive = make(chan struct{})
 		go d.readLoop()
 	}
 }
@@ -342,6 +369,10 @@ func (d *DataChannel) OnError(f func(err error)) {
 func (d *DataChannel) onError(err error) {
 	d.mu.RLock()
 	handler := d.onErrorHandler
+	if d.isGracefulClosed {
+		d.mu.RUnlock()
+		return
+	}
 	d.mu.RUnlock()
 
 	if handler != nil {
@@ -356,6 +387,12 @@ var rlBufPool = sync.Pool{New: func() interface{} {
 }}
 
 func (d *DataChannel) readLoop() {
+	defer func() {
+		d.mu.Lock()
+		readLoopActive := d.readLoopActive
+		d.mu.Unlock()
+		defer close(readLoopActive)
+	}()
 	for {
 		buffer := rlBufPool.Get().([]byte) //nolint:forcetypeassert
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
@@ -438,7 +475,32 @@ func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 // Close Closes the DataChannel. It may be called regardless of whether
 // the DataChannel object was created by this peer or the remote peer.
 func (d *DataChannel) Close() error {
+	return d.close(false)
+}
+
+// GracefulClose Closes the DataChannel. It may be called regardless of whether
+// the DataChannel object was created by this peer or the remote peer. It also waits
+// for any goroutines it started to complete. This is only safe to call outside of
+// DataChannel callbacks or if in a callback, in its own goroutine.
+func (d *DataChannel) GracefulClose() error {
+	return d.close(true)
+}
+
+// Normally, close only stops writes from happening, so graceful=true
+// will wait for reads to be finished based on underlying SCTP association
+// closure or a SCTP reset stream from the other side. This is safe to call
+// with graceful=true after tearing down a PeerConnection but not
+// necessarily before. For example, if you used a vnet and dropped all packets
+// right before closing the DataChannel, you'd need never see a reset stream.
+func (d *DataChannel) close(shouldGracefullyClose bool) error {
 	d.mu.Lock()
+	d.isGracefulClosed = true
+	readLoopActive := d.readLoopActive
+	if shouldGracefullyClose && readLoopActive != nil {
+		defer func() {
+			<-readLoopActive
+		}()
+	}
 	haveSctpTransport := d.dataChannel != nil
 	d.mu.Unlock()
 

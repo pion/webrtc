@@ -19,6 +19,8 @@ func TestOperations_Enqueue(t *testing.T) {
 		onNegotiationNeededCalledCount++
 		onNegotiationNeededCalledCountMu.Unlock()
 	})
+	defer ops.GracefulClose()
+
 	for resultSet := 0; resultSet < 100; resultSet++ {
 		results := make([]int, 16)
 		resultSetCopy := resultSet
@@ -46,5 +48,35 @@ func TestOperations_Enqueue(t *testing.T) {
 func TestOperations_Done(*testing.T) {
 	ops := newOperations(&atomicBool{}, func() {
 	})
+	defer ops.GracefulClose()
 	ops.Done()
+}
+
+func TestOperations_GracefulClose(t *testing.T) {
+	ops := newOperations(&atomicBool{}, func() {
+	})
+
+	counter := 0
+	var counterMu sync.Mutex
+	incFunc := func() {
+		counterMu.Lock()
+		counter++
+		counterMu.Unlock()
+	}
+	const times = 25
+	for i := 0; i < times; i++ {
+		ops.Enqueue(incFunc)
+	}
+	ops.Done()
+	counterMu.Lock()
+	counterCur := counter
+	counterMu.Unlock()
+	assert.Equal(t, counterCur, times)
+
+	ops.GracefulClose()
+	for i := 0; i < times; i++ {
+		ops.Enqueue(incFunc)
+	}
+	ops.Done()
+	assert.Equal(t, counterCur, times)
 }

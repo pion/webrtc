@@ -120,6 +120,10 @@ func (m *Mux) readLoop() {
 		}
 
 		if err = m.dispatch(buf[:n]); err != nil {
+			if errors.Is(err, io.ErrClosedPipe) {
+				// if the buffer was closed, that's not an error we care to report
+				return
+			}
 			m.log.Errorf("mux: ending readLoop dispatch error %s", err.Error())
 			return
 		}
