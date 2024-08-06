@@ -179,3 +179,69 @@ func TestPeerConnection_Close_DuringICE(t *testing.T) {
 		t.Error("pcOffer.Close() Timeout")
 	}
 }
+
+func TestPeerConnection_CloseWithIncomingMessages(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutinesStrict(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dcAnswer *DataChannel
+	answerDataChannelOpened := make(chan struct{})
+	pcAnswer.OnDataChannel(func(d *DataChannel) {
+		// Make sure this is the data channel we were looking for. (Not the one
+		// created in signalPair).
+		if d.Label() != "data" {
+			return
+		}
+		dcAnswer = d
+		close(answerDataChannelOpened)
+	})
+
+	dcOffer, err := pcOffer.CreateDataChannel("data", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offerDataChannelOpened := make(chan struct{})
+	dcOffer.OnOpen(func() {
+		close(offerDataChannelOpened)
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-offerDataChannelOpened
+	<-answerDataChannelOpened
+
+	msgNum := 0
+	dcOffer.OnMessage(func(_ DataChannelMessage) {
+		t.Log("msg", msgNum)
+		msgNum++
+	})
+
+	// send 50 messages, then close pcOffer, and then send another 50
+	for i := 0; i < 100; i++ {
+		if i == 50 {
+			err = pcOffer.GracefulClose()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		_ = dcAnswer.Send([]byte("hello!"))
+	}
+
+	err = pcAnswer.GracefulClose()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
