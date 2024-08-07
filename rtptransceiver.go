@@ -24,8 +24,8 @@ type RTPTransceiver struct {
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
-	stopped bool
-	kind    RTPCodecType
+	isStopped *atomicBool
+	kind      RTPCodecType
 
 	api *API
 	mu  sync.RWMutex
@@ -38,7 +38,7 @@ func newRTPTransceiver(
 	kind RTPCodecType,
 	api *API,
 ) *RTPTransceiver {
-	t := &RTPTransceiver{kind: kind, api: api}
+	t := &RTPTransceiver{kind: kind, api: api, isStopped: &atomicBool{}}
 	t.setReceiver(receiver)
 	t.setSender(sender)
 	t.setDirection(direction)
@@ -153,6 +153,10 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 
 // Stop irreversibly stops the RTPTransceiver
 func (t *RTPTransceiver) Stop() error {
+	if t.isStopped.swap(true) {
+		return nil
+	}
+
 	if sender := t.Sender(); sender != nil {
 		if err := sender.Stop(); err != nil {
 			return err
@@ -167,6 +171,11 @@ func (t *RTPTransceiver) Stop() error {
 	t.setDirection(RTPTransceiverDirectionInactive)
 	t.setCurrentDirection(RTPTransceiverDirectionInactive)
 	return nil
+}
+
+// IsStopped returns true if RTPTransceiver is stopped, else returns false
+func (t *RTPTransceiver) IsStopped() bool {
+	return t.isStopped.get()
 }
 
 func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
