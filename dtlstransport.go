@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/dtls/v2"
-	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v3/pkg/crypto/fingerprint"
 	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
@@ -51,13 +51,18 @@ type DTLSTransport struct {
 
 	srtpSession, srtcpSession   atomic.Value
 	srtpEndpoint, srtcpEndpoint *mux.Endpoint
-	simulcastStreams            []*srtp.ReadStreamSRTP
+	simulcastStreams            []simulcastStreamPair
 	srtpReady                   chan struct{}
 
 	dtlsMatcher mux.MatchFunc
 
 	api *API
 	log logging.LeveledLogger
+}
+
+type simulcastStreamPair struct {
+	srtp  *srtp.ReadStreamSRTP
+	srtcp *srtp.ReadStreamSRTCP
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
@@ -279,7 +284,7 @@ func (t *DTLSTransport) role() DTLSRole {
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport
-func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
+func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint: gocognit
 	// Take lock and prepare connection, we must not hold the lock
 	// when connecting
 	prepareTransport := func() (DTLSRole, *dtls.Config, error) {
@@ -341,7 +346,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	dtlsConfig.FlightInterval = t.api.settingEngine.dtls.retransmissionInterval
 	dtlsConfig.InsecureSkipVerifyHello = t.api.settingEngine.dtls.insecureSkipHelloVerify
 	dtlsConfig.EllipticCurves = t.api.settingEngine.dtls.ellipticCurves
-	dtlsConfig.ConnectContextMaker = t.api.settingEngine.dtls.connectContextMaker
 	dtlsConfig.ExtendedMasterSecret = t.api.settingEngine.dtls.extendedMasterSecret
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
@@ -350,9 +354,18 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
 	if role == DTLSRoleClient {
-		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
 	} else {
-		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsConfig)
+		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
+	}
+
+	if err == nil {
+		if t.api.settingEngine.dtls.connectContextMaker != nil {
+			handshakeCtx, _ := t.api.settingEngine.dtls.connectContextMaker()
+			err = dtlsConn.HandshakeContext(handshakeCtx)
+		} else {
+			err = dtlsConn.Handshake()
+		}
 	}
 
 	// Re-take the lock, nothing beyond here is blocking
@@ -377,6 +390,8 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		t.srtpProtectionProfile = srtp.ProtectionProfileAeadAes256Gcm
 	case dtls.SRTP_AES128_CM_HMAC_SHA1_80:
 		t.srtpProtectionProfile = srtp.ProtectionProfileAes128CmHmacSha1_80
+	case dtls.SRTP_NULL_HMAC_SHA1_80:
+		t.srtpProtectionProfile = srtp.ProtectionProfileNullHmacSha1_80
 	default:
 		t.onStateChange(DTLSTransportStateFailed)
 		return ErrNoSRTPProtectionProfile
@@ -434,7 +449,8 @@ func (t *DTLSTransport) Stop() error {
 	}
 
 	for i := range t.simulcastStreams {
-		closeErrs = append(closeErrs, t.simulcastStreams[i].Close())
+		closeErrs = append(closeErrs, t.simulcastStreams[i].srtp.Close())
+		closeErrs = append(closeErrs, t.simulcastStreams[i].srtcp.Close())
 	}
 
 	if t.conn != nil {
@@ -475,11 +491,11 @@ func (t *DTLSTransport) ensureICEConn() error {
 	return nil
 }
 
-func (t *DTLSTransport) storeSimulcastStream(s *srtp.ReadStreamSRTP) {
+func (t *DTLSTransport) storeSimulcastStream(srtpReadStream *srtp.ReadStreamSRTP, srtcpReadStream *srtp.ReadStreamSRTCP) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.simulcastStreams = append(t.simulcastStreams, s)
+	t.simulcastStreams = append(t.simulcastStreams, simulcastStreamPair{srtpReadStream, srtcpReadStream})
 }
 
 func (t *DTLSTransport) streamsForSSRC(ssrc SSRC, streamInfo interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {

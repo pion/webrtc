@@ -132,6 +132,7 @@ func main() {
 			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
 			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
 			ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+			defer ticker.Stop()
 			for ; true; <-ticker.C {
 				frame, _, ivfErr := ivf.ParseNextFrame()
 				if errors.Is(ivfErr, io.EOF) {
@@ -197,6 +198,7 @@ func main() {
 			// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
 			// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
 			ticker := time.NewTicker(oggPageDuration)
+			defer ticker.Stop()
 			for ; true; <-ticker.C {
 				pageData, pageHeader, oggErr := ogg.ParseNextPage()
 				if errors.Is(oggErr, io.EOF) {

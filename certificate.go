@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/dtls/v2/pkg/crypto/fingerprint"
+	"github.com/pion/dtls/v3/pkg/crypto/fingerprint"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 

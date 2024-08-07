@@ -84,8 +84,13 @@ func main() {
 
 		// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
 		// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
-		sleepTime := time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000)
-		for {
+		//
+		// It is important to use a time.Ticker instead of time.Sleep because
+		// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
+		// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
+		ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+		defer ticker.Stop()
+		for range ticker.C {
 			frame, _, ivfErr := ivf.ParseNextFrame()
 			if errors.Is(ivfErr, io.EOF) {
 				fmt.Printf("All frames parsed and sent")
@@ -101,7 +106,6 @@ func main() {
 				frame[i] ^= cipherKey
 			}
 
-			time.Sleep(sleepTime)
 			if ivfErr = videoTrack.WriteSample(media.Sample{Data: frame, Duration: time.Second}); ivfErr != nil {
 				panic(ivfErr)
 			}

@@ -1000,6 +1000,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		assert.NoError(t, err)
 
 		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
 		testFinished := make(chan struct{})
 		seenFiveStreams, seenFiveStreamsCancel := context.WithCancel(context.Background())
 
@@ -1080,6 +1081,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			return
 		}))
 
+		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+		peerConnectionConnected.Wait()
+
 		sequenceNumber := uint16(0)
 		sendRTPPacket := func() {
 			sequenceNumber++
@@ -1097,12 +1101,12 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			sendRTPPacket()
 		}
 
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
 		trackRemoteChan := make(chan *TrackRemote, 1)
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
 			trackRemoteChan <- trackRemote
 		})
+
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 		trackRemote := func() *TrackRemote {
 			for {
@@ -1525,7 +1529,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
 					Padding:        true,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00, 0x02},
 			}
@@ -1544,7 +1548,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					Version:        2,
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00},
 			}
@@ -1588,7 +1592,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 					Version:        2,
 					SequenceNumber: sequenceNumber,
 					PayloadType:    96,
-					SSRC:           uint32(i),
+					SSRC:           uint32(i + 1),
 				},
 				Payload: []byte{0x00},
 			}

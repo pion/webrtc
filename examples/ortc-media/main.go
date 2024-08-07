@@ -223,6 +223,7 @@ func fourCCToTrack(fourCC string) *webrtc.TrackLocalStaticSample {
 // Write a file to Track
 func writeFileToTrack(ivf *ivfreader.IVFReader, header *ivfreader.IVFFileHeader, track *webrtc.TrackLocalStaticSample) {
 	ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+	defer ticker.Stop()
 	for ; true; <-ticker.C {
 		frame, _, err := ivf.ParseNextFrame()
 		if errors.Is(err, io.EOF) {
@@ -297,7 +298,7 @@ func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done")
+		fmt.Fprintf(w, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

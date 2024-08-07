@@ -201,7 +201,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 
 		var t *trackStreams
 		for idx, ts := range r.tracks {
-			if ts.track != nil && parameters.Encodings[i].SSRC != 0 && ts.track.SSRC() == parameters.Encodings[i].SSRC {
+			if ts.track != nil && ts.track.SSRC() == parameters.Encodings[i].SSRC {
 				t = &r.tracks[idx]
 				break
 			}
@@ -210,12 +210,10 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 			return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, parameters.Encodings[i].SSRC)
 		}
 
-		if parameters.Encodings[i].SSRC != 0 {
-			t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
-			var err error
-			if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
-				return err
-			}
+		t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
+		var err error
+		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
+			return err
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
@@ -435,7 +433,7 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 	track.repairInterceptor = rtpInterceptor
 	track.repairRtcpReadStream = rtcpReadStream
 	track.repairRtcpInterceptor = rtcpInterceptor
-	track.repairStreamChannel = make(chan rtxPacketWithAttributes)
+	track.repairStreamChannel = make(chan rtxPacketWithAttributes, 50)
 
 	go func() {
 		for {
@@ -485,6 +483,8 @@ func (r *RTPReceiver) receiveForRtx(ssrc SSRC, rsid string, streamInfo *intercep
 				r.rtxPool.Put(b) // nolint:staticcheck
 				return
 			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes, pool: &r.rtxPool}:
+			default:
+				// skip the RTX packet if the repair stream channel is full, could be blocked in the application's read loop
 			}
 		}
 	}()
