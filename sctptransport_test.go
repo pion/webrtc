@@ -6,7 +6,13 @@
 
 package webrtc
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestGenerateDataChannelID(t *testing.T) {
 	sctpTransportWithChannels := func(ids []uint16) *SCTPTransport {
@@ -53,5 +59,63 @@ func TestGenerateDataChannelID(t *testing.T) {
 		if _, ok := testCase.s.dataChannelIDsUsed[*idPtr]; !ok {
 			t.Errorf("expected new id to be added to the map: %d", *idPtr)
 		}
+	}
+}
+
+func TestSCTPTransportOnClose(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+
+	answerPC.OnDataChannel(func(dc *DataChannel) {
+		dc.OnMessage(func(msg DataChannelMessage) {
+			dc.Send([]byte("hello"))
+		})
+	})
+
+	recvMsg := make(chan struct{}, 1)
+	offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			defer func() {
+				offerPC.OnConnectionStateChange(nil)
+			}()
+
+			dc, createErr := offerPC.CreateDataChannel(expectedLabel, nil)
+			if createErr != nil {
+				t.Errorf("Failed to create a PC pair for testing")
+				return
+			}
+			dc.OnMessage(func(msg DataChannelMessage) {
+				if !bytes.Equal(msg.Data, []byte("hello")) {
+					t.Error("invalid msg received")
+				}
+				recvMsg <- struct{}{}
+			})
+			dc.OnOpen(func() {
+				dc.Send([]byte("hello"))
+			})
+		}
+	})
+
+	err = signalPair(offerPC, answerPC)
+	require.NoError(t, err)
+
+	select {
+	case <-recvMsg:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+
+	// setup SCTP OnClose callback
+	ch := make(chan error, 1)
+	answerPC.SCTP().OnClose(func(err error) {
+		ch <- err
+	})
+
+	offerPC.Close() // This will trigger sctp onclose callback on remote
+
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
 	}
 }
