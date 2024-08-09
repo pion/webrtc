@@ -67,8 +67,10 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	require.NoError(t, err)
 
 	answerPC.OnDataChannel(func(dc *DataChannel) {
-		dc.OnMessage(func(msg DataChannelMessage) {
-			dc.Send([]byte("hello"))
+		dc.OnMessage(func(_ DataChannelMessage) {
+			if err := dc.Send([]byte("hello")); err != nil {
+				t.Error("failed to send message")
+			}
 		})
 	})
 
@@ -91,7 +93,9 @@ func TestSCTPTransportOnClose(t *testing.T) {
 				recvMsg <- struct{}{}
 			})
 			dc.OnOpen(func() {
-				dc.Send([]byte("hello"))
+				if err := dc.Send([]byte("hello")); err != nil {
+					t.Error("failed to send initial msg", err)
+				}
 			})
 		}
 	})
@@ -111,7 +115,8 @@ func TestSCTPTransportOnClose(t *testing.T) {
 		ch <- err
 	})
 
-	offerPC.Close() // This will trigger sctp onclose callback on remote
+	err = offerPC.Close() // This will trigger sctp onclose callback on remote
+	require.NoError(t, err)
 
 	select {
 	case <-ch:

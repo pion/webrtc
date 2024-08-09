@@ -237,8 +237,10 @@ ACCEPT:
 			MaxRetransmits:    maxRetransmits,
 		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
 		if err != nil {
-			// This data channel is invalid. Close it an log an error.
-			dc.Close()
+			// This data channel is invalid. Close it and log an error.
+			if err := dc.Close(); err != nil {
+				r.log.Errorf("Failed to close invalid data channel: %v", err)
+			}
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)
 			// We've received a datachannel with invalid configuration. We can still receive other datachannels.
