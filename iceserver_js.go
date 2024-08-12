@@ -9,7 +9,7 @@ package webrtc
 import (
 	"errors"
 
-	"github.com/pion/ice/v3"
+	"github.com/pion/ice/v4"
 )
 
 // ICEServer describes a single STUN and TURN server that can be used by

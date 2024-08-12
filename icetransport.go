@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice/v3"
+	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4/internal/mux"
 	"github.com/pion/webrtc/v4/internal/util"
