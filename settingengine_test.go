@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
-	"github.com/pion/ice/v3"
-	"github.com/pion/stun/v2"
+	"github.com/pion/ice/v4"
+	"github.com/pion/stun/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
