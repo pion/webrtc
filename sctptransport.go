@@ -45,6 +45,7 @@ type SCTPTransport struct {
 	// OnStateChange  func()
 
 	onErrorHandler func(error)
+	onCloseHandler func(error)
 
 	sctpAssociation            *sctp.Association
 	onDataChannelHandler       func(*DataChannel)
@@ -174,6 +175,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		dataChannels = append(dataChannels, dc.dataChannel)
 	}
 	r.lock.RUnlock()
+
 ACCEPT:
 	for {
 		dc, err := datachannel.Accept(a, &datachannel.Config{
@@ -183,6 +185,9 @@ ACCEPT:
 			if !errors.Is(err, io.EOF) {
 				r.log.Errorf("Failed to accept data channel: %v", err)
 				r.onError(err)
+				r.onClose(err)
+			} else {
+				r.onClose(nil)
 			}
 			return
 		}
@@ -230,9 +235,14 @@ ACCEPT:
 			MaxRetransmits:    maxRetransmits,
 		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
 		if err != nil {
+			// This data channel is invalid. Close it and log an error.
+			if err1 := dc.Close(); err1 != nil {
+				r.log.Errorf("Failed to close invalid data channel: %v", err1)
+			}
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)
-			return
+			// We've received a datachannel with invalid configuration. We can still receive other datachannels.
+			continue ACCEPT
 		}
 
 		<-r.onDataChannel(rtcDC)
@@ -249,8 +259,7 @@ ACCEPT:
 	}
 }
 
-// OnError sets an event handler which is invoked when
-// the SCTP connection error occurs.
+// OnError sets an event handler which is invoked when the SCTP Association errors.
 func (r *SCTPTransport) OnError(f func(err error)) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -260,6 +269,23 @@ func (r *SCTPTransport) OnError(f func(err error)) {
 func (r *SCTPTransport) onError(err error) {
 	r.lock.RLock()
 	handler := r.onErrorHandler
+	r.lock.RUnlock()
+
+	if handler != nil {
+		go handler(err)
+	}
+}
+
+// OnClose sets an event handler which is invoked when the SCTP Association closes.
+func (r *SCTPTransport) OnClose(f func(err error)) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.onCloseHandler = f
+}
+
+func (r *SCTPTransport) onClose(err error) {
+	r.lock.RLock()
+	handler := r.onCloseHandler
 	r.lock.RUnlock()
 
 	if handler != nil {
