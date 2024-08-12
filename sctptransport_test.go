@@ -66,6 +66,8 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	offerPC, answerPC, err := newPair()
 	require.NoError(t, err)
 
+	defer closePairNow(t, offerPC, answerPC)
+
 	answerPC.OnDataChannel(func(dc *DataChannel) {
 		dc.OnMessage(func(_ DataChannelMessage) {
 			if err1 := dc.Send([]byte("hello")); err1 != nil {
