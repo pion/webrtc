@@ -245,3 +245,45 @@ func TestPeerConnection_CloseWithIncomingMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPeerConnection_GracefulCloseWhileOpening(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutinesStrict(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	offer, err := pcOffer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	if err = pcOffer.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	<-offerGatheringComplete
+
+	err = pcOffer.GracefulClose()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = pcAnswer.SetRemoteDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+
+	err = pcAnswer.GracefulClose()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
