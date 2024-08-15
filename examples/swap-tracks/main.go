@@ -119,8 +119,10 @@ func main() { // nolint:gocognit
 				// If just switched to this track, send PLI to get picture refresh
 				if !isCurrTrack {
 					isCurrTrack = true
-					if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
-						fmt.Println(writeErr)
+					if track.Kind() == webrtc.RTPCodecTypeVideo {
+						if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
+							fmt.Println(writeErr)
+						}
 					}
 				}
 				packets <- rtp
