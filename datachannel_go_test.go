@@ -73,13 +73,13 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	api := NewAPI()
 	dc := &DataChannel{api: api}
 
-	max := 512
+	maxVal := 512
 	out := make(chan int)
 	inner := func(msg DataChannelMessage) {
 		// randomly sleep
 		// math/rand a weak RNG, but this does not need to be secure. Ignore with #nosec
 		/* #nosec */
-		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(maxVal)))
 		/* #nosec */ if err != nil {
 			t.Fatalf("Failed to get random sleep duration: %s", err)
 		}
@@ -92,7 +92,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	})
 
 	go func() {
-		for i := 1; i <= max; i++ {
+		for i := 1; i <= maxVal; i++ {
 			buf := make([]byte, 8)
 			binary.PutVarint(buf, int64(i))
 			dc.onMessage(DataChannelMessage{Data: buf})
@@ -107,16 +107,16 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 		}
 	}()
 
-	values := make([]int, 0, max)
+	values := make([]int, 0, maxVal)
 	for v := range out {
 		values = append(values, v)
-		if len(values) == max {
+		if len(values) == maxVal {
 			close(out)
 		}
 	}
 
-	expected := make([]int, max)
-	for i := 1; i <= max; i++ {
+	expected := make([]int, maxVal)
+	for i := 1; i <= maxVal; i++ {
 		expected[i-1] = i
 	}
 	assert.EqualValues(t, expected, values)

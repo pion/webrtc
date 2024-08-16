@@ -423,12 +423,12 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 		id++
 	}
 
-	max := r.MaxChannels()
+	maxVal := r.MaxChannels()
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	for ; id < max-1; id += 2 {
+	for ; id < maxVal-1; id += 2 {
 		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
