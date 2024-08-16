@@ -51,7 +51,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) {
 		for {
 			pkt, _, err := track.ReadRTP()
 			if err != nil {
-				assert.True(t, errors.Is(io.EOF, err))
+				assert.True(t, errors.Is(err, io.EOF))
 				return
 			}
 

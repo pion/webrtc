@@ -228,7 +228,7 @@ func writeFileToTrack(ivf *ivfreader.IVFReader, header *ivfreader.IVFFileHeader,
 		frame, _, err := ivf.ParseNextFrame()
 		if errors.Is(err, io.EOF) {
 			fmt.Printf("All video frames parsed and sent")
-			os.Exit(0)
+			os.Exit(0) //nolint: gocritic
 		}
 
 		if err != nil {

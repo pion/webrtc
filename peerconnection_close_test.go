@@ -259,7 +259,7 @@ func TestPeerConnection_GracefulCloseWhileOpening(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+	if _, err = pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
 		t.Fatal(err)
 	}
 
