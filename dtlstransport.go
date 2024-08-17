@@ -355,6 +355,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
 	dtlsConfig.KeyLogWriter = t.api.settingEngine.dtls.keyLogWriter
+	dtlsConfig.ClientHelloMessageHook = t.api.settingEngine.dtls.clientHelloMessageHook
+	dtlsConfig.ServerHelloMessageHook = t.api.settingEngine.dtls.serverHelloMessageHook
+	dtlsConfig.CertificateRequestMessageHook = t.api.settingEngine.dtls.certificateRequestMessageHook
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
