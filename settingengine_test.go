@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/stun/v3"
 	"github.com/pion/transport/v3/test"
@@ -308,4 +309,34 @@ func TestSetICEBindingRequestHandler(t *testing.T) {
 	<-seenICEControlled.Done()
 	<-seenICEControlling.Done()
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestSetHooks(t *testing.T) {
+	s := SettingEngine{}
+
+	if s.dtls.clientHelloMessageHook != nil ||
+		s.dtls.serverHelloMessageHook != nil ||
+		s.dtls.certificateRequestMessageHook != nil {
+		t.Fatalf("SettingEngine defaults aren't as expected.")
+	}
+
+	s.SetDTLSClientHelloMessageHook(func(msg handshake.MessageClientHello) handshake.Message {
+		return &msg
+	})
+	s.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
+		return &msg
+	})
+	s.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
+		return &msg
+	})
+
+	if s.dtls.clientHelloMessageHook == nil {
+		t.Errorf("Failed to set DTLS Client Hello Hook")
+	}
+	if s.dtls.serverHelloMessageHook == nil {
+		t.Errorf("Failed to set DTLS Server Hello Hook")
+	}
+	if s.dtls.certificateRequestMessageHook == nil {
+		t.Errorf("Failed to set DTLS Certificate Request Hook")
+	}
 }

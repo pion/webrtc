@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/dtls/v3"
 	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v3"
@@ -63,17 +64,20 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		insecureSkipHelloVerify   bool
-		disableInsecureSkipVerify bool
-		retransmissionInterval    time.Duration
-		ellipticCurves            []dtlsElliptic.Curve
-		connectContextMaker       func() (context.Context, func())
-		extendedMasterSecret      dtls.ExtendedMasterSecretType
-		clientAuth                *dtls.ClientAuthType
-		clientCAs                 *x509.CertPool
-		rootCAs                   *x509.CertPool
-		keyLogWriter              io.Writer
-		customCipherSuites        func() []dtls.CipherSuite
+		insecureSkipHelloVerify       bool
+		disableInsecureSkipVerify     bool
+		retransmissionInterval        time.Duration
+		ellipticCurves                []dtlsElliptic.Curve
+		connectContextMaker           func() (context.Context, func())
+		extendedMasterSecret          dtls.ExtendedMasterSecretType
+		clientAuth                    *dtls.ClientAuthType
+		clientCAs                     *x509.CertPool
+		rootCAs                       *x509.CertPool
+		keyLogWriter                  io.Writer
+		customCipherSuites            func() []dtls.CipherSuite
+		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
+		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
+		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -453,6 +457,24 @@ func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 // This allow usage of Ciphers that are reserved for private usage.
 func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
 	e.dtls.customCipherSuites = customCipherSuites
+}
+
+// SetDTLSClientHelloMessageHook if not nil, is called when a DTLS Client Hello message is sent
+// from a client. The returned handshake message replaces the original message.
+func (e *SettingEngine) SetDTLSClientHelloMessageHook(hook func(handshake.MessageClientHello) handshake.Message) {
+	e.dtls.clientHelloMessageHook = hook
+}
+
+// SetDTLSServerHelloMessageHook if not nil, is called when a DTLS Server Hello message is sent
+// from a client. The returned handshake message replaces the original message.
+func (e *SettingEngine) SetDTLSServerHelloMessageHook(hook func(handshake.MessageServerHello) handshake.Message) {
+	e.dtls.serverHelloMessageHook = hook
+}
+
+// SetDTLSCertificateRequestMessageHook if not nil, is called when a DTLS Certificate Request message is sent
+// from a client. The returned handshake message replaces the original message.
+func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(hook func(handshake.MessageCertificateRequest) handshake.Message) {
+	e.dtls.certificateRequestMessageHook = hook
 }
 
 // SetSCTPRTOMax sets the maximum retransmission timeout.
