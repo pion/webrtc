@@ -27,8 +27,8 @@ Run `echo $BROWSER_SDP | stats`
 Copy the text that `stats` just emitted and copy into second text area
 
 ### Hit 'Start Session' in jsfiddle
-The `stats` program will now print the InboundRTPStreamStats for each incoming stream. You will see the following in
-your console. The exact fields will change as we add more values.
+The `stats` program will now print the InboundRTPStreamStats for each incoming stream and Remote IP+Ports.
+You will see the following in your console. The exact fields will change as we add more values.
 
 ```
 Stats for: video/VP8
@@ -42,6 +42,11 @@ InboundRTPStreamStats:
         FIRCount: 0
         PLICount: 0
         NACKCount: 0
+
+
+remote-candidate IP(192.168.1.93) Port(59239)
+remote-candidate IP(172.18.176.1) Port(59241)
+remote-candidate IP(fd4d:d991:c340:6749:8c53:ee52:ae8c:14d4) Port(59238)
 ```
 
 Congrats, you have used Pion WebRTC! Now start building something cool

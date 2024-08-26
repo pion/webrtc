@@ -16,12 +16,16 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/webrtc/v4"
 )
+
+// How ofter to print WebRTC stats
+const statsInterval = time.Second * 5
 
 // nolint:gocognit
 func main() {
@@ -87,13 +91,14 @@ func main() {
 		fmt.Printf("New incoming track with codec: %s\n", track.Codec().MimeType)
 
 		go func() {
+			// Print the stats for this individual track
 			for {
 				stats := statsGetter.Get(uint32(track.SSRC()))
 
 				fmt.Printf("Stats for: %s\n", track.Codec().MimeType)
 				fmt.Println(stats.InboundRTPStreamStats)
 
-				time.Sleep(time.Second * 5)
+				time.Sleep(statsInterval)
 			}
 		}()
 
@@ -106,10 +111,14 @@ func main() {
 		}
 	})
 
+	var iceConnectionState atomic.Value
+	iceConnectionState.Store(webrtc.ICEConnectionStateNew)
+
 	// Set the handler for ICE connection state
 	// This will notify you when the peer has connected/disconnected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
 		fmt.Printf("Connection State has changed %s \n", connectionState.String())
+		iceConnectionState.Store(connectionState)
 	})
 
 	// Wait for the offer to be pasted
@@ -145,8 +154,25 @@ func main() {
 	// Output the answer in base64 so we can paste it in browser
 	fmt.Println(encode(peerConnection.LocalDescription()))
 
-	// Block forever
-	select {}
+	for {
+		time.Sleep(statsInterval)
+
+		// Stats are only printed after completed to make Copy/Pasting easier
+		if iceConnectionState.Load() == webrtc.ICEConnectionStateChecking {
+			continue
+		}
+
+		// Only print the remote IPs seen
+		for _, s := range peerConnection.GetStats() {
+			switch stat := s.(type) {
+			case webrtc.ICECandidateStats:
+				if stat.Type == webrtc.StatsTypeRemoteCandidate {
+					fmt.Printf("%s IP(%s) Port(%d)\n", stat.Type, stat.IP, stat.Port)
+				}
+			default:
+			}
+		}
+	}
 }
 
 // Read from stdin until we get a newline
