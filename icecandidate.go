@@ -6,7 +6,7 @@ package webrtc
 import (
 	"fmt"
 
-	"github.com/pion/ice/v3"
+	"github.com/pion/ice/v4"
 )
 
 // ICECandidate represents a ice candidate

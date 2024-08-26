@@ -111,15 +111,18 @@ func main() {
 
 		// Start reading from all the streams and sending them to the related output track
 		rid := track.RID()
-		go func() {
-			ticker := time.NewTicker(3 * time.Second)
-			for range ticker.C {
-				fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
-				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
-					fmt.Println(writeErr)
+		if track.Kind() == webrtc.RTPCodecTypeVideo {
+			go func() {
+				ticker := time.NewTicker(3 * time.Second)
+				defer ticker.Stop()
+				for range ticker.C {
+					fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
+					if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
+						fmt.Println(writeErr)
+					}
 				}
-			}
-		}()
+			}()
+		}
 		for {
 			// Read RTP packets being sent to Pion
 			packet, _, readErr := track.ReadRTP()

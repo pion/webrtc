@@ -216,7 +216,12 @@ func (t *DTLSTransport) startSRTP() error {
 		)
 	}
 
-	connState := t.conn.ConnectionState()
+	connState, ok := t.conn.ConnectionState()
+	if !ok {
+		// nolint
+		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+	}
+
 	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.role() == DTLSRoleClient)
 	if err != nil {
 		// nolint
@@ -350,6 +355,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	dtlsConfig.ClientCAs = t.api.settingEngine.dtls.clientCAs
 	dtlsConfig.RootCAs = t.api.settingEngine.dtls.rootCAs
 	dtlsConfig.KeyLogWriter = t.api.settingEngine.dtls.keyLogWriter
+	dtlsConfig.ClientHelloMessageHook = t.api.settingEngine.dtls.clientHelloMessageHook
+	dtlsConfig.ServerHelloMessageHook = t.api.settingEngine.dtls.serverHelloMessageHook
+	dtlsConfig.CertificateRequestMessageHook = t.api.settingEngine.dtls.certificateRequestMessageHook
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
@@ -398,12 +406,17 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	}
 
 	// Check the fingerprint if a certificate was exchanged
-	remoteCerts := dtlsConn.ConnectionState().PeerCertificates
-	if len(remoteCerts) == 0 {
+	connectionState, ok := dtlsConn.ConnectionState()
+	if !ok {
 		t.onStateChange(DTLSTransportStateFailed)
 		return errNoRemoteCertificate
 	}
-	t.remoteCertificate = remoteCerts[0]
+
+	if len(connectionState.PeerCertificates) == 0 {
+		t.onStateChange(DTLSTransportStateFailed)
+		return errNoRemoteCertificate
+	}
+	t.remoteCertificate = connectionState.PeerCertificates[0]
 
 	if !t.api.settingEngine.disableCertificateFingerprintVerification {
 		parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)

@@ -183,7 +183,9 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 	return func() {
 		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label(), channel.ID())
 
-		for range time.NewTicker(5 * time.Second).C {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
 			message, err := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 			if err != nil {
 				panic(err)

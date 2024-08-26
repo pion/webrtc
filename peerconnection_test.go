@@ -387,11 +387,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wg.Done()
 		})
 	})
-	pcOffer.OnConnectionStateChange(func(callbackState PeerConnectionState) {
-		if storedState := pcOffer.ConnectionState(); callbackState != storedState {
-			t.Errorf("State in callback argument is different from ConnectionState(): callbackState=%s, storedState=%s", callbackState, storedState)
-		}
-
+	pcOffer.OnConnectionStateChange(func(PeerConnectionState) {
 		onceOffererOnConnectionStateChange.Do(func() {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()

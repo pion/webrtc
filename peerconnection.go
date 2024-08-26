@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice/v3"
+	"github.com/pion/ice/v4"
 	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
@@ -56,6 +56,9 @@ type PeerConnection struct {
 	idpLoginURL *string
 
 	isClosed                                *atomicBool
+	isGracefullyClosingOrClosed             bool
+	isCloseDone                             chan struct{}
+	isGracefulCloseDone                     chan struct{}
 	isNegotiationNeeded                     *atomicBool
 	updateNegotiationNeededFlagOnEmptyChain *atomicBool
 
@@ -117,6 +120,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			ICECandidatePoolSize: 0,
 		},
 		isClosed:                                &atomicBool{},
+		isCloseDone:                             make(chan struct{}),
+		isGracefulCloseDone:                     make(chan struct{}),
 		isNegotiationNeeded:                     &atomicBool{},
 		updateNegotiationNeededFlagOnEmptyChain: &atomicBool{},
 		lastOffer:                               "",
@@ -2092,16 +2097,59 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
-// Close ends the PeerConnection
+// Close ends the PeerConnection.
 func (pc *PeerConnection) Close() error {
+	return pc.close(false /* shouldGracefullyClose */)
+}
+
+// GracefulClose ends the PeerConnection. It also waits
+// for any goroutines it started to complete. This is only safe to call outside of
+// PeerConnection callbacks or if in a callback, in its own goroutine.
+func (pc *PeerConnection) GracefulClose() error {
+	return pc.close(true /* shouldGracefullyClose */)
+}
+
+func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
-	if pc.isClosed.swap(true) {
-		return nil
+
+	pc.mu.Lock()
+	// A lock in this critical section is needed because pc.isClosed and
+	// pc.isGracefullyClosingOrClosed are related to each other in that we
+	// want to make graceful and normal closure one time operations in order
+	// to avoid any double closure errors from cropping up. However, there are
+	// some overlapping close cases when both normal and graceful close are used
+	// that should be idempotent, but be cautioned when writing new close behavior
+	// to preserve this property.
+	isAlreadyClosingOrClosed := pc.isClosed.swap(true)
+	isAlreadyGracefullyClosingOrClosed := pc.isGracefullyClosingOrClosed
+	if shouldGracefullyClose && !isAlreadyGracefullyClosingOrClosed {
+		pc.isGracefullyClosingOrClosed = true
+	}
+	pc.mu.Unlock()
+
+	if isAlreadyClosingOrClosed {
+		if !shouldGracefullyClose {
+			return nil
+		}
+		// Even if we're already closing, it may not be graceful:
+		// If we are not the ones doing the closing, we just wait for the graceful close
+		// to happen and then return.
+		if isAlreadyGracefullyClosingOrClosed {
+			<-pc.isGracefulCloseDone
+			return nil
+		}
+		// Otherwise we need to go through the graceful closure flow once the
+		// normal closure is done since there are extra steps to take with a
+		// graceful close.
+		<-pc.isCloseDone
+	} else {
+		defer close(pc.isCloseDone)
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
-	pc.signalingState.Set(SignalingStateClosed)
+	if shouldGracefullyClose {
+		defer close(pc.isGracefulCloseDone)
+	}
 
 	// Try closing everything and collect the errors
 	// Shutdown strategy:
@@ -2110,6 +2158,34 @@ func (pc *PeerConnection) Close() error {
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
 	closeErrs := make([]error, 4)
+
+	doGracefulCloseOps := func() []error {
+		if !shouldGracefullyClose {
+			return nil
+		}
+
+		// these are all non-canon steps
+		var gracefulCloseErrors []error
+		if pc.iceTransport != nil {
+			gracefulCloseErrors = append(gracefulCloseErrors, pc.iceTransport.GracefulStop())
+		}
+
+		pc.ops.GracefulClose()
+
+		pc.sctpTransport.lock.Lock()
+		for _, d := range pc.sctpTransport.dataChannels {
+			gracefulCloseErrors = append(gracefulCloseErrors, d.GracefulClose())
+		}
+		pc.sctpTransport.lock.Unlock()
+		return gracefulCloseErrors
+	}
+
+	if isAlreadyClosingOrClosed {
+		return util.FlattenErrs(doGracefulCloseOps())
+	}
+
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
+	pc.signalingState.Set(SignalingStateClosed)
 
 	closeErrs = append(closeErrs, pc.api.interceptor.Close())
 
@@ -2141,12 +2217,15 @@ func (pc *PeerConnection) Close() error {
 	closeErrs = append(closeErrs, pc.dtlsTransport.Stop())
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
-	if pc.iceTransport != nil {
+	if pc.iceTransport != nil && !shouldGracefullyClose {
+		// we will stop gracefully in doGracefulCloseOps
 		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+
+	closeErrs = append(closeErrs, doGracefulCloseOps()...)
 
 	return util.FlattenErrs(closeErrs)
 }
@@ -2321,8 +2400,11 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 
 	pc.dtlsTransport.internalOnCloseHandler = func() {
-		pc.log.Info("Closing PeerConnection from DTLS CloseNotify")
+		if pc.isClosed.get() {
+			return
+		}
 
+		pc.log.Info("Closing PeerConnection from DTLS CloseNotify")
 		go func() {
 			if pcClosErr := pc.Close(); pcClosErr != nil {
 				pc.log.Warnf("Failed to close PeerConnection from DTLS CloseNotify: %s", pcClosErr)
@@ -2520,7 +2602,7 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			mediaTransceivers := []*RTPTransceiver{t}
 
 			extensions, _ := rtpExtensionsFromMediaDescription(media)
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, ridMap: getRids(media)})
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, rids: getRids(media)})
 		}
 	}
 
