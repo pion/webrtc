@@ -240,6 +240,7 @@ var (
 	errInvalidICEServer               = errors.New("invalid ICEServer")
 
 	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
+	errICETransportClosed   = errors.New("ICETransport closed")
 
 	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
 
