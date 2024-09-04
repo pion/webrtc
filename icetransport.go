@@ -157,6 +157,10 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 		return err
 	}
 
+	if t.State() == ICETransportStateClosed {
+		return errICETransportClosed
+	}
+
 	t.conn = iceConn
 
 	config := mux.Config{
@@ -200,28 +204,31 @@ func (t *ICETransport) GracefulStop() error {
 
 func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	t.setState(ICETransportStateClosed)
 
 	if t.ctxCancel != nil {
 		t.ctxCancel()
 	}
 
+	// mux and gatherer can only be set when ICETransport.State != Closed.
+	mux := t.mux
+	gatherer := t.gatherer
+	t.lock.Unlock()
+
 	if t.mux != nil {
 		var closeErrs []error
-		if shouldGracefullyClose && t.gatherer != nil {
+		if shouldGracefullyClose && gatherer != nil {
 			// we can't access icegatherer/icetransport.Close via
 			// mux's net.Conn Close so we call it earlier here.
-			closeErrs = append(closeErrs, t.gatherer.GracefulClose())
+			closeErrs = append(closeErrs, gatherer.GracefulClose())
 		}
-		closeErrs = append(closeErrs, t.mux.Close())
+		closeErrs = append(closeErrs, mux.Close())
 		return util.FlattenErrs(closeErrs)
-	} else if t.gatherer != nil {
+	} else if gatherer != nil {
 		if shouldGracefullyClose {
-			return t.gatherer.GracefulClose()
+			return gatherer.GracefulClose()
 		}
-		return t.gatherer.Close()
+		return gatherer.Close()
 	}
 	return nil
 }
