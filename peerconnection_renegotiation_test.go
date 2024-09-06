@@ -1160,11 +1160,14 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	vp8Track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
 	assert.NoError(t, err)
 	sender, err := pcOffer.AddTrack(vp8Track)
 	assert.NoError(t, err)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+	peerConnectionConnected.Wait()
 
 	assert.Equal(t, len(pcOffer.GetTransceivers()), 1)
 	assert.Equal(t, pcOffer.GetTransceivers()[0].getCurrentDirection(), RTPTransceiverDirectionSendonly)
@@ -1185,6 +1188,45 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, len(pcOffer.GetTransceivers()), 2)
 	assert.True(t, sender.rtpTransceiver == pcOffer.GetTransceivers()[0])
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	tracksCh := make(chan *TrackRemote, 2)
+	pcAnswer.OnTrack(func(tr *TrackRemote, _ *RTPReceiver) {
+		tracksCh <- tr
+	})
+
+	ssrcReuse := sender.GetParameters().Encodings[0].SSRC
+	for i := 0; i < 10; i++ {
+		assert.NoError(t, vp8Track.WriteRTP(&rtp.Packet{Header: rtp.Header{Version: 2}, Payload: []byte{0, 1, 2, 3, 4, 5}}))
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// shold not reuse tranceiver between two CreateOffer
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.RemoveTrack(sender))
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+	sender3, err := pcOffer.AddTrack(vp8Track)
+	ssrcNotReuse := sender3.GetParameters().Encodings[0].SSRC
+	assert.NoError(t, err)
+	assert.Equal(t, len(pcOffer.GetTransceivers()), 3)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	assert.True(t, sender3.rtpTransceiver == pcOffer.GetTransceivers()[2])
+
+	for i := 0; i < 10; i++ {
+		assert.NoError(t, vp8Track.WriteRTP(&rtp.Packet{Header: rtp.Header{Version: 2}, Payload: []byte{0, 1, 2, 3, 4, 5}}))
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	tr1 := <-tracksCh
+	tr2 := <-tracksCh
+	assert.Equal(t, tr1.SSRC(), ssrcReuse)
+	assert.Equal(t, tr2.SSRC(), ssrcNotReuse)
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
