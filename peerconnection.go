@@ -1118,10 +1118,18 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			case direction == RTPTransceiverDirectionRecvonly:
 				if t.Direction() == RTPTransceiverDirectionSendrecv {
 					t.setDirection(RTPTransceiverDirectionSendonly)
+				} else if t.Direction() == RTPTransceiverDirectionRecvonly {
+					t.setDirection(RTPTransceiverDirectionInactive)
 				}
 			case direction == RTPTransceiverDirectionSendrecv:
 				if t.Direction() == RTPTransceiverDirectionSendonly {
 					t.setDirection(RTPTransceiverDirectionSendrecv)
+				} else if t.Direction() == RTPTransceiverDirectionInactive {
+					t.setDirection(RTPTransceiverDirectionRecvonly)
+				}
+			case direction == RTPTransceiverDirectionSendonly:
+				if t.Direction() == RTPTransceiverDirectionInactive {
+					t.setDirection(RTPTransceiverDirectionRecvonly)
 				}
 			}
 
@@ -1288,7 +1296,7 @@ func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransc
 		// If a transceiver is created by applying a remote description that has recvonly transceiver,
 		// it will have no sender. In this case, the transceiver's current direction is set to inactive so
 		// that the transceiver can be reused by next AddTrack.
-		if direction == RTPTransceiverDirectionSendonly && t.Sender() == nil {
+		if !weOffer && direction == RTPTransceiverDirectionSendonly && t.Sender() == nil {
 			direction = RTPTransceiverDirectionInactive
 		}
 
@@ -1340,8 +1348,8 @@ func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc
 
 			mid := t.Mid()
 			receiverNeedsStopped := false
-			func() {
-				for _, t := range tracks {
+			for _, track := range tracks {
+				func(t *TrackRemote) {
 					t.mu.Lock()
 					defer t.mu.Unlock()
 
@@ -1349,19 +1357,19 @@ func (pc *PeerConnection) configureRTPReceivers(isRenegotiation bool, remoteDesc
 						if details := trackDetailsForRID(incomingTracks, mid, t.rid); details != nil {
 							t.id = details.id
 							t.streamID = details.streamID
-							continue
+							return
 						}
 					} else if t.ssrc != 0 {
 						if details := trackDetailsForSSRC(incomingTracks, t.ssrc); details != nil {
 							t.id = details.id
 							t.streamID = details.streamID
-							continue
+							return
 						}
 					}
 
 					receiverNeedsStopped = true
-				}
-			}()
+				}(track)
+			}
 
 			if !receiverNeedsStopped {
 				continue
