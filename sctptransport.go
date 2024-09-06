@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math"
@@ -153,6 +154,10 @@ func (r *SCTPTransport) Stop() error {
 	if r.sctpAssociation == nil {
 		return nil
 	}
+
+	var ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+	r.sctpAssociation.Shutdown(ctx)
+
 	err := r.sctpAssociation.Close()
 	if err != nil {
 		return err
