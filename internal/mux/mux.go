@@ -37,6 +37,7 @@ type Mux struct {
 	bufferSize int
 	lock       sync.Mutex
 	endpoints  map[*Endpoint]MatchFunc
+	isClosed   bool
 
 	pendingPackets [][]byte
 
@@ -96,6 +97,7 @@ func (m *Mux) Close() error {
 
 		delete(m.endpoints, e)
 	}
+	m.isClosed = true
 	m.lock.Unlock()
 
 	err := m.nextConn.Close()
@@ -154,22 +156,21 @@ func (m *Mux) dispatch(buf []byte) error {
 			break
 		}
 	}
-	m.lock.Unlock()
-
 	if endpoint == nil {
-		m.lock.Lock()
 		defer m.lock.Unlock()
 
-		if len(m.pendingPackets) >= maxPendingPackets {
-			m.log.Warnf("Warning: mux: no endpoint for packet starting with %d, not adding to queue size(%d)", buf[0], len(m.pendingPackets))
-		} else {
-			m.log.Warnf("Warning: mux: no endpoint for packet starting with %d, adding to queue size(%d)", buf[0], len(m.pendingPackets))
-			m.pendingPackets = append(m.pendingPackets, append([]byte{}, buf...))
+		if !m.isClosed {
+			if len(m.pendingPackets) >= maxPendingPackets {
+				m.log.Warnf("Warning: mux: no endpoint for packet starting with %d, not adding to queue size(%d)", buf[0], len(m.pendingPackets))
+			} else {
+				m.log.Warnf("Warning: mux: no endpoint for packet starting with %d, adding to queue size(%d)", buf[0], len(m.pendingPackets))
+				m.pendingPackets = append(m.pendingPackets, append([]byte{}, buf...))
+			}
 		}
-
 		return nil
 	}
 
+	m.lock.Unlock()
 	_, err := endpoint.buffer.Write(buf)
 
 	// Expected when bytes are received faster than the endpoint can process them (#2152, #2180)
