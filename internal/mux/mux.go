@@ -33,15 +33,15 @@ type Config struct {
 
 // Mux allows multiplexing
 type Mux struct {
-	lock       sync.RWMutex
 	nextConn   net.Conn
-	endpoints  map[*Endpoint]MatchFunc
 	bufferSize int
-	closedCh   chan struct{}
+	lock       sync.Mutex
+	endpoints  map[*Endpoint]MatchFunc
 
 	pendingPackets [][]byte
 
-	log logging.LeveledLogger
+	closedCh chan struct{}
+	log      logging.LeveledLogger
 }
 
 // NewMux creates a new Mux
