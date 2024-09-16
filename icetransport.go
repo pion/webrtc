@@ -67,7 +67,7 @@ func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
 		return nil, err
 	}
 
-	return &ICECandidatePair{Local: &local, Remote: &remote}, nil
+	return NewICECandidatePair(&local, &remote), nil
 }
 
 // NewICETransport creates a new NewICETransport.
