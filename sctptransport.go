@@ -153,10 +153,8 @@ func (r *SCTPTransport) Stop() error {
 	if r.sctpAssociation == nil {
 		return nil
 	}
-	err := r.sctpAssociation.Close()
-	if err != nil {
-		return err
-	}
+
+	r.sctpAssociation.Abort("")
 
 	r.sctpAssociation = nil
 	r.state = SCTPTransportStateClosed
