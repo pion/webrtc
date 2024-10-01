@@ -21,16 +21,21 @@ type TrackLocalWriter interface {
 // in Interceptors.
 type TrackLocalContext interface {
 	// CodecParameters returns the negotiated RTPCodecParameters. These are the codecs supported by both
-	// PeerConnections and the SSRC/PayloadTypes
+	// PeerConnections and the PayloadTypes
 	CodecParameters() []RTPCodecParameters
 
 	// HeaderExtensions returns the negotiated RTPHeaderExtensionParameters. These are the header extensions supported by
-	// both PeerConnections and the SSRC/PayloadTypes
+	// both PeerConnections and the URI/IDs
 	HeaderExtensions() []RTPHeaderExtensionParameter
 
-	// SSRC requires the negotiated SSRC of this track
-	// This track may have multiple if RTX is enabled
+	// SSRC returns the negotiated SSRC of this track
 	SSRC() SSRC
+
+	// SSRCRetransmission returns the negotiated SSRC used to send retransmissions for this track
+	SSRCRetransmission() SSRC
+
+	// SSRCForwardErrorCorrection returns the negotiated SSRC to send forward error correction for this track
+	SSRCForwardErrorCorrection() SSRC
 
 	// WriteStream returns the WriteStream for this TrackLocal. The implementer writes the outbound
 	// media packets to it
@@ -44,11 +49,11 @@ type TrackLocalContext interface {
 }
 
 type baseTrackLocalContext struct {
-	id              string
-	params          RTPParameters
-	ssrc            SSRC
-	writeStream     TrackLocalWriter
-	rtcpInterceptor interceptor.RTCPReader
+	id                     string
+	params                 RTPParameters
+	ssrc, ssrcRTX, ssrcFEC SSRC
+	writeStream            TrackLocalWriter
+	rtcpInterceptor        interceptor.RTCPReader
 }
 
 // CodecParameters returns the negotiated RTPCodecParameters. These are the codecs supported by both
@@ -64,9 +69,18 @@ func (t *baseTrackLocalContext) HeaderExtensions() []RTPHeaderExtensionParameter
 }
 
 // SSRC requires the negotiated SSRC of this track
-// This track may have multiple if RTX is enabled
 func (t *baseTrackLocalContext) SSRC() SSRC {
 	return t.ssrc
+}
+
+// SSRCRetransmission returns the negotiated SSRC used to send retransmissions for this track
+func (t *baseTrackLocalContext) SSRCRetransmission() SSRC {
+	return t.ssrcRTX
+}
+
+// SSRCForwardErrorCorrection returns the negotiated SSRC to send forward error correction for this track
+func (t *baseTrackLocalContext) SSRCForwardErrorCorrection() SSRC {
+	return t.ssrcFEC
 }
 
 // WriteStream returns the WriteStream for this TrackLocal. The implementer writes the outbound

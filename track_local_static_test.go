@@ -313,3 +313,26 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 
 	closePairNow(t, offerer, answerer)
 }
+
+func Test_TrackLocalStatic_RTX(t *testing.T) {
+	defer test.TimeOut(time.Second * 30).Stop()
+	defer test.CheckRoutines(t)()
+
+	offerer, answerer, err := newPair()
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = offerer.AddTrack(track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	track.mu.Lock()
+	assert.NotZero(t, track.bindings[0].ssrcRTX)
+	assert.NotZero(t, track.bindings[0].payloadTypeRTX)
+	track.mu.Unlock()
+
+	closePairNow(t, offerer, answerer)
+}

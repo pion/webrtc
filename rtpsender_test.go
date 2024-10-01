@@ -401,3 +401,85 @@ func Test_RTPSender_Add_Encoding(t *testing.T) {
 
 	assert.NoError(t, peerConnection.Close())
 }
+
+// nolint: dupl
+func Test_RTPSender_FEC_Support(t *testing.T) {
+	t.Run("FEC disabled by default", func(t *testing.T) {
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+
+		peerConnection, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		rtpSender, err := peerConnection.AddTrack(track)
+		assert.NoError(t, err)
+
+		assert.Zero(t, rtpSender.GetParameters().Encodings[0].FEC.SSRC)
+		assert.NoError(t, peerConnection.Close())
+	})
+
+	t.Run("FEC can be enabled", func(t *testing.T) {
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil},
+			PayloadType:        95,
+		}, RTPCodecTypeVideo))
+
+		api := NewAPI(WithMediaEngine(&m))
+
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+
+		peerConnection, err := api.NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		rtpSender, err := peerConnection.AddTrack(track)
+		assert.NoError(t, err)
+
+		assert.NotZero(t, rtpSender.GetParameters().Encodings[0].FEC.SSRC)
+		assert.NoError(t, peerConnection.Close())
+	})
+}
+
+// nolint: dupl
+func Test_RTPSender_RTX_Support(t *testing.T) {
+	t.Run("RTX SSRC by Default", func(t *testing.T) {
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+
+		peerConnection, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		rtpSender, err := peerConnection.AddTrack(track)
+		assert.NoError(t, err)
+
+		assert.NotZero(t, rtpSender.GetParameters().Encodings[0].RTX.SSRC)
+		assert.NoError(t, peerConnection.Close())
+	})
+
+	t.Run("RTX can be disabled", func(t *testing.T) {
+		m := MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        94,
+		}, RTPCodecTypeVideo))
+		api := NewAPI(WithMediaEngine(&m))
+
+		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+
+		peerConnection, err := api.NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		rtpSender, err := peerConnection.AddTrack(track)
+		assert.NoError(t, err)
+
+		assert.Zero(t, rtpSender.GetParameters().Encodings[0].RTX.SSRC)
+
+		assert.NoError(t, peerConnection.Close())
+	})
+}

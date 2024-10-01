@@ -60,7 +60,7 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 				PayloadType:        96,
 			},
 			{
-				RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+				RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
 				PayloadType:        97,
 			},
 
@@ -69,7 +69,7 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 				PayloadType:        98,
 			},
 			{
-				RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
+				RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=98", nil},
 				PayloadType:        99,
 			},
 		},

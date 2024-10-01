@@ -364,7 +364,7 @@ a=fmtp:97 apt=96
 			PayloadType:        96,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
 			PayloadType:        97,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
@@ -372,7 +372,7 @@ a=fmtp:97 apt=96
 			PayloadType:        102,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=102", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=102", nil},
 			PayloadType:        103,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
@@ -380,7 +380,7 @@ a=fmtp:97 apt=96
 			PayloadType:        104,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=104", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=104", nil},
 			PayloadType:        105,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
@@ -388,7 +388,7 @@ a=fmtp:97 apt=96
 			PayloadType:        98,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=98", nil},
 			PayloadType:        99,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))
@@ -400,7 +400,7 @@ a=fmtp:97 apt=96
 		assert.Equal(t, vp9Codec.MimeType, MimeTypeVP9)
 		vp9RTX, _, err := m.getCodecByPayload(97)
 		assert.NoError(t, err)
-		assert.Equal(t, vp9RTX.MimeType, "video/rtx")
+		assert.Equal(t, vp9RTX.MimeType, MimeTypeRTX)
 
 		h264P1Codec, _, err := m.getCodecByPayload(106)
 		assert.NoError(t, err)
@@ -408,7 +408,7 @@ a=fmtp:97 apt=96
 		assert.Equal(t, h264P1Codec.SDPFmtpLine, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f")
 		h264P1RTX, _, err := m.getCodecByPayload(107)
 		assert.NoError(t, err)
-		assert.Equal(t, h264P1RTX.MimeType, "video/rtx")
+		assert.Equal(t, h264P1RTX.MimeType, MimeTypeRTX)
 		assert.Equal(t, h264P1RTX.SDPFmtpLine, "apt=106")
 
 		h264P0Codec, _, err := m.getCodecByPayload(108)
@@ -417,7 +417,7 @@ a=fmtp:97 apt=96
 		assert.Equal(t, h264P0Codec.SDPFmtpLine, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f")
 		h264P0RTX, _, err := m.getCodecByPayload(109)
 		assert.NoError(t, err)
-		assert.Equal(t, h264P0RTX.MimeType, "video/rtx")
+		assert.Equal(t, h264P0RTX.MimeType, MimeTypeRTX)
 		assert.Equal(t, h264P0RTX.SDPFmtpLine, "apt=108")
 	})
 
@@ -443,7 +443,7 @@ a=fmtp:97 apt=96
 			PayloadType:        96,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
 			PayloadType:        97,
 		}, RTPCodecTypeVideo))
 		assert.NoError(t, m.updateFromRemoteDescription(mustParse(profileLevels)))

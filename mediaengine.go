@@ -47,6 +47,12 @@ const (
 	// MimeTypePCMA PCMA MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypePCMA = "audio/PCMA"
+	// MimeTypeRTX RTX MIME type
+	// Note: Matching should be case insensitive.
+	MimeTypeRTX = "video/rtx"
+	// MimeTypeFlexFEC FEC MIME Type
+	// Note: Matching should be case insensitive.
+	MimeTypeFlexFEC = "video/flexfec"
 )
 
 type mediaEngineHeaderExtension struct {
@@ -106,7 +112,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        96,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=96", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
 			PayloadType:        97,
 		},
 
@@ -115,7 +121,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        102,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=102", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=102", nil},
 			PayloadType:        103,
 		},
 
@@ -124,7 +130,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        104,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=104", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=104", nil},
 			PayloadType:        105,
 		},
 
@@ -133,7 +139,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        106,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=106", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=106", nil},
 			PayloadType:        107,
 		},
 
@@ -142,7 +148,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        108,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=108", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=108", nil},
 			PayloadType:        109,
 		},
 
@@ -151,7 +157,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        127,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=127", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=127", nil},
 			PayloadType:        125,
 		},
 
@@ -160,7 +166,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        39,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=39", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=39", nil},
 			PayloadType:        40,
 		},
 
@@ -169,7 +175,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        45,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=45", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=45", nil},
 			PayloadType:        46,
 		},
 
@@ -178,7 +184,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        98,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=98", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=98", nil},
 			PayloadType:        99,
 		},
 
@@ -187,7 +193,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        100,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=100", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=100", nil},
 			PayloadType:        101,
 		},
 
@@ -196,7 +202,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType:        112,
 		},
 		{
-			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=112", nil},
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=112", nil},
 			PayloadType:        113,
 		},
 	} {
@@ -701,4 +707,24 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	default:
 		return nil, ErrNoPayloaderForCodec
 	}
+}
+
+func (m *MediaEngine) isRTXEnabled(typ RTPCodecType, directions []RTPTransceiverDirection) bool {
+	for _, p := range m.getRTPParametersByKind(typ, directions).Codecs {
+		if p.MimeType == MimeTypeRTX {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *MediaEngine) isFECEnabled(typ RTPCodecType, directions []RTPTransceiverDirection) bool {
+	for _, p := range m.getRTPParametersByKind(typ, directions).Codecs {
+		if strings.Contains(p.MimeType, MimeTypeFlexFEC) {
+			return true
+		}
+	}
+
+	return false
 }
