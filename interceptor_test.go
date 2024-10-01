@@ -196,10 +196,10 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 	if cnt := atomic.LoadUint32(&cntUnbindLocalStream); cnt != 1 {
 		t.Errorf("UnbindLocalStreamFn is expected to be called once, but called %d times", cnt)
 	}
-	if cnt := atomic.LoadUint32(&cntBindRemoteStream); cnt != 1 {
+	if cnt := atomic.LoadUint32(&cntBindRemoteStream); cnt != 2 {
 		t.Errorf("BindRemoteStreamFn is expected to be called once, but called %d times", cnt)
 	}
-	if cnt := atomic.LoadUint32(&cntUnbindRemoteStream); cnt != 1 {
+	if cnt := atomic.LoadUint32(&cntUnbindRemoteStream); cnt != 2 {
 		t.Errorf("UnbindRemoteStreamFn is expected to be called once, but called %d times", cnt)
 	}
 
@@ -207,7 +207,7 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 	if cnt := atomic.LoadUint32(&cntBindRTCPWriter); cnt != 2 {
 		t.Errorf("BindRTCPWriterFn is expected to be called twice, but called %d times", cnt)
 	}
-	if cnt := atomic.LoadUint32(&cntBindRTCPReader); cnt != 2 {
+	if cnt := atomic.LoadUint32(&cntBindRTCPReader); cnt != 3 {
 		t.Errorf("BindRTCPReaderFn is expected to be called twice, but called %d times", cnt)
 	}
 	if cnt := atomic.LoadUint32(&cntClose); cnt != 2 {

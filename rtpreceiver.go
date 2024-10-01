@@ -210,14 +210,14 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error {
 			return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, parameters.Encodings[i].SSRC)
 		}
 
-		t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, codec, globalParams.HeaderExtensions)
+		t.streamInfo = createStreamInfo("", parameters.Encodings[i].SSRC, 0, 0, 0, codec, globalParams.HeaderExtensions)
 		var err error
 		if t.rtpReadStream, t.rtpInterceptor, t.rtcpReadStream, t.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *t.streamInfo); err != nil {
 			return err
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
-			streamInfo := createStreamInfo("", rtxSsrc, 0, codec, globalParams.HeaderExtensions)
+			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, codec, globalParams.HeaderExtensions)
 			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(rtxSsrc, *streamInfo)
 			if err != nil {
 				return err

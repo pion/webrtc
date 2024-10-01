@@ -7,18 +7,13 @@
 package webrtc
 
 import (
-	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/pion/randutil"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
@@ -86,18 +81,17 @@ func TestSetRTPParameters(t *testing.T) {
 func Test_RTX_Read(t *testing.T) {
 	defer test.TimeOut(time.Second * 30).Stop()
 
-	var ssrc *uint32
-	ssrcLines := ""
-	rtxSsrc := randutil.NewMathRandomGenerator().Uint32()
-
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "track-id", "stream-id")
 	assert.NoError(t, err)
 
-	_, err = pcOffer.AddTrack(track)
+	rtpSender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
+
+	rtxSsrc := rtpSender.GetParameters().Encodings[0].RTX.SSRC
+	ssrc := rtpSender.GetParameters().Encodings[0].SSRC
 
 	rtxRead, rtxReadCancel := context.WithCancel(context.Background())
 	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
@@ -111,7 +105,7 @@ func Test_RTX_Read(t *testing.T) {
 
 			assert.NoError(t, readRTPErr)
 			assert.NotNil(t, pkt)
-			assert.Equal(t, pkt.SSRC, *ssrc)
+			assert.Equal(t, pkt.SSRC, uint32(ssrc))
 			assert.Equal(t, pkt.PayloadType, uint8(96))
 			assert.Equal(t, pkt.Payload, []byte{0xB, 0xA, 0xD})
 
@@ -120,7 +114,7 @@ func Test_RTX_Read(t *testing.T) {
 			rtxSSRC := attributes.Get(AttributeRtxSsrc)
 			if rtxPayloadType != nil && rtxSequenceNumber != nil && rtxSSRC != nil {
 				assert.Equal(t, rtxPayloadType, uint8(97))
-				assert.Equal(t, rtxSSRC, rtxSsrc)
+				assert.Equal(t, rtxSSRC, uint32(rtxSsrc))
 				assert.Equal(t, rtxSequenceNumber, pkt.SequenceNumber+500)
 
 				rtxReadCancel()
@@ -128,42 +122,14 @@ func Test_RTX_Read(t *testing.T) {
 		}
 	})
 
-	assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(offer string) (modified string) {
-		scanner := bufio.NewScanner(strings.NewReader(offer))
-		for scanner.Scan() {
-			l := scanner.Text()
-
-			if strings.HasPrefix(l, "a=ssrc") {
-				if ssrc == nil {
-					lineSplit := strings.Split(l, " ")[0]
-					parsed, atoiErr := strconv.ParseUint(strings.TrimPrefix(lineSplit, "a=ssrc:"), 10, 32)
-					assert.NoError(t, atoiErr)
-
-					parsedSsrc := uint32(parsed)
-					ssrc = &parsedSsrc
-
-					modified += fmt.Sprintf("a=ssrc-group:FID %d %d\r\n", *ssrc, rtxSsrc)
-				}
-
-				ssrcLines += l + "\n"
-			} else if ssrcLines != "" {
-				ssrcLines = strings.ReplaceAll(ssrcLines, fmt.Sprintf("%d", *ssrc), fmt.Sprintf("%d", rtxSsrc))
-				modified += ssrcLines
-				ssrcLines = ""
-			}
-
-			modified += l + "\n"
-		}
-
-		return modified
-	}))
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	func() {
 		for i := uint16(0); ; i++ {
 			pkt := rtp.Packet{
 				Header: rtp.Header{
 					Version:        2,
-					SSRC:           *ssrc,
+					SSRC:           uint32(ssrc),
 					PayloadType:    96,
 					SequenceNumber: i,
 				},
@@ -182,7 +148,7 @@ func Test_RTX_Read(t *testing.T) {
 				// Send the RTX
 				_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
 					Version:        2,
-					SSRC:           rtxSsrc,
+					SSRC:           uint32(rtxSsrc),
 					PayloadType:    97,
 					SequenceNumber: i + 500,
 				}, rtxPayload)

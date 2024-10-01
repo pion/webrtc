@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
@@ -778,7 +777,7 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 func TestPlanBMediaExchange(t *testing.T) {
 	runTest := func(trackCount int, t *testing.T) {
 		addSingleTrack := func(p *PeerConnection) *TrackLocalStaticSample {
-			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()), fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()))
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, fmt.Sprintf("video-%d", util.RandUint32()), fmt.Sprintf("video-%d", util.RandUint32()))
 			assert.NoError(t, err)
 
 			_, err = p.AddTrack(track)
@@ -1020,7 +1019,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 					if len(track.bindings) == 1 {
 						_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
 							Version: 2,
-							SSRC:    randutil.NewMathRandomGenerator().Uint32(),
+							SSRC:    util.RandUint32(),
 						}, []byte{0, 1, 2, 3, 4, 5})
 						assert.NoError(t, err)
 					}

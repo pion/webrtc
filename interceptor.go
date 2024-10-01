@@ -159,7 +159,7 @@ func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
 	return i.WriteRTP(&packet.Header, packet.Payload)
 }
 
-func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
+func createStreamInfo(id string, ssrc, ssrcFEC, ssrcRTX SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
 		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
@@ -171,15 +171,17 @@ func createStreamInfo(id string, ssrc SSRC, payloadType PayloadType, codec RTPCo
 	}
 
 	return &interceptor.StreamInfo{
-		ID:                  id,
-		Attributes:          interceptor.Attributes{},
-		SSRC:                uint32(ssrc),
-		PayloadType:         uint8(payloadType),
-		RTPHeaderExtensions: headerExtensions,
-		MimeType:            codec.MimeType,
-		ClockRate:           codec.ClockRate,
-		Channels:            codec.Channels,
-		SDPFmtpLine:         codec.SDPFmtpLine,
-		RTCPFeedback:        feedbacks,
+		ID:                         id,
+		Attributes:                 interceptor.Attributes{},
+		SSRC:                       uint32(ssrc),
+		SSRCRetransmission:         uint32(ssrcRTX),
+		SSRCForwardErrorCorrection: uint32(ssrcFEC),
+		PayloadType:                uint8(payloadType),
+		RTPHeaderExtensions:        headerExtensions,
+		MimeType:                   codec.MimeType,
+		ClockRate:                  codec.ClockRate,
+		Channels:                   codec.Channels,
+		SDPFmtpLine:                codec.SDPFmtpLine,
+		RTCPFeedback:               feedbacks,
 	}
 }

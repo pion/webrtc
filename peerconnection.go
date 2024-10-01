@@ -1048,6 +1048,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		return err
 	}
 
+	// Disable RTX/FEC on RTPSenders if the remote didn't support it
+	for _, sender := range pc.GetSenders() {
+		sender.configureRTXAndFEC()
+	}
+
 	var t *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription(), pc.log)
@@ -1616,7 +1621,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return err
 	}
 
-	streamInfo := createStreamInfo("", ssrc, params.Codecs[0].PayloadType, params.Codecs[0].RTPCodecCapability, params.HeaderExtensions)
+	streamInfo := createStreamInfo("", ssrc, 0, 0, params.Codecs[0].PayloadType, params.Codecs[0].RTPCodecCapability, params.HeaderExtensions)
 	readStream, interceptor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
 	if err != nil {
 		return err

@@ -10,9 +10,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/pion/randutil"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
+	"github.com/pion/webrtc/v4/internal/util"
 )
 
 const (
@@ -68,7 +68,7 @@ func NewWith(out io.Writer, sampleRate uint32, channelCount uint16) (*OggWriter,
 		stream:        out,
 		sampleRate:    sampleRate,
 		channelCount:  channelCount,
-		serial:        randutil.NewMathRandomGenerator().Uint32(),
+		serial:        util.RandUint32(),
 		checksumTable: generateChecksumTable(),
 
 		// Timestamp and Granule MUST start from 1

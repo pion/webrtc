@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/pion/sdp/v3"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -745,4 +746,167 @@ func TestRtpExtensionsFromMediaDescription(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, extensions[sdp.ABSSendTimeURI], 1)
 	assert.Equal(t, extensions[sdp.SDESMidURI], 3)
+}
+
+// Assert that FEC and RTX SSRCes are present if they are enabled in the MediaEngine
+func Test_SSRC_Groups(t *testing.T) {
+	const offerWithRTX = `v=0
+o=- 930222930247584370 1727933945 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic:WMS*
+a=fingerprint:sha-256 11:3F:1C:8D:D4:1D:8D:E7:E1:3E:AF:38:06:0D:1D:40:22:DC:FE:C9:93:E4:80:D8:0B:17:9F:2E:C1:CA:C8:3D
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 101
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:0
+a=ice-ufrag:yIgpPUMarFReduuM
+a=ice-pwd:VmnVaqCByWiOTatFoDBbMGhSFGlsxviz
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:101 opus/90000
+a=rtcp-fb:101 transport-cc
+a=extmap:4 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=ssrc:3566446228 cname:stream-id
+a=ssrc:3566446228 msid:stream-id audio-id
+a=ssrc:3566446228 mslabel:stream-id
+a=ssrc:3566446228 label:audio-id
+a=msid:stream-id audio-id
+a=sendrecv
+m=video 9 UDP/TLS/RTP/SAVPF 96 97
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:1
+a=ice-ufrag:yIgpPUMarFReduuM
+a=ice-pwd:VmnVaqCByWiOTatFoDBbMGhSFGlsxviz
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 transport-cc
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+a=ssrc-group:FID 1701050765 2578535262
+a=ssrc:1701050765 cname:stream-id
+a=ssrc:1701050765 msid:stream-id track-id
+a=ssrc:1701050765 mslabel:stream-id
+a=ssrc:1701050765 label:track-id
+a=msid:stream-id track-id
+a=sendrecv
+`
+
+	const offerNoRTX = `v=0
+o=- 930222930247584370 1727933945 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic:WMS*
+a=fingerprint:sha-256 11:3F:1C:8D:D4:1D:8D:E7:E1:3E:AF:38:06:0D:1D:40:22:DC:FE:C9:93:E4:80:D8:0B:17:9F:2E:C1:CA:C8:3D
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 101
+a=mid:0
+a=ice-ufrag:yIgpPUMarFReduuM
+a=ice-pwd:VmnVaqCByWiOTatFoDBbMGhSFGlsxviz
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:101 opus/90000
+a=rtcp-fb:101 transport-cc
+a=extmap:4 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=ssrc:3566446228 cname:stream-id
+a=ssrc:3566446228 msid:stream-id audio-id
+a=ssrc:3566446228 mslabel:stream-id
+a=ssrc:3566446228 label:audio-id
+a=msid:stream-id audio-id
+a=sendrecv
+m=video 9 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:1
+a=ice-ufrag:yIgpPUMarFReduuM
+a=ice-pwd:VmnVaqCByWiOTatFoDBbMGhSFGlsxviz
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 transport-cc
+a=ssrc-group:FID 1701050765 2578535262
+a=ssrc:1701050765 cname:stream-id
+a=ssrc:1701050765 msid:stream-id track-id
+a=ssrc:1701050765 mslabel:stream-id
+a=ssrc:1701050765 label:track-id
+a=msid:stream-id track-id
+a=sendrecv
+`
+	defer test.CheckRoutines(t)()
+
+	for _, testCase := range []struct {
+		name                   string
+		enableRTXInMediaEngine bool
+		rtxExpected            bool
+		remoteOffer            string
+	}{
+		{"Offer", true, true, ""},
+		{"Offer no Local Groups", false, false, ""},
+		{"Answer", true, true, offerWithRTX},
+		{"Answer No Local Groups", false, false, offerWithRTX},
+		{"Answer No Remote Groups", true, false, offerNoRTX},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			checkRTXSupport := func(s *sdp.SessionDescription) {
+				// RTX is never enabled for audio
+				assert.Nil(t, trackDetailsFromSDP(nil, s)[0].repairSsrc)
+
+				// RTX is conditionally enabled for video
+				if testCase.rtxExpected {
+					assert.NotNil(t, trackDetailsFromSDP(nil, s)[1].repairSsrc)
+				} else {
+					assert.Nil(t, trackDetailsFromSDP(nil, s)[1].repairSsrc)
+				}
+			}
+
+			m := &MediaEngine{}
+			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+				PayloadType:        101,
+			}, RTPCodecTypeAudio))
+			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+				PayloadType:        96,
+			}, RTPCodecTypeVideo))
+			if testCase.enableRTXInMediaEngine {
+				assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+					RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRTX, ClockRate: 90000, Channels: 0, SDPFmtpLine: "apt=96", RTCPFeedback: nil},
+					PayloadType:        97,
+				}, RTPCodecTypeVideo))
+			}
+
+			peerConnection, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+			assert.NoError(t, err)
+
+			audioTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio-id", "stream-id")
+			assert.NoError(t, err)
+
+			_, err = peerConnection.AddTrack(audioTrack)
+			assert.NoError(t, err)
+
+			videoTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video-id", "stream-id")
+			assert.NoError(t, err)
+
+			_, err = peerConnection.AddTrack(videoTrack)
+			assert.NoError(t, err)
+
+			if testCase.remoteOffer == "" {
+				offer, err := peerConnection.CreateOffer(nil)
+				assert.NoError(t, err)
+				checkRTXSupport(offer.parsed)
+			} else {
+				assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: testCase.remoteOffer}))
+				answer, err := peerConnection.CreateAnswer(nil)
+				assert.NoError(t, err)
+				checkRTXSupport(answer.parsed)
+			}
+
+			assert.NoError(t, peerConnection.Close())
+		})
+	}
 }

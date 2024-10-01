@@ -29,7 +29,7 @@ type trackEncoding struct {
 
 	context *baseTrackLocalContext
 
-	ssrc SSRC
+	ssrc, ssrcRTX, ssrcFEC SSRC
 }
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
@@ -110,7 +110,9 @@ func (r *RTPSender) Transport() *DTLSTransport {
 	return r.transport
 }
 
-func (r *RTPSender) getParameters() RTPSendParameters {
+// GetParameters describes the current configuration for the encoding and
+// transmission of media on the sender's track.
+func (r *RTPSender) GetParameters() RTPSendParameters {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -124,6 +126,8 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 			RTPCodingParameters: RTPCodingParameters{
 				RID:         rid,
 				SSRC:        trackEncoding.ssrc,
+				RTX:         RTPRtxParameters{SSRC: trackEncoding.ssrcRTX},
+				FEC:         RTPFecParameters{SSRC: trackEncoding.ssrcFEC},
 				PayloadType: r.payloadType,
 			},
 		})
@@ -141,14 +145,6 @@ func (r *RTPSender) getParameters() RTPSendParameters {
 		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.kind)
 	}
 	return sendParameters
-}
-
-// GetParameters describes the current configuration for the encoding and
-// transmission of media on the sender's track.
-func (r *RTPSender) GetParameters() RTPSendParameters {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.getParameters()
 }
 
 // AddEncoding adds an encoding to RTPSender. Used by simulcast senders.
@@ -201,7 +197,15 @@ func (r *RTPSender) AddEncoding(track TrackLocal) error {
 func (r *RTPSender) addEncoding(track TrackLocal) {
 	trackEncoding := &trackEncoding{
 		track: track,
-		ssrc:  SSRC(randutil.NewMathRandomGenerator().Uint32()),
+		ssrc:  SSRC(util.RandUint32()),
+	}
+
+	if r.api.mediaEngine.isRTXEnabled(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}) {
+		trackEncoding.ssrcRTX = SSRC(util.RandUint32())
+	}
+
+	if r.api.mediaEngine.isFECEnabled(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}) {
+		trackEncoding.ssrcFEC = SSRC(util.RandUint32())
 	}
 
 	r.trackEncodings = append(r.trackEncodings, trackEncoding)
@@ -261,6 +265,8 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		id:              context.ID(),
 		params:          r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
 		ssrc:            context.SSRC(),
+		ssrcRTX:         context.SSRCRetransmission(),
+		ssrcFEC:         context.SSRCForwardErrorCorrection(),
 		writeStream:     context.WriteStream(),
 		rtcpInterceptor: context.RTCPReader(),
 	})
@@ -302,10 +308,14 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 
 		trackEncoding.srtpStream = srtpStream
 		trackEncoding.ssrc = parameters.Encodings[idx].SSRC
+		trackEncoding.ssrcRTX = parameters.Encodings[idx].RTX.SSRC
+		trackEncoding.ssrcFEC = parameters.Encodings[idx].FEC.SSRC
 		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
 			params:          r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
 			ssrc:            parameters.Encodings[idx].SSRC,
+			ssrcFEC:         parameters.Encodings[idx].FEC.SSRC,
+			ssrcRTX:         parameters.Encodings[idx].RTX.SSRC,
 			writeStream:     writeStream,
 			rtcpInterceptor: trackEncoding.rtcpInterceptor,
 		}
@@ -319,6 +329,8 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding.streamInfo = *createStreamInfo(
 			r.id,
 			parameters.Encodings[idx].SSRC,
+			parameters.Encodings[idx].RTX.SSRC,
+			parameters.Encodings[idx].FEC.SSRC,
 			codec.PayloadType,
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
@@ -465,5 +477,22 @@ func (r *RTPSender) hasStopped() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// Set a SSRC for FEC and RTX if MediaEngine has them enabled
+// If the remote doesn't support FEC or RTX we disable locally
+func (r *RTPSender) configureRTXAndFEC() {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, trackEncoding := range r.trackEncodings {
+		if !r.api.mediaEngine.isRTXEnabled(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}) {
+			trackEncoding.ssrcRTX = SSRC(0)
+		}
+
+		if !r.api.mediaEngine.isFECEnabled(r.kind, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}) {
+			trackEncoding.ssrcFEC = SSRC(0)
+		}
 	}
 }
