@@ -193,7 +193,7 @@ func (m *Mux) handlePendingPackets(endpoint *Endpoint, matchFunc MatchFunc) {
 				m.log.Warnf("Warning: mux: error writing packet to endpoint from pending queue: %s", err)
 			}
 		} else {
-			pendingPackets = append(pendingPackets, buf)
+			pendingPackets = append(pendingPackets, 0, buf)
 		}
 	}
 	m.pendingPackets = pendingPackets
