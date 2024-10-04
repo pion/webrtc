@@ -870,6 +870,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 		setRemote := stateChangeOpSetRemote
 		newSDPDoesNotMatchOffer := &rtcerr.InvalidModificationError{Err: errSDPDoesNotMatchOffer}
 		newSDPDoesNotMatchAnswer := &rtcerr.InvalidModificationError{Err: errSDPDoesNotMatchAnswer}
+		_ = newSDPDoesNotMatchAnswer
 
 		var nextState SignalingState
 		var err error
@@ -889,7 +890,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			// have-local-pranswer->SetLocal(answer)->stable
 			case SDPTypeAnswer:
 				if sd.SDP != pc.lastAnswer {
-					return nextState, newSDPDoesNotMatchAnswer
+					pc.lastAnswer = sd.SDP
+					// return nextState, nil
 				}
 				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
 				if err == nil {
@@ -906,7 +908,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
 			case SDPTypePranswer:
 				if sd.SDP != pc.lastAnswer {
-					return nextState, newSDPDoesNotMatchAnswer
+					pc.lastAnswer = sd.SDP
+					// return nextState, nil
 				}
 				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalPranswer, setLocal, sd.Type)
 				if err == nil {
