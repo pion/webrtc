@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Router) {
+func createVNetPair(t *testing.T, interceptorRegistry *interceptor.Registry) (*PeerConnection, *PeerConnection, *vnet.Router) {
 	// Create a root router
 	wan, err := vnet.NewRouter(&vnet.RouterConfig{
 		CIDR:          "1.2.3.0/24",
@@ -53,12 +53,18 @@ func createVNetPair(t *testing.T) (*PeerConnection, *PeerConnection, *vnet.Route
 	// Start the virtual network by calling Start() on the root router
 	assert.NoError(t, wan.Start())
 
-	offerInterceptorRegistry := &interceptor.Registry{}
-	offerPeerConnection, err := NewAPI(WithSettingEngine(offerSettingEngine), WithInterceptorRegistry(offerInterceptorRegistry)).NewPeerConnection(Configuration{})
+	offerOptions := []func(*API){WithSettingEngine(offerSettingEngine)}
+	if interceptorRegistry != nil {
+		offerOptions = append(offerOptions, WithInterceptorRegistry(interceptorRegistry))
+	}
+	offerPeerConnection, err := NewAPI(offerOptions...).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	answerInterceptorRegistry := &interceptor.Registry{}
-	answerPeerConnection, err := NewAPI(WithSettingEngine(answerSettingEngine), WithInterceptorRegistry(answerInterceptorRegistry)).NewPeerConnection(Configuration{})
+	answerOptions := []func(*API){WithSettingEngine(answerSettingEngine)}
+	if interceptorRegistry != nil {
+		answerOptions = append(answerOptions, WithInterceptorRegistry(interceptorRegistry))
+	}
+	answerPeerConnection, err := NewAPI(answerOptions...).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	return offerPeerConnection, answerPeerConnection, wan
