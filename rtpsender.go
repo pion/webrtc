@@ -305,6 +305,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding := r.trackEncodings[idx]
 		srtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].SSRC, rtpSender: r}
 		writeStream := &interceptorToTrackLocalWriter{}
+		rtpParameters := r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
 
 		trackEncoding.srtpStream = srtpStream
 		trackEncoding.ssrc = parameters.Encodings[idx].SSRC
@@ -312,7 +313,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding.ssrcFEC = parameters.Encodings[idx].FEC.SSRC
 		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
-			params:          r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
+			params:          rtpParameters,
 			ssrc:            parameters.Encodings[idx].SSRC,
 			ssrcFEC:         parameters.Encodings[idx].FEC.SSRC,
 			ssrcRTX:         parameters.Encodings[idx].RTX.SSRC,
@@ -332,6 +333,8 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			parameters.Encodings[idx].RTX.SSRC,
 			parameters.Encodings[idx].FEC.SSRC,
 			codec.PayloadType,
+			findRTXPayloadType(codec.PayloadType, rtpParameters.Codecs),
+			0,
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
 		)

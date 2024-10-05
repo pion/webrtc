@@ -66,17 +66,12 @@ func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) (RTPCodecParameters, err
 
 	parameters := RTPCodecParameters{RTPCodecCapability: s.codec}
 	if codec, matchType := codecParametersFuzzySearch(parameters, t.CodecParameters()); matchType != codecMatchNone {
-		var payloadTypeRTX PayloadType
-		if rtxParameters, ok := findRTXCodecParameters(codec.PayloadType, t.CodecParameters()); ok {
-			payloadTypeRTX = rtxParameters.PayloadType
-		}
-
 		s.bindings = append(s.bindings, trackBinding{
 			ssrc:           t.SSRC(),
 			ssrcRTX:        t.SSRCRetransmission(),
 			ssrcFEC:        t.SSRCForwardErrorCorrection(),
 			payloadType:    codec.PayloadType,
-			payloadTypeRTX: payloadTypeRTX,
+			payloadTypeRTX: findRTXPayloadType(codec.PayloadType, t.CodecParameters()),
 			writeStream:    t.WriteStream(),
 			id:             t.ID(),
 		})

@@ -126,13 +126,13 @@ func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecPa
 }
 
 // Given a CodecParameters find the RTX CodecParameters if one exists
-func findRTXCodecParameters(needle PayloadType, haystack []RTPCodecParameters) (RTPCodecParameters, bool) {
+func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
 	aptStr := fmt.Sprintf("apt=%d", needle)
 	for _, c := range haystack {
 		if aptStr == c.SDPFmtpLine {
-			return c, true
+			return c.PayloadType
 		}
 	}
 
-	return RTPCodecParameters{}, false
+	return PayloadType(0)
 }

@@ -159,7 +159,8 @@ func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
 	return i.WriteRTP(&packet.Header, packet.Payload)
 }
 
-func createStreamInfo(id string, ssrc, ssrcFEC, ssrcRTX SSRC, payloadType PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
+// nolint: unparam
+func createStreamInfo(id string, ssrc, ssrcRTX, ssrcFEC SSRC, payloadType, payloadTypeRTX, payloadTypeFEC PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
 		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})
@@ -171,17 +172,19 @@ func createStreamInfo(id string, ssrc, ssrcFEC, ssrcRTX SSRC, payloadType Payloa
 	}
 
 	return &interceptor.StreamInfo{
-		ID:                         id,
-		Attributes:                 interceptor.Attributes{},
-		SSRC:                       uint32(ssrc),
-		SSRCRetransmission:         uint32(ssrcRTX),
-		SSRCForwardErrorCorrection: uint32(ssrcFEC),
-		PayloadType:                uint8(payloadType),
-		RTPHeaderExtensions:        headerExtensions,
-		MimeType:                   codec.MimeType,
-		ClockRate:                  codec.ClockRate,
-		Channels:                   codec.Channels,
-		SDPFmtpLine:                codec.SDPFmtpLine,
-		RTCPFeedback:               feedbacks,
+		ID:                                id,
+		Attributes:                        interceptor.Attributes{},
+		SSRC:                              uint32(ssrc),
+		SSRCRetransmission:                uint32(ssrcRTX),
+		SSRCForwardErrorCorrection:        uint32(ssrcFEC),
+		PayloadType:                       uint8(payloadType),
+		PayloadTypeRetransmission:         uint8(payloadTypeRTX),
+		PayloadTypeForwardErrorCorrection: uint8(payloadTypeFEC),
+		RTPHeaderExtensions:               headerExtensions,
+		MimeType:                          codec.MimeType,
+		ClockRate:                         codec.ClockRate,
+		Channels:                          codec.Channels,
+		SDPFmtpLine:                       codec.SDPFmtpLine,
+		RTCPFeedback:                      feedbacks,
 	}
 }
