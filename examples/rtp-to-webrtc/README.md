@@ -7,7 +7,7 @@ With this example we have pre-made GStreamer and ffmpeg pipelines, but you can u
 ### Download rtp-to-webrtc
 ```
 export GO111MODULE=on
-go get github.com/pion/webrtc/v3/examples/rtp-to-webrtc
+go get github.com/sepehrEslami81/webrtc/v3/examples/rtp-to-webrtc
 ```
 
 ### Open jsfiddle example page
@@ -59,7 +59,7 @@ A video should start playing in your browser above the input boxes.
 Congrats, you have used Pion WebRTC! Now start building something cool
 
 ## Dealing with broken/lossy inputs
-Pion WebRTC also provides a [SampleBuilder](https://pkg.go.dev/github.com/pion/webrtc/v3@v3.0.4/pkg/media/samplebuilder). This consumes RTP packets and returns samples.
+Pion WebRTC also provides a [SampleBuilder](https://pkg.go.dev/github.com/sepehrEslami81/webrtc/v3@v3.0.4/pkg/media/samplebuilder). This consumes RTP packets and returns samples.
 It can be used to re-order and delay for lossy streams. You can see its usage in this example in [daf27b](https://github.com/pion/webrtc/commit/daf27bd0598233b57428b7809587ec3c09510413).
 
 Currently it isn't working with H264, but is useful for VP8 and Opus. See [#1652](https://github.com/pion/webrtc/issues/1652) for the status of fixing for H264.
