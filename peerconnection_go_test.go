@@ -931,7 +931,7 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	offerPeerConnection, answerPeerConnection, wan := createVNetPair(t)
+	offerPeerConnection, answerPeerConnection, wan := createVNetPair(t, nil)
 
 	pushICEState := func(i ICEConnectionState) { iceStates <- i }
 	offerPeerConnection.OnICEConnectionStateChange(pushICEState)
