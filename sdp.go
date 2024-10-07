@@ -374,6 +374,7 @@ func populateLocalCandidates(sessionDescription *SessionDescription, i *ICEGathe
 	}
 }
 
+// nolint: gocognit
 func addSenderSDP(
 	mediaSection mediaSection,
 	isPlanB bool,
@@ -395,7 +396,6 @@ func addSenderSDP(
 			if encoding.RTX.SSRC != 0 {
 				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FID %d %d", encoding.SSRC, encoding.RTX.SSRC))
 			}
-
 			if encoding.FEC.SSRC != 0 {
 				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FEC-FR %d %d", encoding.SSRC, encoding.FEC.SSRC))
 			}
@@ -403,6 +403,13 @@ func addSenderSDP(
 			media = media.WithMediaSource(uint32(encoding.SSRC), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
 
 			if !isPlanB {
+				if encoding.RTX.SSRC != 0 {
+					media = media.WithMediaSource(uint32(encoding.RTX.SSRC), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
+				}
+				if encoding.FEC.SSRC != 0 {
+					media = media.WithMediaSource(uint32(encoding.FEC.SSRC), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
+				}
+
 				media = media.WithPropertyAttribute("msid:" + track.StreamID() + " " + track.ID())
 			}
 		}
