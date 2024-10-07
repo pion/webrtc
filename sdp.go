@@ -393,11 +393,11 @@ func addSenderSDP(
 		sendParameters := sender.GetParameters()
 		for _, encoding := range sendParameters.Encodings {
 			if encoding.RTX.SSRC != 0 {
-				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FID %d %d", encoding.SSRC, encoding.RTX.SSRC))
+				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FID %d %d", encoding.RTX.SSRC, encoding.SSRC))
 			}
 
 			if encoding.FEC.SSRC != 0 {
-				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FEC-FR %d %d", encoding.SSRC, encoding.FEC.SSRC))
+				media = media.WithValueAttribute("ssrc-group", fmt.Sprintf("FEC-FR %d %d", encoding.FEC.SSRC, encoding.SSRC))
 			}
 
 			media = media.WithMediaSource(uint32(encoding.SSRC), track.StreamID() /* cname */, track.StreamID() /* streamLabel */, track.ID())
