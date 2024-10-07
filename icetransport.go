@@ -70,6 +70,12 @@ func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
 	return NewICECandidatePair(&local, &remote), nil
 }
 
+// GetSelectedCandidatePairStats returns the selected candidate pair stats on which packets are sent
+// if there is no selected pair empty stats, false is returned to indicate stats not available
+func (t *ICETransport) GetSelectedCandidatePairStats() (ICECandidatePairStats, bool) {
+	return t.gatherer.getSelectedCandidatePairStats()
+}
+
 // NewICETransport creates a new NewICETransport.
 func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory) *ICETransport {
 	iceTransport := &ICETransport{

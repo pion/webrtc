@@ -306,46 +306,12 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 		for _, candidatePairStats := range agent.GetCandidatePairsStats() {
 			collector.Collecting()
 
-			state, err := toStatsICECandidatePairState(candidatePairStats.State)
+			stats, err := toICECandidatePairStats(candidatePairStats)
 			if err != nil {
 				g.log.Error(err.Error())
+				continue
 			}
 
-			pairID := newICECandidatePairStatsID(candidatePairStats.LocalCandidateID,
-				candidatePairStats.RemoteCandidateID)
-
-			stats := ICECandidatePairStats{
-				Timestamp: statsTimestampFrom(candidatePairStats.Timestamp),
-				Type:      StatsTypeCandidatePair,
-				ID:        pairID,
-				// TransportID:
-				LocalCandidateID:            candidatePairStats.LocalCandidateID,
-				RemoteCandidateID:           candidatePairStats.RemoteCandidateID,
-				State:                       state,
-				Nominated:                   candidatePairStats.Nominated,
-				PacketsSent:                 candidatePairStats.PacketsSent,
-				PacketsReceived:             candidatePairStats.PacketsReceived,
-				BytesSent:                   candidatePairStats.BytesSent,
-				BytesReceived:               candidatePairStats.BytesReceived,
-				LastPacketSentTimestamp:     statsTimestampFrom(candidatePairStats.LastPacketSentTimestamp),
-				LastPacketReceivedTimestamp: statsTimestampFrom(candidatePairStats.LastPacketReceivedTimestamp),
-				FirstRequestTimestamp:       statsTimestampFrom(candidatePairStats.FirstRequestTimestamp),
-				LastRequestTimestamp:        statsTimestampFrom(candidatePairStats.LastRequestTimestamp),
-				LastResponseTimestamp:       statsTimestampFrom(candidatePairStats.LastResponseTimestamp),
-				TotalRoundTripTime:          candidatePairStats.TotalRoundTripTime,
-				CurrentRoundTripTime:        candidatePairStats.CurrentRoundTripTime,
-				AvailableOutgoingBitrate:    candidatePairStats.AvailableOutgoingBitrate,
-				AvailableIncomingBitrate:    candidatePairStats.AvailableIncomingBitrate,
-				CircuitBreakerTriggerCount:  candidatePairStats.CircuitBreakerTriggerCount,
-				RequestsReceived:            candidatePairStats.RequestsReceived,
-				RequestsSent:                candidatePairStats.RequestsSent,
-				ResponsesReceived:           candidatePairStats.ResponsesReceived,
-				ResponsesSent:               candidatePairStats.ResponsesSent,
-				RetransmissionsReceived:     candidatePairStats.RetransmissionsReceived,
-				RetransmissionsSent:         candidatePairStats.RetransmissionsSent,
-				ConsentRequestsSent:         candidatePairStats.ConsentRequestsSent,
-				ConsentExpiredTimestamp:     statsTimestampFrom(candidatePairStats.ConsentExpiredTimestamp),
-			}
 			collector.Collect(stats.ID, stats)
 		}
 
@@ -406,4 +372,24 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 		}
 		collector.Done()
 	}(collector, agent)
+}
+
+func (g *ICEGatherer) getSelectedCandidatePairStats() (ICECandidatePairStats, bool) {
+	agent := g.getAgent()
+	if agent == nil {
+		return ICECandidatePairStats{}, false
+	}
+
+	selectedCandidatePairStats, isAvailable := agent.GetSelectedCandidatePairStats()
+	if !isAvailable {
+		return ICECandidatePairStats{}, false
+	}
+
+	stats, err := toICECandidatePairStats(selectedCandidatePairStats)
+	if err != nil {
+		g.log.Error(err.Error())
+		return ICECandidatePairStats{}, false
+	}
+
+	return stats, true
 }

@@ -1696,6 +1696,46 @@ func toStatsICECandidatePairState(state ice.CandidatePairState) (StatsICECandida
 	}
 }
 
+func toICECandidatePairStats(candidatePairStats ice.CandidatePairStats) (ICECandidatePairStats, error) {
+	state, err := toStatsICECandidatePairState(candidatePairStats.State)
+	if err != nil {
+		return ICECandidatePairStats{}, err
+	}
+
+	return ICECandidatePairStats{
+		Timestamp: statsTimestampFrom(candidatePairStats.Timestamp),
+		Type:      StatsTypeCandidatePair,
+		ID:        newICECandidatePairStatsID(candidatePairStats.LocalCandidateID, candidatePairStats.RemoteCandidateID),
+		// TransportID:
+		LocalCandidateID:            candidatePairStats.LocalCandidateID,
+		RemoteCandidateID:           candidatePairStats.RemoteCandidateID,
+		State:                       state,
+		Nominated:                   candidatePairStats.Nominated,
+		PacketsSent:                 candidatePairStats.PacketsSent,
+		PacketsReceived:             candidatePairStats.PacketsReceived,
+		BytesSent:                   candidatePairStats.BytesSent,
+		BytesReceived:               candidatePairStats.BytesReceived,
+		LastPacketSentTimestamp:     statsTimestampFrom(candidatePairStats.LastPacketSentTimestamp),
+		LastPacketReceivedTimestamp: statsTimestampFrom(candidatePairStats.LastPacketReceivedTimestamp),
+		FirstRequestTimestamp:       statsTimestampFrom(candidatePairStats.FirstRequestTimestamp),
+		LastRequestTimestamp:        statsTimestampFrom(candidatePairStats.LastRequestTimestamp),
+		LastResponseTimestamp:       statsTimestampFrom(candidatePairStats.LastResponseTimestamp),
+		TotalRoundTripTime:          candidatePairStats.TotalRoundTripTime,
+		CurrentRoundTripTime:        candidatePairStats.CurrentRoundTripTime,
+		AvailableOutgoingBitrate:    candidatePairStats.AvailableOutgoingBitrate,
+		AvailableIncomingBitrate:    candidatePairStats.AvailableIncomingBitrate,
+		CircuitBreakerTriggerCount:  candidatePairStats.CircuitBreakerTriggerCount,
+		RequestsReceived:            candidatePairStats.RequestsReceived,
+		RequestsSent:                candidatePairStats.RequestsSent,
+		ResponsesReceived:           candidatePairStats.ResponsesReceived,
+		ResponsesSent:               candidatePairStats.ResponsesSent,
+		RetransmissionsReceived:     candidatePairStats.RetransmissionsReceived,
+		RetransmissionsSent:         candidatePairStats.RetransmissionsSent,
+		ConsentRequestsSent:         candidatePairStats.ConsentRequestsSent,
+		ConsentExpiredTimestamp:     statsTimestampFrom(candidatePairStats.ConsentExpiredTimestamp),
+	}, nil
+}
+
 const (
 	// StatsICECandidatePairStateFrozen means a check for this pair hasn't been
 	// performed, and it can't yet be performed until some other check succeeds,

@@ -98,10 +98,14 @@ func TestICETransport_GetSelectedCandidatePair(t *testing.T) {
 	offererSelectedPair, err := offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
 	assert.Nil(t, offererSelectedPair)
+	_, statsAvailable := offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePairStats()
+	assert.False(t, statsAvailable)
 
 	answererSelectedPair, err := answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
 	assert.Nil(t, answererSelectedPair)
+	_, statsAvailable = answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePairStats()
+	assert.False(t, statsAvailable)
 
 	assert.NoError(t, signalPair(offerer, answerer))
 	peerConnectionConnected.Wait()
@@ -109,10 +113,14 @@ func TestICETransport_GetSelectedCandidatePair(t *testing.T) {
 	offererSelectedPair, err = offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
 	assert.NotNil(t, offererSelectedPair)
+	_, statsAvailable = offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePairStats()
+	assert.True(t, statsAvailable)
 
 	answererSelectedPair, err = answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
 	assert.NotNil(t, answererSelectedPair)
+	_, statsAvailable = answerer.SCTP().Transport().ICETransport().GetSelectedCandidatePairStats()
+	assert.True(t, statsAvailable)
 
 	closePairNow(t, offerer, answerer)
 }
