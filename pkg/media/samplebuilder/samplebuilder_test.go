@@ -396,18 +396,14 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 			s.Push(pkt5)
 
 			for i := 0; i < 3; i++ {
-				pkt, err := s.buffer.PeekAtSequence(uint16((i + int(seqStart)) % 0x10000))
-
-				if pkt != nil || err == nil {
+				if s.buffer[(i+int(seqStart))%0x10000] != nil {
 					t.Errorf("Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i)
 				}
 			}
-			pkt, err := s.buffer.PeekAtSequence(uint16((14 + int(seqStart)) % 0x10000))
-			if pkt != pkt4 || err != nil {
+			if s.buffer[(14+int(seqStart))%0x10000] != pkt4 {
 				t.Error("New packet must be referenced after jump")
 			}
-			pkt, err = s.buffer.PeekAtSequence(uint16((12 + int(seqStart)) % 0x10000))
-			if pkt != pkt5 || err != nil {
+			if s.buffer[(12+int(seqStart))%0x10000] != pkt5 {
 				t.Error("New packet must be referenced after jump")
 			}
 		})
