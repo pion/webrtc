@@ -20,6 +20,16 @@
 </p>
 <br>
 
+### New Release
+
+Pion WebRTC v4.0.0 has been released! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v4.0.0) to learn about new features and breaking changes.
+
+If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v3` release.
+
+We would love your feedback! Please create GitHub issues or join [the Slack channel](https://pion.ly/slack) to follow development and speak with the maintainers.
+
+-----
+
 ### Usage
 [Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v4` (or an earlier version) when importing.
 
