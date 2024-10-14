@@ -6,8 +6,9 @@ package webrtc
 import "github.com/pion/dtls/v3"
 
 const (
-	// Equal to UDP MTU
-	receiveMTU = 1460
+	// default as the standard ethernet MTU
+	// can be overwritten with SettingEngine.SetReceiveMTU()
+	receiveMTU = 1500
 
 	// simulcastProbeCount is the amount of RTP Packets
 	// that handleUndeclaredSSRC will read and try to dispatch from
