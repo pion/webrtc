@@ -52,16 +52,17 @@ Now go build something awesome! Here are some **ideas** to get your creative jui
 * Build a conferencing application that processes audio/video and make decisions off of it.
 * Remotely control a robots and stream its cameras in realtime.
 
-### Want to learn more about WebRTC?
-Join our [Office Hours](https://github.com/pion/webrtc/wiki/OfficeHours). Come hang out, ask questions, get help debugging and
-hear about the cool things being built with WebRTC. We also start every meeting with basic project planning.
-
+### Need Help?
 Check out [WebRTC for the Curious](https://webrtcforthecurious.com). A book about WebRTC in depth, not just about the APIs.
-Learn the full details of ICE, SCTP, DTLS, SRTP, and how they work together to make up the WebRTC stack.
+Learn the full details of ICE, SCTP, DTLS, SRTP, and how they work together to make up the WebRTC stack. This is also a great
+resource if you are trying to debug. Learn the tools of the trade and how to approach WebRTC issues. This book is vendor
+agnostic and will not have any Pion specific information.
 
-This is also a great resource if you are trying to debug. Learn the tools of the trade and how to approach WebRTC issues.
+Pion has an active community on [Slack](https://pion.ly/slack). Please ask for help about anything, questions don't have to be Pion specific!
+Come share your interesting project you are working on. We are here to support you.
 
-This book is vendor agnostic and will not have any Pion specific information.
+One of the maintainers of Pion [Sean-Der](https://github.com/sean-der) is available to help. Schedule at [siobud.com/meeting](https://siobud.com/meeting)
+He is available to talk about Pion or general WebRTC questions, feel free to reach out about anything!
 
 ### Features
 #### PeerConnection API
