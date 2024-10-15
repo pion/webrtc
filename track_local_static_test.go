@@ -9,12 +9,14 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // If a remote doesn't support a Codec used by a `TrackLocalStatic`
@@ -333,6 +335,52 @@ func Test_TrackLocalStatic_RTX(t *testing.T) {
 	assert.NotZero(t, track.bindings[0].ssrcRTX)
 	assert.NotZero(t, track.bindings[0].payloadTypeRTX)
 	track.mu.Unlock()
+
+	closePairNow(t, offerer, answerer)
+}
+
+type customCodecPayloader struct {
+	invokeCount atomic.Int32
+}
+
+func (c *customCodecPayloader) Payload(_ uint16, payload []byte) [][]byte {
+	c.invokeCount.Add(1)
+	return [][]byte{payload}
+}
+
+func Test_TrackLocalStatic_Payloader(t *testing.T) {
+	const mimeTypeCustomCodec = "video/custom-codec"
+
+	mediaEngine := &MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: mimeTypeCustomCodec, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        96,
+	}, RTPCodecTypeVideo))
+
+	offerer, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	answerer, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	customPayloader := &customCodecPayloader{}
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: mimeTypeCustomCodec}, "video", "pion", WithPayloader(func(c RTPCodecCapability) (rtp.Payloader, error) {
+		require.Equal(t, c.MimeType, mimeTypeCustomCodec)
+		return customPayloader, nil
+	}))
+	assert.NoError(t, err)
+
+	_, err = offerer.AddTrack(track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	answerer.OnTrack(func(*TrackRemote, *RTPReceiver) {
+		onTrackFiredFunc()
+	})
+
+	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
 
 	closePairNow(t, offerer, answerer)
 }

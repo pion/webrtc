@@ -31,6 +31,7 @@ type TrackLocalStaticRTP struct {
 	mu                sync.RWMutex
 	bindings          []trackBinding
 	codec             RTPCodecCapability
+	payloader         func(RTPCodecCapability) (rtp.Payloader, error)
 	id, rid, streamID string
 }
 
@@ -54,6 +55,13 @@ func NewTrackLocalStaticRTP(c RTPCodecCapability, id, streamID string, options .
 func WithRTPStreamID(rid string) func(*TrackLocalStaticRTP) {
 	return func(t *TrackLocalStaticRTP) {
 		t.rid = rid
+	}
+}
+
+// WithPayloader allows the user to override the Payloader
+func WithPayloader(h func(RTPCodecCapability) (rtp.Payloader, error)) func(*TrackLocalStaticRTP) {
+	return func(s *TrackLocalStaticRTP) {
+		s.payloader = h
 	}
 }
 
@@ -250,7 +258,12 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 		return codec, nil
 	}
 
-	payloader, err := payloaderForCodec(codec.RTPCodecCapability)
+	payloadHandler := s.rtpTrack.payloader
+	if payloadHandler == nil {
+		payloadHandler = payloaderForCodec
+	}
+
+	payloader, err := payloadHandler(codec.RTPCodecCapability)
 	if err != nil {
 		return codec, err
 	}
