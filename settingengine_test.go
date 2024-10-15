@@ -340,3 +340,57 @@ func TestSetHooks(t *testing.T) {
 		t.Errorf("Failed to set DTLS Certificate Request Hook")
 	}
 }
+
+func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.SetFireOnTrackBeforeFirstRTP(true)
+
+	mediaEngineOne := &MediaEngine{}
+	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        100,
+	}, RTPCodecTypeVideo))
+
+	mediaEngineTwo := &MediaEngine{}
+	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        200,
+	}, RTPCodecTypeVideo))
+
+	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne), WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	answerer, err := NewAPI(WithMediaEngine(mediaEngineTwo)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	_, err = answerer.AddTrack(track)
+	assert.NoError(t, err)
+
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	offerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, err = track.Read(make([]byte, 1500))
+		assert.NoError(t, err)
+		assert.Equal(t, track.PayloadType(), PayloadType(100))
+		assert.Equal(t, track.Codec().RTPCodecCapability.MimeType, "video/VP8")
+
+		onTrackFiredFunc()
+	})
+
+	assert.NoError(t, signalPair(offerer, answerer))
+
+	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
+
+	closePairNow(t, offerer, answerer)
+}
