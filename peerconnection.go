@@ -1245,6 +1245,10 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 			return
 		}
 
+		if pc.api.settingEngine.fireOnTrackBeforeFirstRTP {
+			pc.onTrack(t, receiver)
+			return
+		}
 		go func(track *TrackRemote) {
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 			n, _, err := track.peek(b)
