@@ -363,15 +363,15 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 	for _, t := range pc.rtpTransceivers {
 		// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 		// Step 5.1
-		// if t.stopping && !t.stopped {
+		// if t.stopping && !t.IsStopped() {
 		// 	return true
 		// }
 		m := getByMid(t.Mid(), localDesc)
 		// Step 5.2
-		if !t.stopped && m == nil {
+		if !t.IsStopped() && m == nil {
 			return true
 		}
-		if !t.stopped && m != nil {
+		if !t.IsStopped() && m != nil {
 			// Step 5.3.1
 			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
 				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
@@ -412,7 +412,7 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 			}
 		}
 		// Step 5.4
-		if t.stopped && t.Mid() != "" {
+		if t.IsStopped() && t.Mid() != "" {
 			if getByMid(t.Mid(), localDesc) != nil || getByMid(t.Mid(), remoteDesc) != nil {
 				return true
 			}
@@ -1868,7 +1868,7 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		// transceiver can be reused only if it's currentDirection never be sendrecv or sendonly.
 		// But that will cause sdp inflate. So we only check currentDirection's current value,
 		// that's worked for all browsers.
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil &&
+		if !t.IsStopped() && t.kind == track.Kind() && t.Sender() == nil &&
 			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
 			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 			if err == nil {
@@ -2209,9 +2209,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	pc.mu.Lock()
 	for _, t := range pc.rtpTransceivers {
-		if !t.stopped {
-			closeErrs = append(closeErrs, t.Stop())
-		}
+		closeErrs = append(closeErrs, t.Stop())
 	}
 	if nonMediaBandwidthProbe, ok := pc.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
 		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop())
