@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/dtls/v3"
 	"github.com/pion/ice/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
@@ -1637,4 +1638,28 @@ func TestPeerConnectionDeadlock(t *testing.T) {
 	closeHdlr(pcAnswer)
 
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+// Assert that by default NULL Ciphers aren't enabled. Even if
+// the remote Peer Requests a NULL Cipher we should fail
+func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
+	settingEngine := SettingEngine{}
+	settingEngine.SetSRTPProtectionProfiles(dtls.SRTP_NULL_HMAC_SHA1_80, dtls.SRTP_NULL_HMAC_SHA1_32)
+	offerPC, err := NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	answerPC, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	peerConnectionClosed := make(chan struct{})
+	answerPC.OnConnectionStateChange(func(s PeerConnectionState) {
+		if s == PeerConnectionStateClosed {
+			close(peerConnectionClosed)
+		}
+	})
+
+	<-peerConnectionClosed
+	closePairNow(t, offerPC, answerPC)
 }
