@@ -221,7 +221,7 @@ func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 	gatherer := t.gatherer
 	t.lock.Unlock()
 
-	if t.mux != nil {
+	if mux != nil {
 		var closeErrs []error
 		if shouldGracefullyClose && gatherer != nil {
 			// we can't access icegatherer/icetransport.Close via
