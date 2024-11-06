@@ -97,13 +97,17 @@ type PeerConnection struct {
 //
 // If you wish to customize the set of available codecs and/or the set of active interceptors,
 // create an API with a custom MediaEngine and/or interceptor.Registry,
-// then call API.NewPeerConnection() instead of this function.
+// then call [(*API).NewPeerConnection] instead of this function.
 func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 	api := NewAPI()
 	return api.NewPeerConnection(configuration)
 }
 
-// NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object
+// NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object.
+// This method will attach a default set of codecs and interceptors to
+// the resulting PeerConnection.  If this behavior is not desired,
+// set the set of codecs and interceptors explicitly by using
+// [WithMediaEngine] and [WithInterceptorRegistry] when calling [NewAPI].
 func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
