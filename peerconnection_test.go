@@ -282,6 +282,7 @@ const minimalOffer = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
+a=group:BUNDLE data
 a=msid-semantic: WMS
 m=application 47299 DTLS/SCTP 5000
 c=IN IP4 192.168.20.129
