@@ -719,96 +719,156 @@ func getPeerDirection(media *sdp.MediaDescription) RTPTransceiverDirection {
 	return RTPTransceiverDirectionUnknown
 }
 
-func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
-	fingerprints := []string{}
+func extractBundleID(desc *sdp.SessionDescription) string {
+	groupAttribute, _ := desc.Attribute(sdp.AttrKeyGroup)
 
-	if fingerprint, haveFingerprint := desc.Attribute("fingerprint"); haveFingerprint {
-		fingerprints = append(fingerprints, fingerprint)
+	isBundled := strings.Contains(groupAttribute, "BUNDLE")
+
+	if !isBundled {
+		return ""
 	}
 
-	for _, m := range desc.MediaDescriptions {
-		if fingerprint, haveFingerprint := m.Attribute("fingerprint"); haveFingerprint {
-			fingerprints = append(fingerprints, fingerprint)
+	bundleIDs := strings.Split(groupAttribute, " ")
+
+	if len(bundleIDs) < 2 {
+		return ""
+	}
+
+	return bundleIDs[1]
+}
+
+func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint: gocognit
+	fingerprint := ""
+
+	// Fingerprint on session level has highest priority
+	if sessionFingerprint, haveFingerprint := desc.Attribute("fingerprint"); haveFingerprint {
+		fingerprint = sessionFingerprint
+	}
+
+	if fingerprint == "" {
+		bundleID := extractBundleID(desc)
+		if bundleID != "" {
+			// Locate the fingerprint of the bundled media section
+			for _, m := range desc.MediaDescriptions {
+				if mid, haveMid := m.Attribute("mid"); haveMid {
+					if mid == bundleID && fingerprint == "" {
+						if mediaFingerprint, haveFingerprint := m.Attribute("fingerprint"); haveFingerprint {
+							fingerprint = mediaFingerprint
+						}
+					}
+				}
+			}
+		} else {
+			// Take the fingerprint from the first media section which has one.
+			// Note: According to Bundle spec each media section would have it's own transport
+			//       with it's own cert and fingerprint each, so we would need to return a list.
+			for _, m := range desc.MediaDescriptions {
+				mediaFingerprint, haveFingerprint := m.Attribute("fingerprint")
+				if haveFingerprint && fingerprint == "" {
+					fingerprint = mediaFingerprint
+				}
+			}
 		}
 	}
 
-	if len(fingerprints) < 1 {
+	if fingerprint == "" {
 		return "", "", ErrSessionDescriptionNoFingerprint
 	}
 
-	for _, m := range fingerprints {
-		if m != fingerprints[0] {
-			return "", "", ErrSessionDescriptionConflictingFingerprints
-		}
-	}
-
-	parts := strings.Split(fingerprints[0], " ")
+	parts := strings.Split(fingerprint, " ")
 	if len(parts) != 2 {
 		return "", "", ErrSessionDescriptionInvalidFingerprint
 	}
 	return parts[1], parts[0], nil
 }
 
-func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
+func extractICEDetailsFromMedia(media *sdp.MediaDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) {
+	remoteUfrag := ""
+	remotePwd := ""
 	candidates := []ICECandidate{}
-	remotePwds := []string{}
-	remoteUfrags := []string{}
 
+	if ufrag, haveUfrag := media.Attribute("ice-ufrag"); haveUfrag {
+		remoteUfrag = ufrag
+	}
+	if pwd, havePwd := media.Attribute("ice-pwd"); havePwd {
+		remotePwd = pwd
+	}
+	for _, a := range media.Attributes {
+		if a.IsICECandidate() {
+			c, err := ice.UnmarshalCandidate(a.Value)
+			if err != nil {
+				if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
+					log.Warnf("Discarding remote candidate: %s", err)
+					continue
+				}
+				return "", "", nil, err
+			}
+
+			candidate, err := newICECandidateFromICE(c)
+			if err != nil {
+				return "", "", nil, err
+			}
+
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	return remoteUfrag, remotePwd, candidates, nil
+}
+
+func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
+	remoteCandidates := []ICECandidate{}
+	remotePwd := ""
+	remoteUfrag := ""
+
+	// Ufrag and Pw are allow at session level and thus have highest prio
 	if ufrag, haveUfrag := desc.Attribute("ice-ufrag"); haveUfrag {
-		remoteUfrags = append(remoteUfrags, ufrag)
+		remoteUfrag = ufrag
 	}
 	if pwd, havePwd := desc.Attribute("ice-pwd"); havePwd {
-		remotePwds = append(remotePwds, pwd)
+		remotePwd = pwd
 	}
+
+	bundleID := extractBundleID(desc)
+	missing := true
 
 	for _, m := range desc.MediaDescriptions {
-		if ufrag, haveUfrag := m.Attribute("ice-ufrag"); haveUfrag {
-			remoteUfrags = append(remoteUfrags, ufrag)
-		}
-		if pwd, havePwd := m.Attribute("ice-pwd"); havePwd {
-			remotePwds = append(remotePwds, pwd)
-		}
-
-		for _, a := range m.Attributes {
-			if a.IsICECandidate() {
-				c, err := ice.UnmarshalCandidate(a.Value)
-				if err != nil {
-					if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
-						log.Warnf("Discarding remote candidate: %s", err)
-						continue
-					}
-					return "", "", nil, err
-				}
-
-				candidate, err := newICECandidateFromICE(c)
+		mid := getMidValue(m)
+		// If bundled, only take ICE detail from bundle master section
+		if bundleID != "" {
+			if mid == bundleID {
+				ufrag, pwd, candidates, err := extractICEDetailsFromMedia(m, log)
 				if err != nil {
 					return "", "", nil, err
 				}
-
-				candidates = append(candidates, candidate)
+				if remoteUfrag == "" && ufrag != "" {
+					remoteUfrag = ufrag
+					remotePwd = pwd
+				}
+				remoteCandidates = candidates
 			}
+		} else if missing {
+			// For not-bundled, take ICE details from the first media section
+			ufrag, pwd, candidates, err := extractICEDetailsFromMedia(m, log)
+			if err != nil {
+				return "", "", nil, err
+			}
+			if remoteUfrag == "" && ufrag != "" {
+				remoteUfrag = ufrag
+				remotePwd = pwd
+			}
+			remoteCandidates = candidates
+			missing = false
 		}
 	}
 
-	if len(remoteUfrags) == 0 {
+	if remoteUfrag == "" {
 		return "", "", nil, ErrSessionDescriptionMissingIceUfrag
-	} else if len(remotePwds) == 0 {
+	} else if remotePwd == "" {
 		return "", "", nil, ErrSessionDescriptionMissingIcePwd
 	}
 
-	for _, m := range remoteUfrags {
-		if m != remoteUfrags[0] {
-			return "", "", nil, ErrSessionDescriptionConflictingIceUfrag
-		}
-	}
-
-	for _, m := range remotePwds {
-		if m != remotePwds[0] {
-			return "", "", nil, ErrSessionDescriptionConflictingIcePwd
-		}
-	}
-
-	return remoteUfrags[0], remotePwds[0], candidates, nil
+	return remoteUfrag, remotePwd, remoteCandidates, nil
 }
 
 func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {

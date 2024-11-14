@@ -59,22 +59,69 @@ func TestExtractFingerprint(t *testing.T) {
 		assert.Equal(t, ErrSessionDescriptionInvalidFingerprint, err)
 	})
 
-	t.Run("Conflicting Fingerprint", func(t *testing.T) {
+	t.Run("Session fingerprint wins over media", func(t *testing.T) {
 		s := &sdp.SessionDescription{
-			Attributes: []sdp.Attribute{{Key: "fingerprint", Value: "foo"}},
+			Attributes: []sdp.Attribute{{Key: "fingerprint", Value: "foo bar"}},
 			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "fingerprint", Value: "foo blah"}}},
+				{Attributes: []sdp.Attribute{{Key: "fingerprint", Value: "zoo boo"}}},
 			},
 		}
 
-		_, _, err := extractFingerprint(s)
-		assert.Equal(t, ErrSessionDescriptionConflictingFingerprints, err)
+		fingerprint, hash, err := extractFingerprint(s)
+		assert.NoError(t, err)
+		assert.Equal(t, fingerprint, "bar")
+		assert.Equal(t, hash, "foo")
+	})
+
+	t.Run("Fingerprint from master bundle section", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			Attributes: []sdp.Attribute{
+				{Key: "group", Value: "BUNDLE 1 0"},
+			},
+			MediaDescriptions: []*sdp.MediaDescription{
+				{Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "0"},
+					{Key: "fingerprint", Value: "zoo boo"},
+				}},
+				{Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "1"},
+					{Key: "fingerprint", Value: "bar foo"},
+				}},
+			},
+		}
+
+		fingerprint, hash, err := extractFingerprint(s)
+		assert.NoError(t, err)
+		assert.Equal(t, fingerprint, "foo")
+		assert.Equal(t, hash, "bar")
+	})
+
+	t.Run("Fingerprint from first media section", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "0"},
+					{Key: "fingerprint", Value: "zoo boo"},
+				}},
+				{Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "1"},
+					{Key: "fingerprint", Value: "bar foo"},
+				}},
+			},
+		}
+
+		fingerprint, hash, err := extractFingerprint(s)
+		assert.NoError(t, err)
+		assert.Equal(t, fingerprint, "boo")
+		assert.Equal(t, hash, "zoo")
 	})
 }
 
 func TestExtractICEDetails(t *testing.T) {
-	const defaultUfrag = "defaultPwd"
-	const defaultPwd = "defaultUfrag"
+	const defaultUfrag = "defaultUfrag"
+	const defaultPwd = "defaultPwd"
+	const invalidUfrag = "invalidUfrag"
+	const invalidPwd = "invalidPwd"
 
 	t.Run("Missing ice-pwd", func(t *testing.T) {
 		s := &sdp.SessionDescription{
@@ -131,7 +178,82 @@ func TestExtractICEDetails(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("Conflict ufrag", func(t *testing.T) {
+	t.Run("ice details at session preferred over media", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			Attributes: []sdp.Attribute{
+				{Key: "ice-ufrag", Value: defaultUfrag},
+				{Key: "ice-pwd", Value: defaultPwd},
+			},
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "ice-ufrag", Value: invalidUfrag},
+						{Key: "ice-pwd", Value: invalidPwd},
+					},
+				},
+			},
+		}
+
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		assert.Equal(t, ufrag, defaultUfrag)
+		assert.Equal(t, pwd, defaultPwd)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ice details from bundle media section", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			Attributes: []sdp.Attribute{
+				{Key: "group", Value: "BUNDLE 5 2"},
+			},
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "2"},
+						{Key: "ice-ufrag", Value: invalidUfrag},
+						{Key: "ice-pwd", Value: invalidPwd},
+					},
+				},
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "5"},
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+					},
+				},
+			},
+		}
+
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		assert.Equal(t, ufrag, defaultUfrag)
+		assert.Equal(t, pwd, defaultPwd)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ice details from first media section", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+					},
+				},
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "ice-ufrag", Value: invalidUfrag},
+						{Key: "ice-pwd", Value: invalidPwd},
+					},
+				},
+			},
+		}
+
+		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		assert.Equal(t, ufrag, defaultUfrag)
+		assert.Equal(t, pwd, defaultPwd)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Missing pwd at session level", func(t *testing.T) {
 		s := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{{Key: "ice-ufrag", Value: "invalidUfrag"}},
 			MediaDescriptions: []*sdp.MediaDescription{
@@ -140,19 +262,7 @@ func TestExtractICEDetails(t *testing.T) {
 		}
 
 		_, _, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, err, ErrSessionDescriptionConflictingIceUfrag)
-	})
-
-	t.Run("Conflict pwd", func(t *testing.T) {
-		s := &sdp.SessionDescription{
-			Attributes: []sdp.Attribute{{Key: "ice-pwd", Value: "invalidPwd"}},
-			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "ice-ufrag", Value: defaultUfrag}, {Key: "ice-pwd", Value: defaultPwd}}},
-			},
-		}
-
-		_, _, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, err, ErrSessionDescriptionConflictingIcePwd)
+		assert.Equal(t, err, ErrSessionDescriptionMissingIcePwd)
 	})
 }
 

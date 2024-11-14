@@ -1072,6 +1072,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			for scanner.Scan() {
 				if strings.HasPrefix(scanner.Text(), "m=video") {
 					shouldDiscard = !shouldDiscard
+				} else if strings.HasPrefix(scanner.Text(), "a=group:BUNDLE") {
+					filtered += "a=group:BUNDLE 1 2\r\n"
+					continue
 				}
 
 				if !shouldDiscard {
