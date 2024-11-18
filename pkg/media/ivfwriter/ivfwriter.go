@@ -24,6 +24,7 @@ var (
 
 const (
 	mimeTypeVP8 = "video/VP8"
+	mimeTypeVP9 = "video/VP9"
 	mimeTypeAV1 = "video/AV1"
 
 	ivfFileHeaderSignature = "DKIF"
@@ -35,9 +36,9 @@ type IVFWriter struct {
 	count        uint64
 	seenKeyFrame bool
 
-	isVP8, isAV1 bool
+	isVP8, isVP9, isAV1 bool
 
-	// VP8
+	// VP8, VP9
 	currentFrame []byte
 
 	// AV1
@@ -75,7 +76,7 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 		}
 	}
 
-	if !writer.isAV1 && !writer.isVP8 {
+	if !writer.isAV1 && !writer.isVP8 && !writer.isVP9 {
 		writer.isVP8 = true
 	}
 
@@ -92,9 +93,12 @@ func (i *IVFWriter) writeHeader() error {
 	binary.LittleEndian.PutUint16(header[6:], 32) // Header size
 
 	// FOURCC
-	if i.isVP8 {
+	switch {
+	case i.isVP8:
 		copy(header[8:], "VP80")
-	} else if i.isAV1 {
+	case i.isVP9:
+		copy(header[8:], "VP90")
+	case i.isAV1:
 		copy(header[8:], "AV01")
 	}
 
@@ -123,14 +127,15 @@ func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 }
 
 // WriteRTP adds a new packet and writes the appropriate headers for it
-func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
+func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:gocognit
 	if i.ioWriter == nil {
 		return errFileNotOpened
 	} else if len(packet.Payload) == 0 {
 		return nil
 	}
 
-	if i.isVP8 {
+	switch {
+	case i.isVP8:
 		vp8Packet := codecs.VP8Packet{}
 		if _, err := vp8Packet.Unmarshal(packet.Payload); err != nil {
 			return err
@@ -157,7 +162,35 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 			return err
 		}
 		i.currentFrame = nil
-	} else if i.isAV1 {
+	case i.isVP9:
+		vp9Packet := codecs.VP9Packet{}
+		if _, err := vp9Packet.Unmarshal(packet.Payload); err != nil {
+			return err
+		}
+
+		switch {
+		case !i.seenKeyFrame && vp9Packet.P:
+			return nil
+		case i.currentFrame == nil && !vp9Packet.B:
+			return nil
+		}
+
+		i.seenKeyFrame = true
+		i.currentFrame = append(i.currentFrame, vp9Packet.Payload[0:]...)
+
+		if !packet.Marker {
+			return nil
+		} else if len(i.currentFrame) == 0 {
+			return nil
+		}
+
+		// the timestamp must be sequential. webrtc mandates a clock rate of 90000
+		// and we've assumed 30fps in the header.
+		if err := i.writeFrame(i.currentFrame, uint64(packet.Header.Timestamp)/3000); err != nil {
+			return err
+		}
+		i.currentFrame = nil
+	case i.isAV1:
 		av1Packet := &codecs.AV1Packet{}
 		if _, err := av1Packet.Unmarshal(packet.Payload); err != nil {
 			return err
@@ -215,13 +248,15 @@ type Option func(i *IVFWriter) error
 // WithCodec configures if IVFWriter is writing AV1 or VP8 packets to disk
 func WithCodec(mimeType string) Option {
 	return func(i *IVFWriter) error {
-		if i.isVP8 || i.isAV1 {
+		if i.isVP8 || i.isVP9 || i.isAV1 {
 			return errCodecAlreadySet
 		}
 
 		switch mimeType {
 		case mimeTypeVP8:
 			i.isVP8 = true
+		case mimeTypeVP9:
+			i.isVP9 = true
 		case mimeTypeAV1:
 			i.isAV1 = true
 		default:
