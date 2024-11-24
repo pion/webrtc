@@ -48,8 +48,8 @@ type SettingEngine struct {
 	candidates struct {
 		ICELite                  bool
 		ICENetworkTypes          []NetworkType
-		InterfaceFilter          func(string) bool
-		IPFilter                 func(net.IP) bool
+		InterfaceFilter          func(string) (keep bool)
+		IPFilter                 func(net.IP) (keep bool)
 		NAT1To1IPs               []string
 		NAT1To1IPCandidateType   ICECandidateType
 		MulticastDNSMode         ice.MulticastDNSMode
@@ -201,7 +201,7 @@ func (e *SettingEngine) SetNetworkTypes(candidateTypes []NetworkType) {
 // This can be used to exclude certain network interfaces from ICE. Which may be
 // useful if you know a certain interface will never succeed, or if you wish to reduce
 // the amount of information you wish to expose to the remote peer
-func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
+func (e *SettingEngine) SetInterfaceFilter(filter func(string) (keep bool)) {
 	e.candidates.InterfaceFilter = filter
 }
 
@@ -209,7 +209,7 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) bool) {
 // This can be used to exclude certain ip from ICE. Which may be
 // useful if you know a certain ip will never succeed, or if you wish to reduce
 // the amount of information you wish to expose to the remote peer
-func (e *SettingEngine) SetIPFilter(filter func(net.IP) bool) {
+func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 	e.candidates.IPFilter = filter
 }
 
