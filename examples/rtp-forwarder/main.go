@@ -143,7 +143,6 @@ func main() {
 		}
 
 		b := make([]byte, 1500)
-		rtpPacket := &rtp.Packet{}
 		for {
 			// Read
 			n, _, readErr := track.Read(b)
@@ -152,6 +151,7 @@ func main() {
 			}
 
 			// Unmarshal the packet and update the PayloadType
+			rtpPacket := &rtp.Packet{}
 			if err = rtpPacket.Unmarshal(b[:n]); err != nil {
 				panic(err)
 			}
