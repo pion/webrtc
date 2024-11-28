@@ -311,6 +311,12 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding.ssrc = parameters.Encodings[idx].SSRC
 		trackEncoding.ssrcRTX = parameters.Encodings[idx].RTX.SSRC
 		trackEncoding.ssrcFEC = parameters.Encodings[idx].FEC.SSRC
+		trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
+			interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+				n, err = trackEncoding.srtpStream.Read(in)
+				return n, a, err
+			}),
+		)
 		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
 			params:          rtpParameters,
@@ -337,13 +343,6 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			0,
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
-		)
-
-		trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
-			interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-				n, err = trackEncoding.srtpStream.Read(in)
-				return n, a, err
-			}),
 		)
 
 		rtpInterceptor := r.api.interceptor.BindLocalStream(

@@ -484,3 +484,40 @@ func Test_RTPSender_RTX_Support(t *testing.T) {
 		assert.NoError(t, peerConnection.Close())
 	})
 }
+
+func Test_RTPSender_RTCPReader_Bind_Not_Nil(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	bindCalled := make(chan struct{})
+	rtpSender, err := peerConnection.AddTrack(&TrackLocalCheckRTCPReaderOnBind{
+		t:                      t,
+		TrackLocalStaticSample: track,
+		bindCalled:             bindCalled,
+	})
+	assert.NoError(t, err)
+
+	parameter := rtpSender.GetParameters()
+	err = rtpSender.Send(parameter)
+	<-rtpSender.sendCalled
+	<-bindCalled
+	assert.NoError(t, err)
+
+	assert.NoError(t, peerConnection.Close())
+}
+
+type TrackLocalCheckRTCPReaderOnBind struct {
+	*TrackLocalStaticSample
+	t          *testing.T
+	bindCalled chan struct{}
+}
+
+func (s *TrackLocalCheckRTCPReaderOnBind) Bind(ctx TrackLocalContext) (RTPCodecParameters, error) {
+	assert.NotNil(s.t, ctx.RTCPReader())
+	p, err := s.TrackLocalStaticSample.Bind(ctx)
+	close(s.bindCalled)
+	return p, err
+}
