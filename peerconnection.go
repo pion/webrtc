@@ -2417,7 +2417,7 @@ func (pc *PeerConnection) startTransports(iceRole ICERole, dtlsRole DTLSRole, re
 	}
 
 	pc.dtlsTransport.internalOnCloseHandler = func() {
-		if pc.isClosed.get() {
+		if pc.isClosed.get() || pc.api.settingEngine.disableCloseByDTLS {
 			return
 		}
 
