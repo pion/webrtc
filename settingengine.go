@@ -103,6 +103,7 @@ type SettingEngine struct {
 	iceMaxBindingRequests                     *uint16
 	fireOnTrackBeforeFirstRTP                 bool
 	disableCloseByDTLS                        bool
+	dataChannelBlockWrite                     bool
 }
 
 // getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default
@@ -119,6 +120,12 @@ func (e *SettingEngine) getReceiveMTU() uint {
 // DataChannel.Detach method.
 func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
+}
+
+// EnableDataChannelBlockWrite allows data channels to block on write,
+// it only works if DetachDataChannels is enabled
+func (e *SettingEngine) EnableDataChannelBlockWrite(nonblockWrite bool) {
+	e.dataChannelBlockWrite = nonblockWrite
 }
 
 // SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
