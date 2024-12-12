@@ -438,8 +438,11 @@ func (d *DataChannel) ensureOpen() error {
 	return nil
 }
 
-// Detach allows you to detach the underlying datachannel. This provides
-// an idiomatic API to work with, however it disables the OnMessage callback.
+// Detach allows you to detach the underlying datachannel.
+// This provides an idiomatic API to work with
+// (`io.ReadWriteCloser` with its `.Read()` and `.Write()` methods,
+// as opposed to `.Send()` and `.OnMessage`),
+// however it disables the OnMessage callback.
 // Before calling Detach you have to enable this behavior by calling
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
