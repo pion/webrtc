@@ -392,6 +392,7 @@ func (r *RTPReceiver) receiveForRid(rid string, params RTPParameters, streamInfo
 			r.tracks[i].track.codec = params.Codecs[0]
 			r.tracks[i].track.params = params
 			r.tracks[i].track.ssrc = SSRC(streamInfo.SSRC)
+			r.tracks[i].track.payloadType = params.Codecs[0].PayloadType
 			r.tracks[i].track.mu.Unlock()
 
 			r.tracks[i].streamInfo = streamInfo
