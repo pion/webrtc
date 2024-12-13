@@ -401,7 +401,7 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 }
 
 // Look up a codec and enable if it exists
-func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType, exactMatches, partialMatches []RTPCodecParameters) (codecMatchType, error) {
+func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType, exactMatches, partialMatches []RTPCodecParameters) (RTPCodecParameters, codecMatchType, error) {
 	codecs := m.videoCodecs
 	if typ == RTPCodecTypeAudio {
 		codecs = m.audioCodecs
@@ -411,7 +411,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
 		payloadType, err := strconv.ParseUint(apt, 10, 8)
 		if err != nil {
-			return codecMatchNone, err
+			return RTPCodecParameters{}, codecMatchNone, err
 		}
 
 		aptMatch := codecMatchNone
@@ -435,7 +435,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		}
 
 		if aptMatch == codecMatchNone {
-			return codecMatchNone, nil // not an error, we just ignore this codec we don't support
+			return RTPCodecParameters{}, codecMatchNone, nil // not an error, we just ignore this codec we don't support
 		}
 
 		// replace the apt value with the original codec's payload type
@@ -445,15 +445,15 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		}
 
 		// if apt's media codec is partial match, then apt codec must be partial match too
-		_, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
+		localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
 		if matchType == codecMatchExact && aptMatch == codecMatchPartial {
 			matchType = codecMatchPartial
 		}
-		return matchType, nil
+		return localCodec, matchType, nil
 	}
 
-	_, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
-	return matchType, nil
+	localCodec, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
+	return localCodec, matchType, nil
 }
 
 // Update header extensions from a remote media section
@@ -555,16 +555,18 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		exactMatches := make([]RTPCodecParameters, 0, len(codecs))
 		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
 
-		for _, codec := range codecs {
-			matchType, mErr := m.matchRemoteCodec(codec, typ, exactMatches, partialMatches)
+		for _, remoteCodec := range codecs {
+			localCodec, matchType, mErr := m.matchRemoteCodec(remoteCodec, typ, exactMatches, partialMatches)
 			if mErr != nil {
 				return mErr
 			}
 
+			remoteCodec.RTCPFeedback = rtcpFeedbackIntersection(localCodec.RTCPFeedback, remoteCodec.RTCPFeedback)
+
 			if matchType == codecMatchExact {
-				exactMatches = append(exactMatches, codec)
+				exactMatches = append(exactMatches, remoteCodec)
 			} else if matchType == codecMatchPartial {
-				partialMatches = append(partialMatches, codec)
+				partialMatches = append(partialMatches, remoteCodec)
 			}
 		}
 

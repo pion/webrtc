@@ -78,6 +78,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 			if codec.PayloadType == 0 {
 				codec.PayloadType = c.PayloadType
 			}
+			codec.RTCPFeedback = rtcpFeedbackIntersection(codec.RTCPFeedback, c.RTCPFeedback)
 			filteredCodecs = append(filteredCodecs, codec)
 		}
 	}

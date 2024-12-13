@@ -722,3 +722,74 @@ a=fmtp:127 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001
 		})
 	}
 }
+
+// rtcp-fb should be an intersection of local and remote
+func TestRTCPFeedbackHandling(t *testing.T) {
+	const offerSdp = `
+v=0
+o=- 8448668841136641781 4 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE 0
+a=extmap-allow-mixed
+a=msid-semantic: WMS 4beea6b0-cf95-449c-a1ec-78e16b247426
+m=video 9 UDP/TLS/RTP/SAVPF 96
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=ice-options:google-ice
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:0
+a=sendrecv
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 nack
+`
+
+	runTest := func(createTransceiver bool, t *testing.T) {
+		m := &MediaEngine{}
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, RTCPFeedback: []RTCPFeedback{
+				{Type: TypeRTCPFBTransportCC},
+				{Type: TypeRTCPFBNACK},
+			}},
+			PayloadType: 96,
+		}, RTPCodecTypeVideo))
+
+		peerConnection, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		if createTransceiver {
+			_, err = peerConnection.AddTransceiverFromKind(RTPCodecTypeVideo)
+			assert.NoError(t, err)
+		}
+
+		assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  offerSdp,
+		},
+		))
+
+		answer, err := peerConnection.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		// Both clients support
+		assert.True(t, strings.Contains(answer.SDP, "a=rtcp-fb:96 nack"))
+
+		// Only one client supports
+		assert.False(t, strings.Contains(answer.SDP, "a=rtcp-fb:96 goog-remb"))
+		assert.False(t, strings.Contains(answer.SDP, "a=rtcp-fb:96 transport-cc"))
+
+		assert.NoError(t, peerConnection.Close())
+	}
+
+	t.Run("recvonly", func(t *testing.T) {
+		runTest(false, t)
+	})
+
+	t.Run("sendrecv", func(t *testing.T) {
+		runTest(true, t)
+	})
+}
