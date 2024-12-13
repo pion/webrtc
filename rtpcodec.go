@@ -136,3 +136,16 @@ func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) Paylo
 
 	return PayloadType(0)
 }
+
+func rtcpFeedbackIntersection(a, b []RTCPFeedback) (out []RTCPFeedback) {
+	for _, aFeedback := range a {
+		for _, bFeeback := range b {
+			if aFeedback.Type == bFeeback.Type && aFeedback.Parameter == bFeeback.Parameter {
+				out = append(out, aFeedback)
+				break
+			}
+		}
+	}
+
+	return
+}
