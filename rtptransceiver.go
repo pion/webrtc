@@ -24,8 +24,7 @@ type RTPTransceiver struct {
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
-	stopped bool
-	kind    RTPCodecType
+	kind RTPCodecType
 
 	api *API
 	mu  sync.RWMutex
