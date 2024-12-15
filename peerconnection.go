@@ -371,56 +371,57 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit
 		// 	return true
 		// }
 		m := getByMid(t.Mid(), localDesc)
+
 		// Step 5.2
-		if !t.stopped && m == nil {
+		if m == nil {
 			return true
 		}
-		if !t.stopped && m != nil {
-			// Step 5.3.1
-			if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
-				descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
-				sender := t.Sender()
-				if sender == nil {
-					return true
-				}
-				track := sender.Track()
-				if track == nil {
-					// Situation when sender's track is nil could happen when
-					// a) replaceTrack(nil) is called
-					// b) removeTrack() is called, changing the transceiver's direction to inactive
-					// As t.Direction() in this branch is either sendrecv or sendonly, we believe (a) option is the case
-					// As calling replaceTrack does not require renegotiation, we skip check for this transceiver
-					continue
-				}
-				if !okMsid || descMsid != track.StreamID()+" "+track.ID() {
-					return true
-				}
-			}
-			switch localDesc.Type {
-			case SDPTypeOffer:
-				// Step 5.3.2
-				rm := getByMid(t.Mid(), remoteDesc)
-				if rm == nil {
-					return true
-				}
 
-				if getPeerDirection(m) != t.Direction() && getPeerDirection(rm) != t.Direction().Revers() {
-					return true
-				}
-			case SDPTypeAnswer:
-				// Step 5.3.3
-				if _, ok := m.Attribute(t.Direction().String()); !ok {
-					return true
-				}
-			default:
+		// Step 5.3.1
+		if t.Direction() == RTPTransceiverDirectionSendrecv || t.Direction() == RTPTransceiverDirectionSendonly {
+			descMsid, okMsid := m.Attribute(sdp.AttrKeyMsid)
+			sender := t.Sender()
+			if sender == nil {
+				return true
 			}
-		}
-		// Step 5.4
-		if t.stopped && t.Mid() != "" {
-			if getByMid(t.Mid(), localDesc) != nil || getByMid(t.Mid(), remoteDesc) != nil {
+			track := sender.Track()
+			if track == nil {
+				// Situation when sender's track is nil could happen when
+				// a) replaceTrack(nil) is called
+				// b) removeTrack() is called, changing the transceiver's direction to inactive
+				// As t.Direction() in this branch is either sendrecv or sendonly, we believe (a) option is the case
+				// As calling replaceTrack does not require renegotiation, we skip check for this transceiver
+				continue
+			}
+			if !okMsid || descMsid != track.StreamID()+" "+track.ID() {
 				return true
 			}
 		}
+		switch localDesc.Type {
+		case SDPTypeOffer:
+			// Step 5.3.2
+			rm := getByMid(t.Mid(), remoteDesc)
+			if rm == nil {
+				return true
+			}
+
+			if getPeerDirection(m) != t.Direction() && getPeerDirection(rm) != t.Direction().Revers() {
+				return true
+			}
+		case SDPTypeAnswer:
+			// Step 5.3.3
+			if _, ok := m.Attribute(t.Direction().String()); !ok {
+				return true
+			}
+		default:
+		}
+
+		// Step 5.4
+		// if t.stopped && t.Mid() != "" {
+		// 	if getByMid(t.Mid(), localDesc) != nil || getByMid(t.Mid(), remoteDesc) != nil {
+		// 		return true
+		// 	}
+		// }
 	}
 	// Step 6
 	return false
@@ -1872,7 +1873,7 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		// transceiver can be reused only if it's currentDirection never be sendrecv or sendonly.
 		// But that will cause sdp inflate. So we only check currentDirection's current value,
 		// that's worked for all browsers.
-		if !t.stopped && t.kind == track.Kind() && t.Sender() == nil &&
+		if t.kind == track.Kind() && t.Sender() == nil &&
 			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
 			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 			if err == nil {
@@ -2213,9 +2214,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	pc.mu.Lock()
 	for _, t := range pc.rtpTransceivers {
-		if !t.stopped {
-			closeErrs = append(closeErrs, t.Stop())
-		}
+		closeErrs = append(closeErrs, t.Stop())
 	}
 	if nonMediaBandwidthProbe, ok := pc.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
 		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop())
