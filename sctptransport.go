@@ -98,7 +98,7 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *SCTPTransport) Start(SCTPCapabilities) error {
+func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
 	}
@@ -114,6 +114,7 @@ func (r *SCTPTransport) Start(SCTPCapabilities) error {
 		EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		LoggerFactory:        r.api.settingEngine.LoggerFactory,
 		RTOMax:               float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond),
+		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
 	})
 	if err != nil {
 		return err

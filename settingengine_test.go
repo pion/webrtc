@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/datachannel"
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
@@ -416,4 +417,46 @@ func TestDisableCloseByDTLS(t *testing.T) {
 	time.Sleep(time.Second)
 	assert.True(t, offer.ConnectionState() == PeerConnectionStateConnected)
 	assert.NoError(t, offer.Close())
+}
+
+func TestEnableDataChannelBlockWrite(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.DetachDataChannels()
+	s.EnableDataChannelBlockWrite(true)
+	s.SetSCTPMaxReceiveBufferSize(1500)
+
+	offer, answer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	dc, err := offer.CreateDataChannel("data", nil)
+	assert.NoError(t, err)
+	detachChan := make(chan datachannel.ReadWriteCloserDeadliner, 1)
+	dc.OnOpen(func() {
+		detached, err1 := dc.DetachWithDeadline()
+		assert.NoError(t, err1)
+		detachChan <- detached
+	})
+
+	assert.NoError(t, signalPair(offer, answer))
+	untilConnectionState(PeerConnectionStateConnected, offer, answer).Wait()
+
+	// write should block and return deadline exceeded since the receiver is not reading
+	// and the buffer size is 1500 bytes
+	rawDC := <-detachChan
+	assert.NoError(t, rawDC.SetWriteDeadline(time.Now().Add(time.Second)))
+	buf := make([]byte, 1000)
+	for i := 0; i < 10; i++ {
+		_, err = rawDC.Write(buf)
+		if err != nil {
+			break
+		}
+	}
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	closePairNow(t, offer, answer)
 }
