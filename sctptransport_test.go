@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,5 +125,128 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	case <-ch:
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out")
+	}
+}
+
+func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
+	const N = 10
+	done := make(chan struct{}, N)
+	for i := 0; i < N; i++ {
+		go func() {
+			// Use Detach data channels mode
+			s := SettingEngine{}
+			s.DetachDataChannels()
+			api := NewAPI(WithSettingEngine(s))
+
+			// Set up two peer connections.
+			config := Configuration{}
+			offerPC, err := api.NewPeerConnection(config)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			answerPC, err := api.NewPeerConnection(config)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
+			defer closePairNow(t, offerPC, answerPC)
+			defer func() { done <- struct{}{} }()
+
+			negotiated := true
+			id := uint16(0)
+			readDetach := make(chan struct{})
+			dc1, err := offerPC.CreateDataChannel("", &DataChannelInit{
+				Negotiated: &negotiated,
+				ID:         &id,
+			})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			dc1.OnOpen(func() {
+				_, _ = dc1.Detach()
+				close(readDetach)
+			})
+
+			writeDetach := make(chan struct{})
+			dc2, err := answerPC.CreateDataChannel("", &DataChannelInit{
+				Negotiated: &negotiated,
+				ID:         &id,
+			})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			dc2.OnOpen(func() {
+				_, _ = dc2.Detach()
+				close(writeDetach)
+			})
+
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				connestd := make(chan struct{}, 1)
+				offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+					if state == PeerConnectionStateConnected {
+						connestd <- struct{}{}
+					}
+				})
+				select {
+				case <-connestd:
+				case <-time.After(10 * time.Second):
+					t.Error("conn establishment timed out")
+					return
+				}
+				<-readDetach
+				err1 := dc1.dataChannel.SetReadDeadline(time.Now().Add(10 * time.Second))
+				if err1 != nil {
+					t.Error(err)
+					return
+				}
+				buf := make([]byte, 10)
+				n, err1 := dc1.dataChannel.Read(buf)
+				if err1 != nil {
+					t.Error(err)
+					return
+				}
+				if string(buf[:n]) != "hello" {
+					t.Error("invalid read")
+				}
+			}()
+			go func() {
+				defer wg.Done()
+				connestd := make(chan struct{}, 1)
+				answerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+					if state == PeerConnectionStateConnected {
+						connestd <- struct{}{}
+					}
+				})
+				select {
+				case <-connestd:
+				case <-time.After(10 * time.Second):
+					t.Error("connection establishment timed out")
+					return
+				}
+				<-writeDetach
+				n, err1 := dc2.dataChannel.Write([]byte("hello"))
+				if err1 != nil || n != len("hello") {
+					t.Error(err)
+				}
+			}()
+			err = signalPair(offerPC, answerPC)
+			require.NoError(t, err)
+			wg.Wait()
+		}()
+	}
+
+	for i := 0; i < N; i++ {
+		select {
+		case <-done:
+		case <-time.After(20 * time.Second):
+			t.Fatal("timed out")
+		}
 	}
 }
