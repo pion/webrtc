@@ -142,7 +142,7 @@ func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
 	r.dataChannelsOpened += openedDCCount
 	r.lock.Unlock()
 
-	go r.acceptDataChannels(sctpAssociation)
+	go r.acceptDataChannels(sctpAssociation, dataChannels)
 
 	return nil
 }
@@ -163,10 +163,9 @@ func (r *SCTPTransport) Stop() error {
 	return nil
 }
 
-func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
-	r.lock.RLock()
-	dataChannels := make([]*datachannel.DataChannel, 0, len(r.dataChannels))
-	for _, dc := range r.dataChannels {
+func (r *SCTPTransport) acceptDataChannels(a *sctp.Association, existingDataChannels []*DataChannel) {
+	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
+	for _, dc := range existingDataChannels {
 		dc.mu.Lock()
 		isNil := dc.dataChannel == nil
 		dc.mu.Unlock()
@@ -175,8 +174,6 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association) {
 		}
 		dataChannels = append(dataChannels, dc.dataChannel)
 	}
-	r.lock.RUnlock()
-
 ACCEPT:
 	for {
 		dc, err := datachannel.Accept(a, &datachannel.Config{
