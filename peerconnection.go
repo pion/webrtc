@@ -2209,8 +2209,6 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
 	pc.signalingState.Set(SignalingStateClosed)
 
-	closeErrs = append(closeErrs, pc.api.interceptor.Close())
-
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	pc.mu.Lock()
 	for _, t := range pc.rtpTransceivers {
@@ -2246,6 +2244,9 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
 	closeErrs = append(closeErrs, doGracefulCloseOps()...)
+
+	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
+	closeErrs = append(closeErrs, pc.api.interceptor.Close())
 
 	return util.FlattenErrs(closeErrs)
 }
