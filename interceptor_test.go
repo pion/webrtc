@@ -187,7 +187,8 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 		}
 	}()
 
-	closePairNow(t, sender, receiver)
+	assert.NoError(t, sender.GracefulClose())
+	assert.NoError(t, receiver.GracefulClose())
 
 	// Bind/UnbindLocal/RemoteStream should be called from one side.
 	if cnt := atomic.LoadUint32(&cntBindLocalStream); cnt != 1 {
