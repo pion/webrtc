@@ -225,7 +225,7 @@ func main() {
 
 		// Adjust outbound bandwidth for probing
 		default:
-			frame, _, err = ivf.ParseNextFrame()
+			frame, frameHeader, err = ivf.ParseNextFrame()
 		}
 
 		switch {
