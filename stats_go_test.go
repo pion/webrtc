@@ -144,6 +144,7 @@ func getStatsSamples() []statSample {
 		PerDSCPPacketsReceived: map[string]uint32{
 			"123": 23,
 		},
+		DecoderImplementation: "libvpx",
 	}
 	inboundRTPStreamStatsJSON := `
 {
@@ -210,7 +211,8 @@ func getStatsSamples() []statSample {
   "packetsDuplicated": 22,
   "perDscpPacketsReceived": {
     "123": 23
-  }
+  },
+  "decoderImplementation": "libvpx"
 }
 `
 	outboundRTPStreamStats := OutboundRTPStreamStats{
@@ -264,7 +266,8 @@ func getStatsSamples() []statSample {
 		PerDSCPPacketsSent: map[string]uint32{
 			"123": 23,
 		},
-		Active: true,
+		Active:                true,
+		EncoderImplementation: "libvpx",
 	}
 	outboundRTPStreamStatsJSON := `
 {
@@ -318,7 +321,8 @@ func getStatsSamples() []statSample {
   "perDscpPacketsSent": {
     "123": 23
   },
-  "active": true
+  "active": true,
+  "encoderImplementation": "libvpx"
 }
 `
 	remoteInboundRTPStreamStats := RemoteInboundRTPStreamStats{

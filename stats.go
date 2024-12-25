@@ -567,6 +567,9 @@ type InboundRTPStreamStats struct {
 	// these numbers are not expected to match the numbers seen on sending. Not all
 	// OSes make this information available.
 	PerDSCPPacketsReceived map[string]uint32 `json:"perDscpPacketsReceived"`
+
+	// Identifies the decoder implementation used. This is useful for diagnosing interoperability issues.
+	DecoderImplementation string `json:"decoderImplementation"`
 }
 
 func (s InboundRTPStreamStats) statsMarker() {}
@@ -806,6 +809,9 @@ type OutboundRTPStreamStats struct {
 	// Active indicates whether this RTP stream is configured to be sent or disabled. Note that an
 	// active stream can still not be sending, e.g. when being limited by network conditions.
 	Active bool `json:"active"`
+
+	// Identifies the encoder implementation used. This is useful for diagnosing interoperability issues.
+	EncoderImplementation string `json:"encoderImplementation"`
 }
 
 func (s OutboundRTPStreamStats) statsMarker() {}
