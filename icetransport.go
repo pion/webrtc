@@ -36,7 +36,6 @@ type ICETransport struct {
 	conn     *ice.Conn
 	mux      *mux.Mux
 
-	ctx       context.Context
 	ctxCancel func()
 
 	loggerFactory logging.LoggerFactory
@@ -134,7 +133,8 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 	t.role = *role
 
-	t.ctx, t.ctxCancel = context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	t.ctxCancel = ctxCancel
 
 	// Drop the lock here to allow ICE candidates to be
 	// added so that the agent can complete a connection
@@ -144,12 +144,12 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(t.ctx,
+		iceConn, err = agent.Dial(ctx,
 			params.UsernameFragment,
 			params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(t.ctx,
+		iceConn, err = agent.Accept(ctx,
 			params.UsernameFragment,
 			params.Password)
 
