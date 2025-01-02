@@ -52,7 +52,8 @@ type IVFFrameHeader struct {
 type IVFReader struct {
 	stream               io.Reader
 	bytesReadSuccesfully int64
-	fileHeader           *IVFFileHeader
+	timebaseDenominator  uint32
+	timebaseNumerator    uint32
 }
 
 // NewWith returns a new IVF reader and IVF file header
@@ -70,7 +71,8 @@ func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	reader.fileHeader = header
+	reader.timebaseDenominator = header.TimebaseDenominator
+	reader.timebaseNumerator = header.TimebaseNumerator
 
 	return reader, header, nil
 }
@@ -83,7 +85,7 @@ func (i *IVFReader) ResetReader(reset func(bytesRead int64) io.Reader) {
 }
 
 func (i *IVFReader) ptsToTimestamp(pts uint64) uint64 {
-	return pts * uint64(i.fileHeader.TimebaseDenominator) / uint64(i.fileHeader.TimebaseNumerator)
+	return pts * uint64(i.timebaseDenominator) / uint64(i.timebaseNumerator)
 }
 
 // ParseNextFrame reads from stream and returns IVF frame payload, header,

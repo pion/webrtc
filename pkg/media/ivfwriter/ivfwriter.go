@@ -123,8 +123,8 @@ func (i *IVFWriter) timestampToPts(timestamp uint64) uint64 {
 
 func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 	frameHeader := make([]byte, 12)
-	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame))) // Frame length
-	binary.LittleEndian.PutUint64(frameHeader[4:], i.timestampToPts(timestamp))
+	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame)))          // Frame length
+	binary.LittleEndian.PutUint64(frameHeader[4:], i.timestampToPts(timestamp)) // PTS
 	i.count++
 
 	if _, err := i.ioWriter.Write(frameHeader); err != nil {
