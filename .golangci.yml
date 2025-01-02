@@ -78,7 +78,6 @@ linters:
     - nilnil           # Checks that there is no simultaneous return of `nil` error and an invalid value.
     - nlreturn         # nlreturn checks for a new line before return and branch statements to increase code clarity
     - noctx            # noctx finds sending http request without context.Context
-    - paralleltest     # paralleltest detects missing usage of t.Parallel() method in your Go test
     - predeclared      # find code that shadows one of Go's predeclared identifiers
     - revive           # golint replacement, finds style mistakes
     - staticcheck      # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
@@ -102,6 +101,7 @@ linters:
     - ireturn          # Accept Interfaces, Return Concrete Types
     - mnd              # An analyzer to detect magic numbers
     - nolintlint       # Reports ill-formed or insufficient nolint directives
+    - paralleltest     # paralleltest detects missing usage of t.Parallel() method in your Go test
     - prealloc         # Finds slice declarations that could potentially be preallocated
     - promlinter       # Check Prometheus metrics naming via promlint
     - rowserrcheck     # checks whether Err of rows is checked successfully
