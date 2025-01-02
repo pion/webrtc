@@ -29,6 +29,8 @@ const (
 	ivfFileHeaderSignature = "DKIF"
 )
 
+var errInvalidMediaTimebase = errors.New("invalid media timebase")
+
 // IVFWriter is used to take RTP packets and write them to an IVF on disk
 type IVFWriter struct {
 	ioWriter     io.Writer
@@ -36,6 +38,11 @@ type IVFWriter struct {
 	seenKeyFrame bool
 
 	isVP8, isAV1 bool
+
+	timebaseDenominator uint32
+	timebaseNumerator   uint32
+	firstFrameTimestamp uint32
+	clockRate           uint64
 
 	// VP8
 	currentFrame []byte
@@ -65,8 +72,11 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 	}
 
 	writer := &IVFWriter{
-		ioWriter:     out,
-		seenKeyFrame: false,
+		ioWriter:            out,
+		seenKeyFrame:        false,
+		timebaseDenominator: 30,
+		timebaseNumerator:   1,
+		clockRate:           90000,
 	}
 
 	for _, o := range opts {
@@ -81,6 +91,10 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
+	}
+
+	if writer.timebaseDenominator == 0 {
+		return nil, errInvalidMediaTimebase
 	}
 	return writer, nil
 }
@@ -98,21 +112,25 @@ func (i *IVFWriter) writeHeader() error {
 		copy(header[8:], "AV01")
 	}
 
-	binary.LittleEndian.PutUint16(header[12:], 640) // Width in pixels
-	binary.LittleEndian.PutUint16(header[14:], 480) // Height in pixels
-	binary.LittleEndian.PutUint32(header[16:], 30)  // Framerate denominator
-	binary.LittleEndian.PutUint32(header[20:], 1)   // Framerate numerator
-	binary.LittleEndian.PutUint32(header[24:], 900) // Frame count, will be updated on first Close() call
-	binary.LittleEndian.PutUint32(header[28:], 0)   // Unused
+	binary.LittleEndian.PutUint16(header[12:], 640)                   // Width in pixels
+	binary.LittleEndian.PutUint16(header[14:], 480)                   // Height in pixels
+	binary.LittleEndian.PutUint32(header[16:], i.timebaseDenominator) // Framerate denominator
+	binary.LittleEndian.PutUint32(header[20:], i.timebaseNumerator)   // Framerate numerator
+	binary.LittleEndian.PutUint32(header[24:], 900)                   // Frame count, will be updated on first Close() call
+	binary.LittleEndian.PutUint32(header[28:], 0)                     // Unused
 
 	_, err := i.ioWriter.Write(header)
 	return err
 }
 
+func (i *IVFWriter) timestampToPts(timestamp uint64) uint64 {
+	return timestamp * uint64(i.timebaseNumerator) / uint64(i.timebaseDenominator)
+}
+
 func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 	frameHeader := make([]byte, 12)
-	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame))) // Frame length
-	binary.LittleEndian.PutUint64(frameHeader[4:], timestamp)          // PTS
+	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame)))          // Frame length
+	binary.LittleEndian.PutUint64(frameHeader[4:], i.timestampToPts(timestamp)) // PTS
 	i.count++
 
 	if _, err := i.ioWriter.Write(frameHeader); err != nil {
@@ -129,6 +147,11 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 	} else if len(packet.Payload) == 0 {
 		return nil
 	}
+
+	if i.count == 0 {
+		i.firstFrameTimestamp = packet.Header.Timestamp
+	}
+	relativeTstampMs := 1000 * uint64(packet.Header.Timestamp-i.firstFrameTimestamp) / i.clockRate
 
 	if i.isVP8 {
 		vp8Packet := codecs.VP8Packet{}
@@ -153,7 +176,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 			return nil
 		}
 
-		if err := i.writeFrame(i.currentFrame, uint64(packet.Header.Timestamp)); err != nil {
+		if err := i.writeFrame(i.currentFrame, relativeTstampMs); err != nil {
 			return err
 		}
 		i.currentFrame = nil
@@ -169,7 +192,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 		}
 
 		for j := range obus {
-			if err := i.writeFrame(obus[j], uint64(packet.Header.Timestamp)); err != nil {
+			if err := i.writeFrame(obus[j], relativeTstampMs); err != nil {
 				return err
 			}
 		}
