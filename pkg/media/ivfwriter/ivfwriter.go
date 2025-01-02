@@ -109,10 +109,10 @@ func (i *IVFWriter) writeHeader() error {
 	return err
 }
 
-func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
+func (i *IVFWriter) writeFrame(frame []byte) error {
 	frameHeader := make([]byte, 12)
 	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame))) // Frame length
-	binary.LittleEndian.PutUint64(frameHeader[4:], timestamp)          // PTS
+	binary.LittleEndian.PutUint64(frameHeader[4:], i.count)            // PTS
 	i.count++
 
 	if _, err := i.ioWriter.Write(frameHeader); err != nil {
@@ -153,7 +153,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 			return nil
 		}
 
-		if err := i.writeFrame(i.currentFrame, uint64(packet.Header.Timestamp)); err != nil {
+		if err := i.writeFrame(i.currentFrame); err != nil {
 			return err
 		}
 		i.currentFrame = nil
@@ -169,7 +169,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 		}
 
 		for j := range obus {
-			if err := i.writeFrame(obus[j], uint64(packet.Header.Timestamp)); err != nil {
+			if err := i.writeFrame(obus[j]); err != nil {
 				return err
 			}
 		}
