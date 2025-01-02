@@ -145,6 +145,11 @@ func getStatsSamples() []statSample {
 			"123": 23,
 		},
 		DecoderImplementation: "libvpx",
+		PauseCount:            48,
+		TotalPausesDuration:   48.123,
+		FreezeCount:           49,
+		TotalFreezesDuration:  49.321,
+		PowerEfficientDecoder: true,
 	}
 	inboundRTPStreamStatsJSON := `
 {
@@ -212,7 +217,12 @@ func getStatsSamples() []statSample {
   "perDscpPacketsReceived": {
     "123": 23
   },
-  "decoderImplementation": "libvpx"
+  "decoderImplementation": "libvpx",
+  "pauseCount": 48,
+  "totalPausesDuration": 48.123,
+  "freezeCount": 49,
+  "totalFreezesDuration": 49.321,
+  "powerEfficientDecoder": true
 }
 `
 	outboundRTPStreamStats := OutboundRTPStreamStats{
@@ -268,6 +278,8 @@ func getStatsSamples() []statSample {
 		},
 		Active:                true,
 		EncoderImplementation: "libvpx",
+		PowerEfficientEncoder: true,
+		ScalabilityMode:       "L1T1",
 	}
 	outboundRTPStreamStatsJSON := `
 {
@@ -322,7 +334,9 @@ func getStatsSamples() []statSample {
     "123": 23
   },
   "active": true,
-  "encoderImplementation": "libvpx"
+  "encoderImplementation": "libvpx",
+  "powerEfficientEncoder": true,
+  "scalabilityMode": "L1T1"
 }
 `
 	remoteInboundRTPStreamStats := RemoteInboundRTPStreamStats{
