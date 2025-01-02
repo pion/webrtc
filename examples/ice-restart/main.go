@@ -15,6 +15,7 @@ import (
 
 var peerConnection *webrtc.PeerConnection //nolint
 
+// nolint: cyclop
 func doSignaling(w http.ResponseWriter, r *http.Request) {
 	var err error
 

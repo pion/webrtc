@@ -15,7 +15,8 @@ import (
 )
 
 // websocketServer is called for every new inbound WebSocket
-func websocketServer(ws *websocket.Conn) { // nolint:gocognit
+// nolint: gocognit, cyclop
+func websocketServer(ws *websocket.Conn) {
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {

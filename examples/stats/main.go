@@ -27,7 +27,7 @@ import (
 // How ofter to print WebRTC stats
 const statsInterval = time.Second * 5
 
-// nolint:gocognit
+// nolint:gocognit,cyclop
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

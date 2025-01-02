@@ -38,6 +38,7 @@ import (
   +--------------------+ +--------------------+
 */
 
+// nolint:cyclop
 func main() {
 	var inboundBytes int32  // for offerPeerConnection
 	var outboundBytes int32 // for offerPeerConnection

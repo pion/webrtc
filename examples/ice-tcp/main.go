@@ -82,6 +82,7 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//nolint:cyclop
 func main() {
 	settingEngine := webrtc.SettingEngine{}
 

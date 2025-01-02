@@ -30,6 +30,7 @@ const (
 	videoFileName = "output.ivf"
 )
 
+// nolint:cyclop
 func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
 	port := flag.Int("port", 8080, "http server port")

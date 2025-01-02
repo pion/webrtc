@@ -30,7 +30,7 @@ type udpConn struct {
 	payloadType uint8
 }
 
-// nolint:gocognit
+// nolint:gocognit, cyclop
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

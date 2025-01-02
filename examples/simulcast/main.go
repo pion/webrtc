@@ -22,7 +22,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-// nolint:gocognit
+// nolint:gocognit, cyclop
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 

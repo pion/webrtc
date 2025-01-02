@@ -30,7 +30,8 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 	return resp.Body.Close()
 }
 
-func main() { // nolint:gocognit
+// nolint:gocognit, cyclop
+func main() {
 	offerAddr := flag.String("offer-address", "localhost:50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", ":60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()

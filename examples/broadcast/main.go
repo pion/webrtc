@@ -22,7 +22,8 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-func main() { // nolint:gocognit
+// nolint:gocognit, cyclop
+func main() {
 	port := flag.Int("port", 8080, "http server port")
 	flag.Parse()
 

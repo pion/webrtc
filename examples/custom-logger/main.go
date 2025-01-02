@@ -53,6 +53,7 @@ func (c customLoggerFactory) NewLogger(subsystem string) logging.LeveledLogger {
 	return customLogger{}
 }
 
+// nolint: cyclop
 func main() {
 	// Create a new API with a custom logger
 	// This SettingEngine allows non-standard WebRTC behavior

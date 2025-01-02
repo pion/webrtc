@@ -31,7 +31,7 @@ const (
 	oggPageDuration = time.Millisecond * 20
 )
 
-// nolint:gocognit
+// nolint:gocognit, cyclop
 func main() {
 	// Assert that we have an audio or video file
 	_, err := os.Stat(videoFileName)

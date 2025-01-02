@@ -39,7 +39,7 @@ const (
 	ivfHeaderSize = 32
 )
 
-// nolint: gocognit
+// nolint: gocognit, cyclop
 func main() {
 	qualityLevels := []struct {
 		fileName string

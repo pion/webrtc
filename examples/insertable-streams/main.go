@@ -26,7 +26,7 @@ import (
 
 const cipherKey = 0xAA
 
-// nolint:gocognit
+// nolint:gocognit, cyclop
 func main() {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
