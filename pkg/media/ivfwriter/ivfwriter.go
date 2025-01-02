@@ -145,7 +145,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 	if i.count == 0 {
 		i.firstFrameTimestamp = packet.Header.Timestamp
 	}
-	relativeTstampMs := 1000 * uint64(packet.Header.Timestamp) / i.clockRate
+	relativeTstampMs := 1000 * uint64(packet.Header.Timestamp-i.firstFrameTimestamp) / i.clockRate
 
 	if i.isVP8 {
 		vp8Packet := codecs.VP8Packet{}
