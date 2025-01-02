@@ -24,6 +24,7 @@ var (
 	errIncompleteFileHeader  = errors.New("incomplete file header")
 	errSignatureMismatch     = errors.New("IVF signature mismatch")
 	errUnknownIVFVersion     = errors.New("IVF version unknown, parser may not parse correctly")
+	errInvalidMediaTimebase  = errors.New("invalid media timebase")
 )
 
 // IVFFileHeader 32-byte header for IVF files
@@ -70,6 +71,9 @@ func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	header, err := reader.parseFileHeader()
 	if err != nil {
 		return nil, nil, err
+	}
+	if header.TimebaseDenominator == 0 {
+		return nil, nil, errInvalidMediaTimebase
 	}
 	reader.timebaseDenominator = header.TimebaseDenominator
 	reader.timebaseNumerator = header.TimebaseNumerator
