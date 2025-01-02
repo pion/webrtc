@@ -289,7 +289,7 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 }
 
 // TestInterceptorNack is an end-to-end test for the NACK sender.
-// It test that:
+// It tests that:
 //   - we get a NACK if we negotiated generic NACks;
 //   - we don't get a NACK if we did not negotiate generick NACKs;
 //   - the NACK corresponds to the missing packet.
@@ -306,16 +306,16 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 
 	ir := interceptor.Registry{}
 	m := MediaEngine{}
-	var capability []RTCPFeedback
+	var feedback []RTCPFeedback
 	if requestNack {
-		capability = append(capability, RTCPFeedback{"nack", ""})
+		feedback = append(feedback, RTCPFeedback{"nack", ""})
 	}
 	err := m.RegisterCodec(
 		RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
 				"video/VP8", 90000, 0,
 				"",
-				capability,
+				feedback,
 			},
 			PayloadType: 96,
 		},
@@ -424,7 +424,6 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 	assert.NoError(t, err)
 	err = pc2.Close()
 	assert.NoError(t, err)
-	<-rtcpDone
 
 	if requestNack {
 		if !gotNack {
