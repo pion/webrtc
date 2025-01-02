@@ -84,7 +84,6 @@ linters:
     - stylecheck       # Stylecheck is a replacement for golint
     - tagliatelle      # Checks the struct tags.
     - tenv             # tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
-    - testpackage      # linter that makes you use a separate _test package
     - thelper          # thelper detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     - typecheck        # Like the front-end of a Go compiler, parses and type-checks Go code
     - unconvert        # Remove unnecessary type conversions
@@ -106,6 +105,7 @@ linters:
     - promlinter       # Check Prometheus metrics naming via promlint
     - rowserrcheck     # checks whether Err of rows is checked successfully
     - sqlclosecheck    # Checks that sql.Rows and sql.Stmt are closed.
+    - testpackage      # linter that makes you use a separate _test package
     - tparallel        # tparallel detects inappropriate usage of t.Parallel() method in your Go test codes
     - wrapcheck        # Checks that errors returned from external packages are wrapped
     - wsl              # Whitespace Linter - Forces you to use empty lines!
