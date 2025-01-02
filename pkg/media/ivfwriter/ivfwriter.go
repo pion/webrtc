@@ -29,6 +29,8 @@ const (
 	ivfFileHeaderSignature = "DKIF"
 )
 
+var errInvalidMediaTimebase = errors.New("invalid media timebase")
+
 // IVFWriter is used to take RTP packets and write them to an IVF on disk
 type IVFWriter struct {
 	ioWriter     io.Writer
@@ -89,6 +91,10 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
+	}
+
+	if writer.timebaseDenominator == 0 {
+		return nil, errInvalidMediaTimebase
 	}
 	return writer, nil
 }
