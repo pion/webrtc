@@ -34,39 +34,39 @@ type Header struct {
 
 // Marshal encodes the Header as binary.
 func (h Header) Marshal() ([]byte, error) {
-	d := make([]byte, headerLen)
+	data := make([]byte, headerLen)
 
 	startNano := h.Start.UnixNano()
-	startSec := uint32(startNano / int64(time.Second))
-	startUsec := uint32(
+	startSec := uint32(startNano / int64(time.Second)) //nolint:gosec // G115
+	startUsec := uint32(                               //nolint:gosec // G115
 		(startNano % int64(time.Second)) / int64(time.Microsecond),
 	)
-	binary.BigEndian.PutUint32(d[0:], startSec)
-	binary.BigEndian.PutUint32(d[4:], startUsec)
+	binary.BigEndian.PutUint32(data[0:], startSec)
+	binary.BigEndian.PutUint32(data[4:], startUsec)
 
 	source := h.Source.To4()
-	copy(d[8:], source)
+	copy(data[8:], source)
 
-	binary.BigEndian.PutUint16(d[12:], h.Port)
+	binary.BigEndian.PutUint16(data[12:], h.Port)
 
-	return d, nil
+	return data, nil
 }
 
 // Unmarshal decodes the Header from binary.
-func (h *Header) Unmarshal(d []byte) error {
-	if len(d) < headerLen {
+func (h *Header) Unmarshal(data []byte) error {
+	if len(data) < headerLen {
 		return errMalformed
 	}
 
 	// time as a `struct timeval`
-	startSec := binary.BigEndian.Uint32(d[0:])
-	startUsec := binary.BigEndian.Uint32(d[4:])
+	startSec := binary.BigEndian.Uint32(data[0:])
+	startUsec := binary.BigEndian.Uint32(data[4:])
 	h.Start = time.Unix(int64(startSec), int64(startUsec)*1e3).UTC()
 
 	// ipv4 address
-	h.Source = net.IPv4(d[8], d[9], d[10], d[11])
+	h.Source = net.IPv4(data[8], data[9], data[10], data[11])
 
-	h.Port = binary.BigEndian.Uint16(d[12:])
+	h.Port = binary.BigEndian.Uint16(data[12:])
 
 	// 2 bytes of padding (ignored)
 
@@ -94,8 +94,8 @@ func (p Packet) Marshal() ([]byte, error) {
 	}
 
 	hdr := packetHeader{
-		Length:       uint16(len(p.Payload)) + 8,
-		PacketLength: uint16(packetLength),
+		Length:       uint16(len(p.Payload)) + 8, //nolint:gosec // G115
+		PacketLength: uint16(packetLength),       //nolint:gosec // G115
 		Offset:       p.offsetMs(),
 	}
 	hdrData, err := hdr.Marshal()
@@ -107,9 +107,9 @@ func (p Packet) Marshal() ([]byte, error) {
 }
 
 // Unmarshal decodes the Packet from binary.
-func (p *Packet) Unmarshal(d []byte) error {
+func (p *Packet) Unmarshal(data []byte) error {
 	var hdr packetHeader
-	if err := hdr.Unmarshal(d); err != nil {
+	if err := hdr.Unmarshal(data); err != nil {
 		return err
 	}
 
@@ -119,16 +119,16 @@ func (p *Packet) Unmarshal(d []byte) error {
 	if hdr.Length < 8 {
 		return errMalformed
 	}
-	if len(d) < int(hdr.Length) {
+	if len(data) < int(hdr.Length) {
 		return errMalformed
 	}
-	p.Payload = d[8:hdr.Length]
+	p.Payload = data[8:hdr.Length]
 
 	return nil
 }
 
 func (p *Packet) offsetMs() uint32 {
-	return uint32(p.Offset / time.Millisecond)
+	return uint32(p.Offset / time.Millisecond) //nolint:gosec // G115
 }
 
 type packetHeader struct {

@@ -7,7 +7,7 @@ package webrtc
 type PeerConnectionState int
 
 const (
-	// PeerConnectionStateUnknown is the enum's zero-value
+	// PeerConnectionStateUnknown is the enum's zero-value.
 	PeerConnectionStateUnknown PeerConnectionState = iota
 
 	// PeerConnectionStateNew indicates that any of the ICETransports or

@@ -6,7 +6,7 @@
 
 package webrtc
 
-// GetConnectionStats is a helper method to return the associated stats for a given PeerConnection
+// GetConnectionStats is a helper method to return the associated stats for a given PeerConnection.
 func (r StatsReport) GetConnectionStats(conn *PeerConnection) (PeerConnectionStats, bool) {
 	statsID := conn.getStatsID()
 	stats, ok := r[statsID]
@@ -18,10 +18,11 @@ func (r StatsReport) GetConnectionStats(conn *PeerConnection) (PeerConnectionSta
 	if !ok {
 		return PeerConnectionStats{}, false
 	}
+
 	return pcStats, true
 }
 
-// GetDataChannelStats is a helper method to return the associated stats for a given DataChannel
+// GetDataChannelStats is a helper method to return the associated stats for a given DataChannel.
 func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, bool) {
 	statsID := dc.getStatsID()
 	stats, ok := r[statsID]
@@ -33,10 +34,11 @@ func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, boo
 	if !ok {
 		return DataChannelStats{}, false
 	}
+
 	return dcStats, true
 }
 
-// GetICECandidateStats is a helper method to return the associated stats for a given ICECandidate
+// GetICECandidateStats is a helper method to return the associated stats for a given ICECandidate.
 func (r StatsReport) GetICECandidateStats(c *ICECandidate) (ICECandidateStats, bool) {
 	statsID := c.statsID
 	stats, ok := r[statsID]
@@ -48,10 +50,11 @@ func (r StatsReport) GetICECandidateStats(c *ICECandidate) (ICECandidateStats, b
 	if !ok {
 		return ICECandidateStats{}, false
 	}
+
 	return candidateStats, true
 }
 
-// GetICECandidatePairStats is a helper method to return the associated stats for a given ICECandidatePair
+// GetICECandidatePairStats is a helper method to return the associated stats for a given ICECandidatePair.
 func (r StatsReport) GetICECandidatePairStats(c *ICECandidatePair) (ICECandidatePairStats, bool) {
 	statsID := c.statsID
 	stats, ok := r[statsID]
@@ -63,10 +66,11 @@ func (r StatsReport) GetICECandidatePairStats(c *ICECandidatePair) (ICECandidate
 	if !ok {
 		return ICECandidatePairStats{}, false
 	}
+
 	return candidateStats, true
 }
 
-// GetCertificateStats is a helper method to return the associated stats for a given Certificate
+// GetCertificateStats is a helper method to return the associated stats for a given Certificate.
 func (r StatsReport) GetCertificateStats(c *Certificate) (CertificateStats, bool) {
 	statsID := c.statsID
 	stats, ok := r[statsID]
@@ -78,10 +82,11 @@ func (r StatsReport) GetCertificateStats(c *Certificate) (CertificateStats, bool
 	if !ok {
 		return CertificateStats{}, false
 	}
+
 	return certificateStats, true
 }
 
-// GetCodecStats is a helper method to return the associated stats for a given Codec
+// GetCodecStats is a helper method to return the associated stats for a given Codec.
 func (r StatsReport) GetCodecStats(c *RTPCodecParameters) (CodecStats, bool) {
 	statsID := c.statsID
 	stats, ok := r[statsID]
@@ -93,5 +98,6 @@ func (r StatsReport) GetCodecStats(c *RTPCodecParameters) (CodecStats, bool) {
 	if !ok {
 		return CodecStats{}, false
 	}
+
 	return codecStats, true
 }

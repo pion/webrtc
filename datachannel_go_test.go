@@ -180,7 +180,7 @@ func TestDataChannelParamters_Go(t *testing.T) {
 	})
 }
 
-func TestDataChannelBufferedAmount(t *testing.T) {
+func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 	t.Run("set before datachannel becomes open", func(t *testing.T) {
 		report := test.CheckRoutines(t)
 		defer report()
@@ -301,14 +301,14 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 
 		done := make(chan bool)
 
-		answerPC.OnDataChannel(func(d *DataChannel) {
+		answerPC.OnDataChannel(func(dataChannel *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
 			// created in signalPair).
-			if d.Label() != expectedLabel {
+			if dataChannel.Label() != expectedLabel {
 				return
 			}
 			var nPacketsReceived int
-			d.OnMessage(func(DataChannelMessage) {
+			dataChannel.OnMessage(func(DataChannelMessage) {
 				nPacketsReceived++
 
 				if nPacketsReceived == 10 {
@@ -318,7 +318,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 					}()
 				}
 			})
-			assert.True(t, d.Ordered(), "Ordered should be set to true")
+			assert.True(t, dataChannel.Ordered(), "Ordered should be set to true")
 		})
 
 		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
@@ -360,7 +360,9 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 	})
 }
 
-func TestEOF(t *testing.T) {
+func TestEOF(t *testing.T) { //nolint:cyclop
+	t.Helper()
+
 	report := test.CheckRoutines(t)
 	defer report()
 
@@ -566,7 +568,7 @@ func TestEOF(t *testing.T) {
 }
 
 // Assert that a Session Description that doesn't follow
-// draft-ietf-mmusic-sctp-sdp is still accepted
+// draft-ietf-mmusic-sctp-sdp is still accepted.
 func TestDataChannel_NonStandardSessionDescription(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()

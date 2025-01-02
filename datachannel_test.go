@@ -19,22 +19,26 @@ import (
 // bindings this is a requirement).
 const expectedLabel = "data"
 
-func closePairNow(t testing.TB, pc1, pc2 io.Closer) {
+func closePairNow(tb testing.TB, pc1, pc2 io.Closer) {
+	tb.Helper()
+
 	var fail bool
 	if err := pc1.Close(); err != nil {
-		t.Errorf("Failed to close PeerConnection: %v", err)
+		tb.Errorf("Failed to close PeerConnection: %v", err)
 		fail = true
 	}
 	if err := pc2.Close(); err != nil {
-		t.Errorf("Failed to close PeerConnection: %v", err)
+		tb.Errorf("Failed to close PeerConnection: %v", err)
 		fail = true
 	}
 	if fail {
-		t.FailNow()
+		tb.FailNow()
 	}
 }
 
 func closePair(t *testing.T, pc1, pc2 io.Closer, done <-chan bool) {
+	t.Helper()
+
 	select {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("closePair timed out waiting for done signal")
@@ -43,7 +47,12 @@ func closePair(t *testing.T, pc1, pc2 io.Closer, done <-chan bool) {
 	}
 }
 
-func setUpDataChannelParametersTest(t *testing.T, options *DataChannelInit) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
+func setUpDataChannelParametersTest(
+	t *testing.T,
+	options *DataChannelInit,
+) (*PeerConnection, *PeerConnection, *DataChannel, chan bool) {
+	t.Helper()
+
 	offerPC, answerPC, err := newPair()
 	if err != nil {
 		t.Fatalf("Failed to create a PC pair for testing")
@@ -59,6 +68,8 @@ func setUpDataChannelParametersTest(t *testing.T, options *DataChannelInit) (*Pe
 }
 
 func closeReliabilityParamTest(t *testing.T, pc1, pc2 *PeerConnection, done chan bool) {
+	t.Helper()
+
 	err := signalPair(pc1, pc2)
 	if err != nil {
 		t.Fatalf("Failed to signal our PC pair for testing")
@@ -75,6 +86,8 @@ func BenchmarkDataChannelSend32(b *testing.B) { benchmarkDataChannelSend(b, 32) 
 
 // See https://github.com/pion/webrtc/issues/1516
 func benchmarkDataChannelSend(b *testing.B, numChannels int) {
+	b.Helper()
+
 	offerPC, answerPC, err := newPair()
 	if err != nil {
 		b.Fatalf("Failed to create a PC pair for testing")
@@ -219,7 +232,7 @@ func TestDataChannel_Open(t *testing.T) {
 	})
 }
 
-func TestDataChannel_Send(t *testing.T) {
+func TestDataChannel_Send(t *testing.T) { //nolint:cyclop
 	t.Run("before signaling", func(t *testing.T) {
 		report := test.CheckRoutines(t)
 		defer report()
@@ -362,7 +375,7 @@ func TestDataChannel_Close(t *testing.T) {
 	})
 }
 
-func TestDataChannelParameters(t *testing.T) {
+func TestDataChannelParameters(t *testing.T) { //nolint:cyclop
 	report := test.CheckRoutines(t)
 	defer report()
 

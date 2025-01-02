@@ -70,7 +70,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 	}, nil
 }
 
-func (g *ICEGatherer) createAgent() error {
+func (g *ICEGatherer) createAgent() error { //nolint:cyclop
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -149,11 +149,12 @@ func (g *ICEGatherer) createAgent() error {
 	}
 
 	g.agent = agent
+
 	return nil
 }
 
 // Gather ICE candidates.
-func (g *ICEGatherer) Gather() error {
+func (g *ICEGatherer) Gather() error { //nolint:cyclop
 	if err := g.createAgent(); err != nil {
 		return err
 	}
@@ -182,12 +183,13 @@ func (g *ICEGatherer) Gather() error {
 			sdpMid = mid
 		}
 
-		sdpMLineIndex := uint16(g.sdpMLineIndex.Load())
+		sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
 
 		if candidate != nil {
 			c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
 			if err != nil {
 				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
+
 				return
 			}
 			onLocalCandidateHandler(&c)
@@ -200,10 +202,11 @@ func (g *ICEGatherer) Gather() error {
 	}); err != nil {
 		return err
 	}
+
 	return agent.GatherCandidates()
 }
 
-// set media stream identification tag and media description index for this gatherer
+// set media stream identification tag and media description index for this gatherer.
 func (g *ICEGatherer) setMediaStreamIdentification(mid string, mLineIndex uint16) {
 	g.sdpMid.Store(mid)
 	g.sdpMLineIndex.Store(uint32(mLineIndex))
@@ -290,7 +293,7 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 		sdpMid = mid
 	}
 
-	sdpMLineIndex := uint16(g.sdpMLineIndex.Load())
+	sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
 
 	return newICECandidatesFromICE(iceCandidates, sdpMid, sdpMLineIndex)
 }
@@ -301,7 +304,7 @@ func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
 	g.onLocalCandidateHandler.Store(f)
 }
 
-// OnStateChange fires any time the ICEGatherer changes
+// OnStateChange fires any time the ICEGatherer changes.
 func (g *ICEGatherer) OnStateChange(f func(ICEGathererState)) {
 	g.onStateChangeHandler.Store(f)
 }
@@ -322,6 +325,7 @@ func (g *ICEGatherer) setState(s ICEGathererState) {
 func (g *ICEGatherer) getAgent() *ice.Agent {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
+
 	return g.agent
 }
 
@@ -339,6 +343,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats, err := toICECandidatePairStats(candidatePairStats)
 			if err != nil {
 				g.log.Error(err.Error())
+
 				continue
 			}
 
@@ -363,10 +368,10 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				ID:            candidateStats.ID,
 				Type:          StatsTypeLocalCandidate,
 				IP:            candidateStats.IP,
-				Port:          int32(candidateStats.Port),
+				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,
-				Priority:      int32(candidateStats.Priority),
+				Priority:      int32(candidateStats.Priority), //nolint:gosec
 				URL:           candidateStats.URL,
 				RelayProtocol: candidateStats.RelayProtocol,
 				Deleted:       candidateStats.Deleted,
@@ -391,10 +396,10 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				ID:            candidateStats.ID,
 				Type:          StatsTypeRemoteCandidate,
 				IP:            candidateStats.IP,
-				Port:          int32(candidateStats.Port),
+				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,
-				Priority:      int32(candidateStats.Priority),
+				Priority:      int32(candidateStats.Priority), //nolint:gosec // G115
 				URL:           candidateStats.URL,
 				RelayProtocol: candidateStats.RelayProtocol,
 			}
@@ -418,6 +423,7 @@ func (g *ICEGatherer) getSelectedCandidatePairStats() (ICECandidatePairStats, bo
 	stats, err := toICECandidatePairStats(selectedCandidatePairStats)
 	if err != nil {
 		g.log.Error(err.Error())
+
 		return ICECandidatePairStats{}, false
 	}
 

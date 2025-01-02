@@ -105,13 +105,13 @@ func TestPacketRoundTrip(t *testing.T) {
 			},
 		},
 	} {
-		d, err := test.Packet.Marshal()
+		packet, err := test.Packet.Marshal()
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		var pkt Packet
-		if err := pkt.Unmarshal(d); err != nil {
+		if err := pkt.Unmarshal(packet); err != nil {
 			t.Fatal(err)
 		}
 

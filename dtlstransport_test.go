@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed
-func TestInvalidFingerprintCausesFailed(t *testing.T) {
+// An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed.
+func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()
 
@@ -64,7 +64,10 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 	case offer := <-offerChan:
 		// Replace with invalid fingerprint
 		re := regexp.MustCompile(`sha-256 (.*?)\r`)
-		offer.SDP = re.ReplaceAllString(offer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
+		offer.SDP = re.ReplaceAllString(
+			offer.SDP,
+			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
+		)
 
 		if err := pcAnswer.SetRemoteDescription(offer); err != nil {
 			t.Fatal(err)
@@ -79,7 +82,10 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		answer.SDP = re.ReplaceAllString(answer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
+		answer.SDP = re.ReplaceAllString(
+			answer.SDP,
+			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
+		)
 
 		err = pcOffer.SetRemoteDescription(answer)
 		if err != nil {
@@ -92,12 +98,14 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) {
 	offerConnectionHasClosed.Wait()
 	answerConnectionHasClosed.Wait()
 
-	if pcOffer.SCTP().Transport().State() != DTLSTransportStateClosed && pcOffer.SCTP().Transport().State() != DTLSTransportStateFailed {
+	if pcOffer.SCTP().Transport().State() != DTLSTransportStateClosed &&
+		pcOffer.SCTP().Transport().State() != DTLSTransportStateFailed {
 		t.Fail()
 	}
 	assert.Nil(t, pcOffer.SCTP().Transport().conn)
 
-	if pcAnswer.SCTP().Transport().State() != DTLSTransportStateClosed && pcAnswer.SCTP().Transport().State() != DTLSTransportStateFailed {
+	if pcAnswer.SCTP().Transport().State() != DTLSTransportStateClosed &&
+		pcAnswer.SCTP().Transport().State() != DTLSTransportStateFailed {
 		t.Fail()
 	}
 	assert.Nil(t, pcAnswer.SCTP().Transport().conn)

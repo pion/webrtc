@@ -7,7 +7,7 @@ package webrtc
 type SCTPTransportState int
 
 const (
-	// SCTPTransportStateUnknown is the enum's zero-value
+	// SCTPTransportStateUnknown is the enum's zero-value.
 	SCTPTransportStateUnknown SCTPTransportState = iota
 
 	// SCTPTransportStateConnecting indicates the SCTPTransport is in the

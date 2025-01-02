@@ -127,7 +127,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestMatch(t *testing.T) {
+func TestMatch(t *testing.T) { //nolint:maintidx
 	consistString := map[bool]string{true: "consist", false: "inconsist"}
 
 	for _, ca := range []struct {

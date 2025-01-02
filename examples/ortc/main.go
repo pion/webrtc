@@ -25,6 +25,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// nolint:cyclop
 func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
 	port := flag.Int("port", 8080, "http server port")
@@ -72,8 +73,8 @@ func main() {
 	})
 
 	gatherFinished := make(chan struct{})
-	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
-		if i == nil {
+	gatherer.OnLocalCandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			close(gatherFinished)
 		}
 	})
@@ -181,7 +182,10 @@ type Signal struct {
 
 func handleOnOpen(channel *webrtc.DataChannel) func() {
 	return func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", channel.Label(), channel.ID())
+		fmt.Printf(
+			"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n",
+			channel.Label(), channel.ID(),
+		)
 
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -199,7 +203,7 @@ func handleOnOpen(channel *webrtc.DataChannel) func() {
 	}
 }
 
-// Read from stdin until we get a newline
+// Read from stdin until we get a newline.
 func readUntilNewline() (in string) {
 	var err error
 
@@ -216,10 +220,11 @@ func readUntilNewline() (in string) {
 	}
 
 	fmt.Println("")
+
 	return
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj Signal) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -229,7 +234,7 @@ func encode(obj Signal) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *Signal) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {
@@ -241,12 +246,12 @@ func decode(in string, obj *Signal) {
 	}
 }
 
-// httpSDPServer starts a HTTP Server that consumes SDPs
+// httpSDPServer starts a HTTP Server that consumes SDPs.
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

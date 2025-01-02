@@ -30,6 +30,7 @@ const (
 	videoFileName = "output.ivf"
 )
 
+// nolint:cyclop
 func main() {
 	isOffer := flag.Bool("offer", false, "Act as the offerer if set")
 	port := flag.Int("port", 8080, "http server port")
@@ -45,13 +46,13 @@ func main() {
 	}
 
 	// Use default Codecs
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
 	// Create an API object
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
 
 	// Create the ICE gatherer
 	gatherer, err := api.NewICEGatherer(iceOptions)
@@ -74,7 +75,7 @@ func main() {
 		rtpSendParameters webrtc.RTPSendParameters
 	)
 
-	if *isOffer {
+	if *isOffer { //nolint:nestif
 		// Open the video file
 		file, fileErr := os.Open(videoFileName)
 		if fileErr != nil {
@@ -109,8 +110,8 @@ func main() {
 	}
 
 	gatherFinished := make(chan struct{})
-	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
-		if i == nil {
+	gatherer.OnLocalCandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			close(gatherFinished)
 		}
 	})
@@ -137,7 +138,7 @@ func main() {
 		panic(err)
 	}
 
-	s := Signal{
+	signal := Signal{
 		ICECandidates:     iceCandidates,
 		ICEParameters:     iceParams,
 		DTLSParameters:    dtlsParams,
@@ -147,7 +148,7 @@ func main() {
 	iceRole := webrtc.ICERoleControlled
 
 	// Exchange the information
-	fmt.Println(encode(&s))
+	fmt.Println(encode(&signal))
 	remoteSignal := Signal{}
 
 	if *isOffer {
@@ -196,7 +197,7 @@ func main() {
 	select {}
 }
 
-// Given a FourCC value return a Track
+// Given a FourCC value return a Track.
 func fourCCToTrack(fourCC string) *webrtc.TrackLocalStaticSample {
 	// Determine video codec
 	var trackCodec string
@@ -220,9 +221,11 @@ func fourCCToTrack(fourCC string) *webrtc.TrackLocalStaticSample {
 	return trackLocal
 }
 
-// Write a file to Track
+// Write a file to Track.
 func writeFileToTrack(ivf *ivfreader.IVFReader, header *ivfreader.IVFFileHeader, track *webrtc.TrackLocalStaticSample) {
-	ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+	ticker := time.NewTicker(
+		time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000),
+	)
 	defer ticker.Stop()
 	for ; true; <-ticker.C {
 		frame, _, err := ivf.ParseNextFrame()
@@ -251,7 +254,7 @@ type Signal struct {
 	RTPSendParameters webrtc.RTPSendParameters `json:"rtpSendParameters"`
 }
 
-// Read from stdin until we get a newline
+// Read from stdin until we get a newline.
 func readUntilNewline() (in string) {
 	var err error
 
@@ -268,10 +271,11 @@ func readUntilNewline() (in string) {
 	}
 
 	fmt.Println("")
+
 	return
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj *Signal) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -281,7 +285,7 @@ func encode(obj *Signal) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *Signal) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {
@@ -293,12 +297,12 @@ func decode(in string, obj *Signal) {
 	}
 }
 
-// httpSDPServer starts a HTTP Server that consumes SDPs
+// httpSDPServer starts a HTTP Server that consumes SDPs.
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

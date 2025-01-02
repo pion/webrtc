@@ -8,7 +8,7 @@ package webrtc
 type ICERole int
 
 const (
-	// ICERoleUnknown is the enum's zero-value
+	// ICERoleUnknown is the enum's zero-value.
 	ICERoleUnknown ICERole = iota
 
 	// ICERoleControlling indicates that the ICE agent that is responsible
@@ -50,13 +50,14 @@ func (t ICERole) String() string {
 	}
 }
 
-// MarshalText implements encoding.TextMarshaler
+// MarshalText implements encoding.TextMarshaler.
 func (t ICERole) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (t *ICERole) UnmarshalText(b []byte) error {
 	*t = newICERole(string(b))
+
 	return nil
 }

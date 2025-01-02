@@ -28,10 +28,11 @@ func (s ICEServer) parseURL(i int) (*stun.URI, error) {
 
 func (s ICEServer) validate() error {
 	_, err := s.urls()
+
 	return err
 }
 
-func (s ICEServer) urls() ([]*stun.URI, error) {
+func (s ICEServer) urls() ([]*stun.URI, error) { //nolint:cyclop
 	urls := []*stun.URI{}
 
 	for i := range s.URLs {
@@ -85,6 +86,7 @@ func iceserverUnmarshalUrls(val interface{}) (*[]string, error) {
 			return nil, errInvalidICEServer
 		}
 	}
+
 	return &out, nil
 }
 
@@ -101,14 +103,15 @@ func iceserverUnmarshalOauth(val interface{}) (*OAuthCredential, error) {
 	if !ok {
 		return nil, errInvalidICEServer
 	}
+
 	return &OAuthCredential{
 		MACKey:      MACKey,
 		AccessToken: AccessToken,
 	}, nil
 }
 
-func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
-	if val, ok := m["urls"]; ok {
+func (s *ICEServer) iceserverUnmarshalFields(fields map[string]interface{}) error { //nolint:cyclop
+	if val, ok := fields["urls"]; ok {
 		u, err := iceserverUnmarshalUrls(val)
 		if err != nil {
 			return err
@@ -118,13 +121,13 @@ func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
 		s.URLs = []string{}
 	}
 
-	if val, ok := m["username"]; ok {
+	if val, ok := fields["username"]; ok {
 		s.Username, ok = val.(string)
 		if !ok {
 			return errInvalidICEServer
 		}
 	}
-	if val, ok := m["credentialType"]; ok {
+	if val, ok := fields["credentialType"]; ok {
 		ct, ok := val.(string)
 		if !ok {
 			return errInvalidICEServer
@@ -137,7 +140,7 @@ func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
 	} else {
 		s.CredentialType = ICECredentialTypePassword
 	}
-	if val, ok := m["credential"]; ok {
+	if val, ok := fields["credential"]; ok {
 		switch s.CredentialType {
 		case ICECredentialTypePassword:
 			s.Credential = val
@@ -151,10 +154,11 @@ func (s *ICEServer) iceserverUnmarshalFields(m map[string]interface{}) error {
 			return errInvalidICECredentialTypeString
 		}
 	}
+
 	return nil
 }
 
-// UnmarshalJSON parses the JSON-encoded data and stores the result
+// UnmarshalJSON parses the JSON-encoded data and stores the result.
 func (s *ICEServer) UnmarshalJSON(b []byte) error {
 	var tmp interface{}
 	err := json.Unmarshal(b, &tmp)
@@ -164,10 +168,11 @@ func (s *ICEServer) UnmarshalJSON(b []byte) error {
 	if m, ok := tmp.(map[string]interface{}); ok {
 		return s.iceserverUnmarshalFields(m)
 	}
+
 	return errInvalidICEServer
 }
 
-// MarshalJSON returns the JSON encoding
+// MarshalJSON returns the JSON encoding.
 func (s ICEServer) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{})
 	m["urls"] = s.URLs
@@ -178,5 +183,6 @@ func (s ICEServer) MarshalJSON() ([]byte, error) {
 		m["credential"] = s.Credential
 	}
 	m["credentialType"] = s.CredentialType
+
 	return json.Marshal(m)
 }

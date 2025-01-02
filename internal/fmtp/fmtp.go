@@ -25,7 +25,7 @@ func parseParameters(line string) map[string]string {
 }
 
 // FMTP interface for implementing custom
-// FMTP parsers based on MimeType
+// FMTP parsers based on MimeType.
 type FMTP interface {
 	// MimeType returns the MimeType associated with
 	// the fmtp
@@ -38,36 +38,36 @@ type FMTP interface {
 	Parameter(key string) (string, bool)
 }
 
-// Parse parses an fmtp string based on the MimeType
+// Parse parses an fmtp string based on the MimeType.
 func Parse(mimeType, line string) FMTP {
-	var f FMTP
+	var fmtp FMTP
 
 	parameters := parseParameters(line)
 
 	switch {
 	case strings.EqualFold(mimeType, "video/h264"):
-		f = &h264FMTP{
+		fmtp = &h264FMTP{
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/vp9"):
-		f = &vp9FMTP{
+		fmtp = &vp9FMTP{
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/av1"):
-		f = &av1FMTP{
+		fmtp = &av1FMTP{
 			parameters: parameters,
 		}
 
 	default:
-		f = &genericFMTP{
+		fmtp = &genericFMTP{
 			mimeType:   mimeType,
 			parameters: parameters,
 		}
 	}
 
-	return f
+	return fmtp
 }
 
 type genericFMTP struct {
@@ -80,24 +80,24 @@ func (g *genericFMTP) MimeType() string {
 }
 
 // Match returns true if g and b are compatible fmtp descriptions
-// The generic implementation is used for MimeTypes that are not defined
+// The generic implementation is used for MimeTypes that are not defined.
 func (g *genericFMTP) Match(b FMTP) bool {
-	c, ok := b.(*genericFMTP)
+	fmtp, ok := b.(*genericFMTP)
 	if !ok {
 		return false
 	}
 
-	if !strings.EqualFold(g.mimeType, c.MimeType()) {
+	if !strings.EqualFold(g.mimeType, fmtp.MimeType()) {
 		return false
 	}
 
 	for k, v := range g.parameters {
-		if vb, ok := c.parameters[k]; ok && !strings.EqualFold(vb, v) {
+		if vb, ok := fmtp.parameters[k]; ok && !strings.EqualFold(vb, v) {
 			return false
 		}
 	}
 
-	for k, v := range c.parameters {
+	for k, v := range fmtp.parameters {
 		if va, ok := g.parameters[k]; ok && !strings.EqualFold(va, v) {
 			return false
 		}
@@ -108,5 +108,6 @@ func (g *genericFMTP) Match(b FMTP) bool {
 
 func (g *genericFMTP) Parameter(key string) (string, bool) {
 	v, ok := g.parameters[key]
+
 	return v, ok
 }

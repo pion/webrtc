@@ -117,8 +117,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", videoRTCPFeedback},
-			PayloadType:        102,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 102,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=102", nil},
@@ -126,8 +130,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", videoRTCPFeedback},
-			PayloadType:        104,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 104,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=104", nil},
@@ -135,8 +143,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", videoRTCPFeedback},
-			PayloadType:        106,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 106,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=106", nil},
@@ -144,8 +156,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f", videoRTCPFeedback},
-			PayloadType:        108,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 108,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=108", nil},
@@ -153,8 +169,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f", videoRTCPFeedback},
-			PayloadType:        127,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 127,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=127", nil},
@@ -162,8 +182,13 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f", videoRTCPFeedback},
-			PayloadType:        39,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264,
+				90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 39,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=39", nil},
@@ -198,8 +223,12 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 
 		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f", videoRTCPFeedback},
-			PayloadType:        112,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0,
+				"level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f",
+				videoRTCPFeedback,
+			},
+			PayloadType: 112,
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=112", nil},
@@ -214,13 +243,14 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 	return nil
 }
 
-// addCodec will append codec if it not exists
+// addCodec will append codec if it not exists.
 func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) []RTPCodecParameters {
 	for _, c := range codecs {
 		if c.MimeType == codec.MimeType && c.PayloadType == codec.PayloadType {
 			return codecs
 		}
 	}
+
 	return append(codecs, codec)
 }
 
@@ -240,12 +270,19 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	default:
 		return ErrUnknownType
 	}
+
 	return nil
 }
 
 // RegisterHeaderExtension adds a header extension to the MediaEngine
-// To determine the negotiated value use `GetHeaderExtensionID` after signaling is complete
-func (m *MediaEngine) RegisterHeaderExtension(extension RTPHeaderExtensionCapability, typ RTPCodecType, allowedDirections ...RTPTransceiverDirection) error {
+// To determine the negotiated value use `GetHeaderExtensionID` after signaling is complete.
+//
+//nolint:cyclop
+func (m *MediaEngine) RegisterHeaderExtension(
+	extension RTPHeaderExtensionCapability,
+	typ RTPCodecType,
+	allowedDirections ...RTPTransceiverDirection,
+) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -306,8 +343,11 @@ func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) 
 }
 
 // getHeaderExtensionID returns the negotiated ID for a header extension.
-// If the Header Extension isn't enabled ok will be false
-func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapability) (val int, audioNegotiated, videoNegotiated bool) {
+// If the Header Extension isn't enabled ok will be false.
+func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapability) (
+	val int,
+	audioNegotiated, videoNegotiated bool,
+) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -325,7 +365,7 @@ func (m *MediaEngine) getHeaderExtensionID(extension RTPHeaderExtensionCapabilit
 }
 
 // copy copies any user modifiable state of the MediaEngine
-// all internal state is reset
+// all internal state is reset.
 func (m *MediaEngine) copy() *MediaEngine {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -337,6 +377,7 @@ func (m *MediaEngine) copy() *MediaEngine {
 	if len(m.headerExtensions) > 0 {
 		cloned.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
 	}
+
 	return cloned
 }
 
@@ -346,6 +387,7 @@ func findCodecByPayload(codecs []RTPCodecParameters, payloadType PayloadType) *R
 			return &codec
 		}
 	}
+
 	return nil
 }
 
@@ -393,7 +435,7 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 				PayloadType: codec.PayloadType,
 				MimeType:    codec.MimeType,
 				ClockRate:   codec.ClockRate,
-				Channels:    uint8(codec.Channels),
+				Channels:    uint8(codec.Channels), //nolint:gosec // G115
 				SDPFmtpLine: codec.SDPFmtpLine,
 			}
 
@@ -405,15 +447,21 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 	statsLoop(m.audioCodecs)
 }
 
-// Look up a codec and enable if it exists
-func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCodecType, exactMatches, partialMatches []RTPCodecParameters) (RTPCodecParameters, codecMatchType, error) {
+// Look up a codec and enable if it exists.
+//
+//nolint:cyclop
+func (m *MediaEngine) matchRemoteCodec(
+	remoteCodec RTPCodecParameters,
+	typ RTPCodecType,
+	exactMatches, partialMatches []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType, error) {
 	codecs := m.videoCodecs
 	if typ == RTPCodecTypeAudio {
 		codecs = m.audioCodecs
 	}
 
 	remoteFmtp := fmtp.Parse(remoteCodec.RTPCodecCapability.MimeType, remoteCodec.RTPCodecCapability.SDPFmtpLine)
-	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt {
+	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt { //nolint:nestif
 		payloadType, err := strconv.ParseUint(apt, 10, 8)
 		if err != nil {
 			return RTPCodecParameters{}, codecMatchNone, err
@@ -425,6 +473,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 			if codec.PayloadType == PayloadType(payloadType) {
 				aptMatch = codecMatchExact
 				aptCodec = codec
+
 				break
 			}
 		}
@@ -434,6 +483,7 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 				if codec.PayloadType == PayloadType(payloadType) {
 					aptMatch = codecMatchPartial
 					aptCodec = codec
+
 					break
 				}
 			}
@@ -446,22 +496,29 @@ func (m *MediaEngine) matchRemoteCodec(remoteCodec RTPCodecParameters, typ RTPCo
 		// replace the apt value with the original codec's payload type
 		toMatchCodec := remoteCodec
 		if aptMatched, mt := codecParametersFuzzySearch(aptCodec, codecs); mt == aptMatch {
-			toMatchCodec.SDPFmtpLine = strings.Replace(toMatchCodec.SDPFmtpLine, fmt.Sprintf("apt=%d", payloadType), fmt.Sprintf("apt=%d", aptMatched.PayloadType), 1)
+			toMatchCodec.SDPFmtpLine = strings.Replace(
+				toMatchCodec.SDPFmtpLine,
+				fmt.Sprintf("apt=%d", payloadType),
+				fmt.Sprintf("apt=%d", aptMatched.PayloadType),
+				1,
+			)
 		}
 
-		// if apt's media codec is partial match, then apt codec must be partial match too
+		// if apt's media codec is partial match, then apt codec must be partial match too.
 		localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
 		if matchType == codecMatchExact && aptMatch == codecMatchPartial {
 			matchType = codecMatchPartial
 		}
+
 		return localCodec, matchType, nil
 	}
 
 	localCodec, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
+
 	return localCodec, matchType, nil
 }
 
-// Update header extensions from a remote media section
+// Update header extensions from a remote media section.
 func (m *MediaEngine) updateHeaderExtensionFromMediaSection(media *sdp.MediaDescription) error {
 	var typ RTPCodecType
 	switch {
@@ -482,10 +539,11 @@ func (m *MediaEngine) updateHeaderExtensionFromMediaSection(media *sdp.MediaDesc
 			return err
 		}
 	}
+
 	return nil
 }
 
-// Look up a header extension and enable if it exists
+// Look up a header extension and enable if it exists.
 func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCodecType) error {
 	if m.negotiatedHeaderExtensions == nil {
 		return nil
@@ -508,6 +566,7 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 			m.negotiatedHeaderExtensions[id] = h
 		}
 	}
+
 	return nil
 }
 
@@ -521,8 +580,8 @@ func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) 
 	}
 }
 
-// Update the MediaEngine from a remote description
-func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error {
+// Update the MediaEngine from a remote description.
+func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error { //nolint:cyclop
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -549,6 +608,7 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			if err := m.updateHeaderExtensionFromMediaSection(media); err != nil {
 				return err
 			}
+
 			continue
 		}
 
@@ -590,6 +650,7 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -614,7 +675,8 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	return nil
 }
 
-func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters { //nolint:gocognit
+//nolint:gocognit,cyclop
+func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 
 	// perform before locking to prevent recursive RLocks
@@ -622,21 +684,24 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.negotiatedVideo && typ == RTPCodecTypeVideo ||
-		m.negotiatedAudio && typ == RTPCodecTypeAudio {
+
+	//nolint:nestif
+	if (m.negotiatedVideo && typ == RTPCodecTypeVideo) || (m.negotiatedAudio && typ == RTPCodecTypeAudio) {
 		for id, e := range m.negotiatedHeaderExtensions {
-			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
+			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) &&
+				(e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
 				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
 			}
 		}
 	} else {
 		mediaHeaderExtensions := make(map[int]mediaEngineHeaderExtension)
-		for _, e := range m.headerExtensions {
+		for _, ext := range m.headerExtensions {
 			usingNegotiatedID := false
 			for id := range m.negotiatedHeaderExtensions {
-				if m.negotiatedHeaderExtensions[id].uri == e.uri {
+				if m.negotiatedHeaderExtensions[id].uri == ext.uri {
 					usingNegotiatedID = true
-					mediaHeaderExtensions[id] = e
+					mediaHeaderExtensions[id] = ext
+
 					break
 				}
 			}
@@ -647,7 +712,8 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 						idAvailable = false
 					}
 					if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
-						mediaHeaderExtensions[id] = e
+						mediaHeaderExtensions[id] = ext
+
 						break
 					}
 				}
@@ -655,7 +721,8 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 		}
 
 		for id, e := range mediaHeaderExtensions {
-			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) && (e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
+			if haveRTPTransceiverDirectionIntersection(e.allowedDirections, directions) &&
+				(e.isAudio && typ == RTPCodecTypeAudio || e.isVideo && typ == RTPCodecTypeVideo) {
 				headerExtensions = append(headerExtensions, RTPHeaderExtensionParameter{ID: id, URI: e.uri})
 			}
 		}

@@ -96,7 +96,7 @@ type SettingEngine struct {
 	iceUDPMux                                 ice.UDPMux
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
-	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool
+	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool //nolint:lll
 	disableMediaEngineCopy                    bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
@@ -106,7 +106,7 @@ type SettingEngine struct {
 	dataChannelBlockWrite                     bool
 }
 
-// getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default
+// getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default.
 func (e *SettingEngine) getReceiveMTU() uint {
 	if e.receiveMTU != 0 {
 		return e.receiveMTU
@@ -123,13 +123,13 @@ func (e *SettingEngine) DetachDataChannels() {
 }
 
 // EnableDataChannelBlockWrite allows data channels to block on write,
-// it only works if DetachDataChannels is enabled
+// it only works if DetachDataChannels is enabled.
 func (e *SettingEngine) EnableDataChannelBlockWrite(nonblockWrite bool) {
 	e.dataChannelBlockWrite = nonblockWrite
 }
 
 // SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
-// The default srtp protection profiles are provided by the function `defaultSrtpProtectionProfiles`
+// The default srtp protection profiles are provided by the function `defaultSrtpProtectionProfiles`.
 func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectionProfile) {
 	e.srtpProtectionProfiles = profiles
 }
@@ -146,34 +146,36 @@ func (e *SettingEngine) SetSRTPProtectionProfiles(profiles ...dtls.SRTPProtectio
 //
 // keepAliveInterval:
 //
-//	How often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
+//	How often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent.
+//
+// Default is 2 seconds.
 func (e *SettingEngine) SetICETimeouts(disconnectedTimeout, failedTimeout, keepAliveInterval time.Duration) {
 	e.timeout.ICEDisconnectedTimeout = &disconnectedTimeout
 	e.timeout.ICEFailedTimeout = &failedTimeout
 	e.timeout.ICEKeepaliveInterval = &keepAliveInterval
 }
 
-// SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait
+// SetHostAcceptanceMinWait sets the ICEHostAcceptanceMinWait.
 func (e *SettingEngine) SetHostAcceptanceMinWait(t time.Duration) {
 	e.timeout.ICEHostAcceptanceMinWait = &t
 }
 
-// SetSrflxAcceptanceMinWait sets the ICESrflxAcceptanceMinWait
+// SetSrflxAcceptanceMinWait sets the ICESrflxAcceptanceMinWait.
 func (e *SettingEngine) SetSrflxAcceptanceMinWait(t time.Duration) {
 	e.timeout.ICESrflxAcceptanceMinWait = &t
 }
 
-// SetPrflxAcceptanceMinWait sets the ICEPrflxAcceptanceMinWait
+// SetPrflxAcceptanceMinWait sets the ICEPrflxAcceptanceMinWait.
 func (e *SettingEngine) SetPrflxAcceptanceMinWait(t time.Duration) {
 	e.timeout.ICEPrflxAcceptanceMinWait = &t
 }
 
-// SetRelayAcceptanceMinWait sets the ICERelayAcceptanceMinWait
+// SetRelayAcceptanceMinWait sets the ICERelayAcceptanceMinWait.
 func (e *SettingEngine) SetRelayAcceptanceMinWait(t time.Duration) {
 	e.timeout.ICERelayAcceptanceMinWait = &t
 }
 
-// SetSTUNGatherTimeout sets the ICESTUNGatherTimeout
+// SetSTUNGatherTimeout sets the ICESTUNGatherTimeout.
 func (e *SettingEngine) SetSTUNGatherTimeout(t time.Duration) {
 	e.timeout.ICESTUNGatherTimeout = &t
 }
@@ -191,10 +193,11 @@ func (e *SettingEngine) SetEphemeralUDPPortRange(portMin, portMax uint16) error 
 
 	e.ephemeralUDP.PortMin = portMin
 	e.ephemeralUDP.PortMax = portMax
+
 	return nil
 }
 
-// SetLite configures whether or not the ice agent should be a lite agent
+// SetLite configures whether or not the ice agent should be a lite agent.
 func (e *SettingEngine) SetLite(lite bool) {
 	e.candidates.ICELite = lite
 }
@@ -208,7 +211,7 @@ func (e *SettingEngine) SetNetworkTypes(candidateTypes []NetworkType) {
 // SetInterfaceFilter sets the filtering functions when gathering ICE candidates
 // This can be used to exclude certain network interfaces from ICE. Which may be
 // useful if you know a certain interface will never succeed, or if you wish to reduce
-// the amount of information you wish to expose to the remote peer
+// the amount of information you wish to expose to the remote peer.
 func (e *SettingEngine) SetInterfaceFilter(filter func(string) (keep bool)) {
 	e.candidates.InterfaceFilter = filter
 }
@@ -216,7 +219,7 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) (keep bool)) {
 // SetIPFilter sets the filtering functions when gathering ICE candidates
 // This can be used to exclude certain ip from ICE. Which may be
 // useful if you know a certain ip will never succeed, or if you wish to reduce
-// the amount of information you wish to expose to the remote peer
+// the amount of information you wish to expose to the remote peer.
 func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 	e.candidates.IPFilter = filter
 }
@@ -252,7 +255,7 @@ func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateTy
 }
 
 // SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful
-// for some VM have public IP mapped to loopback interface
+// for some VM have public IP mapped to loopback interface.
 func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 	e.candidates.IncludeLoopbackCandidate = include
 }
@@ -274,6 +277,7 @@ func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	}
 
 	e.answeringDTLSRole = role
+
 	return nil
 }
 
@@ -285,28 +289,29 @@ func (e *SettingEngine) SetNet(net transport.Net) {
 	e.net = net
 }
 
-// SetICEMulticastDNSMode controls if pion/ice queries and generates mDNS ICE Candidates
+// SetICEMulticastDNSMode controls if pion/ice queries and generates mDNS ICE Candidates.
 func (e *SettingEngine) SetICEMulticastDNSMode(multicastDNSMode ice.MulticastDNSMode) {
 	e.candidates.MulticastDNSMode = multicastDNSMode
 }
 
 // SetMulticastDNSHostName sets a static HostName to be used by pion/ice instead of generating one on startup
 //
-// This should only be used for a single PeerConnection. Having multiple PeerConnections with the same HostName will cause
-// undefined behavior
+// This should only be used for a single PeerConnection.
+// Having multiple PeerConnections with the same HostName will cause undefined behavior.
 func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
 	e.candidates.MulticastDNSHostName = hostName
 }
 
 // SetICECredentials sets a staic uFrag/uPwd to be used by pion/ice
 //
-// This is useful if you want to do signalless WebRTC session, or having a reproducible environment with static credentials
+// This is useful if you want to do signalless WebRTC session,
+// or having a reproducible environment with static credentials.
 func (e *SettingEngine) SetICECredentials(usernameFragment, password string) {
 	e.candidates.UsernameFragment = usernameFragment
 	e.candidates.Password = password
 }
 
-// DisableCertificateFingerprintVerification disables fingerprint verification after DTLS Handshake has finished
+// DisableCertificateFingerprintVerification disables fingerprint verification after DTLS Handshake has finished.
 func (e *SettingEngine) DisableCertificateFingerprintVerification(isDisabled bool) {
 	e.disableCertificateFingerprintVerification = isDisabled
 }
@@ -370,7 +375,7 @@ func (e *SettingEngine) SetICEMaxBindingRequests(d uint16) {
 	e.iceMaxBindingRequests = &d
 }
 
-// DisableActiveTCP disables using active TCP for ICE. Active TCP is enabled by default
+// DisableActiveTCP disables using active TCP for ICE. Active TCP is enabled by default.
 func (e *SettingEngine) DisableActiveTCP(isDisabled bool) {
 	e.iceDisableActiveTCP = isDisabled
 }
@@ -383,7 +388,7 @@ func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 }
 
 // SetReceiveMTU sets the size of read buffer that copies incoming packets. This is optional.
-// Leave this 0 for the default receiveMTU
+// Leave this 0 for the default receiveMTU.
 func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
 	e.receiveMTU = receiveMTU
 }
@@ -457,7 +462,7 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 
 // EnableSCTPZeroChecksum controls the zero checksum feature in SCTP.
 // This removes the need to checksum every incoming/outgoing packet and will reduce
-// latency and CPU usage. This feature is not backwards compatible so is disabled by default
+// latency and CPU usage. This feature is not backwards compatible so is disabled by default.
 func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 	e.sctp.enableZeroChecksum = isEnabled
 }
@@ -482,7 +487,9 @@ func (e *SettingEngine) SetDTLSServerHelloMessageHook(hook func(handshake.Messag
 
 // SetDTLSCertificateRequestMessageHook if not nil, is called when a DTLS Certificate Request message is sent
 // from a client. The returned handshake message replaces the original message.
-func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(hook func(handshake.MessageCertificateRequest) handshake.Message) {
+func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
+	hook func(handshake.MessageCertificateRequest) handshake.Message,
+) {
 	e.dtls.certificateRequestMessageHook = hook
 }
 
@@ -496,8 +503,10 @@ func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 // This allows users to do things like
 // - Log incoming Binding Requests for debugging
 // - Implement draft-thatcher-ice-renomination
-// - Implement custom CandidatePair switching logic
-func (e *SettingEngine) SetICEBindingRequestHandler(bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool) {
+// - Implement custom CandidatePair switching logic.
+func (e *SettingEngine) SetICEBindingRequestHandler(
+	bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool,
+) {
 	e.iceBindingRequestHandler = bindingRequestHandler
 }
 

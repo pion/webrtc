@@ -18,8 +18,8 @@ type Stats interface {
 	statsMarker()
 }
 
-// UnmarshalStatsJSON unmarshals a Stats object from JSON
-func UnmarshalStatsJSON(b []byte) (Stats, error) {
+// UnmarshalStatsJSON unmarshals a Stats object from JSON.
+func UnmarshalStatsJSON(b []byte) (Stats, error) { //nolint:cyclop
 	type typeJSON struct {
 		Type StatsType `json:"type"`
 	}
@@ -135,17 +135,17 @@ const (
 	// StatsTypeCertificate is used by CertificateStats.
 	StatsTypeCertificate StatsType = "certificate"
 
-	// StatsTypeSCTPTransport is used by SCTPTransportStats
+	// StatsTypeSCTPTransport is used by SCTPTransportStats.
 	StatsTypeSCTPTransport StatsType = "sctp-transport"
 )
 
-// MediaKind indicates the kind of media (audio or video)
+// MediaKind indicates the kind of media (audio or video).
 type MediaKind string
 
 const (
-	// MediaKindAudio indicates this is audio stats
+	// MediaKindAudio indicates this is audio stats.
 	MediaKindAudio MediaKind = "audio"
-	// MediaKindVideo indicates this is video stats
+	// MediaKindVideo indicates this is video stats.
 	MediaKindVideo MediaKind = "video"
 )
 
@@ -202,11 +202,12 @@ func (src *statsReportCollector) Ready() StatsReport {
 	src.collectingGroup.Wait()
 	src.mux.Lock()
 	defer src.mux.Unlock()
+
 	return src.report
 }
 
 // CodecType specifies whether a CodecStats objects represents a media format
-// that is being encoded or decoded
+// that is being encoded or decoded.
 type CodecType string
 
 const (
@@ -269,6 +270,7 @@ func unmarshalCodecStats(b []byte) (CodecStats, error) {
 	if err != nil {
 		return CodecStats{}, fmt.Errorf("unmarshal codec stats: %w", err)
 	}
+
 	return codecStats, nil
 }
 
@@ -605,6 +607,7 @@ func unmarshalInboundRTPStreamStats(b []byte) (InboundRTPStreamStats, error) {
 	if err != nil {
 		return InboundRTPStreamStats{}, fmt.Errorf("unmarshal inbound rtp stream stats: %w", err)
 	}
+
 	return inboundRTPStreamStats, nil
 }
 
@@ -619,10 +622,14 @@ const (
 	// QualityLimitationReasonCPU means the resolution and/or framerate is primarily limited due to CPU load.
 	QualityLimitationReasonCPU QualityLimitationReason = "cpu"
 
-	// QualityLimitationReasonBandwidth means the resolution and/or framerate is primarily limited due to congestion cues during bandwidth estimation. Typical, congestion control algorithms use inter-arrival time, round-trip time, packet or other congestion cues to perform bandwidth estimation.
+	// QualityLimitationReasonBandwidth means the resolution and/or framerate is primarily limited
+	// due to congestion cues during bandwidth estimation.
+	// Typical, congestion control algorithms use inter-arrival time, round-trip time,
+	//  packet or other congestion cues to perform bandwidth estimation.
 	QualityLimitationReasonBandwidth QualityLimitationReason = "bandwidth"
 
-	// QualityLimitationReasonOther means the resolution and/or framerate is primarily limited for a reason other than the above.
+	// QualityLimitationReasonOther means the resolution and/or framerate is primarily limited
+	//  for a reason other than the above.
 	QualityLimitationReasonOther QualityLimitationReason = "other"
 )
 
@@ -855,6 +862,7 @@ func unmarshalOutboundRTPStreamStats(b []byte) (OutboundRTPStreamStats, error) {
 	if err != nil {
 		return OutboundRTPStreamStats{}, fmt.Errorf("unmarshal outbound rtp stream stats: %w", err)
 	}
+
 	return outboundRTPStreamStats, nil
 }
 
@@ -986,6 +994,7 @@ func unmarshalRemoteInboundRTPStreamStats(b []byte) (RemoteInboundRTPStreamStats
 	if err != nil {
 		return RemoteInboundRTPStreamStats{}, fmt.Errorf("unmarshal remote inbound rtp stream stats: %w", err)
 	}
+
 	return remoteInboundRTPStreamStats, nil
 }
 
@@ -1105,6 +1114,7 @@ func unmarshalRemoteOutboundRTPStreamStats(b []byte) (RemoteOutboundRTPStreamSta
 	if err != nil {
 		return RemoteOutboundRTPStreamStats{}, fmt.Errorf("unmarshal remote outbound rtp stream stats: %w", err)
 	}
+
 	return remoteOutboundRTPStreamStats, nil
 }
 
@@ -1152,6 +1162,7 @@ func unmarshalCSRCStats(b []byte) (RTPContributingSourceStats, error) {
 	if err != nil {
 		return RTPContributingSourceStats{}, fmt.Errorf("unmarshal csrc stats: %w", err)
 	}
+
 	return csrcStats, nil
 }
 
@@ -1215,7 +1226,8 @@ type AudioSourceStats struct {
 
 	// TotalCaptureDelay is the total delay, in seconds, for each audio sample between the time the sample was emitted
 	// by the capture device and the sample reaching the source. This can be used together with totalSamplesCaptured to
-	// calculate the average capture delay per sample. Only applicable if the audio source represents an audio capture device.
+	// calculate the average capture delay per sample.
+	// Only applicable if the audio source represents an audio capture device.
 	TotalCaptureDelay float64 `json:"totalCaptureDelay"`
 
 	// TotalSamplesCaptured is the total number of captured samples reaching the audio source, i.e. that were not dropped
@@ -1278,6 +1290,7 @@ func unmarshalMediaSourceStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal audio source stats: %w", err)
 		}
+
 		return mediaSourceStats, nil
 	case MediaKindVideo:
 		var mediaSourceStats VideoSourceStats
@@ -1285,6 +1298,7 @@ func unmarshalMediaSourceStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal video source stats: %w", err)
 		}
+
 		return mediaSourceStats, nil
 	default:
 		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
@@ -1346,6 +1360,7 @@ func unmarshalMediaPlayoutStats(b []byte) (Stats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal audio playout stats: %w", err)
 	}
+
 	return audioPlayoutStats, nil
 }
 
@@ -1391,6 +1406,7 @@ func unmarshalPeerConnectionStats(b []byte) (PeerConnectionStats, error) {
 	if err != nil {
 		return PeerConnectionStats{}, fmt.Errorf("unmarshal pc stats: %w", err)
 	}
+
 	return pcStats, nil
 }
 
@@ -1445,6 +1461,7 @@ func unmarshalDataChannelStats(b []byte) (DataChannelStats, error) {
 	if err != nil {
 		return DataChannelStats{}, fmt.Errorf("unmarshal data channel stats: %w", err)
 	}
+
 	return dataChannelStats, nil
 }
 
@@ -1477,6 +1494,7 @@ func unmarshalStreamStats(b []byte) (MediaStreamStats, error) {
 	if err != nil {
 		return MediaStreamStats{}, fmt.Errorf("unmarshal stream stats: %w", err)
 	}
+
 	return streamStats, nil
 }
 
@@ -1658,6 +1676,7 @@ func unmarshalSenderStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal audio sender stats: %w", err)
 		}
+
 		return senderStats, nil
 	case MediaKindVideo:
 		var senderStats VideoSenderStats
@@ -1665,6 +1684,7 @@ func unmarshalSenderStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal video sender stats: %w", err)
 		}
+
 		return senderStats, nil
 	default:
 		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
@@ -1689,6 +1709,7 @@ func unmarshalTrackStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal audio track stats: %w", err)
 		}
+
 		return trackStats, nil
 	case MediaKindVideo:
 		var trackStats SenderVideoTrackAttachmentStats
@@ -1696,6 +1717,7 @@ func unmarshalTrackStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal video track stats: %w", err)
 		}
+
 		return trackStats, nil
 	default:
 		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
@@ -1894,6 +1916,7 @@ func unmarshalReceiverStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal audio receiver stats: %w", err)
 		}
+
 		return receiverStats, nil
 	case MediaKindVideo:
 		var receiverStats VideoReceiverStats
@@ -1901,6 +1924,7 @@ func unmarshalReceiverStats(b []byte) (Stats, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal video receiver stats: %w", err)
 		}
+
 		return receiverStats, nil
 	default:
 		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
@@ -1980,6 +2004,7 @@ func unmarshalTransportStats(b []byte) (TransportStats, error) {
 	if err != nil {
 		return TransportStats{}, fmt.Errorf("unmarshal transport stats: %w", err)
 	}
+
 	return transportStats, nil
 }
 
@@ -2000,6 +2025,7 @@ func toStatsICECandidatePairState(state ice.CandidatePairState) (StatsICECandida
 	default:
 		// NOTE: this should never happen[tm]
 		err := fmt.Errorf("%w: %s", errStatsICECandidateStateInvalid, state.String())
+
 		return StatsICECandidatePairState("Unknown"), err
 	}
 }
@@ -2228,6 +2254,7 @@ func unmarshalICECandidatePairStats(b []byte) (ICECandidatePairStats, error) {
 	if err != nil {
 		return ICECandidatePairStats{}, fmt.Errorf("unmarshal ice candidate pair stats: %w", err)
 	}
+
 	return iceCandidatePairStats, nil
 }
 
@@ -2305,6 +2332,7 @@ func unmarshalICECandidateStats(b []byte) (ICECandidateStats, error) {
 	if err != nil {
 		return ICECandidateStats{}, fmt.Errorf("unmarshal ice candidate stats: %w", err)
 	}
+
 	return iceCandidateStats, nil
 }
 
@@ -2344,6 +2372,7 @@ func unmarshalCertificateStats(b []byte) (CertificateStats, error) {
 	if err != nil {
 		return CertificateStats{}, fmt.Errorf("unmarshal certificate stats: %w", err)
 	}
+
 	return certificateStats, nil
 }
 
@@ -2364,8 +2393,9 @@ type SCTPTransportStats struct {
 	// RTCTransportStats for the DTLSTransport and ICETransport supporting the SCTP transport.
 	TransportID string `json:"transportId"`
 
-	// SmoothedRoundTripTime is the latest smoothed round-trip time value, corresponding to spinfo_srtt defined in [RFC6458]
-	// but converted to seconds. If there has been no round-trip time measurements yet, this value is undefined.
+	// SmoothedRoundTripTime is the latest smoothed round-trip time value,
+	// corresponding to spinfo_srtt defined in [RFC6458] but converted to seconds.
+	// If there has been no round-trip time measurements yet, this value is undefined.
 	SmoothedRoundTripTime float64 `json:"smoothedRoundTripTime"`
 
 	// CongestionWindow is the latest congestion window, corresponding to spinfo_cwnd defined in [RFC6458].
@@ -2394,5 +2424,6 @@ func unmarshalSCTPTransportStats(b []byte) (SCTPTransportStats, error) {
 	if err := json.Unmarshal(b, &sctpTransportStats); err != nil {
 		return SCTPTransportStats{}, fmt.Errorf("unmarshal sctp transport stats: %w", err)
 	}
+
 	return sctpTransportStats, nil
 }

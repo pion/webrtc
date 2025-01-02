@@ -18,11 +18,11 @@ func supportedNetworkTypes() []NetworkType {
 	}
 }
 
-// NetworkType represents the type of network
+// NetworkType represents the type of network.
 type NetworkType int
 
 const (
-	// NetworkTypeUnknown is the enum's zero-value
+	// NetworkTypeUnknown is the enum's zero-value.
 	NetworkTypeUnknown NetworkType = iota
 
 	// NetworkTypeUDP4 indicates UDP over IPv4.
@@ -61,7 +61,7 @@ func (t NetworkType) String() string {
 	}
 }
 
-// Protocol returns udp or tcp
+// Protocol returns udp or tcp.
 func (t NetworkType) Protocol() string {
 	switch t {
 	case NetworkTypeUDP4:

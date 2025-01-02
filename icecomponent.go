@@ -8,7 +8,7 @@ package webrtc
 type ICEComponent int
 
 const (
-	// ICEComponentUnknown is the enum's zero-value
+	// ICEComponentUnknown is the enum's zero-value.
 	ICEComponentUnknown ICEComponent = iota
 
 	// ICEComponentRTP indicates that the ICE Transport is used for RTP (or

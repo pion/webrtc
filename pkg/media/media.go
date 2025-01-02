@@ -10,7 +10,7 @@ import (
 	"github.com/pion/rtp"
 )
 
-// A Sample contains encoded media and timing information
+// A Sample contains encoded media and timing information.
 type Sample struct {
 	Data               []byte
 	Timestamp          time.Time
@@ -25,7 +25,7 @@ type Sample struct {
 }
 
 // Writer defines an interface to handle
-// the creation of media files
+// the creation of media files.
 type Writer interface {
 	// Add the content of an RTP packet to the media
 	WriteRTP(packet *rtp.Packet) error

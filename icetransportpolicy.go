@@ -11,7 +11,7 @@ import (
 // permitted candidates. Only these candidates are used for connectivity checks.
 type ICETransportPolicy int
 
-// ICEGatherPolicy is the ORTC equivalent of ICETransportPolicy
+// ICEGatherPolicy is the ORTC equivalent of ICETransportPolicy.
 type ICEGatherPolicy = ICETransportPolicy
 
 const (
@@ -29,7 +29,7 @@ const (
 	iceTransportPolicyAllStr   = "all"
 )
 
-// NewICETransportPolicy takes a string and converts it to ICETransportPolicy
+// NewICETransportPolicy takes a string and converts it to ICETransportPolicy.
 func NewICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
 	case iceTransportPolicyRelayStr:
@@ -50,17 +50,18 @@ func (t ICETransportPolicy) String() string {
 	}
 }
 
-// UnmarshalJSON parses the JSON-encoded data and stores the result
+// UnmarshalJSON parses the JSON-encoded data and stores the result.
 func (t *ICETransportPolicy) UnmarshalJSON(b []byte) error {
 	var val string
 	if err := json.Unmarshal(b, &val); err != nil {
 		return err
 	}
 	*t = NewICETransportPolicy(val)
+
 	return nil
 }
 
-// MarshalJSON returns the JSON encoding
+// MarshalJSON returns the JSON encoding.
 func (t ICETransportPolicy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }

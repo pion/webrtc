@@ -30,7 +30,7 @@ var (
 	errInvalidNilPacket = errors.New("invalid nil packet")
 )
 
-// OggWriter is used to take RTP packets and write them to an OGG on disk
+// OggWriter is used to take RTP packets and write them to an OGG on disk.
 type OggWriter struct {
 	stream                  io.Writer
 	fd                      *os.File
@@ -44,21 +44,22 @@ type OggWriter struct {
 	lastPayloadSize         int
 }
 
-// New builds a new OGG Opus writer
+// New builds a new OGG Opus writer.
 func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	f, err := os.Create(fileName) //nolint:gosec
+	file, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	writer, err := NewWith(f, sampleRate, channelCount)
+	writer, err := NewWith(file, sampleRate, channelCount)
 	if err != nil {
-		return nil, f.Close()
+		return nil, file.Close()
 	}
-	writer.fd = f
+	writer.fd = file
+
 	return writer, nil
 }
 
-// NewWith initialize a new OGG Opus writer with an io.Writer output
+// NewWith initialize a new OGG Opus writer with an io.Writer output.
 func NewWith(out io.Writer, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
 	if out == nil {
 		return nil, errFileNotOpened
@@ -110,8 +111,9 @@ func (i *OggWriter) writeHeaders() error {
 	// ID Header
 	oggIDHeader := make([]byte, 19)
 
-	copy(oggIDHeader[0:], idPageSignature)                          // Magic Signature 'OpusHead'
-	oggIDHeader[8] = 1                                              // Version
+	copy(oggIDHeader[0:], idPageSignature) // Magic Signature 'OpusHead'
+	oggIDHeader[8] = 1                     // Version
+	//nolint:gosec // G115
 	oggIDHeader[9] = uint8(i.channelCount)                          // Channel count
 	binary.LittleEndian.PutUint16(oggIDHeader[10:], defaultPreSkip) // pre-skip
 	binary.LittleEndian.PutUint32(oggIDHeader[12:], i.sampleRate)   // original sample rate, any valid sample e.g 48000
@@ -159,7 +161,8 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 	binary.LittleEndian.PutUint64(page[6:], granulePos) // granule position
 	binary.LittleEndian.PutUint32(page[14:], i.serial)  // Bitstream serial number
 	binary.LittleEndian.PutUint32(page[18:], pageIndex) // Page sequence number
-	page[26] = uint8(nSegments)                         // Number of segments in page.
+	//nolint:gosec // G115
+	page[26] = uint8(nSegments) // Number of segments in page.
 
 	// Filling segment table with the lacing values.
 	// First (nSegments - 1) values will always be 255.
@@ -167,7 +170,7 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 		page[pageHeaderSize+i] = 255
 	}
 	// The last value will be the remainder.
-	page[pageHeaderSize+nSegments-1] = uint8(len(payload) % 255)
+	page[pageHeaderSize+nSegments-1] = uint8(len(payload) % 255) //nolint:gosec // G115
 
 	copy(page[pageHeaderSize+nSegments:], payload) // Payload goes after the segment table, so at pageHeaderSize+nSegments.
 
@@ -176,12 +179,13 @@ func (i *OggWriter) createPage(payload []uint8, headerType uint8, granulePos uin
 		checksum = (checksum << 8) ^ i.checksumTable[byte(checksum>>24)^page[index]]
 	}
 
-	binary.LittleEndian.PutUint32(page[22:], checksum) // Checksum - generating for page data and inserting at 22th position into 32 bits
+	// Checksum - generating for page data and inserting at 22th position into 32 bits
+	binary.LittleEndian.PutUint32(page[22:], checksum)
 
 	return page
 }
 
-// WriteRTP adds a new packet and writes the appropriate headers for it
+// WriteRTP adds a new packet and writes the appropriate headers for it.
 func (i *OggWriter) WriteRTP(packet *rtp.Packet) error {
 	if packet == nil {
 		return errInvalidNilPacket
@@ -207,10 +211,11 @@ func (i *OggWriter) WriteRTP(packet *rtp.Packet) error {
 
 	data := i.createPage(payload, pageHeaderTypeContinuationOfStream, i.previousGranulePosition, i.pageIndex)
 	i.pageIndex++
+
 	return i.writeToStream(data)
 }
 
-// Close stops the recording
+// Close stops the recording.
 func (i *OggWriter) Close() error {
 	defer func() {
 		i.fd = nil
@@ -224,6 +229,7 @@ func (i *OggWriter) Close() error {
 		if closer, ok := i.stream.(io.Closer); ok {
 			return closer.Close()
 		}
+
 		return nil
 	}
 
@@ -249,13 +255,14 @@ func (i *OggWriter) Close() error {
 }
 
 // Wraps writing to the stream and maintains state
-// so we can set values for EOS
+// so we can set values for EOS.
 func (i *OggWriter) writeToStream(p []byte) error {
 	if i.stream == nil {
 		return errFileNotOpened
 	}
 
 	_, err := i.stream.Write(p)
+
 	return err
 }
 
@@ -264,15 +271,16 @@ func generateChecksumTable() *[256]uint32 {
 	const poly = 0x04c11db7
 
 	for i := range table {
-		r := uint32(i) << 24
+		remainder := uint32(i) << 24 //nolint:gosec // G115
 		for j := 0; j < 8; j++ {
-			if (r & 0x80000000) != 0 {
-				r = (r << 1) ^ poly
+			if (remainder & 0x80000000) != 0 {
+				remainder = (remainder << 1) ^ poly
 			} else {
-				r <<= 1
+				remainder <<= 1
 			}
-			table[i] = (r & 0xffffffff)
+			table[i] = (remainder & 0xffffffff)
 		}
 	}
+
 	return &table
 }

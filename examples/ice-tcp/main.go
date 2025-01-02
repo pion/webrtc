@@ -21,7 +21,7 @@ import (
 
 var api *webrtc.API //nolint
 
-func doSignaling(w http.ResponseWriter, r *http.Request) {
+func doSignaling(res http.ResponseWriter, req *http.Request) { //nolint:cyclop
 	peerConnection, err := api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		panic(err)
@@ -48,7 +48,7 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var offer webrtc.SessionDescription
-	if err = json.NewDecoder(r.Body).Decode(&offer); err != nil {
+	if err = json.NewDecoder(req.Body).Decode(&offer); err != nil {
 		panic(err)
 	}
 
@@ -76,12 +76,13 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(response); err != nil {
+	res.Header().Set("Content-Type", "application/json")
+	if _, err := res.Write(response); err != nil {
 		panic(err)
 	}
 }
 
+//nolint:cyclop
 func main() {
 	settingEngine := webrtc.SettingEngine{}
 

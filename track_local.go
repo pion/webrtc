@@ -8,7 +8,7 @@ import (
 	"github.com/pion/rtp"
 )
 
-// TrackLocalWriter is the Writer for outbound RTP Packets
+// TrackLocalWriter is the Writer for outbound RTP Packets.
 type TrackLocalWriter interface {
 	// WriteRTP encrypts a RTP packet and writes to the connection
 	WriteRTP(header *rtp.Header, payload []byte) (int, error)
@@ -57,39 +57,39 @@ type baseTrackLocalContext struct {
 }
 
 // CodecParameters returns the negotiated RTPCodecParameters. These are the codecs supported by both
-// PeerConnections and the SSRC/PayloadTypes
+// PeerConnections and the SSRC/PayloadTypes.
 func (t *baseTrackLocalContext) CodecParameters() []RTPCodecParameters {
 	return t.params.Codecs
 }
 
 // HeaderExtensions returns the negotiated RTPHeaderExtensionParameters. These are the header extensions supported by
-// both PeerConnections and the SSRC/PayloadTypes
+// both PeerConnections and the SSRC/PayloadTypes.
 func (t *baseTrackLocalContext) HeaderExtensions() []RTPHeaderExtensionParameter {
 	return t.params.HeaderExtensions
 }
 
-// SSRC requires the negotiated SSRC of this track
+// SSRC requires the negotiated SSRC of this track.
 func (t *baseTrackLocalContext) SSRC() SSRC {
 	return t.ssrc
 }
 
-// SSRCRetransmission returns the negotiated SSRC used to send retransmissions for this track
+// SSRCRetransmission returns the negotiated SSRC used to send retransmissions for this track.
 func (t *baseTrackLocalContext) SSRCRetransmission() SSRC {
 	return t.ssrcRTX
 }
 
-// SSRCForwardErrorCorrection returns the negotiated SSRC to send forward error correction for this track
+// SSRCForwardErrorCorrection returns the negotiated SSRC to send forward error correction for this track.
 func (t *baseTrackLocalContext) SSRCForwardErrorCorrection() SSRC {
 	return t.ssrcFEC
 }
 
 // WriteStream returns the WriteStream for this TrackLocal. The implementer writes the outbound
-// media packets to it
+// media packets to it.
 func (t *baseTrackLocalContext) WriteStream() TrackLocalWriter {
 	return t.writeStream
 }
 
-// ID is a unique identifier that is used for both Bind/Unbind
+// ID is a unique identifier that is used for both Bind/Unbind.
 func (t *baseTrackLocalContext) ID() string {
 	return t.id
 }
@@ -101,7 +101,7 @@ func (t *baseTrackLocalContext) RTCPReader() interceptor.RTCPReader {
 
 // TrackLocal is an interface that controls how the user can send media
 // The user can provide their own TrackLocal implementations, or use
-// the implementations in pkg/media
+// the implementations in pkg/media.
 type TrackLocal interface {
 	// Bind should implement the way how the media data flows from the Track to the PeerConnection
 	// This will be called internally after signaling is complete and the list of available

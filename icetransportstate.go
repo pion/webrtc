@@ -9,7 +9,7 @@ import "github.com/pion/ice/v4"
 type ICETransportState int
 
 const (
-	// ICETransportStateUnknown is the enum's zero-value
+	// ICETransportStateUnknown is the enum's zero-value.
 	ICETransportStateUnknown ICETransportState = iota
 
 	// ICETransportStateNew indicates the ICETransport is waiting
@@ -143,13 +143,14 @@ func (c ICETransportState) toICE() ice.ConnectionState {
 	}
 }
 
-// MarshalText implements encoding.TextMarshaler
+// MarshalText implements encoding.TextMarshaler.
 func (c ICETransportState) MarshalText() ([]byte, error) {
 	return []byte(c.String()), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (c *ICETransportState) UnmarshalText(b []byte) error {
 	*c = newICETransportState(string(b))
+
 	return nil
 }

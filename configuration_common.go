@@ -23,5 +23,6 @@ func (c Configuration) getICEServers() []ICEServer {
 			iceServers[iceServersIndex].URLs[urlsIndex] = rawURL
 		}
 	}
+
 	return iceServers
 }

@@ -157,7 +157,7 @@ func TestICEGatherer_AlreadyClosed(t *testing.T) {
 	})
 }
 
-func TestNewICEGathererSetMediaStreamIdentification(t *testing.T) {
+func TestNewICEGathererSetMediaStreamIdentification(t *testing.T) { //nolint:cyclop
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()

@@ -9,7 +9,7 @@ import (
 	"github.com/pion/ice/v4"
 )
 
-// ICECandidate represents a ice candidate
+// ICECandidate represents a ice candidate.
 type ICECandidate struct {
 	statsID        string
 	Foundation     string           `json:"foundation"`
@@ -26,9 +26,12 @@ type ICECandidate struct {
 	SDPMLineIndex  uint16           `json:"sdpMLineIndex"`
 }
 
-// Conversion for package ice
-
-func newICECandidatesFromICE(iceCandidates []ice.Candidate, sdpMid string, sdpMLineIndex uint16) ([]ICECandidate, error) {
+// Conversion for package ice.
+func newICECandidatesFromICE(
+	iceCandidates []ice.Candidate,
+	sdpMid string,
+	sdpMLineIndex uint16,
+) ([]ICECandidate, error) {
 	candidates := []ICECandidate{}
 
 	for _, i := range iceCandidates {
@@ -42,36 +45,36 @@ func newICECandidatesFromICE(iceCandidates []ice.Candidate, sdpMid string, sdpML
 	return candidates, nil
 }
 
-func newICECandidateFromICE(i ice.Candidate, sdpMid string, sdpMLineIndex uint16) (ICECandidate, error) {
-	typ, err := convertTypeFromICE(i.Type())
+func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineIndex uint16) (ICECandidate, error) {
+	typ, err := convertTypeFromICE(candidate.Type())
 	if err != nil {
 		return ICECandidate{}, err
 	}
-	protocol, err := NewICEProtocol(i.NetworkType().NetworkShort())
+	protocol, err := NewICEProtocol(candidate.NetworkType().NetworkShort())
 	if err != nil {
 		return ICECandidate{}, err
 	}
 
-	c := ICECandidate{
-		statsID:       i.ID(),
-		Foundation:    i.Foundation(),
-		Priority:      i.Priority(),
-		Address:       i.Address(),
+	newCandidate := ICECandidate{
+		statsID:       candidate.ID(),
+		Foundation:    candidate.Foundation(),
+		Priority:      candidate.Priority(),
+		Address:       candidate.Address(),
 		Protocol:      protocol,
-		Port:          uint16(i.Port()),
-		Component:     i.Component(),
+		Port:          uint16(candidate.Port()), //nolint:gosec // G115
+		Component:     candidate.Component(),
 		Typ:           typ,
-		TCPType:       i.TCPType().String(),
+		TCPType:       candidate.TCPType().String(),
 		SDPMid:        sdpMid,
 		SDPMLineIndex: sdpMLineIndex,
 	}
 
-	if i.RelatedAddress() != nil {
-		c.RelatedAddress = i.RelatedAddress().Address
-		c.RelatedPort = uint16(i.RelatedAddress().Port)
+	if candidate.RelatedAddress() != nil {
+		newCandidate.RelatedAddress = candidate.RelatedAddress().Address
+		newCandidate.RelatedPort = uint16(candidate.RelatedAddress().Port) //nolint:gosec // G115
 	}
 
-	return c, nil
+	return newCandidate, nil
 }
 
 func (c ICECandidate) toICE() (ice.Candidate, error) {
@@ -88,6 +91,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Foundation:  c.Foundation,
 			Priority:    c.Priority,
 		}
+
 		return ice.NewCandidateHost(&config)
 	case ICECandidateTypeSrflx:
 		config := ice.CandidateServerReflexiveConfig{
@@ -101,6 +105,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
+
 		return ice.NewCandidateServerReflexive(&config)
 	case ICECandidateTypePrflx:
 		config := ice.CandidatePeerReflexiveConfig{
@@ -114,6 +119,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
+
 		return ice.NewCandidatePeerReflexive(&config)
 	case ICECandidateTypeRelay:
 		config := ice.CandidateRelayConfig{
@@ -127,6 +133,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelAddr:     c.RelatedAddress,
 			RelPort:     int(c.RelatedPort),
 		}
+
 		return ice.NewCandidateRelay(&config)
 	default:
 		return nil, fmt.Errorf("%w: %s", errICECandidateTypeUnknown, c.Typ)
@@ -153,6 +160,7 @@ func (c ICECandidate) String() string {
 	if err != nil {
 		return fmt.Sprintf("%#v failed to convert to ICE: %s", c, err)
 	}
+
 	return ic.String()
 }
 

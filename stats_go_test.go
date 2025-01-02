@@ -50,7 +50,7 @@ type statSample struct {
 	json  string
 }
 
-func getStatsSamples() []statSample {
+func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 	codecStats := CodecStats{
 		Timestamp:      1688978831527.718,
 		Type:           StatsTypeCodec,
@@ -824,11 +824,14 @@ func getStatsSamples() []statSample {
 		DTLSState:               DTLSTransportStateConnected,
 		ICEState:                ICETransportStateConnected,
 		SelectedCandidatePairID: "CPxIhBDNnT_sPDhy1TB",
-		LocalCertificateID:      "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
-		RemoteCertificateID:     "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
-		DTLSCipher:              "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		SRTPCipher:              "AES_CM_128_HMAC_SHA1_80",
+		//nolint:lll
+		LocalCertificateID: "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
+		//nolint:lll
+		RemoteCertificateID: "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+		DTLSCipher:          "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+		SRTPCipher:          "AES_CM_128_HMAC_SHA1_80",
 	}
+	//nolint:lll
 	transportStatsJSON := `
 {
   "timestamp": 1688978831527.718,
@@ -982,14 +985,19 @@ func getStatsSamples() []statSample {
 }
 `
 	certificateStats := CertificateStats{
-		Timestamp:            1689668364374.479,
-		Type:                 StatsTypeCertificate,
-		ID:                   "CF23:AB:FA:0B:0E:DF:12:34:D3:6C:EA:83:43:BD:79:39:87:39:11:49:41:8A:63:0E:17:B1:3F:94:FA:E3:62:20",
+		Timestamp: 1689668364374.479,
+		Type:      StatsTypeCertificate,
+		//nolint:lll
+		ID: "CF23:AB:FA:0B:0E:DF:12:34:D3:6C:EA:83:43:BD:79:39:87:39:11:49:41:8A:63:0E:17:B1:3F:94:FA:E3:62:20",
+		//nolint:lll
 		Fingerprint:          "23:AB:FA:0B:0E:DF:12:34:D3:6C:EA:83:43:BD:79:39:87:39:11:49:41:8A:63:0E:17:B1:3F:94:FA:E3:62:20",
 		FingerprintAlgorithm: "sha-256",
-		Base64Certificate:    "MIIBFjCBvKADAgECAggAwlrxojpmgTAKBggqhkjOPQQDAjARMQ8wDQYDVQQDDAZXZWJSVEMwHhcNMjMwNzE3MDgxODU2WhcNMjMwODE3MDgxODU2WjARMQ8wDQYDVQQDDAZXZWJSVEMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARKETeS9qNGe3ltwp+q2KgsYWsJLFCJGap4L2aa862sPijHeuzLgO2bju/mosJN0Li7mXhuKBOsCkCMU7vZHVVVMAoGCCqGSM49BAMCA0kAMEYCIQDXyuyMMrgzd+w3c4h3vPn9AzLcf9CHVHRGYyy5ReI/hgIhALkXfaZ96TQRf5FI2mBJJUX9O/q4Poe3wNZxxWeDcYN+",
-		IssuerCertificateID:  "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+		//nolint:lll
+		Base64Certificate: "MIIBFjCBvKADAgECAggAwlrxojpmgTAKBggqhkjOPQQDAjARMQ8wDQYDVQQDDAZXZWJSVEMwHhcNMjMwNzE3MDgxODU2WhcNMjMwODE3MDgxODU2WjARMQ8wDQYDVQQDDAZXZWJSVEMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARKETeS9qNGe3ltwp+q2KgsYWsJLFCJGap4L2aa862sPijHeuzLgO2bju/mosJN0Li7mXhuKBOsCkCMU7vZHVVVMAoGCCqGSM49BAMCA0kAMEYCIQDXyuyMMrgzd+w3c4h3vPn9AzLcf9CHVHRGYyy5ReI/hgIhALkXfaZ96TQRf5FI2mBJJUX9O/q4Poe3wNZxxWeDcYN+",
+		//nolint:lll
+		IssuerCertificateID: "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
 	}
+	//nolint:lll
 	certificateStatsJSON := `
 {
   "timestamp": 1689668364374.479,
@@ -1144,6 +1152,8 @@ func TestStatsUnmarshal(t *testing.T) {
 }
 
 func waitWithTimeout(t *testing.T, wg *sync.WaitGroup) {
+	t.Helper()
+
 	// Wait for all of the event handlers to be triggered.
 	done := make(chan struct{})
 	go func() {
@@ -1160,48 +1170,66 @@ func waitWithTimeout(t *testing.T, wg *sync.WaitGroup) {
 }
 
 func getConnectionStats(t *testing.T, report StatsReport, pc *PeerConnection) PeerConnectionStats {
+	t.Helper()
+
 	stats, ok := report.GetConnectionStats(pc)
 	assert.True(t, ok)
 	assert.Equal(t, stats.Type, StatsTypePeerConnection)
+
 	return stats
 }
 
 func getDataChannelStats(t *testing.T, report StatsReport, dc *DataChannel) DataChannelStats {
+	t.Helper()
+
 	stats, ok := report.GetDataChannelStats(dc)
 	assert.True(t, ok)
 	assert.Equal(t, stats.Type, StatsTypeDataChannel)
+
 	return stats
 }
 
 func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) CodecStats {
+	t.Helper()
+
 	stats, ok := report.GetCodecStats(c)
 	assert.True(t, ok)
 	assert.Equal(t, stats.Type, StatsTypeCodec)
+
 	return stats
 }
 
 func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+	t.Helper()
+
 	stats, ok := report[statsID]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)
 	assert.Equal(t, transportStats.Type, StatsTypeTransport)
+
 	return transportStats
 }
 
 func getSctpTransportStats(t *testing.T, report StatsReport) SCTPTransportStats {
+	t.Helper()
+
 	stats, ok := report["sctpTransport"]
 	assert.True(t, ok)
 	transportStats, ok := stats.(SCTPTransportStats)
 	assert.True(t, ok)
 	assert.Equal(t, transportStats.Type, StatsTypeSCTPTransport)
+
 	return transportStats
 }
 
 func getCertificateStats(t *testing.T, report StatsReport, certificate *Certificate) CertificateStats {
+	t.Helper()
+
 	certificateStats, ok := report.GetCertificateStats(certificate)
 	assert.True(t, ok)
 	assert.Equal(t, certificateStats.Type, StatsTypeCertificate)
+
 	return certificateStats
 }
 
@@ -1213,6 +1241,7 @@ func findLocalCandidateStats(report StatsReport) []ICECandidateStats {
 			result = append(result, stats)
 		}
 	}
+
 	return result
 }
 
@@ -1224,10 +1253,13 @@ func findRemoteCandidateStats(report StatsReport) []ICECandidateStats {
 			result = append(result, stats)
 		}
 	}
+
 	return result
 }
 
 func findCandidatePairStats(t *testing.T, report StatsReport) []ICECandidatePairStats {
+	t.Helper()
+
 	result := []ICECandidatePairStats{}
 	for _, s := range report {
 		stats, ok := s.(ICECandidatePairStats)
@@ -1236,6 +1268,7 @@ func findCandidatePairStats(t *testing.T, report StatsReport) []ICECandidatePair
 			result = append(result, stats)
 		}
 	}
+
 	return result
 }
 
@@ -1277,6 +1310,7 @@ func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error
 		if err != nil {
 			return err
 		}
+
 		return nil
 	}
 }

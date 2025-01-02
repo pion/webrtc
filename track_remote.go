@@ -14,7 +14,7 @@ import (
 	"github.com/pion/rtp"
 )
 
-// TrackRemote represents a single inbound source of media
+// TrackRemote represents a single inbound source of media.
 type TrackRemote struct {
 	mu sync.RWMutex
 
@@ -46,16 +46,17 @@ func newTrackRemote(kind RTPCodecType, ssrc, rtxSsrc SSRC, rid string, receiver 
 
 // ID is the unique identifier for this Track. This should be unique for the
 // stream, but doesn't have to globally unique. A common example would be 'audio' or 'video'
-// and StreamID would be 'desktop' or 'webcam'
+// and StreamID would be 'desktop' or 'webcam'.
 func (t *TrackRemote) ID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.id
 }
 
 // RID gets the RTP Stream ID of this Track
 // With Simulcast you will have multiple tracks with the same ID, but different RID values.
-// In many cases a TrackRemote will not have an RID, so it is important to assert it is non-zero
+// In many cases a TrackRemote will not have an RID, so it is important to assert it is non-zero.
 func (t *TrackRemote) RID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -63,50 +64,55 @@ func (t *TrackRemote) RID() string {
 	return t.rid
 }
 
-// PayloadType gets the PayloadType of the track
+// PayloadType gets the PayloadType of the track.
 func (t *TrackRemote) PayloadType() PayloadType {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.payloadType
 }
 
-// Kind gets the Kind of the track
+// Kind gets the Kind of the track.
 func (t *TrackRemote) Kind() RTPCodecType {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.kind
 }
 
-// StreamID is the group this track belongs too. This must be unique
+// StreamID is the group this track belongs too. This must be unique.
 func (t *TrackRemote) StreamID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.streamID
 }
 
-// SSRC gets the SSRC of the track
+// SSRC gets the SSRC of the track.
 func (t *TrackRemote) SSRC() SSRC {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.ssrc
 }
 
-// Msid gets the Msid of the track
+// Msid gets the Msid of the track.
 func (t *TrackRemote) Msid() string {
 	return t.StreamID() + " " + t.ID()
 }
 
-// Codec gets the Codec of the track
+// Codec gets the Codec of the track.
 func (t *TrackRemote) Codec() RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.codec
 }
 
 // Read reads data from the track.
 func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, err error) {
 	t.mu.RLock()
-	r := t.receiver
+	receiver := t.receiver
 	peeked := t.peeked != nil
 	t.mu.RUnlock()
 
@@ -123,12 +129,13 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		if data != nil {
 			n = copy(b, data)
 			err = t.checkAndUpdateTrack(b)
-			return
+
+			return n, attributes, err
 		}
 	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
-	if rtxPacketReceived := r.readRTX(t); rtxPacketReceived != nil {
+	if rtxPacketReceived := receiver.readRTX(t); rtxPacketReceived != nil {
 		n = copy(b, rtxPacketReceived.pkt)
 		attributes = rtxPacketReceived.attributes
 		rtxPacketReceived.release()
@@ -136,10 +143,11 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 	} else {
 		// If there's no separate RTX track (or there's a separate RTX track but no RTX packet waiting), wait for and return
 		// a packet from the main track
-		n, attributes, err = r.readRTP(b, t)
+		n, attributes, err = receiver.readRTP(b, t)
 		if err != nil {
-			return
+			return n, attributes, err
 		}
+
 		err = t.checkAndUpdateTrack(b)
 	}
 
@@ -147,7 +155,7 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 }
 
 // checkAndUpdateTrack checks payloadType for every incoming packet
-// once a different payloadType is detected the track will be updated
+// once a different payloadType is detected the track will be updated.
 func (t *TrackRemote) checkAndUpdateTrack(b []byte) error {
 	if len(b) < 2 {
 		return errRTPTooShort
@@ -184,10 +192,11 @@ func (t *TrackRemote) ReadRTP() (*rtp.Packet, interceptor.Attributes, error) {
 	if err := r.Unmarshal(b[:i]); err != nil {
 		return nil, nil, err
 	}
+
 	return r, attributes, nil
 }
 
-// peek is like Read, but it doesn't discard the packet read
+// peek is like Read, but it doesn't discard the packet read.
 func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error) {
 	n, a, err = t.Read(b)
 	if err != nil {
@@ -203,6 +212,7 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 	t.peeked = data
 	t.peekedAttributes = a
 	t.mu.Unlock()
+
 	return
 }
 
@@ -211,17 +221,19 @@ func (t *TrackRemote) SetReadDeadline(deadline time.Time) error {
 	return t.receiver.setRTPReadDeadline(deadline, t)
 }
 
-// RtxSSRC returns the RTX SSRC for a track, or 0 if track does not have a separate RTX stream
+// RtxSSRC returns the RTX SSRC for a track, or 0 if track does not have a separate RTX stream.
 func (t *TrackRemote) RtxSSRC() SSRC {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.rtxSsrc
 }
 
-// HasRTX returns true if the track has a separate RTX stream
+// HasRTX returns true if the track has a separate RTX stream.
 func (t *TrackRemote) HasRTX() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.rtxSsrc != 0
 }
 

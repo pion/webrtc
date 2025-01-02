@@ -32,7 +32,11 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	return pca, pcb, nil
 }
 
-func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnection, modificationFunc func(string) string) error {
+func signalPairWithModification(
+	pcOffer *PeerConnection,
+	pcAnswer *PeerConnection,
+	modificationFunc func(string) string,
+) error {
 	// Note(albrow): We need to create a data channel in order to trigger ICE
 	// candidate gathering in the background for the JavaScript/Wasm bindings. If
 	// we don't do this, the complete offer including ICE candidates will never be
@@ -65,11 +69,16 @@ func signalPairWithModification(pcOffer *PeerConnection, pcAnswer *PeerConnectio
 		return err
 	}
 	<-answerGatheringComplete
+
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
-	return signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string { return sessionDescription })
+	return signalPairWithModification(
+		pcOffer,
+		pcAnswer,
+		func(sessionDescription string) string { return sessionDescription },
+	)
 }
 
 func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, direction RTPTransceiverDirection) bool {
@@ -81,9 +90,11 @@ func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, directi
 	for _, media := range parsed.MediaDescriptions {
 		if media.MediaName.Media == kind.String() {
 			_, exists := media.Attribute(direction.String())
+
 			return exists
 		}
 	}
+
 	return false
 }
 
@@ -103,6 +114,7 @@ func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *
 
 		p.OnConnectionStateChange(hdlr)
 	}
+
 	return &triggered
 }
 
@@ -179,6 +191,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 
 				err = pc.Close()
 				assert.Nil(t, err)
+
 				return pc, err
 			},
 			config:  Configuration{},
@@ -231,6 +244,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 				if err != nil {
 					return pc, err
 				}
+
 				return pc, nil
 			},
 			config: Configuration{
@@ -607,8 +621,8 @@ func TestMultipleCreateChannel(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-// Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription
-func TestGatherOnSetLocalDescription(t *testing.T) {
+// Assert that candidates are gathered by calling SetLocalDescription, not SetRemoteDescription.
+func TestGatherOnSetLocalDescription(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -678,7 +692,7 @@ func TestGatherOnSetLocalDescription(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-// Assert that SetRemoteDescription handles invalid states
+// Assert that SetRemoteDescription handles invalid states.
 func TestSetRemoteDescriptionInvalid(t *testing.T) {
 	t.Run("local-offer+SetRemoteDescription(Offer)", func(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
@@ -738,7 +752,7 @@ func TestAddTransceiver(t *testing.T) {
 	}
 }
 
-// Assert that SCTPTransport -> DTLSTransport -> ICETransport works after connected
+// Assert that SCTPTransport -> DTLSTransport -> ICETransport works after connected.
 func TestTransportChain(t *testing.T) {
 	offer, answer, err := newPair()
 	assert.NoError(t, err)
@@ -752,7 +766,7 @@ func TestTransportChain(t *testing.T) {
 	closePairNow(t, offer, answer)
 }
 
-// Assert that the PeerConnection closes via DTLS (and not ICE)
+// Assert that the PeerConnection closes via DTLS (and not ICE).
 func TestDTLSClose(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()

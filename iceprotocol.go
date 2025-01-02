@@ -13,7 +13,7 @@ import (
 type ICEProtocol int
 
 const (
-	// ICEProtocolUnknown is the enum's zero-value
+	// ICEProtocolUnknown is the enum's zero-value.
 	ICEProtocolUnknown ICEProtocol = iota
 
 	// ICEProtocolUDP indicates the URL uses a UDP transport.
@@ -29,7 +29,7 @@ const (
 	iceProtocolTCPStr = "tcp"
 )
 
-// NewICEProtocol takes a string and converts it to ICEProtocol
+// NewICEProtocol takes a string and converts it to ICEProtocol.
 func NewICEProtocol(raw string) (ICEProtocol, error) {
 	switch {
 	case strings.EqualFold(iceProtocolUDPStr, raw):

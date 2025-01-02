@@ -10,7 +10,7 @@ import (
 	"io"
 )
 
-// H264Reader reads data from stream and constructs h264 nal units
+// H264Reader reads data from stream and constructs h264 nal units.
 type H264Reader struct {
 	stream                      io.Reader
 	nalBuffer                   []byte
@@ -25,7 +25,7 @@ var (
 	errDataIsNotH264Stream = errors.New("data is not a H264 bitstream")
 )
 
-// NewReader creates new H264Reader
+// NewReader creates new H264Reader.
 func NewReader(in io.Reader) (*H264Reader, error) {
 	if in == nil {
 		return nil, errNilReader
@@ -42,7 +42,7 @@ func NewReader(in io.Reader) (*H264Reader, error) {
 	return reader, nil
 }
 
-// NAL H.264 Network Abstraction Layer
+// NAL H.264 Network Abstraction Layer.
 type NAL struct {
 	PictureOrderCount uint32
 
@@ -73,6 +73,7 @@ func (reader *H264Reader) read(numToRead int) (data []byte, e error) {
 	}
 	data = reader.readBuffer[0:numShouldRead]
 	reader.readBuffer = reader.readBuffer[numShouldRead:]
+
 	return data, nil
 }
 
@@ -82,7 +83,7 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 
 	prefixBuffer, e := reader.read(4)
 	if e != nil {
-		return
+		return prefixLength, e
 	}
 
 	n := len(prefixBuffer)
@@ -100,12 +101,14 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 		if nalPrefix3BytesFound {
 			return 0, io.EOF
 		}
+
 		return 0, errDataIsNotH264Stream
 	}
 
 	// n == 4
 	if nalPrefix3BytesFound {
 		reader.nalBuffer = append(reader.nalBuffer, prefixBuffer[3])
+
 		return 3, nil
 	}
 
@@ -113,6 +116,7 @@ func (reader *H264Reader) bitStreamStartsWithH264Prefix() (prefixLength int, e e
 	if nalPrefix4BytesFound {
 		return 4, nil
 	}
+
 	return 0, errDataIsNotH264Stream
 }
 
@@ -147,8 +151,10 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 			nal.parseHeader()
 			if nal.UnitType == NalUnitTypeSEI {
 				reader.nalBuffer = nil
+
 				continue
 			}
+
 			break
 		}
 

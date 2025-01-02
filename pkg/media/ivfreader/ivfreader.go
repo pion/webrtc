@@ -49,7 +49,7 @@ type IVFFrameHeader struct {
 	Timestamp uint64 // 4-11
 }
 
-// IVFReader is used to read IVF files and return frame payloads
+// IVFReader is used to read IVF files and return frame payloads.
 type IVFReader struct {
 	stream               io.Reader
 	bytesReadSuccesfully int64
@@ -58,14 +58,14 @@ type IVFReader struct {
 }
 
 // NewWith returns a new IVF reader and IVF file header
-// with an io.Reader input
-func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
-	if in == nil {
+// with an io.Reader input.
+func NewWith(stream io.Reader) (*IVFReader, *IVFFileHeader, error) {
+	if stream == nil {
 		return nil, nil, errNilStream
 	}
 
 	reader := &IVFReader{
-		stream: in,
+		stream: stream,
 	}
 
 	header, err := reader.parseFileHeader()
@@ -122,11 +122,12 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 	}
 
 	i.bytesReadSuccesfully += int64(headerBytesRead) + int64(bytesRead)
+
 	return payload, header, nil
 }
 
 // parseFileHeader reads 32 bytes from stream and returns
-// IVF file header. This is always called before ParseNextFrame()
+// IVF file header. This is always called before ParseNextFrame().
 func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
 	buffer := make([]byte, ivfFileHeaderSize)
 
@@ -157,5 +158,6 @@ func (i *IVFReader) parseFileHeader() (*IVFFileHeader, error) {
 	}
 
 	i.bytesReadSuccesfully += int64(bytesRead)
+
 	return header, nil
 }

@@ -39,8 +39,7 @@ const (
 	ivfHeaderSize = 32
 )
 
-// nolint: gocognit
-func main() {
+func main() { //nolint:gocognit,cyclop,maintidx
 	qualityLevels := []struct {
 		fileName string
 		bitrate  int
@@ -58,9 +57,9 @@ func main() {
 		}
 	}
 
-	i := &interceptor.Registry{}
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	interceptorRegistry := &interceptor.Registry{}
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -81,17 +80,19 @@ func main() {
 		estimatorChan <- estimator
 	})
 
-	i.Add(congestionController)
-	if err = webrtc.ConfigureTWCCHeaderExtensionSender(m, i); err != nil {
+	interceptorRegistry.Add(congestionController)
+	if err = webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
-	if err = webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithInterceptorRegistry(i), webrtc.WithMediaEngine(m)).NewPeerConnection(webrtc.Configuration{
+	peerConnection, err := webrtc.NewAPI(
+		webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine),
+	).NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
@@ -111,7 +112,9 @@ func main() {
 	estimator := <-estimatorChan
 
 	// Create a video track
-	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion",
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -141,8 +144,8 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
 	})
 
 	// Wait for the offer to be pasted
@@ -193,14 +196,21 @@ func main() {
 	// It is important to use a time.Ticker instead of time.Sleep because
 	// * avoids accumulating skew, just calling time.Sleep didn't compensate for the time spent parsing the data
 	// * works around latency issues with Sleep (see https://github.com/golang/go/issues/44343)
-	ticker := time.NewTicker(time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000))
+	ticker := time.NewTicker(
+		time.Millisecond * time.Duration((float32(header.TimebaseNumerator)/float32(header.TimebaseDenominator))*1000),
+	)
 	defer ticker.Stop()
 	frame := []byte{}
 	frameHeader := &ivfreader.IVFFrameHeader{}
 	currentTimestamp := uint64(0)
 
 	switchQualityLevel := func(newQualityLevel int) {
-		fmt.Printf("Switching from %s to %s \n", qualityLevels[currentQuality].fileName, qualityLevels[newQualityLevel].fileName)
+		fmt.Printf(
+			"Switching from %s to %s \n",
+			qualityLevels[currentQuality].fileName,
+			qualityLevels[newQualityLevel].fileName,
+		)
+
 		currentQuality = newQualityLevel
 		ivf.ResetReader(setReaderFile(qualityLevels[currentQuality].fileName))
 		for {
@@ -255,11 +265,12 @@ func setReaderFile(filename string) func(_ int64) io.Reader {
 		if _, err = file.Seek(ivfHeaderSize, io.SeekStart); err != nil {
 			panic(err)
 		}
+
 		return file
 	}
 }
 
-// Read from stdin until we get a newline
+// Read from stdin until we get a newline.
 func readUntilNewline() (in string) {
 	var err error
 
@@ -276,10 +287,11 @@ func readUntilNewline() (in string) {
 	}
 
 	fmt.Println("")
+
 	return
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj *webrtc.SessionDescription) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -289,7 +301,7 @@ func encode(obj *webrtc.SessionDescription) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *webrtc.SessionDescription) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {

@@ -37,6 +37,7 @@ func TestDTLSRoleFromRemoteSDP(t *testing.T) {
 		if err := parsed.Unmarshal([]byte(raw)); err != nil {
 			panic(err)
 		}
+
 		return parsed
 	}
 

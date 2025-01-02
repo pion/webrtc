@@ -14,7 +14,7 @@ import (
 type BundlePolicy int
 
 const (
-	// BundlePolicyUnknown is the enum's zero-value
+	// BundlePolicyUnknown is the enum's zero-value.
 	BundlePolicyUnknown BundlePolicy = iota
 
 	// BundlePolicyBalanced indicates to gather ICE candidates for each
@@ -67,7 +67,7 @@ func (t BundlePolicy) String() string {
 	}
 }
 
-// UnmarshalJSON parses the JSON-encoded data and stores the result
+// UnmarshalJSON parses the JSON-encoded data and stores the result.
 func (t *BundlePolicy) UnmarshalJSON(b []byte) error {
 	var val string
 	if err := json.Unmarshal(b, &val); err != nil {
@@ -75,10 +75,11 @@ func (t *BundlePolicy) UnmarshalJSON(b []byte) error {
 	}
 
 	*t = newBundlePolicy(val)
+
 	return nil
 }
 
-// MarshalJSON returns the JSON encoding
+// MarshalJSON returns the JSON encoding.
 func (t BundlePolicy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }

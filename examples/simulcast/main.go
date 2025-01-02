@@ -22,7 +22,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-// nolint:gocognit
+// nolint:gocognit, cyclop
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
@@ -49,36 +49,52 @@ func main() {
 	outputTracks := map[string]*webrtc.TrackLocalStaticRTP{}
 
 	// Create Track that we send video back to browser on
-	outputTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video_q", "pion_q")
+	outputTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{
+		MimeType: webrtc.MimeTypeVP8,
+	}, "video_q", "pion_q")
 	if err != nil {
 		panic(err)
 	}
 	outputTracks["q"] = outputTrack
 
-	outputTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video_h", "pion_h")
+	outputTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{
+		MimeType: webrtc.MimeTypeVP8,
+	}, "video_h", "pion_h")
 	if err != nil {
 		panic(err)
 	}
 	outputTracks["h"] = outputTrack
 
-	outputTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video_f", "pion_f")
+	outputTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{
+		MimeType: webrtc.MimeTypeVP8,
+	}, "video_f", "pion_f")
 	if err != nil {
 		panic(err)
 	}
 	outputTracks["f"] = outputTrack
 
-	if _, err = peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly}); err != nil {
+	if _, err = peerConnection.AddTransceiverFromKind(
+		webrtc.RTPCodecTypeVideo,
+		webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly},
+	); err != nil {
 		panic(err)
 	}
 
 	// Add this newly created track to the PeerConnection to send back video
-	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["q"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
+	if _, err = peerConnection.AddTransceiverFromTrack(
+		outputTracks["q"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
 		panic(err)
 	}
-	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["h"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
+	if _, err = peerConnection.AddTransceiverFromTrack(
+		outputTracks["h"],
+		webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly},
+	); err != nil {
 		panic(err)
 	}
-	if _, err = peerConnection.AddTransceiverFromTrack(outputTracks["f"], webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}); err != nil {
+	if _, err = peerConnection.AddTransceiverFromTrack(
+		outputTracks["f"],
+		webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly},
+	); err != nil {
 		panic(err)
 	}
 
@@ -117,7 +133,9 @@ func main() {
 				defer ticker.Stop()
 				for range ticker.C {
 					fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
-					if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); writeErr != nil {
+					if writeErr := peerConnection.WriteRTCP(
+						[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
+					); writeErr != nil {
 						fmt.Println(writeErr)
 					}
 				}
@@ -138,18 +156,19 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
 
-		if s == webrtc.PeerConnectionStateFailed {
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+		if state == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure.
+			// It may be reconnected using an ICE Restart.
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
 			os.Exit(0)
 		}
 
-		if s == webrtc.PeerConnectionStateClosed {
+		if state == webrtc.PeerConnectionStateClosed {
 			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
 			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
@@ -183,7 +202,7 @@ func main() {
 	select {}
 }
 
-// Read from stdin until we get a newline
+// Read from stdin until we get a newline.
 func readUntilNewline() (in string) {
 	var err error
 
@@ -200,10 +219,11 @@ func readUntilNewline() (in string) {
 	}
 
 	fmt.Println("")
+
 	return
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj *webrtc.SessionDescription) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -213,7 +233,7 @@ func encode(obj *webrtc.SessionDescription) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *webrtc.SessionDescription) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {

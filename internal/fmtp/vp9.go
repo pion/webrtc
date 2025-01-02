@@ -37,5 +37,6 @@ func (h *vp9FMTP) Match(b FMTP) bool {
 
 func (h *vp9FMTP) Parameter(key string) (string, bool) {
 	v, ok := h.parameters[key]
+
 	return v, ok
 }

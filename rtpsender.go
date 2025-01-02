@@ -32,7 +32,7 @@ type trackEncoding struct {
 	ssrc, ssrcRTX, ssrcFEC SSRC
 }
 
-// RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer
+// RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer.
 type RTPSender struct {
 	trackEncodings []*trackEncoding
 
@@ -57,7 +57,7 @@ type RTPSender struct {
 	sendCalled, stopCalled chan struct{}
 }
 
-// NewRTPSender constructs a new RTPSender
+// NewRTPSender constructs a new RTPSender.
 func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSender, error) {
 	if track == nil {
 		return nil, errRTPSenderTrackNil
@@ -87,6 +87,7 @@ func (api *API) NewRTPSender(track TrackLocal, transport *DTLSTransport) (*RTPSe
 func (r *RTPSender) isNegotiated() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	return r.negotiated
 }
 
@@ -103,10 +104,11 @@ func (r *RTPSender) setRTPTransceiver(rtpTransceiver *RTPTransceiver) {
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
-// if one has not yet been configured
+// if one has not yet been configured.
 func (r *RTPSender) Transport() *DTLSTransport {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	return r.transport
 }
 
@@ -144,11 +146,12 @@ func (r *RTPSender) GetParameters() RTPSendParameters {
 	} else {
 		sendParameters.Codecs = r.api.mediaEngine.getCodecsByKind(r.kind)
 	}
+
 	return sendParameters
 }
 
 // AddEncoding adds an encoding to RTPSender. Used by simulcast senders.
-func (r *RTPSender) AddEncoding(track TrackLocal) error {
+func (r *RTPSender) AddEncoding(track TrackLocal) error { //nolint:cyclop
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -191,6 +194,7 @@ func (r *RTPSender) AddEncoding(track TrackLocal) error {
 	}
 
 	r.addEncoding(track)
+
 	return nil
 }
 
@@ -211,7 +215,7 @@ func (r *RTPSender) addEncoding(track TrackLocal) {
 	r.trackEncodings = append(r.trackEncodings, trackEncoding)
 }
 
-// Track returns the RTCRtpTransceiver track, or nil
+// Track returns the RTCRtpTransceiver track, or nil.
 func (r *RTPSender) Track() TrackLocal {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -226,7 +230,7 @@ func (r *RTPSender) Track() TrackLocal {
 // ReplaceTrack replaces the track currently being used as the sender's source with a new TrackLocal.
 // The new track must be of the same media kind (audio, video, etc) and switching the track should not
 // require negotiation.
-func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
+func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -260,10 +264,15 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error {
 		return nil
 	}
 
+	params := r.api.mediaEngine.getRTPParametersByKind(
+		track.Kind(),
+		[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+	)
+
 	// If we reach this point in the routine, there is only 1 track encoding
 	codec, err := track.Bind(&baseTrackLocalContext{
 		id:              context.ID(),
-		params:          r.api.mediaEngine.getRTPParametersByKind(track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly}),
+		params:          params,
 		ssrc:            context.SSRC(),
 		ssrcRTX:         context.SSRCRetransmission(),
 		ssrcFEC:         context.SSRCForwardErrorCorrection(),
@@ -305,17 +314,23 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding := r.trackEncodings[idx]
 		srtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].SSRC, rtpSender: r}
 		writeStream := &interceptorToTrackLocalWriter{}
-		rtpParameters := r.api.mediaEngine.getRTPParametersByKind(trackEncoding.track.Kind(), []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
+		rtpParameters := r.api.mediaEngine.getRTPParametersByKind(
+			trackEncoding.track.Kind(),
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+		)
 
 		trackEncoding.srtpStream = srtpStream
 		trackEncoding.ssrc = parameters.Encodings[idx].SSRC
 		trackEncoding.ssrcRTX = parameters.Encodings[idx].RTX.SSRC
 		trackEncoding.ssrcFEC = parameters.Encodings[idx].FEC.SSRC
 		trackEncoding.rtcpInterceptor = r.api.interceptor.BindRTCPReader(
-			interceptor.RTCPReaderFunc(func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-				n, err = trackEncoding.srtpStream.Read(in)
-				return n, a, err
-			}),
+			interceptor.RTCPReaderFunc(
+				func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+					n, err = trackEncoding.srtpStream.Read(in)
+
+					return n, a, err
+				},
+			),
 		)
 		trackEncoding.context = &baseTrackLocalContext{
 			id:              r.id,
@@ -356,15 +371,17 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 	}
 
 	close(r.sendCalled)
+
 	return nil
 }
 
-// Stop irreversibly stops the RTPSender
+// Stop irreversibly stops the RTPSender.
 func (r *RTPSender) Stop() error {
 	r.mu.Lock()
 
 	if stopped := r.hasStopped(); stopped {
 		r.mu.Unlock()
+
 		return nil
 	}
 
@@ -390,7 +407,7 @@ func (r *RTPSender) Stop() error {
 	return util.FlattenErrs(errs)
 }
 
-// Read reads incoming RTCP for this RTPSender
+// Read reads incoming RTCP for this RTPSender.
 func (r *RTPSender) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.sendCalled:
@@ -416,7 +433,7 @@ func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
 	return pkts, attributes, nil
 }
 
-// ReadSimulcast reads incoming RTCP for this RTPSender for given rid
+// ReadSimulcast reads incoming RTCP for this RTPSender for given rid.
 func (r *RTPSender) ReadSimulcast(b []byte, rid string) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.sendCalled:
@@ -425,13 +442,14 @@ func (r *RTPSender) ReadSimulcast(b []byte, rid string) (n int, a interceptor.At
 				return t.rtcpInterceptor.Read(b, a)
 			}
 		}
+
 		return 0, nil, fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
 	case <-r.stopCalled:
 		return 0, nil, io.ErrClosedPipe
 	}
 }
 
-// ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you
+// ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you.
 func (r *RTPSender) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, r.api.settingEngine.getReceiveMTU())
 	i, attributes, err := r.ReadSimulcast(b, rid)
@@ -440,6 +458,7 @@ func (r *RTPSender) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.At
 	}
 
 	pkts, err := rtcp.Unmarshal(b[:i])
+
 	return pkts, attributes, err
 }
 
@@ -449,7 +468,8 @@ func (r *RTPSender) SetReadDeadline(t time.Time) error {
 	return r.trackEncodings[0].srtpStream.SetReadDeadline(t)
 }
 
-// SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid will block before returning. 0 is forever.
+// SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid
+// will block before returning. 0 is forever.
 func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -459,10 +479,11 @@ func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) err
 			return t.srtpStream.SetReadDeadline(deadline)
 		}
 	}
+
 	return fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
 }
 
-// hasSent tells if data has been ever sent for this instance
+// hasSent tells if data has been ever sent for this instance.
 func (r *RTPSender) hasSent() bool {
 	select {
 	case <-r.sendCalled:
@@ -472,7 +493,7 @@ func (r *RTPSender) hasSent() bool {
 	}
 }
 
-// hasStopped tells if stop has been called
+// hasStopped tells if stop has been called.
 func (r *RTPSender) hasStopped() bool {
 	select {
 	case <-r.stopCalled:
@@ -483,7 +504,7 @@ func (r *RTPSender) hasStopped() bool {
 }
 
 // Set a SSRC for FEC and RTX if MediaEngine has them enabled
-// If the remote doesn't support FEC or RTX we disable locally
+// If the remote doesn't support FEC or RTX we disable locally.
 func (r *RTPSender) configureRTXAndFEC() {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

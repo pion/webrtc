@@ -99,6 +99,7 @@ func TestICEServer_validate(t *testing.T) {
 		}
 	})
 	t.Run("JsonFailure", func(t *testing.T) {
+		//nolint:lll
 		testCases := [][]byte{
 			[]byte(`{"urls":"NOTAURL","username":"unittest","credential":"placeholder","credentialType":"password"}`),
 			[]byte(`{"urls":["turn:[2001:db8:1234:5678::1]?transport=udp"],"username":"unittest","credential":"placeholder","credentialType":"invalid"}`),

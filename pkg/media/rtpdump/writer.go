@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Writer writes the RTPDump file format
+// Writer writes the RTPDump file format.
 type Writer struct {
 	writerMu sync.Mutex
 	writer   io.Writer
@@ -37,7 +37,7 @@ func NewWriter(w io.Writer, hdr Header) (*Writer, error) {
 	return &Writer{writer: w}, nil
 }
 
-// WritePacket writes a Packet to the output
+// WritePacket writes a Packet to the output.
 func (w *Writer) WritePacket(p Packet) error {
 	w.writerMu.Lock()
 	defer w.writerMu.Unlock()

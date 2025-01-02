@@ -37,5 +37,6 @@ func (h *av1FMTP) Match(b FMTP) bool {
 
 func (h *av1FMTP) Parameter(key string) (string, bool) {
 	v, ok := h.parameters[key]
+
 	return v, ok
 }

@@ -27,5 +27,6 @@ func (b *atomicBool) swap(value bool) bool {
 	if value {
 		i = 1
 	}
+
 	return atomic.SwapInt32(&(b.val), i) != 0
 }

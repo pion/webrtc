@@ -22,7 +22,7 @@ import (
 // behavior per subsystem (ICE, DTLS, SCTP...)
 type customLogger struct{}
 
-// Print all messages except trace
+// Print all messages except trace.
 func (c customLogger) Trace(string)                  {}
 func (c customLogger) Tracef(string, ...interface{}) {}
 
@@ -45,14 +45,16 @@ func (c customLogger) Errorf(format string, args ...interface{}) {
 
 // customLoggerFactory satisfies the interface logging.LoggerFactory
 // This allows us to create different loggers per subsystem. So we can
-// add custom behavior
+// add custom behavior.
 type customLoggerFactory struct{}
 
 func (c customLoggerFactory) NewLogger(subsystem string) logging.LeveledLogger {
 	fmt.Printf("Creating logger for %s \n", subsystem)
+
 	return customLogger{}
 }
 
+// nolint: cyclop
 func main() {
 	// Create a new API with a custom logger
 	// This SettingEngine allows non-standard WebRTC behavior
@@ -90,18 +92,19 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	offerPeerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s (offerer)\n", s.String())
+	offerPeerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s (offerer)\n", state.String())
 
-		if s == webrtc.PeerConnectionStateFailed {
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+		if state == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure.
+			// It may be reconnected using an ICE Restart.
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
 			os.Exit(0)
 		}
 
-		if s == webrtc.PeerConnectionStateClosed {
+		if state == webrtc.PeerConnectionStateClosed {
 			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
 			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
@@ -110,11 +113,12 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	answerPeerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s (answerer)\n", s.String())
+	answerPeerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s (answerer)\n", state.String())
 
-		if s == webrtc.PeerConnectionStateFailed {
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+		if state == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure.
+			// It may be reconnected using an ICE Restart.
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
@@ -124,9 +128,9 @@ func main() {
 
 	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
 	// send it to the other peer
-	answerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
-		if i != nil {
-			if iceErr := offerPeerConnection.AddICECandidate(i.ToJSON()); iceErr != nil {
+	answerPeerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate != nil {
+			if iceErr := offerPeerConnection.AddICECandidate(candidate.ToJSON()); iceErr != nil {
 				panic(iceErr)
 			}
 		}
@@ -134,9 +138,9 @@ func main() {
 
 	// Set ICE Candidate handler. As soon as a PeerConnection has gathered a candidate
 	// send it to the other peer
-	offerPeerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
-		if i != nil {
-			if iceErr := answerPeerConnection.AddICECandidate(i.ToJSON()); iceErr != nil {
+	offerPeerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate != nil {
+			if iceErr := answerPeerConnection.AddICECandidate(candidate.ToJSON()); iceErr != nil {
 				panic(iceErr)
 			}
 		}

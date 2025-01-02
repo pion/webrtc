@@ -19,9 +19,13 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-func signalCandidate(addr string, c *webrtc.ICECandidate) error {
-	payload := []byte(c.ToJSON().Candidate)
-	resp, err := http.Post(fmt.Sprintf("http://%s/candidate", addr), "application/json; charset=utf-8", bytes.NewReader(payload)) //nolint:noctx
+func signalCandidate(addr string, candidate *webrtc.ICECandidate) error {
+	payload := []byte(candidate.ToJSON().Candidate)
+	resp, err := http.Post( //nolint:noctx
+		fmt.Sprintf("http://%s/candidate", addr),
+		"application/json; charset=utf-8",
+		bytes.NewReader(payload),
+	)
 	if err != nil {
 		return err
 	}
@@ -29,7 +33,8 @@ func signalCandidate(addr string, c *webrtc.ICECandidate) error {
 	return resp.Body.Close()
 }
 
-func main() { //nolint:gocognit
+//nolint:gocognit, cyclop
+func main() {
 	offerAddr := flag.String("offer-address", ":50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", "127.0.0.1:60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
@@ -61,8 +66,8 @@ func main() { //nolint:gocognit
 
 	// When an ICE candidate is available send to the other Pion instance
 	// the other Pion instance will add this candidate by calling AddICECandidate
-	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
+	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			return
 		}
 
@@ -71,8 +76,8 @@ func main() { //nolint:gocognit
 
 		desc := peerConnection.RemoteDescription()
 		if desc == nil {
-			pendingCandidates = append(pendingCandidates, c)
-		} else if onICECandidateErr := signalCandidate(*answerAddr, c); onICECandidateErr != nil {
+			pendingCandidates = append(pendingCandidates, candidate)
+		} else if onICECandidateErr := signalCandidate(*answerAddr, candidate); onICECandidateErr != nil {
 			panic(onICECandidateErr)
 		}
 	})
@@ -80,20 +85,22 @@ func main() { //nolint:gocognit
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
 	// This allows us to add ICE candidates faster, we don't have to wait for STUN or TURN
 	// candidates which may be slower
-	http.HandleFunc("/candidate", func(w http.ResponseWriter, r *http.Request) { //nolint: revive
-		candidate, candidateErr := io.ReadAll(r.Body)
+	http.HandleFunc("/candidate", func(res http.ResponseWriter, req *http.Request) { //nolint: revive
+		candidate, candidateErr := io.ReadAll(req.Body)
 		if candidateErr != nil {
 			panic(candidateErr)
 		}
-		if candidateErr := peerConnection.AddICECandidate(webrtc.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
+		if candidateErr := peerConnection.AddICECandidate(
+			webrtc.ICECandidateInit{Candidate: string(candidate)},
+		); candidateErr != nil {
 			panic(candidateErr)
 		}
 	})
 
 	// A HTTP handler that processes a SessionDescription given to us from the other Pion process
-	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) { //nolint: revive
+	http.HandleFunc("/sdp", func(res http.ResponseWriter, req *http.Request) { //nolint: revive
 		sdp := webrtc.SessionDescription{}
-		if sdpErr := json.NewDecoder(r.Body).Decode(&sdp); sdpErr != nil {
+		if sdpErr := json.NewDecoder(req.Body).Decode(&sdp); sdpErr != nil {
 			panic(sdpErr)
 		}
 
@@ -122,18 +129,19 @@ func main() { //nolint:gocognit
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
 
-		if s == webrtc.PeerConnectionStateFailed {
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+		if state == webrtc.PeerConnectionStateFailed {
+			// Wait until PeerConnection has had no network activity for 30 seconds or another failure.
+			// It may be reconnected using an ICE Restart.
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
 			fmt.Println("Peer Connection has gone to failed exiting")
 			os.Exit(0)
 		}
 
-		if s == webrtc.PeerConnectionStateClosed {
+		if state == webrtc.PeerConnectionStateClosed {
 			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
 			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
@@ -142,12 +150,17 @@ func main() { //nolint:gocognit
 
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
-		fmt.Printf("Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n", dataChannel.Label(), dataChannel.ID())
+		fmt.Printf(
+			"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n",
+			dataChannel.Label(), dataChannel.ID(),
+		)
 
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			message, sendTextErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+			message, sendTextErr := randutil.GenerateCryptoRandomString(
+				15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+			)
 			if sendTextErr != nil {
 				panic(sendTextErr)
 			}
@@ -182,7 +195,11 @@ func main() { //nolint:gocognit
 	if err != nil {
 		panic(err)
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s/sdp", *answerAddr), "application/json; charset=utf-8", bytes.NewReader(payload)) // nolint:noctx
+	resp, err := http.Post( //nolint:noctx
+		fmt.Sprintf("http://%s/sdp", *answerAddr),
+		"application/json; charset=utf-8",
+		bytes.NewReader(payload),
+	)
 	if err != nil {
 		panic(err)
 	} else if err := resp.Body.Close(); err != nil {

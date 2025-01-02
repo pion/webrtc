@@ -49,5 +49,6 @@ func (l sampleSequenceLocation) compare(pos uint16) int {
 	if l.head-pos <= pos-l.tail {
 		return slCompareBefore
 	}
+
 	return slCompareAfter
 }

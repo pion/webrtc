@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// buildIVFContainer takes frames and prepends valid IVF file header
+// buildIVFContainer takes frames and prepends valid IVF file header.
 func buildIVFContainer(frames ...*[]byte) *bytes.Buffer {
 	// Valid IVF file header taken from: https://github.com/webmproject/...
 	// vp8-test-vectors/blob/master/vp80-00-comprehensive-001.ivf

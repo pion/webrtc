@@ -81,6 +81,7 @@ func getMdNames(sdp *sdp.SessionDescription) []string {
 	for _, media := range sdp.MediaDescriptions {
 		mdNames = append(mdNames, media.MediaName.Media)
 	}
+
 	return mdNames
 }
 
@@ -96,6 +97,7 @@ func extractSsrcList(md *sdp.MediaDescription) []string {
 	for ssrc := range ssrcMap {
 		ssrcList = append(ssrcList, ssrc)
 	}
+
 	return ssrcList
 }
 
@@ -194,13 +196,19 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{
+		MimeType:    MimeTypeH264,
+		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+	}, "1", "1")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video1)
 	assert.NoError(t, err)
 
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{
+		MimeType:    MimeTypeH264,
+		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+	}, "2", "2")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video2)
@@ -269,13 +277,19 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{
+		MimeType:    MimeTypeH264,
+		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+	}, "1", "1")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video1)
 	assert.NoError(t, err)
 
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{
+		MimeType:    MimeTypeH264,
+		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+	}, "2", "2")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video2)
@@ -312,9 +326,10 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 		for ssrc := range ssrcMap {
 			ssrcList = append(ssrcList, ssrc)
 		}
+
 		return ssrcList
 	}
-	// Verify that each section has 2 SSRCs (one for each sender)
+	// Verify that each section has 2 SSRCs (one for each sender).
 	for _, section := range []string{"video", "audio"} {
 		for _, media := range answer.parsed.MediaDescriptions {
 			if media.MediaName.Media == section {
@@ -326,9 +341,11 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	closePairNow(t, apc, opc)
 }
 
-// Assert that we can catch Remote SessionDescription that don't match our Semantics
+// Assert that we can catch Remote SessionDescription that don't match our Semantics.
 func TestSDPSemantics_SetRemoteDescription_Mismatch(t *testing.T) {
+	//nolint:lll
 	planBOffer := "v=0\r\no=- 4648475892259889561 3 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE video audio\r\na=ice-ufrag:1hhfzwf0ijpzm\r\na=ice-pwd:jm5puo2ab1op3vs59ca53bdk7s\r\na=fingerprint:sha-256 40:42:FB:47:87:52:BF:CB:EC:3A:DF:EB:06:DA:2D:B7:2F:59:42:10:23:7B:9D:4C:C9:58:DD:FF:A2:8F:17:67\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:video\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 goog-remb\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f\r\na=ssrc:1505338584 cname:10000000b5810aac\r\na=ssrc:1 cname:trackB\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:audio\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=ssrc:697641945 cname:10000000b5810aac\r\n"
+	//nolint:lll
 	unifiedPlanOffer := "v=0\r\no=- 4648475892259889561 3 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0 1\r\na=ice-ufrag:1hhfzwf0ijpzm\r\na=ice-pwd:jm5puo2ab1op3vs59ca53bdk7s\r\na=fingerprint:sha-256 40:42:FB:47:87:52:BF:CB:EC:3A:DF:EB:06:DA:2D:B7:2F:59:42:10:23:7B:9D:4C:C9:58:DD:FF:A2:8F:17:67\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:0\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:96 H264/90000\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 goog-remb\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f\r\na=ssrc:1505338584 cname:10000000b5810aac\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=setup:passive\r\na=mid:1\r\na=sendonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=ssrc:697641945 cname:10000000b5810aac\r\n"
 
 	report := test.CheckRoutines(t)

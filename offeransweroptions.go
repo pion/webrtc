@@ -18,7 +18,7 @@ type AnswerOptions struct {
 }
 
 // OfferOptions structure describes the options used to control the offer
-// creation process
+// creation process.
 type OfferOptions struct {
 	OfferAnswerOptions
 

@@ -12,7 +12,7 @@ import (
 type SDPType int
 
 const (
-	// SDPTypeUnknown is the enum's zero-value
+	// SDPTypeUnknown is the enum's zero-value.
 	SDPTypeUnknown SDPType = iota
 
 	// SDPTypeOffer indicates that a description MUST be treated as an SDP offer.
@@ -46,7 +46,7 @@ const (
 	sdpTypeRollbackStr = "rollback"
 )
 
-// NewSDPType creates an SDPType from a string
+// NewSDPType creates an SDPType from a string.
 func NewSDPType(raw string) SDPType {
 	switch raw {
 	case sdpTypeOfferStr:
@@ -77,12 +77,12 @@ func (t SDPType) String() string {
 	}
 }
 
-// MarshalJSON enables JSON marshaling of a SDPType
+// MarshalJSON enables JSON marshaling of a SDPType.
 func (t SDPType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }
 
-// UnmarshalJSON enables JSON unmarshaling of a SDPType
+// UnmarshalJSON enables JSON unmarshaling of a SDPType.
 func (t *SDPType) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {

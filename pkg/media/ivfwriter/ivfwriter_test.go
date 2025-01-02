@@ -215,15 +215,18 @@ func TestIVFWriter_VP8(t *testing.T) {
 	// Third test tries to write a valid VP8 packet - No Keyframe
 	assert.False(addPacketTestCase[0].writer.seenKeyFrame, "Writer's seenKeyFrame should remain false")
 	assert.Equal(uint64(0), addPacketTestCase[0].writer.count, "Writer's packet count should remain 0")
-	assert.Equal(nil, addPacketTestCase[0].writer.WriteRTP(midPartPacket), "Write packet failed") // add a mid partition packet
+	// add a mid partition packet
+	assert.Equal(nil, addPacketTestCase[0].writer.WriteRTP(midPartPacket), "Write packet failed")
 	assert.Equal(uint64(0), addPacketTestCase[0].writer.count, "Writer's packet count should remain 0")
 
 	// Fifth test tries to write a keyframe packet
 	assert.True(addPacketTestCase[1].writer.seenKeyFrame, "Writer's seenKeyFrame should now be true")
 	assert.Equal(uint64(1), addPacketTestCase[1].writer.count, "Writer's packet count should now be 1")
-	assert.Equal(nil, addPacketTestCase[1].writer.WriteRTP(midPartPacket), "Write packet failed") // add a mid partition packet
+	// add a mid partition packet
+	assert.Equal(nil, addPacketTestCase[1].writer.WriteRTP(midPartPacket), "Write packet failed")
 	assert.Equal(uint64(1), addPacketTestCase[1].writer.count, "Writer's packet count should remain 1")
-	assert.Equal(nil, addPacketTestCase[1].writer.WriteRTP(validPacket), "Write packet failed") // add a valid packet
+	// add a valid packet
+	assert.Equal(nil, addPacketTestCase[1].writer.WriteRTP(validPacket), "Write packet failed")
 	assert.Equal(uint64(2), addPacketTestCase[1].writer.count, "Writer's packet count should now be 2")
 
 	for _, t := range addPacketTestCase {

@@ -11,7 +11,7 @@ import (
 type ICEGathererState uint32
 
 const (
-	// ICEGathererStateUnknown is the enum's zero-value
+	// ICEGathererStateUnknown is the enum's zero-value.
 	ICEGathererStateUnknown ICEGathererState = iota
 
 	// ICEGathererStateNew indicates object has been created but

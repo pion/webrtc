@@ -340,7 +340,7 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 }
 
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
-// We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost
+// We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost.
 func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
@@ -477,7 +477,12 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 		{
 			"No local Transceivers, every remote should get nil",
 			[]RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeAudio, RTPCodecTypeVideo, RTPCodecTypeVideo},
-			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendonly, RTPTransceiverDirectionInactive},
+			[]RTPTransceiverDirection{
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionRecvonly,
+				RTPTransceiverDirectionSendonly,
+				RTPTransceiverDirectionInactive,
+			},
 
 			[]*RTPTransceiver{},
 
@@ -658,15 +663,19 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	assert.NoError(t, peerConn.Close())
 }
 
-// Assert Trickle ICE behaviors
-func TestPeerConnectionTrickle(t *testing.T) {
+// Assert Trickle ICE behaviors.
+func TestPeerConnectionTrickle(t *testing.T) { //nolint:cyclop
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
 	_, err = offerPC.CreateDataChannel("test-channel", nil)
 	assert.NoError(t, err)
 
-	addOrCacheCandidate := func(pc *PeerConnection, c *ICECandidate, candidateCache []ICECandidateInit) []ICECandidateInit {
+	addOrCacheCandidate := func(
+		pc *PeerConnection,
+		c *ICECandidate,
+		candidateCache []ICECandidateInit,
+	) []ICECandidateInit {
 		if c == nil {
 			return candidateCache
 		}
@@ -676,6 +685,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 		}
 
 		assert.NoError(t, pc.AddICECandidate(c.ToJSON()))
+
 		return candidateCache
 	}
 
@@ -752,7 +762,7 @@ func TestPeerConnectionTrickle(t *testing.T) {
 	closePairNow(t, offerPC, answerPC)
 }
 
-// Issue #1121, assert populateLocalCandidates doesn't mutate
+// Issue #1121, assert populateLocalCandidates doesn't mutate.
 func TestPopulateLocalCandidates(t *testing.T) {
 	t.Run("PendingLocalDescription shouldn't add extra mutations", func(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
@@ -792,7 +802,7 @@ func TestPopulateLocalCandidates(t *testing.T) {
 	})
 }
 
-// Assert that two agents that only generate mDNS candidates can connect
+// Assert that two agents that only generate mDNS candidates can connect.
 func TestMulticastDNSCandidates(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -896,7 +906,7 @@ func TestICERestart(t *testing.T) {
 	closePairNow(t, offerPC, answerPC)
 }
 
-// Assert error handling when an Agent is restart
+// Assert error handling when an Agent is restart.
 func TestICERestart_Error_Handling(t *testing.T) {
 	iceStates := make(chan ICEConnectionState, 100)
 	blockUntilICEState := func(wantedState ICEConnectionState) {
@@ -957,9 +967,9 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	})
 
 	dataChannelAnswerer := make(chan *DataChannel)
-	offerPeerConnection.OnDataChannel(func(d *DataChannel) {
-		d.OnOpen(func() {
-			dataChannelAnswerer <- d
+	offerPeerConnection.OnDataChannel(func(dataChannel *DataChannel) {
+		dataChannel.OnOpen(func() {
+			dataChannelAnswerer <- dataChannel
 		})
 	})
 
@@ -1010,6 +1020,7 @@ func (r *trackRecords) newTrack() (*TrackLocalStaticRTP, error) {
 	trackID := fmt.Sprintf("pion-track-%d", len(r.trackIDs))
 	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, trackID, "pion")
 	r.trackIDs[trackID] = struct{}{}
+
 	return track, err
 }
 
@@ -1024,12 +1035,14 @@ func (r *trackRecords) handleTrack(t *TrackRemote, _ *RTPReceiver) {
 
 func (r *trackRecords) remains() int {
 	r.mu.Lock()
+
 	defer r.mu.Unlock()
+
 	return len(r.trackIDs) - len(r.receivedTrackIDs)
 }
 
 // This test assure that all track events emits.
-func TestPeerConnection_MassiveTracks(t *testing.T) {
+func TestPeerConnection_MassiveTracks(t *testing.T) { //nolint:cyclop
 	var (
 		tRecs = &trackRecords{
 			trackIDs:         make(map[string]struct{}),
@@ -1166,7 +1179,7 @@ a=mid:data
 `
 
 // this test asserts that if an ice-lite offer is received,
-// pion will take the ICE-CONTROLLING role
+// pion will take the ICE-CONTROLLING role.
 func TestICELite(t *testing.T) {
 	peerConnection, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -1206,6 +1219,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			_, err = pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
 				{Direction: dir},
 			}...)
+
 			return err
 		}
 
@@ -1213,6 +1227,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			RTPCodecTypeVideo,
 			RTPTransceiverInit{Direction: dir},
 		)
+
 		return err
 	}
 
@@ -1424,17 +1439,19 @@ a=sendonly
 a=rtpmap:125 H264/90000
 a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
 `
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
-			PayloadType:        98,
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
+			},
+			PayloadType: 98,
 		}, RTPCodecTypeVideo))
 
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
@@ -1483,17 +1500,19 @@ a=rtpmap:98 H264/90000
 a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
 a=sendonly
 `
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
-			PayloadType:        98,
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
+			},
+			PayloadType: 98,
 		}, RTPCodecTypeVideo))
 
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
@@ -1567,7 +1586,10 @@ a=ssrc:1455629982 cname:{61fd3093-0326-4b12-8258-86bdc1fe677a}
 	assert.NoError(t, err)
 
 	assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSDP}))
-	assert.Equal(t, RTPTransceiverDirectionInactive, peerConnection.rtpTransceivers[0].direction.Load().(RTPTransceiverDirection)) //nolint:forcetypeassert
+	assert.Equal(
+		t, RTPTransceiverDirectionInactive,
+		peerConnection.rtpTransceivers[0].direction.Load().(RTPTransceiverDirection), //nolint:forcetypeassert
+	)
 
 	assert.NoError(t, peerConnection.Close())
 }
@@ -1643,7 +1665,7 @@ func TestPeerConnectionDeadlock(t *testing.T) {
 }
 
 // Assert that by default NULL Ciphers aren't enabled. Even if
-// the remote Peer Requests a NULL Cipher we should fail
+// the remote Peer Requests a NULL Cipher we should fail.
 func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 	settingEngine := SettingEngine{}
 	settingEngine.SetSRTPProtectionProfiles(dtls.SRTP_NULL_HMAC_SHA1_80, dtls.SRTP_NULL_HMAC_SHA1_32)
@@ -1724,12 +1746,16 @@ a=ssrc:29586368 cname:janus
 	mediaEngine := &MediaEngine{}
 
 	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        96,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
+		},
+		PayloadType: 96,
 	}, RTPCodecTypeVideo))
 	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        111,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
+		},
+		PayloadType: 111,
 	}, RTPCodecTypeAudio))
 
 	api := NewAPI(WithMediaEngine(mediaEngine))
@@ -1776,12 +1802,16 @@ func TestTranceiverMediaStreamIdentification(t *testing.T) {
 	mediaEngine := &MediaEngine{}
 
 	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        96,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
+		},
+		PayloadType: 96,
 	}, RTPCodecTypeVideo))
 	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        111,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
+		},
+		PayloadType: 111,
 	}, RTPCodecTypeAudio))
 
 	api := NewAPI(WithMediaEngine(mediaEngine))

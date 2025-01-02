@@ -52,6 +52,7 @@ func TestGenerateDataChannelID(t *testing.T) {
 		err := testCase.s.generateAndSetDataChannelID(testCase.role, &idPtr)
 		if err != nil {
 			t.Errorf("failed to generate id: %v", err)
+
 			return
 		}
 		if *idPtr != testCase.result {
@@ -87,6 +88,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 			dc, createErr := offerPC.CreateDataChannel(expectedLabel, nil)
 			if createErr != nil {
 				t.Errorf("Failed to create a PC pair for testing")
+
 				return
 			}
 			dc.OnMessage(func(msg DataChannelMessage) {
@@ -128,7 +130,8 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	}
 }
 
-func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
+func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nolint:cyclop
+	// nolint:varnamelen
 	const N = 10
 	done := make(chan struct{}, N)
 	for i := 0; i < N; i++ {
@@ -143,11 +146,13 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
 			offerPC, err := api.NewPeerConnection(config)
 			if err != nil {
 				t.Error(err)
+
 				return
 			}
 			answerPC, err := api.NewPeerConnection(config)
 			if err != nil {
 				t.Error(err)
+
 				return
 			}
 
@@ -163,6 +168,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
 			})
 			if err != nil {
 				t.Error(err)
+
 				return
 			}
 			dc1.OnOpen(func() {
@@ -177,6 +183,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
 			})
 			if err != nil {
 				t.Error(err)
+
 				return
 			}
 			dc2.OnOpen(func() {
@@ -198,18 +205,21 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
 				case <-connestd:
 				case <-time.After(10 * time.Second):
 					t.Error("conn establishment timed out")
+
 					return
 				}
 				<-readDetach
 				err1 := dc1.dataChannel.SetReadDeadline(time.Now().Add(10 * time.Second))
 				if err1 != nil {
 					t.Error(err)
+
 					return
 				}
 				buf := make([]byte, 10)
 				n, err1 := dc1.dataChannel.Read(buf)
 				if err1 != nil {
 					t.Error(err)
+
 					return
 				}
 				if string(buf[:n]) != "hello" {
@@ -228,6 +238,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
 				case <-connestd:
 				case <-time.After(10 * time.Second):
 					t.Error("connection establishment timed out")
+
 					return
 				}
 				<-writeDetach

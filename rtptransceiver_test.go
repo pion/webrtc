@@ -14,15 +14,15 @@ import (
 )
 
 func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
-	me := &MediaEngine{}
-	api := NewAPI(WithMediaEngine(me))
-	assert.NoError(t, me.RegisterDefaultCodecs())
+	mediaEngine := &MediaEngine{}
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
-	me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo)
-	me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio)
+	mediaEngine.pushCodecs(mediaEngine.videoCodecs, RTPCodecTypeVideo)
+	mediaEngine.pushCodecs(mediaEngine.audioCodecs, RTPCodecTypeAudio)
 
-	tr := RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
-	assert.EqualValues(t, me.videoCodecs, tr.getCodecs())
+	tr := RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: mediaEngine.videoCodecs}
+	assert.EqualValues(t, mediaEngine.videoCodecs, tr.getCodecs())
 
 	failTestCases := [][]RTPCodecParameters{
 		{
@@ -86,22 +86,22 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 	assert.NotEqual(t, 0, len(tr.getCodecs()))
 }
 
-// Assert that SetCodecPreferences properly filters codecs and PayloadTypes are respected
+// Assert that SetCodecPreferences properly filters codecs and PayloadTypes are respected.
 func Test_RTPTransceiver_SetCodecPreferences_PayloadType(t *testing.T) {
 	testCodec := RTPCodecParameters{
 		RTPCodecCapability: RTPCodecCapability{"video/testCodec", 90000, 0, "", nil},
 		PayloadType:        50,
 	}
 
-	m := &MediaEngine{}
-	assert.NoError(t, m.RegisterDefaultCodecs())
+	mediaEngine := &MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
-	offerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	offerPC, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	assert.NoError(t, m.RegisterCodec(testCodec, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(testCodec, RTPCodecTypeVideo))
 
-	answerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	answerPC, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)

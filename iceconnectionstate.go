@@ -7,7 +7,7 @@ package webrtc
 type ICEConnectionState int
 
 const (
-	// ICEConnectionStateUnknown is the enum's zero-value
+	// ICEConnectionStateUnknown is the enum's zero-value.
 	ICEConnectionStateUnknown ICEConnectionState = iota
 
 	// ICEConnectionStateNew indicates that any of the ICETransports are
@@ -56,7 +56,7 @@ const (
 	iceConnectionStateClosedStr       = "closed"
 )
 
-// NewICEConnectionState takes a string and converts it to ICEConnectionState
+// NewICEConnectionState takes a string and converts it to ICEConnectionState.
 func NewICEConnectionState(raw string) ICEConnectionState {
 	switch raw {
 	case iceConnectionStateNewStr:

@@ -20,7 +20,7 @@ import (
 )
 
 // If a remote doesn't support a Codec used by a `TrackLocalStatic`
-// an error should be returned to the user
+// an error should be returned to the user.
 func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -50,13 +50,15 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP9", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-			PayloadType:        96,
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeType: "video/VP9", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
+			},
+			PayloadType: 96,
 		}, RTPCodecTypeVideo))
 
-		vp9OnlyPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+		vp9OnlyPC, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
 		_, err = vp9OnlyPC.AddTransceiverFromKind(RTPCodecTypeVideo)
@@ -74,7 +76,9 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		offerer, answerer, err := newPair()
 		assert.NoError(t, err)
 
-		invalidCodecTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/invalid-codec"}, "video", "pion")
+		invalidCodecTrack, err := NewTrackLocalStaticSample(
+			RTPCodecCapability{MimeType: "video/invalid-codec"}, "video", "pion",
+		)
 		assert.NoError(t, err)
 
 		_, err = offerer.AddTrack(invalidCodecTrack)
@@ -85,7 +89,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 	})
 }
 
-// Assert that Bind/Unbind happens when expected
+// Assert that Bind/Unbind happens when expected.
 func Test_TrackLocalStatic_Closed(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -125,14 +129,26 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 
 	mediaEngineOne := &MediaEngine{}
 	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        100,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 100,
 	}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
 	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        200,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 200,
 	}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne)).NewPeerConnection(Configuration{})
@@ -160,13 +176,13 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerer, answerer))
 
-	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
+	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{track})
 
 	closePairNow(t, offerer, answerer)
 }
 
 // Assert that writing to a Track doesn't modify the input
-// Even though we can pass a pointer we shouldn't modify the incoming value
+// Even though we can pass a pointer we shouldn't modify the incoming value.
 func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -195,7 +211,7 @@ func Test_TrackLocalStatic_Mutate_Input(t *testing.T) {
 }
 
 // Assert that writing to a Track that has Binded (but not connected)
-// does not block
+// does not block.
 func Test_TrackLocalStatic_Binding_NonBlocking(t *testing.T) {
 	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()
@@ -258,14 +274,26 @@ func BenchmarkTrackLocalWrite(b *testing.B) {
 func Test_TrackLocalStatic_Padding(t *testing.T) {
 	mediaEngineOne := &MediaEngine{}
 	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        100,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 100,
 	}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
 	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        200,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 200,
 	}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne)).NewPeerConnection(Configuration{})
@@ -345,6 +373,7 @@ type customCodecPayloader struct {
 
 func (c *customCodecPayloader) Payload(_ uint16, payload []byte) [][]byte {
 	c.invokeCount.Add(1)
+
 	return [][]byte{payload}
 }
 
@@ -353,8 +382,14 @@ func Test_TrackLocalStatic_Payloader(t *testing.T) {
 
 	mediaEngine := &MediaEngine{}
 	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: mimeTypeCustomCodec, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        96,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     mimeTypeCustomCodec,
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 96,
 	}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
@@ -364,10 +399,16 @@ func Test_TrackLocalStatic_Payloader(t *testing.T) {
 	assert.NoError(t, err)
 
 	customPayloader := &customCodecPayloader{}
-	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: mimeTypeCustomCodec}, "video", "pion", WithPayloader(func(c RTPCodecCapability) (rtp.Payloader, error) {
-		require.Equal(t, c.MimeType, mimeTypeCustomCodec)
-		return customPayloader, nil
-	}))
+	track, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: mimeTypeCustomCodec},
+		"video",
+		"pion",
+		WithPayloader(func(c RTPCodecCapability) (rtp.Payloader, error) {
+			require.Equal(t, c.MimeType, mimeTypeCustomCodec)
+
+			return customPayloader, nil
+		}),
+	)
 	assert.NoError(t, err)
 
 	_, err = offerer.AddTrack(track)
@@ -380,7 +421,7 @@ func Test_TrackLocalStatic_Payloader(t *testing.T) {
 		onTrackFiredFunc()
 	})
 
-	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
+	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{track})
 
 	closePairNow(t, offerer, answerer)
 }

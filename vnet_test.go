@@ -16,7 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createVNetPair(t *testing.T, interceptorRegistry *interceptor.Registry) (*PeerConnection, *PeerConnection, *vnet.Router) {
+func createVNetPair(t *testing.T, interceptorRegistry *interceptor.Registry) (
+	*PeerConnection,
+	*PeerConnection,
+	*vnet.Router,
+) {
+	t.Helper()
 	// Create a root router
 	wan, err := vnet.NewRouter(&vnet.RouterConfig{
 		CIDR:          "1.2.3.0/24",

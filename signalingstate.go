@@ -32,7 +32,7 @@ func (op stateChangeOp) String() string {
 type SignalingState int32
 
 const (
-	// SignalingStateUnknown is the enum's zero-value
+	// SignalingStateUnknown is the enum's zero-value.
 	SignalingStateUnknown SignalingState = iota
 
 	// SignalingStateStable indicates there is no offer/answer exchange in
@@ -110,17 +110,18 @@ func (t SignalingState) String() string {
 	}
 }
 
-// Get thread safe read value
+// Get thread safe read value.
 func (t *SignalingState) Get() SignalingState {
 	return SignalingState(atomic.LoadInt32((*int32)(t)))
 }
 
-// Set thread safe write value
+// Set thread safe write value.
 func (t *SignalingState) Set(state SignalingState) {
 	atomic.StoreInt32((*int32)(t), int32(state))
 }
 
-func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) { // nolint:gocognit
+//nolint:gocognit,cyclop
+func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) {
 	// Special case for rollbacks
 	if sdpType == SDPTypeRollback && cur == SignalingStateStable {
 		return cur, &rtcerr.InvalidModificationError{
@@ -188,6 +189,7 @@ func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType
 			}
 		}
 	}
+
 	return cur, &rtcerr.InvalidModificationError{
 		Err: fmt.Errorf("%w: %s->%s(%s)->%s", errSignalingStateProposedTransitionInvalid, cur, op, sdpType, next),
 	}

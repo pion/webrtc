@@ -10,17 +10,17 @@ import (
 	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
-// RTPCodecType determines the type of a codec
+// RTPCodecType determines the type of a codec.
 type RTPCodecType int
 
 const (
-	// RTPCodecTypeUnknown is the enum's zero-value
+	// RTPCodecTypeUnknown is the enum's zero-value.
 	RTPCodecTypeUnknown RTPCodecType = iota
 
-	// RTPCodecTypeAudio indicates this is an audio codec
+	// RTPCodecTypeAudio indicates this is an audio codec.
 	RTPCodecTypeAudio
 
-	// RTPCodecTypeVideo indicates this is a video codec
+	// RTPCodecTypeVideo indicates this is a video codec.
 	RTPCodecTypeVideo
 )
 
@@ -35,7 +35,7 @@ func (t RTPCodecType) String() string {
 	}
 }
 
-// NewRTPCodecType creates a RTPCodecType from a string
+// NewRTPCodecType creates a RTPCodecType from a string.
 func NewRTPCodecType(r string) RTPCodecType {
 	switch {
 	case strings.EqualFold(r, RTPCodecTypeAudio.String()):
@@ -103,8 +103,11 @@ const (
 
 // Do a fuzzy find for a codec in the list of codecs
 // Used for lookup up a codec in an existing list to find a match
-// Returns codecMatchExact, codecMatchPartial, or codecMatchNone
-func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecParameters) (RTPCodecParameters, codecMatchType) {
+// Returns codecMatchExact, codecMatchPartial, or codecMatchNone.
+func codecParametersFuzzySearch(
+	needle RTPCodecParameters,
+	haystack []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType) {
 	needleFmtp := fmtp.Parse(needle.RTPCodecCapability.MimeType, needle.RTPCodecCapability.SDPFmtpLine)
 
 	// First attempt to match on MimeType + SDPFmtpLine
@@ -125,7 +128,7 @@ func codecParametersFuzzySearch(needle RTPCodecParameters, haystack []RTPCodecPa
 	return RTPCodecParameters{}, codecMatchNone
 }
 
-// Given a CodecParameters find the RTX CodecParameters if one exists
+// Given a CodecParameters find the RTX CodecParameters if one exists.
 func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
 	aptStr := fmt.Sprintf("apt=%d", needle)
 	for _, c := range haystack {
@@ -142,6 +145,7 @@ func rtcpFeedbackIntersection(a, b []RTCPFeedback) (out []RTCPFeedback) {
 		for _, bFeeback := range b {
 			if aFeedback.Type == bFeeback.Type && aFeedback.Parameter == bFeeback.Parameter {
 				out = append(out, aFeedback)
+
 				break
 			}
 		}

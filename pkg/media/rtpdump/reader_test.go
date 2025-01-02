@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestReader(t *testing.T) {
+func TestReader(t *testing.T) { //nolint:maintidx
 	validPreamble := []byte("#!rtpplay1.0 224.2.0.1/3456\n")
 
 	for _, test := range []struct {
@@ -249,11 +249,12 @@ func TestReader(t *testing.T) {
 			WantErr: nil,
 		},
 	} {
-		r, hdr, err := NewReader(bytes.NewReader(test.Data))
+		reader, hdr, err := NewReader(bytes.NewReader(test.Data))
 		if err != nil {
 			if got, want := err, test.WantErr; !errors.Is(got, want) {
 				t.Fatalf("NewReader(%s) err=%v want %v", test.Name, got, want)
 			}
+
 			continue
 		}
 
@@ -264,12 +265,13 @@ func TestReader(t *testing.T) {
 		var nextErr error
 		var packets []Packet
 		for {
-			pkt, err := r.Next()
+			pkt, err := reader.Next()
 			if errors.Is(err, io.EOF) {
 				break
 			}
 			if err != nil {
 				nextErr = err
+
 				break
 			}
 

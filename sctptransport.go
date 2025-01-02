@@ -132,6 +132,7 @@ func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
 			err := d.open(r)
 			if err != nil {
 				r.log.Warnf("failed to open data channel: %s", err)
+
 				continue
 			}
 			openedDCCount++
@@ -147,7 +148,7 @@ func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
 	return nil
 }
 
-// Stop stops the SCTPTransport
+// Stop stops the SCTPTransport.
 func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -163,7 +164,11 @@ func (r *SCTPTransport) Stop() error {
 	return nil
 }
 
-func (r *SCTPTransport) acceptDataChannels(a *sctp.Association, existingDataChannels []*DataChannel) {
+//nolint:cyclop
+func (r *SCTPTransport) acceptDataChannels(
+	assoc *sctp.Association,
+	existingDataChannels []*DataChannel,
+) {
 	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
 	for _, dc := range existingDataChannels {
 		dc.mu.Lock()
@@ -176,7 +181,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association, existingDataChan
 	}
 ACCEPT:
 	for {
-		dc, err := datachannel.Accept(a, &datachannel.Config{
+		dc, err := datachannel.Accept(assoc, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
 		if err != nil {
@@ -187,6 +192,7 @@ ACCEPT:
 			} else {
 				r.onClose(nil)
 			}
+
 			return
 		}
 		for _, ch := range dataChannels {
@@ -199,7 +205,7 @@ ACCEPT:
 			maxRetransmits    *uint16
 			maxPacketLifeTime *uint16
 		)
-		val := uint16(dc.Config.ReliabilityParameter)
+		val := uint16(dc.Config.ReliabilityParameter) //nolint:gosec //G115
 		ordered := true
 
 		switch dc.Config.ChannelType {
@@ -300,7 +306,7 @@ func (r *SCTPTransport) OnDataChannel(f func(*DataChannel)) {
 }
 
 // OnDataChannelOpened sets an event handler which is invoked when a data
-// channel is opened
+// channel is opened.
 func (r *SCTPTransport) OnDataChannelOpened(f func(*DataChannel)) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -324,6 +330,7 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	done = make(chan struct{})
 	if handler == nil || dc == nil {
 		close(done)
+
 		return
 	}
 
@@ -384,10 +391,11 @@ func (r *SCTPTransport) MaxChannels() uint16 {
 	return *r.maxChannels
 }
 
-// State returns the current state of the SCTPTransport
+// State returns the current state of the SCTPTransport.
 func (r *SCTPTransport) State() SCTPTransportState {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
+
 	return r.state
 }
 
@@ -430,6 +438,7 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 		}
 		*idOut = &id
 		r.dataChannelIDsUsed[id] = struct{}{}
+
 		return nil
 	}
 
@@ -443,5 +452,6 @@ func (r *SCTPTransport) association() *sctp.Association {
 	r.lock.RLock()
 	association := r.sctpAssociation
 	r.lock.RUnlock()
+
 	return association
 }

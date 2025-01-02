@@ -47,7 +47,7 @@ func Test_RTPTransceiverInit_SSRC(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, signalPair(offerer, answerer))
-		sendVideoUntilDone(ctx.Done(), t, []*TrackLocalStaticSample{track})
+		sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track})
 		closePairNow(t, offerer, answerer)
 	})
 
@@ -73,7 +73,7 @@ func Test_RTPTransceiverInit_SSRC(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, signalPair(offerer, answerer))
-		sendVideoUntilDone(ctx.Done(), t, []*TrackLocalStaticSample{track})
+		sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track})
 		closePairNow(t, offerer, answerer)
 	})
 }

@@ -24,17 +24,17 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-// How ofter to print WebRTC stats
+// How ofter to print WebRTC stats.
 const statsInterval = time.Second * 5
 
-// nolint:gocognit
+// nolint:gocognit,cyclop
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Create a MediaEngine object to configure the supported codec
-	m := &webrtc.MediaEngine{}
+	mediaEngine := &webrtc.MediaEngine{}
 
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
 	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
 	// for each PeerConnection.
-	i := &interceptor.Registry{}
+	interceptorRegistry := &interceptor.Registry{}
 
 	statsInterceptorFactory, err := stats.NewInterceptor()
 	if err != nil {
@@ -53,15 +53,15 @@ func main() {
 	statsInterceptorFactory.OnNewPeerConnection(func(_ string, g stats.Getter) {
 		statsGetter = g
 	})
-	i.Add(statsInterceptorFactory)
+	interceptorRegistry.Add(statsInterceptorFactory)
 
 	// Use the default set of Interceptors
-	if err = webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(interceptorRegistry))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -175,7 +175,7 @@ func main() {
 	}
 }
 
-// Read from stdin until we get a newline
+// Read from stdin until we get a newline.
 func readUntilNewline() (in string) {
 	var err error
 
@@ -192,10 +192,11 @@ func readUntilNewline() (in string) {
 	}
 
 	fmt.Println("")
+
 	return
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj *webrtc.SessionDescription) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -205,7 +206,7 @@ func encode(obj *webrtc.SessionDescription) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *webrtc.SessionDescription) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {

@@ -64,6 +64,7 @@ func New(maxLate uint16, depacketizer rtp.Depacketizer, sampleRate uint32, opts 
 	for _, o := range opts {
 		o(s)
 	}
+
 	return s
 }
 
@@ -78,6 +79,7 @@ func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
 	for i := location.head; i != location.tail; i++ {
 		if packet := s.buffer[i]; packet != nil {
 			foundHead = packet
+
 			break
 		}
 	}
@@ -89,6 +91,7 @@ func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
 	for i := location.tail - 1; i != location.head; i-- {
 		if packet := s.buffer[i]; packet != nil {
 			foundTail = packet
+
 			break
 		}
 	}
@@ -100,7 +103,7 @@ func (s *SampleBuilder) tooOld(location sampleSequenceLocation) bool {
 	return timestampDistance(foundHead.Timestamp, foundTail.Timestamp) > s.maxLateTimestamp
 }
 
-// fetchTimestamp returns the timestamp associated with a given sample location
+// fetchTimestamp returns the timestamp associated with a given sample location.
 func (s *SampleBuilder) fetchTimestamp(location sampleSequenceLocation) (timestamp uint32, hasData bool) {
 	if location.empty() {
 		return 0, false
@@ -109,6 +112,7 @@ func (s *SampleBuilder) fetchTimestamp(location sampleSequenceLocation) (timesta
 	if packet == nil {
 		return 0, false
 	}
+
 	return packet.Timestamp, true
 }
 
@@ -138,6 +142,7 @@ func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation, fo
 		if !forceConsume {
 			break
 		}
+
 		fallthrough
 	case slCompareBefore:
 		s.releasePacket(s.filled.head)
@@ -176,18 +181,18 @@ func (s *SampleBuilder) purgeBuffers(flush bool) {
 // Push adds an RTP Packet to s's buffer.
 //
 // Push does not copy the input. If you wish to reuse
-// this memory make sure to copy before calling Push
-func (s *SampleBuilder) Push(p *rtp.Packet) {
-	s.buffer[p.SequenceNumber] = p
+// this memory make sure to copy before calling Push.
+func (s *SampleBuilder) Push(packet *rtp.Packet) {
+	s.buffer[packet.SequenceNumber] = packet
 
-	switch s.filled.compare(p.SequenceNumber) {
+	switch s.filled.compare(packet.SequenceNumber) {
 	case slCompareVoid:
-		s.filled.head = p.SequenceNumber
-		s.filled.tail = p.SequenceNumber + 1
+		s.filled.head = packet.SequenceNumber
+		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareBefore:
-		s.filled.head = p.SequenceNumber
+		s.filled.head = packet.SequenceNumber
 	case slCompareAfter:
-		s.filled.tail = p.SequenceNumber + 1
+		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareInside:
 		break
 	}
@@ -204,7 +209,8 @@ const secondToNanoseconds = 1000000000
 // buildSample creates a sample from a valid collection of RTP Packets by
 // walking forwards building a sample if everything looks good clear and
 // update buffer+values
-// nolint: gocognit
+//
+//nolint:gocognit,cyclop
 func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if s.active.empty() {
 		s.active = s.filled
@@ -224,12 +230,14 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
 			consume.head = s.active.head
 			consume.tail = i + 1
+
 			break
 		}
 		headTimestamp, hasData := s.fetchTimestamp(s.active)
 		if hasData && s.buffer[i].Timestamp != headTimestamp {
 			consume.head = s.active.head
 			consume.tail = i
+
 			break
 		}
 	}
@@ -252,6 +260,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	for i := consume.tail; i < s.active.tail; i++ {
 		if s.buffer[i] != nil {
 			afterTimestamp = s.buffer[i].Timestamp
+
 			break
 		}
 	}
@@ -274,6 +283,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		}
 		s.purgeConsumedLocation(consume, true)
 		s.purgeConsumedBuffers()
+
 		return nil
 	}
 
@@ -282,7 +292,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var metadata interface{}
 	var rtpHeaders []*rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
-		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
+		payload, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
@@ -294,7 +304,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 			rtpHeaders = append(rtpHeaders, &h)
 		}
 
-		data = append(data, p...)
+		data = append(data, payload...)
 	}
 	samples := afterTimestamp - sampleTimestamp
 
@@ -331,12 +341,13 @@ func (s *SampleBuilder) Pop() *media.Sample {
 	var result *media.Sample
 	result, s.preparedSamples[s.prepared.head] = s.preparedSamples[s.prepared.head], nil
 	s.prepared.head++
+
 	return result
 }
 
-// seqnumDistance computes the distance between two sequence numbers
+// seqnumDistance computes the distance between two sequence numbers.
 func seqnumDistance(x, y uint16) uint16 {
-	diff := int16(x - y)
+	diff := int16(x - y) //nolint:gosec // G115
 	if diff < 0 {
 		return uint16(-diff)
 	}
@@ -344,9 +355,9 @@ func seqnumDistance(x, y uint16) uint16 {
 	return uint16(diff)
 }
 
-// timestampDistance computes the distance between two timestamps
+// timestampDistance computes the distance between two timestamps.
 func timestampDistance(x, y uint32) uint32 {
-	diff := int32(x - y)
+	diff := int32(x - y) //nolint:gosec // G115
 	if diff < 0 {
 		return uint32(-diff)
 	}
@@ -366,7 +377,7 @@ func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
 }
 
 // WithPacketHeadHandler set a head packet handler to allow inspecting
-// the packet to extract certain information and return as custom metadata
+// the packet to extract certain information and return as custom metadata.
 func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
 	return func(o *SampleBuilder) {
 		o.packetHeadHandler = h
@@ -378,7 +389,7 @@ func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
 func WithMaxTimeDelay(maxLateDuration time.Duration) Option {
 	return func(o *SampleBuilder) {
 		totalMillis := maxLateDuration.Milliseconds()
-		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMillis / 1000)
+		o.maxLateTimestamp = uint32(int64(o.sampleRate) * totalMillis / 1000) //nolint:gosec // G5G115
 	}
 }
 

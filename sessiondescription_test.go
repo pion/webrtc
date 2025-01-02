@@ -46,6 +46,7 @@ func TestSessionDescription_JSON(t *testing.T) {
 				testCase.unmarshalErr,
 				"testCase: %d %v", i, testCase,
 			)
+
 			continue
 		}
 

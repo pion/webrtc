@@ -22,7 +22,8 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-func main() { // nolint:gocognit
+// nolint:gocognit, cyclop
+func main() {
 	port := flag.Int("port", 8080, "http server port")
 	flag.Parse()
 
@@ -41,8 +42,8 @@ func main() { // nolint:gocognit
 		},
 	}
 
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -50,10 +51,10 @@ func main() { // nolint:gocognit
 	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
 	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
 	// for each PeerConnection.
-	i := &interceptor.Registry{}
+	interceptorRegistry := &interceptor.Registry{}
 
 	// Use the default set of Interceptors
-	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
@@ -65,10 +66,13 @@ func main() { // nolint:gocognit
 	if err != nil {
 		panic(err)
 	}
-	i.Add(intervalPliFactory)
+	interceptorRegistry.Add(intervalPliFactory)
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(peerConnectionConfig)
+	peerConnection, err := webrtc.NewAPI(
+		webrtc.WithMediaEngine(mediaEngine),
+		webrtc.WithInterceptorRegistry(interceptorRegistry),
+	).NewPeerConnection(peerConnectionConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +203,7 @@ func main() { // nolint:gocognit
 	}
 }
 
-// JSON encode + base64 a SessionDescription
+// JSON encode + base64 a SessionDescription.
 func encode(obj *webrtc.SessionDescription) string {
 	b, err := json.Marshal(obj)
 	if err != nil {
@@ -209,7 +213,7 @@ func encode(obj *webrtc.SessionDescription) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// Decode a base64 and unmarshal JSON into a SessionDescription
+// Decode a base64 and unmarshal JSON into a SessionDescription.
 func decode(in string, obj *webrtc.SessionDescription) {
 	b, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {
@@ -221,12 +225,12 @@ func decode(in string, obj *webrtc.SessionDescription) {
 	}
 }
 
-// httpSDPServer starts a HTTP Server that consumes SDPs
+// httpSDPServer starts a HTTP Server that consumes SDPs.
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

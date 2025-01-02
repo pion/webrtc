@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Operation is a function
+// Operation is a function.
 type operation func()
 
 // Operations is a task executor.
@@ -64,10 +64,11 @@ func (o *operations) tryEnqueue(op operation) bool {
 	return true
 }
 
-// IsEmpty checks if there are tasks in the queue
+// IsEmpty checks if there are tasks in the queue.
 func (o *operations) IsEmpty() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+
 	return o.ops.Len() == 0
 }
 
@@ -93,6 +94,7 @@ func (o *operations) GracefulClose() {
 	o.mu.Lock()
 	if o.isClosed {
 		o.mu.Unlock()
+
 		return
 	}
 	// do not enqueue anymore ops from here on
@@ -120,6 +122,7 @@ func (o *operations) pop() func() {
 	if op, ok := e.Value.(operation); ok {
 		return op
 	}
+
 	return nil
 }
 
@@ -132,6 +135,7 @@ func (o *operations) start() {
 
 		if o.ops.Len() == 0 || o.isClosed {
 			o.busyCh = nil
+
 			return
 		}
 

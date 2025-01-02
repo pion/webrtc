@@ -37,7 +37,7 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 	return ConfigureTWCCSender(mediaEngine, interceptorRegistry)
 }
 
-// ConfigureRTCPReports will setup everything necessary for generating Sender and Receiver Reports
+// ConfigureRTCPReports will setup everything necessary for generating Sender and Receiver Reports.
 func ConfigureRTCPReports(interceptorRegistry *interceptor.Registry) error {
 	reciver, err := report.NewReceiverInterceptor()
 	if err != nil {
@@ -51,6 +51,7 @@ func ConfigureRTCPReports(interceptorRegistry *interceptor.Registry) error {
 
 	interceptorRegistry.Add(reciver)
 	interceptorRegistry.Add(sender)
+
 	return nil
 }
 
@@ -70,17 +71,22 @@ func ConfigureNack(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Re
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: "nack", Parameter: "pli"}, RTPCodecTypeVideo)
 	interceptorRegistry.Add(responder)
 	interceptorRegistry.Add(generator)
+
 	return nil
 }
 
 // ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
 // a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
 func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
+	); err != nil {
 		return err
 	}
 
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio,
+	); err != nil {
 		return err
 	}
 
@@ -90,6 +96,7 @@ func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorReg
 	}
 
 	interceptorRegistry.Add(i)
+
 	return nil
 }
 
@@ -97,12 +104,16 @@ func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorReg
 // This must be called after registering codecs with the MediaEngine.
 func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeVideo)
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
+	); err != nil {
 		return err
 	}
 
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeAudio)
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeAudio,
+	); err != nil {
 		return err
 	}
 
@@ -112,6 +123,7 @@ func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *intercep
 	}
 
 	interceptorRegistry.Add(generator)
+
 	return nil
 }
 
@@ -125,20 +137,27 @@ func ConfigureCongestionControlFeedback(mediaEngine *MediaEngine, interceptorReg
 		return err
 	}
 	interceptorRegistry.Add(generator)
+
 	return nil
 }
 
-// ConfigureSimulcastExtensionHeaders enables the RTP Extension Headers needed for Simulcast
+// ConfigureSimulcastExtensionHeaders enables the RTP Extension Headers needed for Simulcast.
 func ConfigureSimulcastExtensionHeaders(mediaEngine *MediaEngine) error {
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeVideo); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeVideo,
+	); err != nil {
 		return err
 	}
 
-	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESRTPStreamIDURI}, RTPCodecTypeVideo); err != nil {
+	if err := mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.SDESRTPStreamIDURI}, RTPCodecTypeVideo,
+	); err != nil {
 		return err
 	}
 
-	return mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESRepairRTPStreamIDURI}, RTPCodecTypeVideo)
+	return mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.SDESRepairRTPStreamIDURI}, RTPCodecTypeVideo,
+	)
 }
 
 type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }
@@ -160,8 +179,14 @@ func (i *interceptorToTrackLocalWriter) Write(b []byte) (int, error) {
 	return i.WriteRTP(&packet.Header, packet.Payload)
 }
 
-// nolint: unparam
-func createStreamInfo(id string, ssrc, ssrcRTX, ssrcFEC SSRC, payloadType, payloadTypeRTX, payloadTypeFEC PayloadType, codec RTPCodecCapability, webrtcHeaderExtensions []RTPHeaderExtensionParameter) *interceptor.StreamInfo {
+//nolint:unparam
+func createStreamInfo(
+	id string,
+	ssrc, ssrcRTX, ssrcFEC SSRC,
+	payloadType, payloadTypeRTX, payloadTypeFEC PayloadType,
+	codec RTPCodecCapability,
+	webrtcHeaderExtensions []RTPHeaderExtensionParameter,
+) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
 		headerExtensions = append(headerExtensions, interceptor.RTPHeaderExtension{ID: h.ID, URI: h.URI})

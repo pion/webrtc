@@ -26,7 +26,7 @@ import (
 // E2E test of the features of Interceptors
 // * Assert an extension can be set on an outbound packet
 // * Assert an extension can be read on an outbound packet
-// * Assert that attributes set by an interceptor are returned to the Reader
+// * Assert that attributes set by an interceptor are returned to the Reader.
 func TestPeerConnection_Interceptor(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()
@@ -40,14 +40,16 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
 				return &mock_interceptor.Interceptor{
 					BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
-						return interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
-							// set extension on outgoing packet
-							header.Extension = true
-							header.ExtensionProfile = 0xBEDE
-							assert.NoError(t, header.SetExtension(2, []byte("foo")))
+						return interceptor.RTPWriterFunc(
+							func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
+								// set extension on outgoing packet
+								header.Extension = true
+								header.ExtensionProfile = 0xBEDE
+								assert.NoError(t, header.SetExtension(2, []byte("foo")))
 
-							return writer.Write(header, payload, attributes)
-						})
+								return writer.Write(header, payload, attributes)
+							},
+						)
 					},
 					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
 						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
@@ -56,6 +58,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 							}
 
 							a.Set("attribute", "value")
+
 							return reader.Read(b, a)
 						})
 					},
@@ -108,7 +111,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	closePairNow(t, offerer, answerer)
 }
 
-func Test_Interceptor_BindUnbind(t *testing.T) {
+func Test_Interceptor_BindUnbind(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
@@ -127,14 +130,17 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 	mockInterceptor := &mock_interceptor.Interceptor{
 		BindRTCPReaderFn: func(reader interceptor.RTCPReader) interceptor.RTCPReader {
 			atomic.AddUint32(&cntBindRTCPReader, 1)
+
 			return reader
 		},
 		BindRTCPWriterFn: func(writer interceptor.RTCPWriter) interceptor.RTCPWriter {
 			atomic.AddUint32(&cntBindRTCPWriter, 1)
+
 			return writer
 		},
 		BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
 			atomic.AddUint32(&cntBindLocalStream, 1)
+
 			return writer
 		},
 		UnbindLocalStreamFn: func(*interceptor.StreamInfo) {
@@ -142,6 +148,7 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 		},
 		BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
 			atomic.AddUint32(&cntBindRemoteStream, 1)
+
 			return reader
 		},
 		UnbindRemoteStreamFn: func(_ *interceptor.StreamInfo) {
@@ -149,6 +156,7 @@ func Test_Interceptor_BindUnbind(t *testing.T) {
 		},
 		CloseFn: func() error {
 			atomic.AddUint32(&cntClose, 1)
+
 			return nil
 		},
 	}
@@ -225,6 +233,7 @@ func Test_InterceptorRegistry_Build(t *testing.T) {
 	ir.Add(&mock_interceptor.Factory{
 		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
 			registryBuildCount++
+
 			return &interceptor.NoOp{}, nil
 		},
 	})
@@ -274,6 +283,7 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 			if nonMediaBandwidthProbe, ok := answerer.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
 				assert.Equal(t, len(nonMediaBandwidthProbe.Tracks()), 1)
 				close(probeReceiverCreated)
+
 				return
 			}
 		}
@@ -301,16 +311,18 @@ func TestInterceptorNack(t *testing.T) {
 	t.Run("NoNack", func(t *testing.T) { testInterceptorNack(t, false) })
 }
 
-func testInterceptorNack(t *testing.T, requestNack bool) {
+func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
+	t.Helper()
+
 	const numPackets = 20
 
 	ir := interceptor.Registry{}
-	m := MediaEngine{}
+	mediaEngine := MediaEngine{}
 	var feedback []RTCPFeedback
 	if requestNack {
 		feedback = append(feedback, RTCPFeedback{"nack", ""})
 	}
-	err := m.RegisterCodec(
+	err := mediaEngine.RegisterCodec(
 		RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
 				"video/VP8", 90000, 0,
@@ -323,7 +335,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 	)
 	assert.NoError(t, err)
 	api := NewAPI(
-		WithMediaEngine(&m),
+		WithMediaEngine(&mediaEngine),
 		WithInterceptorRegistry(&ir),
 	)
 
@@ -396,7 +408,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 			}
 			p, _, err2 := track2.ReadRTP()
 			assert.NoError(t, err2)
-			assert.Equal(t, p.SequenceNumber, uint16(i))
+			assert.Equal(t, p.SequenceNumber, uint16(i)) //nolint:gosec //G115
 		}
 		close(done)
 	})
@@ -411,8 +423,8 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 			p.Version = 2
 			p.Marker = true
 			p.PayloadType = 96
-			p.SequenceNumber = uint16(i)
-			p.Timestamp = uint32(i * 90000 / 50)
+			p.SequenceNumber = uint16(i)         //nolint:gosec // G115
+			p.Timestamp = uint32(i * 90000 / 50) ///nolint:gosec // G115
 			p.Payload = []byte{42}
 			err2 := track1.WriteRTP(&p)
 			assert.NoError(t, err2)

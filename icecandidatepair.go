@@ -5,7 +5,7 @@ package webrtc
 
 import "fmt"
 
-// ICECandidatePair represents an ICE Candidate pair
+// ICECandidatePair represents an ICE Candidate pair.
 type ICECandidatePair struct {
 	statsID string
 	Local   *ICECandidate
@@ -21,9 +21,10 @@ func (p *ICECandidatePair) String() string {
 }
 
 // NewICECandidatePair returns an initialized *ICECandidatePair
-// for the given pair of ICECandidate instances
+// for the given pair of ICECandidate instances.
 func NewICECandidatePair(local, remote *ICECandidate) *ICECandidatePair {
 	statsID := newICECandidatePairStatsID(local.statsID, remote.statsID)
+
 	return &ICECandidatePair{
 		statsID: statsID,
 		Local:   local,

@@ -22,24 +22,24 @@ import (
 )
 
 func TestSetEphemeralUDPPortRange(t *testing.T) {
-	s := SettingEngine{}
+	settingEngine := SettingEngine{}
 
-	if s.ephemeralUDP.PortMin != 0 ||
-		s.ephemeralUDP.PortMax != 0 {
+	if settingEngine.ephemeralUDP.PortMin != 0 ||
+		settingEngine.ephemeralUDP.PortMax != 0 {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
 	// set bad ephemeral ports
-	if err := s.SetEphemeralUDPPortRange(3000, 2999); err == nil {
+	if err := settingEngine.SetEphemeralUDPPortRange(3000, 2999); err == nil {
 		t.Fatalf("Setting engine should fail bad ephemeral ports.")
 	}
 
-	if err := s.SetEphemeralUDPPortRange(3000, 4000); err != nil {
+	if err := settingEngine.SetEphemeralUDPPortRange(3000, 4000); err != nil {
 		t.Fatalf("Setting engine failed valid port range: %s", err)
 	}
 
-	if s.ephemeralUDP.PortMin != 3000 ||
-		s.ephemeralUDP.PortMax != 4000 {
+	if settingEngine.ephemeralUDP.PortMin != 3000 ||
+		settingEngine.ephemeralUDP.PortMax != 4000 {
 		t.Fatalf("Setting engine ports do not reflect expected range")
 	}
 }
@@ -73,54 +73,62 @@ func TestDetachDataChannels(t *testing.T) {
 }
 
 func TestSetNAT1To1IPs(t *testing.T) {
-	s := SettingEngine{}
-	if s.candidates.NAT1To1IPs != nil {
+	settingEngine := SettingEngine{}
+	if settingEngine.candidates.NAT1To1IPs != nil {
 		t.Errorf("Invalid default value")
 	}
-	if s.candidates.NAT1To1IPCandidateType != 0 {
+	if settingEngine.candidates.NAT1To1IPCandidateType != 0 {
 		t.Errorf("Invalid default value")
 	}
 
 	ips := []string{"1.2.3.4"}
 	typ := ICECandidateTypeHost
-	s.SetNAT1To1IPs(ips, typ)
-	if len(s.candidates.NAT1To1IPs) != 1 || s.candidates.NAT1To1IPs[0] != "1.2.3.4" {
+	settingEngine.SetNAT1To1IPs(ips, typ)
+	if len(settingEngine.candidates.NAT1To1IPs) != 1 || settingEngine.candidates.NAT1To1IPs[0] != "1.2.3.4" {
 		t.Fatalf("Failed to set NAT1To1IPs")
 	}
-	if s.candidates.NAT1To1IPCandidateType != typ {
+	if settingEngine.candidates.NAT1To1IPCandidateType != typ {
 		t.Fatalf("Failed to set NAT1To1IPCandidateType")
 	}
 }
 
 func TestSetAnsweringDTLSRole(t *testing.T) {
 	s := SettingEngine{}
-	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRoleAuto), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
-	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRole(0)), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
+	assert.Error(
+		t,
+		s.SetAnsweringDTLSRole(DTLSRoleAuto),
+		"SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer",
+	)
+	assert.Error(
+		t,
+		s.SetAnsweringDTLSRole(DTLSRole(0)),
+		"SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer",
+	)
 }
 
 func TestSetReplayProtection(t *testing.T) {
-	s := SettingEngine{}
+	settingEngine := SettingEngine{}
 
-	if s.replayProtection.DTLS != nil ||
-		s.replayProtection.SRTP != nil ||
-		s.replayProtection.SRTCP != nil {
+	if settingEngine.replayProtection.DTLS != nil ||
+		settingEngine.replayProtection.SRTP != nil ||
+		settingEngine.replayProtection.SRTCP != nil {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	s.SetDTLSReplayProtectionWindow(128)
-	s.SetSRTPReplayProtectionWindow(64)
-	s.SetSRTCPReplayProtectionWindow(32)
+	settingEngine.SetDTLSReplayProtectionWindow(128)
+	settingEngine.SetSRTPReplayProtectionWindow(64)
+	settingEngine.SetSRTCPReplayProtectionWindow(32)
 
-	if s.replayProtection.DTLS == nil ||
-		*s.replayProtection.DTLS != 128 {
+	if settingEngine.replayProtection.DTLS == nil ||
+		*settingEngine.replayProtection.DTLS != 128 {
 		t.Errorf("Failed to set DTLS replay protection window")
 	}
-	if s.replayProtection.SRTP == nil ||
-		*s.replayProtection.SRTP != 64 {
+	if settingEngine.replayProtection.SRTP == nil ||
+		*settingEngine.replayProtection.SRTP != 64 {
 		t.Errorf("Failed to set SRTP replay protection window")
 	}
-	if s.replayProtection.SRTCP == nil ||
-		*s.replayProtection.SRTCP != 32 {
+	if settingEngine.replayProtection.SRTCP == nil ||
+		*settingEngine.replayProtection.SRTCP != 32 {
 		t.Errorf("Failed to set SRTCP replay protection window")
 	}
 }
@@ -152,10 +160,10 @@ func TestSettingEngine_SetICETCP(t *testing.T) {
 
 func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 	t.Run("Copy", func(t *testing.T) {
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
-		api := NewAPI(WithMediaEngine(m))
+		api := NewAPI(WithMediaEngine(mediaEngine))
 
 		offerer, answerer, err := api.newPair(Configuration{})
 		assert.NoError(t, err)
@@ -166,8 +174,8 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.NoError(t, signalPair(offerer, answerer))
 
 		// Assert that the MediaEngine the user created isn't modified
-		assert.False(t, m.negotiatedVideo)
-		assert.Empty(t, m.negotiatedVideoCodecs)
+		assert.False(t, mediaEngine.negotiatedVideo)
+		assert.Empty(t, mediaEngine.negotiatedVideoCodecs)
 
 		// Assert that the internal MediaEngine is modified
 		assert.True(t, offerer.api.mediaEngine.negotiatedVideo)
@@ -190,13 +198,13 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 	})
 
 	t.Run("No Copy", func(t *testing.T) {
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
 		s := SettingEngine{}
 		s.DisableMediaEngineCopy(true)
 
-		api := NewAPI(WithMediaEngine(m), WithSettingEngine(s))
+		api := NewAPI(WithMediaEngine(mediaEngine), WithSettingEngine(s))
 
 		offerer, answerer, err := api.newPair(Configuration{})
 		assert.NoError(t, err)
@@ -207,8 +215,8 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 		assert.NoError(t, signalPair(offerer, answerer))
 
 		// Assert that the user MediaEngine was modified, so no copy happened
-		assert.True(t, m.negotiatedVideo)
-		assert.NotEmpty(t, m.negotiatedVideoCodecs)
+		assert.True(t, mediaEngine.negotiatedVideo)
+		assert.NotEmpty(t, mediaEngine.negotiatedVideoCodecs)
 
 		closePairNow(t, offerer, answerer)
 
@@ -224,21 +232,21 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 }
 
 func TestSetDTLSRetransmissionInterval(t *testing.T) {
-	s := SettingEngine{}
+	settingEngine := SettingEngine{}
 
-	if s.dtls.retransmissionInterval != 0 {
+	if settingEngine.dtls.retransmissionInterval != 0 {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	s.SetDTLSRetransmissionInterval(100 * time.Millisecond)
-	if s.dtls.retransmissionInterval == 0 ||
-		s.dtls.retransmissionInterval != 100*time.Millisecond {
+	settingEngine.SetDTLSRetransmissionInterval(100 * time.Millisecond)
+	if settingEngine.dtls.retransmissionInterval == 0 ||
+		settingEngine.dtls.retransmissionInterval != 100*time.Millisecond {
 		t.Errorf("Failed to set DTLS retransmission interval")
 	}
 
-	s.SetDTLSRetransmissionInterval(1 * time.Second)
-	if s.dtls.retransmissionInterval == 0 ||
-		s.dtls.retransmissionInterval != 1*time.Second {
+	settingEngine.SetDTLSRetransmissionInterval(1 * time.Second)
+	if settingEngine.dtls.retransmissionInterval == 0 ||
+		settingEngine.dtls.retransmissionInterval != 1*time.Second {
 		t.Errorf("Failed to set DTLS retransmission interval")
 	}
 }
@@ -287,8 +295,8 @@ func TestSetICEBindingRequestHandler(t *testing.T) {
 	seenICEControlled, seenICEControlledCancel := context.WithCancel(context.Background())
 	seenICEControlling, seenICEControllingCancel := context.WithCancel(context.Background())
 
-	s := SettingEngine{}
-	s.SetICEBindingRequestHandler(func(m *stun.Message, _, _ ice.Candidate, _ *ice.CandidatePair) bool {
+	settingEngine := SettingEngine{}
+	settingEngine.SetICEBindingRequestHandler(func(m *stun.Message, _, _ ice.Candidate, _ *ice.CandidatePair) bool {
 		for _, a := range m.Attributes {
 			switch a.Type {
 			case stun.AttrICEControlled:
@@ -302,7 +310,7 @@ func TestSetICEBindingRequestHandler(t *testing.T) {
 		return false
 	})
 
-	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(settingEngine)).newPair(Configuration{})
 	assert.NoError(t, err)
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
@@ -313,31 +321,31 @@ func TestSetICEBindingRequestHandler(t *testing.T) {
 }
 
 func TestSetHooks(t *testing.T) {
-	s := SettingEngine{}
+	settingEngine := SettingEngine{}
 
-	if s.dtls.clientHelloMessageHook != nil ||
-		s.dtls.serverHelloMessageHook != nil ||
-		s.dtls.certificateRequestMessageHook != nil {
+	if settingEngine.dtls.clientHelloMessageHook != nil ||
+		settingEngine.dtls.serverHelloMessageHook != nil ||
+		settingEngine.dtls.certificateRequestMessageHook != nil {
 		t.Fatalf("SettingEngine defaults aren't as expected.")
 	}
 
-	s.SetDTLSClientHelloMessageHook(func(msg handshake.MessageClientHello) handshake.Message {
+	settingEngine.SetDTLSClientHelloMessageHook(func(msg handshake.MessageClientHello) handshake.Message {
 		return &msg
 	})
-	s.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
+	settingEngine.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
 		return &msg
 	})
-	s.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
+	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
 		return &msg
 	})
 
-	if s.dtls.clientHelloMessageHook == nil {
+	if settingEngine.dtls.clientHelloMessageHook == nil {
 		t.Errorf("Failed to set DTLS Client Hello Hook")
 	}
-	if s.dtls.serverHelloMessageHook == nil {
+	if settingEngine.dtls.serverHelloMessageHook == nil {
 		t.Errorf("Failed to set DTLS Server Hello Hook")
 	}
-	if s.dtls.certificateRequestMessageHook == nil {
+	if settingEngine.dtls.certificateRequestMessageHook == nil {
 		t.Errorf("Failed to set DTLS Certificate Request Hook")
 	}
 }
@@ -349,22 +357,36 @@ func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	s := SettingEngine{}
-	s.SetFireOnTrackBeforeFirstRTP(true)
+	settingEngine := SettingEngine{}
+	settingEngine.SetFireOnTrackBeforeFirstRTP(true)
 
 	mediaEngineOne := &MediaEngine{}
 	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        100,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 100,
 	}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
 	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-		PayloadType:        200,
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:     "video/VP8",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: nil,
+		},
+		PayloadType: 200,
 	}, RTPCodecTypeVideo))
 
-	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne), WithSettingEngine(s)).NewPeerConnection(Configuration{})
+	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne), WithSettingEngine(settingEngine)).NewPeerConnection(
+		Configuration{},
+	)
 	assert.NoError(t, err)
 
 	answerer, err := NewAPI(WithMediaEngine(mediaEngineTwo)).NewPeerConnection(Configuration{})
@@ -391,7 +413,7 @@ func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerer, answerer))
 
-	sendVideoUntilDone(onTrackFired.Done(), t, []*TrackLocalStaticSample{track})
+	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{track})
 
 	closePairNow(t, offerer, answerer)
 }

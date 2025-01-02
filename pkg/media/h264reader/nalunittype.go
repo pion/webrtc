@@ -5,10 +5,10 @@ package h264reader
 
 import "strconv"
 
-// NalUnitType is the type of a NAL
+// NalUnitType is the type of a NAL.
 type NalUnitType uint8
 
-// Enums for NalUnitTypes
+// Enums for NalUnitTypes.
 const (
 	NalUnitTypeUnspecified              NalUnitType = 0  // Unspecified
 	NalUnitTypeCodedSliceNonIdr         NalUnitType = 1  // Coded slice of a non-IDR picture
@@ -25,12 +25,12 @@ const (
 	NalUnitTypeFiller                   NalUnitType = 12 // Filler data
 	NalUnitTypeSpsExt                   NalUnitType = 13 // Sequence parameter set extension
 	NalUnitTypeCodedSliceAux            NalUnitType = 19 // Coded slice of an auxiliary coded picture without partitioning
-	// 14..18                                            // Reserved
-	// 20..23                                            // Reserved
-	// 24..31                                            // Unspecified
+	// 14..18                                            // Reserved.
+	// 20..23                                            // Reserved.
+	// 24..31                                            // Unspecified.
 )
 
-func (n *NalUnitType) String() string {
+func (n *NalUnitType) String() string { //nolint:cyclop
 	var str string
 	switch *n {
 	case NalUnitTypeUnspecified:
@@ -67,5 +67,6 @@ func (n *NalUnitType) String() string {
 		str = "Unknown"
 	}
 	str = str + "(" + strconv.FormatInt(int64(*n), 10) + ")"
+
 	return str
 }

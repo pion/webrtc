@@ -124,14 +124,14 @@ func TestIssue1734_NextNal(t *testing.T) {
 }
 
 func TestTrailing01AfterStartCode(t *testing.T) {
-	r, err := NewReader(bytes.NewReader([]byte{
+	reader, err := NewReader(bytes.NewReader([]byte{
 		0x0, 0x0, 0x0, 0x1, 0x01,
 		0x0, 0x0, 0x0, 0x1, 0x01,
 	}))
 	require.NoError(t, err)
 
 	for i := 0; i <= 1; i++ {
-		nal, err := r.NextNAL()
+		nal, err := reader.NextNAL()
 		require.NoError(t, err)
 		require.NotNil(t, nal)
 	}

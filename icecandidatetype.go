@@ -13,7 +13,7 @@ import (
 type ICECandidateType int
 
 const (
-	// ICECandidateTypeUnknown is the enum's zero-value
+	// ICECandidateTypeUnknown is the enum's zero-value.
 	ICECandidateTypeUnknown ICECandidateType = iota
 
 	// ICECandidateTypeHost indicates that the candidate is of Host type as
@@ -51,7 +51,7 @@ const (
 	iceCandidateTypeRelayStr = "relay"
 )
 
-// NewICECandidateType takes a string and converts it into ICECandidateType
+// NewICECandidateType takes a string and converts it into ICECandidateType.
 func NewICECandidateType(raw string) (ICECandidateType, error) {
 	switch raw {
 	case iceCandidateTypeHostStr:
@@ -95,6 +95,7 @@ func getCandidateType(candidateType ice.CandidateType) (ICECandidateType, error)
 	default:
 		// NOTE: this should never happen[tm]
 		err := fmt.Errorf("%w: %s", errICEInvalidConvertCandidateType, candidateType.String())
+
 		return ICECandidateTypeUnknown, err
 	}
 }
@@ -108,5 +109,6 @@ func (t ICECandidateType) MarshalText() ([]byte, error) {
 func (t *ICECandidateType) UnmarshalText(b []byte) error {
 	var err error
 	*t, err = NewICECandidateType(string(b))
+
 	return err
 }

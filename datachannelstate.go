@@ -7,7 +7,7 @@ package webrtc
 type DataChannelState int
 
 const (
-	// DataChannelStateUnknown is the enum's zero-value
+	// DataChannelStateUnknown is the enum's zero-value.
 	DataChannelStateUnknown DataChannelState = iota
 
 	// DataChannelStateConnecting indicates that the data channel is being
@@ -66,13 +66,14 @@ func (t DataChannelState) String() string {
 	}
 }
 
-// MarshalText implements encoding.TextMarshaler
+// MarshalText implements encoding.TextMarshaler.
 func (t DataChannelState) MarshalText() ([]byte, error) {
 	return []byte(t.String()), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (t *DataChannelState) UnmarshalText(b []byte) error {
 	*t = newDataChannelState(string(b))
+
 	return nil
 }

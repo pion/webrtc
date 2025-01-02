@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// Reader reads the RTPDump file format
+// Reader reads the RTPDump file format.
 type Reader struct {
 	readerMu sync.Mutex
 	reader   io.Reader
@@ -66,7 +66,7 @@ func NewReader(r io.Reader) (*Reader, Header, error) {
 	}, hdr, nil
 }
 
-// Next returns the next Packet in the Reader input stream
+// Next returns the next Packet in the Reader input stream.
 func (r *Reader) Next() (Packet, error) {
 	r.readerMu.Lock()
 	defer r.readerMu.Unlock()
@@ -81,16 +81,16 @@ func (r *Reader) Next() (Packet, error) {
 		return Packet{}, err
 	}
 
-	var h packetHeader
-	if err = h.Unmarshal(hBuf); err != nil {
+	var header packetHeader
+	if err = header.Unmarshal(hBuf); err != nil {
 		return Packet{}, err
 	}
 
-	if h.Length == 0 {
+	if header.Length == 0 {
 		return Packet{}, errMalformed
 	}
 
-	payload := make([]byte, h.Length-pktHeaderLen)
+	payload := make([]byte, header.Length-pktHeaderLen)
 	_, err = io.ReadFull(r.reader, payload)
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return Packet{}, errMalformed
@@ -100,8 +100,8 @@ func (r *Reader) Next() (Packet, error) {
 	}
 
 	return Packet{
-		Offset:  h.offset(),
-		IsRTCP:  h.PacketLength == 0,
+		Offset:  header.offset(),
+		IsRTCP:  header.PacketLength == 0,
 		Payload: payload,
 	}, nil
 }

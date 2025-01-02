@@ -42,26 +42,30 @@ func newRTPTransceiver(
 	t.setSender(sender)
 	t.setDirection(direction)
 	t.setCurrentDirection(RTPTransceiverDirectionUnknown)
+
 	return t
 }
 
 // SetCodecPreferences sets preferred list of supported codecs
-// if codecs is empty or nil we reset to default from MediaEngine
+// if codecs is empty or nil we reset to default from MediaEngine.
 func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	for _, codec := range codecs {
-		if _, matchType := codecParametersFuzzySearch(codec, t.api.mediaEngine.getCodecsByKind(t.kind)); matchType == codecMatchNone {
+		if _, matchType := codecParametersFuzzySearch(
+			codec, t.api.mediaEngine.getCodecsByKind(t.kind),
+		); matchType == codecMatchNone {
 			return fmt.Errorf("%w %s", errRTPTransceiverCodecUnsupported, codec.MimeType)
 		}
 	}
 
 	t.codecs = codecs
+
 	return nil
 }
 
-// Codecs returns list of supported codecs
+// Codecs returns list of supported codecs.
 func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -85,7 +89,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	return filteredCodecs
 }
 
-// Sender returns the RTPTransceiver's RTPSender if it has one
+// Sender returns the RTPTransceiver's RTPSender if it has one.
 func (t *RTPTransceiver) Sender() *RTPSender {
 	if v, ok := t.sender.Load().(*RTPSender); ok {
 		return v
@@ -94,9 +98,10 @@ func (t *RTPTransceiver) Sender() *RTPSender {
 	return nil
 }
 
-// SetSender sets the RTPSender and Track to current transceiver
+// SetSender sets the RTPSender and Track to current transceiver.
 func (t *RTPTransceiver) SetSender(s *RTPSender, track TrackLocal) error {
 	t.setSender(s)
+
 	return t.setSendingTrack(track)
 }
 
@@ -112,7 +117,7 @@ func (t *RTPTransceiver) setSender(s *RTPSender) {
 	t.sender.Store(s)
 }
 
-// Receiver returns the RTPTransceiver's RTPReceiver if it has one
+// Receiver returns the RTPTransceiver's RTPReceiver if it has one.
 func (t *RTPTransceiver) Receiver() *RTPReceiver {
 	if v, ok := t.receiver.Load().(*RTPReceiver); ok {
 		return v
@@ -127,6 +132,7 @@ func (t *RTPTransceiver) SetMid(mid string) error {
 		return fmt.Errorf("%w: %s to %s", errRTPTransceiverCannotChangeMid, currentMid, mid)
 	}
 	t.mid.Store(mid)
+
 	return nil
 }
 
@@ -135,6 +141,7 @@ func (t *RTPTransceiver) Mid() string {
 	if v, ok := t.mid.Load().(string); ok {
 		return v
 	}
+
 	return ""
 }
 
@@ -143,15 +150,16 @@ func (t *RTPTransceiver) Kind() RTPCodecType {
 	return t.kind
 }
 
-// Direction returns the RTPTransceiver's current direction
+// Direction returns the RTPTransceiver's current direction.
 func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 	if direction, ok := t.direction.Load().(RTPTransceiverDirection); ok {
 		return direction
 	}
+
 	return RTPTransceiverDirection(0)
 }
 
-// Stop irreversibly stops the RTPTransceiver
+// Stop irreversibly stops the RTPTransceiver.
 func (t *RTPTransceiver) Stop() error {
 	if sender := t.Sender(); sender != nil {
 		if err := sender.Stop(); err != nil {
@@ -166,6 +174,7 @@ func (t *RTPTransceiver) Stop() error {
 
 	t.setDirection(RTPTransceiverDirectionInactive)
 	t.setCurrentDirection(RTPTransceiverDirectionInactive)
+
 	return nil
 }
 
@@ -193,10 +202,11 @@ func (t *RTPTransceiver) getCurrentDirection() RTPTransceiverDirection {
 	if v, ok := t.currentDirection.Load().(RTPTransceiverDirection); ok {
 		return v
 	}
+
 	return RTPTransceiverDirectionUnknown
 }
 
-func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error {
+func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cyclop
 	if err := t.Sender().ReplaceTrack(track); err != nil {
 		return err
 	}
@@ -222,6 +232,7 @@ func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error {
 	default:
 		return errRTPTransceiverSetSendingInvalidState
 	}
+
 	return nil
 }
 
@@ -236,13 +247,21 @@ func findByMid(mid string, localTransceivers []*RTPTransceiver) (*RTPTransceiver
 }
 
 // Given a direction+type pluck a transceiver from the passed list
-// if no entry satisfies the requested type+direction return a inactive Transceiver
-func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransceiverDirection, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
+// if no entry satisfies the requested type+direction return a inactive Transceiver.
+func satisfyTypeAndDirection(
+	remoteKind RTPCodecType,
+	remoteDirection RTPTransceiverDirection,
+	localTransceivers []*RTPTransceiver,
+) (*RTPTransceiver, []*RTPTransceiver) {
 	// Get direction order from most preferred to least
 	getPreferredDirections := func() []RTPTransceiverDirection {
 		switch remoteDirection {
 		case RTPTransceiverDirectionSendrecv:
-			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionSendonly}
+			return []RTPTransceiverDirection{
+				RTPTransceiverDirectionRecvonly,
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionSendonly,
+			}
 		case RTPTransceiverDirectionSendonly:
 			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
 		case RTPTransceiverDirectionRecvonly:
@@ -265,11 +284,17 @@ func satisfyTypeAndDirection(remoteKind RTPCodecType, remoteDirection RTPTransce
 }
 
 // handleUnknownRTPPacket consumes a single RTP Packet and returns information that is helpful
-// for demuxing and handling an unknown SSRC (usually for Simulcast)
-func handleUnknownRTPPacket(buf []byte, midExtensionID, streamIDExtensionID, repairStreamIDExtensionID uint8, mid, rid, rsid *string) (payloadType PayloadType, paddingOnly bool, err error) {
+// for demuxing and handling an unknown SSRC (usually for Simulcast).
+func handleUnknownRTPPacket(
+	buf []byte,
+	midExtensionID,
+	streamIDExtensionID,
+	repairStreamIDExtensionID uint8,
+	mid, rid, rsid *string,
+) (payloadType PayloadType, paddingOnly bool, err error) {
 	rp := &rtp.Packet{}
 	if err = rp.Unmarshal(buf); err != nil {
-		return
+		return 0, false, err
 	}
 
 	if rp.Padding && len(rp.Payload) == 0 {
@@ -277,7 +302,7 @@ func handleUnknownRTPPacket(buf []byte, midExtensionID, streamIDExtensionID, rep
 	}
 
 	if !rp.Header.Extension {
-		return
+		return payloadType, paddingOnly, nil
 	}
 
 	payloadType = PayloadType(rp.PayloadType)
@@ -293,5 +318,5 @@ func handleUnknownRTPPacket(buf []byte, midExtensionID, streamIDExtensionID, rep
 		*rsid = string(payload)
 	}
 
-	return
+	return payloadType, paddingOnly, nil
 }

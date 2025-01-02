@@ -12,7 +12,7 @@ import (
 )
 
 // buildOggFile generates a valid oggfile that can
-// be used for tests
+// be used for tests.
 func buildOggContainer() []byte {
 	return []byte{
 		0x4f, 0x67, 0x67, 0x53, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
