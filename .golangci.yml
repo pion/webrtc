@@ -25,6 +25,23 @@ linters-settings:
       - ^os.Exit$
       - ^panic$
       - ^print(ln)?$
+  varnamelen:
+    max-distance: 12
+    min-name-length: 2
+    ignore-type-assert-ok: true
+    ignore-map-index-ok: true
+    ignore-chan-recv-ok: true
+    ignore-decls:
+      - pc *PeerConnection
+      - pc *webrtc.PeerConnection
+      - wg *sync.WaitGroup
+      - wg sync.WaitGroup
+      - i int
+      - n int
+      - m map[string]interface{}
+      - w io.Writer
+      - r io.Reader
+      - b []byte
 
 linters:
   enable:
