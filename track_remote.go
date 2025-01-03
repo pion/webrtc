@@ -106,7 +106,7 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 // Read reads data from the track.
 func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, err error) {
 	t.mu.RLock()
-	r := t.receiver
+	receiver := t.receiver
 	peeked := t.peeked != nil
 	t.mu.RUnlock()
 
@@ -128,7 +128,7 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
-	if rtxPacketReceived := r.readRTX(t); rtxPacketReceived != nil {
+	if rtxPacketReceived := receiver.readRTX(t); rtxPacketReceived != nil {
 		n = copy(b, rtxPacketReceived.pkt)
 		attributes = rtxPacketReceived.attributes
 		rtxPacketReceived.release()
@@ -136,7 +136,7 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 	} else {
 		// If there's no separate RTX track (or there's a separate RTX track but no RTX packet waiting), wait for and return
 		// a packet from the main track
-		n, attributes, err = r.readRTP(b, t)
+		n, attributes, err = receiver.readRTP(b, t)
 		if err != nil {
 			return
 		}

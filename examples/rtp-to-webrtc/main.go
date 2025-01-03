@@ -21,6 +21,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// nolint:cyclop
 func main() {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{

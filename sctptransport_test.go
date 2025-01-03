@@ -129,6 +129,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 }
 
 func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) {
+	// nolint:varnamelen
 	const N = 10
 	done := make(chan struct{}, N)
 	for i := 0; i < N; i++ {

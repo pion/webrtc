@@ -36,7 +36,6 @@ type ICETransport struct {
 	conn     *ice.Conn
 	mux      *mux.Mux
 
-	ctx       context.Context
 	ctxCancel func()
 
 	loggerFactory logging.LoggerFactory
@@ -134,7 +133,8 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 	t.role = *role
 
-	t.ctx, t.ctxCancel = context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	t.ctxCancel = ctxCancel
 
 	// Drop the lock here to allow ICE candidates to be
 	// added so that the agent can complete a connection
@@ -144,12 +144,12 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(t.ctx,
+		iceConn, err = agent.Dial(ctx,
 			params.UsernameFragment,
 			params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(t.ctx,
+		iceConn, err = agent.Accept(ctx,
 			params.UsernameFragment,
 			params.Password)
 
@@ -308,8 +308,8 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	defer t.lock.RUnlock()
 
 	var (
-		c   ice.Candidate
-		err error
+		candidate ice.Candidate
+		err       error
 	)
 
 	if err = t.ensureGatherer(); err != nil {
@@ -317,7 +317,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	}
 
 	if remoteCandidate != nil {
-		if c, err = remoteCandidate.toICE(); err != nil {
+		if candidate, err = remoteCandidate.toICE(); err != nil {
 			return err
 		}
 	}
@@ -327,7 +327,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 		return fmt.Errorf("%w: unable to add remote candidates", errICEAgentNotExist)
 	}
 
-	return agent.AddRemoteCandidate(c)
+	return agent.AddRemoteCandidate(candidate)
 }
 
 // State returns the current ice transport state.

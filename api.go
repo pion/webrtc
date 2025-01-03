@@ -29,38 +29,38 @@ type API struct {
 // It uses the default Codecs and Interceptors unless you customize them
 // using WithMediaEngine and WithInterceptorRegistry respectively.
 func NewAPI(options ...func(*API)) *API {
-	a := &API{
+	api := &API{
 		interceptor:   &interceptor.NoOp{},
 		settingEngine: &SettingEngine{},
 	}
 
 	for _, o := range options {
-		o(a)
+		o(api)
 	}
 
-	if a.settingEngine.LoggerFactory == nil {
-		a.settingEngine.LoggerFactory = logging.NewDefaultLoggerFactory()
+	if api.settingEngine.LoggerFactory == nil {
+		api.settingEngine.LoggerFactory = logging.NewDefaultLoggerFactory()
 	}
 
-	logger := a.settingEngine.LoggerFactory.NewLogger("api")
+	logger := api.settingEngine.LoggerFactory.NewLogger("api")
 
-	if a.mediaEngine == nil {
-		a.mediaEngine = &MediaEngine{}
-		err := a.mediaEngine.RegisterDefaultCodecs()
+	if api.mediaEngine == nil {
+		api.mediaEngine = &MediaEngine{}
+		err := api.mediaEngine.RegisterDefaultCodecs()
 		if err != nil {
 			logger.Errorf("Failed to register default codecs %s", err)
 		}
 	}
 
-	if a.interceptorRegistry == nil {
-		a.interceptorRegistry = &interceptor.Registry{}
-		err := RegisterDefaultInterceptors(a.mediaEngine, a.interceptorRegistry)
+	if api.interceptorRegistry == nil {
+		api.interceptorRegistry = &interceptor.Registry{}
+		err := RegisterDefaultInterceptors(api.mediaEngine, api.interceptorRegistry)
 		if err != nil {
 			logger.Errorf("Failed to register default interceptors %s", err)
 		}
 	}
 
-	return a
+	return api
 }
 
 // WithMediaEngine allows providing a MediaEngine to the API.

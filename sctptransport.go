@@ -163,7 +163,7 @@ func (r *SCTPTransport) Stop() error {
 	return nil
 }
 
-func (r *SCTPTransport) acceptDataChannels(a *sctp.Association, existingDataChannels []*DataChannel) {
+func (r *SCTPTransport) acceptDataChannels(assoc *sctp.Association, existingDataChannels []*DataChannel) {
 	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
 	for _, dc := range existingDataChannels {
 		dc.mu.Lock()
@@ -176,7 +176,7 @@ func (r *SCTPTransport) acceptDataChannels(a *sctp.Association, existingDataChan
 	}
 ACCEPT:
 	for {
-		dc, err := datachannel.Accept(a, &datachannel.Config{
+		dc, err := datachannel.Accept(assoc, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
 		if err != nil {

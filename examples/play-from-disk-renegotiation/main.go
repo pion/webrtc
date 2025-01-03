@@ -25,9 +25,9 @@ var peerConnection *webrtc.PeerConnection //nolint
 
 // doSignaling exchanges all state of the local PeerConnection and is called
 // every time a video is added or removed
-func doSignaling(w http.ResponseWriter, r *http.Request) {
+func doSignaling(res http.ResponseWriter, req *http.Request) {
 	var offer webrtc.SessionDescription
-	if err := json.NewDecoder(r.Body).Decode(&offer); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&offer); err != nil {
 		panic(err)
 	}
 
@@ -55,24 +55,24 @@ func doSignaling(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(response); err != nil {
+	res.Header().Set("Content-Type", "application/json")
+	if _, err := res.Write(response); err != nil {
 		panic(err)
 	}
 }
 
 // Add a single video track
-func createPeerConnection(w http.ResponseWriter, r *http.Request) {
+func createPeerConnection(res http.ResponseWriter, req *http.Request) {
 	if peerConnection.ConnectionState() != webrtc.PeerConnectionStateNew {
 		panic(fmt.Sprintf("createPeerConnection called in non-new state (%s)", peerConnection.ConnectionState()))
 	}
 
-	doSignaling(w, r)
+	doSignaling(res, req)
 	fmt.Println("PeerConnection has been created")
 }
 
 // Add a single video track
-func addVideo(w http.ResponseWriter, r *http.Request) {
+func addVideo(res http.ResponseWriter, req *http.Request) {
 	videoTrack, err := webrtc.NewTrackLocalStaticSample(
 		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8},
 		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
@@ -99,19 +99,19 @@ func addVideo(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	go writeVideoToTrack(videoTrack)
-	doSignaling(w, r)
+	doSignaling(res, req)
 	fmt.Println("Video track has been added")
 }
 
 // Remove a single sender
-func removeVideo(w http.ResponseWriter, r *http.Request) {
+func removeVideo(res http.ResponseWriter, req *http.Request) {
 	if senders := peerConnection.GetSenders(); len(senders) != 0 {
 		if err := peerConnection.RemoveTrack(senders[0]); err != nil {
 			panic(err)
 		}
 	}
 
-	doSignaling(w, r)
+	doSignaling(res, req)
 	fmt.Println("Video track has been removed")
 }
 
@@ -130,10 +130,10 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
 
-		if s == webrtc.PeerConnectionStateFailed {
+		if state == webrtc.PeerConnectionStateFailed {
 			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
 			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
 			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
@@ -141,7 +141,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if s == webrtc.PeerConnectionStateClosed {
+		if state == webrtc.PeerConnectionStateClosed {
 			// PeerConnection was explicitly closed. This usually happens from a DTLS CloseNotify
 			fmt.Println("Peer Connection has gone to closed exiting")
 			os.Exit(0)
@@ -165,7 +165,7 @@ func main() {
 
 // Read a video file from disk and write it to a webrtc.Track
 // When the video has been completely read this exits without error
-func writeVideoToTrack(t *webrtc.TrackLocalStaticSample) {
+func writeVideoToTrack(track *webrtc.TrackLocalStaticSample) {
 	// Open a IVF file and start reading using our IVFReader
 	file, err := os.Open("output.ivf")
 	if err != nil {
@@ -192,7 +192,7 @@ func writeVideoToTrack(t *webrtc.TrackLocalStaticSample) {
 			return
 		}
 
-		if err = t.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
+		if err = track.WriteSample(media.Sample{Data: frame, Duration: time.Second}); err != nil {
 			fmt.Printf("Finish writing video track: %s ", err)
 			return
 		}

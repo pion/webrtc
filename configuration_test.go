@@ -43,7 +43,7 @@ func TestConfiguration_getICEServers(t *testing.T) {
 }
 
 func TestConfigurationJSON(t *testing.T) {
-	j := `{
+	config := `{
     "iceServers": [{"urls": ["turn:turn.example.org"],
                     "username": "jch",
                     "credential": "topsecret"
@@ -67,7 +67,7 @@ func TestConfigurationJSON(t *testing.T) {
 	}
 
 	var conf2 Configuration
-	assert.NoError(t, json.Unmarshal([]byte(j), &conf2))
+	assert.NoError(t, json.Unmarshal([]byte(config), &conf2))
 	assert.Equal(t, conf, conf2)
 
 	j2, err := json.Marshal(conf2)

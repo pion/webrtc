@@ -301,14 +301,14 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 
 		done := make(chan bool)
 
-		answerPC.OnDataChannel(func(d *DataChannel) {
+		answerPC.OnDataChannel(func(dataChannel *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
 			// created in signalPair).
-			if d.Label() != expectedLabel {
+			if dataChannel.Label() != expectedLabel {
 				return
 			}
 			var nPacketsReceived int
-			d.OnMessage(func(DataChannelMessage) {
+			dataChannel.OnMessage(func(DataChannelMessage) {
 				nPacketsReceived++
 
 				if nPacketsReceived == 10 {
@@ -318,7 +318,7 @@ func TestDataChannelBufferedAmount(t *testing.T) {
 					}()
 				}
 			})
-			assert.True(t, d.Ordered(), "Ordered should be set to true")
+			assert.True(t, dataChannel.Ordered(), "Ordered should be set to true")
 		})
 
 		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)

@@ -74,7 +74,7 @@ func TestExtractFingerprint(t *testing.T) {
 	})
 
 	t.Run("Fingerprint from master bundle section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{
 				{Key: "group", Value: "BUNDLE 1 0"},
 			},
@@ -90,14 +90,14 @@ func TestExtractFingerprint(t *testing.T) {
 			},
 		}
 
-		fingerprint, hash, err := extractFingerprint(s)
+		fingerprint, hash, err := extractFingerprint(descr)
 		assert.NoError(t, err)
 		assert.Equal(t, fingerprint, "foo")
 		assert.Equal(t, hash, "bar")
 	})
 
 	t.Run("Fingerprint from first media section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{Attributes: []sdp.Attribute{
 					{Key: "mid", Value: "0"},
@@ -110,7 +110,7 @@ func TestExtractFingerprint(t *testing.T) {
 			},
 		}
 
-		fingerprint, hash, err := extractFingerprint(s)
+		fingerprint, hash, err := extractFingerprint(descr)
 		assert.NoError(t, err)
 		assert.Equal(t, fingerprint, "boo")
 		assert.Equal(t, hash, "zoo")
@@ -179,7 +179,7 @@ func TestExtractICEDetails(t *testing.T) {
 	})
 
 	t.Run("ice details at session preferred over media", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{
 				{Key: "ice-ufrag", Value: defaultUfrag},
 				{Key: "ice-pwd", Value: defaultPwd},
@@ -194,14 +194,14 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		ufrag, pwd, _, err := extractICEDetails(descr, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
 	})
 
 	t.Run("ice details from bundle media section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{
 				{Key: "group", Value: "BUNDLE 5 2"},
 			},
@@ -223,14 +223,14 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		ufrag, pwd, _, err := extractICEDetails(descr, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
 	})
 
 	t.Run("ice details from first media section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					Attributes: []sdp.Attribute{
@@ -247,7 +247,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
+		ufrag, pwd, _, err := extractICEDetails(descr, nil)
 		assert.Equal(t, ufrag, defaultUfrag)
 		assert.Equal(t, pwd, defaultPwd)
 		assert.NoError(t, err)
@@ -268,7 +268,7 @@ func TestExtractICEDetails(t *testing.T) {
 
 func TestTrackDetailsFromSDP(t *testing.T) {
 	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
@@ -325,7 +325,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			},
 		}
 
-		tracks := trackDetailsFromSDP(nil, s)
+		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 3, len(tracks))
 		if trackDetail := trackDetailsForSSRC(tracks, 1000); trackDetail != nil {
 			assert.Fail(t, "got the unknown track ssrc:1000 which should have been skipped")
@@ -358,7 +358,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 	})
 
 	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
@@ -380,11 +380,11 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 			},
 		}
-		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, s)))
+		assert.Equal(t, 0, len(trackDetailsFromSDP(nil, descr)))
 	})
 
 	t.Run("ssrc-group after ssrc", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
@@ -413,7 +413,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			},
 		}
 
-		tracks := trackDetailsFromSDP(nil, s)
+		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 2, len(tracks))
 		assert.Equal(t, SSRC(4000), *tracks[0].repairSsrc)
 		assert.Equal(t, SSRC(6000), *tracks[1].repairSsrc)
@@ -422,7 +422,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 func TestHaveApplicationMediaSection(t *testing.T) {
 	t.Run("Audio only", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
@@ -436,7 +436,7 @@ func TestHaveApplicationMediaSection(t *testing.T) {
 			},
 		}
 
-		assert.False(t, haveApplicationMediaSection(s))
+		assert.False(t, haveApplicationMediaSection(descr))
 	})
 
 	t.Run("Application", func(t *testing.T) {
@@ -767,7 +767,7 @@ func TestPopulateSDP(t *testing.T) {
 }
 
 func TestGetRIDs(t *testing.T) {
-	m := []*sdp.MediaDescription{
+	mediaDescr := []*sdp.MediaDescription{
 		{
 			MediaName: sdp.MediaName{
 				Media: "video",
@@ -779,7 +779,7 @@ func TestGetRIDs(t *testing.T) {
 		},
 	}
 
-	rids := getRids(m[0])
+	rids := getRids(mediaDescr[0])
 
 	assert.NotEmpty(t, rids, "Rid mapping should be present")
 	found := false
@@ -974,23 +974,23 @@ a=sendrecv
 				}
 			}
 
-			m := &MediaEngine{}
-			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			me := &MediaEngine{}
+			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
 				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
 				PayloadType:        101,
 			}, RTPCodecTypeAudio))
-			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
 				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
 				PayloadType:        96,
 			}, RTPCodecTypeVideo))
 			if testCase.enableRTXInMediaEngine {
-				assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+				assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
 					RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRTX, ClockRate: 90000, Channels: 0, SDPFmtpLine: "apt=96", RTCPFeedback: nil},
 					PayloadType:        97,
 				}, RTPCodecTypeVideo))
 			}
 
-			peerConnection, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+			peerConnection, err := NewAPI(WithMediaEngine(me)).NewPeerConnection(Configuration{})
 			assert.NoError(t, err)
 
 			audioTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio-id", "stream-id")

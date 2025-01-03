@@ -249,7 +249,7 @@ func TestReader(t *testing.T) {
 			WantErr: nil,
 		},
 	} {
-		r, hdr, err := NewReader(bytes.NewReader(test.Data))
+		reader, hdr, err := NewReader(bytes.NewReader(test.Data))
 		if err != nil {
 			if got, want := err, test.WantErr; !errors.Is(got, want) {
 				t.Fatalf("NewReader(%s) err=%v want %v", test.Name, got, want)
@@ -264,7 +264,7 @@ func TestReader(t *testing.T) {
 		var nextErr error
 		var packets []Packet
 		for {
-			pkt, err := r.Next()
+			pkt, err := reader.Next()
 			if errors.Is(err, io.EOF) {
 				break
 			}

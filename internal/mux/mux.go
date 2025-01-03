@@ -47,7 +47,7 @@ type Mux struct {
 
 // NewMux creates a new Mux
 func NewMux(config Config) *Mux {
-	m := &Mux{
+	mux := &Mux{
 		nextConn:   config.Conn,
 		endpoints:  make(map[*Endpoint]MatchFunc),
 		bufferSize: config.BufferSize,
@@ -55,28 +55,28 @@ func NewMux(config Config) *Mux {
 		log:        config.LoggerFactory.NewLogger("mux"),
 	}
 
-	go m.readLoop()
+	go mux.readLoop()
 
-	return m
+	return mux
 }
 
 // NewEndpoint creates a new Endpoint
-func (m *Mux) NewEndpoint(f MatchFunc) *Endpoint {
-	e := &Endpoint{
+func (m *Mux) NewEndpoint(matchFunc MatchFunc) *Endpoint {
+	endpoint := &Endpoint{
 		mux:    m,
 		buffer: packetio.NewBuffer(),
 	}
 
 	// Set a maximum size of the buffer in bytes.
-	e.buffer.SetLimitSize(maxBufferSize)
+	endpoint.buffer.SetLimitSize(maxBufferSize)
 
 	m.lock.Lock()
-	m.endpoints[e] = f
+	m.endpoints[endpoint] = matchFunc
 	m.lock.Unlock()
 
-	go m.handlePendingPackets(e, f)
+	go m.handlePendingPackets(endpoint, matchFunc)
 
-	return e
+	return endpoint
 }
 
 // RemoveEndpoint removes an endpoint from the Mux

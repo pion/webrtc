@@ -305,12 +305,12 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 	const numPackets = 20
 
 	ir := interceptor.Registry{}
-	m := MediaEngine{}
+	mediaEngine := MediaEngine{}
 	var capability []RTCPFeedback
 	if requestNack {
 		capability = append(capability, RTCPFeedback{"nack", ""})
 	}
-	err := m.RegisterCodec(
+	err := mediaEngine.RegisterCodec(
 		RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
 				"video/VP8", 90000, 0,
@@ -323,7 +323,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 	)
 	assert.NoError(t, err)
 	api := NewAPI(
-		WithMediaEngine(&m),
+		WithMediaEngine(&mediaEngine),
 		WithInterceptorRegistry(&ir),
 	)
 

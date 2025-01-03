@@ -93,7 +93,7 @@ func (api *API) newDataChannel(params *DataChannelParameters, sctpTransport *SCT
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
 	}
 
-	d := &DataChannel{
+	dataChannel := &DataChannel{
 		sctpTransport:     sctpTransport,
 		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
 		label:             params.Label,
@@ -107,8 +107,8 @@ func (api *API) newDataChannel(params *DataChannelParameters, sctpTransport *SCT
 		log:               log,
 	}
 
-	d.setReadyState(DataChannelStateConnecting)
-	return d, nil
+	dataChannel.setReadyState(DataChannelStateConnecting)
+	return dataChannel, nil
 }
 
 // open opens the datachannel over the sctp transport
@@ -399,11 +399,11 @@ func (d *DataChannel) readLoop() {
 			return
 		}
 
-		m := DataChannelMessage{Data: make([]byte, n), IsString: isString}
-		copy(m.Data, buffer[:n])
+		msg := DataChannelMessage{Data: make([]byte, n), IsString: isString}
+		copy(msg.Data, buffer[:n])
 
 		// NB: Why was DataChannelMessage not passed as a pointer value?
-		d.onMessage(m) // nolint:staticcheck
+		d.onMessage(msg) // nolint:staticcheck
 	}
 }
 

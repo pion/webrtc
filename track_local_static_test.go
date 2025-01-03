@@ -50,13 +50,13 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP9", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
 			PayloadType:        96,
 		}, RTPCodecTypeVideo))
 
-		vp9OnlyPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+		vp9OnlyPC, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
 		_, err = vp9OnlyPC.AddTransceiverFromKind(RTPCodecTypeVideo)
