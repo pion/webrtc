@@ -49,10 +49,10 @@ func serve(addr string) error {
 
 	// Serve the required pages
 	// DIY 'mux' to avoid additional dependencies
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		url := r.URL.Path
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		url := req.URL.Path
 		if url == "/wasm_exec.js" {
-			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "misc/wasm/"))).ServeHTTP(w, r)
+			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "misc/wasm/"))).ServeHTTP(res, req)
 			return
 		}
 
@@ -73,7 +73,7 @@ func serve(addr string) error {
 				}
 				fiddle := filepath.Join(exampleLink, "jsfiddle")
 				if len(parts[4]) != 0 {
-					http.StripPrefix("/example/"+exampleType+"/"+exampleLink+"/", http.FileServer(http.Dir(fiddle))).ServeHTTP(w, r)
+					http.StripPrefix("/example/"+exampleType+"/"+exampleLink+"/", http.FileServer(http.Dir(fiddle))).ServeHTTP(res, req)
 					return
 				}
 
@@ -91,7 +91,7 @@ func serve(addr string) error {
 					exampleType == "js",
 				}
 
-				err = temp.Execute(w, data)
+				err = temp.Execute(res, data)
 				if err != nil {
 					panic(err)
 				}
@@ -100,7 +100,7 @@ func serve(addr string) error {
 		}
 
 		// Serve the main page
-		err := homeTemplate.Execute(w, examples)
+		err := homeTemplate.Execute(res, examples)
 		if err != nil {
 			panic(err)
 		}

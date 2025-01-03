@@ -308,8 +308,8 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	defer t.lock.RUnlock()
 
 	var (
-		c   ice.Candidate
-		err error
+		candidate ice.Candidate
+		err       error
 	)
 
 	if err = t.ensureGatherer(); err != nil {
@@ -317,7 +317,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	}
 
 	if remoteCandidate != nil {
-		if c, err = remoteCandidate.toICE(); err != nil {
+		if candidate, err = remoteCandidate.toICE(); err != nil {
 			return err
 		}
 	}
@@ -327,7 +327,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 		return fmt.Errorf("%w: unable to add remote candidates", errICEAgentNotExist)
 	}
 
-	return agent.AddRemoteCandidate(c)
+	return agent.AddRemoteCandidate(candidate)
 }
 
 // State returns the current ice transport state.

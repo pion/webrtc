@@ -58,9 +58,9 @@ func main() {
 		}
 	}
 
-	i := &interceptor.Registry{}
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	interceptorRegistry := &interceptor.Registry{}
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -81,17 +81,17 @@ func main() {
 		estimatorChan <- estimator
 	})
 
-	i.Add(congestionController)
-	if err = webrtc.ConfigureTWCCHeaderExtensionSender(m, i); err != nil {
+	interceptorRegistry.Add(congestionController)
+	if err = webrtc.ConfigureTWCCHeaderExtensionSender(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
-	if err = webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithInterceptorRegistry(i), webrtc.WithMediaEngine(m)).NewPeerConnection(webrtc.Configuration{
+	peerConnection, err := webrtc.NewAPI(webrtc.WithInterceptorRegistry(interceptorRegistry), webrtc.WithMediaEngine(mediaEngine)).NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
@@ -141,8 +141,8 @@ func main() {
 
 	// Set the handler for Peer connection state
 	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", s.String())
+	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
 	})
 
 	// Wait for the offer to be pasted

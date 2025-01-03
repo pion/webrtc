@@ -59,13 +59,13 @@ type IVFReader struct {
 
 // NewWith returns a new IVF reader and IVF file header
 // with an io.Reader input
-func NewWith(in io.Reader) (*IVFReader, *IVFFileHeader, error) {
-	if in == nil {
+func NewWith(stream io.Reader) (*IVFReader, *IVFFileHeader, error) {
+	if stream == nil {
 		return nil, nil, errNilStream
 	}
 
 	reader := &IVFReader{
-		stream: in,
+		stream: stream,
 	}
 
 	header, err := reader.parseFileHeader()

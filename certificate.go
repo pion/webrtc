@@ -67,22 +67,22 @@ func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, 
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
-func (c Certificate) Equals(o Certificate) bool {
+func (c Certificate) Equals(cert Certificate) bool {
 	switch cSK := c.privateKey.(type) {
 	case *rsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
+		if oSK, ok := cert.privateKey.(*rsa.PrivateKey); ok {
 			if cSK.N.Cmp(oSK.N) != 0 {
 				return false
 			}
-			return c.x509Cert.Equal(o.x509Cert)
+			return c.x509Cert.Equal(cert.x509Cert)
 		}
 		return false
 	case *ecdsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
+		if oSK, ok := cert.privateKey.(*ecdsa.PrivateKey); ok {
 			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
 				return false
 			}
-			return c.x509Cert.Equal(o.x509Cert)
+			return c.x509Cert.Equal(cert.x509Cert)
 		}
 		return false
 	default:
@@ -213,11 +213,11 @@ func CertificateFromPEM(pems string) (*Certificate, error) {
 // certificate and the other for the private key
 func (c Certificate) PEM() (string, error) {
 	// First write the X509 certificate
-	var o strings.Builder
+	var builder strings.Builder
 	xcertBytes := make(
 		[]byte, base64.StdEncoding.EncodedLen(len(c.x509Cert.Raw)))
 	base64.StdEncoding.Encode(xcertBytes, c.x509Cert.Raw)
-	err := pem.Encode(&o, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
+	err := pem.Encode(&builder, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
 	if err != nil {
 		return "", fmt.Errorf("failed to pem encode the X certificate: %w", err)
 	}
@@ -226,9 +226,9 @@ func (c Certificate) PEM() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal private key: %w", err)
 	}
-	err = pem.Encode(&o, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	err = pem.Encode(&builder, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 	if err != nil {
 		return "", fmt.Errorf("failed to encode private key: %w", err)
 	}
-	return o.String(), nil
+	return builder.String(), nil
 }

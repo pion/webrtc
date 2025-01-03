@@ -420,17 +420,17 @@ func Test_RTPSender_FEC_Support(t *testing.T) {
 	})
 
 	t.Run("FEC can be enabled", func(t *testing.T) {
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil},
 			PayloadType:        95,
 		}, RTPCodecTypeVideo))
 
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 		assert.NoError(t, err)
@@ -463,12 +463,12 @@ func Test_RTPSender_RTX_Support(t *testing.T) {
 	})
 
 	t.Run("RTX can be disabled", func(t *testing.T) {
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 		assert.NoError(t, err)

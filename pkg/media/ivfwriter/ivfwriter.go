@@ -53,15 +53,15 @@ type IVFWriter struct {
 
 // New builds a new IVF writer
 func New(fileName string, opts ...Option) (*IVFWriter, error) {
-	f, err := os.Create(fileName) //nolint:gosec
+	file, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	writer, err := NewWith(f, opts...)
+	writer, err := NewWith(file, opts...)
 	if err != nil {
 		return nil, err
 	}
-	writer.ioWriter = f
+	writer.ioWriter = file
 	return writer, nil
 }
 

@@ -73,8 +73,8 @@ func main() {
 	})
 
 	gatherFinished := make(chan struct{})
-	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
-		if i == nil {
+	gatherer.OnLocalCandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			close(gatherFinished)
 		}
 	})
@@ -245,9 +245,9 @@ func decode(in string, obj *Signal) {
 // httpSDPServer starts a HTTP Server that consumes SDPs
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

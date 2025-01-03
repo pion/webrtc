@@ -320,8 +320,8 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	s := SettingEngine{}
 	s.SetICETimeouts(time.Second/2, time.Second/2, time.Second/8)
 
-	m := &MediaEngine{}
-	assert.NoError(t, m.RegisterDefaultCodecs())
+	mediaEngine := &MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
 	pcOffer, pcAnswer, wan := createVNetPair(t, nil)
 
@@ -472,12 +472,12 @@ func TestUndeclaredSSRC(t *testing.T) {
 	t.Run("Has RID", func(t *testing.T) {
 		unhandledSimulcastError := make(chan struct{})
 
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
 		pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(SettingEngine{
 			LoggerFactory: &undeclaredSsrcLoggerFactory{unhandledSimulcastError},
-		}), WithMediaEngine(m)).newPair(Configuration{})
+		}), WithMediaEngine(mediaEngine)).newPair(Configuration{})
 		assert.NoError(t, err)
 
 		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
@@ -1044,13 +1044,13 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	t.Run("Break NonSimulcast", func(t *testing.T) {
 		unhandledSimulcastError := make(chan struct{})
 
-		m := &MediaEngine{}
-		assert.NoError(t, m.RegisterDefaultCodecs())
-		assert.NoError(t, ConfigureSimulcastExtensionHeaders(m))
+		mediaEngine := &MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
+		assert.NoError(t, ConfigureSimulcastExtensionHeaders(mediaEngine))
 
 		pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(SettingEngine{
 			LoggerFactory: &undeclaredSsrcLoggerFactory{unhandledSimulcastError},
-		}), WithMediaEngine(m)).newPair(Configuration{})
+		}), WithMediaEngine(mediaEngine)).newPair(Configuration{})
 		assert.NoError(t, err)
 
 		firstTrack, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "firstTrack", "firstTrack")
@@ -1149,9 +1149,9 @@ func TestPeerConnection_CreateOffer_NoCodecs(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	m := &MediaEngine{}
+	mediaEngine := &MediaEngine{}
 
-	pc, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	pc, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")

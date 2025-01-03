@@ -631,12 +631,12 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 		}
 	} else {
 		mediaHeaderExtensions := make(map[int]mediaEngineHeaderExtension)
-		for _, e := range m.headerExtensions {
+		for _, ext := range m.headerExtensions {
 			usingNegotiatedID := false
 			for id := range m.negotiatedHeaderExtensions {
-				if m.negotiatedHeaderExtensions[id].uri == e.uri {
+				if m.negotiatedHeaderExtensions[id].uri == ext.uri {
 					usingNegotiatedID = true
-					mediaHeaderExtensions[id] = e
+					mediaHeaderExtensions[id] = ext
 					break
 				}
 			}
@@ -647,7 +647,7 @@ func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPT
 						idAvailable = false
 					}
 					if _, taken := m.negotiatedHeaderExtensions[id]; idAvailable && !taken {
-						mediaHeaderExtensions[id] = e
+						mediaHeaderExtensions[id] = ext
 						break
 					}
 				}

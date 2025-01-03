@@ -46,15 +46,15 @@ type OggWriter struct {
 
 // New builds a new OGG Opus writer
 func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	f, err := os.Create(fileName) //nolint:gosec
+	file, err := os.Create(fileName) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-	writer, err := NewWith(f, sampleRate, channelCount)
+	writer, err := NewWith(file, sampleRate, channelCount)
 	if err != nil {
-		return nil, f.Close()
+		return nil, file.Close()
 	}
-	writer.fd = f
+	writer.fd = file
 	return writer, nil
 }
 
@@ -264,14 +264,14 @@ func generateChecksumTable() *[256]uint32 {
 	const poly = 0x04c11db7
 
 	for i := range table {
-		r := uint32(i) << 24
+		remainder := uint32(i) << 24
 		for j := 0; j < 8; j++ {
-			if (r & 0x80000000) != 0 {
-				r = (r << 1) ^ poly
+			if (remainder & 0x80000000) != 0 {
+				remainder = (remainder << 1) ^ poly
 			} else {
-				r <<= 1
+				remainder <<= 1
 			}
-			table[i] = (r & 0xffffffff)
+			table[i] = (remainder & 0xffffffff)
 		}
 	}
 	return &table

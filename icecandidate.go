@@ -40,34 +40,34 @@ func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, err
 	return candidates, nil
 }
 
-func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
-	typ, err := convertTypeFromICE(i.Type())
+func newICECandidateFromICE(candidate ice.Candidate) (ICECandidate, error) {
+	typ, err := convertTypeFromICE(candidate.Type())
 	if err != nil {
 		return ICECandidate{}, err
 	}
-	protocol, err := NewICEProtocol(i.NetworkType().NetworkShort())
+	protocol, err := NewICEProtocol(candidate.NetworkType().NetworkShort())
 	if err != nil {
 		return ICECandidate{}, err
 	}
 
-	c := ICECandidate{
-		statsID:    i.ID(),
-		Foundation: i.Foundation(),
-		Priority:   i.Priority(),
-		Address:    i.Address(),
+	newCandidate := ICECandidate{
+		statsID:    candidate.ID(),
+		Foundation: candidate.Foundation(),
+		Priority:   candidate.Priority(),
+		Address:    candidate.Address(),
 		Protocol:   protocol,
-		Port:       uint16(i.Port()),
-		Component:  i.Component(),
+		Port:       uint16(candidate.Port()),
+		Component:  candidate.Component(),
 		Typ:        typ,
-		TCPType:    i.TCPType().String(),
+		TCPType:    candidate.TCPType().String(),
 	}
 
-	if i.RelatedAddress() != nil {
-		c.RelatedAddress = i.RelatedAddress().Address
-		c.RelatedPort = uint16(i.RelatedAddress().Port)
+	if candidate.RelatedAddress() != nil {
+		newCandidate.RelatedAddress = candidate.RelatedAddress().Address
+		newCandidate.RelatedPort = uint16(candidate.RelatedAddress().Port)
 	}
 
-	return c, nil
+	return newCandidate, nil
 }
 
 func (c ICECandidate) toICE() (ice.Candidate, error) {

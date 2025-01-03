@@ -42,8 +42,8 @@ func main() {
 		},
 	}
 
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -51,10 +51,10 @@ func main() {
 	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
 	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
 	// for each PeerConnection.
-	i := &interceptor.Registry{}
+	interceptorRegistry := &interceptor.Registry{}
 
 	// Use the default set of Interceptors
-	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
@@ -66,10 +66,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	i.Add(intervalPliFactory)
+	interceptorRegistry.Add(intervalPliFactory)
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(peerConnectionConfig)
+	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(interceptorRegistry)).NewPeerConnection(peerConnectionConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -225,9 +225,9 @@ func decode(in string, obj *webrtc.SessionDescription) {
 // httpSDPServer starts a HTTP Server that consumes SDPs
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

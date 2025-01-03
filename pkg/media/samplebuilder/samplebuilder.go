@@ -177,17 +177,17 @@ func (s *SampleBuilder) purgeBuffers(flush bool) {
 //
 // Push does not copy the input. If you wish to reuse
 // this memory make sure to copy before calling Push
-func (s *SampleBuilder) Push(p *rtp.Packet) {
-	s.buffer[p.SequenceNumber] = p
+func (s *SampleBuilder) Push(packet *rtp.Packet) {
+	s.buffer[packet.SequenceNumber] = packet
 
-	switch s.filled.compare(p.SequenceNumber) {
+	switch s.filled.compare(packet.SequenceNumber) {
 	case slCompareVoid:
-		s.filled.head = p.SequenceNumber
-		s.filled.tail = p.SequenceNumber + 1
+		s.filled.head = packet.SequenceNumber
+		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareBefore:
-		s.filled.head = p.SequenceNumber
+		s.filled.head = packet.SequenceNumber
 	case slCompareAfter:
-		s.filled.tail = p.SequenceNumber + 1
+		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareInside:
 		break
 	}
@@ -282,7 +282,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var metadata interface{}
 	var rtpHeaders []*rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
-		p, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
+		payload, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
 			return nil
 		}
@@ -294,7 +294,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 			rtpHeaders = append(rtpHeaders, &h)
 		}
 
-		data = append(data, p...)
+		data = append(data, payload...)
 	}
 	samples := afterTimestamp - sampleTimestamp
 

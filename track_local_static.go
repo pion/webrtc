@@ -68,20 +68,20 @@ func WithPayloader(h func(RTPCodecCapability) (rtp.Payloader, error)) func(*Trac
 // Bind is called by the PeerConnection after negotiation is complete
 // This asserts that the code requested is supported by the remote peer.
 // If so it sets up all the state (SSRC and PayloadType) to have a call
-func (s *TrackLocalStaticRTP) Bind(t TrackLocalContext) (RTPCodecParameters, error) {
+func (s *TrackLocalStaticRTP) Bind(trackContext TrackLocalContext) (RTPCodecParameters, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	parameters := RTPCodecParameters{RTPCodecCapability: s.codec}
-	if codec, matchType := codecParametersFuzzySearch(parameters, t.CodecParameters()); matchType != codecMatchNone {
+	if codec, matchType := codecParametersFuzzySearch(parameters, trackContext.CodecParameters()); matchType != codecMatchNone {
 		s.bindings = append(s.bindings, trackBinding{
-			ssrc:           t.SSRC(),
-			ssrcRTX:        t.SSRCRetransmission(),
-			ssrcFEC:        t.SSRCForwardErrorCorrection(),
+			ssrc:           trackContext.SSRC(),
+			ssrcRTX:        trackContext.SSRCRetransmission(),
+			ssrcFEC:        trackContext.SSRCForwardErrorCorrection(),
 			payloadType:    codec.PayloadType,
-			payloadTypeRTX: findRTXPayloadType(codec.PayloadType, t.CodecParameters()),
-			writeStream:    t.WriteStream(),
-			id:             t.ID(),
+			payloadTypeRTX: findRTXPayloadType(codec.PayloadType, trackContext.CodecParameters()),
+			writeStream:    trackContext.WriteStream(),
+			id:             trackContext.ID(),
 		})
 
 		return codec, nil
@@ -168,16 +168,16 @@ func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 }
 
 // writeRTP is like WriteRTP, except that it may modify the packet p
-func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
+func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	writeErrs := []error{}
 
 	for _, b := range s.bindings {
-		p.Header.SSRC = uint32(b.ssrc)
-		p.Header.PayloadType = uint8(b.payloadType)
-		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
+		packet.Header.SSRC = uint32(b.ssrc)
+		packet.Header.PayloadType = uint8(b.payloadType)
+		if _, err := b.writeStream.WriteRTP(&packet.Header, packet.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
 	}
@@ -293,11 +293,11 @@ func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 	s.rtpTrack.mu.RLock()
-	p := s.packetizer
+	packetizer := s.packetizer
 	clockRate := s.clockRate
 	s.rtpTrack.mu.RUnlock()
 
-	if p == nil {
+	if packetizer == nil {
 		return nil
 	}
 
@@ -308,9 +308,9 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 
 	samples := uint32(sample.Duration.Seconds() * clockRate)
 	if sample.PrevDroppedPackets > 0 {
-		p.SkipSamples(samples * uint32(sample.PrevDroppedPackets))
+		packetizer.SkipSamples(samples * uint32(sample.PrevDroppedPackets))
 	}
-	packets := p.Packetize(sample.Data, samples)
+	packets := packetizer.Packetize(sample.Data, samples)
 
 	writeErrs := []error{}
 	for _, p := range packets {

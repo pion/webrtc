@@ -69,7 +69,7 @@ type simulcastStreamPair struct {
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
-	t := &DTLSTransport{
+	trans := &DTLSTransport{
 		iceTransport: transport,
 		api:          api,
 		state:        DTLSTransportStateNew,
@@ -84,7 +84,7 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 			if !x509Cert.Expires().IsZero() && now.After(x509Cert.Expires()) {
 				return nil, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}
 			}
-			t.certificates = append(t.certificates, x509Cert)
+			trans.certificates = append(trans.certificates, x509Cert)
 		}
 	} else {
 		sk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -95,10 +95,10 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 		if err != nil {
 			return nil, err
 		}
-		t.certificates = []Certificate{*certificate}
+		trans.certificates = []Certificate{*certificate}
 	}
 
-	return t, nil
+	return trans, nil
 }
 
 // ICETransport returns the currently-configured *ICETransport or nil

@@ -46,13 +46,13 @@ func main() {
 	}
 
 	// Use default Codecs
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	mediaEngine := &webrtc.MediaEngine{}
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
 	// Create an API object
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine))
 
 	// Create the ICE gatherer
 	gatherer, err := api.NewICEGatherer(iceOptions)
@@ -110,8 +110,8 @@ func main() {
 	}
 
 	gatherFinished := make(chan struct{})
-	gatherer.OnLocalCandidate(func(i *webrtc.ICECandidate) {
-		if i == nil {
+	gatherer.OnLocalCandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			close(gatherFinished)
 		}
 	})
@@ -138,7 +138,7 @@ func main() {
 		panic(err)
 	}
 
-	s := Signal{
+	signal := Signal{
 		ICECandidates:     iceCandidates,
 		ICEParameters:     iceParams,
 		DTLSParameters:    dtlsParams,
@@ -148,7 +148,7 @@ func main() {
 	iceRole := webrtc.ICERoleControlled
 
 	// Exchange the information
-	fmt.Println(encode(&s))
+	fmt.Println(encode(&signal))
 	remoteSignal := Signal{}
 
 	if *isOffer {
@@ -297,9 +297,9 @@ func decode(in string, obj *Signal) {
 // httpSDPServer starts a HTTP Server that consumes SDPs
 func httpSDPServer(port int) chan string {
 	sdpChan := make(chan string)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		fmt.Fprintf(w, "done") //nolint: errcheck
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		fmt.Fprintf(res, "done") //nolint: errcheck
 		sdpChan <- string(body)
 	})
 

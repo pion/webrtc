@@ -41,7 +41,7 @@ func (h *h264FMTP) MimeType() string {
 //	  apply for the level part of profile-level-id and does not apply
 //	  for the other stream properties and capability parameters.
 func (h *h264FMTP) Match(b FMTP) bool {
-	c, ok := b.(*h264FMTP)
+	fmtp, ok := b.(*h264FMTP)
 	if !ok {
 		return false
 	}
@@ -51,7 +51,7 @@ func (h *h264FMTP) Match(b FMTP) bool {
 	if !hok {
 		return false
 	}
-	cpmode, cok := c.parameters["packetization-mode"]
+	cpmode, cok := fmtp.parameters["packetization-mode"]
 	if !cok {
 		return false
 	}
@@ -66,7 +66,7 @@ func (h *h264FMTP) Match(b FMTP) bool {
 		return false
 	}
 
-	cplid, cok := c.parameters["profile-level-id"]
+	cplid, cok := fmtp.parameters["profile-level-id"]
 	if !cok {
 		return false
 	}

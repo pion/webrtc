@@ -16,7 +16,7 @@ import (
 
 // websocketServer is called for every new inbound WebSocket
 // nolint: gocognit, cyclop
-func websocketServer(ws *websocket.Conn) {
+func websocketServer(wsConn *websocket.Conn) {
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
@@ -27,17 +27,17 @@ func websocketServer(ws *websocket.Conn) {
 	// ice trickle is implemented. Everytime we have a new candidate available we send
 	// it as soon as it is ready. We don't wait to emit a Offer/Answer until they are
 	// all available
-	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
+	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
 			return
 		}
 
-		outbound, marshalErr := json.Marshal(c.ToJSON())
+		outbound, marshalErr := json.Marshal(candidate.ToJSON())
 		if marshalErr != nil {
 			panic(marshalErr)
 		}
 
-		if _, err = ws.Write(outbound); err != nil {
+		if _, err = wsConn.Write(outbound); err != nil {
 			panic(err)
 		}
 	})
@@ -62,7 +62,7 @@ func websocketServer(ws *websocket.Conn) {
 	buf := make([]byte, 1500)
 	for {
 		// Read each inbound WebSocket Message
-		n, err := ws.Read(buf)
+		n, err := wsConn.Read(buf)
 		if err != nil {
 			panic(err)
 		}
@@ -95,7 +95,7 @@ func websocketServer(ws *websocket.Conn) {
 				panic(marshalErr)
 			}
 
-			if _, err = ws.Write(outbound); err != nil {
+			if _, err = wsConn.Write(outbound); err != nil {
 				panic(err)
 			}
 		// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty

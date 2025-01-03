@@ -32,9 +32,9 @@ func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
 	// Create a MediaEngine object to configure the supported codec
-	m := &webrtc.MediaEngine{}
+	mediaEngine := &webrtc.MediaEngine{}
 
-	if err := m.RegisterDefaultCodecs(); err != nil {
+	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		panic(err)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
 	// this is enabled by default. If you are manually managing You MUST create a InterceptorRegistry
 	// for each PeerConnection.
-	i := &interceptor.Registry{}
+	interceptorRegistry := &interceptor.Registry{}
 
 	statsInterceptorFactory, err := stats.NewInterceptor()
 	if err != nil {
@@ -53,15 +53,15 @@ func main() {
 	statsInterceptorFactory.OnNewPeerConnection(func(_ string, g stats.Getter) {
 		statsGetter = g
 	})
-	i.Add(statsInterceptorFactory)
+	interceptorRegistry.Add(statsInterceptorFactory)
 
 	// Use the default set of Interceptors
-	if err = webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+	if err = webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 		panic(err)
 	}
 
 	// Create the API object with the MediaEngine
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(interceptorRegistry))
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

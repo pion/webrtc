@@ -127,25 +127,25 @@ func (o *OggReader) readHeaders() (*OggHeader, error) {
 // ParseNextPage reads from stream and returns Ogg page payload, header,
 // and an error if there is incomplete page data.
 func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
-	h := make([]byte, pageHeaderLen)
+	header := make([]byte, pageHeaderLen)
 
-	n, err := io.ReadFull(o.stream, h)
+	n, err := io.ReadFull(o.stream, header)
 	if err != nil {
 		return nil, nil, err
-	} else if n < len(h) {
+	} else if n < len(header) {
 		return nil, nil, errShortPageHeader
 	}
 
 	pageHeader := &OggPageHeader{
-		sig: [4]byte{h[0], h[1], h[2], h[3]},
+		sig: [4]byte{header[0], header[1], header[2], header[3]},
 	}
 
-	pageHeader.version = h[4]
-	pageHeader.headerType = h[5]
-	pageHeader.GranulePosition = binary.LittleEndian.Uint64(h[6 : 6+8])
-	pageHeader.serial = binary.LittleEndian.Uint32(h[14 : 14+4])
-	pageHeader.index = binary.LittleEndian.Uint32(h[18 : 18+4])
-	pageHeader.segmentsCount = h[26]
+	pageHeader.version = header[4]
+	pageHeader.headerType = header[5]
+	pageHeader.GranulePosition = binary.LittleEndian.Uint64(header[6 : 6+8])
+	pageHeader.serial = binary.LittleEndian.Uint32(header[14 : 14+4])
+	pageHeader.index = binary.LittleEndian.Uint32(header[18 : 18+4])
+	pageHeader.segmentsCount = header[26]
 
 	sizeBuffer := make([]byte, pageHeader.segmentsCount)
 	if _, err = io.ReadFull(o.stream, sizeBuffer); err != nil {
@@ -168,14 +168,14 @@ func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
 			checksum = (checksum << 8) ^ o.checksumTable[byte(checksum>>24)^v]
 		}
 
-		for index := range h {
+		for index := range header {
 			// Don't include expected checksum in our generation
 			if index > 21 && index < 26 {
 				updateChecksum(0)
 				continue
 			}
 
-			updateChecksum(h[index])
+			updateChecksum(header[index])
 		}
 		for _, s := range sizeBuffer {
 			updateChecksum(s)
@@ -184,12 +184,12 @@ func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) {
 			updateChecksum(payload[index])
 		}
 
-		if binary.LittleEndian.Uint32(h[22:22+4]) != checksum {
+		if binary.LittleEndian.Uint32(header[22:22+4]) != checksum {
 			return nil, nil, errChecksumMismatch
 		}
 	}
 
-	o.bytesReadSuccesfully += int64(len(h) + len(sizeBuffer) + len(payload))
+	o.bytesReadSuccesfully += int64(len(header) + len(sizeBuffer) + len(payload))
 
 	return payload, pageHeader, nil
 }

@@ -957,9 +957,9 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	})
 
 	dataChannelAnswerer := make(chan *DataChannel)
-	offerPeerConnection.OnDataChannel(func(d *DataChannel) {
-		d.OnOpen(func() {
-			dataChannelAnswerer <- d
+	offerPeerConnection.OnDataChannel(func(dataChannel *DataChannel) {
+		dataChannel.OnOpen(func() {
+			dataChannelAnswerer <- dataChannel
 		})
 	})
 
@@ -1424,17 +1424,17 @@ a=sendonly
 a=rtpmap:125 H264/90000
 a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
 `
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
 			PayloadType:        98,
 		}, RTPCodecTypeVideo))
 
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
@@ -1483,17 +1483,17 @@ a=rtpmap:98 H264/90000
 a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
 a=sendonly
 `
-		m := MediaEngine{}
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		mediaEngine := MediaEngine{}
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
 			PayloadType:        94,
 		}, RTPCodecTypeVideo))
-		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil},
 			PayloadType:        98,
 		}, RTPCodecTypeVideo))
 
-		api := NewAPI(WithMediaEngine(&m))
+		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
