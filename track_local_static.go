@@ -164,11 +164,25 @@ func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 
 	*packet = *p
 
-	return s.writeRTP(packet)
+	return s.writeRTP(packet, false)
 }
 
+// WriteRTPRTX is like WriteRTP, but attempts to use the associated RTX
+// SSID if one exists
+func (s *TrackLocalStaticRTP) WriteRTPRTX(p *rtp.Packet) error {
+	packet := getPacketAllocationFromPool()
+
+	defer resetPacketPoolAllocation(packet)
+
+	*packet = *p
+
+	return s.writeRTP(packet, true)
+}
+
+
 // writeRTP is like WriteRTP, except that it may modify the packet p
-func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
+// if rtx is true, it attempts to use the associated RTX track.
+func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet, rtx bool) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -177,6 +191,10 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 	for _, b := range s.bindings {
 		p.Header.SSRC = uint32(b.ssrc)
 		p.Header.PayloadType = uint8(b.payloadType)
+		if rtx && b.ssrcRTX != 0 {
+			p.Header.SSRC = uint32(b.ssrcRTX)
+			p.Header.PayloadType = uint8(b.payloadTypeRTX)
+		}
 		if _, err := b.writeStream.WriteRTP(&p.Header, p.Payload); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
@@ -190,6 +208,16 @@ func (s *TrackLocalStaticRTP) writeRTP(p *rtp.Packet) error {
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them
 func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
+	return s.write(b, false)
+}
+
+// WriteRTX is like Write, but attempts to use the associated RTX SSID
+func (s *TrackLocalStaticRTP) WriteRTX(b []byte) (n int, err error) {
+	return s.write(b, true)
+}
+
+// write does the work of Write and WriteRTX
+func (s *TrackLocalStaticRTP) write(b []byte, rtx bool) (n int, err error) {
 	packet := getPacketAllocationFromPool()
 
 	defer resetPacketPoolAllocation(packet)
@@ -198,7 +226,7 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 		return 0, err
 	}
 
-	return len(b), s.writeRTP(packet)
+	return len(b), s.writeRTP(packet, rtx)
 }
 
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
