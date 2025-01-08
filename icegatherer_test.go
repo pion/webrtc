@@ -156,3 +156,72 @@ func TestICEGatherer_AlreadyClosed(t *testing.T) {
 		assert.ErrorIs(t, err, errICEAgentNotExist)
 	})
 }
+
+func TestNewICEGathererSetMediaStreamIdentification(t *testing.T) {
+	// Limit runtime in case of deadlocks
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	opts := ICEGatherOptions{
+		ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
+	}
+
+	gatherer, err := NewAPI().NewICEGatherer(opts)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expectedMid := "5"
+	expectedMLineIndex := uint16(1)
+
+	gatherer.setMediaStreamIdentification(expectedMid, expectedMLineIndex)
+
+	if gatherer.State() != ICEGathererStateNew {
+		t.Fatalf("Expected gathering state new")
+	}
+
+	gatherFinished := make(chan struct{})
+	gatherer.OnLocalCandidate(func(i *ICECandidate) {
+		if i == nil {
+			close(gatherFinished)
+		} else {
+			assert.Equal(t, expectedMid, i.SDPMid)
+			assert.Equal(t, expectedMLineIndex, i.SDPMLineIndex)
+		}
+	})
+
+	if err = gatherer.Gather(); err != nil {
+		t.Error(err)
+	}
+
+	<-gatherFinished
+
+	params, err := gatherer.GetLocalParameters()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if params.UsernameFragment == "" ||
+		params.Password == "" {
+		t.Fatalf("Empty local username or password frag")
+	}
+
+	candidates, err := gatherer.GetLocalCandidates()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(candidates) == 0 {
+		t.Fatalf("No candidates gathered")
+	}
+
+	for _, c := range candidates {
+		assert.Equal(t, expectedMid, c.SDPMid)
+		assert.Equal(t, expectedMLineIndex, c.SDPMLineIndex)
+	}
+
+	assert.NoError(t, gatherer.Close())
+}

@@ -167,6 +167,54 @@ func TestConvertTypeFromICE(t *testing.T) {
 	})
 }
 
+func TestNewIdentifiedICECandidateFromICE(t *testing.T) {
+	config := ice.CandidateHostConfig{
+		Network:    "udp",
+		Address:    "::1",
+		Port:       1234,
+		Component:  1,
+		Foundation: "foundation",
+		Priority:   128,
+	}
+	ice, err := ice.NewCandidateHost(&config)
+	assert.NoError(t, err)
+
+	ct, err := newICECandidateFromICE(ice, "1", 2)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "1", ct.SDPMid)
+	assert.Equal(t, uint16(2), ct.SDPMLineIndex)
+}
+
+func TestNewIdentifiedICECandidatesFromICE(t *testing.T) {
+	ic, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network:    "udp",
+		Address:    "::1",
+		Port:       1234,
+		Component:  1,
+		Foundation: "foundation",
+		Priority:   128,
+	})
+
+	assert.NoError(t, err)
+
+	candidates := []ice.Candidate{ic, ic, ic}
+
+	sdpMid := "1"
+	sdpMLineIndex := uint16(2)
+
+	results, err := newICECandidatesFromICE(candidates, sdpMid, sdpMLineIndex)
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, 3, len(results))
+
+	for _, result := range results {
+		assert.Equal(t, sdpMid, result.SDPMid)
+		assert.Equal(t, sdpMLineIndex, result.SDPMLineIndex)
+	}
+}
+
 func TestICECandidate_ToJSON(t *testing.T) {
 	candidate := ICECandidate{
 		Foundation: "foundation",
@@ -182,4 +230,21 @@ func TestICECandidate_ToJSON(t *testing.T) {
 
 	assert.Equal(t, uint16(0), *candidateInit.SDPMLineIndex)
 	assert.Equal(t, "candidate:foundation 1 udp 128 1.0.0.1 1234 typ host", candidateInit.Candidate)
+}
+
+func TestICECandidateZeroSDPid(t *testing.T) {
+	candidate := ICECandidate{}
+
+	assert.Equal(t, candidate.SDPMid, "")
+	assert.Equal(t, candidate.SDPMLineIndex, uint16(0))
+}
+
+func TestICECandidateSDPMid_ToJSON(t *testing.T) {
+	candidate := ICECandidate{}
+
+	candidate.SDPMid = "0"
+	candidate.SDPMLineIndex = 1
+
+	assert.Equal(t, candidate.SDPMid, "0")
+	assert.Equal(t, candidate.SDPMLineIndex, uint16(1))
 }

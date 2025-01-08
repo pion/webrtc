@@ -57,12 +57,12 @@ func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
 		return nil, err
 	}
 
-	local, err := newICECandidateFromICE(icePair.Local)
+	local, err := newICECandidateFromICE(icePair.Local, "", 0)
 	if err != nil {
 		return nil, err
 	}
 
-	remote, err := newICECandidateFromICE(icePair.Remote)
+	remote, err := newICECandidateFromICE(icePair.Remote, "", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 		return err
 	}
 	if err := agent.OnSelectedCandidatePairChange(func(local, remote ice.Candidate) {
-		candidates, err := newICECandidatesFromICE([]ice.Candidate{local, remote})
+		candidates, err := newICECandidatesFromICE([]ice.Candidate{local, remote}, "", 0)
 		if err != nil {
 			t.log.Warnf("%w: %s", errICECandiatesCoversionFailed, err)
 			return

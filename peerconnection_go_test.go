@@ -1665,3 +1665,186 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 	<-peerConnectionClosed
 	closePairNow(t, offerPC, answerPC)
 }
+
+// https://github.com/pion/webrtc/issues/2690
+func TestPeerConnectionTrickleMediaStreamIdentification(t *testing.T) {
+	const remoteSdp = `v=0
+o=- 1735985477255306 1 IN IP4 127.0.0.1
+s=VideoRoom 1234
+t=0 0
+a=group:BUNDLE 0 1
+a=ice-options:trickle
+a=fingerprint:sha-256 61:BF:17:29:C0:EF:B2:77:75:79:64:F9:D8:D0:03:6C:5A:D3:9A:BC:E5:F4:5A:05:4C:3C:3B:A0:B4:2B:CF:A8
+a=extmap-allow-mixed
+a=msid-semantic: WMS *
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 127.0.0.1
+a=sendonly
+a=mid:0
+a=rtcp-mux
+a=ice-ufrag:xv3r
+a=ice-pwd:NT22yM6JeOsahq00U9ZJS/
+a=ice-options:trickle
+a=setup:actpass
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 transport-cc
+a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=fmtp:111 useinbandfec=1
+a=msid:janus janus0
+a=ssrc:2280306597 cname:janus
+m=video 9 UDP/TLS/RTP/SAVPF 96 97
+c=IN IP4 127.0.0.1
+a=sendonly
+a=mid:1
+a=rtcp-mux
+a=ice-ufrag:xv3r
+a=ice-pwd:NT22yM6JeOsahq00U9ZJS/
+a=ice-options:trickle
+a=setup:actpass
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 transport-cc
+a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:12 http://www.webrtc.org/experiments/rtp-hdrext/playout-delay
+a=extmap:13 urn:3gpp:video-orientation
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+a=ssrc-group:FID 4099488402 29586368
+a=msid:janus janus1
+a=ssrc:4099488402 cname:janus
+a=ssrc:29586368 cname:janus
+`
+
+	mediaEngine := &MediaEngine{}
+
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        96,
+	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        111,
+	}, RTPCodecTypeAudio))
+
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pc, err := api.NewPeerConnection(Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	pc.OnICECandidate(func(candidate *ICECandidate) {
+		if candidate == nil {
+			return
+		}
+
+		assert.NotEmpty(t, candidate.SDPMid)
+
+		assert.Contains(t, []string{"0", "1"}, candidate.SDPMid)
+		assert.Contains(t, []uint16{0, 1}, candidate.SDPMLineIndex)
+	})
+
+	assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  remoteSdp,
+	}))
+
+	gatherComplete := GatheringCompletePromise(pc)
+	ans, _ := pc.CreateAnswer(nil)
+	assert.NoError(t, pc.SetLocalDescription(ans))
+
+	<-gatherComplete
+
+	assert.NoError(t, pc.Close())
+
+	assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
+}
+
+func TestTranceiverMediaStreamIdentification(t *testing.T) {
+	const videoMid = "0"
+	const audioMid = "1"
+
+	mediaEngine := &MediaEngine{}
+
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        96,
+	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		PayloadType:        111,
+	}, RTPCodecTypeAudio))
+
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	pcOfferer, pcAnswerer, err := api.newPair(Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	pcOfferer.OnICECandidate(func(candidate *ICECandidate) {
+		if candidate == nil {
+			return
+		}
+
+		assert.NotEmpty(t, candidate.SDPMid)
+		assert.Contains(t, []string{videoMid, audioMid}, candidate.SDPMid)
+		assert.Contains(t, []uint16{0, 1}, candidate.SDPMLineIndex)
+	})
+
+	pcAnswerer.OnICECandidate(func(candidate *ICECandidate) {
+		if candidate == nil {
+			return
+		}
+
+		assert.NotEmpty(t, candidate.SDPMid)
+		assert.Contains(t, []string{videoMid, audioMid}, candidate.SDPMid)
+		assert.Contains(t, []uint16{0, 1}, candidate.SDPMLineIndex)
+	})
+
+	videoTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+		Direction: RTPTransceiverDirectionRecvonly,
+	})
+	assert.NoError(t, err)
+
+	audioTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
+		Direction: RTPTransceiverDirectionRecvonly,
+	})
+	assert.NoError(t, err)
+
+	assert.NoError(t, videoTransceiver.SetMid(videoMid))
+	assert.NoError(t, audioTransceiver.SetMid(audioMid))
+
+	offer, err := pcOfferer.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcOfferer.SetLocalDescription(offer))
+
+	assert.NoError(t, pcAnswerer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswerer.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pcAnswerer.SetLocalDescription(answer))
+
+	answerGatherComplete := GatheringCompletePromise(pcOfferer)
+	offerGatherComplete := GatheringCompletePromise(pcAnswerer)
+
+	<-answerGatherComplete
+	<-offerGatherComplete
+
+	assert.NoError(t, pcOfferer.Close())
+	assert.NoError(t, pcAnswerer.Close())
+}
