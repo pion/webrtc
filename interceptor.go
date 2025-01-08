@@ -94,6 +94,7 @@ func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorReg
 }
 
 // ConfigureTWCCSender will setup everything necessary for generating TWCC reports.
+// This must be called after registering codecs with the MediaEngine.
 func ConfigureTWCCSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBTransportCC}, RTPCodecTypeVideo)
 	if err := mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo); err != nil {
