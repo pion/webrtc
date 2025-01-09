@@ -667,7 +667,7 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 			return nil
 		}
 
-		iceCandidate, err := newICECandidateFromICE(c)
+		iceCandidate, err := newICECandidateFromICE(c, "", 0)
 		if err != nil {
 			return nil
 		}

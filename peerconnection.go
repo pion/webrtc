@@ -1017,6 +1017,11 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		})
 	}
 
+	mediaSection, ok := selectCandidateMediaSection(desc.parsed)
+	if ok {
+		pc.iceGatherer.setMediaStreamIdentification(mediaSection.SDPMid, mediaSection.SDPMLineIndex)
+	}
+
 	if pc.iceGatherer.State() == ICEGathererStateNew {
 		return pc.iceGatherer.Gather()
 	}
@@ -1151,12 +1156,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 		}
 	}
 
-	remoteUfrag, remotePwd, candidates, err := extractICEDetails(desc.parsed, pc.log)
+	iceDetails, err := extractICEDetails(desc.parsed, pc.log)
 	if err != nil {
 		return err
 	}
 
-	if isRenegotiation && pc.iceTransport.haveRemoteCredentialsChange(remoteUfrag, remotePwd) {
+	if isRenegotiation && pc.iceTransport.haveRemoteCredentialsChange(iceDetails.Ufrag, iceDetails.Password) {
 		// An ICE Restart only happens implicitly for a SetRemoteDescription of type offer
 		if !weOffer {
 			if err = pc.iceTransport.restart(); err != nil {
@@ -1164,13 +1169,13 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			}
 		}
 
-		if err = pc.iceTransport.setRemoteCredentials(remoteUfrag, remotePwd); err != nil {
+		if err = pc.iceTransport.setRemoteCredentials(iceDetails.Ufrag, iceDetails.Password); err != nil {
 			return err
 		}
 	}
 
-	for i := range candidates {
-		if err = pc.iceTransport.AddRemoteCandidate(&candidates[i]); err != nil {
+	for i := range iceDetails.Candidates {
+		if err = pc.iceTransport.AddRemoteCandidate(&iceDetails.Candidates[i]); err != nil {
 			return err
 		}
 	}
@@ -1218,7 +1223,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	}
 
 	pc.ops.Enqueue(func() {
-		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), remoteUfrag, remotePwd, fingerprint, fingerprintHash)
+		pc.startTransports(iceRole, dtlsRoleFromRemoteSDP(desc.parsed), iceDetails.Ufrag, iceDetails.Password, fingerprint, fingerprintHash)
 		if weOffer {
 			pc.startRTP(false, &desc, currentTransceivers)
 		}
@@ -1806,7 +1811,7 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 			return err
 		}
 
-		c, err := newICECandidateFromICE(candidate)
+		c, err := newICECandidateFromICE(candidate, "", 0)
 		if err != nil {
 			return err
 		}

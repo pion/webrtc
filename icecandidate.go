@@ -22,15 +22,17 @@ type ICECandidate struct {
 	RelatedAddress string           `json:"relatedAddress"`
 	RelatedPort    uint16           `json:"relatedPort"`
 	TCPType        string           `json:"tcpType"`
+	SDPMid         string           `json:"sdpMid"`
+	SDPMLineIndex  uint16           `json:"sdpMLineIndex"`
 }
 
 // Conversion for package ice
 
-func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, error) {
+func newICECandidatesFromICE(iceCandidates []ice.Candidate, sdpMid string, sdpMLineIndex uint16) ([]ICECandidate, error) {
 	candidates := []ICECandidate{}
 
 	for _, i := range iceCandidates {
-		c, err := newICECandidateFromICE(i)
+		c, err := newICECandidateFromICE(i, sdpMid, sdpMLineIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +42,7 @@ func newICECandidatesFromICE(iceCandidates []ice.Candidate) ([]ICECandidate, err
 	return candidates, nil
 }
 
-func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
+func newICECandidateFromICE(i ice.Candidate, sdpMid string, sdpMLineIndex uint16) (ICECandidate, error) {
 	typ, err := convertTypeFromICE(i.Type())
 	if err != nil {
 		return ICECandidate{}, err
@@ -51,15 +53,17 @@ func newICECandidateFromICE(i ice.Candidate) (ICECandidate, error) {
 	}
 
 	c := ICECandidate{
-		statsID:    i.ID(),
-		Foundation: i.Foundation(),
-		Priority:   i.Priority(),
-		Address:    i.Address(),
-		Protocol:   protocol,
-		Port:       uint16(i.Port()),
-		Component:  i.Component(),
-		Typ:        typ,
-		TCPType:    i.TCPType().String(),
+		statsID:       i.ID(),
+		Foundation:    i.Foundation(),
+		Priority:      i.Priority(),
+		Address:       i.Address(),
+		Protocol:      protocol,
+		Port:          uint16(i.Port()),
+		Component:     i.Component(),
+		Typ:           typ,
+		TCPType:       i.TCPType().String(),
+		SDPMid:        sdpMid,
+		SDPMLineIndex: sdpMLineIndex,
 	}
 
 	if i.RelatedAddress() != nil {
@@ -155,8 +159,6 @@ func (c ICECandidate) String() string {
 // ToJSON returns an ICECandidateInit
 // as indicated by the spec https://w3c.github.io/webrtc-pc/#dom-rtcicecandidate-tojson
 func (c ICECandidate) ToJSON() ICECandidateInit {
-	zeroVal := uint16(0)
-	emptyStr := ""
 	candidateStr := ""
 
 	candidate, err := c.toICE()
@@ -166,7 +168,7 @@ func (c ICECandidate) ToJSON() ICECandidateInit {
 
 	return ICECandidateInit{
 		Candidate:     fmt.Sprintf("candidate:%s", candidateStr),
-		SDPMid:        &emptyStr,
-		SDPMLineIndex: &zeroVal,
+		SDPMid:        &c.SDPMid,
+		SDPMLineIndex: &c.SDPMLineIndex,
 	}
 }

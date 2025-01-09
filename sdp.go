@@ -782,18 +782,26 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { 
 	return parts[1], parts[0], nil
 }
 
-func extractICEDetailsFromMedia(media *sdp.MediaDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) {
+// identifiedMediaDescription contains a MediaDescription with sdpMid and sdpMLineIndex
+type identifiedMediaDescription struct {
+	MediaDescription *sdp.MediaDescription
+	SDPMid           string
+	SDPMLineIndex    uint16
+}
+
+func extractICEDetailsFromMedia(media *identifiedMediaDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) {
 	remoteUfrag := ""
 	remotePwd := ""
 	candidates := []ICECandidate{}
+	descr := media.MediaDescription
 
-	if ufrag, haveUfrag := media.Attribute("ice-ufrag"); haveUfrag {
+	if ufrag, haveUfrag := descr.Attribute("ice-ufrag"); haveUfrag {
 		remoteUfrag = ufrag
 	}
-	if pwd, havePwd := media.Attribute("ice-pwd"); havePwd {
+	if pwd, havePwd := descr.Attribute("ice-pwd"); havePwd {
 		remotePwd = pwd
 	}
-	for _, a := range media.Attributes {
+	for _, a := range descr.Attributes {
 		if a.IsICECandidate() {
 			c, err := ice.UnmarshalCandidate(a.Value)
 			if err != nil {
@@ -804,7 +812,7 @@ func extractICEDetailsFromMedia(media *sdp.MediaDescription, log logging.Leveled
 				return "", "", nil, err
 			}
 
-			candidate, err := newICECandidateFromICE(c)
+			candidate, err := newICECandidateFromICE(c, media.SDPMid, media.SDPMLineIndex)
 			if err != nil {
 				return "", "", nil, err
 			}
@@ -816,59 +824,77 @@ func extractICEDetailsFromMedia(media *sdp.MediaDescription, log logging.Leveled
 	return remoteUfrag, remotePwd, candidates, nil
 }
 
-func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (string, string, []ICECandidate, error) { // nolint:gocognit
-	remoteCandidates := []ICECandidate{}
-	remotePwd := ""
-	remoteUfrag := ""
+type sdpICEDetails struct {
+	Ufrag      string
+	Password   string
+	Candidates []ICECandidate
+}
+
+func extractICEDetails(desc *sdp.SessionDescription, log logging.LeveledLogger) (*sdpICEDetails, error) { // nolint:gocognit
+	details := &sdpICEDetails{
+		Candidates: []ICECandidate{},
+	}
 
 	// Ufrag and Pw are allow at session level and thus have highest prio
 	if ufrag, haveUfrag := desc.Attribute("ice-ufrag"); haveUfrag {
-		remoteUfrag = ufrag
+		details.Ufrag = ufrag
 	}
 	if pwd, havePwd := desc.Attribute("ice-pwd"); havePwd {
-		remotePwd = pwd
+		details.Password = pwd
 	}
 
-	bundleID := extractBundleID(desc)
-	missing := true
+	mediaDescr, ok := selectCandidateMediaSection(desc)
+	if ok {
+		ufrag, pwd, candidates, err := extractICEDetailsFromMedia(mediaDescr, log)
+		if err != nil {
+			return nil, err
+		}
 
-	for _, m := range desc.MediaDescriptions {
-		mid := getMidValue(m)
+		if details.Ufrag == "" && ufrag != "" {
+			details.Ufrag = ufrag
+			details.Password = pwd
+		}
+
+		details.Candidates = candidates
+	}
+
+	if details.Ufrag == "" {
+		return nil, ErrSessionDescriptionMissingIceUfrag
+	} else if details.Password == "" {
+		return nil, ErrSessionDescriptionMissingIcePwd
+	}
+
+	return details, nil
+}
+
+// Select the first media section or the first bundle section
+// Currently Pion uses the first media section to gather candidates.
+// https://github.com/pion/webrtc/pull/2950
+func selectCandidateMediaSection(sessionDescription *sdp.SessionDescription) (descr *identifiedMediaDescription, ok bool) {
+	bundleID := extractBundleID(sessionDescription)
+
+	for mLineIndex, mediaDescr := range sessionDescription.MediaDescriptions {
+		mid := getMidValue(mediaDescr)
 		// If bundled, only take ICE detail from bundle master section
 		if bundleID != "" {
 			if mid == bundleID {
-				ufrag, pwd, candidates, err := extractICEDetailsFromMedia(m, log)
-				if err != nil {
-					return "", "", nil, err
-				}
-				if remoteUfrag == "" && ufrag != "" {
-					remoteUfrag = ufrag
-					remotePwd = pwd
-				}
-				remoteCandidates = candidates
+				return &identifiedMediaDescription{
+					MediaDescription: mediaDescr,
+					SDPMid:           mid,
+					SDPMLineIndex:    uint16(mLineIndex),
+				}, true
 			}
-		} else if missing {
+		} else {
 			// For not-bundled, take ICE details from the first media section
-			ufrag, pwd, candidates, err := extractICEDetailsFromMedia(m, log)
-			if err != nil {
-				return "", "", nil, err
-			}
-			if remoteUfrag == "" && ufrag != "" {
-				remoteUfrag = ufrag
-				remotePwd = pwd
-			}
-			remoteCandidates = candidates
-			missing = false
+			return &identifiedMediaDescription{
+				MediaDescription: mediaDescr,
+				SDPMid:           mid,
+				SDPMLineIndex:    uint16(mLineIndex),
+			}, true
 		}
 	}
 
-	if remoteUfrag == "" {
-		return "", "", nil, ErrSessionDescriptionMissingIceUfrag
-	} else if remotePwd == "" {
-		return "", "", nil, ErrSessionDescriptionMissingIcePwd
-	}
-
-	return remoteUfrag, remotePwd, remoteCandidates, nil
+	return nil, false
 }
 
 func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {

@@ -130,7 +130,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s, nil)
+		_, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIcePwd)
 	})
 
@@ -141,7 +141,7 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s, nil)
+		_, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIceUfrag)
 	})
 
@@ -154,10 +154,10 @@ func TestExtractICEDetails(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, ufrag, defaultUfrag)
-		assert.Equal(t, pwd, defaultPwd)
+		details, err := extractICEDetails(s, nil)
 		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
 	})
 
 	t.Run("ice details at media level", func(t *testing.T) {
@@ -172,14 +172,14 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, ufrag, defaultUfrag)
-		assert.Equal(t, pwd, defaultPwd)
+		details, err := extractICEDetails(s, nil)
 		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
 	})
 
 	t.Run("ice details at session preferred over media", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{
 				{Key: "ice-ufrag", Value: defaultUfrag},
 				{Key: "ice-pwd", Value: defaultPwd},
@@ -194,14 +194,14 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, ufrag, defaultUfrag)
-		assert.Equal(t, pwd, defaultPwd)
+		details, err := extractICEDetails(descr, nil)
 		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
 	})
 
 	t.Run("ice details from bundle media section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			Attributes: []sdp.Attribute{
 				{Key: "group", Value: "BUNDLE 5 2"},
 			},
@@ -223,19 +223,20 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, ufrag, defaultUfrag)
-		assert.Equal(t, pwd, defaultPwd)
+		details, err := extractICEDetails(descr, nil)
 		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
 	})
 
 	t.Run("ice details from first media section", func(t *testing.T) {
-		s := &sdp.SessionDescription{
+		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					Attributes: []sdp.Attribute{
 						{Key: "ice-ufrag", Value: defaultUfrag},
 						{Key: "ice-pwd", Value: defaultPwd},
+						{Key: "mid", Value: "5"},
 					},
 				},
 				{
@@ -247,10 +248,10 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		ufrag, pwd, _, err := extractICEDetails(s, nil)
-		assert.Equal(t, ufrag, defaultUfrag)
-		assert.Equal(t, pwd, defaultPwd)
+		details, err := extractICEDetails(descr, nil)
 		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
 	})
 
 	t.Run("Missing pwd at session level", func(t *testing.T) {
@@ -261,8 +262,104 @@ func TestExtractICEDetails(t *testing.T) {
 			},
 		}
 
-		_, _, _, err := extractICEDetails(s, nil)
+		_, err := extractICEDetails(s, nil)
 		assert.Equal(t, err, ErrSessionDescriptionMissingIcePwd)
+	})
+
+	t.Run("Extracts candidate from media section", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			Attributes: []sdp.Attribute{
+				{Key: "group", Value: "BUNDLE video audio"},
+			},
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "ice-ufrag", Value: "ufrag"},
+						{Key: "ice-pwd", Value: "pwd"},
+						{Key: "ice-options", Value: "google-ice"},
+						{Key: "candidate", Value: "1 1 udp 2122162783 192.168.84.254 46492 typ host generation 0"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "ice-ufrag", Value: "ufrag"},
+						{Key: "ice-pwd", Value: "pwd"},
+						{Key: "ice-options", Value: "google-ice"},
+						{Key: "mid", Value: "video"},
+						{Key: "candidate", Value: "1 1 udp 2122162783 192.168.84.254 46492 typ host generation 0"},
+					},
+				},
+			},
+		}
+
+		details, err := extractICEDetails(s, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, "ufrag")
+		assert.Equal(t, details.Password, "pwd")
+		assert.Equal(t, details.Candidates[0].Address, "192.168.84.254")
+		assert.Equal(t, details.Candidates[0].Port, uint16(46492))
+		assert.Equal(t, details.Candidates[0].Typ, ICECandidateTypeHost)
+		assert.Equal(t, details.Candidates[0].SDPMid, "video")
+		assert.Equal(t, details.Candidates[0].SDPMLineIndex, uint16(1))
+	})
+}
+
+func TestSelectCandidateMediaSection(t *testing.T) {
+	t.Run("no media section", func(t *testing.T) {
+		descr := &sdp.SessionDescription{}
+
+		media, ok := selectCandidateMediaSection(descr)
+		assert.False(t, ok)
+		assert.Nil(t, media)
+	})
+
+	t.Run("no bundle", func(t *testing.T) {
+		descr := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{Attributes: []sdp.Attribute{{Key: "mid", Value: "0"}}},
+				{Attributes: []sdp.Attribute{{Key: "mid", Value: "1"}}},
+			},
+		}
+
+		media, ok := selectCandidateMediaSection(descr)
+		assert.True(t, ok)
+		assert.NotNil(t, media)
+		assert.NotNil(t, media.MediaDescription)
+		assert.Equal(t, "0", media.SDPMid)
+		assert.Equal(t, uint16(0), media.SDPMLineIndex)
+	})
+
+	t.Run("with bundle", func(t *testing.T) {
+		descr := &sdp.SessionDescription{
+			Attributes: []sdp.Attribute{
+				{Key: "group", Value: "BUNDLE 5 2"},
+			},
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "2"},
+					},
+				},
+				{
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "5"},
+					},
+				},
+			},
+		}
+
+		media, ok := selectCandidateMediaSection(descr)
+		assert.True(t, ok)
+		assert.NotNil(t, media)
+		assert.NotNil(t, media.MediaDescription)
+		assert.Equal(t, "5", media.SDPMid)
+		assert.Equal(t, uint16(1), media.SDPMLineIndex)
 	})
 }
 
