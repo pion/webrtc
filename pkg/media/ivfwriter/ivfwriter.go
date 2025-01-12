@@ -159,9 +159,9 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 			return err
 		}
 
-		isKeyFrame := vp8Packet.Payload[0] & 0x01
+		isKeyFrame := (vp8Packet.Payload[0] & 0x01) == 0
 		switch {
-		case !i.seenKeyFrame && isKeyFrame == 1:
+		case !i.seenKeyFrame && !isKeyFrame:
 			return nil
 		case i.currentFrame == nil && vp8Packet.S != 1:
 			return nil
