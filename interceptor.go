@@ -138,7 +138,7 @@ func ConfigureSimulcastExtensionHeaders(mediaEngine *MediaEngine) error {
 		return err
 	}
 
-	return mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdesRepairRTPStreamIDURI}, RTPCodecTypeVideo)
+	return mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESRepairRTPStreamIDURI}, RTPCodecTypeVideo)
 }
 
 type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interceptor.RTPWriter }

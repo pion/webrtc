@@ -1616,7 +1616,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return errPeerConnSimulcastStreamIDRTPExtensionRequired
 	}
 
-	repairStreamIDExtensionID, _, _ := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdesRepairRTPStreamIDURI})
+	repairStreamIDExtensionID, _, _ := pc.api.mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESRepairRTPStreamIDURI})
 
 	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 

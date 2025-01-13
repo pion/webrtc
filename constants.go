@@ -33,8 +33,6 @@ const (
 
 	generatedCertificateOrigin = "WebRTC"
 
-	sdesRepairRTPStreamIDURI = "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"
-
 	// AttributeRtxPayloadType is the interceptor attribute added when Read() returns an RTX packet containing the RTX stream payload type
 	AttributeRtxPayloadType = "rtx_payload_type"
 	// AttributeRtxSsrc is the interceptor attribute added when Read() returns an RTX packet containing the RTX stream SSRC

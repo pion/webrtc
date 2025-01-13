@@ -37,7 +37,7 @@ func TestSetRTPParameters(t *testing.T) {
 		HeaderExtensions: []RTPHeaderExtensionParameter{
 			{URI: sdp.SDESMidURI},
 			{URI: sdp.SDESRTPStreamIDURI},
-			{URI: sdesRepairRTPStreamIDURI},
+			{URI: sdp.SDESRepairRTPStreamIDURI},
 		},
 	}
 

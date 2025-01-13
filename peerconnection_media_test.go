@@ -1504,7 +1504,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) {
 			midID = uint8(extension.ID)
 		case sdp.SDESRTPStreamIDURI:
 			ridID = uint8(extension.ID)
-		case sdesRepairRTPStreamIDURI:
+		case sdp.SDESRepairRTPStreamIDURI:
 			rsid = uint8(extension.ID)
 		}
 	}
@@ -1678,7 +1678,7 @@ func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
 				midID = uint8(extension.ID)
 			case sdp.SDESRTPStreamIDURI:
 				ridID = uint8(extension.ID)
-			case sdesRepairRTPStreamIDURI:
+			case sdp.SDESRepairRTPStreamIDURI:
 				rsidID = uint8(extension.ID)
 			}
 		}
