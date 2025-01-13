@@ -64,40 +64,40 @@ func main() {
 		panic(err)
 	}
 
-	// Create a Congestion Controller. This analyzes inbound and outbound data and provides
-	// suggestions on how much we should be sending.
-	//
-	// Passing `nil` means we use the default Estimation Algorithm which is Google Congestion Control.
-	// You can use the other ones that Pion provides, or write your own!
-	congestionController, err := cc.NewInterceptor(func() (cc.BandwidthEstimator, error) {
-		return gcc.NewSendSideBWE(gcc.SendSideBWEInitialBitrate(lowBitrate))
-	})
+	if err := webrtc.ConfigureTWCCHeaderExtensionSender(m, i); err != nil {
+		panic(err)
+	}
+
+	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
+		panic(err)
+	}
+
+	api := webrtc.NewAPI(
+		webrtc.WithInterceptorRegistry(i), webrtc.WithMediaEngine(m),
+	)
+
+	estimator, err := gcc.NewSendSideBWE(
+		gcc.SendSideBWEInitialBitrate(lowBitrate),
+	)
 	if err != nil {
 		panic(err)
 	}
-
-	estimatorChan := make(chan cc.BandwidthEstimator, 1)
-	congestionController.OnNewPeerConnection(func(id string, estimator cc.BandwidthEstimator) { //nolint: revive
-		estimatorChan <- estimator
-	})
-
-	i.Add(congestionController)
-	if err = webrtc.ConfigureTWCCHeaderExtensionSender(m, i); err != nil {
+	interceptor, err := cc.NewSingleInterceptor(estimator)
+	if err != nil {
 		panic(err)
 	}
-
-	if err = webrtc.RegisterDefaultInterceptors(m, i); err != nil {
-		panic(err)
-	}
-
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewAPI(webrtc.WithInterceptorRegistry(i), webrtc.WithMediaEngine(m)).NewPeerConnection(webrtc.Configuration{
+	configuration := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: []string{"stun:stun.l.google.com:19302"},
 			},
 		},
-	})
+	}
+
+	peerConnection, err := api.NewPeerConnection(
+		configuration,
+		webrtc.WithInterceptor(interceptor),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -106,9 +106,6 @@ func main() {
 			fmt.Printf("cannot close peerConnection: %v\n", cErr)
 		}
 	}()
-
-	// Wait until our Bandwidth Estimator has been created
-	estimator := <-estimatorChan
 
 	// Create a video track
 	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "pion")
