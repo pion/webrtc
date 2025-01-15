@@ -464,10 +464,12 @@ func (d *DataChannel) DetachWithDeadline() (datachannel.ReadWriteCloserDeadliner
 	d.mu.Lock()
 
 	if !d.api.settingEngine.detach.DataChannels {
+		d.mu.Unlock()
 		return nil, errDetachNotEnabled
 	}
 
 	if d.dataChannel == nil {
+		d.mu.Unlock()
 		return nil, errDetachBeforeOpened
 	}
 
