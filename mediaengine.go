@@ -692,6 +692,8 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	switch strings.ToLower(codec.MimeType) {
 	case strings.ToLower(MimeTypeH264):
 		return &codecs.H264Payloader{}, nil
+	case strings.ToLower(MimeTypeH265):
+		return &codecs.H265Payloader{}, nil
 	case strings.ToLower(MimeTypeOpus):
 		return &codecs.OpusPayloader{}, nil
 	case strings.ToLower(MimeTypeVP8):
