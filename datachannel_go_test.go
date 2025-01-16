@@ -822,3 +822,30 @@ func TestDataChannelClose(t *testing.T) {
 		assert.NoError(t, answerPC.Close())
 	})
 }
+
+func TestDataChannel_DetachErrors(t *testing.T) {
+	t.Run("error errDetachNotEnabled", func(t *testing.T) {
+		s := SettingEngine{}
+		offer, answer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+		assert.NoError(t, err)
+		dc, err := offer.CreateDataChannel("data", nil)
+		assert.NoError(t, err)
+		_, err = dc.Detach()
+		assert.ErrorIs(t, err, errDetachNotEnabled)
+		assert.NoError(t, offer.Close())
+		assert.NoError(t, answer.Close())
+	})
+
+	t.Run("error errDetachBeforeOpened", func(t *testing.T) {
+		s := SettingEngine{}
+		s.DetachDataChannels()
+		offer, answer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
+		assert.NoError(t, err)
+		dc, err := offer.CreateDataChannel("data", nil)
+		assert.NoError(t, err)
+		_, err = dc.Detach()
+		assert.ErrorIs(t, err, errDetachBeforeOpened)
+		assert.NoError(t, offer.Close())
+		assert.NoError(t, answer.Close())
+	})
+}
