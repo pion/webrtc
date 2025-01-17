@@ -91,6 +91,8 @@ type PeerConnection struct {
 	log logging.LeveledLogger
 
 	interceptorRTCPWriter interceptor.RTCPWriter
+
+	extraInterceptors []interceptor.Interceptor
 }
 
 // NewPeerConnection creates a PeerConnection with the default codecs and interceptors.
@@ -98,9 +100,9 @@ type PeerConnection struct {
 // If you wish to customize the set of available codecs and/or the set of active interceptors,
 // create an API with a custom MediaEngine and/or interceptor.Registry,
 // then call [(*API).NewPeerConnection] instead of this function.
-func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+func NewPeerConnection(configuration Configuration, options... func (*PeerConnection) error) (*PeerConnection, error) {
 	api := NewAPI()
-	return api.NewPeerConnection(configuration)
+	return api.NewPeerConnection(configuration, options...)
 }
 
 // NewPeerConnection creates a new PeerConnection with the provided configuration against the received API object.
@@ -108,7 +110,7 @@ func NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
 // the resulting PeerConnection.  If this behavior is not desired,
 // set the set of codecs and interceptors explicitly by using
 // [WithMediaEngine] and [WithInterceptorRegistry] when calling [NewAPI].
-func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection, error) {
+func (api *API) NewPeerConnection(configuration Configuration, options... func (*PeerConnection) error) (*PeerConnection, error) {
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
@@ -136,12 +138,20 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
+
+	for _, option := range options {
+		err := option(pc)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	pc.ops = newOperations(pc.updateNegotiationNeededFlagOnEmptyChain, pc.onNegotiationNeeded)
 
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	i, err := api.interceptorRegistry.Build("")
+	i, err := api.interceptorRegistry.Build("", pc.extraInterceptors...)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +203,13 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
+}
+
+func WithInterceptor(i interceptor.Interceptor) func (*PeerConnection) error {
+	return func(pc *PeerConnection) error {
+		pc.extraInterceptors = append(pc.extraInterceptors, i)
+		return nil
+	}
 }
 
 // initConfiguration defines validation of the specified Configuration and
