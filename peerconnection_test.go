@@ -738,6 +738,50 @@ func TestAddTransceiver(t *testing.T) {
 	}
 }
 
+func TestRemoveMiddleTransceiverAndRenegotiate(t *testing.T) {
+	// Initialize the offerPC PeerConnection
+	offerPC, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer offerPC.Close()
+
+	// Initialize the answerPC PeerConnection
+	answerPC, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer answerPC.Close()
+
+	// Add multiple transceivers to the offerer
+	videoTransceiver1, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+	audioTransceiver, err := offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+	videoTransceiver2, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	// Perform initial SDP negotiation
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	// Ensure MIDs are assigned
+	assert.NotEmpty(t, videoTransceiver1.Mid())
+	assert.NotEmpty(t, audioTransceiver.Mid())
+	assert.NotEmpty(t, videoTransceiver2.Mid())
+
+	// Remove the middle transceiver (audio) using its MID
+	offerPC.removeRTPTransceiver([]string{audioTransceiver.Mid()})
+
+	// Verify the transceiver was removed
+	remainingTransceivers := offerPC.GetTransceivers()
+	assert.Len(t, remainingTransceivers, 2)
+	assert.Equal(t, videoTransceiver1.Mid(), remainingTransceivers[0].Mid())
+	assert.Equal(t, videoTransceiver2.Mid(), remainingTransceivers[1].Mid())
+}
+
 // Assert that SCTPTransport -> DTLSTransport -> ICETransport works after connected
 func TestTransportChain(t *testing.T) {
 	offer, answer, err := newPair()

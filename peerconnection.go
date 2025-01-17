@@ -847,7 +847,6 @@ func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, erro
 	if err != nil {
 		return SessionDescription{}, err
 	}
-
 	desc := SessionDescription{
 		Type:   SDPTypeAnswer,
 		SDP:    string(sdpBytes),
@@ -1007,7 +1006,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
-		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false)
+		rejected := []string{}
+		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false, &rejected)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
@@ -1015,6 +1015,9 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		pc.ops.Enqueue(func() {
 			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
 		})
+		pc.mu.Lock()
+		pc.removeRTPTransceiver(rejected)
+		pc.mu.Unlock()
 	}
 
 	mediaSection, ok := selectCandidateMediaSection(desc.parsed)
@@ -1184,7 +1187,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 
 	if isRenegotiation {
 		if weOffer {
-			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
+			rejected := []string{}
+			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true, &rejected)
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
 				return err
 			}
@@ -1192,6 +1196,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 			pc.ops.Enqueue(func() {
 				pc.startRTP(true, &desc, currentTransceivers)
 			})
+			pc.mu.Lock()
+			pc.removeRTPTransceiver(rejected)
+			pc.mu.Unlock()
 		}
 		return nil
 	}
@@ -1214,7 +1221,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error { 
 	// Start the networking in a new routine since it will block until
 	// the connection is actually established.
 	if weOffer {
-		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
+		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true, nil)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
 		}
@@ -1277,7 +1284,8 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 }
 
-func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransceivers []*RTPTransceiver, weOffer bool) error {
+// rejected is only meaningful when SessionDescription is answer
+func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransceivers []*RTPTransceiver, weOffer bool, rejected *[]string) error {
 	currentTransceivers = append([]*RTPTransceiver{}, currentTransceivers...)
 	for _, media := range answer.parsed.MediaDescriptions {
 		midValue := getMidValue(media)
@@ -1318,7 +1326,10 @@ func setRTPTransceiverCurrentDirection(answer *SessionDescription, currentTransc
 		if !weOffer && direction == RTPTransceiverDirectionSendonly && t.Sender() == nil {
 			direction = RTPTransceiverDirectionInactive
 		}
-
+		// reject transceiver if it is inactive
+		if rejected != nil && media.MediaName.Port.Value == 0 && direction == RTPTransceiverDirectionInactive {
+			*rejected = append(*rejected, midValue)
+		}
 		t.setCurrentDirection(direction)
 	}
 	return nil
@@ -2264,6 +2275,38 @@ func (pc *PeerConnection) addRTPTransceiver(t *RTPTransceiver) {
 	pc.onNegotiationNeeded()
 }
 
+// removeRTPTransceiver remove inactive
+// and fires onNegotiationNeeded;
+// caller of this method should hold `pc.mu` lock
+func (pc *PeerConnection) removeRTPTransceiver(mids []string) {
+	if len(mids) == 0 {
+		return
+	}
+
+	midSet := make(map[string]struct{}, len(mids))
+	for _, mid := range mids {
+		if mid == "" {
+			continue
+		}
+		midSet[mid] = struct{}{}
+	}
+
+	n := 0
+	for _, transceiver := range pc.rtpTransceivers {
+		if _, exists := midSet[transceiver.Mid()]; exists {
+			err := transceiver.Stop()
+			if err != nil {
+				pc.log.Errorf("Failed to stop transceiver: %s", err)
+			}
+		} else {
+			pc.rtpTransceivers[n] = transceiver
+			n++
+		}
+	}
+	// Resize the slice to remove unwanted transceivers
+	pc.rtpTransceivers = pc.rtpTransceivers[:n]
+}
+
 // CurrentLocalDescription represents the local description that was
 // successfully negotiated the last time the PeerConnection transitioned
 // into the stable state plus any local candidates that have been generated
@@ -2628,7 +2671,16 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 			mediaTransceivers := []*RTPTransceiver{t}
 
 			extensions, _ := rtpExtensionsFromMediaDescription(media)
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, rids: getRids(media)})
+			rejected := false
+			if media.MediaName.Port.Value == 0 {
+				for _, attr := range media.Attributes {
+					if attr.Key == sdp.AttrKeyInactive {
+						rejected = true
+						break
+					}
+				}
+			}
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, rids: getRids(media), rejected: rejected})
 		}
 	}
 

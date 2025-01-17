@@ -1,0 +1,117 @@
+<html>
+<!--
+    SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+    SPDX-License-Identifier: MIT
+  -->
+
+<head>
+  <title>ice-single-port</title>
+</head>
+
+<body>
+  <h3> ICE Selected Pairs </h3>
+  <div id="deleteTransceiver"></div> <br />
+</body>
+
+<script>
+  let removeTransceiverByMid = (sdp, mids) => {
+    const lines = sdp.split('\r\n');
+    const midSet = new Set(mids);
+    let currentMid = null;
+    let firstMid = null;
+    let updatedLines = [];
+    let lastMlineIndex = -1, lastDirectionIndex = -1;
+    let lamda = () => {
+      if (currentMid && midSet.has(currentMid)) {
+        if (currentMid != firstMid) {
+          const mLineParts = updatedLines[lastMlineIndex].split(' ');
+          mLineParts[1] = '0';
+          updatedLines[lastMlineIndex] = mLineParts.join(' ');
+        }
+        updatedLines[lastDirectionIndex] = 'a=inactive';
+        lastMlineIndex = lastDirectionIndex = -1;
+      }
+    };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('m=')) {
+        lamda();
+        currentMid = null;
+        lastMlineIndex = updatedLines.length;
+        updatedLines.push(line);
+        continue;
+      }
+      if (line.startsWith('a=mid:')) {
+        currentMid = line.substring(6).trim();
+        if (!firstMid) {
+          firstMid = currentMid;
+        }
+      }
+      if (currentMid && midSet.has(currentMid)) {
+        if (line.startsWith('a=ssrc') || line.startsWith('a=ssrc-group')) {
+          continue;
+        }
+        if (line.match(/^a=(sendrecv|sendonly|recvonly|inactive)$/)) {
+          lastDirectionIndex = updatedLines.length;
+          updatedLines.push(line);
+          continue;
+        }
+        updatedLines.push(line);
+      }
+      else {
+        updatedLines.push(line);
+      }
+    }
+    lamda();
+    return updatedLines.join('\r\n');
+  }
+  let pc = new RTCPeerConnection()
+  pc.addTransceiver('video')
+  pc.addTransceiver('audio')
+
+  pc.createOffer()
+    .then(offer => {
+      pc.setLocalDescription(offer)
+
+      return fetch(`/doOffer`, {
+        method: 'post',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(offer)
+      })
+    })
+    .then(res => res.json())
+    .then(res => pc.setRemoteDescription(res))
+    .catch(alert)
+
+  setTimeout(() => {
+    const transceivers = pc.getTransceivers();
+    if (transceivers.length > 1) {
+      const secondTransceiver = transceivers[1];
+
+      // Get the MID of the second transceiver
+      const mid = secondTransceiver.mid;
+
+      sdp = removeTransceiverByMid(pc.localDescription.sdp, [mid]);
+      console.log("updated sdp:", sdp);
+      let offer = { type: "offer", sdp: sdp };
+      pc.setLocalDescription(offer);
+      fetch(`/doUpdate`, {
+        method: 'post',
+        headers: {
+          'Accept': 'application/json, text/plain, */*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(offer)
+      }).then(res => res.json())
+        .then(res => pc.setRemoteDescription(res))
+        .catch(alert)
+    } else {
+      console.log("The peer connection does not have a second transceiver.");
+    }
+  }, 3000);
+</script>
+
+</html>
