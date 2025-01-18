@@ -435,3 +435,138 @@ func testInterceptorNack(t *testing.T, requestNack bool) {
 		}
 	}
 }
+
+// TestInterceptorNackReply is an end-to-end test for the NACK responder.
+// It tests that we do receive a resent packet to a NACK, both with and
+// without negotiating an RTX track.
+func TestInterceptorNackReply(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
+	t.Run("RTX", func(t *testing.T) { testInterceptorNackReply(t, true) })
+	t.Run("NoRTX", func(t *testing.T) { testInterceptorNackReply(t, false) })
+}
+
+func testInterceptorNackReply(t *testing.T, negotiateRTX bool) {
+	ir := interceptor.Registry{}
+	m := MediaEngine{}
+	feedback := []RTCPFeedback{{"nack", ""}}
+	err := m.RegisterCodec(
+		RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				"video/VP8", 90000, 0,
+				"",
+				feedback,
+			},
+			PayloadType: 96,
+		},
+		RTPCodecTypeVideo,
+	)
+	assert.NoError(t, err)
+
+	if negotiateRTX {
+		err = m.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{
+					MimeTypeRTX, 90000, 0,
+					"apt=96",
+					feedback,
+				},
+				PayloadType: 97,
+			},
+			RTPCodecTypeVideo,
+		)
+		assert.NoError(t, err)
+	}
+	api := NewAPI(
+		WithMediaEngine(&m),
+		WithInterceptorRegistry(&ir),
+	)
+
+	pc1, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track1, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video", "pion",
+	)
+	assert.NoError(t, err)
+	sender, err := pc1.AddTrack(track1)
+	assert.NoError(t, err)
+
+	pc2, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	offer, err := pc1.CreateOffer(nil)
+	assert.NoError(t, err)
+	err = pc1.SetLocalDescription(offer)
+	assert.NoError(t, err)
+	<-GatheringCompletePromise(pc1)
+
+	err = pc2.SetRemoteDescription(*pc1.LocalDescription())
+	assert.NoError(t, err)
+	answer, err := pc2.CreateAnswer(nil)
+	assert.NoError(t, err)
+	err = pc2.SetLocalDescription(answer)
+	assert.NoError(t, err)
+	<-GatheringCompletePromise(pc2)
+
+	err = pc1.SetRemoteDescription(*pc2.LocalDescription())
+	assert.NoError(t, err)
+
+	done := make(chan struct{})
+	pc2.OnTrack(func(track2 *TrackRemote, _ *RTPReceiver) {
+		defer close(done)
+		p, _, err2 := track2.ReadRTP()
+		assert.NoError(t, err2)
+		time.Sleep(20 * time.Millisecond)
+		err2 = pc2.WriteRTCP([]rtcp.Packet{
+			&rtcp.TransportLayerNack{
+				MediaSSRC: uint32(track2.SSRC()),
+				Nacks: rtcp.NackPairsFromSequenceNumbers(
+					[]uint16{p.SequenceNumber},
+				),
+			},
+		})
+		assert.NoError(t, err2)
+		p2, _, err2 := track2.ReadRTP()
+		assert.NoError(t, err2)
+		assert.Equal(t, p.SequenceNumber, p2.SequenceNumber)
+		assert.Equal(t, p.Timestamp, p2.Timestamp)
+		assert.Equal(t, p.Payload, p2.Payload)
+	})
+
+	rtcpDone := make(chan struct{})
+	go func() {
+		defer close(rtcpDone)
+		buf := make([]byte, 1500)
+		for {
+			_, _, err2 := sender.Read(buf)
+			// nolint
+			if err2 == io.EOF {
+				break
+			}
+			assert.NoError(t, err2)
+		}
+	}()
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		var p rtp.Packet
+		p.Version = 2
+		p.Marker = true
+		p.PayloadType = 96
+		p.SequenceNumber = 0
+		p.Timestamp = 0
+		p.Payload = []byte{42}
+		err2 := track1.WriteRTP(&p)
+		assert.NoError(t, err2)
+	}()
+
+	<-done
+	err = pc1.Close()
+	assert.NoError(t, err)
+	err = pc2.Close()
+	assert.NoError(t, err)
+	<-rtcpDone
+}
