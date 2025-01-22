@@ -55,6 +55,7 @@ const (
 	MimeTypeFlexFEC = "video/flexfec"
 )
 
+// ErrCodecAlreadyRegistered indicates that a codec has already been registered for the same payload type.
 var ErrCodecAlreadyRegistered = fmt.Errorf("codec already registered for same payload type")
 
 type mediaEngineHeaderExtension struct {

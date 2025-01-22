@@ -592,7 +592,8 @@ func TestMediaEngineDoubleRegister(t *testing.T) {
 	assert.Equal(t, len(mediaEngine.audioCodecs), 1)
 }
 
-// If a user attempts to register a codec with same payload but with different codec we should just discard duplicate calls.
+// If a user attempts to register a codec with same payload but with different
+// codec we should just discard duplicate calls.
 func TestMediaEngineDoubleRegisterDifferentCodec(t *testing.T) {
 	mediaEngine := MediaEngine{}
 
