@@ -55,6 +55,8 @@ const (
 	MimeTypeFlexFEC = "video/flexfec"
 )
 
+var ErrCodecAlreadyRegistered = fmt.Errorf("codec already registered for same payload type")
+
 type mediaEngineHeaderExtension struct {
 	uri              string
 	isAudio, isVideo bool
@@ -244,14 +246,14 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 }
 
 // addCodec will append codec if it not exists.
-func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) []RTPCodecParameters {
+func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) ([]RTPCodecParameters, error) {
 	for _, c := range codecs {
-		if c.MimeType == codec.MimeType && c.PayloadType == codec.PayloadType {
-			return codecs
+		if c.PayloadType == codec.PayloadType {
+			return codecs, ErrCodecAlreadyRegistered
 		}
 	}
 
-	return append(codecs, codec)
+	return append(codecs, codec), nil
 }
 
 // RegisterCodec adds codec to the MediaEngine
@@ -261,17 +263,18 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var err error
 	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
-		m.audioCodecs = m.addCodec(m.audioCodecs, codec)
+		m.audioCodecs, err = m.addCodec(m.audioCodecs, codec)
 	case RTPCodecTypeVideo:
-		m.videoCodecs = m.addCodec(m.videoCodecs, codec)
+		m.videoCodecs, err = m.addCodec(m.videoCodecs, codec)
 	default:
 		return ErrUnknownType
 	}
 
-	return nil
+	return err
 }
 
 // RegisterHeaderExtension adds a header extension to the MediaEngine
@@ -573,9 +576,9 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) {
 	for _, codec := range codecs {
 		if typ == RTPCodecTypeAudio {
-			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
+			m.negotiatedAudioCodecs, _ = m.addCodec(m.negotiatedAudioCodecs, codec)
 		} else if typ == RTPCodecTypeVideo {
-			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+			m.negotiatedVideoCodecs, _ = m.addCodec(m.negotiatedVideoCodecs, codec)
 		}
 	}
 }
