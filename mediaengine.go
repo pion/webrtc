@@ -256,7 +256,6 @@ func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParame
 
 // RegisterCodec adds codec to the MediaEngine
 // These are the list of codecs supported by this PeerConnection.
-// RegisterCodec is not safe for concurrent use.
 func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
