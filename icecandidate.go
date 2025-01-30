@@ -24,6 +24,7 @@ type ICECandidate struct {
 	TCPType        string           `json:"tcpType"`
 	SDPMid         string           `json:"sdpMid"`
 	SDPMLineIndex  uint16           `json:"sdpMLineIndex"`
+	extensions     string
 }
 
 // Conversion for package ice.
@@ -69,6 +70,8 @@ func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineInde
 		SDPMLineIndex: sdpMLineIndex,
 	}
 
+	newCandidate.setExtensions(candidate.Extensions())
+
 	if candidate.RelatedAddress() != nil {
 		newCandidate.RelatedAddress = candidate.RelatedAddress().Address
 		newCandidate.RelatedPort = uint16(candidate.RelatedAddress().Port) //nolint:gosec // G115
@@ -77,7 +80,7 @@ func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineInde
 	return newCandidate, nil
 }
 
-func (c ICECandidate) toICE() (ice.Candidate, error) {
+func (c ICECandidate) toICE() (cand ice.Candidate, err error) {
 	candidateID := c.statsID
 	switch c.Typ {
 	case ICECandidateTypeHost:
@@ -92,7 +95,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			Priority:    c.Priority,
 		}
 
-		return ice.NewCandidateHost(&config)
+		cand, err = ice.NewCandidateHost(&config)
 	case ICECandidateTypeSrflx:
 		config := ice.CandidateServerReflexiveConfig{
 			CandidateID: candidateID,
@@ -106,7 +109,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelPort:     int(c.RelatedPort),
 		}
 
-		return ice.NewCandidateServerReflexive(&config)
+		cand, err = ice.NewCandidateServerReflexive(&config)
 	case ICECandidateTypePrflx:
 		config := ice.CandidatePeerReflexiveConfig{
 			CandidateID: candidateID,
@@ -120,7 +123,7 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelPort:     int(c.RelatedPort),
 		}
 
-		return ice.NewCandidatePeerReflexive(&config)
+		cand, err = ice.NewCandidatePeerReflexive(&config)
 	case ICECandidateTypeRelay:
 		config := ice.CandidateRelayConfig{
 			CandidateID: candidateID,
@@ -134,10 +137,67 @@ func (c ICECandidate) toICE() (ice.Candidate, error) {
 			RelPort:     int(c.RelatedPort),
 		}
 
-		return ice.NewCandidateRelay(&config)
+		cand, err = ice.NewCandidateRelay(&config)
 	default:
 		return nil, fmt.Errorf("%w: %s", errICECandidateTypeUnknown, c.Typ)
 	}
+
+	if cand != nil && err == nil {
+		err = c.exportExtensions(cand)
+	}
+
+	return cand, err
+}
+
+func (c *ICECandidate) setExtensions(ext []ice.CandidateExtension) {
+	var extensions string
+
+	for i := range ext {
+		if i > 0 {
+			extensions += " "
+		}
+
+		extensions += ext[i].Key + " " + ext[i].Value
+	}
+
+	c.extensions = extensions
+}
+
+func (c *ICECandidate) exportExtensions(cand ice.Candidate) error {
+	extensions := c.extensions
+	var ext ice.CandidateExtension
+	var field string
+
+	for i, start := 0, 0; i < len(extensions); i++ {
+		switch {
+		case extensions[i] == ' ':
+			field = extensions[start:i]
+			start = i + 1
+		case i == len(extensions)-1:
+			field = extensions[start:]
+		default:
+			continue
+		}
+
+		// Extension keys can't be empty
+		hasKey := ext.Key != ""
+		if !hasKey {
+			ext.Key = field
+		} else {
+			ext.Value = field
+		}
+
+		// Extension value can be empty
+		if hasKey || i == len(extensions)-1 {
+			if err := cand.AddExtension(ext); err != nil {
+				return err
+			}
+
+			ext = ice.CandidateExtension{}
+		}
+	}
+
+	return nil
 }
 
 func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {

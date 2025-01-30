@@ -248,3 +248,109 @@ func TestICECandidateSDPMid_ToJSON(t *testing.T) {
 	assert.Equal(t, candidate.SDPMid, "0")
 	assert.Equal(t, candidate.SDPMLineIndex, uint16(1))
 }
+
+func TestICECandidateExtensions_ToJSON(t *testing.T) {
+	candidates := []struct {
+		candidate  string
+		extensions []ice.CandidateExtension
+	}{
+		{
+			"2637185494 1 udp 2121932543 192.168.1.4 50723 typ host generation 1 ufrag Jzd0 network-id 1",
+			[]ice.CandidateExtension{
+				{
+					Key:   "generation",
+					Value: "1",
+				},
+				{
+					Key:   "ufrag",
+					Value: "Jzd0",
+				},
+				{
+					Key:   "network-id",
+					Value: "1",
+				},
+			},
+		},
+		{
+			"1052353102 1 tcp 2128609279 192.168.0.196 0 typ host tcptype active ufrag Jzd0 network-id 1",
+			[]ice.CandidateExtension{
+				{
+					Key:   "tcptype",
+					Value: "active",
+				},
+				{
+					Key:   "ufrag",
+					Value: "Jzd0",
+				},
+				{
+					Key:   "network-id",
+					Value: "1",
+				},
+			},
+		},
+		{
+			"1052353102 1 tcp 2128609279 192.168.0.196 0 typ host tcptype active ufrag Jzd0 network-id 1 empty-ext ",
+			[]ice.CandidateExtension{
+				{
+					Key:   "tcptype",
+					Value: "active",
+				},
+				{
+					Key:   "ufrag",
+					Value: "Jzd0",
+				},
+				{
+					Key:   "network-id",
+					Value: "1",
+				},
+				{
+					Key:   "empty-ext",
+					Value: "",
+				},
+			},
+		},
+		{
+			"1052353102 1 tcp 2128609279 192.168.0.196 0 typ host tcptype active ufrag Jzd0 empty-ext  network-id 1",
+			[]ice.CandidateExtension{
+				{
+					Key:   "tcptype",
+					Value: "active",
+				},
+				{
+					Key:   "ufrag",
+					Value: "Jzd0",
+				},
+				{
+					Key:   "empty-ext",
+					Value: "",
+				},
+				{
+					Key:   "network-id",
+					Value: "1",
+				},
+			},
+		},
+	}
+
+	for _, cand := range candidates {
+		cand := cand
+		candidate, err := ice.UnmarshalCandidate(cand.candidate)
+		assert.NoError(t, err)
+
+		sdpMid := "1"
+		sdpMLineIndex := uint16(2)
+
+		iceCandidate, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
+		assert.NoError(t, err)
+
+		candidateInit := iceCandidate.ToJSON()
+
+		assert.Equal(t, sdpMLineIndex, *candidateInit.SDPMLineIndex)
+		assert.Equal(t, "candidate:"+cand.candidate, candidateInit.Candidate)
+
+		iceBack, err := iceCandidate.toICE()
+
+		assert.NoError(t, err)
+		assert.Equal(t, cand.extensions, iceBack.Extensions())
+	}
+}
