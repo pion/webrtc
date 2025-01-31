@@ -400,7 +400,7 @@ func Test_TrackLocalStatic_Payloader(t *testing.T) {
 
 	customPayloader := &customCodecPayloader{}
 	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: mimeTypeCustomCodec},
+		RTPCodecCapability{MimeType: mimeTypeCustomCodec, ClockRate: 90000},
 		"video",
 		"pion",
 		WithPayloader(func(c RTPCodecCapability) (rtp.Payloader, error) {

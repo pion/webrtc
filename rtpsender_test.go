@@ -36,7 +36,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
 	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
-	trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264}, "video", "pion")
+	trackB, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, ClockRate: 90000}, "video", "pion")
 	assert.NoError(t, err)
 
 	rtpSender, err := sender.AddTrack(trackA)
