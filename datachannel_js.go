@@ -33,6 +33,11 @@ type DataChannel struct {
 	api *API
 }
 
+// JSValue returns the underlying RTCDataChannel
+func (d *DataChannel) JSValue() js.Value {
+	return d.underlying
+}
+
 // OnOpen sets an event handler which is invoked when
 // the underlying data transport has been established (or re-established).
 func (d *DataChannel) OnOpen(f func()) {

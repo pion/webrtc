@@ -13,3 +13,8 @@ type RTPReceiver struct {
 	// Pointer to the underlying JavaScript RTCRTPReceiver object.
 	underlying js.Value
 }
+
+// JSValue returns the underlying RTCRtpReceiver
+func (r *RTPReceiver) JSValue() js.Value {
+	return r.underlying
+}
