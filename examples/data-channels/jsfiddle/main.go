@@ -42,6 +42,9 @@ func main() {
 	sendChannel.OnClose(func() {
 		fmt.Println("sendChannel has closed")
 	})
+	sendChannel.OnClosing(func() {
+		fmt.Println("sendChannel is closing")
+	})
 	sendChannel.OnError(func(err error) {
 		fmt.Println("sendChannel error", err)
 	})

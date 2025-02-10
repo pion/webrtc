@@ -27,6 +27,7 @@ type DataChannel struct {
 	// syscall/js API. Initially nil.
 	onOpenHandler       *js.Func
 	onCloseHandler      *js.Func
+	onClosingHandler    *js.Func
 	onMessageHandler    *js.Func
 	onBufferedAmountLow *js.Func
 	onErrorHandler      *js.Func
@@ -63,6 +64,21 @@ func (d *DataChannel) OnClose(f func()) {
 	})
 	d.onCloseHandler = &onCloseHandler
 	d.underlying.Set("onclose", onCloseHandler)
+}
+
+// FYI `OnClosing` is not implemented in the non-JS version of Pion.
+
+func (d *DataChannel) OnClosing(f func()) {
+	if d.onClosingHandler != nil {
+		oldHandler := d.onClosingHandler
+		defer oldHandler.Release()
+	}
+	onClosingHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		go f()
+		return js.Undefined()
+	})
+	d.onClosingHandler = &onClosingHandler
+	d.underlying.Set("onclosing", onClosingHandler)
 }
 
 func (d *DataChannel) OnError(f func(err error)) {
@@ -164,6 +180,9 @@ func (d *DataChannel) Close() (err error) {
 	}
 	if d.onCloseHandler != nil {
 		d.onCloseHandler.Release()
+	}
+	if d.onClosingHandler != nil {
+		d.onClosingHandler.Release()
 	}
 	if d.onMessageHandler != nil {
 		d.onMessageHandler.Release()
