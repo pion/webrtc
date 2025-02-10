@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"syscall/js"
 
@@ -28,6 +29,7 @@ type DataChannel struct {
 	onCloseHandler      *js.Func
 	onMessageHandler    *js.Func
 	onBufferedAmountLow *js.Func
+	onErrorHandler      *js.Func
 
 	// A reference to the associated api object used by this datachannel
 	api *API
@@ -61,6 +63,24 @@ func (d *DataChannel) OnClose(f func()) {
 	})
 	d.onCloseHandler = &onCloseHandler
 	d.underlying.Set("onclose", onCloseHandler)
+}
+
+func (d *DataChannel) OnError(f func(err error)) {
+	if d.onErrorHandler != nil {
+		oldHandler := d.onErrorHandler
+		defer oldHandler.Release()
+	}
+	onErrorHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		event := args[0]
+		errorObj := event.Get("error")
+		// FYI RTCError has some extra properties, e.g. `errorDetail`:
+		// https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/error_event
+		errorMessage := errorObj.Get("message").String()
+		go f(errors.New(errorMessage))
+		return js.Undefined()
+	})
+	d.onErrorHandler = &onErrorHandler
+	d.underlying.Set("onerror", onErrorHandler)
 }
 
 // OnMessage sets an event handler which is invoked on a binary message arrival
@@ -150,6 +170,9 @@ func (d *DataChannel) Close() (err error) {
 	}
 	if d.onBufferedAmountLow != nil {
 		d.onBufferedAmountLow.Release()
+	}
+	if d.onErrorHandler != nil {
+		d.onErrorHandler.Release()
 	}
 
 	return nil
