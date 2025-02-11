@@ -16,6 +16,11 @@ type RTPTransceiver struct {
 	underlying js.Value
 }
 
+// JSValue returns the underlying RTCRtpTransceiver
+func (r *RTPTransceiver) JSValue() js.Value {
+	return r.underlying
+}
+
 // Direction returns the RTPTransceiver's current direction
 func (r *RTPTransceiver) Direction() RTPTransceiverDirection {
 	return NewRTPTransceiverDirection(r.underlying.Get("direction").String())
