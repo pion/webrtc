@@ -1887,4 +1887,6 @@ func Test_WriteRTCP_Disconnected(t *testing.T) {
 	assert.Error(t, peerConnection.WriteRTCP(
 		[]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 5, MediaSSRC: 10}}),
 	)
+
+	assert.NoError(t, peerConnection.Close())
 }
