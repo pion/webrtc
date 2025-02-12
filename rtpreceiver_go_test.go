@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -73,4 +74,39 @@ func TestSetRTPParameters(t *testing.T) {
 	<-seenPacket.Done()
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, sender, receiver)
+}
+
+func TestReceiveError(t *testing.T) {
+	api := NewAPI()
+
+	dtlsTransport, err := api.NewDTLSTransport(nil, nil)
+	assert.NoError(t, err)
+
+	rtpReceiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, dtlsTransport)
+	assert.NoError(t, err)
+
+	rtpParameters := RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{
+			{
+				RTPCodingParameters: RTPCodingParameters{
+					SSRC: 1000,
+				},
+			},
+		},
+	}
+
+	assert.Error(t, rtpReceiver.Receive(rtpParameters))
+
+	chanErrs := make(chan error)
+	go func() {
+		_, _, chanErr := rtpReceiver.Read(nil)
+		chanErrs <- chanErr
+
+		_, _, chanErr = rtpReceiver.Track().ReadRTP()
+		chanErrs <- chanErr
+	}()
+
+	assert.NoError(t, rtpReceiver.Stop())
+	assert.Error(t, io.ErrClosedPipe, <-chanErrs)
+	assert.Error(t, io.ErrClosedPipe, <-chanErrs)
 }
