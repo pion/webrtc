@@ -10,7 +10,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -116,8 +115,6 @@ func removeVideo(res http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	var err error
 	if peerConnection, err = webrtc.NewPeerConnection(webrtc.Configuration{}); err != nil {
 		panic(err)
