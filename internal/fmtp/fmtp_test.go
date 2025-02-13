@@ -56,17 +56,23 @@ func TestParseParameters(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	for _, ca := range []struct {
-		name     string
-		mimeType string
-		line     string
-		expected FMTP
+		name      string
+		mimeType  string
+		clockRate uint32
+		channels  uint16
+		line      string
+		expected  FMTP
 	}{
 		{
 			"generic",
 			"generic",
+			90000,
+			2,
 			"key-name=value",
 			&genericFMTP{
-				mimeType: "generic",
+				mimeType:  "generic",
+				clockRate: 90000,
+				channels:  2,
 				parameters: map[string]string{
 					"key-name": "value",
 				},
@@ -75,9 +81,13 @@ func TestParse(t *testing.T) {
 		{
 			"generic case normalization",
 			"generic",
+			90000,
+			2,
 			"Key=value",
 			&genericFMTP{
-				mimeType: "generic",
+				mimeType:  "generic",
+				clockRate: 90000,
+				channels:  2,
 				parameters: map[string]string{
 					"key": "value",
 				},
@@ -86,6 +96,8 @@ func TestParse(t *testing.T) {
 		{
 			"h264",
 			"video/h264",
+			90000,
+			0,
 			"key-name=value",
 			&h264FMTP{
 				parameters: map[string]string{
@@ -96,6 +108,8 @@ func TestParse(t *testing.T) {
 		{
 			"vp9",
 			"video/vp9",
+			90000,
+			0,
 			"key-name=value",
 			&vp9FMTP{
 				parameters: map[string]string{
@@ -106,6 +120,8 @@ func TestParse(t *testing.T) {
 		{
 			"av1",
 			"video/av1",
+			90000,
+			0,
 			"key-name=value",
 			&av1FMTP{
 				parameters: map[string]string{
@@ -115,7 +131,7 @@ func TestParse(t *testing.T) {
 		},
 	} {
 		t.Run(ca.name, func(t *testing.T) {
-			f := Parse(ca.mimeType, ca.line)
+			f := Parse(ca.mimeType, ca.clockRate, ca.channels, ca.line)
 			if !reflect.DeepEqual(ca.expected, f) {
 				t.Errorf("expected '%v', got '%v'", ca.expected, f)
 			}
@@ -178,6 +194,27 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 			true,
 		},
 		{
+			"generic inferred channels",
+			&genericFMTP{
+				mimeType: "generic",
+				channels: 1,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType: "generic",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			true,
+		},
+		{
 			"generic inconsistent different kind",
 			&genericFMTP{
 				mimeType: "generic",
@@ -202,6 +239,52 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 			},
 			&genericFMTP{
 				mimeType: "generic2",
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			false,
+		},
+		{
+			"generic inconsistent different clock rate",
+			&genericFMTP{
+				mimeType:  "generic",
+				clockRate: 90000,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "generic",
+				clockRate: 48000,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			false,
+		},
+		{
+			"generic inconsistent different channels",
+			&genericFMTP{
+				mimeType:  "generic",
+				clockRate: 90000,
+				channels:  2,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "generic",
+				clockRate: 90000,
+				channels:  1,
 				parameters: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -497,6 +580,126 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 				},
 			},
 			false,
+		},
+		{
+			"pcmu channels",
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 8000,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 8000,
+				channels:  1,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			true,
+		},
+		{
+			"pcmu inconsistent channels",
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 8000,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 8000,
+				channels:  2,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			false,
+		},
+		{
+			"pcmu clockrate",
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 0,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 8000,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			true,
+		},
+		{
+			"pcmu inconsistent clockrate",
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 0,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "audio/pcmu",
+				clockRate: 16000,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			false,
+		},
+		{
+			"opus clockrate",
+			&genericFMTP{
+				mimeType:  "audio/opus",
+				clockRate: 0,
+				channels:  0,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			&genericFMTP{
+				mimeType:  "audio/opus",
+				clockRate: 48000,
+				channels:  2,
+				parameters: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+			},
+			true,
 		},
 	} {
 		t.Run(ca.name, func(t *testing.T) {
