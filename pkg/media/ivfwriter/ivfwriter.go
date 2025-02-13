@@ -223,7 +223,7 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop, gocogn
 
 		// the timestamp must be sequential. webrtc mandates a clock rate of 90000
 		// and we've assumed 30fps in the header.
-		if err := i.writeFrame(i.currentFrame, uint64(packet.Timestamp)/3000); err != nil {
+		if err := i.writeFrame(i.currentFrame, relativeTstampMs); err != nil {
 			return err
 		}
 		i.currentFrame = nil
