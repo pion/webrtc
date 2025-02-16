@@ -8,6 +8,32 @@ import (
 	"strings"
 )
 
+func defaultClockRate(mimeType string) uint32 {
+	defaults := map[string]uint32{
+		"audio/opus": 48000,
+		"audio/pcmu": 8000,
+		"audio/pcma": 8000,
+	}
+
+	if def, ok := defaults[strings.ToLower(mimeType)]; ok {
+		return def
+	}
+
+	return 90000
+}
+
+func defaultChannels(mimeType string) uint16 {
+	defaults := map[string]uint16{
+		"audio/opus": 2,
+	}
+
+	if def, ok := defaults[strings.ToLower(mimeType)]; ok {
+		return def
+	}
+
+	return 0
+}
+
 func parseParameters(line string) map[string]string {
 	parameters := make(map[string]string)
 
@@ -22,6 +48,61 @@ func parseParameters(line string) map[string]string {
 	}
 
 	return parameters
+}
+
+// ClockRateEqual checks whether two clock rates are equal.
+func ClockRateEqual(mimeType string, valA, valB uint32) bool {
+	// Lots of users use formats without setting clock rate or channels.
+	// In this case, use default values.
+	// It would be better to remove this exception in a future major release.
+	if valA == 0 {
+		valA = defaultClockRate(mimeType)
+	}
+	if valB == 0 {
+		valB = defaultClockRate(mimeType)
+	}
+
+	return valA == valB
+}
+
+// ChannelsEqual checks whether two channels are equal.
+func ChannelsEqual(mimeType string, valA, valB uint16) bool {
+	// Lots of users use formats without setting clock rate or channels.
+	// In this case, use default values.
+	// It would be better to remove this exception in a future major release.
+	if valA == 0 {
+		valA = defaultChannels(mimeType)
+	}
+	if valB == 0 {
+		valB = defaultChannels(mimeType)
+	}
+
+	// RFC8866: channel count "is OPTIONAL and may be omitted
+	// if the number of channels is one".
+	if valA == 0 {
+		valA = 1
+	}
+	if valB == 0 {
+		valB = 1
+	}
+
+	return valA == valB
+}
+
+func paramsEqual(valA, valB map[string]string) bool {
+	for k, v := range valA {
+		if vb, ok := valB[k]; ok && !strings.EqualFold(vb, v) {
+			return false
+		}
+	}
+
+	for k, v := range valB {
+		if va, ok := valA[k]; ok && !strings.EqualFold(va, v) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // FMTP interface for implementing custom
@@ -39,7 +120,7 @@ type FMTP interface {
 }
 
 // Parse parses an fmtp string based on the MimeType.
-func Parse(mimeType, line string) FMTP {
+func Parse(mimeType string, clockRate uint32, channels uint16, line string) FMTP {
 	var fmtp FMTP
 
 	parameters := parseParameters(line)
@@ -63,6 +144,8 @@ func Parse(mimeType, line string) FMTP {
 	default:
 		fmtp = &genericFMTP{
 			mimeType:   mimeType,
+			clockRate:  clockRate,
+			channels:   channels,
 			parameters: parameters,
 		}
 	}
@@ -72,6 +155,8 @@ func Parse(mimeType, line string) FMTP {
 
 type genericFMTP struct {
 	mimeType   string
+	clockRate  uint32
+	channels   uint16
 	parameters map[string]string
 }
 
@@ -87,23 +172,10 @@ func (g *genericFMTP) Match(b FMTP) bool {
 		return false
 	}
 
-	if !strings.EqualFold(g.mimeType, fmtp.MimeType()) {
-		return false
-	}
-
-	for k, v := range g.parameters {
-		if vb, ok := fmtp.parameters[k]; ok && !strings.EqualFold(vb, v) {
-			return false
-		}
-	}
-
-	for k, v := range fmtp.parameters {
-		if va, ok := g.parameters[k]; ok && !strings.EqualFold(va, v) {
-			return false
-		}
-	}
-
-	return true
+	return strings.EqualFold(g.mimeType, fmtp.MimeType()) &&
+		ClockRateEqual(g.mimeType, g.clockRate, fmtp.clockRate) &&
+		ChannelsEqual(g.mimeType, g.channels, fmtp.channels) &&
+		paramsEqual(g.parameters, fmtp.parameters)
 }
 
 func (g *genericFMTP) Parameter(key string) (string, bool) {
