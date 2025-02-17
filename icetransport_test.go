@@ -125,19 +125,34 @@ func TestICETransport_GetSelectedCandidatePair(t *testing.T) {
 	closePairNow(t, offerer, answerer)
 }
 
-func TestICETransport_GetLocalParameters(t *testing.T) {
+func TestICETransport_GetLocalAndRemoteParameters(t *testing.T) {
 	offerer, answerer, err := newPair()
 	assert.NoError(t, err)
+
+	_, err = offerer.SCTP().Transport().ICETransport().GetRemoteParameters()
+	assert.Error(t, err, errICEAgentNotExist)
 
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 
 	assert.NoError(t, signalPair(offerer, answerer))
 	peerConnectionConnected.Wait()
 
-	localParameters, err := offerer.SCTP().Transport().ICETransport().GetLocalParameters()
+	offerLocalParameters, err := offerer.SCTP().Transport().ICETransport().GetLocalParameters()
 	assert.NoError(t, err)
-	assert.NotEqual(t, localParameters.UsernameFragment, "")
-	assert.NotEqual(t, localParameters.Password, "")
+
+	offerRemoteParameters, err := offerer.SCTP().Transport().ICETransport().GetRemoteParameters()
+	assert.NoError(t, err)
+
+	answerLocalParameters, err := answerer.SCTP().Transport().ICETransport().GetLocalParameters()
+	assert.NoError(t, err)
+
+	answerRemoteParameters, err := answerer.SCTP().Transport().ICETransport().GetRemoteParameters()
+	assert.NoError(t, err)
+
+	assert.Equal(t, offerLocalParameters.UsernameFragment, answerRemoteParameters.UsernameFragment)
+	assert.Equal(t, offerLocalParameters.Password, answerRemoteParameters.Password)
+	assert.Equal(t, answerLocalParameters.UsernameFragment, offerRemoteParameters.UsernameFragment)
+	assert.Equal(t, answerLocalParameters.Password, offerRemoteParameters.Password)
 
 	closePairNow(t, offerer, answerer)
 }
