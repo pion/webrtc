@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/rtp/codecs/av1/frame"
+	"github.com/pion/rtp/codecs/av1/obu"
 )
 
 var (
@@ -44,7 +44,7 @@ type (
 		currentFrame []byte
 
 		// AV1
-		av1Frame frame.AV1
+		av1Depacketizer *codecs.AV1Depacketizer
 	}
 )
 
@@ -97,7 +97,6 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 	if writer.codec == codecUnset {
 		writer.codec = codecVP8
 	}
-
 	if err := writer.writeHeader(); err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 }
 
 // WriteRTP adds a new packet and writes the appropriate headers for it.
-func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop, gocognit
+func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop,gocyclo,gocognit
 	if i.ioWriter == nil {
 		return errFileNotOpened
 	} else if len(packet.Payload) == 0 {
@@ -228,21 +227,41 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop, gocogn
 		}
 		i.currentFrame = nil
 	case codecAV1:
-		av1Packet := &codecs.AV1Packet{}
-		if _, err := av1Packet.Unmarshal(packet.Payload); err != nil {
-			return err
+		if i.av1Depacketizer == nil {
+			i.av1Depacketizer = &codecs.AV1Depacketizer{}
 		}
 
-		obus, err := i.av1Frame.ReadFrames(av1Packet)
+		payload, err := i.av1Depacketizer.Unmarshal(packet.Payload)
 		if err != nil {
 			return err
 		}
 
-		for j := range obus {
-			if err := i.writeFrame(obus[j], relativeTstampMs); err != nil {
-				return err
+		if !i.seenKeyFrame {
+			isKeyFrame := i.av1Depacketizer.N || (len(payload) > 0 && obu.Type((payload[0]&0x78)>>3) == obu.OBUSequenceHeader)
+			if !isKeyFrame {
+				return nil
 			}
+
+			i.seenKeyFrame = true
 		}
+
+		i.currentFrame = append(i.currentFrame, payload...)
+
+		if !packet.Marker {
+			return nil
+		}
+
+		delimiter := obu.Header{
+			Type:         obu.OBUTemporalDelimiter,
+			HasSizeField: true,
+		}
+		frame := append(delimiter.Marshal(), 0)
+		frame = append(frame, i.currentFrame...)
+
+		if err := i.writeFrame(frame, relativeTstampMs); err != nil {
+			return err
+		}
+		i.currentFrame = nil
 	default:
 		return errCodecUnset
 	}
