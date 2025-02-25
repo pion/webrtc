@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -54,6 +55,9 @@ const (
 	// Note: Matching should be case insensitive.
 	MimeTypeFlexFEC = "video/flexfec"
 )
+
+// ErrCodecAlreadyRegistered indicates that a codec has already been registered for the same payload type.
+var ErrCodecAlreadyRegistered = fmt.Errorf("codec already registered for same payload type")
 
 type mediaEngineHeaderExtension struct {
 	uri              string
@@ -244,17 +248,20 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 }
 
 // addCodec will append codec if it not exists.
-func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) []RTPCodecParameters {
+func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) ([]RTPCodecParameters, error) {
 	for _, c := range codecs {
-		if c.MimeType == codec.MimeType &&
-			fmtp.ClockRateEqual(c.MimeType, c.ClockRate, codec.ClockRate) &&
-			fmtp.ChannelsEqual(c.MimeType, c.Channels, codec.Channels) &&
-			c.PayloadType == codec.PayloadType {
-			return codecs
+		if c.PayloadType == codec.PayloadType {
+			if c.MimeType == codec.MimeType &&
+				fmtp.ClockRateEqual(c.MimeType, c.ClockRate, codec.ClockRate) &&
+				fmtp.ChannelsEqual(c.MimeType, c.Channels, codec.Channels) {
+				return codecs, nil
+			}
+
+			return codecs, ErrCodecAlreadyRegistered
 		}
 	}
 
-	return append(codecs, codec)
+	return append(codecs, codec), nil
 }
 
 // RegisterCodec adds codec to the MediaEngine
@@ -263,17 +270,18 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var err error
 	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
-		m.audioCodecs = m.addCodec(m.audioCodecs, codec)
+		m.audioCodecs, err = m.addCodec(m.audioCodecs, codec)
 	case RTPCodecTypeVideo:
-		m.videoCodecs = m.addCodec(m.videoCodecs, codec)
+		m.videoCodecs, err = m.addCodec(m.videoCodecs, codec)
 	default:
 		return ErrUnknownType
 	}
 
-	return nil
+	return err
 }
 
 // RegisterHeaderExtension adds a header extension to the MediaEngine
@@ -577,14 +585,21 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 	return nil
 }
 
-func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) {
+func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) error {
+	var joinedErr error
 	for _, codec := range codecs {
+		var err error
 		if typ == RTPCodecTypeAudio {
-			m.negotiatedAudioCodecs = m.addCodec(m.negotiatedAudioCodecs, codec)
+			m.negotiatedAudioCodecs, err = m.addCodec(m.negotiatedAudioCodecs, codec)
 		} else if typ == RTPCodecTypeVideo {
-			m.negotiatedVideoCodecs = m.addCodec(m.negotiatedVideoCodecs, codec)
+			m.negotiatedVideoCodecs, err = m.addCodec(m.negotiatedVideoCodecs, codec)
+		}
+		if err != nil {
+			joinedErr = errors.Join(joinedErr, err)
 		}
 	}
+
+	return joinedErr
 }
 
 // Update the MediaEngine from a remote description.
@@ -645,12 +660,15 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		// use exact matches when they exist, otherwise fall back to partial
 		switch {
 		case len(exactMatches) > 0:
-			m.pushCodecs(exactMatches, typ)
+			err = m.pushCodecs(exactMatches, typ)
 		case len(partialMatches) > 0:
-			m.pushCodecs(partialMatches, typ)
+			err = m.pushCodecs(partialMatches, typ)
 		default:
 			// no match, not negotiated
 			continue
+		}
+		if err != nil {
+			return err
 		}
 
 		if err := m.updateHeaderExtensionFromMediaSection(media); err != nil {

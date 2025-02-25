@@ -18,8 +18,8 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 	api := NewAPI(WithMediaEngine(mediaEngine))
 	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
-	mediaEngine.pushCodecs(mediaEngine.videoCodecs, RTPCodecTypeVideo)
-	mediaEngine.pushCodecs(mediaEngine.audioCodecs, RTPCodecTypeAudio)
+	assert.NoError(t, mediaEngine.pushCodecs(mediaEngine.videoCodecs, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.pushCodecs(mediaEngine.audioCodecs, RTPCodecTypeAudio))
 
 	tr := RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: mediaEngine.videoCodecs}
 	assert.EqualValues(t, mediaEngine.videoCodecs, tr.getCodecs())

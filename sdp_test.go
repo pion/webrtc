@@ -683,8 +683,8 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 		me := &MediaEngine{}
 		assert.NoError(t, me.RegisterDefaultCodecs())
 		api := NewAPI(WithMediaEngine(me))
-		me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo)
-		me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio)
+		assert.NoError(t, me.pushCodecs(me.videoCodecs, RTPCodecTypeVideo))
+		assert.NoError(t, me.pushCodecs(me.audioCodecs, RTPCodecTypeAudio))
 
 		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
