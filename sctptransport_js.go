@@ -14,6 +14,11 @@ type SCTPTransport struct {
 	underlying js.Value
 }
 
+// JSValue returns the underlying RTCSctpTransport
+func (r *SCTPTransport) JSValue() js.Value {
+	return r.underlying
+}
+
 // Transport returns the DTLSTransport instance the SCTPTransport is sending over.
 func (r *SCTPTransport) Transport() *DTLSTransport {
 	underlying := r.underlying.Get("transport")

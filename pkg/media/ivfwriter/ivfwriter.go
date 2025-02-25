@@ -16,40 +16,48 @@ import (
 )
 
 var (
-	errFileNotOpened    = errors.New("file not opened")
-	errInvalidNilPacket = errors.New("invalid nil packet")
-	errCodecAlreadySet  = errors.New("codec is already set")
-	errNoSuchCodec      = errors.New("no codec for this MimeType")
+	errFileNotOpened        = errors.New("file not opened")
+	errInvalidNilPacket     = errors.New("invalid nil packet")
+	errCodecUnset           = errors.New("codec is unset")
+	errCodecAlreadySet      = errors.New("codec is already set")
+	errNoSuchCodec          = errors.New("no codec for this MimeType")
+	errInvalidMediaTimebase = errors.New("invalid media timebase")
+)
+
+type (
+	codec int
+
+	// IVFWriter is used to take RTP packets and write them to an IVF on disk.
+	IVFWriter struct {
+		ioWriter     io.Writer
+		count        uint64
+		seenKeyFrame bool
+
+		codec codec
+
+		timebaseDenominator uint32
+		timebaseNumerator   uint32
+		firstFrameTimestamp uint32
+		clockRate           uint64
+
+		// VP8, VP9
+		currentFrame []byte
+
+		// AV1
+		av1Frame frame.AV1
+	}
 )
 
 const (
+	codecUnset codec = iota
+	codecVP8
+	codecVP9
+	codecAV1
+
 	mimeTypeVP8 = "video/VP8"
+	mimeTypeVP9 = "video/VP9"
 	mimeTypeAV1 = "video/AV1"
-
-	ivfFileHeaderSignature = "DKIF"
 )
-
-var errInvalidMediaTimebase = errors.New("invalid media timebase")
-
-// IVFWriter is used to take RTP packets and write them to an IVF on disk.
-type IVFWriter struct {
-	ioWriter     io.Writer
-	count        uint64
-	seenKeyFrame bool
-
-	isVP8, isAV1 bool
-
-	timebaseDenominator uint32
-	timebaseNumerator   uint32
-	firstFrameTimestamp uint32
-	clockRate           uint64
-
-	// VP8
-	currentFrame []byte
-
-	// AV1
-	av1Frame frame.AV1
-}
 
 // New builds a new IVF writer.
 func New(fileName string, opts ...Option) (*IVFWriter, error) {
@@ -86,8 +94,8 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 		}
 	}
 
-	if !writer.isAV1 && !writer.isVP8 {
-		writer.isVP8 = true
+	if writer.codec == codecUnset {
+		writer.codec = codecVP8
 	}
 
 	if err := writer.writeHeader(); err != nil {
@@ -103,15 +111,20 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 
 func (i *IVFWriter) writeHeader() error {
 	header := make([]byte, 32)
-	copy(header[0:], ivfFileHeaderSignature)      // DKIF
+	copy(header[0:], "DKIF")                      // DKIF
 	binary.LittleEndian.PutUint16(header[4:], 0)  // Version
 	binary.LittleEndian.PutUint16(header[6:], 32) // Header size
 
 	// FOURCC
-	if i.isVP8 {
+	switch i.codec {
+	case codecVP8:
 		copy(header[8:], "VP80")
-	} else if i.isAV1 {
+	case codecVP9:
+		copy(header[8:], "VP90")
+	case codecAV1:
 		copy(header[8:], "AV01")
+	default:
+		return errCodecUnset
 	}
 
 	binary.LittleEndian.PutUint16(header[12:], 640)                   // Width in pixels
@@ -146,7 +159,7 @@ func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 }
 
 // WriteRTP adds a new packet and writes the appropriate headers for it.
-func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop
+func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop, gocognit
 	if i.ioWriter == nil {
 		return errFileNotOpened
 	} else if len(packet.Payload) == 0 {
@@ -154,11 +167,12 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop
 	}
 
 	if i.count == 0 {
-		i.firstFrameTimestamp = packet.Header.Timestamp
+		i.firstFrameTimestamp = packet.Timestamp
 	}
-	relativeTstampMs := 1000 * uint64(packet.Header.Timestamp-i.firstFrameTimestamp) / i.clockRate
+	relativeTstampMs := 1000 * uint64(packet.Timestamp-i.firstFrameTimestamp) / i.clockRate
 
-	if i.isVP8 { //nolint:nestif
+	switch i.codec {
+	case codecVP8:
 		vp8Packet := codecs.VP8Packet{}
 		if _, err := vp8Packet.Unmarshal(packet.Payload); err != nil {
 			return err
@@ -185,7 +199,35 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop
 			return err
 		}
 		i.currentFrame = nil
-	} else if i.isAV1 {
+	case codecVP9:
+		vp9Packet := codecs.VP9Packet{}
+		if _, err := vp9Packet.Unmarshal(packet.Payload); err != nil {
+			return err
+		}
+
+		switch {
+		case !i.seenKeyFrame && vp9Packet.P:
+			return nil
+		case i.currentFrame == nil && !vp9Packet.B:
+			return nil
+		}
+
+		i.seenKeyFrame = true
+		i.currentFrame = append(i.currentFrame, vp9Packet.Payload[0:]...)
+
+		if !packet.Marker {
+			return nil
+		} else if len(i.currentFrame) == 0 {
+			return nil
+		}
+
+		// the timestamp must be sequential. webrtc mandates a clock rate of 90000
+		// and we've assumed 30fps in the header.
+		if err := i.writeFrame(i.currentFrame, relativeTstampMs); err != nil {
+			return err
+		}
+		i.currentFrame = nil
+	case codecAV1:
 		av1Packet := &codecs.AV1Packet{}
 		if _, err := av1Packet.Unmarshal(packet.Payload); err != nil {
 			return err
@@ -201,6 +243,8 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error { //nolint:cyclop
 				return err
 			}
 		}
+	default:
+		return errCodecUnset
 	}
 
 	return nil
@@ -243,15 +287,17 @@ type Option func(i *IVFWriter) error
 // WithCodec configures if IVFWriter is writing AV1 or VP8 packets to disk.
 func WithCodec(mimeType string) Option {
 	return func(i *IVFWriter) error {
-		if i.isVP8 || i.isAV1 {
+		if i.codec != codecUnset {
 			return errCodecAlreadySet
 		}
 
 		switch mimeType {
 		case mimeTypeVP8:
-			i.isVP8 = true
+			i.codec = codecVP8
+		case mimeTypeVP9:
+			i.codec = codecVP9
 		case mimeTypeAV1:
-			i.isAV1 = true
+			i.codec = codecAV1
 		default:
 			return errNoSuchCodec
 		}

@@ -1127,10 +1127,13 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 		defer trackMapLock.Unlock()
 
 		for _, track := range trackMap {
-			_, _, err := track.ReadRTP() // Ignore first Read, this is our peeked data
-			assert.Nil(t, err)
+			_, _, err := track.ReadRTP()
 
-			_, _, err = track.ReadRTP()
+			// Ignore first Read, this was our peeked data
+			if err == nil {
+				_, _, err = track.ReadRTP()
+			}
+
 			assert.Equal(t, err, io.EOF)
 		}
 	}

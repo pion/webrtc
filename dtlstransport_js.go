@@ -17,6 +17,11 @@ type DTLSTransport struct {
 	underlying js.Value
 }
 
+// JSValue returns the underlying RTCDtlsTransport
+func (r *DTLSTransport) JSValue() js.Value {
+	return r.underlying
+}
+
 // ICETransport returns the currently-configured *ICETransport or nil
 // if one has not been configured
 func (r *DTLSTransport) ICETransport() *ICETransport {

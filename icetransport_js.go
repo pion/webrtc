@@ -15,6 +15,11 @@ type ICETransport struct {
 	underlying js.Value
 }
 
+// JSValue returns the underlying RTCIceTransport
+func (t *ICETransport) JSValue() js.Value {
+	return t.underlying
+}
+
 // GetSelectedCandidatePair returns the selected candidate pair on which packets are sent
 // if there is no selected pair nil is returned
 func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {

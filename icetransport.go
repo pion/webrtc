@@ -358,6 +358,28 @@ func (t *ICETransport) GetLocalParameters() (ICEParameters, error) {
 	return t.gatherer.GetLocalParameters()
 }
 
+// GetRemoteParameters returns an IceParameters object which provides information
+// uniquely identifying the remote peer for the duration of the ICE session.
+func (t *ICETransport) GetRemoteParameters() (ICEParameters, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		return ICEParameters{}, fmt.Errorf("%w: unable to get remote parameters", errICEAgentNotExist)
+	}
+
+	uFrag, uPwd, err := agent.GetRemoteUserCredentials()
+	if err != nil {
+		return ICEParameters{}, fmt.Errorf("%w: unable to get remote parameters", err)
+	}
+
+	return ICEParameters{
+		UsernameFragment: uFrag,
+		Password:         uPwd,
+	}, nil
+}
+
 func (t *ICETransport) setState(i ICETransportState) {
 	t.state.Store(i)
 }

@@ -193,7 +193,6 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		return errRTPReceiverReceiveAlreadyCalled
 	default:
 	}
-	defer close(r.received)
 
 	globalParams := r.getParameters()
 	codec := RTPCodecCapability{}
@@ -256,6 +255,8 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			}
 		}
 	}
+
+	close(r.received)
 
 	return nil
 }
@@ -404,7 +405,12 @@ func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
 
 // readRTP should only be called by a track, this only exists so we can keep state in one place.
 func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a interceptor.Attributes, err error) {
-	<-r.received
+	select {
+	case <-r.received:
+	case <-r.closed:
+		return 0, nil, io.EOF
+	}
+
 	if t := r.streamsForTrack(reader); t != nil {
 		return t.rtpInterceptor.Read(b, a)
 	}

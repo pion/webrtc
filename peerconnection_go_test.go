@@ -24,6 +24,7 @@ import (
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/ice/v4"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
@@ -1877,4 +1878,15 @@ func TestTranceiverMediaStreamIdentification(t *testing.T) {
 
 	assert.NoError(t, pcOfferer.Close())
 	assert.NoError(t, pcAnswerer.Close())
+}
+
+func Test_WriteRTCP_Disconnected(t *testing.T) {
+	peerConnection, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.Error(t, peerConnection.WriteRTCP(
+		[]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 5, MediaSSRC: 10}}),
+	)
+
+	assert.NoError(t, peerConnection.Close())
 }

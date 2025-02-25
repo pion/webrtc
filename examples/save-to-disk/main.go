@@ -124,7 +124,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ivfFile, err := ivfwriter.New("output.ivf")
+	ivfFile, err := ivfwriter.New("output.ivf", ivfwriter.WithCodec("video/VP8"))
 	if err != nil {
 		panic(err)
 	}

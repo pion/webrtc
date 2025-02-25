@@ -343,6 +343,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats, err := toICECandidatePairStats(candidatePairStats)
 			if err != nil {
 				g.log.Error(err.Error())
+				collector.Done()
 
 				continue
 			}

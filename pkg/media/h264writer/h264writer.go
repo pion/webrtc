@@ -62,7 +62,7 @@ func (h *H264Writer) WriteRTP(packet *rtp.Packet) error {
 	}
 
 	data, err := h.cachedPacket.Unmarshal(packet.Payload)
-	if err != nil {
+	if err != nil || len(data) == 0 {
 		return err
 	}
 
