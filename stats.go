@@ -2041,32 +2041,35 @@ func toICECandidatePairStats(candidatePairStats ice.CandidatePairStats) (ICECand
 		Type:      StatsTypeCandidatePair,
 		ID:        newICECandidatePairStatsID(candidatePairStats.LocalCandidateID, candidatePairStats.RemoteCandidateID),
 		// TransportID:
-		LocalCandidateID:            candidatePairStats.LocalCandidateID,
-		RemoteCandidateID:           candidatePairStats.RemoteCandidateID,
-		State:                       state,
-		Nominated:                   candidatePairStats.Nominated,
-		PacketsSent:                 candidatePairStats.PacketsSent,
-		PacketsReceived:             candidatePairStats.PacketsReceived,
-		BytesSent:                   candidatePairStats.BytesSent,
-		BytesReceived:               candidatePairStats.BytesReceived,
-		LastPacketSentTimestamp:     statsTimestampFrom(candidatePairStats.LastPacketSentTimestamp),
-		LastPacketReceivedTimestamp: statsTimestampFrom(candidatePairStats.LastPacketReceivedTimestamp),
-		FirstRequestTimestamp:       statsTimestampFrom(candidatePairStats.FirstRequestTimestamp),
-		LastRequestTimestamp:        statsTimestampFrom(candidatePairStats.LastRequestTimestamp),
-		LastResponseTimestamp:       statsTimestampFrom(candidatePairStats.LastResponseTimestamp),
-		TotalRoundTripTime:          candidatePairStats.TotalRoundTripTime,
-		CurrentRoundTripTime:        candidatePairStats.CurrentRoundTripTime,
-		AvailableOutgoingBitrate:    candidatePairStats.AvailableOutgoingBitrate,
-		AvailableIncomingBitrate:    candidatePairStats.AvailableIncomingBitrate,
-		CircuitBreakerTriggerCount:  candidatePairStats.CircuitBreakerTriggerCount,
-		RequestsReceived:            candidatePairStats.RequestsReceived,
-		RequestsSent:                candidatePairStats.RequestsSent,
-		ResponsesReceived:           candidatePairStats.ResponsesReceived,
-		ResponsesSent:               candidatePairStats.ResponsesSent,
-		RetransmissionsReceived:     candidatePairStats.RetransmissionsReceived,
-		RetransmissionsSent:         candidatePairStats.RetransmissionsSent,
-		ConsentRequestsSent:         candidatePairStats.ConsentRequestsSent,
-		ConsentExpiredTimestamp:     statsTimestampFrom(candidatePairStats.ConsentExpiredTimestamp),
+		LocalCandidateID:              candidatePairStats.LocalCandidateID,
+		RemoteCandidateID:             candidatePairStats.RemoteCandidateID,
+		State:                         state,
+		Nominated:                     candidatePairStats.Nominated,
+		PacketsSent:                   candidatePairStats.PacketsSent,
+		PacketsReceived:               candidatePairStats.PacketsReceived,
+		BytesSent:                     candidatePairStats.BytesSent,
+		BytesReceived:                 candidatePairStats.BytesReceived,
+		LastPacketSentTimestamp:       statsTimestampFrom(candidatePairStats.LastPacketSentTimestamp),
+		LastPacketReceivedTimestamp:   statsTimestampFrom(candidatePairStats.LastPacketReceivedTimestamp),
+		FirstRequestTimestamp:         statsTimestampFrom(candidatePairStats.FirstRequestTimestamp),
+		LastRequestTimestamp:          statsTimestampFrom(candidatePairStats.LastRequestTimestamp),
+		FirstResponseTimestamp:        statsTimestampFrom(candidatePairStats.FirstResponseTimestamp),
+		LastResponseTimestamp:         statsTimestampFrom(candidatePairStats.LastResponseTimestamp),
+		FirstRequestReceivedTimestamp: statsTimestampFrom(candidatePairStats.FirstRequestReceivedTimestamp),
+		LastRequestReceivedTimestamp:  statsTimestampFrom(candidatePairStats.LastRequestReceivedTimestamp),
+		TotalRoundTripTime:            candidatePairStats.TotalRoundTripTime,
+		CurrentRoundTripTime:          candidatePairStats.CurrentRoundTripTime,
+		AvailableOutgoingBitrate:      candidatePairStats.AvailableOutgoingBitrate,
+		AvailableIncomingBitrate:      candidatePairStats.AvailableIncomingBitrate,
+		CircuitBreakerTriggerCount:    candidatePairStats.CircuitBreakerTriggerCount,
+		RequestsReceived:              candidatePairStats.RequestsReceived,
+		RequestsSent:                  candidatePairStats.RequestsSent,
+		ResponsesReceived:             candidatePairStats.ResponsesReceived,
+		ResponsesSent:                 candidatePairStats.ResponsesSent,
+		RetransmissionsReceived:       candidatePairStats.RetransmissionsReceived,
+		RetransmissionsSent:           candidatePairStats.RetransmissionsSent,
+		ConsentRequestsSent:           candidatePairStats.ConsentRequestsSent,
+		ConsentExpiredTimestamp:       statsTimestampFrom(candidatePairStats.ConsentExpiredTimestamp),
 	}, nil
 }
 
@@ -2163,9 +2166,21 @@ type ICECandidatePairStats struct {
 	// (LastRequestTimestamp - FirstRequestTimestamp) / RequestsSent.
 	LastRequestTimestamp StatsTimestamp `json:"lastRequestTimestamp"`
 
+	// FirstResponseTimestamp represents the timestamp at which the first STUN response
+	// was received on this particular candidate pair.
+	FirstResponseTimestamp StatsTimestamp `json:"firstResponseTimestamp"`
+
 	// LastResponseTimestamp represents the timestamp at which the last STUN response
 	// was received on this particular candidate pair.
 	LastResponseTimestamp StatsTimestamp `json:"lastResponseTimestamp"`
+
+	// FirstRequestReceivedTimestamp represents the timestamp at which the first
+	// connectivity check request was received.
+	FirstRequestReceivedTimestamp StatsTimestamp `json:"firstRequestReceivedTimestamp"`
+
+	// LastRequestReceivedTimestamp represents the timestamp at which the last
+	// connectivity check request was received.
+	LastRequestReceivedTimestamp StatsTimestamp `json:"lastRequestReceivedTimestamp"`
 
 	// TotalRoundTripTime represents the sum of all round trip time measurements
 	// in seconds since the beginning of the session, based on STUN connectivity
