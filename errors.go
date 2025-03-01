@@ -149,6 +149,9 @@ var (
 	//  needs at least one configured codec.
 	ErrSenderWithNoCodecs = errors.New("unable to populate media section, RTPSender created with no codecs")
 
+	// ErrCodecAlreadyRegistered indicates that a codec has already been registered for the same payload type.
+	ErrCodecAlreadyRegistered = errors.New("codec already registered for same payload type")
+
 	// ErrRTPSenderNewTrackHasIncorrectKind indicates that the new track is of a different kind than the previous/original.
 	ErrRTPSenderNewTrackHasIncorrectKind = errors.New("new track must be of the same kind as previous")
 
