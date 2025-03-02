@@ -71,9 +71,32 @@ func createPeerConnection(res http.ResponseWriter, req *http.Request) {
 }
 
 // Add a single video track.
-func addVideo(res http.ResponseWriter, req *http.Request) {
+func addVideo(res http.ResponseWriter, req *http.Request) { //nolint:cyclop
+	// Open a IVF file and start reading using our IVFReader
+	file, err := os.Open("output.ivf")
+	if err != nil {
+		panic(err)
+	}
+
+	ivf, header, err := ivfreader.NewWith(file)
+	if err != nil {
+		panic(err)
+	}
+
+	var mimeType string
+	switch header.FourCC {
+	case "VP80":
+		mimeType = webrtc.MimeTypeVP8
+	case "VP90":
+		mimeType = webrtc.MimeTypeVP9
+	case "AV01":
+		mimeType = webrtc.MimeTypeAV1
+	default:
+		panic(fmt.Sprintf("unsupported codec: %s", header.FourCC))
+	}
+
 	videoTrack, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8},
+		webrtc.RTPCodecCapability{MimeType: mimeType},
 		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
 		fmt.Sprintf("video-%d", randutil.NewMathRandomGenerator().Uint32()),
 	)
@@ -97,9 +120,9 @@ func addVideo(res http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	go writeVideoToTrack(videoTrack)
 	doSignaling(res, req)
 	fmt.Println("Video track has been added")
+	go writeVideoToTrack(ivf, header, videoTrack)
 }
 
 // Remove a single sender.
@@ -163,18 +186,9 @@ func main() {
 
 // Read a video file from disk and write it to a webrtc.Track
 // When the video has been completely read this exits without error.
-func writeVideoToTrack(track *webrtc.TrackLocalStaticSample) {
-	// Open a IVF file and start reading using our IVFReader
-	file, err := os.Open("output.ivf")
-	if err != nil {
-		panic(err)
-	}
-
-	ivf, header, err := ivfreader.NewWith(file)
-	if err != nil {
-		panic(err)
-	}
-
+func writeVideoToTrack(
+	ivf *ivfreader.IVFReader, header *ivfreader.IVFFileHeader, track *webrtc.TrackLocalStaticSample,
+) {
 	// Send our video file frame at a time. Pace our sending so we send it at the same speed it should be played back as.
 	// This isn't required since the video is timestamped, but we will such much higher loss if we send all at once.
 	//
