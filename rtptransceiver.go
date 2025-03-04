@@ -86,6 +86,17 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 		}
 	}
 
+	// check if direction is specified
+	if t.direction.Load() != nil {
+		for _, c := range filteredCodecs {
+			if rtxCodec := findRTXPCodec(c.PayloadType, mediaEngineCodecs); rtxCodec != nil {
+				if _, matchType := codecParametersFuzzySearch(*rtxCodec, filteredCodecs); matchType == codecMatchNone {
+					filteredCodecs = append(filteredCodecs, *rtxCodec)
+				}
+			}
+		}
+	}
+
 	return filteredCodecs
 }
 

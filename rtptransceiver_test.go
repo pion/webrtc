@@ -135,3 +135,55 @@ func Test_RTPTransceiver_SetCodecPreferences_PayloadType(t *testing.T) {
 
 	closePairNow(t, offerPC, answerPC)
 }
+
+func Test_RTPTransceiver_SDP_Codec(t *testing.T) {
+	tests := []struct {
+		Label          string
+		setPreferences bool
+	}{
+		{
+			Label:          "NoSetCodecPreferences",
+			setPreferences: false,
+		},
+		{
+			Label:          "SetCodecPreferences",
+			setPreferences: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Label, func(t *testing.T) {
+			pc, err := NewPeerConnection(Configuration{})
+			assert.NoError(t, err)
+
+			transceiver, err := pc.AddTransceiverFromKind(
+				RTPCodecTypeVideo,
+				RTPTransceiverInit{
+					Direction: RTPTransceiverDirectionRecvonly,
+				},
+			)
+			assert.NoError(t, err)
+
+			if test.setPreferences {
+				codec := RTPCodecCapability{
+					"video/vp8", 90000, 0, "", nil,
+				}
+
+				err = transceiver.SetCodecPreferences(
+					[]RTPCodecParameters{
+						{
+							RTPCodecCapability: codec,
+						},
+					},
+				)
+				assert.NoError(t, err)
+			}
+
+			offer, err := pc.CreateOffer(nil)
+			assert.NoError(t, err)
+
+			assert.Equal(t, true, strings.Contains(offer.SDP, "apt=96"))
+			assert.NoError(t, pc.Close())
+		})
+	}
+}

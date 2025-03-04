@@ -143,7 +143,7 @@ func codecParametersFuzzySearch(
 	return RTPCodecParameters{}, codecMatchNone
 }
 
-// Given a CodecParameters find the RTX CodecParameters if one exists.
+// Given a CodecParameters find the RTX Payload if one exists.
 func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
 	aptStr := fmt.Sprintf("apt=%d", needle)
 	for _, c := range haystack {
@@ -153,6 +153,18 @@ func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) Paylo
 	}
 
 	return PayloadType(0)
+}
+
+// Given a CodecParameters find the RTX CodecParameters if one exists.
+func findRTXPCodec(needle PayloadType, haystack []RTPCodecParameters) *RTPCodecParameters {
+	aptStr := fmt.Sprintf("apt=%d", needle)
+	for _, c := range haystack {
+		if aptStr == c.SDPFmtpLine {
+			return &c
+		}
+	}
+
+	return nil
 }
 
 func rtcpFeedbackIntersection(a, b []RTCPFeedback) (out []RTCPFeedback) {
