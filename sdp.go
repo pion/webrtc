@@ -337,6 +337,7 @@ func addDataMediaSection(
 	candidates []ICECandidate,
 	dtlsRole sdp.ConnectionRole,
 	iceGatheringState ICEGatheringState,
+	sctpMaxMessageSize uint32,
 ) error {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
@@ -357,6 +358,7 @@ func addDataMediaSection(
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
 		WithPropertyAttribute("sctp-port:5000").
+		WithValueAttribute("max-message-size", fmt.Sprintf("%d", sctpMaxMessageSize)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
 	for _, f := range dtlsFingerprints {
@@ -655,6 +657,7 @@ func populateSDP(
 	mediaSections []mediaSection,
 	iceGatheringState ICEGatheringState,
 	matchBundleGroup *string,
+	sctpMaxMessageSize uint32,
 ) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
@@ -691,6 +694,7 @@ func populateSDP(
 				candidates,
 				connectionRole,
 				iceGatheringState,
+				sctpMaxMessageSize,
 			); err != nil {
 				return nil, err
 			}
@@ -991,16 +995,6 @@ func selectCandidateMediaSection(sessionDescription *sdp.SessionDescription) (
 	return nil, false
 }
 
-func haveApplicationMediaSection(desc *sdp.SessionDescription) bool {
-	for _, mediaDescr := range desc.MediaDescriptions {
-		if mediaDescr.MediaName.Media == mediaSectionApplication {
-			return true
-		}
-	}
-
-	return false
-}
-
 func getByMid(searchMid string, desc *SessionDescription) *sdp.MediaDescription {
 	for _, m := range desc.parsed.MediaDescriptions {
 		if mid, ok := m.Attribute(sdp.AttrKeyMID); ok && mid == searchMid {
@@ -1127,4 +1121,16 @@ func isExtMapAllowMixedSet(desc *sdp.SessionDescription) bool {
 	}
 
 	return false
+}
+
+func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == "max-message-size" {
+			if v, err := strconv.ParseUint(a.Value, 10, 32); err == nil {
+				return uint32(v)
+			}
+		}
+	}
+
+	return 0
 }

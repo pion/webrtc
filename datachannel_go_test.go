@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"io"
@@ -850,4 +851,39 @@ func TestDataChannel_DetachErrors(t *testing.T) {
 		assert.NoError(t, offer.Close())
 		assert.NoError(t, answer.Close())
 	})
+}
+
+func TestDataChannelMessageSize(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+
+	dc, err := offerPC.CreateDataChannel("", nil)
+	assert.NoError(t, err)
+
+	answerDataChannelMessages := make(chan []byte)
+	answerPC.OnDataChannel(func(d *DataChannel) {
+		d.OnMessage(func(m DataChannelMessage) {
+			answerDataChannelMessages <- m.Data
+		})
+	})
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	messagesSent, messagesSentCancel := context.WithCancel(context.Background())
+	dc.OnOpen(func() {
+		for i := 0; i <= 10; i++ {
+			outboundMessage := make([]byte, sctpMaxMessageSizeUnsetValue*i)
+			_, err := rand.Read(outboundMessage)
+			assert.NoError(t, err)
+
+			assert.NoError(t, dc.Send(outboundMessage))
+			inboundMessage := <-answerDataChannelMessages
+
+			assert.Equal(t, outboundMessage, inboundMessage)
+		}
+		messagesSentCancel()
+	})
+
+	<-messagesSent.Done()
+	closePairNow(t, offerPC, answerPC)
 }

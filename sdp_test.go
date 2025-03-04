@@ -519,35 +519,39 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 func TestHaveApplicationMediaSection(t *testing.T) {
 	t.Run("Audio only", func(t *testing.T) {
-		descr := &sdp.SessionDescription{
-			MediaDescriptions: []*sdp.MediaDescription{
-				{
-					MediaName: sdp.MediaName{
-						Media: "audio",
-					},
-					Attributes: []sdp.Attribute{
-						{Key: "sendrecv"},
-						{Key: "ssrc", Value: "2000"},
+		descr := &SessionDescription{
+			parsed: &sdp.SessionDescription{
+				MediaDescriptions: []*sdp.MediaDescription{
+					{
+						MediaName: sdp.MediaName{
+							Media: "audio",
+						},
+						Attributes: []sdp.Attribute{
+							{Key: "sendrecv"},
+							{Key: "ssrc", Value: "2000"},
+						},
 					},
 				},
 			},
 		}
 
-		assert.False(t, haveApplicationMediaSection(descr))
+		assert.Nil(t, haveDataChannel(descr))
 	})
 
 	t.Run("Application", func(t *testing.T) {
-		s := &sdp.SessionDescription{
-			MediaDescriptions: []*sdp.MediaDescription{
-				{
-					MediaName: sdp.MediaName{
-						Media: mediaSectionApplication,
+		s := SessionDescription{
+			parsed: &sdp.SessionDescription{
+				MediaDescriptions: []*sdp.MediaDescription{
+					{
+						MediaName: sdp.MediaName{
+							Media: mediaSectionApplication,
+						},
 					},
 				},
 			},
 		}
 
-		assert.True(t, haveApplicationMediaSection(s))
+		assert.NotNil(t, haveDataChannel(&s))
 	})
 }
 
@@ -595,18 +599,29 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 		return func(t *testing.T) {
 			t.Helper()
 
-			s := &sdp.SessionDescription{}
+			testSdp := &sdp.SessionDescription{}
 
 			dtlsFingerprints, err := certificate.GetFingerprints()
 			assert.NoError(t, err)
 
-			s, err = populateSDP(s, false,
+			testSdp, err = populateSDP(testSdp,
+				false,
 				dtlsFingerprints,
 				SDPMediaDescriptionFingerprints,
-				false, true, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil)
+				false,
+				true,
+				engine,
+				sdp.ConnectionRoleActive,
+				[]ICECandidate{},
+				ICEParameters{},
+				media,
+				ICEGatheringStateNew,
+				nil,
+				0,
+			)
 			assert.NoError(t, err)
 
-			sdparray, err := s.Marshal()
+			sdparray, err := testSdp.Marshal()
 			assert.NoError(t, err)
 
 			assert.Equal(t, strings.Count(string(sdparray), "sha-256"), expectedFingerprintCount)
@@ -656,6 +671,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -714,6 +730,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -753,6 +770,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			[]mediaSection{},
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -810,6 +828,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.NoError(t, err)
 
@@ -842,6 +861,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			[]mediaSection{},
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -871,6 +891,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			[]mediaSection{},
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -914,6 +935,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			nil,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -953,6 +975,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			&matchedBundle,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 
@@ -994,6 +1017,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			mediaSections,
 			ICEGatheringStateComplete,
 			&matchedBundle,
+			se.getSCTPMaxMessageSize(),
 		)
 		assert.Nil(t, err)
 

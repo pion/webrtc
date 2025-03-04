@@ -7,7 +7,10 @@
 package webrtc
 
 import (
+	"bufio"
 	"bytes"
+	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -260,4 +263,98 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			t.Fatal("timed out")
 		}
 	}
+}
+
+// Assert that max-message-size is signaled properly
+// and able to be configured via SettingEngine.
+func TestMaxMessageSizeSignaling(t *testing.T) {
+	t.Run("Local Offer", func(t *testing.T) {
+		peerConnection, err := NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+
+		_, err = peerConnection.CreateDataChannel("", nil)
+		require.NoError(t, err)
+
+		offer, err := peerConnection.CreateOffer(nil)
+		require.NoError(t, err)
+
+		require.Contains(t, offer.SDP, "a=max-message-size:1073741823\r\n")
+		require.NoError(t, peerConnection.Close())
+	})
+
+	t.Run("Local SettingEngine", func(t *testing.T) {
+		settingEngine := SettingEngine{}
+		settingEngine.SetSCTPMaxMessageSize(4321)
+
+		peerConnection, err := NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+
+		_, err = peerConnection.CreateDataChannel("", nil)
+		require.NoError(t, err)
+
+		offer, err := peerConnection.CreateOffer(nil)
+		require.NoError(t, err)
+
+		require.Contains(t, offer.SDP, "a=max-message-size:4321\r\n")
+		require.NoError(t, peerConnection.Close())
+	})
+
+	t.Run("Remote", func(t *testing.T) {
+		settingEngine := SettingEngine{}
+		settingEngine.SetSCTPMaxMessageSize(4321)
+
+		offerPeerConnection, err := NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+
+		answerPeerConnection, err := NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+
+		onDataChannelOpen, onDataChannelOpenCancel := context.WithCancel(context.Background())
+		answerPeerConnection.OnDataChannel(func(d *DataChannel) {
+			d.OnOpen(func() {
+				onDataChannelOpenCancel()
+			})
+		})
+
+		require.NoError(t, signalPair(offerPeerConnection, answerPeerConnection))
+
+		<-onDataChannelOpen.Done()
+		require.Equal(t, uint32(defaultMaxSCTPMessageSize), offerPeerConnection.SCTP().GetCapabilities().MaxMessageSize)
+		require.Equal(t, uint32(4321), answerPeerConnection.SCTP().GetCapabilities().MaxMessageSize)
+
+		closePairNow(t, offerPeerConnection, answerPeerConnection)
+	})
+
+	t.Run("Remote Unset", func(t *testing.T) {
+		offerPeerConnection, answerPeerConnection, err := newPair()
+		require.NoError(t, err)
+
+		require.NoError(t, signalPairWithModification(offerPeerConnection, answerPeerConnection, func(sessionDescription string) (filtered string) { // nolint
+			scanner := bufio.NewScanner(strings.NewReader(sessionDescription))
+			for scanner.Scan() {
+				if strings.HasPrefix(scanner.Text(), "a=max-message-size") {
+					continue
+				}
+
+				filtered += scanner.Text() + "\r\n"
+			}
+
+			return
+		}))
+
+		onDataChannelOpen, onDataChannelOpenCancel := context.WithCancel(context.Background())
+		answerPeerConnection.OnDataChannel(func(d *DataChannel) {
+			d.OnOpen(func() {
+				onDataChannelOpenCancel()
+			})
+		})
+
+		require.NoError(t, signalPair(offerPeerConnection, answerPeerConnection))
+
+		<-onDataChannelOpen.Done()
+		require.Equal(t, uint32(defaultMaxSCTPMessageSize), offerPeerConnection.SCTP().GetCapabilities().MaxMessageSize)
+		require.Equal(t, uint32(sctpMaxMessageSizeUnsetValue), answerPeerConnection.SCTP().GetCapabilities().MaxMessageSize)
+
+		closePairNow(t, offerPeerConnection, answerPeerConnection)
+	})
 }

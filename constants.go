@@ -3,7 +3,11 @@
 
 package webrtc
 
-import "github.com/pion/dtls/v3"
+import (
+	"math"
+
+	"github.com/pion/dtls/v3"
+)
 
 const (
 	// default as the standard ethernet MTU
@@ -18,6 +22,15 @@ const (
 	// simulcastMaxProbeRoutines is how many active routines can be used to probe
 	// If the total amount of incoming SSRCes exceeds this new requests will be ignored.
 	simulcastMaxProbeRoutines = 25
+
+	// Default Max SCTP Message Size is the largest single DataChannel
+	// message we can send or accept. This default was chosen to match FireFox.
+	defaultMaxSCTPMessageSize = 1073741823
+
+	// If a DataChannel Max Message Size isn't declared by the Remote(max-message-size)
+	// this is the value we default to. This value was chosen because it was the behavior
+	// of Pion before max-message-size was implemented.
+	sctpMaxMessageSizeUnsetValue = math.MaxUint16
 
 	mediaSectionApplication = "application"
 

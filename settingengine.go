@@ -83,6 +83,7 @@ type SettingEngine struct {
 		maxReceiveBufferSize uint32
 		enableZeroChecksum   bool
 		rtoMax               time.Duration
+		maxMessageSize       uint32
 	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
@@ -104,6 +105,14 @@ type SettingEngine struct {
 	fireOnTrackBeforeFirstRTP                 bool
 	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
+}
+
+func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
+	if e.sctp.maxMessageSize != 0 {
+		return e.sctp.maxMessageSize
+	}
+
+	return defaultMaxSCTPMessageSize
 }
 
 // getReceiveMTU returns the configured MTU. If SettingEngine's MTU is configured to 0 it returns the default.
@@ -465,6 +474,12 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 // latency and CPU usage. This feature is not backwards compatible so is disabled by default.
 func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 	e.sctp.enableZeroChecksum = isEnabled
+}
+
+// SetSCTPMaxMessageSize sets the largest message we are willing to accept.
+// Leave this 0 for the default max message size.
+func (e *SettingEngine) SetSCTPMaxMessageSize(maxMessageSize uint32) {
+	e.sctp.maxMessageSize = maxMessageSize
 }
 
 // SetDTLSCustomerCipherSuites allows the user to specify a list of DTLS CipherSuites.

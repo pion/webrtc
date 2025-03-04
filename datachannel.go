@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
-const dataChannelBufferSize = math.MaxUint16 // message size limit for Chromium
 var errSCTPNotEstablished = errors.New("SCTP not established")
 
 // DataChannel represents a WebRTC DataChannel
@@ -404,10 +402,24 @@ func (d *DataChannel) readLoop() {
 		d.mu.Unlock()
 		defer close(readLoopActive)
 	}()
-	buffer := make([]byte, dataChannelBufferSize)
+
+	buffer := make([]byte, sctpMaxMessageSizeUnsetValue)
 	for {
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
 		if err != nil {
+			if errors.Is(err, io.ErrShortBuffer) {
+				if int64(n) < int64(d.api.settingEngine.getSCTPMaxMessageSize()) {
+					buffer = append(buffer, make([]byte, len(buffer))...) // nolint
+
+					continue
+				}
+
+				d.log.Errorf(
+					"Incoming DataChannel message larger then Max Message size %v",
+					d.api.settingEngine.getSCTPMaxMessageSize(),
+				)
+			}
+
 			d.setReadyState(DataChannelStateClosed)
 			if !errors.Is(err, io.EOF) {
 				d.onError(err)
@@ -417,11 +429,10 @@ func (d *DataChannel) readLoop() {
 			return
 		}
 
-		msg := DataChannelMessage{Data: make([]byte, n), IsString: isString}
-		copy(msg.Data, buffer[:n])
-
-		// NB: Why was DataChannelMessage not passed as a pointer value?
-		d.onMessage(msg) // nolint:staticcheck
+		d.onMessage(DataChannelMessage{
+			Data:     append([]byte{}, buffer[:n]...),
+			IsString: isString,
+		})
 	}
 }
 
