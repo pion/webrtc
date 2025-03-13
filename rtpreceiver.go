@@ -26,14 +26,16 @@ type trackStreams struct {
 
 	streamInfo, repairStreamInfo *interceptor.StreamInfo
 
-	rtpReadStream  *srtp.ReadStreamSRTP
-	rtpInterceptor interceptor.RTPReader
+	rtpReadStream *srtp.ReadStreamSRTP
+	rtpReader     interceptor.RTPReader
+	rtpProcessor  interceptor.RTPProcessor
 
 	rtcpReadStream  *srtp.ReadStreamSRTCP
 	rtcpInterceptor interceptor.RTCPReader
 
 	repairReadStream    *srtp.ReadStreamSRTP
-	repairInterceptor   interceptor.RTPReader
+	repairReader        interceptor.RTPReader
+	repairProcessor     interceptor.RTPProcessor
 	repairStreamChannel chan rtxPacketWithAttributes
 
 	repairRtcpReadStream  *srtp.ReadStreamSRTCP
@@ -228,13 +230,13 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		var err error
 
 		//nolint:lll // # TODO refactor
-		if streams.rtpReadStream, streams.rtpInterceptor, streams.rtcpReadStream, streams.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo); err != nil {
+		if streams.rtpReadStream, streams.rtpReader, streams.rtpProcessor, streams.rtcpReadStream, streams.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo); err != nil {
 			return err
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, codec, globalParams.HeaderExtensions)
-			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(
+			rtpReadStream, rtpReader, rtpProcessor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(
 				rtxSsrc,
 				*streamInfo,
 			)
@@ -247,7 +249,8 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 				"",
 				streamInfo,
 				rtpReadStream,
-				rtpInterceptor,
+				rtpReader,
+				rtpProcessor,
 				rtcpReadStream,
 				rtcpInterceptor,
 			); err != nil {
@@ -412,7 +415,11 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 	}
 
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpInterceptor.Read(b, a)
+		i, attr, err := t.rtpReader.Read(b, a)
+		if err != nil {
+			return 0, nil, err
+		}
+		return t.rtpProcessor.Process(i, b, attr)
 	}
 
 	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
@@ -425,7 +432,8 @@ func (r *RTPReceiver) receiveForRid(
 	params RTPParameters,
 	streamInfo *interceptor.StreamInfo,
 	rtpReadStream *srtp.ReadStreamSRTP,
-	rtpInterceptor interceptor.RTPReader,
+	rtpReader interceptor.RTPReader,
+	rtpProcessor interceptor.RTPProcessor,
 	rtcpReadStream *srtp.ReadStreamSRTCP,
 	rtcpInterceptor interceptor.RTCPReader,
 ) (*TrackRemote, error) {
@@ -443,7 +451,8 @@ func (r *RTPReceiver) receiveForRid(
 
 			r.tracks[i].streamInfo = streamInfo
 			r.tracks[i].rtpReadStream = rtpReadStream
-			r.tracks[i].rtpInterceptor = rtpInterceptor
+			r.tracks[i].rtpReader = rtpReader
+			r.tracks[i].rtpProcessor = rtpProcessor
 			r.tracks[i].rtcpReadStream = rtcpReadStream
 			r.tracks[i].rtcpInterceptor = rtcpInterceptor
 
@@ -462,7 +471,8 @@ func (r *RTPReceiver) receiveForRtx(
 	rsid string,
 	streamInfo *interceptor.StreamInfo,
 	rtpReadStream *srtp.ReadStreamSRTP,
-	rtpInterceptor interceptor.RTPReader,
+	rtpReader interceptor.RTPReader,
+	rtpProcessor interceptor.RTPProcessor,
 	rtcpReadStream *srtp.ReadStreamSRTCP,
 	rtcpInterceptor interceptor.RTCPReader,
 ) error {
@@ -488,7 +498,8 @@ func (r *RTPReceiver) receiveForRtx(
 
 	track.repairStreamInfo = streamInfo
 	track.repairReadStream = rtpReadStream
-	track.repairInterceptor = rtpInterceptor
+	track.repairReader = rtpReader
+	track.repairProcessor = rtpProcessor
 	track.repairRtcpReadStream = rtcpReadStream
 	track.repairRtcpInterceptor = rtcpInterceptor
 	track.repairStreamChannel = make(chan rtxPacketWithAttributes, 50)
@@ -496,7 +507,12 @@ func (r *RTPReceiver) receiveForRtx(
 	go func() {
 		for {
 			b := r.rtxPool.Get().([]byte) // nolint:forcetypeassert
-			i, attributes, err := track.repairInterceptor.Read(b, nil)
+			i, attributes, err := track.repairReader.Read(b, nil)
+			if err != nil {
+				r.rtxPool.Put(b) // nolint:staticcheck
+				return
+			}
+			i, attributes, err = track.repairProcessor.Process(i, b, attributes)
 			if err != nil {
 				r.rtxPool.Put(b) // nolint:staticcheck
 
@@ -590,7 +606,7 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 }
 
 // readRTX returns an RTX packet if one is available on the RTX track, otherwise returns nil.
-func (r *RTPReceiver) readRTX(reader *TrackRemote) *rtxPacketWithAttributes {
+func (r *RTPReceiver) readRTX(b []byte, reader *TrackRemote) *rtxPacketWithAttributes {
 	if !reader.HasRTX() {
 		return nil
 	}
@@ -604,7 +620,13 @@ func (r *RTPReceiver) readRTX(reader *TrackRemote) *rtxPacketWithAttributes {
 	if t := r.streamsForTrack(reader); t != nil {
 		select {
 		case rtxPacketReceived := <-t.repairStreamChannel:
-			return &rtxPacketReceived
+			{
+				n := copy(b, rtxPacketReceived.pkt)
+				_, _, err := t.rtpProcessor.Process(n, b, nil)
+				if err == nil {
+					return &rtxPacketReceived
+				}
+			}
 		default:
 		}
 	}
