@@ -9,7 +9,6 @@ package webrtc
 import (
 	"errors"
 	"io"
-	"math"
 	"sync"
 	"time"
 
@@ -33,10 +32,6 @@ type SCTPTransport struct {
 	// SCTPTransportState doesn't have an enum to distinguish between New/Connecting
 	// so we need a dedicated field
 	isStarted bool
-
-	// MaxMessageSize represents the maximum size of data that can be passed to
-	// DataChannel's send() method.
-	maxMessageSize float64
 
 	// MaxChannels represents the maximum amount of DataChannel's that can
 	// be used simultaneously.
@@ -74,7 +69,6 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 		dataChannelIDsUsed: make(map[uint16]struct{}),
 	}
 
-	res.updateMessageSize()
 	res.updateMaxChannels()
 
 	return res
@@ -90,19 +84,29 @@ func (r *SCTPTransport) Transport() *DTLSTransport {
 
 // GetCapabilities returns the SCTPCapabilities of the SCTPTransport.
 func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
+	var maxMessageSize uint32
+	if a := r.association(); a != nil {
+		maxMessageSize = a.MaxMessageSize()
+	}
+
 	return SCTPCapabilities{
-		MaxMessageSize: 0,
+		MaxMessageSize: maxMessageSize,
 	}
 }
 
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
-func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
+func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
 	}
 	r.isStarted = true
+
+	maxMessageSize := capabilities.MaxMessageSize
+	if maxMessageSize == 0 {
+		maxMessageSize = sctpMaxMessageSizeUnsetValue
+	}
 
 	dtlsTransport := r.Transport()
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
@@ -115,6 +119,7 @@ func (r *SCTPTransport) Start(_ SCTPCapabilities) error {
 		LoggerFactory:        r.api.settingEngine.LoggerFactory,
 		RTOMax:               float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond),
 		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
+		MaxMessageSize:       maxMessageSize,
 	})
 	if err != nil {
 		return err
@@ -342,36 +347,6 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	}()
 
 	return
-}
-
-func (r *SCTPTransport) updateMessageSize() {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	var remoteMaxMessageSize float64 = 65536 // pion/webrtc#758
-	var canSendSize float64 = 65536          // pion/webrtc#758
-
-	r.maxMessageSize = r.calcMessageSize(remoteMaxMessageSize, canSendSize)
-}
-
-func (r *SCTPTransport) calcMessageSize(remoteMaxMessageSize, canSendSize float64) float64 {
-	switch {
-	case remoteMaxMessageSize == 0 &&
-		canSendSize == 0:
-		return math.Inf(1)
-
-	case remoteMaxMessageSize == 0:
-		return canSendSize
-
-	case canSendSize == 0:
-		return remoteMaxMessageSize
-
-	case canSendSize > remoteMaxMessageSize:
-		return remoteMaxMessageSize
-
-	default:
-		return canSendSize
-	}
 }
 
 func (r *SCTPTransport) updateMaxChannels() {

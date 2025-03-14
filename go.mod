@@ -10,9 +10,9 @@ require (
 	github.com/pion/logging v0.2.3
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.15
-	github.com/pion/rtp v1.8.12
-	github.com/pion/sctp v1.8.36
-	github.com/pion/sdp/v3 v3.0.10
+	github.com/pion/rtp v1.8.13
+	github.com/pion/sctp v1.8.37
+	github.com/pion/sdp/v3 v3.0.11
 	github.com/pion/srtp/v3 v3.0.4
 	github.com/pion/stun/v3 v3.0.0
 	github.com/pion/transport/v3 v3.0.7

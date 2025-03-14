@@ -510,11 +510,7 @@ func TestDataChannelParameters(t *testing.T) { //nolint:cyclop
 		})
 
 		go func() {
-			for {
-				if seenAnswerMessage.get() && seenOfferMessage.get() {
-					break
-				}
-
+			for seenAnswerMessage.get() && seenOfferMessage.get() {
 				if offerDatachannel.ReadyState() == DataChannelStateOpen {
 					assert.NoError(t, offerDatachannel.SendText(expectedMessage))
 				}

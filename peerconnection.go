@@ -1563,10 +1563,10 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 }
 
 // Start SCTP subsystem.
-func (pc *PeerConnection) startSCTP() {
+func (pc *PeerConnection) startSCTP(maxMessageSize uint32) {
 	// Start sctp
 	if err := pc.sctpTransport.Start(SCTPCapabilities{
-		MaxMessageSize: 0,
+		MaxMessageSize: maxMessageSize,
 	}); err != nil {
 		pc.log.Warnf("Failed to start SCTP: %s", err)
 		if err = pc.sctpTransport.Stop(); err != nil {
@@ -2626,8 +2626,8 @@ func (pc *PeerConnection) startRTP(
 	}
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
-	if haveApplicationMediaSection(remoteDesc.parsed) {
-		pc.startSCTP()
+	if d := haveDataChannel(remoteDesc); d != nil {
+		pc.startSCTP(getMaxMessageSize(d))
 	}
 }
 
@@ -2719,6 +2719,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		mediaSections,
 		pc.ICEGatheringState(),
 		nil,
+		pc.api.settingEngine.getSCTPMaxMessageSize(),
 	)
 }
 
@@ -2885,6 +2886,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 		mediaSections,
 		pc.ICEGatheringState(),
 		bundleGroup,
+		pc.api.settingEngine.getSCTPMaxMessageSize(),
 	)
 }
 
