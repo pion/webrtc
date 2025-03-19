@@ -51,15 +51,15 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 							},
 						)
 					},
-					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
-						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPProcessor) interceptor.RTPProcessor {
+						return interceptor.RTPProcessorFunc(func(i int, b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 							if a == nil {
 								a = interceptor.Attributes{}
 							}
 
 							a.Set("attribute", "value")
 
-							return reader.Read(b, a)
+							return reader.Process(i, b, a)
 						})
 					},
 				}, nil
@@ -146,7 +146,7 @@ func Test_Interceptor_BindUnbind(t *testing.T) { //nolint:cyclop
 		UnbindLocalStreamFn: func(*interceptor.StreamInfo) {
 			atomic.AddUint32(&cntUnbindLocalStream, 1)
 		},
-		BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+		BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPProcessor) interceptor.RTPProcessor {
 			atomic.AddUint32(&cntBindRemoteStream, 1)
 
 			return reader
@@ -412,6 +412,24 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 		}
 		close(done)
 	})
+
+	pcOfferConnected := make(chan struct{})
+	pcAnswerConnected := make(chan struct{})
+
+	pc1.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			close(pcOfferConnected)
+		}
+	})
+
+	pc2.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			close(pcAnswerConnected)
+		}
+	})
+
+	<-pcOfferConnected
+	<-pcAnswerConnected
 
 	go func() {
 		for i := 0; i < numPackets; i++ {

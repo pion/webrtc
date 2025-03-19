@@ -150,10 +150,11 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 	go func() {
 		for {
-			time.Sleep(time.Millisecond * 100)
 			if pcOffer.ICEConnectionState() != ICEConnectionStateConnected {
+				time.Sleep(time.Millisecond * 100)
 				continue
 			}
+
 			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
 				fmt.Println(routineErr)
 			}
@@ -169,6 +170,12 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	}()
 
 	go func() {
+		for {
+			if pcOffer.ICEConnectionState() == ICEConnectionStateConnected {
+				break
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
 		parameters := sender.GetParameters()
 
 		for {
@@ -190,7 +197,6 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 			}
 		}
 	}()
-
 	go func() {
 		if _, _, routineErr := sender.Read(make([]byte, 1400)); routineErr == nil {
 			close(awaitRTCPSenderRecv)
