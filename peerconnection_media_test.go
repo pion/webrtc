@@ -441,6 +441,20 @@ func filterSsrc(offer string) (filteredSDP string) {
 	return
 }
 
+func filterSDPExtensions(offer string) (filteredSDP string) {
+	scanner := bufio.NewScanner(strings.NewReader(offer))
+	for scanner.Scan() {
+		l := scanner.Text()
+		if strings.HasPrefix(l, "a=extmap") {
+			continue
+		}
+
+		filteredSDP += l + "\n"
+	}
+
+	return
+}
+
 // If a SessionDescription has a single media section and no SSRC
 // assume that it is meant to handle all RTP packets.
 func TestUndeclaredSSRC(t *testing.T) {
@@ -529,6 +543,127 @@ func TestUndeclaredSSRC(t *testing.T) {
 
 		sendVideoUntilDone(t, unhandledSimulcastError, []*TrackLocalStaticSample{vp8Writer})
 		closePairNow(t, pcOffer, pcAnswer)
+	})
+
+	t.Run("multiple media sections, no sdp extensions", func(t *testing.T) {
+		pcOffer, pcAnswer, err := newPair()
+		assert.NoError(t, err)
+
+		vp8Writer, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.CreateDataChannel("data", nil)
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(vp8Writer)
+		assert.NoError(t, err)
+
+		opusWriter, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio", "pion")
+		assert.NoError(t, err)
+
+		_, err = pcOffer.AddTrack(opusWriter)
+		assert.NoError(t, err)
+
+		onVideoTrackFired := make(chan struct{})
+		onAudioTrackFired := make(chan struct{})
+
+		gotVideo, gotAudio := false, false
+		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+			switch trackRemote.Kind() {
+			case RTPCodecTypeVideo:
+				assert.False(t, gotVideo, "already got video track")
+				assert.Equal(t, trackRemote.StreamID(), vp8Writer.StreamID())
+				assert.Equal(t, trackRemote.ID(), vp8Writer.ID())
+				gotVideo = true
+				onVideoTrackFired <- struct{}{}
+			case RTPCodecTypeAudio:
+				assert.False(t, gotAudio, "already got audio track")
+				assert.Equal(t, trackRemote.StreamID(), opusWriter.StreamID())
+				assert.Equal(t, trackRemote.ID(), opusWriter.ID())
+				gotAudio = true
+				onAudioTrackFired <- struct{}{}
+			default:
+				assert.Fail(t, "unexpected track kind", trackRemote.Kind())
+			}
+		})
+
+		offer, err := pcOffer.CreateOffer(nil)
+		assert.NoError(t, err)
+
+		offerGatheringComplete := GatheringCompletePromise(pcOffer)
+		assert.NoError(t, pcOffer.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
+		offer.SDP = filterSDPExtensions(filterSsrc(pcOffer.LocalDescription().SDP))
+		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+		answer, err := pcAnswer.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+		<-answerGatheringComplete
+
+		assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
+
+		wait := sync.WaitGroup{}
+		wait.Add(2)
+		go func() {
+			sendVideoUntilDone(t, onVideoTrackFired, []*TrackLocalStaticSample{vp8Writer})
+			wait.Done()
+		}()
+		go func() {
+			sendVideoUntilDone(t, onAudioTrackFired, []*TrackLocalStaticSample{opusWriter})
+			wait.Done()
+		}()
+
+		wait.Wait()
+		closePairNow(t, pcOffer, pcAnswer)
+	})
+
+	t.Run("findMediaSectionByPayloadType test", func(t *testing.T) {
+		parsed := &SessionDescription{
+			parsed: &sdp.SessionDescription{
+				MediaDescriptions: []*sdp.MediaDescription{
+					{
+						MediaName: sdp.MediaName{
+							Media:   "video",
+							Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
+							Formats: []string{"96", "97", "98", "99", "BAD", "100", "101", "102"},
+						},
+					},
+					{
+						MediaName: sdp.MediaName{
+							Media:   "audio",
+							Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
+							Formats: []string{"8", "9", "101"},
+						},
+					},
+					{
+						MediaName: sdp.MediaName{
+							Media:   "application",
+							Protos:  []string{"UDP", "DTLS", "SCTP"},
+							Formats: []string{"webrtc-datachannel"},
+						},
+					},
+				},
+			},
+		}
+		peer := &PeerConnection{}
+
+		video, ok := peer.findMediaSectionByPayloadType(96, parsed)
+		assert.True(t, ok)
+		assert.NotNil(t, video)
+		assert.Equal(t, "video", video.MediaName.Media)
+
+		audio, ok := peer.findMediaSectionByPayloadType(8, parsed)
+		assert.True(t, ok)
+		assert.NotNil(t, audio)
+		assert.Equal(t, "audio", audio.MediaName.Media)
+
+		missing, ok := peer.findMediaSectionByPayloadType(42, parsed)
+		assert.False(t, ok)
+		assert.Nil(t, missing)
 	})
 }
 
