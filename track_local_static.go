@@ -280,8 +280,10 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 	if err != nil {
 		return codec, err
 	}
+	if s.sequencer == nil {
+		s.sequencer = rtp.NewRandomSequencer()
+	}
 
-	s.sequencer = rtp.NewRandomSequencer()
 	s.packetizer = rtp.NewPacketizer(
 		rtpOutboundMTU,
 		0, // Value is handled when writing
@@ -299,6 +301,14 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 // because a track has been stopped.
 func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 	return s.rtpTrack.Unbind(t)
+}
+
+func (s *TrackLocalStaticSample) SetSequencer(sequencer rtp.Sequencer) {
+	s.sequencer = sequencer
+}
+
+func (s *TrackLocalStaticSample) GetSequencer() rtp.Sequencer {
+	return s.sequencer
 }
 
 // WriteSample writes a Sample to the TrackLocalStaticSample
