@@ -1,6 +1,10 @@
 module github.com/pion/webrtc/v4
 
-go 1.20
+go 1.22.0
+
+toolchain go1.22.6
+
+replace github.com/pion/rtp => github.com/aginetwork7/rtp v1.0.0-alpha.0
 
 require (
 	github.com/pion/datachannel v1.5.10
