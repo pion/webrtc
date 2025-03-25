@@ -130,7 +130,7 @@ func TestICECandidate_Convert(t *testing.T) {
 
 		// first copy the candidate ID so it matches the new one
 		testCase.native.statsID = expectedICE.ID()
-		actualICE, err := testCase.native.toICE()
+		actualICE, err := testCase.native.ToICE()
 		assert.NoError(t, err)
 
 		assert.Equal(t, expectedICE, actualICE, "testCase: %d ice not equal %v", i, actualICE)
@@ -237,6 +237,30 @@ func TestICECandidateZeroSDPid(t *testing.T) {
 
 	assert.Equal(t, candidate.SDPMid, "")
 	assert.Equal(t, candidate.SDPMLineIndex, uint16(0))
+}
+
+func TestICECandidateString(t *testing.T) {
+	candidate := ICECandidate{
+		Foundation: "foundation",
+		Priority:   128,
+		Address:    "1.0.0.1",
+		Protocol:   ICEProtocolUDP,
+		Port:       1234,
+		Typ:        ICECandidateTypeHost,
+		Component:  1,
+	}
+	iceCandidateConfig := ice.CandidateHostConfig{
+		Network:    "udp",
+		Address:    "1.0.0.1",
+		Port:       1234,
+		Component:  1,
+		Foundation: "foundation",
+		Priority:   128,
+	}
+	iceCandidate, err := ice.NewCandidateHost(&iceCandidateConfig)
+	assert.NoError(t, err)
+
+	assert.Equal(t, candidate.String(), iceCandidate.String())
 }
 
 func TestICECandidateSDPMid_ToJSON(t *testing.T) {
@@ -348,7 +372,7 @@ func TestICECandidateExtensions_ToJSON(t *testing.T) {
 		assert.Equal(t, sdpMLineIndex, *candidateInit.SDPMLineIndex)
 		assert.Equal(t, "candidate:"+cand.candidate, candidateInit.Candidate)
 
-		iceBack, err := iceCandidate.toICE()
+		iceBack, err := iceCandidate.ToICE()
 
 		assert.NoError(t, err)
 		assert.Equal(t, cand.extensions, iceBack.Extensions())

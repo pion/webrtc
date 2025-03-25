@@ -80,7 +80,8 @@ func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineInde
 	return newCandidate, nil
 }
 
-func (c ICECandidate) toICE() (cand ice.Candidate, err error) {
+// ToICE converts ICECandidate to ice.Candidate.
+func (c ICECandidate) ToICE() (cand ice.Candidate, err error) {
 	candidateID := c.statsID
 	switch c.Typ {
 	case ICECandidateTypeHost:
@@ -216,7 +217,7 @@ func convertTypeFromICE(t ice.CandidateType) (ICECandidateType, error) {
 }
 
 func (c ICECandidate) String() string {
-	ic, err := c.toICE()
+	ic, err := c.ToICE()
 	if err != nil {
 		return fmt.Sprintf("%#v failed to convert to ICE: %s", c, err)
 	}
@@ -229,7 +230,7 @@ func (c ICECandidate) String() string {
 func (c ICECandidate) ToJSON() ICECandidateInit {
 	candidateStr := ""
 
-	candidate, err := c.toICE()
+	candidate, err := c.ToICE()
 	if err == nil {
 		candidateStr = candidate.Marshal()
 	}
