@@ -65,7 +65,7 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
 				assert.Equal(t, track.Codec().MimeType, MimeTypeH264)
 				seenPacketBCancel()
 			default:
-				t.Fatalf("Unexpected RTP Data % 02x", pkt.Payload[len(pkt.Payload)-1])
+				assert.Failf(t, "Unexpected RTP", "Data % 02x", pkt.Payload[len(pkt.Payload)-1])
 			}
 		}
 	})

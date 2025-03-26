@@ -59,9 +59,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	defer report()
 
 	pcOffer, pcAnswer, err := newPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	awaitRTPRecv := make(chan bool)
 	awaitRTPRecvClosed := make(chan bool)
@@ -140,13 +138,9 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	vp8Track, err := NewTrackLocalStaticSample(
 		RTPCodecCapability{MimeType: MimeTypeVP8}, expectedTrackID, expectedStreamID,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	sender, err := pcOffer.AddTrack(vp8Track)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	go func() {
 		for {
@@ -155,6 +149,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 				continue
 			}
 			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
+				//nolint:forbidigo // not a test failure
 				fmt.Println(routineErr)
 			}
 
@@ -200,22 +195,21 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	err, ok := <-trackMetadataValid
-	if ok {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+	assert.False(t, ok)
 
 	<-awaitRTPRecv
 	<-awaitRTPSend
 
 	<-awaitRTCPSenderRecv
-	if err, ok = <-awaitRTCPSenderSend; ok {
-		t.Fatal(err)
-	}
+	err, ok = <-awaitRTCPSenderSend
+	assert.NoError(t, err)
+	assert.False(t, ok)
 
 	<-awaitRTCPReceiverRecv
-	if err, ok = <-awaitRTCPReceiverSend; ok {
-		t.Fatal(err)
-	}
+	err, ok = <-awaitRTCPReceiverSend
+	assert.NoError(t, err)
+	assert.False(t, ok)
 
 	closePairNow(t, pcOffer, pcAnswer)
 	<-awaitRTPRecvClosed
@@ -237,41 +231,30 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) { //nolint:cyclop
 	defer report()
 
 	pcOffer, pcAnswer, err := newPair()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = pcOffer.AddTransceiverFromKind(
 		RTPCodecTypeVideo,
 		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = pcAnswer.AddTransceiverFromKind(
 		RTPCodecTypeAudio,
 		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	opusTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio", "pion1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if _, err = pcOffer.AddTrack(opusTrack); err != nil {
-		t.Fatal(err)
-	} else if _, err = pcAnswer.AddTrack(vp8Track); err != nil {
-		t.Fatal(err)
-	}
+	_, err = pcOffer.AddTrack(opusTrack)
+	assert.NoError(t, err)
+	_, err = pcAnswer.AddTrack(vp8Track)
+	assert.NoError(t, err)
 
 	var onTrackFiredLock sync.Mutex
 	onTrackFired := false
@@ -294,36 +277,26 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) { //nolint:cyclop
 	})
 
 	err = signalPair(pcOffer, pcAnswer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	<-iceCompleteAnswer
 	<-iceCompleteOffer
 
 	// Each PeerConnection should have one sender, one receiver and one transceiver
 	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
 		senders := pc.GetSenders()
-		if len(senders) != 1 {
-			t.Errorf("Each PeerConnection should have one RTPSender, we have %d", len(senders))
-		}
+		assert.Len(t, senders, 1, "Each PeerConnection should have one RTPSender")
 
 		receivers := pc.GetReceivers()
-		if len(receivers) != 2 {
-			t.Errorf("Each PeerConnection should have two RTPReceivers, we have %d", len(receivers))
-		}
+		assert.Len(t, receivers, 2, "Each PeerConnection should have two RTPReceivers")
 
 		transceivers := pc.GetTransceivers()
-		if len(transceivers) != 2 {
-			t.Errorf("Each PeerConnection should have two RTPTransceivers, we have %d", len(transceivers))
-		}
+		assert.Len(t, transceivers, 2, "Each PeerConnection should have two RTPTransceivers")
 	}
 
 	closePairNow(t, pcOffer, pcAnswer)
 
 	onTrackFiredLock.Lock()
-	if onTrackFired {
-		t.Fatalf("PeerConnection OnTrack fired even though we got no packets")
-	}
+	assert.False(t, onTrackFired, "PeerConnection OnTrack fired even though we got no packets")
 	onTrackFiredLock.Unlock()
 }
 
@@ -354,14 +327,10 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 	})
 
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	vp8Sender, err := pcOffer.AddTrack(vp8Track)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	haveDisconnected := make(chan error)
 	pcOffer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
@@ -383,20 +352,16 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 		}
 	})
 
-	if err = signalPair(pcOffer, pcAnswer); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	err, ok := <-haveDisconnected
-	if ok {
-		t.Fatal(err)
-	}
+	assert.False(t, ok)
+	assert.NoError(t, err)
 	for i := 0; i <= 5; i++ {
-		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); rtpErr != nil {
-			t.Fatal(rtpErr)
-		} else if rtcpErr := pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}}); rtcpErr != nil {
-			t.Fatal(rtcpErr)
-		}
+		err = vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second})
+		assert.NoError(t, err)
+		err = pcOffer.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: 0}})
+		assert.NoError(t, err)
 	}
 
 	assert.NoError(t, wan.Stop())
@@ -675,50 +640,32 @@ func TestAddTransceiverFromTrackSendOnly(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticSample(
 		RTPCodecCapability{MimeType: "audio/Opus"},
 		"track-id",
 		"stream-id",
 	)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	transceiver, err := pc.AddTransceiverFromTrack(track, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendonly,
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	if transceiver.Receiver() != nil {
-		t.Errorf("Transceiver shouldn't have a receiver")
-	}
-
-	if transceiver.Sender() == nil {
-		t.Errorf("Transceiver should have a sender")
-	}
-
-	if len(pc.GetTransceivers()) != 1 {
-		t.Errorf("PeerConnection should have one transceiver but has %d", len(pc.GetTransceivers()))
-	}
-
-	if len(pc.GetSenders()) != 1 {
-		t.Errorf("PeerConnection should have one sender but has %d", len(pc.GetSenders()))
-	}
+	assert.Nil(t, transceiver.Receiver(), "Transceiver shouldn't have a receiver")
+	assert.NotNil(t, transceiver.Sender(), "Transceiver should have a sender")
+	assert.Len(t, pc.GetTransceivers(), 1, "PeerConnection should have one transceiver")
+	assert.Len(t, pc.GetSenders(), 1, "PeerConnection should have one sender")
 
 	offer, err := pc.CreateOffer(nil)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly) {
-		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendonly)
-	}
+	assert.Truef(
+		t, offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly),
+		"Direction on SDP is not %s", RTPTransceiverDirectionSendonly,
+	)
 
 	assert.NoError(t, pc.Close())
 }
@@ -731,46 +678,30 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticSample(
 		RTPCodecCapability{MimeType: "audio/Opus"},
 		"track-id",
 		"stream-id",
 	)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	transceiver, err := pc.AddTransceiverFromTrack(track, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionSendrecv,
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
-
-	if transceiver.Receiver() == nil {
-		t.Errorf("Transceiver should have a receiver")
-	}
-
-	if transceiver.Sender() == nil {
-		t.Errorf("Transceiver should have a sender")
-	}
-
-	if len(pc.GetTransceivers()) != 1 {
-		t.Errorf("PeerConnection should have one transceiver but has %d", len(pc.GetTransceivers()))
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, transceiver.Receiver(), "Transceiver should have a receiver")
+	assert.NotNil(t, transceiver.Sender(), "Transceiver should have a sender")
+	assert.Len(t, pc.GetTransceivers(), 1, "PeerConnection should have one transceiver")
 
 	offer, err := pc.CreateOffer(nil)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	if !offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv) {
-		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionSendrecv)
-	}
+	assert.Truef(
+		t, offerMediaHasDirection(offer, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv),
+		"Direction on SDP is not %s", RTPTransceiverDirectionSendrecv,
+	)
 	assert.NoError(t, pc.Close())
 }
 
@@ -868,33 +799,23 @@ func TestAddTransceiverFromKind(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	if transceiver.Receiver() == nil {
-		t.Errorf("Transceiver should have a receiver")
-	}
-
-	if transceiver.Sender() != nil {
-		t.Errorf("Transceiver shouldn't have a sender")
-	}
+	assert.NotNil(t, transceiver.Receiver(), "Transceiver should have a receiver")
+	assert.Nil(t, transceiver.Sender(), "Transceiver shouldn't have a sender")
 
 	offer, err := pc.CreateOffer(nil)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	if !offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly) {
-		t.Errorf("Direction on SDP is not %s", RTPTransceiverDirectionRecvonly)
-	}
+	assert.Truef(
+		t, offerMediaHasDirection(offer, RTPCodecTypeVideo, RTPTransceiverDirectionRecvonly),
+		"Direction on SDP is not %s", RTPTransceiverDirectionRecvonly,
+	)
 	assert.NoError(t, pc.Close())
 }
 
@@ -906,9 +827,7 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	track, err := NewTrackLocalStaticSample(
 		RTPCodecCapability{
@@ -918,17 +837,16 @@ func TestAddTransceiverFromTrackFailsRecvOnly(t *testing.T) {
 		"track-id",
 		"track-label",
 	)
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
 	transceiver, err := pc.AddTransceiverFromTrack(track, RTPTransceiverInit{
 		Direction: RTPTransceiverDirectionRecvonly,
 	})
 
-	if transceiver != nil {
-		t.Error("AddTransceiverFromTrack shouldn't succeed with Direction RTPTransceiverDirectionRecvonly")
-	}
+	assert.Nil(
+		t, transceiver,
+		"AddTransceiverFromTrack shouldn't succeed with Direction RTPTransceiverDirectionRecvonly",
+	)
 
 	assert.NotNil(t, err)
 	assert.NoError(t, pc.Close())
@@ -1384,9 +1302,7 @@ func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
 				break
 			}
 		}
-		if !have {
-			t.Errorf("track was added but not found on senders")
-		}
+		assert.True(t, have, "track was added but not found on senders")
 	}
 
 	assert.NoError(t, pc.Close())
@@ -1985,6 +1901,7 @@ func TestPeerConnection_Zero_PayloadType(t *testing.T) {
 				if routineErr := audioTrack.WriteSample(
 					media.Sample{Data: []byte{0x00}, Duration: time.Second},
 				); routineErr != nil {
+					//nolint:forbidigo // not a test failure
 					fmt.Println(routineErr)
 				}
 			}

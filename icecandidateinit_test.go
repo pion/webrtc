@@ -28,21 +28,14 @@ func TestICECandidateInit_Serialization(t *testing.T) {
 
 	for i, tc := range tt {
 		b, err := json.Marshal(tc.candidate)
-		if err != nil {
-			t.Errorf("Failed to marshal %d: %v", i, err)
-		}
+		assert.NoErrorf(t, err, "test case %d", i)
 		actualSerialized := string(b)
-		if actualSerialized != tc.serialized {
-			t.Errorf("%d expected %s got %s", i, tc.serialized, actualSerialized)
-		}
+		assert.Equalf(t, tc.serialized, actualSerialized, "test case %d", i)
 
 		var actual ICECandidateInit
 		err = json.Unmarshal(b, &actual)
-		if err != nil {
-			t.Errorf("Failed to unmarshal %d: %v", i, err)
-		}
-
-		assert.Equal(t, tc.candidate, actual, "should match")
+		assert.NoErrorf(t, err, "test case %d", i)
+		assert.Equalf(t, tc.candidate, actual, "test case %d", i)
 	}
 }
 

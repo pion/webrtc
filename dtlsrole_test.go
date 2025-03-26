@@ -34,9 +34,7 @@ func TestDTLSRole_String(t *testing.T) {
 func TestDTLSRoleFromRemoteSDP(t *testing.T) {
 	parseSDP := func(raw string) *sdp.SessionDescription {
 		parsed := &sdp.SessionDescription{}
-		if err := parsed.Unmarshal([]byte(raw)); err != nil {
-			panic(err)
-		}
+		assert.NoError(t, parsed.Unmarshal([]byte(raw)))
 
 		return parsed
 	}

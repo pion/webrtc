@@ -23,25 +23,18 @@ import (
 
 func TestSetEphemeralUDPPortRange(t *testing.T) {
 	settingEngine := SettingEngine{}
-
-	if settingEngine.ephemeralUDP.PortMin != 0 ||
-		settingEngine.ephemeralUDP.PortMax != 0 {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.Equal(t, uint16(0), settingEngine.ephemeralUDP.PortMin)
+	assert.Equal(t, uint16(0), settingEngine.ephemeralUDP.PortMax)
 
 	// set bad ephemeral ports
-	if err := settingEngine.SetEphemeralUDPPortRange(3000, 2999); err == nil {
-		t.Fatalf("Setting engine should fail bad ephemeral ports.")
-	}
+	assert.Error(
+		t, settingEngine.SetEphemeralUDPPortRange(3000, 2999),
+		"Setting engine should fail bad ephemeral ports",
+	)
 
-	if err := settingEngine.SetEphemeralUDPPortRange(3000, 4000); err != nil {
-		t.Fatalf("Setting engine failed valid port range: %s", err)
-	}
-
-	if settingEngine.ephemeralUDP.PortMin != 3000 ||
-		settingEngine.ephemeralUDP.PortMax != 4000 {
-		t.Fatalf("Setting engine ports do not reflect expected range")
-	}
+	assert.NoError(t, settingEngine.SetEphemeralUDPPortRange(3000, 4000))
+	assert.Equal(t, uint16(3000), settingEngine.ephemeralUDP.PortMin)
+	assert.Equal(t, uint16(4000), settingEngine.ephemeralUDP.PortMax)
 }
 
 func TestSetConnectionTimeout(t *testing.T) {
@@ -60,36 +53,22 @@ func TestSetConnectionTimeout(t *testing.T) {
 
 func TestDetachDataChannels(t *testing.T) {
 	s := SettingEngine{}
-
-	if s.detach.DataChannels {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.False(t, s.detach.DataChannels)
 
 	s.DetachDataChannels()
-
-	if !s.detach.DataChannels {
-		t.Fatalf("Failed to enable detached data channels.")
-	}
+	assert.True(t, s.detach.DataChannels, "Failed to enable detached data channels.")
 }
 
 func TestSetNAT1To1IPs(t *testing.T) {
 	settingEngine := SettingEngine{}
-	if settingEngine.candidates.NAT1To1IPs != nil {
-		t.Errorf("Invalid default value")
-	}
-	if settingEngine.candidates.NAT1To1IPCandidateType != 0 {
-		t.Errorf("Invalid default value")
-	}
+	assert.Nil(t, settingEngine.candidates.NAT1To1IPs)
+	assert.Equal(t, ICECandidateType(0), settingEngine.candidates.NAT1To1IPCandidateType)
 
 	ips := []string{"1.2.3.4"}
 	typ := ICECandidateTypeHost
 	settingEngine.SetNAT1To1IPs(ips, typ)
-	if len(settingEngine.candidates.NAT1To1IPs) != 1 || settingEngine.candidates.NAT1To1IPs[0] != "1.2.3.4" {
-		t.Fatalf("Failed to set NAT1To1IPs")
-	}
-	if settingEngine.candidates.NAT1To1IPCandidateType != typ {
-		t.Fatalf("Failed to set NAT1To1IPCandidateType")
-	}
+	assert.Equal(t, ips, settingEngine.candidates.NAT1To1IPs, "Failed to set NAT1To1IPs")
+	assert.Equal(t, typ, settingEngine.candidates.NAT1To1IPCandidateType, "Failed to set NAT1To1IPCandidateType")
 }
 
 func TestSetAnsweringDTLSRole(t *testing.T) {
@@ -109,28 +88,39 @@ func TestSetAnsweringDTLSRole(t *testing.T) {
 func TestSetReplayProtection(t *testing.T) {
 	settingEngine := SettingEngine{}
 
-	if settingEngine.replayProtection.DTLS != nil ||
-		settingEngine.replayProtection.SRTP != nil ||
-		settingEngine.replayProtection.SRTCP != nil {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.Nil(t, settingEngine.replayProtection.DTLS)
+	assert.Nil(t, settingEngine.replayProtection.SRTP)
+	assert.Nil(t, settingEngine.replayProtection.SRTCP)
 
 	settingEngine.SetDTLSReplayProtectionWindow(128)
 	settingEngine.SetSRTPReplayProtectionWindow(64)
 	settingEngine.SetSRTCPReplayProtectionWindow(32)
 
-	if settingEngine.replayProtection.DTLS == nil ||
-		*settingEngine.replayProtection.DTLS != 128 {
-		t.Errorf("Failed to set DTLS replay protection window")
-	}
-	if settingEngine.replayProtection.SRTP == nil ||
-		*settingEngine.replayProtection.SRTP != 64 {
-		t.Errorf("Failed to set SRTP replay protection window")
-	}
-	if settingEngine.replayProtection.SRTCP == nil ||
-		*settingEngine.replayProtection.SRTCP != 32 {
-		t.Errorf("Failed to set SRTCP replay protection window")
-	}
+	assert.NotNil(
+		t, settingEngine.replayProtection.DTLS,
+		"DTLS replay protection window should not be nil",
+	)
+	assert.Equal(
+		t, uint(128), *settingEngine.replayProtection.DTLS,
+		"Failed to set DTLS replay protection window",
+	)
+
+	assert.NotNil(
+		t, settingEngine.replayProtection.SRTP,
+		"SRTP replay protection window should not be nil",
+	)
+	assert.Equal(
+		t, uint(64), *settingEngine.replayProtection.SRTP,
+		"Failed to set SRTP replay protection window",
+	)
+	assert.NotNil(
+		t, settingEngine.replayProtection.SRTCP,
+		"SRTCP replay protection window should not be nil",
+	)
+	assert.Equal(
+		t, uint(32), *settingEngine.replayProtection.SRTCP,
+		"Failed to set SRTCP replay protection window",
+	)
 }
 
 func TestSettingEngine_SetICETCP(t *testing.T) {
@@ -138,9 +128,7 @@ func TestSettingEngine_SetICETCP(t *testing.T) {
 	defer report()
 
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{})
-	if err != nil {
-		panic(err)
-	}
+	assert.NoError(t, err)
 
 	defer func() {
 		_ = listener.Close()
@@ -234,35 +222,28 @@ func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 func TestSetDTLSRetransmissionInterval(t *testing.T) {
 	settingEngine := SettingEngine{}
 
-	if settingEngine.dtls.retransmissionInterval != 0 {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.Equal(t, time.Duration(0), settingEngine.dtls.retransmissionInterval)
 
 	settingEngine.SetDTLSRetransmissionInterval(100 * time.Millisecond)
-	if settingEngine.dtls.retransmissionInterval == 0 ||
-		settingEngine.dtls.retransmissionInterval != 100*time.Millisecond {
-		t.Errorf("Failed to set DTLS retransmission interval")
-	}
+	assert.Equal(
+		t, 100*time.Millisecond, settingEngine.dtls.retransmissionInterval,
+		"Failed to set DTLS retransmission interval",
+	)
 
 	settingEngine.SetDTLSRetransmissionInterval(1 * time.Second)
-	if settingEngine.dtls.retransmissionInterval == 0 ||
-		settingEngine.dtls.retransmissionInterval != 1*time.Second {
-		t.Errorf("Failed to set DTLS retransmission interval")
-	}
+	assert.Equal(
+		t, 1*time.Second, settingEngine.dtls.retransmissionInterval,
+		"Failed to set DTLS retransmission interval",
+	)
 }
 
 func TestSetDTLSEllipticCurves(t *testing.T) {
 	s := SettingEngine{}
-
-	if len(s.dtls.ellipticCurves) != 0 {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.Empty(t, s.dtls.ellipticCurves)
 
 	s.SetDTLSEllipticCurves(elliptic.P256)
-	if len(s.dtls.ellipticCurves) == 0 ||
-		s.dtls.ellipticCurves[0] != elliptic.P256 {
-		t.Errorf("Failed to set DTLS elliptic curves")
-	}
+	assert.NotEmpty(t, s.dtls.ellipticCurves, "Failed to set DTLS elliptic curves")
+	assert.Equal(t, elliptic.P256, s.dtls.ellipticCurves[0])
 }
 
 func TestSetDTLSHandShakeTimeout(*testing.T) {
@@ -323,11 +304,9 @@ func TestSetICEBindingRequestHandler(t *testing.T) {
 func TestSetHooks(t *testing.T) {
 	settingEngine := SettingEngine{}
 
-	if settingEngine.dtls.clientHelloMessageHook != nil ||
-		settingEngine.dtls.serverHelloMessageHook != nil ||
-		settingEngine.dtls.certificateRequestMessageHook != nil {
-		t.Fatalf("SettingEngine defaults aren't as expected.")
-	}
+	assert.Nil(t, settingEngine.dtls.clientHelloMessageHook)
+	assert.Nil(t, settingEngine.dtls.serverHelloMessageHook)
+	assert.Nil(t, settingEngine.dtls.certificateRequestMessageHook)
 
 	settingEngine.SetDTLSClientHelloMessageHook(func(msg handshake.MessageClientHello) handshake.Message {
 		return &msg
@@ -339,15 +318,18 @@ func TestSetHooks(t *testing.T) {
 		return &msg
 	})
 
-	if settingEngine.dtls.clientHelloMessageHook == nil {
-		t.Errorf("Failed to set DTLS Client Hello Hook")
-	}
-	if settingEngine.dtls.serverHelloMessageHook == nil {
-		t.Errorf("Failed to set DTLS Server Hello Hook")
-	}
-	if settingEngine.dtls.certificateRequestMessageHook == nil {
-		t.Errorf("Failed to set DTLS Certificate Request Hook")
-	}
+	assert.NotNil(
+		t, settingEngine.dtls.clientHelloMessageHook,
+		"Failed to set DTLS Client Hello Hook",
+	)
+	assert.NotNil(
+		t, settingEngine.dtls.serverHelloMessageHook,
+		"Failed to set DTLS Server Hello Hook",
+	)
+	assert.NotNil(
+		t, settingEngine.dtls.certificateRequestMessageHook,
+		"Failed to set DTLS Certificate Request Hook",
+	)
 }
 
 func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {

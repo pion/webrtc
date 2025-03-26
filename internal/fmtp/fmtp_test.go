@@ -4,8 +4,9 @@
 package fmtp
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseParameters(t *testing.T) {
@@ -47,9 +48,7 @@ func TestParseParameters(t *testing.T) {
 	} {
 		t.Run(ca.name, func(t *testing.T) {
 			parameters := parseParameters(ca.line)
-			if !reflect.DeepEqual(parameters, ca.parameters) {
-				t.Errorf("expected '%v', got '%v'", ca.parameters, parameters)
-			}
+			assert.Equal(t, ca.parameters, parameters)
 		})
 	}
 }
@@ -132,13 +131,9 @@ func TestParse(t *testing.T) {
 	} {
 		t.Run(ca.name, func(t *testing.T) {
 			f := Parse(ca.mimeType, ca.clockRate, ca.channels, ca.line)
-			if !reflect.DeepEqual(ca.expected, f) {
-				t.Errorf("expected '%v', got '%v'", ca.expected, f)
-			}
 
-			if f.MimeType() != ca.mimeType {
-				t.Errorf("Expected '%v', got '%s'", ca.mimeType, f.MimeType())
-			}
+			assert.Equal(t, ca.expected, f)
+			assert.Equal(t, ca.mimeType, f.MimeType())
 		})
 	}
 }
@@ -704,20 +699,19 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 	} {
 		t.Run(ca.name, func(t *testing.T) {
 			c := ca.a.Match(ca.b)
-			if c != ca.consist {
-				t.Errorf(
-					"'%s' and '%s' are expected to be %s, but treated as %s",
-					ca.a, ca.b, consistString[ca.consist], consistString[c],
-				)
-			}
+			assert.Equal(t, ca.consist, c)
+			assert.Equal(
+				t, ca.consist, c,
+				"'%s' and '%s' are expected to be %s, but treated as %s",
+				ca.a, ca.b, consistString[ca.consist], consistString[c],
+			)
 
 			c = ca.b.Match(ca.a)
-			if c != ca.consist {
-				t.Errorf(
-					"'%s' and '%s' are expected to be %s, but treated as %s",
-					ca.a, ca.b, consistString[ca.consist], consistString[c],
-				)
-			}
+			assert.Equalf(
+				t, ca.consist, c,
+				"'%s' and '%s' are expected to be %s, but treated as %s",
+				ca.b, ca.a, consistString[ca.consist], consistString[c],
+			)
 		})
 	}
 }

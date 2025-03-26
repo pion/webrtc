@@ -5,19 +5,14 @@ package util
 
 import (
 	"errors"
-	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMathRandAlpha(t *testing.T) {
-	if len(MathRandAlpha(10)) != 10 {
-		t.Errorf("MathRandAlpha return invalid length")
-	}
-
-	isLetter := regexp.MustCompile(`^[a-zA-Z]+$`).MatchString
-	if !isLetter(MathRandAlpha(10)) {
-		t.Errorf("MathRandAlpha should be AlphaNumeric only")
-	}
+	assert.Len(t, MathRandAlpha(10), 10, "MathRandAlpha should return 10 characters")
+	assert.Regexp(t, `^[a-zA-Z]+$`, MathRandAlpha(10), "MathRandAlpha should be Alpha only")
 }
 
 func TestMultiError(t *testing.T) {
@@ -37,20 +32,13 @@ func TestMultiError(t *testing.T) {
 	})
 	str := "err1\nerr2\nerr3"
 
-	if errs.Error() != str {
-		t.Errorf("String representation doesn't match, expected: %s, got: %s", errs.Error(), str)
-	}
+	assert.Equal(t, str, errs.Error(), "String representation doesn't match")
 
 	errIs, ok := errs.(multiError) //nolint:errorlint
-	if !ok {
-		t.Fatal("FlattenErrs returns non-multiError")
-	}
+	assert.True(t, ok, "FlattenErrs returns non-multiError")
 	for i := 0; i < 3; i++ {
-		if !errIs.Is(rawErrs[i]) {
-			t.Errorf("'%+v' should contains '%v'", errs, rawErrs[i])
-		}
+		assert.Truef(t, errIs.Is(rawErrs[i]), "Should contains this error '%v'", rawErrs[i])
 	}
-	if errIs.Is(rawErrs[3]) {
-		t.Errorf("'%+v' should not contains '%v'", errs, rawErrs[3])
-	}
+
+	assert.Falsef(t, errIs.Is(rawErrs[3]), "Should not contains this error '%v'", rawErrs[3])
 }

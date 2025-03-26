@@ -140,30 +140,18 @@ func TestICECandidate_Convert(t *testing.T) {
 func TestConvertTypeFromICE(t *testing.T) {
 	t.Run("host", func(t *testing.T) {
 		ct, err := convertTypeFromICE(ice.CandidateTypeHost)
-		if err != nil {
-			t.Fatal("failed coverting ice.CandidateTypeHost")
-		}
-		if ct != ICECandidateTypeHost {
-			t.Fatal("should be converted to ICECandidateTypeHost")
-		}
+		assert.NoError(t, err, "failed coverting ice.CandidateTypeHost")
+		assert.Equal(t, ICECandidateTypeHost, ct, "should be converted to ICECandidateTypeHost")
 	})
 	t.Run("srflx", func(t *testing.T) {
 		ct, err := convertTypeFromICE(ice.CandidateTypeServerReflexive)
-		if err != nil {
-			t.Fatal("failed coverting ice.CandidateTypeServerReflexive")
-		}
-		if ct != ICECandidateTypeSrflx {
-			t.Fatal("should be converted to ICECandidateTypeSrflx")
-		}
+		assert.NoError(t, err, "failed coverting ice.CandidateTypeServerReflexive")
+		assert.Equal(t, ICECandidateTypeSrflx, ct, "should be converted to ICECandidateTypeSrflx")
 	})
 	t.Run("prflx", func(t *testing.T) {
 		ct, err := convertTypeFromICE(ice.CandidateTypePeerReflexive)
-		if err != nil {
-			t.Fatal("failed coverting ice.CandidateTypePeerReflexive")
-		}
-		if ct != ICECandidateTypePrflx {
-			t.Fatal("should be converted to ICECandidateTypePrflx")
-		}
+		assert.NoError(t, err, "failed coverting ice.CandidateTypePeerReflexive")
+		assert.Equal(t, ICECandidateTypePrflx, ct, "should be converted to ICECandidateTypePrflx")
 	})
 }
 

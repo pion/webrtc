@@ -30,13 +30,8 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	}
 
 	gatherer, err := NewAPI().NewICEGatherer(opts)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if gatherer.State() != ICEGathererStateNew {
-		t.Fatalf("Expected gathering state new")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, ICEGathererStateNew, gatherer.State())
 
 	gatherFinished := make(chan struct{})
 	gatherer.OnLocalCandidate(func(i *ICECandidate) {
@@ -45,30 +40,19 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		}
 	})
 
-	if err = gatherer.Gather(); err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, gatherer.Gather())
 
 	<-gatherFinished
 
 	params, err := gatherer.GetLocalParameters()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
-	if params.UsernameFragment == "" ||
-		params.Password == "" {
-		t.Fatalf("Empty local username or password frag")
-	}
+	assert.NotEmpty(t, params.UsernameFragment, "Empty local username frag")
+	assert.NotEmpty(t, params.Password, "Empty local password")
 
 	candidates, err := gatherer.GetLocalCandidates()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(candidates) == 0 {
-		t.Fatalf("No candidates gathered")
-	}
+	assert.NoError(t, err)
+	assert.NotEmpty(t, candidates, "No candidates gathered")
 
 	assert.NoError(t, gatherer.Close())
 }
@@ -85,9 +69,7 @@ func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
 
 	gatherer, err := NewAPI(WithSettingEngine(s)).NewICEGatherer(ICEGatherOptions{})
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	gotMulticastDNSCandidate, resolveFunc := context.WithCancel(context.Background())
 	gatherer.OnLocalCandidate(func(c *ICECandidate) {
@@ -170,18 +152,14 @@ func TestNewICEGathererSetMediaStreamIdentification(t *testing.T) { //nolint:cyc
 	}
 
 	gatherer, err := NewAPI().NewICEGatherer(opts)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	expectedMid := "5"
 	expectedMLineIndex := uint16(1)
 
 	gatherer.setMediaStreamIdentification(expectedMid, expectedMLineIndex)
 
-	if gatherer.State() != ICEGathererStateNew {
-		t.Fatalf("Expected gathering state new")
-	}
+	assert.Equal(t, ICEGathererStateNew, gatherer.State())
 
 	gatherFinished := make(chan struct{})
 	gatherer.OnLocalCandidate(func(i *ICECandidate) {
@@ -193,30 +171,18 @@ func TestNewICEGathererSetMediaStreamIdentification(t *testing.T) { //nolint:cyc
 		}
 	})
 
-	if err = gatherer.Gather(); err != nil {
-		t.Error(err)
-	}
-
+	assert.NoError(t, gatherer.Gather())
 	<-gatherFinished
 
 	params, err := gatherer.GetLocalParameters()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
-	if params.UsernameFragment == "" ||
-		params.Password == "" {
-		t.Fatalf("Empty local username or password frag")
-	}
+	assert.NotEmpty(t, params.UsernameFragment, "Empty local username frag")
+	assert.NotEmpty(t, params.Password, "Empty local password")
 
 	candidates, err := gatherer.GetLocalCandidates()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(candidates) == 0 {
-		t.Fatalf("No candidates gathered")
-	}
+	assert.NoError(t, err)
+	assert.NotEmpty(t, candidates, "No candidates gathered")
 
 	for _, c := range candidates {
 		assert.Equal(t, expectedMid, c.SDPMid)

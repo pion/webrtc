@@ -15,7 +15,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math/big"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -273,14 +272,12 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 		},
 	} {
 		pc, err := test.init()
-		if err != nil {
-			t.Errorf("SetConfiguration %q: init failed: %v", test.name, err)
-		}
+		assert.NoErrorf(t, err, "SetConfiguration %q: init failed", test.name)
 
 		err = pc.SetConfiguration(test.config)
-		if got, want := err, test.wantErr; !reflect.DeepEqual(got, want) {
-			t.Errorf("SetConfiguration %q: err = %v, want %v", test.name, got, want)
-		}
+		// This is supposed to be assert.Equal, and not assert.ErrorIs,
+		// The error is a pointer to a struct.
+		assert.Equal(t, test.wantErr, err, "SetConfiguration %q", test.name)
 
 		assert.NoError(t, pc.Close())
 	}
@@ -351,9 +348,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 
 	api := NewAPI()
 	offerPC, answerPC, err := api.newPair(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// Drop all incoming DTLS traffic
 	dropAllDTLS := func([]byte) bool {
@@ -362,9 +357,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	offerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
 	answerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
 
-	if err = signalPair(offerPC, answerPC); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(offerPC, answerPC))
 
 	iceComplete := make(chan interface{})
 	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
@@ -408,13 +401,9 @@ func TestPeerConnection_AnswerWithoutOffer(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Errorf("New PeerConnection: got error: %v", err)
-	}
+	assert.NoError(t, err)
 	_, err = pc.CreateAnswer(nil)
-	if !reflect.DeepEqual(&rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}, err) {
-		t.Errorf("CreateAnswer without RemoteDescription: got error: %v", err)
-	}
+	assert.Equal(t, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}, err)
 
 	assert.NoError(t, pc.Close())
 }
@@ -519,10 +508,7 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			},
 		},
 	} {
-		if len(test.kinds) != len(test.directions) {
-			t.Fatal("Kinds and Directions must be the same length")
-		}
-
+		assert.Len(t, test.kinds, len(test.directions), "Kinds and Directions must be the same length")
 		got := []*RTPTransceiver{}
 		for i := range test.kinds {
 			res, filteredLocalTransceivers := satisfyTypeAndDirection(test.kinds[i], test.directions[i], test.localTransceivers)
@@ -531,18 +517,7 @@ func TestPeerConnection_satisfyTypeAndDirection(t *testing.T) {
 			test.localTransceivers = filteredLocalTransceivers
 		}
 
-		if !reflect.DeepEqual(got, test.want) {
-			gotStr := ""
-			for _, t := range got {
-				gotStr += fmt.Sprintf("%+v\n", t)
-			}
-
-			wantStr := ""
-			for _, t := range test.want {
-				wantStr += fmt.Sprintf("%+v\n", t)
-			}
-			t.Errorf("satisfyTypeAndDirection %q: \ngot\n%s \nwant\n%s", test.name, gotStr, wantStr)
-		}
+		assert.Equal(t, test.want, got, "satisfyTypeAndDirection %q", test.name)
 	}
 }
 
@@ -584,20 +559,13 @@ func TestPeerConnection_IceLite(t *testing.T) {
 		offerSettingEngine := SettingEngine{}
 		offerSettingEngine.SetLite(offerIsLite)
 		offerPC, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		answerSettingEngine := SettingEngine{}
 		answerSettingEngine.SetLite(answerisLite)
 		answerPC, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err = signalPair(offerPC, answerPC); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
+		assert.NoError(t, signalPair(offerPC, answerPC))
 
 		dataChannelOpen := make(chan interface{})
 		answerPC.OnDataChannel(func(_ *DataChannel) {
@@ -637,9 +605,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 
 		switch s { // nolint:exhaustive
 		case ICEGatheringStateGathering:
-			if seenComplete.get() {
-				t.Error("Completed before gathering")
-			}
+			assert.False(t, seenGathering.get(), "Completed before gathering")
 			seenGathering.set(true)
 		case ICEGatheringStateComplete:
 			seenComplete.set(true)
@@ -657,7 +623,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 
 	select {
 	case <-time.After(time.Second * 10):
-		t.Fatal("Gathering and Complete were never seen")
+		assert.Fail(t, "Gathering and Complete were never seen")
 	case <-seenGatheringAndComplete:
 	}
 
@@ -695,9 +661,7 @@ func TestPeerConnectionTrickle(t *testing.T) { //nolint:cyclop
 
 	cachedOfferCandidates := []ICECandidateInit{}
 	offerPC.OnICECandidate(func(c *ICECandidate) {
-		if offerCandidateDone {
-			t.Error("Received OnICECandidate after finishing gathering")
-		}
+		assert.False(t, offerCandidateDone, "Received OnICECandidate after finishing gathering")
 		if c == nil {
 			offerCandidateDone = true
 		}
@@ -710,9 +674,7 @@ func TestPeerConnectionTrickle(t *testing.T) { //nolint:cyclop
 
 	cachedAnswerCandidates := []ICECandidateInit{}
 	answerPC.OnICECandidate(func(c *ICECandidate) {
-		if answerCandidateDone {
-			t.Error("Received OnICECandidate after finishing gathering")
-		}
+		assert.False(t, answerCandidateDone, "Received OnICECandidate after finishing gathering")
 		if c == nil {
 			answerCandidateDone = true
 		}
@@ -1120,7 +1082,7 @@ func TestPeerConnection_MassiveTracks(t *testing.T) { //nolint:cyclop
 		time.Sleep(pingInterval)
 		select {
 		case <-tooLong:
-			t.Error("unable to receive all track events in time")
+			assert.Fail(t, "unable to receive all track events in time")
 		default:
 		}
 	}
@@ -1146,14 +1108,10 @@ func TestEmptyCandidate(t *testing.T) {
 
 	for i, testCase := range testCases {
 		peerConn, err := NewPeerConnection(Configuration{})
-		if err != nil {
-			t.Errorf("Case %d: got error: %v", i, err)
-		}
+		assert.NoErrorf(t, err, "Case %d failed", i)
 
 		err = peerConn.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: minimalOffer})
-		if err != nil {
-			t.Errorf("Case %d: got error: %v", i, err)
-		}
+		assert.NoErrorf(t, err, "Case %d failed", i)
 
 		if testCase.expectError {
 			assert.Error(t, peerConn.AddICECandidate(testCase.ICECandidate))
@@ -1343,12 +1301,8 @@ func TestPeerConnection_SessionID(t *testing.T) {
 			offerSessionID = sessionID
 			offerSessionVersion = sessionVersion
 		} else {
-			if offerSessionID != sessionID {
-				t.Errorf("offer[%v] session id mismatch: expected=%v, got=%v", i, offerSessionID, sessionID)
-			}
-			if offerSessionVersion+1 != sessionVersion {
-				t.Errorf("offer[%v] session version mismatch: expected=%v, got=%v", i, offerSessionVersion+1, sessionVersion)
-			}
+			assert.Equalf(t, offerSessionID, sessionID, "offer[%v] session id mismatch", i)
+			assert.Equalf(t, offerSessionVersion+1, sessionVersion, "offer[%v] session version mismatch", i)
 			offerSessionVersion++
 		}
 
@@ -1359,12 +1313,8 @@ func TestPeerConnection_SessionID(t *testing.T) {
 			answerSessionID = sessionID
 			answerSessionVersion = sessionVersion
 		} else {
-			if answerSessionID != sessionID {
-				t.Errorf("answer[%v] session id mismatch: expected=%v, got=%v", i, answerSessionID, sessionID)
-			}
-			if answerSessionVersion+1 != sessionVersion {
-				t.Errorf("answer[%v] session version mismatch: expected=%v, got=%v", i, answerSessionVersion+1, sessionVersion)
-			}
+			assert.Equalf(t, answerSessionID, sessionID, "answer[%v] session id mismatch", i)
+			assert.Equalf(t, answerSessionVersion+1, sessionVersion, "answer[%v] session version mismatch", i)
 			answerSessionVersion++
 		}
 	}
@@ -1377,21 +1327,21 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 
 	pc.onSignalingStateChange(SignalingStateStable)
 	pc.OnSignalingStateChange(func(SignalingState) {
-		t.Error("OnSignalingStateChange called")
+		assert.Fail(t, "OnSignalingStateChange called")
 	})
 	pc.OnSignalingStateChange(nil)
 	pc.onSignalingStateChange(SignalingStateStable)
 
 	pc.onConnectionStateChange(PeerConnectionStateNew)
 	pc.OnConnectionStateChange(func(PeerConnectionState) {
-		t.Error("OnConnectionStateChange called")
+		assert.Fail(t, "OnConnectionStateChange called")
 	})
 	pc.OnConnectionStateChange(nil)
 	pc.onConnectionStateChange(PeerConnectionStateNew)
 
 	pc.onICEConnectionStateChange(ICEConnectionStateNew)
 	pc.OnICEConnectionStateChange(func(ICEConnectionState) {
-		t.Error("OnConnectionStateChange called")
+		assert.Fail(t, "OnICEConnectionStateChange called")
 	})
 	pc.OnICEConnectionStateChange(nil)
 	pc.onICEConnectionStateChange(ICEConnectionStateNew)
@@ -1399,7 +1349,7 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 	pc.onNegotiationNeeded()
 	pc.negotiationNeededOp()
 	pc.OnNegotiationNeeded(func() {
-		t.Error("OnNegotiationNeeded called")
+		assert.Fail(t, "OnNegotiationNeeded called")
 	})
 	pc.OnNegotiationNeeded(nil)
 	pc.onNegotiationNeeded()

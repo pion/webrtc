@@ -14,18 +14,9 @@ import (
 
 func TestNewAPI(t *testing.T) {
 	api := NewAPI()
-
-	if api.settingEngine == nil {
-		t.Error("Failed to init settings engine")
-	}
-
-	if api.mediaEngine == nil {
-		t.Error("Failed to init media engine")
-	}
-
-	if api.interceptorRegistry == nil {
-		t.Error("Failed to init interceptor registry")
-	}
+	assert.NotNil(t, api.settingEngine, "failed to init settings engine")
+	assert.NotNil(t, api.mediaEngine, "failed to init media engine")
+	assert.NotNil(t, api.interceptorRegistry, "failed to init interceptor registry")
 }
 
 func TestNewAPI_Options(t *testing.T) {
@@ -36,13 +27,9 @@ func TestNewAPI_Options(t *testing.T) {
 		WithSettingEngine(s),
 	)
 
-	if !api.settingEngine.detach.DataChannels {
-		t.Error("Failed to set settings engine")
-	}
-
-	if len(api.mediaEngine.audioCodecs) == 0 || len(api.mediaEngine.videoCodecs) == 0 {
-		t.Error("Failed to set media engine")
-	}
+	assert.True(t, api.settingEngine.detach.DataChannels, "failed to set settings engine")
+	assert.NotEmpty(t, api.mediaEngine.audioCodecs, "failed to set audio codecs")
+	assert.NotEmpty(t, api.mediaEngine.videoCodecs, "failed to set video codecs")
 }
 
 func TestNewAPI_OptionsDefaultize(t *testing.T) {
