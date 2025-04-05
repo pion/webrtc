@@ -201,29 +201,21 @@ func Test_Interceptor_BindUnbind(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, receiver.GracefulClose())
 
 	// Bind/UnbindLocal/RemoteStream should be called from one side.
-	if cnt := atomic.LoadUint32(&cntBindLocalStream); cnt != 1 {
-		t.Errorf("BindLocalStreamFn is expected to be called once, but called %d times", cnt)
-	}
-	if cnt := atomic.LoadUint32(&cntUnbindLocalStream); cnt != 1 {
-		t.Errorf("UnbindLocalStreamFn is expected to be called once, but called %d times", cnt)
-	}
-	if cnt := atomic.LoadUint32(&cntBindRemoteStream); cnt != 2 {
-		t.Errorf("BindRemoteStreamFn is expected to be called once, but called %d times", cnt)
-	}
-	if cnt := atomic.LoadUint32(&cntUnbindRemoteStream); cnt != 2 {
-		t.Errorf("UnbindRemoteStreamFn is expected to be called once, but called %d times", cnt)
-	}
+	assert.Equal(t, uint32(1), atomic.LoadUint32(&cntBindLocalStream), "BindLocalStreamFn is expected to be called once")
+	assert.Equal(
+		t, uint32(1), atomic.LoadUint32(&cntUnbindLocalStream), "UnbindLocalStreamFn is expected to be called once",
+	)
+	assert.Equal(
+		t, uint32(2), atomic.LoadUint32(&cntBindRemoteStream), "BindRemoteStreamFn is expected to be called twice",
+	)
+	assert.Equal(
+		t, uint32(2), atomic.LoadUint32(&cntUnbindRemoteStream), "UnbindRemoteStreamFn is expected to be called twice",
+	)
 
 	// BindRTCPWriter/Reader and Close should be called from both side.
-	if cnt := atomic.LoadUint32(&cntBindRTCPWriter); cnt != 2 {
-		t.Errorf("BindRTCPWriterFn is expected to be called twice, but called %d times", cnt)
-	}
-	if cnt := atomic.LoadUint32(&cntBindRTCPReader); cnt != 3 {
-		t.Errorf("BindRTCPReaderFn is expected to be called twice, but called %d times", cnt)
-	}
-	if cnt := atomic.LoadUint32(&cntClose); cnt != 2 {
-		t.Errorf("CloseFn is expected to be called twice, but called %d times", cnt)
-	}
+	assert.Equal(t, uint32(2), atomic.LoadUint32(&cntBindRTCPWriter), "BindRTCPWriterFn is expected to be called twice")
+	assert.Equal(t, uint32(3), atomic.LoadUint32(&cntBindRTCPReader), "BindRTCPReaderFn is expected to be called thrice")
+	assert.Equal(t, uint32(2), atomic.LoadUint32(&cntClose), "CloseFn is expected to be called twice")
 }
 
 func Test_InterceptorRegistry_Build(t *testing.T) {
@@ -438,12 +430,8 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	if requestNack {
-		if !gotNack {
-			t.Errorf("Expected to get a NACK, got none")
-		}
+		assert.True(t, gotNack, "Expected to get a NACK, got none")
 	} else {
-		if gotNack {
-			t.Errorf("Expected to get no NACK, got one")
-		}
+		assert.False(t, gotNack, "Expected to get no NACK, got one")
 	}
 }

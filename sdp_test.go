@@ -742,9 +742,9 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			}
 			for _, a := range desc.Attributes {
 				if strings.Contains(a.Key, "rtpmap") {
-					if a.Value == "98 VP9/90000" {
-						t.Fatal("vp9 should not be present in sdp")
-					} else if a.Value == "96 VP8/90000" {
+					assert.NotEqual(t, a.Value, "98 VP9/90000", "vp9 should not be present in sdp")
+
+					if a.Value == "96 VP8/90000" {
 						foundVP8 = true
 					}
 				}

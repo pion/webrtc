@@ -45,8 +45,10 @@ func TestNetworkType(t *testing.T) {
 
 	for i, testCase := range testCases {
 		actual, err := NewNetworkType(testCase.typeString)
-		if (err != nil) != testCase.shouldFail {
-			t.Error(err)
+		if testCase.shouldFail {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
 		}
 		assert.Equal(t,
 			testCase.expectedType,

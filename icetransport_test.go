@@ -82,9 +82,10 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 	<-iceComplete
 
-	if atomic.LoadInt32(&senderCalledCandidateChange) == 0 {
-		t.Fatalf("Sender ICETransport OnSelectedCandidateChange was never called")
-	}
+	assert.NotEmpty(
+		t, atomic.LoadInt32(&senderCalledCandidateChange),
+		"Sender ICETransport OnSelectedCandidateChange was never called",
+	)
 
 	closePairNow(t, pcOffer, pcAnswer)
 }

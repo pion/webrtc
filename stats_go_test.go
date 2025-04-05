@@ -38,9 +38,7 @@ func TestStatsTimestampTime(t *testing.T) {
 			WantTime:  time.Unix(0, 1e3),
 		},
 	} {
-		if got, want := test.Timestamp.Time(), test.WantTime.UTC(); got != want {
-			t.Fatalf("StatsTimestamp(%v).Time() = %v, want %v", test.Timestamp, got, want)
-		}
+		assert.Equal(t, test.WantTime.UTC(), test.Timestamp.Time())
 	}
 }
 
@@ -1171,7 +1169,7 @@ func waitWithTimeout(t *testing.T, wg *sync.WaitGroup) {
 	case <-done:
 		break
 	case <-timeout:
-		t.Fatal("timed out waiting for waitgroup")
+		assert.Fail(t, "timed out waiting for waitgroup")
 	}
 }
 

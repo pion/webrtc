@@ -298,7 +298,7 @@ func (t *ICETransport) SetRemoteCandidates(remoteCandidates []ICECandidate) erro
 	}
 
 	for _, c := range remoteCandidates {
-		i, err := c.toICE()
+		i, err := c.ToICE()
 		if err != nil {
 			return err
 		}
@@ -326,7 +326,7 @@ func (t *ICETransport) AddRemoteCandidate(remoteCandidate *ICECandidate) error {
 	}
 
 	if remoteCandidate != nil {
-		if candidate, err = remoteCandidate.toICE(); err != nil {
+		if candidate, err = remoteCandidate.ToICE(); err != nil {
 			return err
 		}
 	}

@@ -211,7 +211,7 @@ var (
 		"remoteDescription contained media section without mid value",
 	)
 	errPeerConnRemoteDescriptionNil                  = errors.New("remoteDescription has not been set yet")
-	errPeerConnSingleMediaSectionHasExplicitSSRC     = errors.New("single media section has an explicit SSRC")
+	errMediaSectionHasExplictSSRCAttribute           = errors.New("media section has an explicit SSRC")
 	errPeerConnRemoteSSRCAddTransceiver              = errors.New("could not add transceiver for remote SSRC")
 	errPeerConnSimulcastMidRTPExtensionRequired      = errors.New("mid RTP Extensions required for Simulcast")
 	errPeerConnSimulcastStreamIDRTPExtensionRequired = errors.New("stream id RTP Extensions required for Simulcast")
@@ -275,7 +275,9 @@ var (
 	errICETransportNotInNew = errors.New("ICETransport can only be called in ICETransportStateNew")
 	errICETransportClosed   = errors.New("ICETransport closed")
 
-	errCertificatePEMFormatError = errors.New("bad Certificate PEM format")
+	errCertificatePEMMultipleCert = errors.New("failed parsing certificate, more than 1 CERTIFICATE block in pems")
+	errCertificatePEMMultiplePriv = errors.New("failed parsing certificate, more than 1 PRIVATE KEY block in pems")
+	errCertificatePEMMissing      = errors.New("failed parsing certificate, pems must contain both a CERTIFICATE block and a PRIVATE KEY block") // nolint: lll
 
 	errRTPTooShort = errors.New("not long enough to be a RTP Packet")
 

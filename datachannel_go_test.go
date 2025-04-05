@@ -7,13 +7,11 @@
 package webrtc
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"io"
 	"math/big"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -81,9 +79,7 @@ func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 		// math/rand a weak RNG, but this does not need to be secure. Ignore with #nosec
 		/* #nosec */
 		randInt, err := rand.Int(rand.Reader, big.NewInt(int64(maxVal)))
-		/* #nosec */ if err != nil {
-			t.Fatalf("Failed to get random sleep duration: %s", err)
-		}
+		assert.NoError(t, err, "Failed to get random sleep duration")
 		time.Sleep(time.Duration(randInt.Int64()) * time.Microsecond)
 		s, _ := binary.Varint(msg.Data)
 		out <- int(s)
@@ -194,9 +190,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		buf := make([]byte, 1000)
 
 		offerPC, answerPC, err := newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		assert.NoError(t, err)
 
 		nPacketsToSend := int(10)
 		var nOfferReceived uint32
@@ -216,9 +210,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 
 				for i := 0; i < nPacketsToSend; i++ {
 					e := answerDC.Send(buf)
-					if e != nil {
-						t.Fatalf("Failed to send string on data channel")
-					}
+					assert.NoError(t, e, "Failed to send string on data channel")
 				}
 			})
 
@@ -241,10 +233,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		})
 
 		offerDC, err := offerPC.CreateDataChannel(expectedLabel, nil)
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
-
+		assert.NoError(t, err, "Failed to create a PC pair for testing")
 		assert.True(t, offerDC.Ordered(), "Ordered should be set to true")
 
 		offerDC.OnOpen(func() {
@@ -252,9 +241,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 
 			for i := 0; i < nPacketsToSend; i++ {
 				e := offerDC.Send(buf)
-				if e != nil {
-					t.Fatalf("Failed to send string on data channel")
-				}
+				assert.NoError(t, e, "Failed to send string on data channel")
 				// assert.Equal(t, (i+1)*len(buf), int(offerDC.BufferedAmount()), "unexpected bufferedAmount")
 			}
 		})
@@ -276,9 +263,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		})
 
 		err = signalPair(offerPC, answerPC)
-		if err != nil {
-			t.Fatalf("Failed to signal our PC pair for testing")
-		}
+		assert.NoError(t, err, "Failed to signal our PC pair for testing")
 
 		closePair(t, offerPC, answerPC, done)
 
@@ -296,9 +281,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		buf := make([]byte, 1000)
 
 		offerPC, answerPC, err := newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		assert.NoError(t, err)
 
 		done := make(chan bool)
 
@@ -323,9 +306,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		})
 
 		dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		assert.NoError(t, err)
 
 		assert.True(t, dc.Ordered(), "Ordered should be set to true")
 
@@ -338,10 +319,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 			})
 
 			for i := 0; i < 10; i++ {
-				e := dc.Send(buf)
-				if e != nil {
-					t.Fatalf("Failed to send string on data channel")
-				}
+				assert.NoError(t, dc.Send(buf), "Failed to send string on data channel")
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")
 			}
@@ -350,10 +328,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		dc.OnMessage(func(DataChannelMessage) {
 		})
 
-		err = signalPair(offerPC, answerPC)
-		if err != nil {
-			t.Fatalf("Failed to signal our PC pair for testing")
-		}
+		assert.NoError(t, signalPair(offerPC, answerPC))
 
 		closePair(t, offerPC, answerPC, done)
 
@@ -380,13 +355,9 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 		// Set up two peer connections.
 		config := Configuration{}
 		pca, err := api.NewPeerConnection(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		pcb, err := api.NewPeerConnection(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		defer closePairNow(t, pca, pcb)
 
@@ -400,10 +371,7 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 			log.Debug("OnDataChannel was called")
 			dc.OnOpen(func() {
 				detached, err2 := dc.Detach()
-				if err2 != nil {
-					log.Debugf("Detach failed: %s", err2.Error())
-					t.Error(err2)
-				}
+				assert.NoError(t, err2, "Detach failed")
 
 				dcChan <- detached
 			})
@@ -423,25 +391,15 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 			log.Debug("Waiting for ping...")
 			msg, err2 := io.ReadAll(dc)
 			log.Debugf("Received ping! \"%s\"", string(msg))
-			if err2 != nil {
-				t.Error(err2)
-			}
+			assert.NoError(t, err2)
 
-			if !bytes.Equal(msg, testData) {
-				t.Errorf("expected %q, got %q", string(msg), string(testData))
-			} else {
-				log.Debug("Received ping successfully!")
-			}
+			assert.Equal(t, testData, msg)
 		}()
 
-		if err = signalPair(pca, pcb); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, signalPair(pca, pcb))
 
 		attached, err := pca.CreateDataChannel(label, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		log.Debug("Waiting for data channel to open")
 		open := make(chan struct{})
 		attached.OnOpen(func() {
@@ -452,17 +410,14 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 
 		var dc io.ReadWriteCloser
 		dc, err = attached.Detach()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			log.Debug("Sending ping...")
-			if _, err2 := dc.Write(testData); err2 != nil {
-				t.Error(err2)
-			}
+			_, err = dc.Write(testData)
+			assert.NoError(t, err)
 			log.Debug("Sent ping")
 
 			assert.NoError(t, dc.Close(), "should succeed")
@@ -483,13 +438,9 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 		// Set up two peer connections.
 		config := Configuration{}
 		pca, err := NewPeerConnection(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 		pcb, err := NewPeerConnection(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		defer closePairNow(t, pca, pcb)
 
@@ -520,23 +471,17 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 			log.Debug("pcb: registering onMessage callback")
 			dcb.OnMessage(func(dcMsg DataChannelMessage) {
 				log.Debugf("pcb: received ping: %s", string(dcMsg.Data))
-				if !reflect.DeepEqual(dcMsg.Data, testData) {
-					t.Error("data mismatch")
-				}
+				assert.Equal(t, testData, dcMsg.Data)
 			})
 		})
 
 		dca, err = pca.CreateDataChannel(label, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
 		dca.OnOpen(func() {
 			log.Debug("pca: data channel opened")
 			log.Debugf("pca: sending \"%s\"", string(testData))
-			if err := dca.Send(testData); err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(t, dca.Send(testData))
 			log.Debug("pca: sent ping")
 			assert.NoError(t, dca.Close(), "should succeed") // <-- dca closes
 		})
@@ -551,14 +496,10 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 		log.Debug("pca: registering onMessage callback")
 		dca.OnMessage(func(dcMsg DataChannelMessage) {
 			log.Debugf("pca: received pong: %s", string(dcMsg.Data))
-			if !reflect.DeepEqual(dcMsg.Data, testData) {
-				t.Error("data mismatch")
-			}
+			assert.Equal(t, testData, dcMsg.Data)
 		})
 
-		if err := signalPair(pca, pcb); err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, signalPair(pca, pcb))
 
 		// When dca closes the channel,
 		// (1) dca.Onclose() will fire immediately, then
@@ -634,9 +575,7 @@ func TestDataChannel_Dial(t *testing.T) {
 		wg.Add(2)
 
 		offerPC, answerPC, err := newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		assert.NoError(t, err)
 
 		answerPC.OnDataChannel(func(d *DataChannel) {
 			if d.Label() != expectedLabel {
@@ -645,7 +584,7 @@ func TestDataChannel_Dial(t *testing.T) {
 
 			d.OnDial(func() {
 				// only dialing side should fire OnDial
-				t.Fatalf("answering side should not call on dial")
+				assert.Fail(t, "answering side should not call on dial")
 			})
 
 			d.OnOpen(wg.Done)
@@ -673,9 +612,7 @@ func TestDataChannel_Dial(t *testing.T) {
 		done := make(chan bool)
 
 		offerPC, answerPC, err := newPair()
-		if err != nil {
-			t.Fatalf("Failed to create a PC pair for testing")
-		}
+		assert.NoError(t, err)
 
 		d, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		assert.NoError(t, err)
@@ -704,35 +641,26 @@ func TestDetachRemovesDatachannelReference(t *testing.T) {
 	// Set up two peer connections.
 	config := Configuration{}
 	pca, err := api.NewPeerConnection(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	pcb, err := api.NewPeerConnection(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	defer closePairNow(t, pca, pcb)
 
 	dcChan := make(chan *DataChannel, 1)
 	pcb.OnDataChannel(func(d *DataChannel) {
 		d.OnOpen(func() {
-			if _, detachErr := d.Detach(); detachErr != nil {
-				t.Error(detachErr)
-			}
+			_, err = d.Detach()
+			assert.NoError(t, err)
 
 			dcChan <- d
 		})
 	})
 
-	if err = signalPair(pca, pcb); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, signalPair(pca, pcb))
 
 	attached, err := pca.CreateDataChannel("", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	open := make(chan struct{}, 1)
 	attached.OnOpen(func() {
 		open <- struct{}{}
@@ -743,9 +671,7 @@ func TestDetachRemovesDatachannelReference(t *testing.T) {
 	d.sctpTransport.lock.RLock()
 	defer d.sctpTransport.lock.RUnlock()
 	for _, dc := range d.sctpTransport.dataChannels[:cap(d.sctpTransport.dataChannels)] {
-		if dc == d {
-			t.Errorf("expected sctpTransport to drop reference to datachannel")
-		}
+		assert.NotEqual(t, dc, d, "expected sctpTransport to drop reference to datachannel")
 	}
 }
 
@@ -801,7 +727,7 @@ func TestDataChannelClose(t *testing.T) {
 			}
 
 			dataChannel.OnOpen(func() {
-				t.Fatal("OnOpen must not be fired after we call Close")
+				assert.Fail(t, "OnOpen must not be fired after we call Close")
 			})
 
 			dataChannel.OnClose(func() {

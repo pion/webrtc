@@ -302,7 +302,7 @@ func addCandidatesToMediaDescriptions(
 	}
 
 	for _, c := range candidates {
-		candidate, err := c.toICE()
+		candidate, err := c.ToICE()
 		if err != nil {
 			return err
 		}

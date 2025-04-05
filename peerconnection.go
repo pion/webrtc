@@ -1577,22 +1577,16 @@ func (pc *PeerConnection) startSCTP(maxMessageSize uint32) {
 	}
 }
 
-//nolint:cyclop
 func (pc *PeerConnection) handleUndeclaredSSRC(
 	ssrc SSRC,
-	remoteDescription *SessionDescription,
+	mediaSection *sdp.MediaDescription,
 ) (handled bool, err error) {
-	if len(remoteDescription.parsed.MediaDescriptions) != 1 {
-		return false, nil
-	}
-
-	onlyMediaSection := remoteDescription.parsed.MediaDescriptions[0]
 	streamID := ""
 	id := ""
 	hasRidAttribute := false
 	hasSSRCAttribute := false
 
-	for _, a := range onlyMediaSection.Attributes {
+	for _, a := range mediaSection.Attributes {
 		switch a.Key {
 		case sdp.AttrKeyMsid:
 			if split := strings.Split(a.Value, " "); len(split) == 2 {
@@ -1609,7 +1603,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(
 	if hasRidAttribute {
 		return false, nil
 	} else if hasSSRCAttribute {
-		return false, errPeerConnSingleMediaSectionHasExplicitSSRC
+		return false, errMediaSectionHasExplictSSRCAttribute
 	}
 
 	incoming := trackDetails{
@@ -1618,7 +1612,7 @@ func (pc *PeerConnection) handleUndeclaredSSRC(
 		streamID: streamID,
 		id:       id,
 	}
-	if onlyMediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
+	if mediaSection.MediaName.Media == RTPCodecTypeAudio.String() {
 		incoming.kind = RTPCodecTypeAudio
 	}
 
@@ -1634,6 +1628,38 @@ func (pc *PeerConnection) handleUndeclaredSSRC(
 	pc.startReceiver(incoming, t.Receiver())
 
 	return true, nil
+}
+
+// For legacy clients that didn't support urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+// or urn:ietf:params:rtp-hdrext:sdes:mid extension, and didn't declare a=ssrc lines.
+// Assumes that the payload type is unique across the media section.
+func (pc *PeerConnection) findMediaSectionByPayloadType(
+	payloadType PayloadType,
+	remoteDescription *SessionDescription,
+) (selectedMediaSection *sdp.MediaDescription, ok bool) {
+	for i := range remoteDescription.parsed.MediaDescriptions {
+		descr := remoteDescription.parsed.MediaDescriptions[i]
+		media := descr.MediaName.Media
+		if !strings.EqualFold(media, "video") && !strings.EqualFold(media, "audio") {
+			continue
+		}
+
+		formats := descr.MediaName.Formats
+		for _, payloadStr := range formats {
+			payload, err := strconv.ParseUint(payloadStr, 10, 8)
+			if err != nil {
+				continue
+			}
+
+			// Return the first media section that has the payload type.
+			// Assuming that the payload type is unique across the media section.
+			if PayloadType(payload) == payloadType {
+				return remoteDescription.parsed.MediaDescriptions[i], true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 // Chrome sends probing traffic on SSRC 0. This reads the packets to ensure that we properly
@@ -1665,7 +1691,7 @@ func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
 	}
 }
 
-func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit,cyclop
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -1683,29 +1709,20 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		}
 	}
 
-	// If the remote SDP was only one media section the ssrc doesn't have to be explicitly declared
-	if handled, err := pc.handleUndeclaredSSRC(ssrc, remoteDescription); handled || err != nil {
-		return err
+	// if the SSRC is not declared in the SDP and there is only one media section,
+	// we attempt to resolve it using this single section
+	// This applies even if the client supports RTP extensions:
+	// (urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id and urn:ietf:params:rtp-hdrext:sdes:mid)
+	// and even if the RTP stream contains an incorrect MID or RID.
+	// while this can be incorrect, this is done to maintain compatibility with older behavior.
+	if len(remoteDescription.parsed.MediaDescriptions) == 1 {
+		mediaSection := remoteDescription.parsed.MediaDescriptions[0]
+		if handled, err := pc.handleUndeclaredSSRC(ssrc, mediaSection); handled || err != nil {
+			return err
+		}
 	}
 
-	midExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(
-		RTPHeaderExtensionCapability{sdp.SDESMidURI},
-	)
-	if !audioSupported && !videoSupported {
-		return errPeerConnSimulcastMidRTPExtensionRequired
-	}
-
-	streamIDExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(
-		RTPHeaderExtensionCapability{sdp.SDESRTPStreamIDURI},
-	)
-	if !audioSupported && !videoSupported {
-		return errPeerConnSimulcastStreamIDRTPExtensionRequired
-	}
-
-	repairStreamIDExtensionID, _, _ := pc.api.mediaEngine.getHeaderExtensionID(
-		RTPHeaderExtensionCapability{sdp.SDESRepairRTPStreamIDURI},
-	)
-
+	// We read the RTP packet to determine the payload type
 	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 
 	i, err := rtpStream.Read(b)
@@ -1722,6 +1739,32 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 	if err != nil {
 		return err
 	}
+
+	midExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(
+		RTPHeaderExtensionCapability{sdp.SDESMidURI},
+	)
+	if !audioSupported && !videoSupported {
+		// try to find media section by payload type as a last resort for legacy clients.
+		mediaSection, ok := pc.findMediaSectionByPayloadType(payloadType, remoteDescription)
+		if ok {
+			if ok, err = pc.handleUndeclaredSSRC(ssrc, mediaSection); ok || err != nil {
+				return err
+			}
+		}
+
+		return errPeerConnSimulcastMidRTPExtensionRequired
+	}
+
+	streamIDExtensionID, audioSupported, videoSupported := pc.api.mediaEngine.getHeaderExtensionID(
+		RTPHeaderExtensionCapability{sdp.SDESRTPStreamIDURI},
+	)
+	if !audioSupported && !videoSupported {
+		return errPeerConnSimulcastStreamIDRTPExtensionRequired
+	}
+
+	repairStreamIDExtensionID, _, _ := pc.api.mediaEngine.getHeaderExtensionID(
+		RTPHeaderExtensionCapability{sdp.SDESRepairRTPStreamIDURI},
+	)
 
 	streamInfo := createStreamInfo(
 		"",

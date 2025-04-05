@@ -54,6 +54,12 @@ const (
 	// MimeTypeFlexFEC FEC MIME Type
 	// Note: Matching should be case insensitive.
 	MimeTypeFlexFEC = "video/flexfec"
+	// MimeTypeFlexFEC03 FlexFEC03 MIME Type
+	// Note: Matching should be case insensitive.
+	MimeTypeFlexFEC03 = "video/flexfec-03"
+	// MimeTypeUlpFEC UlpFEC MIME Type
+	// Note: Matching should be case insensitive.
+	MimeTypeUlpFEC = "video/ulpfec"
 )
 
 type mediaEngineHeaderExtension struct {

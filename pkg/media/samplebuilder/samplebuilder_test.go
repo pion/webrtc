@@ -404,10 +404,7 @@ func TestSeqnumDistance(t *testing.T) {
 	}
 
 	for _, data := range testData {
-		if ret := seqnumDistance(data.x, data.y); ret != data.d {
-			t.Errorf("seqnumDistance(%d, %d) returned %d which must be %d",
-				data.x, data.y, ret, data.d)
-		}
+		assert.Equalf(t, data.d, seqnumDistance(data.x, data.y), "seqnumDistance(%d, %d)", data.x, data.y)
 	}
 }
 
@@ -430,16 +427,19 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 			fd.Push(pkt5)
 
 			for i := 0; i < 3; i++ {
-				if fd.buffer[(i+int(seqStart))%0x10000] != nil {
-					t.Errorf("Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i)
-				}
+				assert.Nilf(
+					t, fd.buffer[(i+int(seqStart))%0x10000],
+					"Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i,
+				)
 			}
-			if fd.buffer[(14+int(seqStart))%0x10000] != pkt4 {
-				t.Error("New packet must be referenced after jump")
-			}
-			if fd.buffer[(12+int(seqStart))%0x10000] != pkt5 {
-				t.Error("New packet must be referenced after jump")
-			}
+			assert.Equal(
+				t, pkt4, fd.buffer[(14+int(seqStart))%0x10000],
+				"New packet must be referenced after jump",
+			)
+			assert.Equal(
+				t, pkt5, fd.buffer[(12+int(seqStart))%0x10000],
+				"New packet must be referenced after jump",
+			)
 		})
 	}
 }
@@ -456,9 +456,7 @@ func TestSampleBuilderPushMaxZero(t *testing.T) {
 
 	s := New(0, d, 1)
 	s.Push(&pkts[0])
-	if sample := s.Pop(); sample == nil {
-		t.Error("Should expect a popped sample")
-	}
+	assert.NotNil(t, s.Pop(), "Should expect a sample")
 }
 
 func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
@@ -478,25 +476,15 @@ func TestSampleBuilderWithPacketReleaseHandler(t *testing.T) {
 	fd := New(10, &fakeDepacketizer{}, 1, WithPacketReleaseHandler(fakePacketReleaseHandler))
 	fd.Push(&pkts[0])
 	fd.Push(&pkts[1])
-	if len(released) == 0 {
-		t.Errorf("Old packet is not released")
-	}
-	if len(released) > 0 && released[0].SequenceNumber != pkts[0].SequenceNumber {
-		t.Errorf("Unexpected packet released by maxLate")
-	}
+	assert.NotEmpty(t, released, "Old packet is not released")
+	assert.Equal(t, pkts[0].SequenceNumber, released[0].SequenceNumber, "Unexpected packet released by maxLate")
 	// Test packets released after samples built.
 	fd.Push(&pkts[2])
 	fd.Push(&pkts[3])
 	fd.Push(&pkts[4])
-	if fd.Pop() == nil {
-		t.Errorf("Should have some sample here.")
-	}
-	if len(released) < 3 {
-		t.Errorf("packet built with sample is not released")
-	}
-	if len(released) >= 2 && released[2].SequenceNumber != pkts[2].SequenceNumber {
-		t.Errorf("Unexpected packet released by samples built")
-	}
+	assert.NotNil(t, fd.Pop(), "Should have some sample here.")
+	assert.GreaterOrEqual(t, len(released), 3, "packet built with sample is not released")
+	assert.Equal(t, pkts[2].SequenceNumber, released[2].SequenceNumber, "Unexpected packet released by samples built")
 }
 
 func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
@@ -621,9 +609,7 @@ func TestSampleBuilder_Flush(t *testing.T) {
 		Payload: []byte{0x01, 0x12},
 	}) // Valid packet
 
-	if sample := fd.Pop(); sample != nil {
-		t.Fatal("Unexpected sample is returned. Test precondition may be broken")
-	}
+	assert.Nil(t, fd.Pop(), "Unexpected sample is returned. Test precondition may be broken")
 
 	fd.Flush()
 

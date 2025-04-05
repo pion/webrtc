@@ -8,13 +8,13 @@ package webrtc
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,17 +53,12 @@ func TestGenerateDataChannelID(t *testing.T) {
 	for _, testCase := range testCases {
 		idPtr := new(uint16)
 		err := testCase.s.generateAndSetDataChannelID(testCase.role, &idPtr)
-		if err != nil {
-			t.Errorf("failed to generate id: %v", err)
-
-			return
-		}
-		if *idPtr != testCase.result {
-			t.Errorf("Wrong id: %d expected %d", *idPtr, testCase.result)
-		}
-		if _, ok := testCase.s.dataChannelIDsUsed[*idPtr]; !ok {
-			t.Errorf("expected new id to be added to the map: %d", *idPtr)
-		}
+		assert.NoError(t, err, "failed to generate data channel id")
+		assert.Equal(t, testCase.result, *idPtr)
+		assert.Contains(
+			t, testCase.s.dataChannelIDsUsed, *idPtr,
+			"expected new id to be added to the map",
+		)
 	}
 }
 
@@ -75,9 +70,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 
 	answerPC.OnDataChannel(func(dc *DataChannel) {
 		dc.OnMessage(func(_ DataChannelMessage) {
-			if err1 := dc.Send([]byte("hello")); err1 != nil {
-				t.Error("failed to send message")
-			}
+			assert.NoError(t, dc.Send([]byte("hello")), "failed to send message")
 		})
 	})
 
@@ -89,21 +82,16 @@ func TestSCTPTransportOnClose(t *testing.T) {
 			}()
 
 			dc, createErr := offerPC.CreateDataChannel(expectedLabel, nil)
-			if createErr != nil {
-				t.Errorf("Failed to create a PC pair for testing")
-
-				return
-			}
+			assert.NoError(t, createErr, "Failed to create a PC pair for testing")
 			dc.OnMessage(func(msg DataChannelMessage) {
-				if !bytes.Equal(msg.Data, []byte("hello")) {
-					t.Error("invalid msg received")
-				}
+				assert.Equal(
+					t, []byte("hello"), msg.Data,
+					"invalid msg received",
+				)
 				recvMsg <- struct{}{}
 			})
 			dc.OnOpen(func() {
-				if err1 := dc.Send([]byte("hello")); err1 != nil {
-					t.Error("failed to send initial msg", err1)
-				}
+				assert.NoError(t, dc.Send([]byte("hello")), "failed to send initial msg")
 			})
 		}
 	})
@@ -114,7 +102,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	select {
 	case <-recvMsg:
 	case <-time.After(5 * time.Second):
-		t.Fatal("timed out")
+		assert.Fail(t, "timed out")
 	}
 
 	// setup SCTP OnClose callback
@@ -129,7 +117,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 	select {
 	case <-ch:
 	case <-time.After(5 * time.Second):
-		t.Fatal("timed out")
+		assert.Fail(t, "timed out")
 	}
 }
 
@@ -147,17 +135,9 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			// Set up two peer connections.
 			config := Configuration{}
 			offerPC, err := api.NewPeerConnection(config)
-			if err != nil {
-				t.Error(err)
-
-				return
-			}
+			assert.NoError(t, err)
 			answerPC, err := api.NewPeerConnection(config)
-			if err != nil {
-				t.Error(err)
-
-				return
-			}
+			assert.NoError(t, err)
 
 			defer closePairNow(t, offerPC, answerPC)
 			defer func() { done <- struct{}{} }()
@@ -169,11 +149,8 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				Negotiated: &negotiated,
 				ID:         &id,
 			})
-			if err != nil {
-				t.Error(err)
+			assert.NoError(t, err)
 
-				return
-			}
 			dc1.OnOpen(func() {
 				_, _ = dc1.Detach()
 				close(readDetach)
@@ -184,11 +161,8 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				Negotiated: &negotiated,
 				ID:         &id,
 			})
-			if err != nil {
-				t.Error(err)
+			assert.NoError(t, err)
 
-				return
-			}
 			dc2.OnOpen(func() {
 				_, _ = dc2.Detach()
 				close(writeDetach)
@@ -207,27 +181,17 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				select {
 				case <-connestd:
 				case <-time.After(10 * time.Second):
-					t.Error("conn establishment timed out")
+					assert.Fail(t, "conn establishment timed out")
 
 					return
 				}
 				<-readDetach
 				err1 := dc1.dataChannel.SetReadDeadline(time.Now().Add(10 * time.Second))
-				if err1 != nil {
-					t.Error(err)
-
-					return
-				}
+				assert.NoError(t, err1)
 				buf := make([]byte, 10)
 				n, err1 := dc1.dataChannel.Read(buf)
-				if err1 != nil {
-					t.Error(err)
-
-					return
-				}
-				if string(buf[:n]) != "hello" {
-					t.Error("invalid read")
-				}
+				assert.NoError(t, err1)
+				assert.Equal(t, "hello", string(buf[:n]), "invalid read")
 			}()
 			go func() {
 				defer wg.Done()
@@ -240,15 +204,14 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				select {
 				case <-connestd:
 				case <-time.After(10 * time.Second):
-					t.Error("connection establishment timed out")
+					assert.Fail(t, "connection establishment timed out")
 
 					return
 				}
 				<-writeDetach
 				n, err1 := dc2.dataChannel.Write([]byte("hello"))
-				if err1 != nil || n != len("hello") {
-					t.Error(err)
-				}
+				assert.NoError(t, err1)
+				assert.Equal(t, len("hello"), n)
 			}()
 			err = signalPair(offerPC, answerPC)
 			require.NoError(t, err)
@@ -260,7 +223,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 		select {
 		case <-done:
 		case <-time.After(20 * time.Second):
-			t.Fatal("timed out")
+			assert.Fail(t, "timed out")
 		}
 	}
 }

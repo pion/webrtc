@@ -8,9 +8,10 @@ import (
 	"errors"
 	"io"
 	"net"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReader(t *testing.T) { //nolint:maintidx
@@ -250,17 +251,13 @@ func TestReader(t *testing.T) { //nolint:maintidx
 		},
 	} {
 		reader, hdr, err := NewReader(bytes.NewReader(test.Data))
+		// we validate the error again. at the end of the reading loop.
 		if err != nil {
-			if got, want := err, test.WantErr; !errors.Is(got, want) {
-				t.Fatalf("NewReader(%s) err=%v want %v", test.Name, got, want)
-			}
+			assert.ErrorIs(t, err, test.WantErr, test.Name)
 
 			continue
 		}
-
-		if got, want := hdr, test.WantHeader; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%q Header = %#v, want %#v", test.Name, got, want)
-		}
+		assert.Equal(t, test.WantHeader, hdr, test.Name)
 
 		var nextErr error
 		var packets []Packet
@@ -278,11 +275,11 @@ func TestReader(t *testing.T) { //nolint:maintidx
 			packets = append(packets, pkt)
 		}
 
-		if got, want := nextErr, test.WantErr; !errors.Is(got, want) {
-			t.Fatalf("%s err=%v want %v", test.Name, got, want)
+		if test.WantErr != nil {
+			assert.ErrorIs(t, nextErr, test.WantErr, test.Name)
+		} else {
+			assert.NoError(t, nextErr, test.Name)
 		}
-		if got, want := packets, test.WantPackets; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%q packets=%#v, want %#v", test.Name, got, want)
-		}
+		assert.Equal(t, test.WantPackets, packets, test.Name)
 	}
 }

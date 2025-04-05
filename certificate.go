@@ -191,33 +191,55 @@ func (c Certificate) collectStats(report *statsReportCollector) error {
 
 // CertificateFromPEM creates a fresh certificate based on a string containing
 // pem blocks fort the private key and x509 certificate.
-func CertificateFromPEM(pems string) (*Certificate, error) {
-	// decode & parse the certificate
-	block, more := pem.Decode([]byte(pems))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errCertificatePEMFormatError
-	}
-	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
-	n, err := base64.StdEncoding.Decode(certBytes, block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode ceritifcate: %w", err)
-	}
-	cert, err := x509.ParseCertificate(certBytes[:n])
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing ceritifcate: %w", err)
-	}
-	// decode & parse the private key
-	block, _ = pem.Decode(more)
-	if block == nil || block.Type != "PRIVATE KEY" {
-		return nil, errCertificatePEMFormatError
-	}
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse private key: %w", err)
-	}
-	x := CertificateFromX509(privateKey, cert)
+func CertificateFromPEM(pems string) (*Certificate, error) { //nolint: cyclop
+	var cert *x509.Certificate
+	var privateKey crypto.PrivateKey
 
-	return &x, nil
+	var block *pem.Block
+	more := []byte(pems)
+	for {
+		var err error
+		block, more = pem.Decode(more)
+		if block == nil {
+			break
+		}
+
+		// decode & parse the certificate
+		switch block.Type {
+		case "CERTIFICATE":
+			if cert != nil {
+				return nil, errCertificatePEMMultipleCert
+			}
+			cert, err = x509.ParseCertificate(block.Bytes)
+			// If parsing failed using block.Bytes, then parse the bytes as base64 and try again
+			if err != nil {
+				var n int
+				certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
+				n, err = base64.StdEncoding.Decode(certBytes, block.Bytes)
+				if err == nil {
+					cert, err = x509.ParseCertificate(certBytes[:n])
+				}
+			}
+		case "PRIVATE KEY":
+			if privateKey != nil {
+				return nil, errCertificatePEMMultiplePriv
+			}
+			privateKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+		}
+
+		// Report errors from parsing either the private key or the certificate
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode %s: %w", block.Type, err)
+		}
+	}
+
+	if cert == nil || privateKey == nil {
+		return nil, errCertificatePEMMissing
+	}
+
+	ret := CertificateFromX509(privateKey, cert)
+
+	return &ret, nil
 }
 
 // PEM returns the certificate encoded as two pem block: once for the X509
