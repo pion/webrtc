@@ -358,9 +358,10 @@ func (m *MediaEngine) copy() *MediaEngine {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cloned := &MediaEngine{
-		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
-		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
-		headerExtensions: append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
+		videoCodecs:          append([]RTPCodecParameters{}, m.videoCodecs...),
+		audioCodecs:          append([]RTPCodecParameters{}, m.audioCodecs...),
+		headerExtensions:     append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
+		negotiateMultiCodecs: m.negotiateMultiCodecs,
 	}
 	if len(m.headerExtensions) > 0 {
 		cloned.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
@@ -596,9 +597,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		}
 
 		switch {
-		case (!m.negotiatedAudio || m.negotiateMultiCodecs) && typ == RTPCodecTypeAudio:
+		case !m.negotiatedAudio && typ == RTPCodecTypeAudio:
 			m.negotiatedAudio = true
-		case (!m.negotiatedVideo || m.negotiateMultiCodecs) && typ == RTPCodecTypeVideo:
+		case !m.negotiatedVideo && typ == RTPCodecTypeVideo:
 			m.negotiatedVideo = true
 		default:
 			// update header extesions from remote sdp if codec is negotiated, Firefox
@@ -609,7 +610,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 				return err
 			}
 
-			continue
+			if !m.negotiateMultiCodecs || (typ != RTPCodecTypeAudio && typ != RTPCodecTypeVideo) {
+				continue
+			}
 		}
 
 		codecs, err := codecsFromMediaDescription(media)
