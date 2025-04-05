@@ -75,6 +75,7 @@ type mediaEngineHeaderExtension struct {
 type MediaEngine struct {
 	// If we have attempted to negotiate a codec type yet.
 	negotiatedVideo, negotiatedAudio bool
+	negotiateMultiCodecs             bool
 
 	videoCodecs, audioCodecs                     []RTPCodecParameters
 	negotiatedVideoCodecs, negotiatedAudioCodecs []RTPCodecParameters
@@ -83,6 +84,22 @@ type MediaEngine struct {
 	negotiatedHeaderExtensions map[int]mediaEngineHeaderExtension
 
 	mu sync.RWMutex
+}
+
+// SetMultiCodecNegotiation enables or disables the negotiation of multiple codecs.
+func (m *MediaEngine) SetMultiCodecNegotiation(negotiateMultiCodecs bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.negotiateMultiCodecs = negotiateMultiCodecs
+}
+
+// MultiCodecNegotiation returns the current state of the negotiation of multiple codecs.
+func (m *MediaEngine) MultiCodecNegotiation() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.negotiateMultiCodecs
 }
 
 // RegisterDefaultCodecs registers the default codecs supported by Pion WebRTC.
@@ -383,9 +400,10 @@ func (m *MediaEngine) copy() *MediaEngine {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cloned := &MediaEngine{
-		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
-		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
-		headerExtensions: append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
+		videoCodecs:          append([]RTPCodecParameters{}, m.videoCodecs...),
+		audioCodecs:          append([]RTPCodecParameters{}, m.audioCodecs...),
+		headerExtensions:     append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
+		negotiateMultiCodecs: m.negotiateMultiCodecs,
 	}
 	if len(m.headerExtensions) > 0 {
 		cloned.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
@@ -634,7 +652,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 				return err
 			}
 
-			continue
+			if !m.negotiateMultiCodecs || (typ != RTPCodecTypeAudio && typ != RTPCodecTypeVideo) {
+				continue
+			}
 		}
 
 		codecs, err := codecsFromMediaDescription(media)
