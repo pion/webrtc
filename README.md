@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://pion.ly"><img src="https://img.shields.io/badge/pion-webrtc-gray.svg?longCache=true&colorB=brightgreen" alt="Pion WebRTC"></a>
   <a href="https://sourcegraph.com/github.com/pion/webrtc?badge"><img src="https://sourcegraph.com/github.com/pion/webrtc/-/badge.svg" alt="Sourcegraph Widget"></a>
-  <a href="https://pion.ly/slack"><img src="https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen" alt="Slack Widget"></a> <a href="https://discord.gg/PngbdqpFbt"><img src="https://img.shields.io/badge/join-us%20on%20discord-gray.svg?longCache=true&logo=discord&colorB=brightblue" alt="join us on Discord"></a> <a href="https://bsky.app/profile/pion.ly"><img src="https://img.shields.io/badge/follow-us%20on%20bluesky-gray.svg?longCache=true&logo=bluesky&colorB=brightblue" alt="Follow us on Bluesky"></a> <a href="https://twitter.com/_pion?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40_pion&style=social&url=https%3A%2F%2Ftwitter.com%2F_pion" alt="Twitter Widget"></a>
+  <a href="https://discord.gg/PngbdqpFbt"><img src="https://img.shields.io/badge/join-us%20on%20discord-gray.svg?longCache=true&logo=discord&colorB=brightblue" alt="join us on Discord"></a> <a href="https://bsky.app/profile/pion.ly"><img src="https://img.shields.io/badge/follow-us%20on%20bluesky-gray.svg?longCache=true&logo=bluesky&colorB=brightblue" alt="Follow us on Bluesky"></a> <a href="https://twitter.com/_pion?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40_pion&style=social&url=https%3A%2F%2Ftwitter.com%2F_pion" alt="Twitter Widget"></a>
   <a href="https://github.com/pion/awesome-pion" alt="Awesome Pion"><img src="https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg"></a>
   <br>
   <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pion/webrtc/test.yaml">
@@ -25,7 +25,7 @@ Pion WebRTC v4.0.0 has been released! See the [release notes](https://github.com
 
 If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v3` release.
 
-We would love your feedback! Please create GitHub issues or Join the community you are most comfortable in, [the Slack channel](https://pion.ly/slack) or [Discord](https://discord.gg/PngbdqpFbt) to follow development and speak with the maintainers.
+We would love your feedback! Please create GitHub issues or Join the [ Discord](https://discord.gg/PngbdqpFbt) to follow development and speak with the maintainers.
 
 -----
 
@@ -41,7 +41,7 @@ We would love your feedback! Please create GitHub issues or Join the community y
 
 **[GoDoc](https://pkg.go.dev/github.com/pion/webrtc/v4)** is an auto generated API reference. All our Public APIs are commented.
 
-**[FAQ](https://github.com/pion/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in [Slack](https://pion.ly/slack) or [Discord](https://discord.gg/PngbdqpFbt) we are always looking to expand it.
+**[FAQ](https://github.com/pion/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in  [Discord](https://discord.gg/PngbdqpFbt) we are always looking to expand it.
 
 Now go build something awesome! Here are some **ideas** to get your creative juices flowing:
 * Send a video file to multiple browser in real time for perfectly synchronized movie watching.
@@ -57,7 +57,7 @@ Learn the full details of ICE, SCTP, DTLS, SRTP, and how they work together to m
 resource if you are trying to debug. Learn the tools of the trade and how to approach WebRTC issues. This book is vendor
 agnostic and will not have any Pion specific information.
 
-Join the community you are most comfortable in, [Slack](https://pion.ly/slack) or [Discord](https://discord.gg/PngbdqpFbt). Please ask for help about anything, questions don't have to be Pion specific!
+Pion has an active community on [Discord](https://discord.gg/PngbdqpFbt). Please ask for help about anything, questions don't have to be Pion specific!
 Come share your interesting project you are working on. We are here to support you.
 
 One of the maintainers of Pion [Sean-Der](https://github.com/sean-der) is available to help. Schedule at [siobud.com/meeting](https://siobud.com/meeting)
@@ -125,7 +125,7 @@ If you are looking to get involved this is a great place to get started! We woul
 Work on Pion's congestion control and bandwidth estimation was funded through the [User-Operated Internet](https://nlnet.nl/useroperated/) fund, a fund established by [NLnet](https://nlnet.nl/) made possible by financial support from the [PKT Community](https://pkt.cash/)/[The Network Steward](https://pkt.cash/network-steward) and stichting [Technology Commons Trust](https://technologycommons.org/).
 
 ### Community
-Pion has an active community on the [Slack](https://pion.ly/slack) or [Discord](https://discord.gg/PngbdqpFbt).
+Pion has an active community on the [Discord](https://discord.gg/PngbdqpFbt).
 
 Follow the [Pion Twitter](https://twitter.com/_pion) for project updates and important WebRTC news.
 
