@@ -575,21 +575,71 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 
 // If a user attempts to register a codec twice we should just discard duplicate calls.
 func TestMediaEngineDoubleRegister(t *testing.T) {
-	mediaEngine := MediaEngine{}
+	t.Run("Same Codec", func(t *testing.T) {
+		mediaEngine := MediaEngine{}
 
-	assert.NoError(t, mediaEngine.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-			PayloadType:        111,
-		}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
 
-	assert.NoError(t, mediaEngine.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-			PayloadType:        111,
-		}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
 
-	assert.Equal(t, len(mediaEngine.audioCodecs), 1)
+		assert.Equal(t, len(mediaEngine.audioCodecs), 1)
+	})
+
+	t.Run("Case Insensitive Audio Codec", func(t *testing.T) {
+		mediaEngine := MediaEngine{}
+
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{"audio/OPUS", 48000, 0, "", nil},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
+
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{"audio/opus", 48000, 0, "", nil},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
+
+		assert.Equal(t, len(mediaEngine.audioCodecs), 1)
+	})
+
+	t.Run("Case Insensitive Video Codec", func(t *testing.T) {
+		mediaEngine := MediaEngine{}
+
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeRTX), 90000, 0, "", nil},
+				PayloadType:        98,
+			}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "", nil},
+				PayloadType:        98,
+			}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeFlexFEC), 90000, 0, "", nil},
+				PayloadType:        100,
+			}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil},
+				PayloadType:        100,
+			}, RTPCodecTypeVideo))
+		assert.Equal(t, len(mediaEngine.videoCodecs), 2)
+		isRTX := mediaEngine.isRTXEnabled(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+		assert.True(t, isRTX)
+		isFEC := mediaEngine.isFECEnabled(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+		assert.True(t, isFEC)
+	})
 }
 
 // If a user attempts to register a codec with same payload but with different

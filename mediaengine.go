@@ -240,7 +240,7 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParameters) ([]RTPCodecParameters, error) {
 	for _, c := range codecs {
 		if c.PayloadType == codec.PayloadType {
-			if c.MimeType == codec.MimeType &&
+			if strings.EqualFold(c.MimeType, codec.MimeType) &&
 				fmtp.ClockRateEqual(c.MimeType, c.ClockRate, codec.ClockRate) &&
 				fmtp.ChannelsEqual(c.MimeType, c.Channels, codec.Channels) {
 				return codecs, nil
@@ -798,7 +798,7 @@ func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 
 func (m *MediaEngine) isRTXEnabled(typ RTPCodecType, directions []RTPTransceiverDirection) bool {
 	for _, p := range m.getRTPParametersByKind(typ, directions).Codecs {
-		if p.MimeType == MimeTypeRTX {
+		if strings.EqualFold(p.MimeType, MimeTypeRTX) {
 			return true
 		}
 	}
@@ -808,7 +808,7 @@ func (m *MediaEngine) isRTXEnabled(typ RTPCodecType, directions []RTPTransceiver
 
 func (m *MediaEngine) isFECEnabled(typ RTPCodecType, directions []RTPTransceiverDirection) bool {
 	for _, p := range m.getRTPParametersByKind(typ, directions).Codecs {
-		if strings.Contains(p.MimeType, MimeTypeFlexFEC) {
+		if strings.Contains(strings.ToLower(p.MimeType), MimeTypeFlexFEC) {
 			return true
 		}
 	}
