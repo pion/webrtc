@@ -334,6 +334,13 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	pc1, err := api.NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
+	pc1Connected := make(chan struct{})
+	pc1.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			close(pc1Connected)
+		}
+	})
+
 	track1, err := NewTrackLocalStaticRTP(
 		RTPCodecCapability{MimeType: MimeTypeVP8},
 		"video", "pion",
@@ -361,6 +368,8 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 
 	err = pc1.SetRemoteDescription(*pc2.LocalDescription())
 	assert.NoError(t, err)
+
+	<-pc1Connected
 
 	var gotNack bool
 	rtcpDone := make(chan struct{})
@@ -416,7 +425,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 			p.Marker = true
 			p.PayloadType = 96
 			p.SequenceNumber = uint16(i)         //nolint:gosec // G115
-			p.Timestamp = uint32(i * 90000 / 50) ///nolint:gosec // G115
+			p.Timestamp = uint32(i * 90000 / 50) //nolint:gosec // G115
 			p.Payload = []byte{42}
 			err2 := track1.WriteRTP(&p)
 			assert.NoError(t, err2)
