@@ -155,6 +155,17 @@ func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) Paylo
 	return PayloadType(0)
 }
 
+// For now, only FlexFEC is supported.
+func findFECPayloadType(haystack []RTPCodecParameters) PayloadType {
+	for _, c := range haystack {
+		if strings.Contains(c.RTPCodecCapability.MimeType, MimeTypeFlexFEC) {
+			return c.PayloadType
+		}
+	}
+
+	return PayloadType(0)
+}
+
 func rtcpFeedbackIntersection(a, b []RTCPFeedback) (out []RTCPFeedback) {
 	for _, aFeedback := range a {
 		for _, bFeeback := range b {
