@@ -25,7 +25,7 @@ Pion WebRTC v4.0.0 has been released! See the [release notes](https://github.com
 
 If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v3` release.
 
-We would love your feedback! Please create GitHub issues or Join the [ Discord](https://discord.gg/PngbdqpFbt) to follow development and speak with the maintainers.
+We would love your feedback! Please create GitHub issues or Join the [Discord](https://discord.gg/PngbdqpFbt) to follow development and speak with the maintainers.
 
 -----
 
@@ -41,7 +41,7 @@ We would love your feedback! Please create GitHub issues or Join the [ Discord](
 
 **[GoDoc](https://pkg.go.dev/github.com/pion/webrtc/v4)** is an auto generated API reference. All our Public APIs are commented.
 
-**[FAQ](https://github.com/pion/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in  [Discord](https://discord.gg/PngbdqpFbt) we are always looking to expand it.
+**[FAQ](https://github.com/pion/webrtc/wiki/FAQ)** has answers to common questions. If you have a question not covered please ask in [Discord](https://discord.gg/PngbdqpFbt) we are always looking to expand it.
 
 Now go build something awesome! Here are some **ideas** to get your creative juices flowing:
 * Send a video file to multiple browser in real time for perfectly synchronized movie watching.
@@ -127,7 +127,7 @@ Work on Pion's congestion control and bandwidth estimation was funded through th
 ### Community
 Pion has an active community on the [Discord](https://discord.gg/PngbdqpFbt).
 
-Follow the [Pion Twitter](https://twitter.com/_pion) for project updates and important WebRTC news.
+Follow the [Pion Bluesky](https://bsky.app/profile/pion.ly) or [Pion Twitter](https://twitter.com/_pion) for project updates and important WebRTC news.
 
 We are always looking to support **your projects**. Please reach out if you have something to build!
 If you need commercial support or don't want to use public methods you can contact us at [team@pion.ly](mailto:team@pion.ly)
