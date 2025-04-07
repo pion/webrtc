@@ -358,10 +358,9 @@ func (m *MediaEngine) copy() *MediaEngine {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cloned := &MediaEngine{
-		videoCodecs:          append([]RTPCodecParameters{}, m.videoCodecs...),
-		audioCodecs:          append([]RTPCodecParameters{}, m.audioCodecs...),
-		headerExtensions:     append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
-		negotiateMultiCodecs: m.negotiateMultiCodecs,
+		videoCodecs:      append([]RTPCodecParameters{}, m.videoCodecs...),
+		audioCodecs:      append([]RTPCodecParameters{}, m.audioCodecs...),
+		headerExtensions: append([]mediaEngineHeaderExtension{}, m.headerExtensions...),
 	}
 	if len(m.headerExtensions) > 0 {
 		cloned.negotiatedHeaderExtensions = map[int]mediaEngineHeaderExtension{}
