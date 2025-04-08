@@ -650,8 +650,8 @@ func TestDetachRemovesDatachannelReference(t *testing.T) {
 	dcChan := make(chan *DataChannel, 1)
 	pcb.OnDataChannel(func(d *DataChannel) {
 		d.OnOpen(func() {
-			_, err = d.Detach()
-			assert.NoError(t, err)
+			_, detachErr := d.Detach()
+			assert.NoError(t, detachErr)
 
 			dcChan <- d
 		})
