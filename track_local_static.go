@@ -213,10 +213,11 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP.
 type TrackLocalStaticSample struct {
-	packetizer rtp.Packetizer
-	sequencer  rtp.Sequencer
-	rtpTrack   *TrackLocalStaticRTP
-	clockRate  float64
+	packetizer    rtp.Packetizer
+	sequencer     rtp.Sequencer
+	rtpTrack      *TrackLocalStaticRTP
+	clockRate     float64
+	lastTimestamp uint32
 }
 
 // NewTrackLocalStaticSample returns a TrackLocalStaticSample.
@@ -280,14 +281,17 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 	if err != nil {
 		return codec, err
 	}
+	if s.sequencer == nil {
+		s.sequencer = rtp.NewRandomSequencer()
+	}
 
-	s.sequencer = rtp.NewRandomSequencer()
 	s.packetizer = rtp.NewPacketizer(
 		rtpOutboundMTU,
 		0, // Value is handled when writing
 		0, // Value is handled when writing
 		payloader,
 		s.sequencer,
+		s.lastTimestamp,
 		codec.ClockRate,
 	)
 	s.clockRate = float64(codec.RTPCodecCapability.ClockRate)
@@ -299,6 +303,22 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 // because a track has been stopped.
 func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 	return s.rtpTrack.Unbind(t)
+}
+
+func (s *TrackLocalStaticSample) SetSequencer(sequencer rtp.Sequencer) {
+	s.sequencer = sequencer
+}
+
+func (s *TrackLocalStaticSample) GetSequencer() rtp.Sequencer {
+	return s.sequencer
+}
+
+func (s *TrackLocalStaticSample) SetTimestamp(ts uint32) {
+	s.lastTimestamp = ts
+}
+
+func (s *TrackLocalStaticSample) GetTimestamp() uint32 {
+	return s.lastTimestamp
 }
 
 // WriteSample writes a Sample to the TrackLocalStaticSample

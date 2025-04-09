@@ -519,10 +519,12 @@ func addTransceiverSDP(
 			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
 		}
 	}
-	if len(codecs) == 0 {
+	if len(codecs) == 0 || mediaSection.rejected {
 		// If we are sender and we have no codecs throw an error early
 		if transceiver.Sender() != nil {
-			return false, ErrSenderWithNoCodecs
+			if !mediaSection.rejected {
+				return false, ErrSenderWithNoCodecs
+			}
 		}
 
 		// Explicitly reject track if we don't have the codec
@@ -546,9 +548,14 @@ func addTransceiverSDP(
 					Address: "0.0.0.0",
 				},
 			},
+			Attributes: []sdp.Attribute{
+				{Key: RTPTransceiverDirectionInactive.String(), Value: ""},
+				{Key: "mid", Value: midValue},
+			},
 		})
 
 		return false, nil
+
 	}
 
 	directions := []RTPTransceiverDirection{}
@@ -619,6 +626,7 @@ type mediaSection struct {
 	data            bool
 	matchExtensions map[string]int
 	rids            []*simulcastRid
+	rejected        bool
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {

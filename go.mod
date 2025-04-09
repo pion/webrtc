@@ -1,6 +1,10 @@
 module github.com/pion/webrtc/v4
 
-go 1.20
+go 1.22.0
+
+toolchain go1.22.6
+
+replace github.com/pion/rtp => github.com/aginetwork7/rtp v1.0.0-alpha.0
 
 require (
 	github.com/pion/datachannel v1.5.10
@@ -25,7 +29,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/onsi/gomega v1.17.0 // indirect
+	github.com/onsi/gomega v1.36.2 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
