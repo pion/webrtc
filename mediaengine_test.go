@@ -954,8 +954,8 @@ a=ssrc:4281768245 msid:6ff05509-be96-4ef1-a74f-425e14720983 16d5d7fe-d076-4718-9
 	})
 	t.Run("Multi codec negotiation enabled", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
-		mediaEngine.SetMultiCodecNegotiation(true)
-		assert.True(t, mediaEngine.MultiCodecNegotiation())
+		mediaEngine.setMultiCodecNegotiation(true)
+		assert.True(t, mediaEngine.multiCodecNegotiation())
 		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(offerSdp)))
 		assert.Len(t, mediaEngine.negotiatedVideoCodecs, 2)
