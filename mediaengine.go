@@ -44,16 +44,16 @@ type MediaEngine struct {
 	mu sync.RWMutex
 }
 
-// SetMultiCodecNegotiation enables or disables the negotiation of multiple codecs.
-func (m *MediaEngine) SetMultiCodecNegotiation(negotiateMultiCodecs bool) {
+// setMultiCodecNegotiation enables or disables the negotiation of multiple codecs.
+func (m *MediaEngine) setMultiCodecNegotiation(negotiateMultiCodecs bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.negotiateMultiCodecs = negotiateMultiCodecs
 }
 
-// MultiCodecNegotiation returns the current state of the negotiation of multiple codecs.
-func (m *MediaEngine) MultiCodecNegotiation() bool {
+// multiCodecNegotiation returns the current state of the negotiation of multiple codecs.
+func (m *MediaEngine) multiCodecNegotiation() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
