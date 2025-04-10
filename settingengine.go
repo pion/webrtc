@@ -397,11 +397,12 @@ func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 	e.disableMediaEngineCopy = isDisabled
 }
 
-// EnableMediaEngineMultipleCodecs allow the MediaEngine to negotiate different codecs for
-// multiple media sections in the SDP. This is actually spec compliant behavior, but not how
-// Pion used to negotiate things so far without this setting. The value of this setting will
-// get copied to every copy of the MediaEngine generated for new PeerConnections (assuming
-// DisableMediaEngineCopy is set to false).
+// DisableMediaEngineMultipleCodecs disables the MediaEngine negotiating different codecs for
+// multiple media sections in the SDP. This is the new default behvior, because it makes
+// Pion more spec compliant. The value of this setting will get copied to every copy of the
+// MediaEngine generated for new PeerConnections (assuming DisableMediaEngineCopy is set to
+// false).
+// Note: this setting is targeted to be removed in release 4.2.0 (or later)
 func (e *SettingEngine) DisableMediaEngineMultipleCodecs(enable bool) {
 	e.disableMediaEngineMultipleCodecs = enable
 }
