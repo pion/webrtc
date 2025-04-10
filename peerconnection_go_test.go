@@ -15,6 +15,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math/big"
+	"net"
 	"regexp"
 	"strings"
 	"sync"
@@ -1839,4 +1840,79 @@ func Test_WriteRTCP_Disconnected(t *testing.T) {
 	)
 
 	assert.NoError(t, peerConnection.Close())
+}
+
+func Test_IPv6(t *testing.T) { //nolint: cyclop
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		t.Skip()
+	}
+
+	IPv6Supported := false
+	for _, iface := range interfaces {
+		addrs, netErr := iface.Addrs()
+		if netErr != nil {
+			continue
+		}
+
+		// Loop over the addresses for the interface.
+		for _, addr := range addrs {
+			var ip net.IP
+
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if ip == nil || ip.To4() != nil || ip.IsLinkLocalUnicast() || ip.IsLoopback() {
+				continue
+			}
+
+			IPv6Supported = true
+		}
+	}
+
+	if !IPv6Supported {
+		t.Skip()
+	}
+
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	settingEngine := SettingEngine{}
+	settingEngine.SetNetworkTypes([]NetworkType{NetworkTypeUDP6})
+
+	offerPC, answerPC, err := NewAPI(WithSettingEngine(settingEngine)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	peerConnectionConnected.Wait()
+
+	offererSelectedPair, err := offerPC.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.NotNil(t, offererSelectedPair)
+
+	answererSelectedPair, err := answerPC.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
+	assert.NoError(t, err)
+	assert.NotNil(t, answererSelectedPair)
+
+	for _, c := range []*ICECandidate{
+		answererSelectedPair.Local,
+		answererSelectedPair.Remote,
+		offererSelectedPair.Local,
+		offererSelectedPair.Remote,
+	} {
+		iceCandidate, err := c.ToICE()
+		assert.NoError(t, err)
+		assert.Equal(t, iceCandidate.NetworkType(), ice.NetworkTypeUDP6)
+	}
+
+	closePairNow(t, offerPC, answerPC)
 }
