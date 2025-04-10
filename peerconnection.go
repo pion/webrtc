@@ -2053,7 +2053,7 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		// But that will cause sdp inflate. So we only check currentDirection's current value,
 		// that's worked for all browsers.
 		if transceiver.kind == track.Kind() && transceiver.Sender() == nil &&
-			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
+			currentDirection != RTPTransceiverDirectionSendrecv && currentDirection != RTPTransceiverDirectionSendonly {
 			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 			if err == nil {
 				err = transceiver.SetSender(sender, track)
