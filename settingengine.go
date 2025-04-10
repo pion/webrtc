@@ -99,7 +99,7 @@ type SettingEngine struct {
 	iceDisableActiveTCP                       bool
 	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool //nolint:lll
 	disableMediaEngineCopy                    bool
-	enableMediaEngineMultipleCodecs           bool
+	disableMediaEngineMultipleCodecs          bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
@@ -402,8 +402,8 @@ func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 // Pion used to negotiate things so far without this setting. The value of this setting will
 // get copied to every copy of the MediaEngine generated for new PeerConnections (assuming
 // DisableMediaEngineCopy is set to false).
-func (e *SettingEngine) EnableMediaEngineMultipleCodecs(enable bool) {
-	e.enableMediaEngineMultipleCodecs = enable
+func (e *SettingEngine) DisableMediaEngineMultipleCodecs(enable bool) {
+	e.disableMediaEngineMultipleCodecs = enable
 }
 
 // SetReceiveMTU sets the size of read buffer that copies incoming packets. This is optional.
