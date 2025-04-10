@@ -355,7 +355,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			parameters.Encodings[idx].FEC.SSRC,
 			codec.PayloadType,
 			findRTXPayloadType(codec.PayloadType, rtpParameters.Codecs),
-			0,
+			findFECPayloadType(rtpParameters.Codecs),
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
 		)
