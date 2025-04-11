@@ -403,8 +403,8 @@ func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 // MediaEngine generated for new PeerConnections (assuming DisableMediaEngineCopy is set to
 // false).
 // Note: this setting is targeted to be removed in release 4.2.0 (or later)
-func (e *SettingEngine) DisableMediaEngineMultipleCodecs(enable bool) {
-	e.disableMediaEngineMultipleCodecs = enable
+func (e *SettingEngine) DisableMediaEngineMultipleCodecs(isDisabled bool) {
+	e.disableMediaEngineMultipleCodecs = isDisabled
 }
 
 // SetReceiveMTU sets the size of read buffer that copies incoming packets. This is optional.
