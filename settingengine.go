@@ -99,6 +99,7 @@ type SettingEngine struct {
 	iceDisableActiveTCP                       bool
 	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool //nolint:lll
 	disableMediaEngineCopy                    bool
+	disableMediaEngineMultipleCodecs          bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
@@ -394,6 +395,16 @@ func (e *SettingEngine) DisableActiveTCP(isDisabled bool) {
 // modify codecs after signaling. Make sure not to share MediaEngines between PeerConnections.
 func (e *SettingEngine) DisableMediaEngineCopy(isDisabled bool) {
 	e.disableMediaEngineCopy = isDisabled
+}
+
+// DisableMediaEngineMultipleCodecs disables the MediaEngine negotiating different codecs for
+// multiple media sections in the SDP. This is the new default behvior, because it makes
+// Pion more spec compliant. The value of this setting will get copied to every copy of the
+// MediaEngine generated for new PeerConnections (assuming DisableMediaEngineCopy is set to
+// false).
+// Note: this setting is targeted to be removed in release 4.2.0 (or later)
+func (e *SettingEngine) DisableMediaEngineMultipleCodecs(isDisabled bool) {
+	e.disableMediaEngineMultipleCodecs = isDisabled
 }
 
 // SetReceiveMTU sets the size of read buffer that copies incoming packets. This is optional.

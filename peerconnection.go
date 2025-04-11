@@ -156,6 +156,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		pc.api.mediaEngine = api.mediaEngine
 	} else {
 		pc.api.mediaEngine = api.mediaEngine.copy()
+		pc.api.mediaEngine.setMultiCodecNegotiation(!api.settingEngine.disableMediaEngineMultipleCodecs)
 	}
 
 	if err = pc.initConfiguration(configuration); err != nil {
