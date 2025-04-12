@@ -2880,6 +2880,9 @@ func (pc *PeerConnection) generateMatchedSDP(
 		}
 	}
 
+	pc.sctpTransport.lock.Lock()
+	defer pc.sctpTransport.lock.Unlock()
+
 	var bundleGroup *string
 	// If we are offering also include unmatched local transceivers
 	if includeUnmatched { //nolint:nestif
