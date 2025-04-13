@@ -961,3 +961,158 @@ a=ssrc:4281768245 msid:6ff05509-be96-4ef1-a74f-425e14720983 16d5d7fe-d076-4718-9
 		assert.Len(t, mediaEngine.negotiatedVideoCodecs, 2)
 	})
 }
+
+func TestAutoConfigRTXCodecs(t *testing.T) {
+	for _, test := range []struct {
+		Original       []RTPCodecParameters
+		ExpectedResult []RTPCodecParameters
+		ExpectedError  error
+	}{
+		{
+			// no video codec
+			Original: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:     MimeTypeFlexFEC03,
+						ClockRate:    90000,
+						Channels:     0,
+						SDPFmtpLine:  "repair-window=10000000",
+						RTCPFeedback: nil,
+					},
+				},
+			},
+			ExpectedResult: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:     MimeTypeFlexFEC03,
+						ClockRate:    90000,
+						Channels:     0,
+						SDPFmtpLine:  "repair-window=10000000",
+						RTCPFeedback: nil,
+					},
+				},
+			},
+			ExpectedError: nil,
+		},
+		{
+			// one video codec with no nack rtcp feedback
+			Original: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:     MimeTypeH265,
+						ClockRate:    90000,
+						Channels:     0,
+						SDPFmtpLine:  "",
+						RTCPFeedback: nil,
+					},
+				},
+			},
+			ExpectedResult: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:     MimeTypeH265,
+						ClockRate:    90000,
+						Channels:     0,
+						SDPFmtpLine:  "",
+						RTCPFeedback: nil,
+					},
+				},
+			},
+			ExpectedError: nil,
+		},
+		{
+			// one video codec with nack and pli rtcp feedback
+			Original: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:    MimeTypeH265,
+						ClockRate:   90000,
+						Channels:    0,
+						SDPFmtpLine: "",
+						RTCPFeedback: []RTCPFeedback{
+							{Type: "nack", Parameter: ""},
+							{Type: "nack", Parameter: "pli"},
+						},
+					},
+				},
+			},
+			ExpectedResult: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:    MimeTypeH265,
+						ClockRate:   90000,
+						Channels:    0,
+						SDPFmtpLine: "",
+						RTCPFeedback: []RTCPFeedback{
+							{Type: "nack", Parameter: ""},
+							{Type: "nack", Parameter: "pli"},
+						},
+					},
+				},
+				{
+					PayloadType: 2,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:     MimeTypeRTX,
+						ClockRate:    90000,
+						Channels:     0,
+						SDPFmtpLine:  "apt=1",
+						RTCPFeedback: nil,
+					},
+				},
+			},
+			ExpectedError: nil,
+		},
+		{
+			// multiple video codec, expect error because of PayloadType collision
+			Original: []RTPCodecParameters{
+				{
+					PayloadType: 1,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:    MimeTypeH265,
+						ClockRate:   90000,
+						Channels:    0,
+						SDPFmtpLine: "",
+						RTCPFeedback: []RTCPFeedback{
+							{Type: "nack", Parameter: ""},
+							{Type: "nack", Parameter: "pli"},
+						},
+					},
+				},
+				{
+					PayloadType: 2,
+					RTPCodecCapability: RTPCodecCapability{
+						MimeType:    MimeTypeVP8,
+						ClockRate:   90000,
+						Channels:    0,
+						SDPFmtpLine: "",
+						RTCPFeedback: []RTCPFeedback{
+							{Type: "nack", Parameter: ""},
+							{Type: "nack", Parameter: "pli"},
+						},
+					},
+				},
+			},
+			ExpectedResult: nil,
+			ExpectedError:  ErrCodecAlreadyRegistered,
+		},
+	} {
+		m := &MediaEngine{
+			videoCodecs: test.Original,
+		}
+		err := m.autoConfigRTXCodecs()
+		assert.Equal(t, err, test.ExpectedError)
+		if err == nil {
+			for i := range m.videoCodecs {
+				// ignore for following assert
+				m.videoCodecs[i].statsID = ""
+			}
+			assert.Equal(t, m.videoCodecs, test.ExpectedResult)
+		}
+	}
+}
