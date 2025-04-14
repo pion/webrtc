@@ -245,6 +245,44 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	return err
 }
 
+func (m *MediaEngine) autoConfigRTXCodecs() error {
+	additionalRTXCodecs := []RTPCodecParameters{}
+	for _, codec := range m.videoCodecs {
+		// ignore FEC & RTX
+		if strings.Contains(codec.MimeType, MimeTypeFlexFEC) || codec.MimeType == MimeTypeRTX {
+			continue
+		}
+		haveNACK := false
+		for _, fb := range codec.RTCPFeedback {
+			if fb.Type == "nack" {
+				haveNACK = true
+
+				break
+			}
+		}
+		if haveNACK {
+			additionalRTXCodecs = append(additionalRTXCodecs, RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{
+					MimeType:     MimeTypeRTX,
+					ClockRate:    90000,
+					Channels:     0,
+					SDPFmtpLine:  fmt.Sprintf("apt=%d", codec.PayloadType),
+					RTCPFeedback: nil,
+				},
+				PayloadType: codec.PayloadType + 1,
+			})
+		}
+	}
+	for i := range additionalRTXCodecs {
+		err := m.RegisterCodec(additionalRTXCodecs[i], RTPCodecTypeVideo)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // RegisterHeaderExtension adds a header extension to the MediaEngine
 // To determine the negotiated value use `GetHeaderExtensionID` after signaling is complete.
 //
