@@ -135,7 +135,7 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
-	if rtxPacketReceived := receiver.readRTX(t); rtxPacketReceived != nil {
+	if rtxPacketReceived := receiver.readRTX(b, t); rtxPacketReceived != nil {
 		n = copy(b, rtxPacketReceived.pkt)
 		attributes = rtxPacketReceived.attributes
 		rtxPacketReceived.release()
