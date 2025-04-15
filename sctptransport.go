@@ -430,3 +430,14 @@ func (r *SCTPTransport) association() *sctp.Association {
 
 	return association
 }
+
+// BufferedAmount returns total amount (in bytes) of currently buffered user data.
+func (r *SCTPTransport) BufferedAmount() int {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.sctpAssociation == nil {
+		return 0
+	}
+
+	return r.sctpAssociation.BufferedAmount()
+}
