@@ -10,7 +10,7 @@ type OfferAnswerOptions struct {
 	// about whether it wishes voice detection feature to be enabled or disabled.
 	VoiceActivityDetection bool
 	// ICETricklingSupported indicates whether the ICE agent should use trickle ICE
-	// If set, the "a=ice-options:trickle ice2" attribute is added to the generated SDP payload.
+	// If set, the "a=ice-options:trickle" attribute is added to the generated SDP payload.
 	// (See https://datatracker.ietf.org/doc/html/rfc9725#section-4.3.3)
 	ICETricklingSupported bool
 }
