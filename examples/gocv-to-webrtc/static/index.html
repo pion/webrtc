@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>GoCV + FFmpeg + Pion WebRTC</title>
+  </head>
+  <body>
+    <h2>GoCV + WebRTC Demo</h2>
+    <button id="btnStart">Start Session</button>
+
+    <h3>Remote Video</h3>
+    <div id="remoteVideos"></div>
+
+    <h3>Logs</h3>
+    <div id="log"></div>
+
+    <script>
+      const logDiv = document.getElementById("log");
+      function log(msg) {
+        logDiv.innerHTML += msg + "<br>";
+      }
+
+      document.getElementById("btnStart").onclick = async () => {
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+
+        pc.oniceconnectionstatechange = () => {
+          log("ICE state: " + pc.iceConnectionState);
+        };
+
+        // When the server sends a video track, display it
+        pc.ontrack = (event) => {
+          const el = document.createElement(event.track.kind);
+          el.srcObject = event.streams[0];
+          el.autoplay = true;
+          el.controls = true;
+          document.getElementById("remoteVideos").appendChild(el);
+        };
+
+        // We want to receive (only) a video track from the server
+        pc.addTransceiver("video", { direction: "recvonly" });
+
+        // 1) Create an offer
+        log("Creating offer...");
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // 2) Wait for ICE gathering to finish
+        await new Promise((resolve) => {
+          if (pc.iceGatheringState === "complete") {
+            resolve();
+          } else {
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === "complete") {
+                resolve();
+              }
+            };
+          }
+        });
+
+        // 3) POST the offer to the server
+        log("Sending offer to server...");
+        const resp = await fetch("/offer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pc.localDescription),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error("Error from server: " + errText);
+        }
+
+        // 4) Get the server's answer and set it
+        const answer = await resp.json();
+        log("Received answer, setting remote description...");
+        await pc.setRemoteDescription(answer);
+
+        log("WebRTC negotiation complete! Waiting for remote video...");
+      };
+    </script>
+  </body>
+</html>
