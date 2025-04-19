@@ -53,8 +53,6 @@ func main() {
 	// Create a MediaEngine object to configure the supported codec
 	mediaEngine := &webrtc.MediaEngine{}
 
-	// Setup the codecs you want to use.
-	// We'll use a VP8 and Opus but you can also define your own
 	if err := mediaEngine.RegisterCodec(webrtc.RTPCodecParameters{
 		RTPCodecCapability: webrtc.RTPCodecCapability{
 			MimeType:     webrtc.MimeTypeAV1,
