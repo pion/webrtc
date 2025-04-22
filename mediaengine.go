@@ -174,8 +174,8 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 		},
 		{
 			RTPCodecCapability: RTPCodecCapability{
-				MimeType:  MimeTypeH265,
-				ClockRate: 90000,
+				MimeType:     MimeTypeH265,
+				ClockRate:    90000,
 				RTCPFeedback: videoRTCPFeedback,
 			},
 			PayloadType: 116,
