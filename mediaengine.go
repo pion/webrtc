@@ -173,6 +173,14 @@ func (m *MediaEngine) RegisterDefaultCodecs() error {
 			PayloadType: 39,
 		},
 		{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeType:  MimeTypeH265,
+				ClockRate: 90000,
+				RTCPFeedback: videoRTCPFeedback,
+			},
+			PayloadType: 116,
+		},
+		{
 			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=39", nil},
 			PayloadType:        40,
 		},
