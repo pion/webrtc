@@ -6,6 +6,6 @@ Files: README.md DESIGN.md **/README.md AUTHORS.txt renovate.json go.mod go.sum 
 Copyright: 2023 The Pion community <https://pion.ly>
 License: MIT
 
-Files: testdata/fuzz/* **/testdata/fuzz/* api/*.txt
+Files: testdata/seed/* testdata/fuzz/* **/testdata/fuzz/* api/*.txt
 Copyright: 2023 The Pion community <https://pion.ly>
 License: CC0-1.0

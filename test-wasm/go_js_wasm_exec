@@ -18,8 +18,8 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-NODE_WASM_EXEC="$(go env GOROOT)/misc/wasm/wasm_exec_node.js"
-WASM_EXEC="$(go env GOROOT)/misc/wasm/wasm_exec.js"
+NODE_WASM_EXEC="$(go env GOROOT)/lib/wasm/wasm_exec_node.js"
+WASM_EXEC="$(go env GOROOT)/lib/wasm/wasm_exec.js"
 
 if test -f "$NODE_WASM_EXEC"; then
 	exec node --require="${DIR}/node_shim.js" "$NODE_WASM_EXEC" "$@"
