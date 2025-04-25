@@ -120,6 +120,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		RTOMax:               float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond),
 		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
 		MaxMessageSize:       maxMessageSize,
+		MTU:                  outboundMTU,
 	})
 	if err != nil {
 		return err
