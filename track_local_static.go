@@ -283,7 +283,7 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 
 	s.sequencer = rtp.NewRandomSequencer()
 	s.packetizer = rtp.NewPacketizer(
-		rtpOutboundMTU,
+		outboundMTU,
 		0, // Value is handled when writing
 		0, // Value is handled when writing
 		payloader,
