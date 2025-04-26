@@ -33,6 +33,7 @@ type TrackLocalStaticRTP struct {
 	codec             RTPCodecCapability
 	payloader         func(RTPCodecCapability) (rtp.Payloader, error)
 	id, rid, streamID string
+	rtpTimestamp      *uint32
 }
 
 // NewTrackLocalStaticRTP returns a TrackLocalStaticRTP.
@@ -66,6 +67,13 @@ func WithRTPStreamID(rid string) func(*TrackLocalStaticRTP) {
 func WithPayloader(h func(RTPCodecCapability) (rtp.Payloader, error)) func(*TrackLocalStaticRTP) {
 	return func(s *TrackLocalStaticRTP) {
 		s.payloader = h
+	}
+}
+
+// WithRTPTimestamp set the initial RTP timestamp for the track.
+func WithRTPTimestamp(timestamp uint32) func(*TrackLocalStaticRTP) {
+	return func(s *TrackLocalStaticRTP) {
+		s.rtpTimestamp = &timestamp
 	}
 }
 
@@ -282,14 +290,21 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 	}
 
 	s.sequencer = rtp.NewRandomSequencer()
-	s.packetizer = rtp.NewPacketizer(
+
+	options := []rtp.PacketizerOption{}
+
+	if s.rtpTrack.rtpTimestamp != nil {
+		options = append(options, rtp.WithTimestamp(*s.rtpTrack.rtpTimestamp))
+	}
+
+	s.packetizer = rtp.NewPacketizerWithOptions(
 		outboundMTU,
-		0, // Value is handled when writing
-		0, // Value is handled when writing
 		payloader,
 		s.sequencer,
 		codec.ClockRate,
+		options...,
 	)
+
 	s.clockRate = float64(codec.RTPCodecCapability.ClockRate)
 
 	return codec, nil
