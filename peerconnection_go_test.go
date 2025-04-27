@@ -24,6 +24,7 @@ import (
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/ice/v4"
+	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
@@ -1915,4 +1916,92 @@ func Test_IPv6(t *testing.T) { //nolint: cyclop
 	}
 
 	closePairNow(t, offerPC, answerPC)
+}
+
+type testICELogger struct {
+	lastErrorMessage string
+}
+
+func (t *testICELogger) Trace(string)                  {}
+func (t *testICELogger) Tracef(string, ...interface{}) {}
+func (t *testICELogger) Debug(string)                  {}
+func (t *testICELogger) Debugf(string, ...interface{}) {}
+func (t *testICELogger) Info(string)                   {}
+func (t *testICELogger) Infof(string, ...interface{})  {}
+func (t *testICELogger) Warn(string)                   {}
+func (t *testICELogger) Warnf(string, ...interface{})  {}
+func (t *testICELogger) Error(msg string)              { t.lastErrorMessage = msg }
+func (t *testICELogger) Errorf(format string, args ...interface{}) {
+	t.lastErrorMessage = fmt.Sprintf(format, args...)
+}
+
+type testICELoggerFactory struct {
+	logger *testICELogger
+}
+
+func (t *testICELoggerFactory) NewLogger(string) logging.LeveledLogger {
+	return t.logger
+}
+
+func TestAddICECandidate__DroppingOldGenerationCandidates(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	testLogger := &testICELogger{}
+	loggerFactory := &testICELoggerFactory{logger: testLogger}
+
+	// Create a new API with the custom logger
+	api := NewAPI(WithSettingEngine(SettingEngine{
+		LoggerFactory: loggerFactory,
+	}))
+
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.CreateDataChannel("test", nil)
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	offerGatheringComplete := GatheringCompletePromise(pc)
+	assert.NoError(t, pc.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	remotePC, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NoError(t, remotePC.SetRemoteDescription(offer))
+
+	remoteDesc := remotePC.RemoteDescription()
+	assert.NotNil(t, remoteDesc)
+
+	ufrag, hasUfrag := remoteDesc.parsed.MediaDescriptions[0].Attribute("ice-ufrag")
+	assert.True(t, hasUfrag)
+
+	emptyUfragCandidate := ICECandidateInit{
+		Candidate: "candidate:1 1 UDP 2122252543 192.168.1.1 12345 typ host",
+	}
+	err = remotePC.AddICECandidate(emptyUfragCandidate)
+	assert.NoError(t, err)
+	assert.Empty(t, testLogger.lastErrorMessage)
+
+	validCandidate := ICECandidateInit{
+		Candidate: fmt.Sprintf("candidate:1 1 UDP 2122252543 192.168.1.1 12345 typ host ufrag %s", ufrag),
+	}
+	err = remotePC.AddICECandidate(validCandidate)
+	assert.NoError(t, err)
+	assert.Empty(t, testLogger.lastErrorMessage)
+
+	invalidCandidate := ICECandidateInit{
+		Candidate: "candidate:1 1 UDP 2122252543 192.168.1.1 12345 typ host ufrag invalid",
+	}
+	err = remotePC.AddICECandidate(invalidCandidate)
+	assert.NoError(t, err)
+	assert.Contains(t, testLogger.lastErrorMessage, "dropping candidate with ufrag")
+
+	closePairNow(t, pc, remotePC)
 }

@@ -1962,33 +1962,65 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates.
 func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
-	if pc.RemoteDescription() == nil {
+	remoteDesc := pc.RemoteDescription()
+	if remoteDesc == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
 
-	var iceCandidate *ICECandidate
-	if candidateValue != "" {
-		candidate, err := ice.UnmarshalCandidate(candidateValue)
-		if err != nil {
-			if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
-				pc.log.Warnf("Discarding remote candidate: %s", err)
-
-				return nil
-			}
-
-			return err
-		}
-
-		c, err := newICECandidateFromICE(candidate, "", 0)
-		if err != nil {
-			return err
-		}
-		iceCandidate = &c
+	if candidateValue == "" {
+		return pc.iceTransport.AddRemoteCandidate(nil)
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(iceCandidate)
+	cand, err := ice.UnmarshalCandidate(candidateValue)
+	if err != nil {
+		if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
+			pc.log.Warnf("Discarding remote candidate: %s", err)
+
+			return nil
+		}
+
+		return err
+	}
+
+	// Reject candidates from old generations.
+	// If candidate.usernameFragment is not null,
+	// and is not equal to any username fragment present in the corresponding media
+	//  description of an applied remote description,
+	// return a promise rejected with a newly created OperationError.
+	// https://w3c.github.io/webrtc-pc/#dom-peerconnection-addicecandidate
+	if ufrag, ok := cand.GetExtension("ufrag"); ok {
+		if !pc.descriptionContainsUfrag(remoteDesc.parsed, ufrag.Value) {
+			pc.log.Errorf("dropping candidate with ufrag %s because it doesn't match the current ufrags", ufrag.Value)
+
+			return nil
+		}
+	}
+
+	c, err := newICECandidateFromICE(cand, "", 0)
+	if err != nil {
+		return err
+	}
+
+	return pc.iceTransport.AddRemoteCandidate(&c)
+}
+
+// Return true if the sdp contains a specific ufrag.
+func (pc *PeerConnection) descriptionContainsUfrag(sdp *sdp.SessionDescription, matchUfrag string) bool {
+	ufrag, ok := sdp.Attribute("ice-ufrag")
+	if ok && ufrag == matchUfrag {
+		return true
+	}
+
+	for _, media := range sdp.MediaDescriptions {
+		ufrag, ok := media.Attribute("ice-ufrag")
+		if ok && ufrag == matchUfrag {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ICEConnectionState returns the ICE connection state of the
