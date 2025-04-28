@@ -1,0 +1,97 @@
+<html>
+
+  <!--
+		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+  <head>
+    <title>whip-whep</title>
+  </head>
+
+  <body>
+    <button onclick="window.doWHIP()">Publish</button>
+    <button onclick="window.doWHEP()">Subscribe</button>
+    <br />
+Message<br />
+<textarea id="message">This is my DataChannel message!</textarea> <br/>
+<button onclick="window.sendMessage()">Send Message</button> <br />
+    <h3> Logs </h3>
+    <div id="logs"></div>
+
+
+    <h3> ICE Connection States </h3>
+    <div id="iceConnectionStates"></div> <br />
+  </body>
+
+  <script>
+    const log = msg => {
+      document.getElementById('logs').innerHTML += msg + '<br>'
+    }
+
+    let peerConnection = new RTCPeerConnection()
+
+    const sendChannel = peerConnection.createDataChannel('foo')
+    sendChannel.onclose = () => console.log('sendChannel has closed')
+    sendChannel.onopen = () => console.log('sendChannel has opened')
+    sendChannel.onmessage = e => log(`From ${e.data}`)
+
+    peerConnection.oniceconnectionstatechange = () => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(peerConnection.iceConnectionState))
+
+      document.getElementById('iceConnectionStates').appendChild(el);
+    }
+
+    window.doWHEP = () => {
+
+      peerConnection.createOffer().then(offer => {
+        peerConnection.setLocalDescription(offer)
+
+        fetch(`/whep`, {
+          method: 'POST',
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer none`,
+            'Content-Type': 'application/sdp'
+          }
+        }).then(r => r.text())
+          .then(answer => {
+            peerConnection.setRemoteDescription({
+              sdp: answer,
+              type: 'answer'
+            })
+          })
+      })
+    }
+
+    window.doWHIP = () => {
+          peerConnection.createOffer().then(offer => {
+            peerConnection.setLocalDescription(offer)
+
+            fetch(`/whip`, {
+              method: 'POST',
+              body: offer.sdp,
+              headers: {
+                Authorization: `Bearer none`,
+                'Content-Type': 'application/sdp'
+              }
+            }).then(r => r.text())
+              .then(answer => {
+                peerConnection.setRemoteDescription({
+                  sdp: answer,
+                  type: 'answer'
+                })
+              })
+          })
+    }
+
+    window.sendMessage = () => {
+      const message = document.getElementById('message').value
+      if (message === '') {
+        return alert('Message must not be empty')
+      }
+
+      sendChannel.send(message)
+    }
+  </script>
+</html>
