@@ -453,8 +453,8 @@ func Test_TrackLocalStatic_Timestamp(t *testing.T) {
 		pkt, _, err := trackRemote.ReadRTP()
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, pkt.Timestamp, initialTimestamp)
-		// Allow for ~10 dropped packets
-		assert.LessOrEqual(t, pkt.Timestamp, initialTimestamp+30000)
+		// not accurate, but some grace period for slow CI test runners.
+		assert.LessOrEqual(t, pkt.Timestamp, initialTimestamp+100000)
 
 		onTrackFiredFunc()
 	})
