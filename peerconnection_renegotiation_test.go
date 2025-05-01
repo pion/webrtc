@@ -34,7 +34,7 @@ func sendVideoUntilDone(t *testing.T, done <-chan struct{}, tracks []*TrackLocal
 		select {
 		case <-time.After(20 * time.Millisecond):
 			for _, track := range tracks {
-				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
+				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: 20 * time.Millisecond}))
 			}
 		case <-done:
 			return
