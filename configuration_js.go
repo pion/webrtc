@@ -36,4 +36,6 @@ type Configuration struct {
 
 	// ICECandidatePoolSize describes the size of the prefetched ICE pool.
 	ICECandidatePoolSize uint8
+
+	Certificates []Certificate `json:"certificates,omitempty"`
 }
