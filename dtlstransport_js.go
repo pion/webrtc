@@ -34,3 +34,32 @@ func (r *DTLSTransport) ICETransport() *ICETransport {
 		underlying: underlying,
 	}
 }
+
+func (t *DTLSTransport) GetRemoteCertificate() []byte {
+	if t.underlying.IsNull() || t.underlying.IsUndefined() {
+		return nil
+	}
+
+	// Firefox does not support getRemoteCertificates: https://bugzilla.mozilla.org/show_bug.cgi?id=1805446
+	jsGet := t.underlying.Get("getRemoteCertificates")
+	if jsGet.IsUndefined() || jsGet.IsNull() {
+		return nil
+	}
+
+	jsCerts := t.underlying.Call("getRemoteCertificates")
+	if jsCerts.Length() == 0 {
+		return nil
+	}
+
+	buf := jsCerts.Index(0)
+	u8 := js.Global().Get("Uint8Array").New(buf)
+
+	if u8.Length() == 0 {
+		return nil
+	}
+
+	cert := make([]byte, u8.Length())
+	js.CopyBytesToGo(cert, u8)
+
+	return cert
+}
