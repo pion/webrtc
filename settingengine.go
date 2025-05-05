@@ -106,6 +106,7 @@ type SettingEngine struct {
 	fireOnTrackBeforeFirstRTP                 bool
 	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
+	autoConfigRTXCodec                        bool
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
@@ -550,4 +551,9 @@ func (e *SettingEngine) SetFireOnTrackBeforeFirstRTP(fireOnTrackBeforeFirstRTP b
 // and relies on the ice failed state to detect the connection is interrupted.
 func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
 	e.disableCloseByDTLS = isEnabled
+}
+
+// AutoConfigRTXCodec sets if the RTX codec should be automatically configured.
+func (e *SettingEngine) AutoConfigRTXCodec(autoConfigRTXCodec bool) {
+	e.autoConfigRTXCodec = autoConfigRTXCodec
 }
