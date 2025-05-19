@@ -16,6 +16,7 @@ import (
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractFingerprint(t *testing.T) {
@@ -454,6 +455,38 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		}
 	})
 
+	t.Run("Tracks unknown, video with RTX and FEC", func(t *testing.T) {
+		descr := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc-group", Value: "FID 3000 4000"},
+						{Key: "ssrc-group", Value: "FEC-FR 3000 5000"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:rtx_trk_label rtx_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:fec_trk_label fec_trk_guid"},
+					},
+				},
+			},
+		}
+
+		tracks := trackDetailsFromSDP(nil, descr)
+		assert.Equal(t, 1, len(tracks))
+		track := tracks[0]
+		assert.Equal(t, RTPCodecTypeVideo, track.kind)
+		assert.Equal(t, SSRC(3000), track.ssrcs[0])
+		assert.Equal(t, "video_trk_label", track.streamID)
+		require.NotNil(t, track.rtxSsrc, "missing RTX ssrc for video track")
+		assert.Equal(t, SSRC(4000), *track.rtxSsrc)
+		require.NotNil(t, track.fecSsrc, "missing FEC ssrc for video track")
+		assert.Equal(t, SSRC(5000), *track.fecSsrc)
+	})
+
 	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
 		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
@@ -512,8 +545,8 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 2, len(tracks))
-		assert.Equal(t, SSRC(4000), *tracks[0].repairSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[1].repairSsrc)
+		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
+		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc)
 	})
 }
 
@@ -1235,13 +1268,13 @@ a=sendrecv
 		t.Run(testCase.name, func(t *testing.T) {
 			checkRTXSupport := func(s *sdp.SessionDescription) {
 				// RTX is never enabled for audio
-				assert.Nil(t, trackDetailsFromSDP(nil, s)[0].repairSsrc)
+				assert.Nil(t, trackDetailsFromSDP(nil, s)[0].rtxSsrc)
 
 				// RTX is conditionally enabled for video
 				if testCase.rtxExpected {
-					assert.NotNil(t, trackDetailsFromSDP(nil, s)[1].repairSsrc)
+					assert.NotNil(t, trackDetailsFromSDP(nil, s)[1].rtxSsrc)
 				} else {
-					assert.Nil(t, trackDetailsFromSDP(nil, s)[1].repairSsrc)
+					assert.Nil(t, trackDetailsFromSDP(nil, s)[1].rtxSsrc)
 				}
 			}
 
