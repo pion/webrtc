@@ -1776,7 +1776,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)
-	readStream, interceptor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
+	readStream, rtpReader, rtpProcessor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
 	if err != nil {
 		return err
 	}
@@ -1790,7 +1790,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				readCount--
 			}
 
-			i, _, err := interceptor.Read(b, nil)
+			i, _, err := rtpReader.Read(b, nil)
 			if err != nil {
 				return err
 			}
@@ -1819,7 +1819,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				receiver.mu.Lock()
 				defer receiver.mu.Unlock()
 
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, rtpReader, rtpProcessor, rtcpReadStream, rtcpInterceptor)
 			}
 
 			track, err := receiver.receiveForRid(
@@ -1827,7 +1827,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				params,
 				streamInfo,
 				readStream,
-				interceptor,
+				rtpReader,
+				rtpProcessor,
 				rtcpReadStream,
 				rtcpInterceptor,
 			)
