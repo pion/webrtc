@@ -84,6 +84,9 @@ type SettingEngine struct {
 		enableZeroChecksum   bool
 		rtoMax               time.Duration
 		maxMessageSize       uint32
+		minCwnd              uint32
+		fastRtxWnd           uint32
+		cwndCAStep           uint32
 	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
@@ -523,6 +526,22 @@ func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
 // Leave this 0 for the default timeout.
 func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 	e.sctp.rtoMax = rtoMax
+}
+
+// SetSCTPMinCwnd sets the minimum congestion window size. The congestion window
+// will not be smaller than this value during congestion control.
+func (e *SettingEngine) SetSCTPMinCwnd(minCwnd uint32) {
+	e.sctp.minCwnd = minCwnd
+}
+
+// SetSCTPFastRtxWnd sets the fast retransmission window size.
+func (e *SettingEngine) SetSCTPFastRtxWnd(fastRtxWnd uint32) {
+	e.sctp.fastRtxWnd = fastRtxWnd
+}
+
+// SetSCTPCwndCAStep sets congestion window adjustment step size during congestion avoidance.
+func (e *SettingEngine) SetSCTPCwndCAStep(cwndCAStep uint32) {
+	e.sctp.cwndCAStep = cwndCAStep
 }
 
 // SetICEBindingRequestHandler sets a callback that is fired on a STUN BindingRequest
