@@ -121,6 +121,9 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
 		MaxMessageSize:       maxMessageSize,
 		MTU:                  outboundMTU,
+		MinCwnd:              r.api.settingEngine.sctp.minCwnd,
+		FastRtxWnd:           r.api.settingEngine.sctp.fastRtxWnd,
+		CwndCAStep:           r.api.settingEngine.sctp.cwndCAStep,
 	})
 	if err != nil {
 		return err
