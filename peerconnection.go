@@ -2718,7 +2718,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 	if err != nil {
 		return nil, err
 	}
-	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
+	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS *"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
@@ -2811,7 +2811,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 	if err != nil {
 		return nil, err
 	}
-	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS*"})
+	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS *"})
 
 	iceParams, err := pc.iceGatherer.GetLocalParameters()
 	if err != nil {
