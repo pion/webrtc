@@ -1,0 +1,8 @@
+---
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: play-from-disk-fec
+description: play-from-disk-fec demonstrates how to use forward error correction (FlexFEC-03) while sending video to your Chrome-based browser from files saved to disk.
+authors:
+  - Aleksandr Alekseev
