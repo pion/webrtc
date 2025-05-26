@@ -9,6 +9,7 @@ package webrtc
 //
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
@@ -235,6 +236,68 @@ func Test_InterceptorRegistry_Build(t *testing.T) {
 
 	assert.Equal(t, 2, registryBuildCount)
 	closePairNow(t, peerConnectionA, peerConnectionB)
+}
+
+// TestConfigureFlexFEC03_FECParameters tests only that FEC parameters are correctly set and that SDP contains FEC info.
+// FEC between 2 Pion clients is not currently supported and cannot be negotiated due to the blocking issue:
+// https://github.com/pion/webrtc/issues/3109
+func TestConfigureFlexFEC03_FECParameters(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	mediaEngine := &MediaEngine{}
+
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
+		PayloadType:        96,
+	}, RTPCodecTypeVideo))
+
+	interceptorRegistry := &interceptor.Registry{}
+
+	fecPayloadType := PayloadType(120)
+	assert.NoError(t, ConfigureFlexFEC03(fecPayloadType, mediaEngine, interceptorRegistry))
+
+	assert.NoError(t, RegisterDefaultInterceptors(mediaEngine, interceptorRegistry))
+
+	api := NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(interceptorRegistry))
+
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	sender, err := pc.AddTrack(track)
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.Contains(t, offer.SDP, "a=rtpmap:120 flexfec-03/90000")
+
+	assert.NoError(t, pc.SetLocalDescription(offer))
+
+	params := sender.GetParameters()
+	assert.NotZero(t, params.Encodings[0].FEC.SSRC, "FEC SSRC should be non-zero")
+
+	expectedFECGroup := fmt.Sprintf("FEC-FR %d %d", params.Encodings[0].SSRC, params.Encodings[0].FEC.SSRC)
+	assert.Contains(t, offer.SDP, expectedFECGroup, "SDP should contain FEC-FR ssrc-group")
+
+	var fecCodecFound bool
+	for _, codec := range params.Codecs {
+		if codec.MimeType == MimeTypeFlexFEC03 && codec.PayloadType == fecPayloadType {
+			fecCodecFound = true
+			assert.Equal(t, uint32(90000), codec.ClockRate)
+			assert.Equal(t, "repair-window=10000000", codec.SDPFmtpLine)
+
+			break
+		}
+	}
+	assert.True(t, fecCodecFound, "FlexFEC-03 codec should be registered")
 }
 
 func Test_Interceptor_ZeroSSRC(t *testing.T) {
