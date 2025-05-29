@@ -464,3 +464,58 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	closePairNow(t, offer, answer)
 }
+
+func TestAutoConfigRTXCodec(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	settingEngine := SettingEngine{}
+	settingEngine.DisableMediaEngineCopy(true)
+	settingEngine.AutoConfigRTXCodec(true)
+	mediaEngine := &MediaEngine{}
+	err := mediaEngine.RegisterCodec(
+		RTPCodecParameters{
+			PayloadType: 96,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeType:  MimeTypeVP8,
+				ClockRate: 90000,
+			},
+		},
+		RTPCodecTypeVideo,
+	)
+	assert.Equal(t, err, nil)
+	api := NewAPI(
+		WithMediaEngine(mediaEngine),
+		WithSettingEngine(settingEngine),
+	)
+	config := Configuration{
+		ICEServers: []ICEServer{
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	}
+	var pc *PeerConnection
+	pc, err = api.NewPeerConnection(config)
+	assert.Equal(t, err, nil)
+	for i := range mediaEngine.videoCodecs {
+		mediaEngine.videoCodecs[i].statsID = ""
+	}
+	assert.Equal(t, len(mediaEngine.videoCodecs), 2)
+	assert.Equal(t, mediaEngine.videoCodecs[1],
+		RTPCodecParameters{
+			PayloadType: 97,
+			RTPCodecCapability: RTPCodecCapability{
+				MimeType:     MimeTypeRTX,
+				ClockRate:    90000,
+				Channels:     0,
+				SDPFmtpLine:  "apt=96",
+				RTCPFeedback: nil,
+			},
+		},
+	)
+	assert.NoError(t, pc.close(true))
+}

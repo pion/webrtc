@@ -142,14 +142,21 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	i, err := api.interceptorRegistry.Build("")
-	if err != nil {
+	var i interceptor.Interceptor
+	var err error
+	if i, err = api.interceptorRegistry.Build(""); err != nil {
 		return nil, err
 	}
 
 	pc.api = &API{
 		settingEngine: api.settingEngine,
 		interceptor:   i,
+	}
+
+	if api.settingEngine.autoConfigRTXCodec {
+		if err = api.mediaEngine.autoConfigRTXCodecs(); err != nil {
+			return nil, err
+		}
 	}
 
 	if api.settingEngine.disableMediaEngineCopy {
