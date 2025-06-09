@@ -323,6 +323,7 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 			assert.NoError(t, e)
 			assert.True(t, p.Padding)
 			assert.Equal(t, p.PaddingSize, byte(255))
+			assert.Equal(t, p.Header.PaddingSize, byte(255))
 		}
 
 		onTrackFiredFunc()
