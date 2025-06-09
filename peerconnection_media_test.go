@@ -166,6 +166,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		parameters := sender.GetParameters()
 
+		<-awaitRTPSend
 		for {
 			time.Sleep(time.Millisecond * 100)
 			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{
