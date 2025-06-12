@@ -271,6 +271,37 @@ func BenchmarkTrackLocalWrite(b *testing.B) {
 	}
 }
 
+type TestPacketizer struct {
+	rtp.Packetizer
+	checked [3]bool
+}
+
+func (p *TestPacketizer) GeneratePadding(samples uint32) []*rtp.Packet {
+	packets := p.Packetizer.GeneratePadding(samples)
+	for _, packet := range packets {
+		// Reset padding to ensure we control it
+		packet.Header.PaddingSize = 0
+		packet.PaddingSize = 0
+		packet.Payload = nil
+
+		p.checked[packet.SequenceNumber%3] = true
+		switch packet.SequenceNumber % 3 {
+		case 0:
+			// Recommended way to add padding
+			packet.Header.PaddingSize = 255
+		case 1:
+			// This was used as a workaround so has to be supported too
+			packet.Payload = make([]byte, 255)
+			packet.Payload[254] = 255
+		case 2:
+			// This field is deprecated but still used by some clients
+			packet.PaddingSize = 255
+		}
+	}
+
+	return packets
+}
+
 func Test_TrackLocalStatic_Padding(t *testing.T) {
 	mediaEngineOne := &MediaEngine{}
 	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
@@ -333,6 +364,10 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 
 	exit := false
 
+	// Use a custom packetizer that generates packets with padding in a few different ways
+	packetizer := &TestPacketizer{Packetizer: track.packetizer}
+	track.packetizer = packetizer
+
 	for !exit {
 		select {
 		case <-time.After(1 * time.Millisecond):
@@ -343,6 +378,8 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 	}
 
 	closePairNow(t, offerer, answerer)
+
+	assert.Equal(t, [3]bool{true, true, true}, packetizer.checked)
 }
 
 func Test_TrackLocalStatic_RTX(t *testing.T) {
