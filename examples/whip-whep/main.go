@@ -15,6 +15,9 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
+	"github.com/pion/interceptor/pkg/packetdump"
+	"github.com/pion/interceptor/pkg/report"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -134,8 +137,27 @@ func whepHandler(res http.ResponseWriter, req *http.Request) {
 		panic(err)
 	}
 
+	interceptorRegistry := &interceptor.Registry{}
+	packetDump, err := packetdump.NewSenderInterceptor(
+		// filter out all RTP packets, only RTCP packets will be logged
+		packetdump.RTPFilter(func(_ *rtp.Packet) bool {
+			return false
+		}),
+	)
+	if err != nil {
+		panic(err)
+	}
+	interceptorRegistry.Add(packetDump)
+	senderInterceptor, err := report.NewSenderInterceptor()
+	if err != nil {
+		panic(err)
+	}
+	interceptorRegistry.Add(senderInterceptor)
+
+	api := webrtc.NewAPI(webrtc.WithInterceptorRegistry(interceptorRegistry))
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfiguration)
+	peerConnection, err := api.NewPeerConnection(peerConnectionConfiguration)
 	if err != nil {
 		panic(err)
 	}
