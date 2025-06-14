@@ -143,16 +143,26 @@ func codecParametersFuzzySearch(
 	return RTPCodecParameters{}, codecMatchNone
 }
 
-// Given a CodecParameters find the RTX CodecParameters if one exists.
+// Given a CodecParameters find the RTX PayloadType.
 func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
-	aptStr := fmt.Sprintf("apt=%d", needle)
-	for _, c := range haystack {
-		if aptStr == c.SDPFmtpLine {
-			return c.PayloadType
-		}
+	rtxParam := findRTXCodecParameters(needle, haystack)
+	if rtxParam != nil {
+		return rtxParam.PayloadType
 	}
 
 	return PayloadType(0)
+}
+
+// Given a CodecParameters find the RTX CodecParameters if one exists.
+func findRTXCodecParameters(needle PayloadType, haystack []RTPCodecParameters) *RTPCodecParameters {
+	aptStr := fmt.Sprintf("apt=%d", needle)
+	for i, c := range haystack {
+		if aptStr == c.SDPFmtpLine {
+			return &haystack[i]
+		}
+	}
+
+	return nil
 }
 
 // For now, only FlexFEC is supported.
