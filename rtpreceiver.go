@@ -218,10 +218,15 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, parameters.Encodings[i].SSRC)
 		}
 
+		rtxPayloadType := findRTXPayloadType(globalParams.Codecs[0].PayloadType, globalParams.Codecs)
 		streams.streamInfo = createStreamInfo(
 			"",
 			parameters.Encodings[i].SSRC,
-			0, 0, 0, 0, 0,
+			parameters.Encodings[i].RTX.SSRC,
+			parameters.Encodings[i].FEC.SSRC,
+			globalParams.Codecs[0].PayloadType,
+			rtxPayloadType,
+			findFECPayloadType(globalParams.Codecs),
 			codec,
 			globalParams.HeaderExtensions,
 		)
@@ -233,7 +238,17 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
-			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, codec, globalParams.HeaderExtensions)
+			streamInfo := createStreamInfo(
+				"",
+				rtxSsrc,
+				0,
+				0,
+				rtxPayloadType,
+				0,
+				0,
+				codec,
+				globalParams.HeaderExtensions,
+			)
 			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(
 				rtxSsrc,
 				*streamInfo,
