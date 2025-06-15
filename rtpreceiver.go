@@ -42,7 +42,13 @@ func (s *trackStreams) configureStreams(
 	decodingParams RTPDecodingParameters,
 	codec RTPCodecCapability,
 	globalParams RTPParameters,
-	streamsForSSRC func(SSRC, interceptor.StreamInfo) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error),
+	streamsForSSRC func(SSRC, interceptor.StreamInfo) (
+		*srtp.ReadStreamSRTP,
+		interceptor.RTPReader,
+		*srtp.ReadStreamSRTCP,
+		interceptor.RTCPReader,
+		error,
+	),
 ) (bool, error) {
 	rtxPayloadType := findRTXPayloadType(globalParams.Codecs[0].PayloadType, globalParams.Codecs)
 
