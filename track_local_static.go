@@ -154,7 +154,7 @@ func (s *TrackLocalStaticRTP) Codec() RTPCodecCapability {
 // packetPool is a pool of packets used by WriteRTP and Write below
 // nolint:gochecknoglobals
 var rtpPacketPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &rtp.Packet{}
 	},
 }

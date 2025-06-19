@@ -23,23 +23,23 @@ import (
 type customLogger struct{}
 
 // Print all messages except trace.
-func (c customLogger) Trace(string)                  {}
-func (c customLogger) Tracef(string, ...interface{}) {}
+func (c customLogger) Trace(string)          {}
+func (c customLogger) Tracef(string, ...any) {}
 
 func (c customLogger) Debug(msg string) { fmt.Printf("customLogger Debug: %s\n", msg) }
-func (c customLogger) Debugf(format string, args ...interface{}) {
+func (c customLogger) Debugf(format string, args ...any) {
 	c.Debug(fmt.Sprintf(format, args...))
 }
 func (c customLogger) Info(msg string) { fmt.Printf("customLogger Info: %s\n", msg) }
-func (c customLogger) Infof(format string, args ...interface{}) {
+func (c customLogger) Infof(format string, args ...any) {
 	c.Trace(fmt.Sprintf(format, args...))
 }
 func (c customLogger) Warn(msg string) { fmt.Printf("customLogger Warn: %s\n", msg) }
-func (c customLogger) Warnf(format string, args ...interface{}) {
+func (c customLogger) Warnf(format string, args ...any) {
 	c.Warn(fmt.Sprintf(format, args...))
 }
 func (c customLogger) Error(msg string) { fmt.Printf("customLogger Error: %s\n", msg) }
-func (c customLogger) Errorf(format string, args ...interface{}) {
+func (c customLogger) Errorf(format string, args ...any) {
 	c.Error(fmt.Sprintf(format, args...))
 }
 

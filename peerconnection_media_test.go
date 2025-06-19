@@ -371,16 +371,16 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 
 type undeclaredSsrcLogger struct{ unhandledSimulcastError chan struct{} }
 
-func (u *undeclaredSsrcLogger) Trace(string)                  {}
-func (u *undeclaredSsrcLogger) Tracef(string, ...interface{}) {}
-func (u *undeclaredSsrcLogger) Debug(string)                  {}
-func (u *undeclaredSsrcLogger) Debugf(string, ...interface{}) {}
-func (u *undeclaredSsrcLogger) Info(string)                   {}
-func (u *undeclaredSsrcLogger) Infof(string, ...interface{})  {}
-func (u *undeclaredSsrcLogger) Warn(string)                   {}
-func (u *undeclaredSsrcLogger) Warnf(string, ...interface{})  {}
-func (u *undeclaredSsrcLogger) Error(string)                  {}
-func (u *undeclaredSsrcLogger) Errorf(format string, _ ...interface{}) {
+func (u *undeclaredSsrcLogger) Trace(string)          {}
+func (u *undeclaredSsrcLogger) Tracef(string, ...any) {}
+func (u *undeclaredSsrcLogger) Debug(string)          {}
+func (u *undeclaredSsrcLogger) Debugf(string, ...any) {}
+func (u *undeclaredSsrcLogger) Info(string)           {}
+func (u *undeclaredSsrcLogger) Infof(string, ...any)  {}
+func (u *undeclaredSsrcLogger) Warn(string)           {}
+func (u *undeclaredSsrcLogger) Warnf(string, ...any)  {}
+func (u *undeclaredSsrcLogger) Error(string)          {}
+func (u *undeclaredSsrcLogger) Errorf(format string, _ ...any) {
 	if format == incomingUnhandledRTPSsrc {
 		close(u.unhandledSimulcastError)
 	}
