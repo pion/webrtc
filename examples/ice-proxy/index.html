@@ -1,0 +1,61 @@
+<html>
+  <!--
+		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+  <head>
+    <title>ice-tcp</title>
+  </head>
+
+  <body>
+    <h1>ICE TCP</h1>
+
+    <h3> ICE Connection States </h3>
+    <div id="iceConnectionStates"></div> <br />
+
+    <h3> Inbound DataChannel Messages </h3>
+    <div id="inboundDataChannelMessages"></div>
+  </body>
+
+  <script>
+    let pc = new RTCPeerConnection({iceServers: [{
+      urls: 'turn:127.0.0.1:17342?transport=tcp',
+      username: 'turn_username',
+      credential: 'turn_password',
+    }]})
+    let dc = pc.createDataChannel('data')
+
+    dc.onmessage = event => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(event.data))
+
+      document.getElementById('inboundDataChannelMessages').appendChild(el);
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(pc.iceConnectionState))
+
+      document.getElementById('iceConnectionStates').appendChild(el);
+    }
+
+    pc.createOffer()
+      .then(offer => {
+        pc.setLocalDescription(offer)
+
+        return fetch(`/doSignaling`, {
+          method: 'post',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(offer)
+        })
+      })
+      .then(res => res.json())
+      .then(res => {
+        pc.setRemoteDescription(res)
+      })
+      .catch(alert)
+  </script>
+</html>
