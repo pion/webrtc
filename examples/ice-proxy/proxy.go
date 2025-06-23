@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/pion/turn/v4"
 	"golang.org/x/net/proxy"
 )
 
@@ -73,8 +72,8 @@ func (d *proxyDialer) Dial(network, addr string) (net.Conn, error) {
 	return conn, nil
 }
 
-func newHTTPProxy() (*url.URL, net.Listener) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func newHTTPProxy() *url.URL {
+	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		panic(err)
 	}
@@ -91,8 +90,8 @@ func newHTTPProxy() (*url.URL, net.Listener) {
 
 	return &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port), // nolint:forcetypeassert
-	}, listener
+		Host:   fmt.Sprintf("localhost:%d", listener.Addr().(*net.TCPAddr).Port), // nolint:forcetypeassert
+	}
 }
 
 func proxyHandleConn(clientConn net.Conn) {
@@ -120,33 +119,4 @@ func proxyHandleConn(clientConn net.Conn) {
 	// Copy data between client and target
 	go io.Copy(clientConn, targetConn) // nolint: errcheck
 	go io.Copy(targetConn, clientConn) // nolint: errcheck
-}
-
-func newTURNServer() *turn.Server {
-	tcpListener, err := net.Listen("tcp4", "127.0.0.1:17342")
-	if err != nil {
-		panic(err)
-	}
-
-	server, err := turn.NewServer(turn.ServerConfig{
-		AuthHandler: func(username, realm string, addr net.Addr) ([]byte, bool) {
-			log.Printf("Request to TURN from %q", addr.String())
-
-			return turn.GenerateAuthKey("turn_username", realm, "turn_password"), true
-		},
-		ListenerConfigs: []turn.ListenerConfig{
-			{
-				Listener: tcpListener,
-				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
-					RelayAddress: net.ParseIP("127.0.0.1"),
-					Address:      "127.0.0.1",
-				},
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	return server
 }
