@@ -15,6 +15,9 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
+	"github.com/pion/interceptor/pkg/packetdump"
+	"github.com/pion/interceptor/pkg/report"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -49,7 +52,7 @@ func main() {
 	panic(http.ListenAndServe(":8080", nil)) // nolint: gosec
 }
 
-func whipHandler(res http.ResponseWriter, req *http.Request) {
+func whipHandler(res http.ResponseWriter, req *http.Request) { // nolint: cyclop
 	// Read the offer from HTTP Request
 	offer, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -94,8 +97,6 @@ func whipHandler(res http.ResponseWriter, req *http.Request) {
 	// Create the API object with the MediaEngine
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(interceptorRegistry))
 
-	// Prepare the configuration
-
 	// Create a new RTCPeerConnection
 	peerConnection, err := api.NewPeerConnection(peerConnectionConfiguration)
 	if err != nil {
@@ -110,19 +111,25 @@ func whipHandler(res http.ResponseWriter, req *http.Request) {
 	// Set a handler for when a new remote track starts, this handler saves buffers to disk as
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
+	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		go func() {
+			for {
+				_, _, rtcpErr := receiver.ReadRTCP()
+				if rtcpErr != nil {
+					panic(rtcpErr)
+				}
+			}
+		}()
 		for {
 			pkt, _, err := track.ReadRTP()
 			if err != nil {
 				panic(err)
 			}
-
 			if err = videoTrack.WriteRTP(pkt); err != nil {
 				panic(err)
 			}
 		}
 	})
-
 	// Send answer via HTTP Response
 	writeAnswer(res, peerConnection, offer, "/whip")
 }
@@ -134,8 +141,27 @@ func whepHandler(res http.ResponseWriter, req *http.Request) {
 		panic(err)
 	}
 
+	interceptorRegistry := &interceptor.Registry{}
+	packetDump, err := packetdump.NewSenderInterceptor(
+		// filter out all RTP packets, only RTCP packets will be logged
+		packetdump.RTPFilter(func(_ *rtp.Packet) bool {
+			return false
+		}),
+	)
+	if err != nil {
+		panic(err)
+	}
+	interceptorRegistry.Add(packetDump)
+	senderInterceptor, err := report.NewSenderInterceptor()
+	if err != nil {
+		panic(err)
+	}
+	interceptorRegistry.Add(senderInterceptor)
+
+	api := webrtc.NewAPI(webrtc.WithInterceptorRegistry(interceptorRegistry))
+
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(peerConnectionConfiguration)
+	peerConnection, err := api.NewPeerConnection(peerConnectionConfiguration)
 	if err != nil {
 		panic(err)
 	}
