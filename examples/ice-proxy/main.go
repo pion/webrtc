@@ -11,12 +11,10 @@ const (
 	turnPassword   = "turn_password"
 )
 
-//nolint:cyclop
 func main() {
-
 	// Setup TURN server.
 	turnServer := newTURNServer()
-	defer turnServer.Close()
+	defer turnServer.Close() // nolint:errcheck
 
 	// Setup answering agent with proxy and TURN.
 	setupAnsweringAgent()

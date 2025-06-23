@@ -13,6 +13,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// nolint:cyclop
 func setupOfferingAgent() {
 	var settingEngine webrtc.SettingEngine
 	// Allow loopback candidates.
@@ -41,16 +42,16 @@ func setupOfferingAgent() {
 	dc.OnOpen(func() {
 		// Send the current time every 3 seconds.
 		for range time.Tick(3 * time.Second) {
-			if err := dc.SendText(time.Now().Format(time.RFC3339Nano)); err != nil {
-				panic(err)
+			if sendErr := dc.SendText(time.Now().Format(time.RFC3339Nano)); sendErr != nil {
+				panic(sendErr)
 			}
 		}
 	})
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 		// Receive the echoed time from the remote agent and calculate the round-trip time.
-		sendTime, err := time.Parse(time.RFC3339Nano, string(msg.Data))
-		if err != nil {
-			panic(err)
+		sendTime, parseErr := time.Parse(time.RFC3339Nano, string(msg.Data))
+		if parseErr != nil {
+			panic(parseErr)
 		}
 		log.Printf("[Offerer] Data channel round-trip time: %s", time.Since(sendTime))
 	})
@@ -63,7 +64,7 @@ func setupOfferingAgent() {
 		panic(err)
 	}
 
-	if err := peerConnection.SetLocalDescription(offer); err != nil {
+	if err = peerConnection.SetLocalDescription(offer); err != nil {
 		panic(err)
 	}
 
@@ -78,18 +79,19 @@ func setupOfferingAgent() {
 	}
 
 	// Send offer to the answering agent.
+	// nolint:noctx
 	resp, err := http.Post("http://localhost:8080/sdp", "application/json", bytes.NewBuffer(offerJSON))
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint:errcheck
 
 	// Receive answer and set remote description.
 	var answer webrtc.SessionDescription
-	if err := json.NewDecoder(resp.Body).Decode(&answer); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&answer); err != nil {
 		panic(err)
 	}
-	if err := peerConnection.SetRemoteDescription(answer); err != nil {
+	if err = peerConnection.SetRemoteDescription(answer); err != nil {
 		panic(err)
 	}
 }

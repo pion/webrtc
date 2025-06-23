@@ -16,7 +16,7 @@ func newTURNServer() *turn.Server {
 	}
 
 	server, err := turn.NewServer(turn.ServerConfig{
-		AuthHandler: func(username, realm string, addr net.Addr) ([]byte, bool) {
+		AuthHandler: func(_, realm string, _ net.Addr) ([]byte, bool) {
 			// Accept any request with provided username and password.
 			return turn.GenerateAuthKey(turnUsername, realm, turnPassword), true
 		},

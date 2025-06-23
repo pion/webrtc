@@ -11,6 +11,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// nolint:cyclop
 func setupAnsweringAgent() {
 	// Create and start a simple HTTP proxy server.
 	proxyURL := newHTTPProxy()
@@ -65,7 +66,7 @@ func setupAnsweringAgent() {
 
 	// HTTP handler that accepts an offer, creates an answer,
 	// and sends it back to the offering agent.
-	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/sdp", func(rw http.ResponseWriter, r *http.Request) {
 		var sdp webrtc.SessionDescription
 		if err := json.NewDecoder(r.Body).Decode(&sdp); err != nil {
 			panic(err)
@@ -82,7 +83,7 @@ func setupAnsweringAgent() {
 			panic(err)
 		}
 
-		if err := peerConnection.SetLocalDescription(answer); err != nil {
+		if err = peerConnection.SetLocalDescription(answer); err != nil {
 			panic(err)
 		}
 
@@ -96,7 +97,7 @@ func setupAnsweringAgent() {
 			panic(err)
 		}
 
-		if _, err := w.Write(resp); err != nil {
+		if _, err := rw.Write(resp); err != nil {
 			panic(err)
 		}
 	})
@@ -104,6 +105,7 @@ func setupAnsweringAgent() {
 	// Start an HTTP server to handle the SDP exchange from the offering agent.
 	go func() {
 		// The HTTP server is not gracefully shutdown in this example.
+		// nolint:gosec
 		err := http.ListenAndServe("localhost:8080", nil)
 		if err != nil {
 			panic(err)
