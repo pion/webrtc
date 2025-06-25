@@ -319,12 +319,12 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 
 	pcOffer, pcAnswer, wan := createVNetPair(t, nil)
 
-	keepPackets := &atomicBool{}
-	keepPackets.set(true)
+	keepPackets := &atomic.Bool{}
+	keepPackets.Store(true)
 
 	// Add a filter that monitors the traffic on the router
 	wan.AddChunkFilter(func(vnet.Chunk) bool {
-		return keepPackets.get()
+		return keepPackets.Load()
 	})
 
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
@@ -349,7 +349,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 				time.Sleep(time.Second)
 			}
 
-			keepPackets.set(false)
+			keepPackets.Store(false)
 		}
 	})
 
