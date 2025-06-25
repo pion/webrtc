@@ -1139,6 +1139,12 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		rids := []string{"layer_1", "layer_2", "layer_3"}
 		ridSelected := rids[0]
 
+		onTrackCalled := atomicBool{}
+		answerer.OnTrack(func(remote *TrackRemote, receiver *RTPReceiver) {
+			assert.Equal(t, remote.rid, ridSelected)
+			onTrackCalled.set(true)
+		})
+
 		vp8WriterA, err := NewTrackLocalStaticRTP(
 			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID(rids[0]),
 		)
@@ -1162,10 +1168,6 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		assert.NoError(t, sender.AddEncoding(vp8WriterC))
 
 		assert.NoError(t, signalPair(offerer, answerer))
-
-		answerer.OnTrack(func(remote *TrackRemote, receiver *RTPReceiver) {
-			assert.Equal(t, remote.rid, ridSelected)
-		})
 
 		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 		peerConnectionConnected.Wait()
@@ -1226,6 +1228,8 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		}()
 
 		<-seenOneStream.Done()
+
+		assert.Equal(t, true, onTrackCalled.get())
 
 		closePairNow(t, offerer, answerer)
 		close(testFinished)
