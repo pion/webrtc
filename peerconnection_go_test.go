@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -592,8 +593,8 @@ func TestPeerConnection_IceLite(t *testing.T) {
 }
 
 func TestOnICEGatheringStateChange(t *testing.T) {
-	seenGathering := &atomicBool{}
-	seenComplete := &atomicBool{}
+	seenGathering := &atomic.Bool{}
+	seenComplete := &atomic.Bool{}
 
 	seenGatheringAndComplete := make(chan any)
 
@@ -607,13 +608,13 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 
 		switch s { // nolint:exhaustive
 		case ICEGatheringStateGathering:
-			assert.False(t, seenGathering.get(), "Completed before gathering")
-			seenGathering.set(true)
+			assert.False(t, seenGathering.Load(), "Completed before gathering")
+			seenGathering.Store(true)
 		case ICEGatheringStateComplete:
-			seenComplete.set(true)
+			seenComplete.Store(true)
 		}
 
-		if seenGathering.get() && seenComplete.get() {
+		if seenGathering.Load() && seenComplete.Load() {
 			close(seenGatheringAndComplete)
 		}
 	}
@@ -913,12 +914,12 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	offerPeerConnection.OnICEConnectionStateChange(pushICEState)
 	answerPeerConnection.OnICEConnectionStateChange(pushICEState)
 
-	keepPackets := &atomicBool{}
-	keepPackets.set(true)
+	keepPackets := &atomic.Bool{}
+	keepPackets.Store(true)
 
 	// Add a filter that monitors the traffic on the router
 	wan.AddChunkFilter(func(vnet.Chunk) bool {
-		return keepPackets.get()
+		return keepPackets.Load()
 	})
 
 	const testMessage = "testMessage"
@@ -960,13 +961,13 @@ func TestICERestart_Error_Handling(t *testing.T) {
 
 	// Drop all packets, assert we have disconnected
 	// and send a DataChannel message when disconnected
-	keepPackets.set(false)
+	keepPackets.Store(false)
 	blockUntilICEState(ICEConnectionStateFailed)
 	assert.NoError(t, dataChannel.SendText(testMessage))
 
 	// ICE Restart and assert we have reconnected
 	// block until our DataChannel message is delivered
-	keepPackets.set(true)
+	keepPackets.Store(true)
 	connectWithICERestart(offerPeerConnection, answerPeerConnection)
 	blockUntilICEState(ICEConnectionStateConnected)
 	assert.Equal(t, testMessage, <-dataChannelMessages)
