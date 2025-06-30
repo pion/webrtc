@@ -62,7 +62,7 @@ func TestValueToICECandidate(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		v := map[string]interface{}{}
+		v := map[string]any{}
 		err := json.Unmarshal([]byte(testCase.jsonCandidate), &v)
 		if err != nil {
 			t.Errorf("Case %d: bad test, got error: %v", i, err)

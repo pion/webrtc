@@ -5,13 +5,14 @@ package webrtc
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOperations_Enqueue(t *testing.T) {
-	updateNegotiationNeededFlagOnEmptyChain := &atomicBool{}
+	updateNegotiationNeededFlagOnEmptyChain := &atomic.Bool{}
 	onNegotiationNeededCalledCount := 0
 	var onNegotiationNeededCalledCountMu sync.Mutex
 	ops := newOperations(updateNegotiationNeededFlagOnEmptyChain, func() {
@@ -29,7 +30,7 @@ func TestOperations_Enqueue(t *testing.T) {
 				ops.Enqueue(func() {
 					results[j] = j * j
 					if resultSetCopy > 50 {
-						updateNegotiationNeededFlagOnEmptyChain.set(true)
+						updateNegotiationNeededFlagOnEmptyChain.Store(true)
 					}
 				})
 			}(i)
@@ -46,14 +47,14 @@ func TestOperations_Enqueue(t *testing.T) {
 }
 
 func TestOperations_Done(*testing.T) {
-	ops := newOperations(&atomicBool{}, func() {
+	ops := newOperations(&atomic.Bool{}, func() {
 	})
 	defer ops.GracefulClose()
 	ops.Done()
 }
 
 func TestOperations_GracefulClose(t *testing.T) {
-	ops := newOperations(&atomicBool{}, func() {
+	ops := newOperations(&atomic.Bool{}, func() {
 	})
 
 	counter := 0

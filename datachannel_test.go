@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -450,23 +451,23 @@ func TestDataChannelParameters(t *testing.T) { //nolint:cyclop
 			assert.Fail(t, "OnDataChannel must not be fired when negotiated == true")
 		})
 
-		seenAnswerMessage := &atomicBool{}
-		seenOfferMessage := &atomicBool{}
+		seenAnswerMessage := &atomic.Bool{}
+		seenOfferMessage := &atomic.Bool{}
 
 		answerDatachannel.OnMessage(func(msg DataChannelMessage) {
 			if msg.IsString && string(msg.Data) == expectedMessage {
-				seenAnswerMessage.set(true)
+				seenAnswerMessage.Store(true)
 			}
 		})
 
 		offerDatachannel.OnMessage(func(msg DataChannelMessage) {
 			if msg.IsString && string(msg.Data) == expectedMessage {
-				seenOfferMessage.set(true)
+				seenOfferMessage.Store(true)
 			}
 		})
 
 		go func() {
-			for seenAnswerMessage.get() && seenOfferMessage.get() {
+			for seenAnswerMessage.Load() && seenOfferMessage.Load() {
 				if offerDatachannel.ReadyState() == DataChannelStateOpen {
 					assert.NoError(t, offerDatachannel.SendText(expectedMessage))
 				}

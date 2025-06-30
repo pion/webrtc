@@ -82,7 +82,7 @@ func main() {
 	})
 
 	// Set up global callbacks which will be triggered on button clicks.
-	js.Global().Set("sendMessage", js.FuncOf(func(_ js.Value, _ []js.Value) interface{} {
+	js.Global().Set("sendMessage", js.FuncOf(func(_ js.Value, _ []js.Value) any {
 		go func() {
 			el := getElementByID("message")
 			message := el.Get("value").String()
@@ -96,7 +96,7 @@ func main() {
 		}()
 		return js.Undefined()
 	}))
-	js.Global().Set("startSession", js.FuncOf(func(_ js.Value, _ []js.Value) interface{} {
+	js.Global().Set("startSession", js.FuncOf(func(_ js.Value, _ []js.Value) any {
 		go func() {
 			el := getElementByID("remoteSessionDescription")
 			sd := el.Get("value").String()
@@ -113,7 +113,7 @@ func main() {
 		}()
 		return js.Undefined()
 	}))
-	js.Global().Set("copySDP", js.FuncOf(func(_ js.Value, _ []js.Value) interface{} {
+	js.Global().Set("copySDP", js.FuncOf(func(_ js.Value, _ []js.Value) any {
 		go func() {
 			defer func() {
 				if e := recover(); e != nil {

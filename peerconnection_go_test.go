@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -361,7 +362,7 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
-	iceComplete := make(chan interface{})
+	iceComplete := make(chan any)
 	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
 			time.Sleep(time.Second) // Give time for DTLS to start
@@ -569,7 +570,7 @@ func TestPeerConnection_IceLite(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, signalPair(offerPC, answerPC))
 
-		dataChannelOpen := make(chan interface{})
+		dataChannelOpen := make(chan any)
 		answerPC.OnDataChannel(func(_ *DataChannel) {
 			close(dataChannelOpen)
 		})
@@ -592,10 +593,10 @@ func TestPeerConnection_IceLite(t *testing.T) {
 }
 
 func TestOnICEGatheringStateChange(t *testing.T) {
-	seenGathering := &atomicBool{}
-	seenComplete := &atomicBool{}
+	seenGathering := &atomic.Bool{}
+	seenComplete := &atomic.Bool{}
 
-	seenGatheringAndComplete := make(chan interface{})
+	seenGatheringAndComplete := make(chan any)
 
 	peerConn, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -607,13 +608,13 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 
 		switch s { // nolint:exhaustive
 		case ICEGatheringStateGathering:
-			assert.False(t, seenGathering.get(), "Completed before gathering")
-			seenGathering.set(true)
+			assert.False(t, seenGathering.Load(), "Completed before gathering")
+			seenGathering.Store(true)
 		case ICEGatheringStateComplete:
-			seenComplete.set(true)
+			seenComplete.Store(true)
 		}
 
-		if seenGathering.get() && seenComplete.get() {
+		if seenGathering.Load() && seenComplete.Load() {
 			close(seenGatheringAndComplete)
 		}
 	}
@@ -913,12 +914,12 @@ func TestICERestart_Error_Handling(t *testing.T) {
 	offerPeerConnection.OnICEConnectionStateChange(pushICEState)
 	answerPeerConnection.OnICEConnectionStateChange(pushICEState)
 
-	keepPackets := &atomicBool{}
-	keepPackets.set(true)
+	keepPackets := &atomic.Bool{}
+	keepPackets.Store(true)
 
 	// Add a filter that monitors the traffic on the router
 	wan.AddChunkFilter(func(vnet.Chunk) bool {
-		return keepPackets.get()
+		return keepPackets.Load()
 	})
 
 	const testMessage = "testMessage"
@@ -960,13 +961,13 @@ func TestICERestart_Error_Handling(t *testing.T) {
 
 	// Drop all packets, assert we have disconnected
 	// and send a DataChannel message when disconnected
-	keepPackets.set(false)
+	keepPackets.Store(false)
 	blockUntilICEState(ICEConnectionStateFailed)
 	assert.NoError(t, dataChannel.SendText(testMessage))
 
 	// ICE Restart and assert we have reconnected
 	// block until our DataChannel message is delivered
-	keepPackets.set(true)
+	keepPackets.Store(true)
 	connectWithICERestart(offerPeerConnection, answerPeerConnection)
 	blockUntilICEState(ICEConnectionStateConnected)
 	assert.Equal(t, testMessage, <-dataChannelMessages)
@@ -1922,16 +1923,16 @@ type testICELogger struct {
 	lastErrorMessage string
 }
 
-func (t *testICELogger) Trace(string)                  {}
-func (t *testICELogger) Tracef(string, ...interface{}) {}
-func (t *testICELogger) Debug(string)                  {}
-func (t *testICELogger) Debugf(string, ...interface{}) {}
-func (t *testICELogger) Info(string)                   {}
-func (t *testICELogger) Infof(string, ...interface{})  {}
-func (t *testICELogger) Warn(string)                   {}
-func (t *testICELogger) Warnf(string, ...interface{})  {}
-func (t *testICELogger) Error(msg string)              { t.lastErrorMessage = msg }
-func (t *testICELogger) Errorf(format string, args ...interface{}) {
+func (t *testICELogger) Trace(string)          {}
+func (t *testICELogger) Tracef(string, ...any) {}
+func (t *testICELogger) Debug(string)          {}
+func (t *testICELogger) Debugf(string, ...any) {}
+func (t *testICELogger) Info(string)           {}
+func (t *testICELogger) Infof(string, ...any)  {}
+func (t *testICELogger) Warn(string)           {}
+func (t *testICELogger) Warnf(string, ...any)  {}
+func (t *testICELogger) Error(msg string)      { t.lastErrorMessage = msg }
+func (t *testICELogger) Errorf(format string, args ...any) {
 	t.lastErrorMessage = fmt.Sprintf(format, args...)
 }
 

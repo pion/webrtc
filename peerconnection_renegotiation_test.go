@@ -162,10 +162,10 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
-	haveRenegotiated := &atomicBool{}
+	haveRenegotiated := &atomic.Bool{}
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {
-		assert.True(t, haveRenegotiated.get(), "OnTrack was called before renegotiation")
+		assert.True(t, haveRenegotiated.Load(), "OnTrack was called before renegotiation")
 		onTrackFiredFunc()
 	})
 
@@ -189,7 +189,7 @@ func TestPeerConnection_Renegotiation_AddTrack(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	haveRenegotiated.set(true)
+	haveRenegotiated.Store(true)
 	assert.False(t, sender.isNegotiated())
 	offer, err := pcOffer.CreateOffer(nil)
 	assert.True(t, sender.isNegotiated())
@@ -283,11 +283,11 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
-	haveRenegotiated := &atomicBool{}
+	haveRenegotiated := &atomic.Bool{}
 	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
 	var atomicRemoteTrack atomic.Value
 	pcOffer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
-		assert.True(t, haveRenegotiated.get(), "OnTrack was called before renegotiation")
+		assert.True(t, haveRenegotiated.Load(), "OnTrack was called before renegotiation")
 		onTrackFiredFunc()
 		atomicRemoteTrack.Store(track)
 	})
@@ -307,7 +307,7 @@ func TestPeerConnection_Renegotiation_AddTrack_Rename(t *testing.T) {
 	vp8Track.rtpTrack.id = "foo2"
 	vp8Track.rtpTrack.streamID = "bar2"
 
-	haveRenegotiated.set(true)
+	haveRenegotiated.Store(true)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{vp8Track})
