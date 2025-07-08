@@ -234,21 +234,9 @@ func createStreamInfo(
 		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
 	}
 
-	streamCodecs := make([]interceptor.RTPCodecParameters, 0, len(codecs))
+	payloadToMimeType := make(map[uint8]string)
 	for _, c := range codecs {
-		feedbacks := make([]interceptor.RTCPFeedback, 0, len(c.RTCPFeedback))
-		for _, f := range c.RTCPFeedback {
-			feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
-		}
-
-		streamCodecs = append(streamCodecs, interceptor.RTPCodecParameters{
-			MimeType:     c.MimeType,
-			ClockRate:    c.ClockRate,
-			Channels:     c.Channels,
-			SDPFmtpLine:  c.SDPFmtpLine,
-			RTCPFeedback: feedbacks,
-			PayloadType:  uint8(c.PayloadType),
-		})
+		payloadToMimeType[uint8(c.PayloadType)] = c.MimeType
 	}
 
 	return &interceptor.StreamInfo{
@@ -266,6 +254,6 @@ func createStreamInfo(
 		Channels:                          codec.Channels,
 		SDPFmtpLine:                       codec.SDPFmtpLine,
 		RTCPFeedback:                      feedbacks,
-		Codecs:                            streamCodecs,
+		PayloadToMimeType:                 payloadToMimeType,
 	}
 }

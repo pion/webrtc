@@ -55,21 +55,9 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		streamInfoCodecs := make([]interceptor.RTPCodecParameters, 0, len(videoCodecs))
+		payloadToMimeType := make(map[uint8]string)
 		for _, c := range videoCodecs {
-			feedbacks := make([]interceptor.RTCPFeedback, 0, len(c.RTCPFeedback))
-			for _, f := range c.RTCPFeedback {
-				feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
-			}
-
-			streamInfoCodecs = append(streamInfoCodecs, interceptor.RTPCodecParameters{
-				MimeType:     c.MimeType,
-				ClockRate:    c.ClockRate,
-				Channels:     c.Channels,
-				SDPFmtpLine:  c.SDPFmtpLine,
-				RTCPFeedback: feedbacks,
-				PayloadType:  uint8(c.PayloadType),
-			})
+			payloadToMimeType[uint8(c.PayloadType)] = c.MimeType
 		}
 
 		ir := &interceptor.Registry{}
@@ -77,7 +65,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
 				return &mock_interceptor.Interceptor{
 					BindLocalStreamFn: func(streamInfo *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
-						assert.Equal(t, streamInfoCodecs, streamInfo.Codecs)
+						assert.Equal(t, payloadToMimeType, streamInfo.PayloadToMimeType)
 						return interceptor.RTPWriterFunc(
 							func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
 								// set extension on outgoing packet
@@ -90,7 +78,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 						)
 					},
 					BindRemoteStreamFn: func(streamInfo *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
-						assert.Equal(t, streamInfoCodecs, streamInfo.Codecs)
+						assert.Equal(t, payloadToMimeType, streamInfo.PayloadToMimeType)
 						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 							if a == nil {
 								a = interceptor.Attributes{}
