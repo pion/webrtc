@@ -166,6 +166,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		parameters := sender.GetParameters()
 
+		<-awaitRTPSend
 		for {
 			time.Sleep(time.Millisecond * 100)
 			if routineErr := pcOffer.WriteRTCP([]rtcp.Packet{
@@ -318,12 +319,12 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 
 	pcOffer, pcAnswer, wan := createVNetPair(t, nil)
 
-	keepPackets := &atomicBool{}
-	keepPackets.set(true)
+	keepPackets := &atomic.Bool{}
+	keepPackets.Store(true)
 
 	// Add a filter that monitors the traffic on the router
 	wan.AddChunkFilter(func(vnet.Chunk) bool {
-		return keepPackets.get()
+		return keepPackets.Load()
 	})
 
 	vp8Track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2")
@@ -348,7 +349,7 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 				time.Sleep(time.Second)
 			}
 
-			keepPackets.set(false)
+			keepPackets.Store(false)
 		}
 	})
 
@@ -370,16 +371,16 @@ func TestPeerConnection_Media_Disconnected(t *testing.T) { //nolint:cyclop
 
 type undeclaredSsrcLogger struct{ unhandledSimulcastError chan struct{} }
 
-func (u *undeclaredSsrcLogger) Trace(string)                  {}
-func (u *undeclaredSsrcLogger) Tracef(string, ...interface{}) {}
-func (u *undeclaredSsrcLogger) Debug(string)                  {}
-func (u *undeclaredSsrcLogger) Debugf(string, ...interface{}) {}
-func (u *undeclaredSsrcLogger) Info(string)                   {}
-func (u *undeclaredSsrcLogger) Infof(string, ...interface{})  {}
-func (u *undeclaredSsrcLogger) Warn(string)                   {}
-func (u *undeclaredSsrcLogger) Warnf(string, ...interface{})  {}
-func (u *undeclaredSsrcLogger) Error(string)                  {}
-func (u *undeclaredSsrcLogger) Errorf(format string, _ ...interface{}) {
+func (u *undeclaredSsrcLogger) Trace(string)          {}
+func (u *undeclaredSsrcLogger) Tracef(string, ...any) {}
+func (u *undeclaredSsrcLogger) Debug(string)          {}
+func (u *undeclaredSsrcLogger) Debugf(string, ...any) {}
+func (u *undeclaredSsrcLogger) Info(string)           {}
+func (u *undeclaredSsrcLogger) Infof(string, ...any)  {}
+func (u *undeclaredSsrcLogger) Warn(string)           {}
+func (u *undeclaredSsrcLogger) Warnf(string, ...any)  {}
+func (u *undeclaredSsrcLogger) Error(string)          {}
+func (u *undeclaredSsrcLogger) Errorf(format string, _ ...any) {
 	if format == incomingUnhandledRTPSsrc {
 		close(u.unhandledSimulcastError)
 	}

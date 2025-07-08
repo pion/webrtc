@@ -47,7 +47,7 @@ type SampleBuilder struct {
 	paddingPackets uint16
 
 	// allows inspecting head packets of each sample and then returns a custom metadata
-	packetHeadHandler func(headPacket interface{}) interface{}
+	packetHeadHandler func(headPacket any) any
 
 	// return array of RTP headers as Sample.RTPHeaders
 	returnRTPHeaders bool
@@ -289,7 +289,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// merge all the buffers into a sample
 	data := []byte{}
-	var metadata interface{}
+	var metadata any
 	var rtpHeaders []*rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
 		payload, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
@@ -378,7 +378,7 @@ func WithPacketReleaseHandler(h func(*rtp.Packet)) Option {
 
 // WithPacketHeadHandler set a head packet handler to allow inspecting
 // the packet to extract certain information and return as custom metadata.
-func WithPacketHeadHandler(h func(headPacket interface{}) interface{}) Option {
+func WithPacketHeadHandler(h func(headPacket any) any) Option {
 	return func(o *SampleBuilder) {
 		o.packetHeadHandler = h
 	}

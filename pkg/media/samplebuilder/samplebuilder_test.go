@@ -497,7 +497,7 @@ func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
 	}
 
 	headCount := 0
-	s := New(10, &fakeDepacketizer{}, 1, WithPacketHeadHandler(func(interface{}) interface{} {
+	s := New(10, &fakeDepacketizer{}, 1, WithPacketHeadHandler(func(any) any {
 		headCount++
 
 		return true
