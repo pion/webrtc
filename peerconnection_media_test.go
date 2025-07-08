@@ -1140,10 +1140,10 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		rids := []string{"layer_1", "layer_2", "layer_3"}
 		ridSelected := rids[0]
 
-		onTrackCalled := atomicBool{}
+		onTrackCalled := &atomic.Bool{}
 		answerer.OnTrack(func(remote *TrackRemote, receiver *RTPReceiver) {
 			assert.Equal(t, remote.rid, ridSelected)
-			onTrackCalled.set(true)
+			onTrackCalled.Store(true)
 		})
 
 		vp8WriterA, err := NewTrackLocalStaticRTP(
@@ -1230,7 +1230,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 
 		<-seenOneStream.Done()
 
-		assert.Equal(t, true, onTrackCalled.get())
+		assert.Equal(t, true, onTrackCalled.Load())
 
 		closePairNow(t, offerer, answerer)
 		close(testFinished)
