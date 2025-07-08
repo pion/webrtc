@@ -28,6 +28,7 @@ import (
 // * Assert an extension can be set on an outbound packet
 // * Assert an extension can be read on an outbound packet
 // * Assert that attributes set by an interceptor are returned to the Reader.
+// * Assert that StreamInfo.Codecs contain capabilities of all negotiated codecs for track's SSRC
 func TestPeerConnection_Interceptor(t *testing.T) {
 	to := test.TimeOut(time.Second * 20)
 	defer to.Stop()
@@ -36,11 +37,47 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 	defer report()
 
 	createPC := func() *PeerConnection {
+		videoRTCPFeedback := []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}
+		videoCodecs := []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", videoRTCPFeedback},
+				PayloadType:        96,
+			},
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", videoRTCPFeedback},
+				PayloadType:        98,
+			},
+		}
+
+		me := &MediaEngine{}
+		for _, videoCodec := range videoCodecs {
+			err := me.RegisterCodec(videoCodec, RTPCodecTypeVideo)
+			assert.NoError(t, err)
+		}
+
+		streamInfoCodecs := make([]interceptor.RTPCodecParameters, 0, len(videoCodecs))
+		for _, c := range videoCodecs {
+			feedbacks := make([]interceptor.RTCPFeedback, 0, len(c.RTCPFeedback))
+			for _, f := range c.RTCPFeedback {
+				feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+			}
+
+			streamInfoCodecs = append(streamInfoCodecs, interceptor.RTPCodecParameters{
+				MimeType:     c.MimeType,
+				ClockRate:    c.ClockRate,
+				Channels:     c.Channels,
+				SDPFmtpLine:  c.SDPFmtpLine,
+				RTCPFeedback: feedbacks,
+				PayloadType:  uint8(c.PayloadType),
+			})
+		}
+
 		ir := &interceptor.Registry{}
 		ir.Add(&mock_interceptor.Factory{
 			NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
 				return &mock_interceptor.Interceptor{
-					BindLocalStreamFn: func(_ *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
+					BindLocalStreamFn: func(streamInfo *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
+						assert.Equal(t, streamInfoCodecs, streamInfo.Codecs)
 						return interceptor.RTPWriterFunc(
 							func(header *rtp.Header, payload []byte, attributes interceptor.Attributes) (int, error) {
 								// set extension on outgoing packet
@@ -52,7 +89,8 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 							},
 						)
 					},
-					BindRemoteStreamFn: func(_ *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+					BindRemoteStreamFn: func(streamInfo *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+						assert.Equal(t, streamInfoCodecs, streamInfo.Codecs)
 						return interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 							if a == nil {
 								a = interceptor.Attributes{}
@@ -67,7 +105,7 @@ func TestPeerConnection_Interceptor(t *testing.T) {
 			},
 		})
 
-		pc, err := NewAPI(WithInterceptorRegistry(ir)).NewPeerConnection(Configuration{})
+		pc, err := NewAPI(WithInterceptorRegistry(ir), WithMediaEngine(me)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
 		return pc

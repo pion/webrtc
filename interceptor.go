@@ -222,6 +222,7 @@ func createStreamInfo(
 	payloadType, payloadTypeRTX, payloadTypeFEC PayloadType,
 	codec RTPCodecCapability,
 	webrtcHeaderExtensions []RTPHeaderExtensionParameter,
+	codecs []RTPCodecParameters,
 ) *interceptor.StreamInfo {
 	headerExtensions := make([]interceptor.RTPHeaderExtension, 0, len(webrtcHeaderExtensions))
 	for _, h := range webrtcHeaderExtensions {
@@ -231,6 +232,23 @@ func createStreamInfo(
 	feedbacks := make([]interceptor.RTCPFeedback, 0, len(codec.RTCPFeedback))
 	for _, f := range codec.RTCPFeedback {
 		feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+	}
+
+	streamCodecs := make([]interceptor.RTPCodecParameters, 0, len(codecs))
+	for _, c := range codecs {
+		feedbacks := make([]interceptor.RTCPFeedback, 0, len(c.RTCPFeedback))
+		for _, f := range c.RTCPFeedback {
+			feedbacks = append(feedbacks, interceptor.RTCPFeedback{Type: f.Type, Parameter: f.Parameter})
+		}
+
+		streamCodecs = append(streamCodecs, interceptor.RTPCodecParameters{
+			MimeType:     c.MimeType,
+			ClockRate:    c.ClockRate,
+			Channels:     c.Channels,
+			SDPFmtpLine:  c.SDPFmtpLine,
+			RTCPFeedback: feedbacks,
+			PayloadType:  uint8(c.PayloadType),
+		})
 	}
 
 	return &interceptor.StreamInfo{
@@ -248,5 +266,6 @@ func createStreamInfo(
 		Channels:                          codec.Channels,
 		SDPFmtpLine:                       codec.SDPFmtpLine,
 		RTCPFeedback:                      feedbacks,
+		Codecs:                            streamCodecs,
 	}
 }
