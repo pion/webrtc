@@ -1173,6 +1173,20 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 		peerConnectionConnected.Wait()
 
+		parameters := sender.GetParameters()
+
+		var midID, ridID uint8
+		for _, extension := range parameters.HeaderExtensions {
+			switch extension.URI {
+			case sdp.SDESMidURI:
+				midID = uint8(extension.ID) //nolint:gosec // G115
+			case sdp.SDESRTPStreamIDURI:
+				ridID = uint8(extension.ID) //nolint:gosec // G115
+			}
+		}
+		assert.NotZero(t, midID)
+		assert.NotZero(t, ridID)
+
 		ticker := time.NewTicker(time.Millisecond * 20)
 		defer ticker.Stop()
 		testFinished := make(chan struct{})
@@ -1200,24 +1214,14 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 					if !sentOnePacket && len(senderTrack.bindings) > 0 {
 						sentOnePacket = true
 
-						midExtensionID, _, _ := answerer.api.mediaEngine.getHeaderExtensionID(
-							RTPHeaderExtensionCapability{sdp.SDESMidURI},
-						)
-						assert.Greater(t, midExtensionID, 0)
-
-						streamIDExtensionID, _, _ := answerer.api.mediaEngine.getHeaderExtensionID(
-							RTPHeaderExtensionCapability{sdp.SDESRTPStreamIDURI},
-						)
-						assert.Greater(t, streamIDExtensionID, 0)
-
 						header := &rtp.Header{
 							Version: 2,
 							SSRC:    util.RandUint32(),
 						}
 						header.Extension = true
 						header.ExtensionProfile = 0x1000
-						assert.NoError(t, header.SetExtension(uint8(midExtensionID), []byte("0")))
-						assert.NoError(t, header.SetExtension(uint8(streamIDExtensionID), []byte(ridSelected)))
+						assert.NoError(t, header.SetExtension(midID, []byte("0")))
+						assert.NoError(t, header.SetExtension(ridID, []byte(ridSelected)))
 
 						_, err = senderTrack.bindings[0].writeStream.WriteRTP(header, []byte{0, 1, 2, 3, 4, 5})
 						assert.NoError(t, err)
