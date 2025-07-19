@@ -224,6 +224,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			0, 0, 0, 0, 0,
 			codec,
 			globalParams.HeaderExtensions,
+			globalParams.Codecs,
 		)
 		var err error
 
@@ -233,7 +234,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		}
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
-			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, codec, globalParams.HeaderExtensions)
+			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, codec, globalParams.HeaderExtensions, globalParams.Codecs)
 			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(
 				rtxSsrc,
 				*streamInfo,
