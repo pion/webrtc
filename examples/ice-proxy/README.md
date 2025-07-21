@@ -6,15 +6,15 @@ This proxy functionality is particularly useful when direct peer-to-peer communi
 ## Instructions
 
 ### Download ice-proxy
+The example is self-contained and requires no input.
 
 ```bash
-git clone https://github.com/pion/webrtc.git
-cd webrtc/examples/ice-proxy
+go install github.com/pion/webrtc/v4/examples/ice-proxy@latest
 ```
 
 ### Run ice-proxy
 ```bash
-go run *.go
+ice-proxy
 ```
 
 Upon execution, four distinct entities will be launched:
