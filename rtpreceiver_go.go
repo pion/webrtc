@@ -26,7 +26,7 @@ func (r *RTPReceiver) SetRTPParameters(params RTPParameters) {
 	for ndx, codec := range params.Codecs {
 		currentTrack := r.tracks[ndx].track
 
-		r.tracks[ndx].streamInfo.RTPHeaderExtensions = headerExtensions
+		r.tracks[ndx].mediaStream.streamInfo.RTPHeaderExtensions = headerExtensions
 
 		currentTrack.mu.Lock()
 		currentTrack.codec = codec
