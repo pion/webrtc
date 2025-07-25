@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -70,6 +71,8 @@ type RTPReceiver struct {
 	api *API
 
 	rtxPool sync.Pool
+
+	log logging.LeveledLogger
 }
 
 // NewRTPReceiver constructs a new RTPReceiver.
@@ -78,7 +81,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		return nil, errRTPReceiverDTLSTransportNil
 	}
 
-	r := &RTPReceiver{
+	rtpReceiver := &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 		api:       api,
@@ -88,9 +91,10 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		rtxPool: sync.Pool{New: func() any {
 			return make([]byte, api.settingEngine.getReceiveMTU())
 		}},
+		log: api.settingEngine.LoggerFactory.NewLogger("RTPReceiver"),
 	}
 
-	return r, nil
+	return rtpReceiver, nil
 }
 
 func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
@@ -272,6 +276,10 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
+		if len(r.tracks) > 1 {
+			r.log.Errorf(useReadSimulcast)
+		}
+
 		return r.tracks[0].rtcpInterceptor.Read(b, a)
 	case <-r.closed:
 		return 0, nil, io.ErrClosedPipe
