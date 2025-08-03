@@ -36,6 +36,38 @@ func newICECandidatesFromICE(
 	candidates := []ICECandidate{}
 
 	for _, i := range iceCandidates {
+		if i.Type() == ice.CandidateTypeHost {
+			hostCandidate := i.(*ice.CandidateHost)
+			if len(hostCandidate.Addresses()) > 0 {
+				// no related address for host candidate
+				for j := range hostCandidate.Addresses() {
+					cfg := ice.CandidateHostConfig{
+						Network:    hostCandidate.NetworkType().NetworkShort(),
+						Address:    hostCandidate.Addresses()[j],
+						Port:       hostCandidate.Ports()[j],
+						Component:  hostCandidate.Component(),
+						Priority:   hostCandidate.Priority(),
+						Foundation: hostCandidate.Foundation(),
+						TCPType:    hostCandidate.TCPType(),
+					}
+					newHostCandidate, err := ice.NewCandidateHost(&cfg)
+					if err != nil {
+						return nil, err
+					}
+					for _, ext := range hostCandidate.Extensions() {
+						if err := newHostCandidate.AddExtension(ext); err != nil {
+							return nil, err
+						}
+					}
+					c, err := newICECandidateFromICE(newHostCandidate, sdpMid, sdpMLineIndex)
+					if err != nil {
+						return nil, err
+					}
+					candidates = append(candidates, c)
+				}
+				continue
+			}
+		}
 		c, err := newICECandidateFromICE(i, sdpMid, sdpMLineIndex)
 		if err != nil {
 			return nil, err
