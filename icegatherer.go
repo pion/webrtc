@@ -132,6 +132,8 @@ func (g *ICEGatherer) createAgent() error { //nolint:cyclop
 		DisableActiveTCP:       g.api.settingEngine.iceDisableActiveTCP,
 		MaxBindingRequests:     g.api.settingEngine.iceMaxBindingRequests,
 		BindingRequestHandler:  g.api.settingEngine.iceBindingRequestHandler,
+		HostUDPAdvertisedAddrsMapper: g.api.settingEngine.candidates.HostUDPAdvertisedAddrsMapper,
+		HostTCPAdvertisedAddrsMapper: g.api.settingEngine.candidates.HostTCPAdvertisedAddrsMapper,
 	}
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
