@@ -46,17 +46,19 @@ type SettingEngine struct {
 		ICESTUNGatherTimeout      *time.Duration
 	}
 	candidates struct {
-		ICELite                  bool
-		ICENetworkTypes          []NetworkType
-		InterfaceFilter          func(string) (keep bool)
-		IPFilter                 func(net.IP) (keep bool)
-		NAT1To1IPs               []string
-		NAT1To1IPCandidateType   ICECandidateType
-		MulticastDNSMode         ice.MulticastDNSMode
-		MulticastDNSHostName     string
-		UsernameFragment         string
-		Password                 string
-		IncludeLoopbackCandidate bool
+		ICELite                      bool
+		ICENetworkTypes              []NetworkType
+		InterfaceFilter              func(string) (keep bool)
+		IPFilter                     func(net.IP) (keep bool)
+		NAT1To1IPs                   []string
+		NAT1To1IPCandidateType       ICECandidateType
+		MulticastDNSMode             ice.MulticastDNSMode
+		MulticastDNSHostName         string
+		UsernameFragment             string
+		Password                     string
+		IncludeLoopbackCandidate     bool
+		HostUDPAdvertisedAddrsMapper func(net.IP) []ice.Endpoint
+		HostTCPAdvertisedAddrsMapper func(net.IP) []ice.Endpoint
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -265,6 +267,16 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
+}
+
+// SetHostUDPAdvertisedAddrsMapper sets the function that maps the local UDP address to the advertised UDP addresses.
+func (e *SettingEngine) SetHostUDPAdvertisedAddrsMapper(mapper func(net.IP) []ice.Endpoint) {
+	e.candidates.HostUDPAdvertisedAddrsMapper = mapper
+}
+
+// SetHostTCPAdvertisedAddrsMapper sets the function that maps the local TCP address to the advertised TCP addresses.
+func (e *SettingEngine) SetHostTCPAdvertisedAddrsMapper(mapper func(net.IP) []ice.Endpoint) {
+	e.candidates.HostTCPAdvertisedAddrsMapper = mapper
 }
 
 // SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful
