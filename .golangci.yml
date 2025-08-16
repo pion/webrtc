@@ -1,53 +1,7 @@
 # SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
 # SPDX-License-Identifier: MIT
 
-run:
-  timeout: 5m
-
-linters-settings:
-  govet:
-    enable:
-      - shadow
-  misspell:
-    locale: US
-  exhaustive:
-    default-signifies-exhaustive: true
-  gomodguard:
-    blocked:
-      modules:
-        - github.com/pkg/errors:
-            recommendations:
-              - errors
-  forbidigo:
-    analyze-types: true
-    forbid:
-      - ^fmt.Print(f|ln)?$
-      - ^log.(Panic|Fatal|Print)(f|ln)?$
-      - ^os.Exit$
-      - ^panic$
-      - ^print(ln)?$
-      - p: ^testing.T.(Error|Errorf|Fatal|Fatalf|Fail|FailNow)$
-        pkg: ^testing$
-        msg: "use testify/assert instead"
-  varnamelen:
-    max-distance: 12
-    min-name-length: 2
-    ignore-type-assert-ok: true
-    ignore-map-index-ok: true
-    ignore-chan-recv-ok: true
-    ignore-decls:
-      - i int
-      - n int
-      - w io.Writer
-      - r io.Reader
-      - b []byte
-  revive:
-    rules:
-      # Prefer 'any' type alias over 'interface{}' for Go 1.18+ compatibility
-      - name: use-any
-        severity: warning
-        disabled: false
-
+version: "2"
 linters:
   enable:
     - asciicheck       # Simple linter to check that your code does not contain non-ASCII identifiers
@@ -66,10 +20,8 @@ linters:
     - errname          # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
     - errorlint        # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - exhaustive       # check exhaustiveness of enum switch statements
-    - exportloopref    # checks for pointers to enclosing loop variables
     - forbidigo        # Forbids identifiers
     - forcetypeassert  # finds forced type assertions
-    - gci              # Gci control golang package import order and make it always deterministic.
     - gochecknoglobals # Checks that no globals are present in Go code
     - gocognit         # Computes and checks the cognitive complexity of functions
     - goconst          # Finds repeated strings that could be replaced by a constant
@@ -77,14 +29,10 @@ linters:
     - gocyclo          # Computes and checks the cyclomatic complexity of functions
     - godot            # Check if comments end in a period
     - godox            # Tool for detection of FIXME, TODO and other comment keywords
-    - gofmt            # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
-    - gofumpt          # Gofumpt checks whether code was gofumpt-ed.
     - goheader         # Checks is file header matches to pattern
-    - goimports        # Goimports does everything that gofmt does. Additionally it checks unused imports
     - gomoddirectives  # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
     - goprintffuncname # Checks that printf-like functions are named with `f` at the end
     - gosec            # Inspects source code for security problems
-    - gosimple         # Linter for Go source code that specializes in simplifying a code
     - govet            # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
     - grouper          # An analyzer to analyze expression groups.
     - importas         # Enforces consistent import aliases
@@ -102,11 +50,8 @@ linters:
     - predeclared      # find code that shadows one of Go's predeclared identifiers
     - revive           # golint replacement, finds style mistakes
     - staticcheck      # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
-    - stylecheck       # Stylecheck is a replacement for golint
     - tagliatelle      # Checks the struct tags.
-    - tenv             # tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
     - thelper          # thelper detects golang test helpers without t.Helper() call and checks the consistency of test helpers
-    - typecheck        # Like the front-end of a Go compiler, parses and type-checks Go code
     - unconvert        # Remove unnecessary type conversions
     - unparam          # Reports unused function parameters
     - unused           # Checks Go code for unused constants, variables, functions and types
@@ -131,21 +76,74 @@ linters:
     - tparallel        # tparallel detects inappropriate usage of t.Parallel() method in your Go test codes
     - wrapcheck        # Checks that errors returned from external packages are wrapped
     - wsl              # Whitespace Linter - Forces you to use empty lines!
-
-issues:
-  exclude-use-default: false
-  exclude-dirs-use-default: false
-  exclude-rules:
-    # Allow complex tests and examples, better to be self contained
-    - path: (examples|main\.go)
-      linters:
-        - gocognit
-        - forbidigo
-    - path: _test\.go
-      linters:
-        - gocognit
-
-    # Allow forbidden identifiers in CLI commands
-    - path: cmd
-      linters:
-        - forbidigo
+  settings:
+    staticcheck:
+      checks:
+        - all
+        # "could remove embedded field", to keep it explicit!
+        - -QF1008
+        # "could use tagged switch on enum", Cases conflicts with exhaustive!
+        - -QF1003
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      forbid:
+        - pattern: ^fmt.Print(f|ln)?$
+        - pattern: ^log.(Panic|Fatal|Print)(f|ln)?$
+        - pattern: ^os.Exit$
+        - pattern: ^panic$
+        - pattern: ^print(ln)?$
+        - pattern: ^testing.T.(Error|Errorf|Fatal|Fatalf|Fail|FailNow)$
+          pkg: ^testing$
+          msg: use testify/assert instead
+      analyze-types: true
+    gomodguard:
+      blocked:
+        modules:
+          - github.com/pkg/errors:
+              recommendations:
+                - errors
+    govet:
+      enable:
+        - shadow
+    revive:
+      rules:
+        # Prefer 'any' type alias over 'interface{}' for Go 1.18+ compatibility
+        - name: use-any
+          severity: warning
+          disabled: false
+    misspell:
+      locale: US
+    varnamelen:
+      max-distance: 12
+      min-name-length: 2
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+      ignore-decls:
+        - i int
+        - n int
+        - w io.Writer
+        - r io.Reader
+        - b []byte
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - forbidigo
+          - gocognit
+        path: (examples|main\.go)
+      - linters:
+          - gocognit
+        path: _test\.go
+      - linters:
+          - forbidigo
+        path: cmd
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
