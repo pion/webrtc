@@ -78,20 +78,14 @@ func TestPeerConnection_Close_PreICE(t *testing.T) {
 
 	assert.NoError(t, pcAnswer.SetRemoteDescription(answer))
 
-	for {
-		if pcAnswer.iceTransport.State() == ICETransportStateChecking {
-			break
-		}
+	for pcAnswer.iceTransport.State() != ICETransportStateChecking {
 		time.Sleep(time.Second / 4)
 	}
 
 	assert.NoError(t, pcAnswer.Close())
 
 	// Assert that ICETransport is shutdown, test timeout will prevent deadlock
-	for {
-		if pcAnswer.iceTransport.State() == ICETransportStateClosed {
-			return
-		}
+	for pcAnswer.iceTransport.State() != ICETransportStateClosed {
 		time.Sleep(time.Second / 4)
 	}
 }
