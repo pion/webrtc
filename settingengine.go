@@ -57,6 +57,8 @@ type SettingEngine struct {
 		UsernameFragment         string
 		Password                 string
 		IncludeLoopbackCandidate bool
+		HostUDPAdvertisedAddrsMapper func(*net.UDPAddr) []net.UDPAddr
+		HostTCPAdvertisedAddrsMapper func(*net.TCPAddr) []net.TCPAddr
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -265,6 +267,16 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
+}
+
+// SetHostUDPAdvertisedAddrsMapper sets the function that maps the local UDP address to the advertised UDP addresses.
+func (e *SettingEngine) SetHostUDPAdvertisedAddrsMapper(mapper func(*net.UDPAddr) []net.UDPAddr) {
+	e.candidates.HostUDPAdvertisedAddrsMapper = mapper
+}
+
+// SetHostTCPAdvertisedAddrsMapper sets the function that maps the local TCP address to the advertised TCP addresses.
+func (e *SettingEngine) SetHostTCPAdvertisedAddrsMapper(mapper func(*net.TCPAddr) []net.TCPAddr) {
+	e.candidates.HostTCPAdvertisedAddrsMapper = mapper
 }
 
 // SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful
