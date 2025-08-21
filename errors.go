@@ -231,6 +231,10 @@ var (
 	errPeerConnSetIdentityProviderNotImplemented = errors.New("TODO SetIdentityProvider")
 	errPeerConnWriteRTCPOpenWriteStream          = errors.New("WriteRTCP failed to open WriteStream")
 	errPeerConnTranscieverMidNil                 = errors.New("cannot find transceiver with mid")
+	errPeerConnEarlyMediaWithoutAnswer           = errors.New(
+		"cannot process early media without SDP answer," +
+			"use SettingEngine.SetHandleUndeclaredSSRCWithoutAnswer(true) to process without answer",
+	)
 
 	errRTPReceiverDTLSTransportNil            = errors.New("DTLSTransport must not be nil")
 	errRTPReceiverReceiveAlreadyCalled        = errors.New("Receive has already been called")
