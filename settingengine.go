@@ -109,6 +109,7 @@ type SettingEngine struct {
 	fireOnTrackBeforeFirstRTP                 bool
 	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
+	handleUndeclaredSSRCWithoutAnswer         bool
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
@@ -569,4 +570,10 @@ func (e *SettingEngine) SetFireOnTrackBeforeFirstRTP(fireOnTrackBeforeFirstRTP b
 // and relies on the ice failed state to detect the connection is interrupted.
 func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
 	e.disableCloseByDTLS = isEnabled
+}
+
+// SetHandleUndeclaredSSRCWithoutAnswer controls if an SDP answer is required for
+// processing early media of non-simulcast tracks.
+func (e *SettingEngine) SetHandleUndeclaredSSRCWithoutAnswer(handleUndeclaredSSRCWithoutAnswer bool) {
+	e.handleUndeclaredSSRCWithoutAnswer = handleUndeclaredSSRCWithoutAnswer
 }
