@@ -277,7 +277,7 @@ func satisfyTypeAndDirection(
 				RTPTransceiverDirectionSendonly,
 			}
 		case RTPTransceiverDirectionSendonly:
-			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly}
 		case RTPTransceiverDirectionRecvonly:
 			return []RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv}
 		default:
