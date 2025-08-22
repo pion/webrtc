@@ -1422,6 +1422,10 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
 		assert.Equal(t, codecMatchExact, matchType)
 		assert.EqualValues(t, 94, codecOfTr2.PayloadType)
+		codecPartialMatchOfTr2 := pc.GetTransceivers()[1].getCodecs()[2]
+		_, matchType = codecParametersFuzzySearch(codecPartialMatchOfTr2, codecs)
+		assert.Equal(t, codecMatchPartial, matchType)
+		assert.EqualValues(t, 98, codecPartialMatchOfTr2.PayloadType)
 		assert.NoError(t, pc.Close())
 	})
 
