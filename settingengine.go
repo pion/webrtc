@@ -110,6 +110,7 @@ type SettingEngine struct {
 	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
+	disableTransceiverReuseInRecvonly         bool
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
@@ -576,4 +577,24 @@ func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
 // processing early media of non-simulcast tracks.
 func (e *SettingEngine) SetHandleUndeclaredSSRCWithoutAnswer(handleUndeclaredSSRCWithoutAnswer bool) {
 	e.handleUndeclaredSSRCWithoutAnswer = handleUndeclaredSSRCWithoutAnswer
+}
+
+// SetDisableTransceiverReuseInRecvonly controls if a transceiver is re-used
+// when its current direction is `recvonly`.
+//
+// This is useful for the following scenario
+//   - Remote side sends `offer` with `sendonly` media section.
+//   - Local side creates transceiver in `SetRemoteDescription` and sets direction to `recvonly`.
+//   - Local side calls `AddTrack`.
+//   - As the current direction is `recvonly`, the transceiver added above will be re-used.
+//     That will set the direction to `sendrecv` and the generated `answer` will have `sendrecv`
+//     for that media section.
+//   - That answer becomes incompatible as the offerer is using `sendonly`.
+//
+// Note that local transceiver will be in `recvonly` for both `sendrecv` and `sendonly` directions
+// in the media section. If the `offer` did use `sendrecv`, it is possible to re-use that transceiver
+// for sending. So, disabling re-use will prohibit re-use in the `sendrecv` case also and hence is
+// slightly wasteful.
+func (e *SettingEngine) SetDisableTransceiverReuseInRecvonly(disableTransceiverReuseInRecvonly bool) {
+	e.disableTransceiverReuseInRecvonly = disableTransceiverReuseInRecvonly
 }

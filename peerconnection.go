@@ -1160,16 +1160,25 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				// if transceiver is create by remote sdp, set prefer codec same as remote peer
 				if codecs, err := codecsFromMediaDescription(media); err == nil {
 					filteredCodecs := []RTPCodecParameters{}
+					filteredCodecsPartial := []RTPCodecParameters{}
 					for _, codec := range codecs {
-						if c, matchType := codecParametersFuzzySearch(
+						c, matchType := codecParametersFuzzySearch(
 							codec,
 							pc.api.mediaEngine.getCodecsByKind(kind),
-						); matchType == codecMatchExact {
+						)
+						switch matchType {
+						case codecMatchExact:
 							// if codec match exact, use payloadtype register to mediaengine
 							codec.PayloadType = c.PayloadType
 							filteredCodecs = append(filteredCodecs, codec)
+						case codecMatchPartial:
+							codec.PayloadType = c.PayloadType
+							filteredCodecsPartial = append(filteredCodecsPartial, codec)
+
+						default:
 						}
 					}
+					filteredCodecs = append(filteredCodecs, filteredCodecsPartial...)
 					_ = transceiver.SetCodecPreferences(filteredCodecs)
 				}
 
@@ -2096,7 +2105,8 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 		// But that will cause sdp inflate. So we only check currentDirection's current value,
 		// that's worked for all browsers.
 		if transceiver.kind == track.Kind() && transceiver.Sender() == nil &&
-			currentDirection != RTPTransceiverDirectionSendrecv && currentDirection != RTPTransceiverDirectionSendonly {
+			currentDirection != RTPTransceiverDirectionSendrecv && currentDirection != RTPTransceiverDirectionSendonly &&
+			(!pc.api.settingEngine.disableTransceiverReuseInRecvonly || currentDirection != RTPTransceiverDirectionRecvonly) {
 			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
 			if err == nil {
 				err = transceiver.SetSender(sender, track)

@@ -707,41 +707,95 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 }
 
 func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
-	pc, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	tr, err := pc.AddTransceiverFromKind(
-		RTPCodecTypeVideo,
-		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
-	)
-	assert.NoError(t, err)
-
-	assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
-
-	addTrack := func() (TrackLocal, *RTPSender) {
-		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	t.Run("reuse test", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		sender, err := pc.AddTrack(track)
+		tr, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+		)
 		assert.NoError(t, err)
 
-		return track, sender
-	}
+		assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
 
-	track1, sender1 := addTrack()
-	assert.Equal(t, 1, len(pc.GetTransceivers()))
-	assert.Equal(t, sender1, tr.Sender())
-	assert.Equal(t, track1, tr.Sender().Track())
-	require.NoError(t, pc.RemoveTrack(sender1))
+		addTrack := func() (TrackLocal, *RTPSender) {
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+			assert.NoError(t, err)
 
-	track2, _ := addTrack()
-	assert.Equal(t, 1, len(pc.GetTransceivers()))
-	assert.Equal(t, track2, tr.Sender().Track())
+			sender, err := pc.AddTrack(track)
+			assert.NoError(t, err)
 
-	addTrack()
-	assert.Equal(t, 2, len(pc.GetTransceivers()))
+			return track, sender
+		}
 
-	assert.NoError(t, pc.Close())
+		track1, sender1 := addTrack()
+		assert.Equal(t, 1, len(pc.GetTransceivers()))
+		assert.Equal(t, sender1, tr.Sender())
+		assert.Equal(t, track1, tr.Sender().Track())
+		require.NoError(t, pc.RemoveTrack(sender1))
+
+		track2, _ := addTrack()
+		assert.Equal(t, 1, len(pc.GetTransceivers()))
+		assert.Equal(t, track2, tr.Sender().Track())
+
+		addTrack()
+		assert.Equal(t, 2, len(pc.GetTransceivers()))
+
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("reuse disable test", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetDisableTransceiverReuseInRecvonly(true)
+		pc, err := NewAPI(WithSettingEngine(se)).NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		tr, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+		)
+		assert.NoError(t, err)
+
+		assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
+
+		addTrack := func() (TrackLocal, *RTPSender) {
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+			assert.NoError(t, err)
+
+			sender, err := pc.AddTrack(track)
+			assert.NoError(t, err)
+
+			return track, sender
+		}
+
+		// force direction to `recvonly` and ensure SettingEngine setting disables re-use
+		tr.setCurrentDirection(RTPTransceiverDirectionRecvonly)
+		addTrack()
+		assert.Equal(t, 2, len(pc.GetTransceivers()))
+
+		// the newly added transceiver above will have a sender, so not re-usable
+		_, sender := addTrack()
+		assert.Equal(t, 3, len(pc.GetTransceivers()))
+
+		// remove last added track to make that transceiver re-usable
+		require.NoError(t, pc.RemoveTrack(sender))
+
+		track, sender := addTrack()
+		assert.Equal(t, 3, len(pc.GetTransceivers()))
+		var matchedTransceiver *RTPTransceiver
+		for _, tr := range pc.GetTransceivers() {
+			if tr.Sender() == sender {
+				matchedTransceiver = tr
+
+				break
+			}
+		}
+		assert.NotNil(t, matchedTransceiver)
+		assert.Equal(t, track, matchedTransceiver.Sender().Track())
+
+		assert.NoError(t, pc.Close())
+	})
 }
 
 func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {

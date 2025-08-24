@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pion/webrtc/v4/internal/fmtp"
@@ -153,6 +154,38 @@ func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) Paylo
 	}
 
 	return PayloadType(0)
+}
+
+// Given needle CodecParameters, returns if needle is RTX and
+// if primary codec corresponding to that needle is in the haystack of codecs.
+func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCodecParameters) (
+	isRTX bool, primaryExists bool,
+) {
+	if !strings.EqualFold(needle.MimeType, MimeTypeRTX) {
+		return
+	}
+
+	isRTX = true
+	parsed := fmtp.Parse(needle.MimeType, needle.ClockRate, needle.Channels, needle.SDPFmtpLine)
+	aptPayload, ok := parsed.Parameter("apt")
+	if !ok {
+		return
+	}
+
+	primaryPayloadType, err := strconv.Atoi(aptPayload)
+	if err != nil || primaryPayloadType < 0 || primaryPayloadType > 255 {
+		return
+	}
+
+	for _, c := range haystack {
+		if c.PayloadType == PayloadType(primaryPayloadType) {
+			primaryExists = true
+
+			return
+		}
+	}
+
+	return
 }
 
 // For now, only FlexFEC is supported.
