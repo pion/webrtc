@@ -17,11 +17,12 @@ import (
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	mid              atomic.Value // string
-	sender           atomic.Value // *RTPSender
-	receiver         atomic.Value // *RTPReceiver
-	direction        atomic.Value // RTPTransceiverDirection
-	currentDirection atomic.Value // RTPTransceiverDirection
+	mid                    atomic.Value // string
+	sender                 atomic.Value // *RTPSender
+	receiver               atomic.Value // *RTPReceiver
+	direction              atomic.Value // RTPTransceiverDirection
+	currentDirection       atomic.Value // RTPTransceiverDirection
+	currentRemoteDirection atomic.Value // RTPTransceiverDirection
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
@@ -220,6 +221,18 @@ func (t *RTPTransceiver) getCurrentDirection() RTPTransceiverDirection {
 	return RTPTransceiverDirectionUnknown
 }
 
+func (t *RTPTransceiver) setCurrentRemoteDirection(d RTPTransceiverDirection) {
+	t.currentRemoteDirection.Store(d)
+}
+
+func (t *RTPTransceiver) getCurrentRemoteDirection() RTPTransceiverDirection {
+	if v, ok := t.currentRemoteDirection.Load().(RTPTransceiverDirection); ok {
+		return v
+	}
+
+	return RTPTransceiverDirectionUnknown
+}
+
 func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cyclop
 	if err := t.Sender().ReplaceTrack(track); err != nil {
 		return err
@@ -248,6 +261,37 @@ func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cycl
 	}
 
 	return nil
+}
+
+func (t *RTPTransceiver) isSendAllowed(kind RTPCodecType) bool {
+	if t.kind != kind || t.Sender() != nil {
+		return false
+	}
+
+	// According to https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack, if the
+	// transceiver can be reused only if its currentDirection was never sendrecv or sendonly.
+	// But that will cause sdp to inflate. So we only check currentDirection's current value,
+	// that's worked for all browsers.
+	currentDirection := t.getCurrentDirection()
+	if currentDirection == RTPTransceiverDirectionSendrecv ||
+		currentDirection == RTPTransceiverDirectionSendonly {
+		return false
+	}
+
+	// `currentRemoteDirection` should be checked before using the transceiver for send.
+	// Remote directions could be
+	//   - `sendrecv` or `recvonly` - can send, remote direction will transition from
+	//     `sendrecv` -> `recvonly` if a remote track was removed.
+	//   - `sendonly` or `inactive` - cannot send, remote direction will transitions from
+	//     `sendonly` -> `inactive` if a remote track was removed.
+	//   - `unknown` - can send - we are the offering side and remote direction is unknown
+	currentRemoteDirection := t.getCurrentRemoteDirection()
+	if currentRemoteDirection == RTPTransceiverDirectionSendonly ||
+		currentRemoteDirection == RTPTransceiverDirectionInactive {
+		return false
+	}
+
+	return true
 }
 
 func findByMid(mid string, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {

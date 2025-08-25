@@ -745,56 +745,141 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 		assert.NoError(t, pc.Close())
 	})
 
-	t.Run("reuse disable test", func(t *testing.T) {
-		se := SettingEngine{}
-		se.SetDisableTransceiverReuseInRecvonly(true)
-		pc, err := NewAPI(WithSettingEngine(se)).NewPeerConnection(Configuration{})
-		assert.NoError(t, err)
-
-		tr, err := pc.AddTransceiverFromKind(
-			RTPCodecTypeVideo,
-			RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
-		)
-		assert.NoError(t, err)
-
-		assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
-
-		addTrack := func() (TrackLocal, *RTPSender) {
-			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
-			assert.NoError(t, err)
-
-			sender, err := pc.AddTrack(track)
-			assert.NoError(t, err)
-
-			return track, sender
+	t.Run("reuse remote direction test", func(t *testing.T) {
+		testCases := []struct {
+			remoteDirection         RTPTransceiverDirection
+			remoteDirectionNoSender RTPTransceiverDirection // direction should switch to this on track removal
+			isSendAllowed           bool
+		}{
+			{
+				remoteDirection:         RTPTransceiverDirectionSendrecv,
+				remoteDirectionNoSender: RTPTransceiverDirectionRecvonly,
+				isSendAllowed:           true,
+			},
+			{
+				remoteDirection:         RTPTransceiverDirectionSendonly,
+				remoteDirectionNoSender: RTPTransceiverDirectionInactive,
+				isSendAllowed:           false,
+			},
 		}
 
-		// force direction to `recvonly` and ensure SettingEngine setting disables re-use
-		tr.setCurrentDirection(RTPTransceiverDirectionRecvonly)
-		addTrack()
-		assert.Equal(t, 2, len(pc.GetTransceivers()))
+		for _, testCase := range testCases {
+			t.Run(testCase.remoteDirection.String(), func(t *testing.T) {
+				pcOffer, pcAnswer, err := newPair()
+				require.NoError(t, err)
+				assert.NoError(t, err)
 
-		// the newly added transceiver above will have a sender, so not re-usable
-		_, sender := addTrack()
-		assert.Equal(t, 3, len(pc.GetTransceivers()))
+				remoteTrack, err := NewTrackLocalStaticSample(
+					RTPCodecCapability{
+						MimeType:    MimeTypeH264,
+						SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+					},
+					"track-id",
+					"track-label",
+				)
+				assert.NoError(t, err)
 
-		// remove last added track to make that transceiver re-usable
-		require.NoError(t, pc.RemoveTrack(sender))
+				remoteTransceiver, err := pcOffer.AddTransceiverFromTrack(remoteTrack, RTPTransceiverInit{
+					Direction: testCase.remoteDirection,
+				})
+				assert.NoError(t, err)
 
-		track, sender := addTrack()
-		assert.Equal(t, 3, len(pc.GetTransceivers()))
-		var matchedTransceiver *RTPTransceiver
-		for _, tr := range pc.GetTransceivers() {
-			if tr.Sender() == sender {
-				matchedTransceiver = tr
+				var remoteSender *RTPSender
+				for _, tr := range pcOffer.GetTransceivers() {
+					if tr == remoteTransceiver {
+						remoteSender = tr.Sender()
 
-				break
-			}
+						break
+					}
+				}
+
+				addTrack := func() (TrackLocal, *RTPSender) {
+					track, err1 := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+					assert.NoError(t, err1)
+
+					sender, err1 := pcAnswer.AddTrack(track)
+					assert.NoError(t, err1)
+
+					return track, sender
+				}
+
+				offer, err := pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				// should have created local transceiver from remote description
+				localTransceivers := pcAnswer.GetTransceivers()
+				assert.Equal(t, 1, len(localTransceivers))
+				assert.Equal(t, testCase.remoteDirection, localTransceivers[0].getCurrentRemoteDirection())
+
+				localTrack, localSender := addTrack()
+				localTransceivers = pcAnswer.GetTransceivers()
+				if testCase.isSendAllowed {
+					assert.Equal(t, 1, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[0].Sender())
+					assert.Equal(t, localTrack, localTransceivers[0].Sender().Track())
+				} else {
+					assert.Equal(t, 2, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[1].Sender())
+					assert.Equal(t, localTrack, localTransceivers[1].Sender().Track())
+				}
+
+				answer, err := pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				// even if send was not allowed and answering side created a new transcever,
+				// it would not have been added to answer because there was no media section
+				// to assign it to, so the offer side should still see only one transceiver.
+				assert.Equal(t, 1, len(pcOffer.GetTransceivers()))
+
+				// remove local track and do a negotiation to clear sender from answer
+				require.NoError(t, pcAnswer.RemoveTrack(localSender))
+
+				offer, err = pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				assert.Equal(t, testCase.remoteDirection, localTransceivers[0].getCurrentRemoteDirection())
+
+				answer, err = pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				// remove remote track from offer to change current remote direction
+				require.NoError(t, pcOffer.RemoveTrack(remoteSender))
+
+				offer, err = pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				assert.Equal(t, testCase.remoteDirectionNoSender, localTransceivers[0].getCurrentRemoteDirection())
+
+				// try adding again
+				localTrack, localSender = addTrack()
+				localTransceivers = pcAnswer.GetTransceivers()
+				if testCase.isSendAllowed {
+					assert.Equal(t, 1, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[0].Sender())
+					assert.Equal(t, localTrack, localTransceivers[0].Sender().Track())
+				} else {
+					// the unmatched local transceiver should be re-usable
+					assert.Equal(t, 2, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[1].Sender())
+					assert.Equal(t, localTrack, localTransceivers[1].Sender().Track())
+				}
+
+				answer, err = pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				closePairNow(t, pcOffer, pcAnswer)
+			})
 		}
-		assert.NotNil(t, matchedTransceiver)
-		assert.Equal(t, track, matchedTransceiver.Sender().Track())
-
-		assert.NoError(t, pc.Close())
 	})
 }
 
