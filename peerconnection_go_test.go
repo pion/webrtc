@@ -1285,6 +1285,146 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 	}
 }
 
+func TestPeerConnection_MediaDirectionInSDP(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	createTransceiver := func(pc *PeerConnection, dir RTPTransceiverDirection) (*RTPSender, error) {
+		// AddTransceiverFromKind() can't be used with sendonly
+		if dir == RTPTransceiverDirectionSendonly {
+			codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+
+			track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+			if err != nil {
+				return nil, err
+			}
+
+			transceiver, err := pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
+				{Direction: dir},
+			}...)
+
+			return transceiver.Sender(), err
+		}
+
+		transceiver, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RTPTransceiverInit{Direction: dir},
+		)
+
+		return transceiver.Sender(), err
+	}
+
+	testCases := []struct {
+		remoteDirections         []RTPTransceiverDirection
+		numExpectedTransceivers  int
+		numExpectedMediaSections int
+		localDirections          []RTPTransceiverDirection
+	}{
+		{
+			remoteDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendonly,
+				RTPTransceiverDirectionInactive,
+			},
+			numExpectedTransceivers:  2,
+			numExpectedMediaSections: 1,
+			localDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionRecvonly,
+				RTPTransceiverDirectionInactive,
+			},
+		},
+		{
+			remoteDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionRecvonly,
+			},
+			numExpectedTransceivers:  1,
+			numExpectedMediaSections: 1,
+			localDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionSendonly,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run("add track before remote description - "+testCase.remoteDirections[0].String(), func(t *testing.T) {
+			pcOffer, pcAnswer, err := newPair()
+			assert.NoError(t, err)
+
+			// add track to answerer before any remote description, added transceiver will be `sendrecv`
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+			assert.NoError(t, err)
+			_, err = pcAnswer.AddTrack(track)
+			assert.NoError(t, err)
+
+			sender, err := createTransceiver(pcOffer, testCase.remoteDirections[0])
+			assert.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+			assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+			// transceiver created from remote description
+			//  - cannot match track added above if remote direction is `sendonly`
+			//  - can match track added above if remote direction is `sendrecv`
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+			assert.Equal(t, testCase.numExpectedTransceivers, len(pcAnswer.GetTransceivers()))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			assert.NoError(t, err)
+
+			// direction has to be `recvonly` in answer if remote direction is `sendonly`
+			// direction has to be `sendrecv` in answer if remote direction is `sendrecv`
+			parsed, err := answer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok := parsed.MediaDescriptions[0].Attribute(testCase.localDirections[0].String())
+			assert.True(t, ok)
+
+			assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+			assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			// remove the remote track and re-negotiate
+			//  - both directions should become `inactive` if original remote direction was `sendonly`
+			//  - remote direction should become `recvonly and local direction should become `sendonly`
+			//    if original remote direction was `sendrecv`
+			assert.NoError(t, pcOffer.RemoveTrack(sender))
+
+			offer, err = pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+
+			// offer direction should have changed to the following after removing track
+			//   - `inactive` if original offer direction was `sendonly`
+			//   - `recvonly` if original offer direction was `sendrecv`
+			parsed, err = offer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok = parsed.MediaDescriptions[0].Attribute(testCase.remoteDirections[1].String())
+			assert.True(t, ok)
+
+			assert.NoError(t, pcOffer.SetLocalDescription(offer))
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err = pcAnswer.CreateAnswer(nil)
+			assert.NoError(t, err)
+
+			// answer direction should have changed to
+			//   - `inactive` if original offer direction was `sendonly`
+			//   - `sendonly` if original offer direction was `sendrecv`
+			parsed, err = answer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok = parsed.MediaDescriptions[0].Attribute(testCase.localDirections[1].String())
+			assert.True(t, ok)
+
+			closePairNow(t, pcOffer, pcAnswer)
+		})
+	}
+}
+
 func TestPeerConnection_SessionID(t *testing.T) {
 	defer test.TimeOut(time.Second * 10).Stop()
 	defer test.CheckRoutines(t)()
