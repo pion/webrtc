@@ -1137,6 +1137,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 					return err
 				}
 			}
+			if transceiver != nil {
+				transceiver.setCurrentRemoteDirection(direction)
+			}
 
 			switch {
 			case transceiver == nil:
@@ -1153,6 +1156,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				}
 
 				transceiver = newRTPTransceiver(receiver, nil, localDirection, kind, pc.api)
+				transceiver.setCurrentRemoteDirection(direction)
 				pc.mu.Lock()
 				pc.addRTPTransceiver(transceiver)
 				pc.mu.Unlock()
@@ -2099,29 +2103,24 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	for _, transceiver := range pc.rtpTransceivers {
-		currentDirection := transceiver.getCurrentDirection()
-		// According to https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack, if the
-		// transceiver can be reused only if it's currentDirection never be sendrecv or sendonly.
-		// But that will cause sdp inflate. So we only check currentDirection's current value,
-		// that's worked for all browsers.
-		if transceiver.kind == track.Kind() && transceiver.Sender() == nil &&
-			currentDirection != RTPTransceiverDirectionSendrecv && currentDirection != RTPTransceiverDirectionSendonly &&
-			(!pc.api.settingEngine.disableTransceiverReuseInRecvonly || currentDirection != RTPTransceiverDirectionRecvonly) {
-			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
-			if err == nil {
-				err = transceiver.SetSender(sender, track)
-				if err != nil {
-					_ = sender.Stop()
-					transceiver.setSender(nil)
-				}
-			}
-			if err != nil {
-				return nil, err
-			}
-			pc.onNegotiationNeeded()
-
-			return sender, nil
+		if !transceiver.isSendAllowed(track.Kind()) {
+			continue
 		}
+
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err == nil {
+			err = transceiver.SetSender(sender, track)
+			if err != nil {
+				_ = sender.Stop()
+				transceiver.setSender(nil)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		pc.onNegotiationNeeded()
+
+		return sender, nil
 	}
 
 	transceiver, err := pc.newTransceiverFromTrack(RTPTransceiverDirectionSendrecv, track)
