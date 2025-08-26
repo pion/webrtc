@@ -188,6 +188,19 @@ func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCod
 	return
 }
 
+// Filter out RTX codecs that do not have a primary codec.
+func filterUnattachedRTX(codecs []RTPCodecParameters) []RTPCodecParameters {
+	for i := len(codecs) - 1; i >= 0; i-- {
+		c := codecs[i]
+		if isRTX, primaryExists := primaryPayloadTypeForRTXExists(c, codecs); isRTX && !primaryExists {
+			// no primary for RTX, remove the RTX
+			codecs = append(codecs[:i], codecs[i+1:]...)
+		}
+	}
+
+	return codecs
+}
+
 // For now, only FlexFEC is supported.
 func findFECPayloadType(haystack []RTPCodecParameters) PayloadType {
 	for _, c := range haystack {

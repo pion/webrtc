@@ -8,7 +8,6 @@ package webrtc
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -62,25 +61,12 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 		}
 	}
 
-	// remove RTX codecs if there is no corresponding primary codec
-	for i := len(codecs) - 1; i >= 0; i-- {
-		c := codecs[i]
-		if !strings.EqualFold(c.MimeType, MimeTypeRTX) {
-			continue
-		}
-
-		if isRTX, primaryExists := primaryPayloadTypeForRTXExists(c, codecs); isRTX && !primaryExists {
-			// no primary for RTX, remove the RTX
-			codecs = append(codecs[:i], codecs[i+1:]...)
-		}
-	}
-
-	t.codecs = codecs
+	t.codecs = filterUnattachedRTX(codecs)
 
 	return nil
 }
 
-// Codecs returns list of supported codecs.
+// getCodecs returns list of supported codecs.
 func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -101,7 +87,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 		}
 	}
 
-	return filteredCodecs
+	return filterUnattachedRTX(filteredCodecs)
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one.
