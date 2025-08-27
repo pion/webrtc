@@ -1502,13 +1502,13 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 }
 
 func TestTransceiverCreatedByRemoteSdpHasSameCodecOrderAsRemote(t *testing.T) {
-	t.Run("Codec MatchExact", func(t *testing.T) { //nolint:dupl
+	t.Run("Codec MatchExact and MatchPartial", func(t *testing.T) { //nolint:dupl
 		const remoteSdp = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
 a=group:BUNDLE 0 1
-m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106
+m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106 49
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
 a=ice-options:google-ice
@@ -1519,8 +1519,10 @@ a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
 a=rtpmap:94 VP8/90000
 a=rtpmap:106 H264/90000
 a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:49 H265/90000
+a=fmtp:49 level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST
 a=sendonly
-m=video 60323 UDP/TLS/RTP/SAVPF 108 98 125
+m=video 60323 UDP/TLS/RTP/SAVPF 49 108 98 125
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
 a=ice-options:google-ice
@@ -1532,6 +1534,8 @@ a=rtpmap:108 VP8/90000
 a=sendonly
 a=rtpmap:125 H264/90000
 a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:49 H265/90000
+a=fmtp:49 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST
 `
 		mediaEngine := MediaEngine{}
 		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
@@ -1544,6 +1548,12 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 			},
 			PayloadType: 98,
 		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH265, 90000, 0, "level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST", nil,
+			},
+			PayloadType: 49,
+		}, RTPCodecTypeVideo))
 
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
@@ -1552,20 +1562,35 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 			Type: SDPTypeOffer,
 			SDP:  remoteSdp,
 		}))
+
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
-		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+
 		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
-		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+
+		codecsOfTr1 := pc.GetTransceivers()[0].getCodecs()
+		_, matchType := codecParametersFuzzySearch(codecsOfTr1[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
-		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.EqualValues(t, 98, codecsOfTr1[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[1], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 94, codecOfTr2.PayloadType)
-		codecPartialMatchOfTr2 := pc.GetTransceivers()[1].getCodecs()[2]
-		_, matchType = codecParametersFuzzySearch(codecPartialMatchOfTr2, codecs)
+		assert.EqualValues(t, 94, codecsOfTr1[1].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[2], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 49, codecsOfTr1[2].PayloadType)
+
+		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 94, codecsOfTr2[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
+		// as H.265 (49) is a partial match, it gets pushed to the end
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[2], codecs)
 		assert.Equal(t, codecMatchPartial, matchType)
-		assert.EqualValues(t, 98, codecPartialMatchOfTr2.PayloadType)
+		assert.EqualValues(t, 49, codecsOfTr2[2].PayloadType)
+
 		assert.NoError(t, pc.Close())
 	})
 
@@ -1613,21 +1638,34 @@ a=sendonly
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
+
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
 			Type: SDPTypeOffer,
 			SDP:  remoteSdp,
 		}))
+
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
-		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+
 		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
-		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+
+		codecsOfTr1 := pc.GetTransceivers()[0].getCodecs()
+		_, matchType := codecParametersFuzzySearch(codecsOfTr1[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
-		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.EqualValues(t, 98, codecsOfTr1[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 106, codecsOfTr1[1].PayloadType)
+
+		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
 		// h.264/profile-id=640032 should be remap to 106 as same as transceiver 1
-		assert.EqualValues(t, 106, codecOfTr2.PayloadType)
+		assert.EqualValues(t, 106, codecsOfTr2[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
+
 		assert.NoError(t, pc.Close())
 	})
 }

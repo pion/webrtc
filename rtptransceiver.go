@@ -8,10 +8,13 @@ package webrtc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
@@ -73,7 +76,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
 	if len(t.codecs) == 0 {
-		return mediaEngineCodecs
+		return filterUnattachedRTX(mediaEngineCodecs)
 	}
 
 	filteredCodecs := []RTPCodecParameters{}
@@ -88,6 +91,96 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	}
 
 	return filterUnattachedRTX(filteredCodecs)
+}
+
+// match codecs from remote description, used when remote is offerer and creating a transceiver
+// from remote description with the aim of keeping order of codecs in remote description.
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
+	remoteCodecs, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return
+	}
+
+	// make a copy as this slice is modified
+	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
+
+	// find codec matches between what is in remote description and
+	// the transceivers codecs and use payload type registered to
+	// media engine.
+	payloadMapping := make(map[PayloadType]PayloadType) // for RTX re-mapping later
+	filterByMatchType := func(matchFilter codecMatchType) []RTPCodecParameters {
+		filteredCodecs := []RTPCodecParameters{}
+		for remoteCodecIdx := len(remoteCodecs) - 1; remoteCodecIdx >= 0; remoteCodecIdx-- {
+			remoteCodec := remoteCodecs[remoteCodecIdx]
+			if strings.EqualFold(remoteCodec.RTPCodecCapability.MimeType, MimeTypeRTX) {
+				continue
+			}
+
+			matchCodec, matchType := codecParametersFuzzySearch(
+				remoteCodec,
+				leftCodecs,
+			)
+			if matchType == matchFilter {
+				payloadMapping[remoteCodec.PayloadType] = matchCodec.PayloadType
+
+				remoteCodec.PayloadType = matchCodec.PayloadType
+				filteredCodecs = append([]RTPCodecParameters{remoteCodec}, filteredCodecs...)
+
+				// removed matched codec for next round
+				remoteCodecs = append(remoteCodecs[:remoteCodecIdx], remoteCodecs[remoteCodecIdx+1:]...)
+
+				needleFmtp := fmtp.Parse(
+					matchCodec.RTPCodecCapability.MimeType,
+					matchCodec.RTPCodecCapability.ClockRate,
+					matchCodec.RTPCodecCapability.Channels,
+					matchCodec.RTPCodecCapability.SDPFmtpLine,
+				)
+
+				for leftCodecIdx := len(leftCodecs) - 1; leftCodecIdx >= 0; leftCodecIdx-- {
+					leftCodec := leftCodecs[leftCodecIdx]
+					leftCodecFmtp := fmtp.Parse(
+						leftCodec.RTPCodecCapability.MimeType,
+						leftCodec.RTPCodecCapability.ClockRate,
+						leftCodec.RTPCodecCapability.Channels,
+						leftCodec.RTPCodecCapability.SDPFmtpLine,
+					)
+
+					if needleFmtp.Match(leftCodecFmtp) {
+						leftCodecs = append(leftCodecs[:leftCodecIdx], leftCodecs[leftCodecIdx+1:]...)
+
+						break
+					}
+				}
+			}
+		}
+
+		return filteredCodecs
+	}
+
+	filteredCodecs := filterByMatchType(codecMatchExact)
+	filteredCodecs = append(filteredCodecs, filterByMatchType(codecMatchPartial)...)
+
+	// find RTX associations and add those
+	for remotePayloadType, mediaEnginePayloadType := range payloadMapping {
+		remoteRTX := findRTXPayloadType(remotePayloadType, remoteCodecs)
+		if remoteRTX == PayloadType(0) {
+			continue
+		}
+
+		mediaEngineRTX := findRTXPayloadType(mediaEnginePayloadType, leftCodecs)
+		if mediaEngineRTX == PayloadType(0) {
+			continue
+		}
+
+		for _, rtxCodec := range leftCodecs {
+			if rtxCodec.PayloadType == mediaEngineRTX {
+				filteredCodecs = append(filteredCodecs, rtxCodec)
+
+				break
+			}
+		}
+	}
+	_ = t.SetCodecPreferences(filteredCodecs)
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one.

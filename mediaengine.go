@@ -630,6 +630,23 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			return err
 		}
 
+		addIfNew := func(existingCodecs []RTPCodecParameters, codec RTPCodecParameters) []RTPCodecParameters {
+			found := false
+			for _, existingCodec := range existingCodecs {
+				if existingCodec.PayloadType == codec.PayloadType {
+					found = true
+
+					break
+				}
+			}
+
+			if !found {
+				existingCodecs = append(existingCodecs, codec)
+			}
+
+			return existingCodecs
+		}
+
 		exactMatches := make([]RTPCodecParameters, 0, len(codecs))
 		partialMatches := make([]RTPCodecParameters, 0, len(codecs))
 
@@ -642,9 +659,24 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			remoteCodec.RTCPFeedback = rtcpFeedbackIntersection(localCodec.RTCPFeedback, remoteCodec.RTCPFeedback)
 
 			if matchType == codecMatchExact {
-				exactMatches = append(exactMatches, remoteCodec)
+				exactMatches = addIfNew(exactMatches, remoteCodec)
 			} else if matchType == codecMatchPartial {
-				partialMatches = append(partialMatches, remoteCodec)
+				partialMatches = addIfNew(partialMatches, remoteCodec)
+			}
+		}
+		// second pass in case there were missed RTX codecs
+		for _, remoteCodec := range codecs {
+			localCodec, matchType, mErr := m.matchRemoteCodec(remoteCodec, typ, exactMatches, partialMatches)
+			if mErr != nil {
+				return mErr
+			}
+
+			remoteCodec.RTCPFeedback = rtcpFeedbackIntersection(localCodec.RTCPFeedback, remoteCodec.RTCPFeedback)
+
+			if matchType == codecMatchExact {
+				exactMatches = addIfNew(exactMatches, remoteCodec)
+			} else if matchType == codecMatchPartial {
+				partialMatches = addIfNew(partialMatches, remoteCodec)
 			}
 		}
 

@@ -27,6 +27,7 @@ import (
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -766,7 +767,6 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 		for _, testCase := range testCases {
 			t.Run(testCase.remoteDirection.String(), func(t *testing.T) {
 				pcOffer, pcAnswer, err := newPair()
-				require.NoError(t, err)
 				assert.NoError(t, err)
 
 				remoteTrack, err := NewTrackLocalStaticSample(
@@ -881,6 +881,184 @@ func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestAddTransceiverFromRemoteDescription(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// offer side
+	se := SettingEngine{}
+	se.DisableMediaEngineCopy(true)
+	mediaEngineOffer := &MediaEngine{}
+	// offer side has fewer codecs than answer side
+	for _, codec := range []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=50", nil},
+			PayloadType:        51,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        50,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        52,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=52", nil},
+			PayloadType:        53,
+		},
+	} {
+		assert.NoError(t, mediaEngineOffer.RegisterCodec(codec, RTPCodecTypeVideo))
+	}
+	pcOffer, err := NewAPI(WithSettingEngine(se), WithMediaEngine(mediaEngineOffer)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	// answer side
+	mediaEngineAnswer := &MediaEngine{}
+	// answer has more codecs than offer side and in different order
+	for _, codec := range []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        82,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=82", nil},
+			PayloadType:        83,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        80,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=80", nil},
+			PayloadType:        81,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/av1", 90000, 0, "", nil},
+			PayloadType:        84,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=84", nil},
+			PayloadType:        85,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/h265", 90000, 0, "", nil},
+			PayloadType:        86,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=86", nil},
+			PayloadType:        87,
+		},
+	} {
+		assert.NoError(t, mediaEngineAnswer.RegisterCodec(codec, RTPCodecTypeVideo))
+	}
+	pcAnswer, err := NewAPI(WithMediaEngine(mediaEngineAnswer)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1")
+	require.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromTrack(track1)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+	// this should create a transceiver on answer side from remote description and
+	// set codec prefereces with order of codecs in offer using the corresponding
+	// payload types from the media engine codecs
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answerSideTransceivers := pcAnswer.GetTransceivers()
+	assert.Equal(t, 1, len(answerSideTransceivers))
+
+	// media engine updates negotiated codecs from remote description,
+	// so payload type will be what is in the offer
+	// all rtx are placed later and could be in any order
+	checkPreferredCodecs := func(
+		actualPreferredCodecs []RTPCodecParameters,
+		expectedPreferredCodecsPrimary []RTPCodecParameters,
+		expectedPreferredCodecsRTX []RTPCodecParameters,
+	) {
+		assert.Equal(
+			t,
+			len(expectedPreferredCodecsPrimary)+len(expectedPreferredCodecsRTX),
+			len(actualPreferredCodecs),
+		)
+
+		for i, expectedPreferredCodec := range expectedPreferredCodecsPrimary {
+			expectedFmtp := fmtp.Parse(
+				expectedPreferredCodec.RTPCodecCapability.MimeType,
+				expectedPreferredCodec.RTPCodecCapability.ClockRate,
+				expectedPreferredCodec.RTPCodecCapability.Channels,
+				expectedPreferredCodec.RTPCodecCapability.SDPFmtpLine,
+			)
+			actualFmtp := fmtp.Parse(
+				actualPreferredCodecs[i].RTPCodecCapability.MimeType,
+				actualPreferredCodecs[i].RTPCodecCapability.ClockRate,
+				actualPreferredCodecs[i].RTPCodecCapability.Channels,
+				actualPreferredCodecs[i].RTPCodecCapability.SDPFmtpLine,
+			)
+			assert.True(t, expectedFmtp.Match(actualFmtp))
+		}
+
+		for _, expectedPreferredCodec := range expectedPreferredCodecsRTX {
+			expectedFmtp := fmtp.Parse(
+				expectedPreferredCodec.RTPCodecCapability.MimeType,
+				expectedPreferredCodec.RTPCodecCapability.ClockRate,
+				expectedPreferredCodec.RTPCodecCapability.Channels,
+				expectedPreferredCodec.RTPCodecCapability.SDPFmtpLine,
+			)
+
+			found := false
+			for j := len(expectedPreferredCodecsPrimary); j < len(actualPreferredCodecs); j++ {
+				actualFmtp := fmtp.Parse(
+					actualPreferredCodecs[j].RTPCodecCapability.MimeType,
+					actualPreferredCodecs[j].RTPCodecCapability.ClockRate,
+					actualPreferredCodecs[j].RTPCodecCapability.Channels,
+					actualPreferredCodecs[j].RTPCodecCapability.SDPFmtpLine,
+				)
+				if expectedFmtp.Match(actualFmtp) {
+					found = true
+
+					break
+				}
+			}
+			assert.True(t, found)
+		}
+	}
+
+	preferredCodecsPrimary := []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        50,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        52,
+		},
+	}
+	preferredCodecsRTX := []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=50", nil},
+			PayloadType:        51,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=52", nil},
+			PayloadType:        53,
+		},
+	}
+
+	checkPreferredCodecs(answerSideTransceivers[0].getCodecs(), preferredCodecsPrimary, preferredCodecsRTX)
+
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {
