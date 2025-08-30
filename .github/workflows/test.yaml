@@ -23,7 +23,7 @@ jobs:
     uses: pion/.goassets/.github/workflows/test.reusable.yml@master
     strategy:
       matrix:
-        go: ["1.24", "1.23"] # auto-update/supported-go-version-list
+        go: ["1.25", "1.24"] # auto-update/supported-go-version-list
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
@@ -33,7 +33,7 @@ jobs:
     uses: pion/.goassets/.github/workflows/test-i386.reusable.yml@master
     strategy:
       matrix:
-        go: ["1.24", "1.23"] # auto-update/supported-go-version-list
+        go: ["1.25", "1.24"] # auto-update/supported-go-version-list
       fail-fast: false
     with:
       go-version: ${{ matrix.go }}
@@ -41,5 +41,5 @@ jobs:
   test-wasm:
     uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
     with:
-      go-version: "1.24" # auto-update/latest-go-version
+      go-version: "1.25" # auto-update/latest-go-version
     secrets: inherit
