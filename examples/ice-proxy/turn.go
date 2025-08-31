@@ -13,7 +13,7 @@ import (
 )
 
 func newTURNServer() *turn.Server {
-	tcpListener, err := net.Listen("tcp4", turnServerAddr)
+	tcpListener, err := net.Listen("tcp4", turnServerAddr) // nolint: noctx
 	if err != nil {
 		panic(err)
 	}

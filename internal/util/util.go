@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Package util provides auxiliary functions internally used in webrtc package
-package util
+package util //nolint: revive
 
 import (
 	"errors"

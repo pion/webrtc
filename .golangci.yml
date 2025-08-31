@@ -80,10 +80,8 @@ linters:
     staticcheck:
       checks:
         - all
-        # "could remove embedded field", to keep it explicit!
-        - -QF1008
-        # "could use tagged switch on enum", Cases conflicts with exhaustive!
-        - -QF1003
+        - -QF1008 # "could remove embedded field", to keep it explicit!
+        - -QF1003 # "could use tagged switch on enum", Cases conflicts with exhaustive!
     exhaustive:
       default-signifies-exhaustive: true
     forbidigo:
@@ -93,10 +91,6 @@ linters:
         - pattern: ^os.Exit$
         - pattern: ^panic$
         - pattern: ^print(ln)?$
-        - pattern: ^testing.T.(Error|Errorf|Fatal|Fatalf|Fail|FailNow)$
-          pkg: ^testing$
-          msg: use testify/assert instead
-      analyze-types: true
     gomodguard:
       blocked:
         modules:
@@ -106,12 +100,6 @@ linters:
     govet:
       enable:
         - shadow
-    revive:
-      rules:
-        # Prefer 'any' type alias over 'interface{}' for Go 1.18+ compatibility
-        - name: use-any
-          severity: warning
-          disabled: false
     misspell:
       locale: US
     varnamelen:
@@ -132,18 +120,15 @@ linters:
       - linters:
           - forbidigo
           - gocognit
-        path: (examples|main\.go)
-      - linters:
-          - gocognit
-        path: _test\.go
+        path: (examples|main\.go|_test\.go)
       - linters:
           - forbidigo
         path: cmd
 formatters:
   enable:
-    - gci
-    - gofmt
-    - gofumpt
-    - goimports
+    - gci              # Gci control golang package import order and make it always deterministic.
+    - gofmt            # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
+    - gofumpt          # Gofumpt checks whether code was gofumpt-ed.
+    - goimports        # Goimports does everything that gofmt does. Additionally it checks unused imports
   exclusions:
     generated: lax
