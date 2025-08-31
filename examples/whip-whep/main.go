@@ -146,9 +146,8 @@ func whipHandler(res http.ResponseWriter, req *http.Request) { // nolint: cyclop
 						fmt.Printf("***** EOF reading RTCP from publish peer connection\n")
 
 						break
-					} else {
-						panic(err)
 					}
+					panic(err)
 				}
 			}
 		}()
@@ -160,9 +159,8 @@ func whipHandler(res http.ResponseWriter, req *http.Request) { // nolint: cyclop
 						fmt.Printf("***** EOF reading RTP from publish peer connection\n")
 
 						break
-					} else {
-						panic(err)
 					}
+					panic(err)
 				}
 
 				// Strip any WHIP extensions before forwarding to WHEP

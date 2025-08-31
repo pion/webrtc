@@ -39,7 +39,7 @@ func (d *proxyDialer) Dial(network, addr string) (net.Conn, error) {
 		panic("unsupported proxy network type")
 	}
 
-	conn, err := net.Dial(network, d.proxyAddr)
+	conn, err := net.Dial(network, d.proxyAddr) // nolint: noctx
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ func (d *proxyDialer) Dial(network, addr string) (net.Conn, error) {
 }
 
 func newHTTPProxy() *url.URL {
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", "localhost:0") // nolint: noctx
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +109,7 @@ func proxyHandleConn(clientConn net.Conn) {
 	}
 
 	// Establish a connection to the target server
-	targetConn, err := net.Dial("tcp", req.URL.Host)
+	targetConn, err := net.Dial("tcp", req.URL.Host) // nolint: noctx
 	if err != nil {
 		panic(err)
 	}
