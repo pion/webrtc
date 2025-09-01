@@ -91,6 +91,10 @@ linters:
         - pattern: ^os.Exit$
         - pattern: ^panic$
         - pattern: ^print(ln)?$
+        - pattern: ^testing.T.(Error|Errorf|Fatal|Fatalf|Fail|FailNow)$
+          pkg: ^testing$
+          msg: use testify/assert instead
+      analyze-types: true
     gomodguard:
       blocked:
         modules:
@@ -100,6 +104,12 @@ linters:
     govet:
       enable:
         - shadow
+    revive:
+      rules:
+        # Prefer 'any' type alias over 'interface{}' for Go 1.18+ compatibility
+        - name: use-any
+          severity: warning
+          disabled: false
     misspell:
       locale: US
     varnamelen:
@@ -120,7 +130,10 @@ linters:
       - linters:
           - forbidigo
           - gocognit
-        path: (examples|main\.go|_test\.go)
+        path: (examples|main\.go)
+      - linters:
+          - gocognit
+        path: _test\.go
       - linters:
           - forbidigo
         path: cmd
