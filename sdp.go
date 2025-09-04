@@ -541,7 +541,7 @@ func addSenderSDP(
 	}
 }
 
-//nolint:cyclop
+//nolint:cyclop, gocognit
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -575,7 +575,11 @@ func addTransceiverSDP(
 		media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
-			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			if feedback.Parameter == "" {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s", codec.PayloadType, feedback.Type))
+			} else {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			}
 		}
 	}
 	if len(codecs) == 0 {

@@ -1057,6 +1057,42 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 		_, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
 		assert.False(t, ok)
 	})
+	t.Run("rtcp-fb trailing space", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		mediaSections := []mediaSection{{id: "0", transceivers: []*RTPTransceiver{tr}}}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+		)
+		assert.Nil(t, err)
+
+		for _, desc := range offerSdp.MediaDescriptions {
+			for _, a := range desc.Attributes {
+				assert.False(t, strings.HasSuffix(a.String(), " "))
+			}
+		}
+	})
 }
 
 func TestGetRIDs(t *testing.T) {
