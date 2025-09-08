@@ -352,3 +352,12 @@ func WithWidthAndHeight(width, height uint16) Option {
 		return nil
 	}
 }
+
+func WithFrameRate(numerator, denominator uint32) Option {
+	return func(i *IVFWriter) error {
+		i.timebaseNumerator = numerator
+		i.timebaseDenominator = denominator
+
+		return nil
+	}
+}
