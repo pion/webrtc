@@ -86,8 +86,6 @@ func createOfferer() *webrtc.PeerConnection {
 
 	// This callback is made when the current bufferedAmount becomes lower than the threshold
 	dataChannel.OnBufferedAmountLow(func() {
-		// Make sure to not block this channel or perform long running operations in this callback
-		// This callback is executed by pion/sctp. If this callback is blocking it will stop operations
 		select {
 		case sendMoreCh <- struct{}{}:
 		default:
