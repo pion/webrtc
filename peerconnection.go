@@ -1774,6 +1774,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		0, 0,
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
+		params.Codecs,
 	)
 	readStream, interceptor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
 	if err != nil {
