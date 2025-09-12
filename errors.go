@@ -244,6 +244,7 @@ var (
 	errRTPSenderTrackNil             = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")
 	errRTPSenderSendAlreadyCalled    = errors.New("Send has already been called")
+	errRTPSenderSendNotCalled        = errors.New("Send has not been called")
 	errRTPSenderStopped              = errors.New("Sender has already been stopped")
 	errRTPSenderTrackRemoved         = errors.New("Sender Track has been removed or replaced to nil")
 	errRTPSenderRidNil               = errors.New("Sender cannot add encoding as rid is empty")
