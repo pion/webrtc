@@ -363,14 +363,12 @@ func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// Create a PeerConnection
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 	defer func() {
 		assert.NoError(t, pc.Close())
 	}()
 
-	// Assert that the stats interceptor was added and its Getter was captured
 	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil with NewPeerConnection")
 }
 
