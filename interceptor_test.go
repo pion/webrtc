@@ -353,6 +353,27 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 	closePairNow(t, offerer, answerer)
 }
 
+// TestStatsInterceptorIsAddedByDefault tests that the stats interceptor
+// is automatically added when creating a PeerConnection with the default API
+// and that its Getter is properly captured.
+func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Create a PeerConnection
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, pc.Close())
+	}()
+
+	// Assert that the stats interceptor was added and its Getter was captured
+	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil with NewPeerConnection")
+}
+
 // TestInterceptorNack is an end-to-end test for the NACK sender.
 // It tests that:
 //   - we get a NACK if we negotiated generic NACks;
