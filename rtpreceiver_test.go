@@ -132,7 +132,6 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	assert.Greater(t, float64(inbound.LastPacketReceivedTimestamp), 0.0)
 }
 
-// Build a fake getter that returns extreme values to exercise wrap warnings
 type fakeGetter struct{ s stats.Stats }
 
 func (f *fakeGetter) Get(uint32) *stats.Stats { return &f.s }
