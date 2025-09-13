@@ -70,7 +70,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 }
 
 // TestRTPReceiver_CollectStats_Mapping validates that collectStats maps
-// interceptor/pkg/stats values into InboundRTPStreamStats
+// interceptor/pkg/stats values into InboundRTPStreamStats.
 func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	ssrc := SSRC(1234)
 	now := time.Now()
@@ -120,8 +120,8 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	require.True(t, ok)
 
 	// Wrap-around semantics for casts
-	assert.Equal(t, uint32(pr), inbound.PacketsReceived)
-	assert.Equal(t, int32(pl), inbound.PacketsLost)
+	assert.Equal(t, uint32(pr), inbound.PacketsReceived) //nolint:gosec
+	assert.Equal(t, int32(pl), inbound.PacketsLost)      //nolint:gosec
 	assert.Equal(t, jitter, inbound.Jitter)
 	assert.Equal(t, bytes, inbound.BytesReceived)
 	assert.Equal(t, hdrBytes, inbound.HeaderBytesReceived)
