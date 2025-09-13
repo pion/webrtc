@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
+	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1277,6 +1278,28 @@ func findCandidatePairStats(t *testing.T, report StatsReport) []ICECandidatePair
 	return result
 }
 
+func findInboundRTPStats(report StatsReport) []InboundRTPStreamStats {
+	result := []InboundRTPStreamStats{}
+	for _, s := range report {
+		if stats, ok := s.(InboundRTPStreamStats); ok {
+			result = append(result, stats)
+		}
+	}
+
+	return result
+}
+
+func findInboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []InboundRTPStreamStats {
+	result := []InboundRTPStreamStats{}
+	for _, s := range report {
+		if stats, ok := s.(InboundRTPStreamStats); ok && stats.SSRC == ssrc {
+			result = append(result, stats)
+		}
+	}
+
+	return result
+}
+
 func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	offerChan := make(chan SessionDescription)
 	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
@@ -1360,7 +1383,7 @@ func TestStatsConvertState(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_GetStats(t *testing.T) {
+func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves multiple branches and waits
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 
@@ -1438,6 +1461,68 @@ func TestPeerConnection_GetStats(t *testing.T) {
 	assert.NotEmpty(t, findLocalCandidateStats(reportPCAnswer))
 	assert.NotEmpty(t, findRemoteCandidateStats(reportPCAnswer))
 	assert.NotEmpty(t, findCandidatePairStats(t, reportPCAnswer))
+
+	inboundAnswer := findInboundRTPStats(reportPCAnswer)
+	assert.NotEmpty(t, inboundAnswer)
+
+	// Send a sample frame to generate RTP packets
+	sample := media.Sample{
+		Data:      []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05},
+		Duration:  time.Second / 30, // 30 FPS
+		Timestamp: time.Now(),
+	}
+	assert.NoError(t, track1.WriteSample(sample))
+
+	// Poll for packets to arrive rather than using a fixed wait time.
+	// This ensures the test is deterministic and fails fast with clear context
+	// if packets don't arrive within the timeout period.
+	assert.Eventually(t, func() bool {
+		reportPCAnswer = answerPC.GetStats()
+		receivers := answerPC.GetReceivers()
+		for _, r := range receivers {
+			for _, tr := range r.Tracks() {
+				if tr.SSRC() == 0 {
+					continue
+				}
+				matches := findInboundRTPStatsBySSRC(reportPCAnswer, tr.SSRC())
+				if len(matches) > 0 && matches[0].PacketsReceived > 0 {
+					return true
+				}
+			}
+		}
+
+		return false
+	}, time.Second, 10*time.Millisecond, "Expected packets to be received")
+
+	// Get fresh stats after sending the sample
+	reportPCAnswer = answerPC.GetStats()
+
+	receivers := answerPC.GetReceivers()
+	for _, r := range receivers {
+		for _, tr := range r.Tracks() {
+			if tr.SSRC() == 0 {
+				continue
+			}
+			matches := findInboundRTPStatsBySSRC(reportPCAnswer, tr.SSRC())
+			require.NotEmpty(t, matches)
+
+			for _, inboundStats := range matches {
+				assert.Equal(t, StatsTypeInboundRTP, inboundStats.Type)
+				assert.Equal(t, tr.SSRC(), inboundStats.SSRC)
+				assert.NotEmpty(t, inboundStats.Kind)
+				assert.NotEmpty(t, inboundStats.TransportID)
+				assert.Greater(t, inboundStats.PacketsReceived, uint32(0))
+				assert.GreaterOrEqual(t, inboundStats.PacketsLost, int32(0))
+				assert.Greater(t, inboundStats.BytesReceived, uint64(0))
+				assert.GreaterOrEqual(t, inboundStats.Jitter, 0.0)
+				assert.GreaterOrEqual(t, inboundStats.HeaderBytesReceived, uint64(0))
+				assert.GreaterOrEqual(t, inboundStats.LastPacketReceivedTimestamp, StatsTimestamp(0))
+				assert.GreaterOrEqual(t, inboundStats.FIRCount, uint32(0))
+				assert.GreaterOrEqual(t, inboundStats.PLICount, uint32(0))
+				assert.GreaterOrEqual(t, inboundStats.NACKCount, uint32(0))
+			}
+		}
+	}
 	assert.NoError(t, err)
 	for i := range offerPC.api.mediaEngine.videoCodecs {
 		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.videoCodecs[i]))

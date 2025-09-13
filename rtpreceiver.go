@@ -10,10 +10,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
@@ -399,6 +401,71 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	close(r.closed)
 
 	return err
+}
+
+func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Emit inbound-rtp stats for each track
+	mid := ""
+	if r.tr != nil {
+		mid = r.tr.Mid()
+	}
+	now := statsTimestampNow()
+	for trackIndex := range r.tracks {
+		remoteTrack := r.tracks[trackIndex].track
+		if remoteTrack == nil {
+			continue
+		}
+
+		collector.Collecting()
+
+		inboundID := fmt.Sprintf("inbound-rtp-%d", uint32(remoteTrack.SSRC()))
+		codecID := ""
+		if remoteTrack.codec.statsID != "" {
+			codecID = remoteTrack.codec.statsID
+		}
+
+		inboundStats := InboundRTPStreamStats{
+			Mid:         mid,
+			Timestamp:   now,
+			Type:        StatsTypeInboundRTP,
+			ID:          inboundID,
+			SSRC:        remoteTrack.SSRC(),
+			Kind:        r.kind.String(),
+			TransportID: "iceTransport",
+			CodecID:     codecID,
+		}
+
+		stats := statsGetter.Get(uint32(remoteTrack.SSRC()))
+		if stats != nil { //nolint:nestif // nested to keep mapping local
+			// Wrap-around casting by design, with warnings if overflow/underflow is detected.
+			pr := stats.InboundRTPStreamStats.PacketsReceived
+			if pr > math.MaxUint32 {
+				r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
+			}
+			inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
+
+			pl := stats.InboundRTPStreamStats.PacketsLost
+			if pl > math.MaxInt32 || pl < math.MinInt32 {
+				r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
+			}
+			inboundStats.PacketsLost = int32(pl) //nolint:gosec
+
+			inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
+			inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
+			inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
+			timestamp := stats.InboundRTPStreamStats.LastPacketReceivedTimestamp
+			inboundStats.LastPacketReceivedTimestamp = StatsTimestamp(
+				timestamp.UnixNano() / int64(time.Millisecond))
+			inboundStats.FIRCount = stats.InboundRTPStreamStats.FIRCount
+			inboundStats.PLICount = stats.InboundRTPStreamStats.PLICount
+			inboundStats.NACKCount = stats.InboundRTPStreamStats.NACKCount
+		}
+
+		collector.Collect(inboundID, inboundStats)
+	}
 }
 
 func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
