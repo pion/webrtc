@@ -21,6 +21,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
@@ -91,6 +92,7 @@ type PeerConnection struct {
 	log logging.LeveledLogger
 
 	interceptorRTCPWriter interceptor.RTCPWriter
+	statsGetter           stats.Getter
 }
 
 // NewPeerConnection creates a PeerConnection with the default codecs and interceptors.
@@ -142,9 +144,13 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	i, err := api.interceptorRegistry.Build("")
+	i, err := api.interceptorRegistry.Build(pc.statsID)
 	if err != nil {
 		return nil, err
+	}
+
+	if getter, ok := getStatsGetter(pc.statsID); ok {
+		pc.statsGetter = getter
 	}
 
 	pc.api = &API{
@@ -2631,6 +2637,11 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		}
 	}
 	pc.mu.Unlock()
+
+	receivers := pc.GetReceivers()
+	for _, receiver := range receivers {
+		receiver.collectStats(statsCollector, pc.statsGetter)
+	}
 
 	pc.api.mediaEngine.collectStats(statsCollector)
 
