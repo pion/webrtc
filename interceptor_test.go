@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -351,6 +352,36 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 
 	<-probeReceiverCreated
 	closePairNow(t, offerer, answerer)
+}
+
+// TestStatsInterceptorIsAddedByDefault tests that the stats interceptor
+// is automatically added when creating a PeerConnection with the default API
+// and that its Getter is properly captured.
+func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, pc.Close())
+	}()
+
+	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil with NewPeerConnection")
+
+	// Also assert that the getter stored during interceptor Build matches
+	// the one attached to this PeerConnection.
+	getter, ok := lookupStats(pc.statsID)
+	assert.True(t, ok, "lookupStats should return a getter for this statsID")
+	assert.NotNil(t, getter)
+	assert.Equal(t,
+		reflect.ValueOf(getter).Pointer(),
+		reflect.ValueOf(pc.statsGetter).Pointer(),
+		"getter returned by lookup should match pc.statsGetter",
+	)
 }
 
 // TestInterceptorNack is an end-to-end test for the NACK sender.
