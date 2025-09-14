@@ -72,12 +72,8 @@ func (reader *H265Reader) read(numToRead int) (data []byte, e error) {
 		}
 		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
 	}
-	var numShouldRead int
-	if numToRead <= len(reader.readBuffer) {
-		numShouldRead = numToRead
-	} else {
-		numShouldRead = len(reader.readBuffer)
-	}
+
+	numShouldRead := min(numToRead, len(reader.readBuffer))
 	data = reader.readBuffer[0:numShouldRead]
 	reader.readBuffer = reader.readBuffer[numShouldRead:]
 
