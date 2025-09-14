@@ -6,6 +6,7 @@ package samplebuilder
 import (
 	"fmt"
 	"runtime"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -52,13 +53,7 @@ func (f *fakeDepacketizer) IsPartitionHead(payload []byte) bool {
 		return true
 	}
 
-	for _, b := range f.headBytes {
-		if payload[0] == b {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(f.headBytes, payload[0])
 }
 
 func (f *fakeDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1695,10 +1696,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		if track.fecSsrc != nil && ssrc == *track.fecSsrc {
 			return nil
 		}
-		for _, trackSsrc := range track.ssrcs {
-			if ssrc == trackSsrc {
-				return nil
-			}
+		if slices.Contains(track.ssrcs, ssrc) {
+			return nil
 		}
 	}
 
