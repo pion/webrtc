@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
+	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -503,4 +505,358 @@ func Test_TrackLocalStatic_Timestamp(t *testing.T) {
 
 	<-onTrackFired.Done()
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+type dummyWriter struct{}
+
+func (dummyWriter) WriteRTP(_ *rtp.Header, _ []byte) (int, error) { return 0, nil }
+func (dummyWriter) Write(_ []byte) (int, error)                   { return 0, nil }
+
+type dummyTrackLocalContext struct {
+	id string
+}
+
+func (d dummyTrackLocalContext) ID() string                                      { return d.id }
+func (d dummyTrackLocalContext) SSRC() SSRC                                      { return 0 }
+func (d dummyTrackLocalContext) SSRCRetransmission() SSRC                        { return 0 }
+func (d dummyTrackLocalContext) SSRCForwardErrorCorrection() SSRC                { return 0 }
+func (d dummyTrackLocalContext) WriteStream() TrackLocalWriter                   { return dummyWriter{} }
+func (d dummyTrackLocalContext) HeaderExtensions() []RTPHeaderExtensionParameter { return nil }
+func (d dummyTrackLocalContext) RTCPReader() interceptor.RTCPReader              { return nil }
+func (d dummyTrackLocalContext) CodecParameters() []RTPCodecParameters {
+	return []RTPCodecParameters{{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:  MimeTypeVP8,
+			ClockRate: 90000,
+		},
+		PayloadType: 96,
+	}}
+}
+
+func Test_TrackLocalStaticRTP_Unbind_ErrUnbindFailed(t *testing.T) {
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	ctx := dummyTrackLocalContext{id: "nonexistent-id"}
+
+	err = track.Unbind(ctx)
+	require.ErrorIs(t, err, ErrUnbindFailed)
+}
+
+func Test_TrackLocalStaticRTP_Kind_Default(t *testing.T) {
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: "application/unknown"},
+		"id",
+		"stream",
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, RTPCodecType(0), track.Kind())
+}
+
+func Test_TrackLocalStaticRTP_Codec_ReturnsConfiguredCodec(t *testing.T) {
+	testCapability := RTPCodecCapability{
+		MimeType:     MimeTypeVP8,
+		ClockRate:    90000,
+		Channels:     0,
+		SDPFmtpLine:  "profile-id=0",
+		RTCPFeedback: []RTCPFeedback{{Type: "nack"}, {Type: "ccm", Parameter: "fir"}},
+	}
+
+	track, err := NewTrackLocalStaticRTP(testCapability, "video", "pion")
+	require.NoError(t, err)
+
+	got := track.Codec()
+	require.Equal(t, testCapability, got)
+}
+
+var errWriteBoom = errors.New("fake write failure")
+
+type errWriter struct{}
+
+func (errWriter) WriteRTP(_ *rtp.Header, _ []byte) (int, error) { return 0, errWriteBoom }
+func (errWriter) Write(_ []byte) (int, error)                   { return 0, nil }
+
+func Test_TrackLocalStaticRTP_writeRTP_ReturnsError(t *testing.T) {
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"id",
+		"stream",
+	)
+	require.NoError(t, err)
+
+	track.mu.Lock()
+	track.bindings = []trackBinding{{
+		id:          "b1",
+		ssrc:        0x1234,
+		payloadType: 96,
+		writeStream: errWriter{},
+	}}
+	track.mu.Unlock()
+
+	pkt := &rtp.Packet{Payload: []byte{0x01, 0x02, 0x03}}
+
+	err = track.writeRTP(pkt)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), errWriteBoom.Error())
+}
+
+func Test_TrackLocalStaticRTP_Write_UnmarshalError(t *testing.T) {
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"id",
+		"stream",
+	)
+	require.NoError(t, err)
+
+	n, werr := track.Write([]byte{0x80}) // < 12-byte RTP header
+	require.Error(t, werr)
+	require.Equal(t, 0, n)
+}
+
+func Test_TrackLocalStaticSample_Codec_ReturnsConfiguredCodec(t *testing.T) {
+	testCapability := RTPCodecCapability{
+		MimeType:     MimeTypeVP8,
+		ClockRate:    90000,
+		Channels:     0,
+		SDPFmtpLine:  "profile-id=0",
+		RTCPFeedback: []RTCPFeedback{{Type: "nack"}, {Type: "ccm", Parameter: "fir"}},
+	}
+
+	sample, err := NewTrackLocalStaticSample(testCapability, "video", "pion")
+	require.NoError(t, err)
+
+	got := sample.Codec()
+	require.Equal(t, testCapability, got)
+}
+
+var errPayloaderBoom = errors.New("payloader boom")
+
+func Test_TrackLocalStaticSample_Bind_PayloaderError(t *testing.T) {
+	sample, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	sample.rtpTrack.mu.Lock()
+	sample.rtpTrack.payloader = func(_ RTPCodecCapability) (rtp.Payloader, error) {
+		return nil, errPayloaderBoom
+	}
+	sample.rtpTrack.mu.Unlock()
+
+	_, bindErr := sample.Bind(dummyTrackLocalContext{id: "ctx-1"})
+	require.ErrorIs(t, bindErr, errPayloaderBoom)
+
+	sample.rtpTrack.mu.RLock()
+	defer sample.rtpTrack.mu.RUnlock()
+	require.Nil(t, sample.packetizer)
+}
+
+type fakePacketizer struct {
+	skipCalls  int
+	lastSample uint32
+
+	packetizeCalls int
+}
+
+func (f *fakePacketizer) SkipSamples(n uint32) { f.skipCalls++; f.lastSample = n }
+func (f *fakePacketizer) GeneratePadding(samples uint32) []*rtp.Packet {
+	f.packetizeCalls++
+	f.lastSample = samples
+
+	return []*rtp.Packet{{}, {}}
+}
+func (f *fakePacketizer) EnableAbsSendTime(value int) {}
+func (f *fakePacketizer) Packetize(_ []byte, _ uint32) []*rtp.Packet {
+	f.packetizeCalls++
+
+	return []*rtp.Packet{
+		{Payload: []byte{0x01}},
+		{Payload: []byte{0x02}},
+	}
+}
+
+func Test_TrackLocalStaticSample_WriteSample_AppendErrors(t *testing.T) {
+	testSample, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	testSample.rtpTrack.mu.Lock()
+	testSample.rtpTrack.bindings = []trackBinding{{
+		id:          "b1",
+		ssrc:        0x1234,
+		payloadType: 96,
+		writeStream: errWriter{},
+	}}
+	testSample.rtpTrack.mu.Unlock()
+
+	fp := &fakePacketizer{}
+	testSample.rtpTrack.mu.Lock()
+	testSample.packetizer = fp
+	testSample.sequencer = rtp.NewRandomSequencer()
+	testSample.clockRate = 48000
+	testSample.rtpTrack.mu.Unlock()
+
+	in := media.Sample{
+		Data:               []byte("hi"),
+		Duration:           20 * time.Millisecond,
+		PrevDroppedPackets: 3,
+	}
+
+	err = testSample.WriteSample(in)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), errWriteBoom.Error())
+
+	require.Equal(t, 1, fp.skipCalls)
+	require.Equal(t, uint32(960*3), fp.lastSample)
+
+	require.Equal(t, 1, fp.packetizeCalls)
+}
+
+func Test_TrackLocalStaticSample_GeneratePadding_PacketizerNil_ReturnsNil(t *testing.T) {
+	s, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	err = s.GeneratePadding(10)
+	require.NoError(t, err)
+}
+
+func Test_TrackLocalStaticSample_GeneratePadding_AppendsAndReturnsError(t *testing.T) {
+	testSample, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	testSample.rtpTrack.mu.Lock()
+	testSample.rtpTrack.bindings = []trackBinding{{
+		id:          "b1",
+		ssrc:        0x1234,
+		payloadType: 96,
+		writeStream: errWriter{},
+	}}
+
+	fp := &fakePacketizer{}
+	testSample.packetizer = fp
+	testSample.rtpTrack.mu.Unlock()
+
+	err = testSample.GeneratePadding(7)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), errWriteBoom.Error())
+
+	require.Equal(t, 1, fp.packetizeCalls)
+	require.Equal(t, uint32(7), fp.lastSample)
+}
+
+func Test_TrackRemote_Msid(t *testing.T) {
+	t.Run("Populated", func(t *testing.T) {
+		tr := newTrackRemote(RTPCodecTypeVideo, 1234, 0, "", nil)
+
+		tr.mu.Lock()
+		tr.id = "video"
+		tr.streamID = "desktop"
+		tr.mu.Unlock()
+
+		require.Equal(t, "desktop video", tr.Msid())
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		tr := newTrackRemote(RTPCodecTypeAudio, 0, 0, "", nil)
+		require.Equal(t, " ", tr.Msid())
+	})
+}
+
+func Test_TrackRemote_checkAndUpdateTrack_ShortPacket(t *testing.T) {
+	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", &RTPReceiver{
+		api:  &API{mediaEngine: &MediaEngine{}},
+		kind: RTPCodecTypeVideo,
+	})
+
+	err := tr.checkAndUpdateTrack([]byte{0x80})
+	require.ErrorIs(t, err, errRTPTooShort)
+}
+
+func Test_TrackRemote_checkAndUpdateTrack_CodecNotFound(t *testing.T) {
+	me := &MediaEngine{} // intentionally empty: no codecs registered.
+	api := &API{mediaEngine: me}
+	recv := &RTPReceiver{api: api, kind: RTPCodecTypeVideo}
+	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", recv)
+
+	// minimal RTP header-sized buffer with a payload type byte.
+	b := []byte{0x80, 96}
+
+	err := tr.checkAndUpdateTrack(b)
+	require.ErrorIs(t, err, ErrCodecNotFound)
+}
+
+func Test_TrackRemote_ReadRTP_UnmarshalError(t *testing.T) {
+	me := &MediaEngine{}
+	require.NoError(t, me.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:  MimeTypeVP8,
+			ClockRate: 90000,
+		},
+		PayloadType: 96,
+	}, RTPCodecTypeVideo))
+
+	api := &API{
+		mediaEngine:   me,
+		settingEngine: &SettingEngine{},
+	}
+
+	recv := &RTPReceiver{
+		api:  api,
+		kind: RTPCodecTypeVideo,
+	}
+
+	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", recv)
+
+	tr.mu.Lock()
+	tr.peeked = []byte{0x80, 96}
+	tr.peekedAttributes = nil
+	tr.mu.Unlock()
+
+	pkt, attrs, err := tr.ReadRTP()
+	require.Error(t, err, "expected Unmarshal to fail on too-short RTP data")
+	require.Nil(t, pkt)
+	require.Nil(t, attrs)
+}
+
+func TestBaseTrackLocalContext_HeaderExtensions_ReturnsParams(t *testing.T) {
+	hdrs := []RTPHeaderExtensionParameter{
+		{URI: "urn:ietf:params:rtp-hdrext:sdes:mid", ID: 1},
+		{URI: "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id", ID: 2},
+	}
+
+	ctx := baseTrackLocalContext{
+		params: RTPParameters{
+			HeaderExtensions: hdrs,
+		},
+	}
+
+	got := ctx.HeaderExtensions()
+	require.Equal(t, hdrs, got)
+
+	got[0].URI = "changed"
+	assert.Equal(t, "changed", ctx.params.HeaderExtensions[0].URI)
+}
+
+func TestBaseTrackLocalContext_HeaderExtensions_NilWhenUnset(t *testing.T) {
+	var ctx baseTrackLocalContext
+	assert.Nil(t, ctx.HeaderExtensions())
 }

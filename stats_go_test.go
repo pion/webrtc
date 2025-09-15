@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -1502,4 +1503,702 @@ func TestPeerConnection_GetStats_Closed(t *testing.T) {
 	assert.NoError(t, pc.Close())
 
 	pc.GetStats()
+}
+
+func TestUnmarshalStatsJSON_TypeFieldUnmarshalError(t *testing.T) {
+	input := []byte(`{"type":123}`)
+
+	_, err := UnmarshalStatsJSON(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshal json type:")
+}
+
+func TestUnmarshalStatsJSON_SCTPTransport(t *testing.T) {
+	input := []byte(`{
+		"timestamp": 1689668364374.479,
+		"type": "sctp-transport",
+		"id": "SCTP1",
+		"transportId": "T01",
+		"smoothedRoundTripTime": 0.123,
+		"congestionWindow": 512,
+		"receiverWindow": 2048,
+		"mtu": 1200,
+		"unackData": 7,
+		"bytesSent": 12345,
+		"bytesReceived": 67890
+	}`)
+
+	s, err := UnmarshalStatsJSON(input)
+	require.NoError(t, err)
+
+	st, ok := s.(SCTPTransportStats)
+	require.True(t, ok, "expected SCTPTransportStats")
+	assert.Equal(t, StatsTypeSCTPTransport, st.Type)
+	assert.Equal(t, "SCTP1", st.ID)
+	assert.Equal(t, "T01", st.TransportID)
+	assert.InDelta(t, 0.123, st.SmoothedRoundTripTime, 1e-9)
+	assert.EqualValues(t, 512, st.CongestionWindow)
+	assert.EqualValues(t, 2048, st.ReceiverWindow)
+	assert.EqualValues(t, 1200, st.MTU)
+	assert.EqualValues(t, 7, st.UNACKData)
+	assert.EqualValues(t, 12345, st.BytesSent)
+	assert.EqualValues(t, 67890, st.BytesReceived)
+}
+
+func TestUnmarshalStatsJSON_UnknownType(t *testing.T) {
+	input := []byte(`{"type":"def-not-a-real-type"}`)
+
+	_, err := UnmarshalStatsJSON(input)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrUnknownType)
+}
+
+func TestUnmarshalCodecStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"payloadType":"not-a-number"}`)
+
+	_, err := unmarshalCodecStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal codec stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalInboundRTPStreamStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"packetsReceived":"not-a-number"}`)
+
+	_, err := unmarshalInboundRTPStreamStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal inbound rtp stream stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalOutboundRTPStreamStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"packetsSent":"oops"}`)
+
+	_, err := unmarshalOutboundRTPStreamStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal outbound rtp stream stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalRemoteInboundRTPStreamStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"packetsReceived":"nope"}`)
+
+	_, err := unmarshalRemoteInboundRTPStreamStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal remote inbound rtp stream stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalRemoteOutboundRTPStreamStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"packetsSent":"nope"}`)
+
+	_, err := unmarshalRemoteOutboundRTPStreamStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal remote outbound rtp stream stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalCSRCStats_ErrorWrap(t *testing.T) {
+	bad := []byte(`{"packetsContributedTo":"nope"}`)
+
+	_, err := unmarshalCSRCStats(bad)
+	require.Error(t, err)
+
+	assert.ErrorContains(t, err, "unmarshal csrc stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
+}
+
+func TestUnmarshalMediaSourceStats_ErrorPaths(t *testing.T) {
+	t.Run("error unmarshalling kind holder", func(t *testing.T) {
+		bad := []byte(`{"kind":123}`)
+		_, err := unmarshalMediaSourceStats(bad)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unmarshal json kind:")
+
+		var ute *json.UnmarshalTypeError
+		assert.True(t, errors.As(err, &ute), "expected underlying *json.UnmarshalTypeError")
+	})
+
+	t.Run("error unmarshalling audio source stats", func(t *testing.T) {
+		bad := []byte(`{"type":"media-source","kind":"audio","audioLevel":"oops"}`)
+		_, err := unmarshalMediaSourceStats(bad)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unmarshal audio source stats:")
+
+		var ute *json.UnmarshalTypeError
+		assert.True(t, errors.As(err, &ute), "expected underlying *json.UnmarshalTypeError")
+	})
+
+	t.Run("error unmarshalling video source stats", func(t *testing.T) {
+		bad := []byte(`{"type":"media-source","kind":"video","width":"oops"}`)
+		_, err := unmarshalMediaSourceStats(bad)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unmarshal video source stats:")
+
+		var ute *json.UnmarshalTypeError
+		assert.True(t, errors.As(err, &ute), "expected underlying *json.UnmarshalTypeError")
+	})
+
+	t.Run("unknown kind default case", func(t *testing.T) {
+		bad := []byte(`{"type":"media-source","kind":"banana"}`)
+		_, err := unmarshalMediaSourceStats(bad)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "kind:")
+		assert.True(t, errors.Is(err, ErrUnknownType), "expected ErrUnknownType")
+	})
+}
+
+func TestUnmarshalMediaPlayoutStats_Error(t *testing.T) {
+	badJSON := []byte(`{
+		"type": "media-playout",
+		"id": "AP",
+		"kind": "audio",
+		"timestamp": "not-a-number"
+	}`)
+
+	s, err := unmarshalMediaPlayoutStats(badJSON)
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), "unmarshal audio playout stats")
+}
+
+func TestUnmarshalPeerConnectionStats_Error(t *testing.T) {
+	bad := []byte(`{
+		"type": "peer-connection",
+		"id": "P",
+		"timestamp": "not-a-number"
+	}`)
+
+	got, err := unmarshalPeerConnectionStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, PeerConnectionStats{}, got, "should return zero value on error")
+	assert.Contains(t, err.Error(), "unmarshal pc stats")
+}
+
+func TestUnmarshalDataChannelStats_Error(t *testing.T) {
+	bad := []byte(`{
+		"type": "data-channel",
+		"id": "D1",
+		"timestamp": "not-a-number"
+	}`)
+
+	got, err := unmarshalDataChannelStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, DataChannelStats{}, got, "should return zero value on error")
+	assert.Contains(t, err.Error(), "unmarshal data channel stats")
+}
+
+func TestUnmarshalStreamStats_Error(t *testing.T) {
+	bad := []byte(`{
+		"type": "stream",
+		"id": "S1",
+		"timestamp": "invalid"
+	}`)
+
+	got, err := unmarshalStreamStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, MediaStreamStats{}, got, "expected zero value on error")
+	assert.Contains(t, err.Error(), "unmarshal stream stats")
+}
+
+func TestUnmarshalSenderStats_SyntaxErrorOnKind(t *testing.T) {
+	s, err := unmarshalSenderStats([]byte(`{`))
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var se *json.SyntaxError
+	assert.ErrorAs(t, err, &se)
+}
+
+func TestUnmarshalSenderStats_Audio_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"audio","timestamp":"oops"}`)
+	s, err := unmarshalSenderStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalSenderStats_Video_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"video","timestamp":"oops"}`)
+	s, err := unmarshalSenderStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalSenderStats_UnknownKind(t *testing.T) {
+	s, err := unmarshalSenderStats([]byte(`{"kind":"def-not-a-real-kind"}`))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.ErrorIs(t, err, ErrUnknownType)
+}
+
+func TestUnmarshalTrackStats_SyntaxErrorOnKind(t *testing.T) {
+	s, err := unmarshalTrackStats([]byte(`{`)) // invalid JSON
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var se *json.SyntaxError
+	assert.ErrorAs(t, err, &se)
+}
+
+func TestUnmarshalTrackStats_Audio_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"` + string(MediaKindAudio) + `","timestamp":"oops"}`)
+	s, err := unmarshalTrackStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalTrackStats_Video_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"` + string(MediaKindVideo) + `","timestamp":"oops"}`)
+	s, err := unmarshalTrackStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalTrackStats_UnknownKind(t *testing.T) {
+	s, err := unmarshalTrackStats([]byte(`{"kind":"definitely-not-real"}`))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.ErrorIs(t, err, ErrUnknownType)
+}
+
+func TestUnmarshalReceiverStats_SyntaxErrorOnKind(t *testing.T) {
+	s, err := unmarshalReceiverStats([]byte(`{`)) // invalid JSON
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var se *json.SyntaxError
+	assert.ErrorAs(t, err, &se)
+}
+
+func TestUnmarshalReceiverStats_Audio_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"` + string(MediaKindAudio) + `","timestamp":"oops"}`)
+	s, err := unmarshalReceiverStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalReceiverStats_Video_UnmarshalTypeError(t *testing.T) {
+	payload := []byte(`{"kind":"` + string(MediaKindVideo) + `","timestamp":"oops"}`)
+	s, err := unmarshalReceiverStats(payload)
+	require.Error(t, err)
+	assert.Nil(t, s)
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalReceiverStats_UnknownKind(t *testing.T) {
+	s, err := unmarshalReceiverStats([]byte(`{"kind":"not-a-real-kind"}`))
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.ErrorIs(t, err, ErrUnknownType)
+}
+
+func TestUnmarshalTransportStats_Error(t *testing.T) {
+	payload := []byte(`{"timestamp":"oops"}`)
+
+	s, err := unmarshalTransportStats(payload)
+	require.Error(t, err)
+	assert.Equal(t, TransportStats{}, s)
+	assert.Contains(t, err.Error(), "unmarshal transport stats:")
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestToICECandidatePairStats_InvalidState(t *testing.T) {
+	bogus := ice.CandidatePairState(255)
+
+	in := ice.CandidatePairStats{
+		State: bogus,
+	}
+
+	out, err := toICECandidatePairStats(in)
+	require.Error(t, err)
+	assert.Equal(t, ICECandidatePairStats{}, out)
+
+	assert.Contains(t, err.Error(), bogus.String())
+}
+
+func TestUnmarshalICECandidatePairStats_Error(t *testing.T) {
+	bad := []byte(`{"timestamp":"not-a-number"}`)
+
+	got, err := unmarshalICECandidatePairStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, ICECandidatePairStats{}, got)
+
+	assert.Contains(t, err.Error(), "unmarshal ice candidate pair stats")
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalICECandidateStats_Error(t *testing.T) {
+	bad := []byte(`{"timestamp":"not-a-number"}`)
+
+	got, err := unmarshalICECandidateStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, ICECandidateStats{}, got)
+
+	assert.Contains(t, err.Error(), "unmarshal ice candidate stats")
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalCertificateStats_Error(t *testing.T) {
+	bad := []byte(`{"timestamp":"not-a-number"}`)
+
+	got, err := unmarshalCertificateStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, CertificateStats{}, got)
+
+	assert.Contains(t, err.Error(), "unmarshal certificate stats")
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestUnmarshalSCTPTransportStats_Success(t *testing.T) {
+	good := []byte(`{
+		"timestamp": 1234,
+		"type": "sctp-transport",
+		"id": "SCTP1",
+		"transportId": "T01",
+		"smoothedRoundTripTime": 0.123,
+		"congestionWindow": 512,
+		"receiverWindow": 1024,
+		"mtu": 1200,
+		"unackData": 3,
+		"bytesSent": 1000,
+		"bytesReceived": 2000
+	}`)
+
+	got, err := unmarshalSCTPTransportStats(good)
+	require.NoError(t, err)
+
+	assert.Equal(t, StatsTimestamp(1234), got.Timestamp)
+	assert.Equal(t, StatsTypeSCTPTransport, got.Type)
+	assert.Equal(t, "SCTP1", got.ID)
+	assert.Equal(t, "T01", got.TransportID)
+	assert.InDelta(t, 0.123, got.SmoothedRoundTripTime, 1e-9)
+	assert.Equal(t, uint32(512), got.CongestionWindow)
+	assert.Equal(t, uint32(1024), got.ReceiverWindow)
+	assert.Equal(t, uint32(1200), got.MTU)
+	assert.Equal(t, uint32(3), got.UNACKData)
+	assert.Equal(t, uint64(1000), got.BytesSent)
+	assert.Equal(t, uint64(2000), got.BytesReceived)
+}
+
+func TestUnmarshalSCTPTransportStats_Error(t *testing.T) {
+	bad := []byte(`{"bytesReceived":"oops"}`)
+
+	got, err := unmarshalSCTPTransportStats(bad)
+	require.Error(t, err)
+	assert.Equal(t, SCTPTransportStats{}, got)
+
+	assert.Contains(t, err.Error(), "unmarshal sctp transport stats")
+
+	var ute *json.UnmarshalTypeError
+	assert.ErrorAs(t, err, &ute)
+}
+
+func TestStatsReport_GetConnectionStats_MissingEntry(t *testing.T) {
+	conn := &PeerConnection{}
+	conn.getStatsID()
+
+	r := StatsReport{}
+	got, ok := r.GetConnectionStats(conn)
+
+	assert.False(t, ok)
+	assert.Equal(t, PeerConnectionStats{}, got)
+}
+
+func TestStatsReport_GetConnectionStats_WrongType(t *testing.T) {
+	conn := &PeerConnection{}
+	id := conn.getStatsID()
+
+	r := StatsReport{
+		id: DataChannelStats{ID: "not-a-pc-stats"},
+	}
+
+	got, ok := r.GetConnectionStats(conn)
+
+	assert.False(t, ok)
+	assert.Equal(t, PeerConnectionStats{}, got)
+}
+
+func TestStatsReport_GetConnectionStats_Success(t *testing.T) {
+	conn := &PeerConnection{}
+	id := conn.getStatsID()
+
+	want := PeerConnectionStats{
+		ID:        id,
+		Type:      StatsTypePeerConnection,
+		Timestamp: 1234,
+	}
+
+	r := StatsReport{
+		id: want,
+	}
+
+	got, ok := r.GetConnectionStats(conn)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestStatsReport_GetDataChannelStats_MissingEntry(t *testing.T) {
+	dc := &DataChannel{}
+	dc.getStatsID()
+
+	r := StatsReport{} // empty -> triggers first `if !ok`
+	got, ok := r.GetDataChannelStats(dc)
+
+	assert.False(t, ok)
+	assert.Equal(t, DataChannelStats{}, got)
+}
+
+func TestStatsReport_GetDataChannelStats_WrongType(t *testing.T) {
+	dc := &DataChannel{}
+	id := dc.getStatsID()
+
+	// Put a different Stats type under the correct key to fail type assertion
+	r := StatsReport{
+		id: PeerConnectionStats{ID: "not-a-dc-stats"},
+	}
+
+	got, ok := r.GetDataChannelStats(dc)
+
+	assert.False(t, ok)                      // triggers second `if !ok` (type assertion fails)
+	assert.Equal(t, DataChannelStats{}, got) // zero value on failure
+}
+
+func TestStatsReport_GetDataChannelStats_Success(t *testing.T) {
+	dc := &DataChannel{}
+	id := dc.getStatsID()
+
+	want := DataChannelStats{
+		ID:                    id,
+		Type:                  StatsTypeDataChannel,
+		Timestamp:             1234,
+		Label:                 "chat",
+		Protocol:              "json",
+		DataChannelIdentifier: 7,
+		TransportID:           "T1",
+		State:                 DataChannelStateOpen,
+		MessagesSent:          10,
+		BytesSent:             100,
+		MessagesReceived:      12,
+		BytesReceived:         120,
+	}
+
+	r := StatsReport{
+		id: want,
+	}
+
+	got, ok := r.GetDataChannelStats(dc)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestStatsReport_GetICECandidateStats_MissingEntry(t *testing.T) {
+	c := &ICECandidate{statsID: "C1"}
+	r := StatsReport{}
+
+	got, ok := r.GetICECandidateStats(c)
+
+	assert.False(t, ok)
+	assert.Equal(t, ICECandidateStats{}, got)
+}
+
+func TestStatsReport_GetICECandidateStats_WrongType(t *testing.T) {
+	c := &ICECandidate{statsID: "C2"}
+
+	r := StatsReport{
+		"C2": PeerConnectionStats{ID: "not-candidate"},
+	}
+
+	got, ok := r.GetICECandidateStats(c)
+
+	assert.False(t, ok)
+	assert.Equal(t, ICECandidateStats{}, got)
+}
+
+func TestStatsReport_GetICECandidateStats_Success(t *testing.T) {
+	statsID := "C3"
+	c := &ICECandidate{statsID: statsID}
+
+	want := ICECandidateStats{
+		ID:   statsID,
+		Type: StatsTypeLocalCandidate,
+	}
+
+	r := StatsReport{
+		statsID: want,
+	}
+
+	got, ok := r.GetICECandidateStats(c)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestStatsReport_GetICECandidatePairStats_MissingEntry(t *testing.T) {
+	pair := &ICECandidatePair{statsID: "CP1"}
+	r := StatsReport{}
+
+	got, ok := r.GetICECandidatePairStats(pair)
+
+	assert.False(t, ok)
+	assert.Equal(t, ICECandidatePairStats{}, got)
+}
+
+func TestStatsReport_GetICECandidatePairStats_WrongType(t *testing.T) {
+	pair := &ICECandidatePair{statsID: "CP2"}
+
+	r := StatsReport{
+		"CP2": PeerConnectionStats{ID: "not-candidate-pair"},
+	}
+
+	got, ok := r.GetICECandidatePairStats(pair)
+
+	assert.False(t, ok)
+	assert.Equal(t, ICECandidatePairStats{}, got)
+}
+
+func TestStatsReport_GetICECandidatePairStats_Success(t *testing.T) {
+	statsID := "CP3"
+	pair := &ICECandidatePair{statsID: statsID}
+
+	want := ICECandidatePairStats{
+		ID:   statsID,
+		Type: StatsTypeCandidatePair,
+	}
+
+	r := StatsReport{
+		statsID: want,
+	}
+
+	got, ok := r.GetICECandidatePairStats(pair)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestStatsReport_GetCertificateStats_MissingEntry(t *testing.T) {
+	cert := &Certificate{statsID: "CERT1"}
+	r := StatsReport{}
+
+	got, ok := r.GetCertificateStats(cert)
+
+	assert.False(t, ok)
+	assert.Equal(t, CertificateStats{}, got)
+}
+
+func TestStatsReport_GetCertificateStats_WrongType(t *testing.T) {
+	cert := &Certificate{statsID: "CERT2"}
+
+	r := StatsReport{
+		"CERT2": PeerConnectionStats{ID: "not-certificate"},
+	}
+
+	got, ok := r.GetCertificateStats(cert)
+
+	assert.False(t, ok)
+	assert.Equal(t, CertificateStats{}, got)
+}
+
+func TestStatsReport_GetCertificateStats_Success(t *testing.T) {
+	statsID := "CERT3"
+	cert := &Certificate{statsID: statsID}
+
+	want := CertificateStats{
+		ID:   statsID,
+		Type: StatsTypeCertificate,
+	}
+
+	r := StatsReport{
+		statsID: want,
+	}
+
+	got, ok := r.GetCertificateStats(cert)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
+func TestStatsReport_GetCodecStats_MissingEntry(t *testing.T) {
+	codec := &RTPCodecParameters{statsID: "CODEC1"}
+	r := StatsReport{}
+
+	got, ok := r.GetCodecStats(codec)
+
+	assert.False(t, ok)
+	assert.Equal(t, CodecStats{}, got)
+}
+
+func TestStatsReport_GetCodecStats_WrongType(t *testing.T) {
+	codec := &RTPCodecParameters{statsID: "CODEC2"}
+
+	r := StatsReport{
+		"CODEC2": PeerConnectionStats{ID: "not-codec"},
+	}
+
+	got, ok := r.GetCodecStats(codec)
+
+	assert.False(t, ok)
+	assert.Equal(t, CodecStats{}, got)
+}
+
+func TestStatsReport_GetCodecStats_Success(t *testing.T) {
+	statsID := "CODEC3"
+	codec := &RTPCodecParameters{statsID: statsID}
+
+	want := CodecStats{
+		ID:   statsID,
+		Type: StatsTypeCodec,
+	}
+
+	r := StatsReport{
+		statsID: want,
+	}
+
+	got, ok := r.GetCodecStats(codec)
+
+	require.True(t, ok)
+	assert.Equal(t, want, got)
 }
