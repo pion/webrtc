@@ -1326,7 +1326,7 @@ type AudioPlayoutStats struct {
 	// SynthesizedSamplesDuration is measured in seconds and is incremented each time an audio sample is synthesized by
 	// this playout path. This metric can be used together with totalSamplesDuration to calculate the percentage of played
 	// out media being synthesized. If the playout path is unable to produce audio samples on time for device playout,
-	// samples are synthesized to be playout out instead. Synthesization typically only happens if the pipeline is
+	// samples are synthesized to be played out instead. Synthesization typically only happens if the pipeline is
 	// underperforming. Samples synthesized by the RTCInboundRtpStreamStats are not counted for here, but in
 	// InboundRtpStreamStats.concealedSamples.
 	SynthesizedSamplesDuration float64 `json:"synthesizedSamplesDuration"`
@@ -1746,7 +1746,7 @@ type AudioReceiverStats struct {
 	// 0 represents silence, and 0.5 represents approximately 6 dBSPL change in
 	// the sound pressure level from 0 dBov.
 	//
-	// If the track is sourced from an Receiver, does no audio processing, has a
+	// If the track is sourced from a Receiver, does no audio processing, has a
 	// constant level, and has a volume setting of 1.0, the audio level is expected
 	// to be the same as the audio level of the source SSRC, while if the volume setting
 	// is 0.5, the AudioLevel is expected to be half that value.
@@ -1871,11 +1871,11 @@ type VideoReceiverStats struct {
 	FramesReceived uint32 `json:"framesReceived"`
 
 	// KeyFramesReceived represents the total number of complete key frames received
-	// for this MediaStreamTrack, such as Infra-frames in VP8 [RFC6386] or I-frames
+	// for this MediaStreamTrack, such as Intra-frames in VP8 [RFC6386] or I-frames
 	// in H.264 [RFC6184]. This is a subset of framesReceived. `framesReceived - keyFramesReceived`
 	// gives you the number of delta frames received. This metric is incremented when
 	// the complete key frame is received. It is not incremented if a partial key
-	// frames is received and sent for decoding, i.e., the frame could not be recovered
+	// frame is received and sent for decoding, i.e., the frame could not be recovered
 	// via retransmission or FEC.
 	KeyFramesReceived uint32 `json:"keyFramesReceived"`
 
@@ -1982,7 +1982,7 @@ type TransportStats struct {
 	// Present only if DTLS is negotiated.
 	LocalCertificateID string `json:"localCertificateId"`
 
-	// LocalCertificateID is the ID of the CertificateStats for the remote certificate.
+	// RemoteCertificateID is the ID of the CertificateStats for the remote certificate.
 	// Present only if DTLS is negotiated.
 	RemoteCertificateID string `json:"remoteCertificateId"`
 
@@ -2247,7 +2247,7 @@ type ICECandidatePairStats struct {
 	// STUN binding response expired.
 	ConsentExpiredTimestamp StatsTimestamp `json:"consentExpiredTimestamp"`
 
-	// PacketsDiscardedOnSend retpresents the total number of packets for this candidate pair
+	// PacketsDiscardedOnSend represents the total number of packets for this candidate pair
 	// that have been discarded due to socket errors, i.e. a socket error occurred
 	// when handing the packets to the socket. This might happen due to various reasons,
 	// including full buffer or no available memory.
@@ -2321,8 +2321,8 @@ type ICECandidateStats struct {
 	// Priority is the "Priority" field of the ICECandidate.
 	Priority int32 `json:"priority"`
 
-	// URL is the URL of the TURN or STUN server indicated in the that translated
-	// this IP address. It is the URL address surfaced in an PeerConnectionICEEvent.
+	// URL of the TURN or STUN server that produced this candidate
+	// It is the URL address surfaced in an PeerConnectionICEEvent.
 	URL string `json:"url"`
 
 	// RelayProtocol is the protocol used by the endpoint to communicate with the

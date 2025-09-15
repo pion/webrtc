@@ -7,18 +7,22 @@
 package webrtc
 
 import (
+	"bytes"
 	"context"
+	"crypto/x509"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/pion/datachannel"
+	"github.com/pion/dtls/v3"
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/stun/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/proxy"
 )
 
 func TestSetEphemeralUDPPortRange(t *testing.T) {
@@ -463,4 +467,162 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	}
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	closePairNow(t, offer, answer)
+}
+
+func TestSettingEngine_getReceiveMTU_Custom(t *testing.T) {
+	var se SettingEngine
+	se.SetReceiveMTU(1234)
+
+	got := se.getReceiveMTU()
+	assert.Equal(t, uint(1234), got)
+}
+
+func TestSettingEngine_ICEAcceptanceAndSTUNSetters(t *testing.T) {
+	var se SettingEngine
+
+	host := 10 * time.Millisecond
+	srflx := 20 * time.Millisecond
+	prflx := 30 * time.Millisecond
+	relay := 40 * time.Millisecond
+	stun := 50 * time.Millisecond
+
+	se.SetHostAcceptanceMinWait(host)
+	se.SetSrflxAcceptanceMinWait(srflx)
+	se.SetPrflxAcceptanceMinWait(prflx)
+	se.SetRelayAcceptanceMinWait(relay)
+	se.SetSTUNGatherTimeout(stun)
+
+	assert.NotNil(t, se.timeout.ICEHostAcceptanceMinWait)
+	assert.NotNil(t, se.timeout.ICESrflxAcceptanceMinWait)
+	assert.NotNil(t, se.timeout.ICEPrflxAcceptanceMinWait)
+	assert.NotNil(t, se.timeout.ICERelayAcceptanceMinWait)
+	assert.NotNil(t, se.timeout.ICESTUNGatherTimeout)
+
+	assert.Equal(t, host, *se.timeout.ICEHostAcceptanceMinWait)
+	assert.Equal(t, srflx, *se.timeout.ICESrflxAcceptanceMinWait)
+	assert.Equal(t, prflx, *se.timeout.ICEPrflxAcceptanceMinWait)
+	assert.Equal(t, relay, *se.timeout.ICERelayAcceptanceMinWait)
+	assert.Equal(t, stun, *se.timeout.ICESTUNGatherTimeout)
+}
+
+func TestSettingEngine_CandidateFiltersAndNetworkTypes(t *testing.T) {
+	var se SettingEngine
+
+	nts := []NetworkType{NetworkTypeUDP4, NetworkTypeUDP6}
+	se.SetNetworkTypes(nts)
+	assert.Equal(t, nts, se.candidates.ICENetworkTypes)
+
+	ifFilter := func(name string) bool { return name == "eth0" }
+	ipFilter := func(ip net.IP) bool { return ip.IsLoopback() }
+
+	se.SetInterfaceFilter(ifFilter)
+	se.SetIPFilter(ipFilter)
+	se.SetIncludeLoopbackCandidate(true)
+
+	assert.NotNil(t, se.candidates.InterfaceFilter)
+	assert.NotNil(t, se.candidates.IPFilter)
+	assert.True(t, se.candidates.InterfaceFilter("eth0"))
+	assert.False(t, se.candidates.InterfaceFilter("wlan0"))
+	assert.True(t, se.candidates.IPFilter(net.IPv4(127, 0, 0, 1)))
+	assert.True(t, se.candidates.IncludeLoopbackCandidate)
+}
+
+func TestSettingEngine_MDNSAndCredentialsAndFingerprint(t *testing.T) {
+	var se SettingEngine
+
+	se.SetMulticastDNSHostName("host.local.")
+	se.SetICECredentials("ufrag123", "pwd456")
+	se.DisableCertificateFingerprintVerification(true)
+
+	assert.Equal(t, "host.local.", se.candidates.MulticastDNSHostName)
+	assert.Equal(t, "ufrag123", se.candidates.UsernameFragment)
+	assert.Equal(t, "pwd456", se.candidates.Password)
+	assert.True(t, se.disableCertificateFingerprintVerification)
+}
+
+func TestSettingEngine_UDPMuxProxyBindingAndTCPFlags(t *testing.T) {
+	var se SettingEngine
+
+	var mux ice.UDPMux
+	se.SetICEUDPMux(mux)
+	assert.Equal(t, mux, se.iceUDPMux)
+
+	se.SetICEProxyDialer(proxy.Direct)
+	assert.Equal(t, proxy.Direct, se.iceProxyDialer)
+
+	var maxReq uint16 = 77
+	se.SetICEMaxBindingRequests(maxReq)
+	assert.NotNil(t, se.iceMaxBindingRequests)
+	assert.Equal(t, maxReq, *se.iceMaxBindingRequests)
+
+	se.DisableActiveTCP(true)
+	assert.True(t, se.iceDisableActiveTCP)
+}
+
+func TestSettingEngine_MediaEngineAndMTUFlags(t *testing.T) {
+	var se SettingEngine
+
+	se.DisableMediaEngineMultipleCodecs(true)
+	assert.True(t, se.disableMediaEngineMultipleCodecs)
+
+	se.SetReceiveMTU(1337)
+	assert.Equal(t, uint(1337), se.receiveMTU)
+}
+
+func TestSettingEngine_DTLSSetters(t *testing.T) {
+	var se SettingEngine
+
+	se.SetDTLSInsecureSkipHelloVerify(true)
+	se.SetDTLSDisableInsecureSkipVerify(true)
+	se.SetDTLSExtendedMasterSecret(dtls.RequireExtendedMasterSecret)
+
+	auth := dtls.RequireAnyClientCert
+	se.SetDTLSClientAuth(auth)
+
+	clientCAs := x509.NewCertPool()
+	rootCAs := x509.NewCertPool()
+	var keyBuf bytes.Buffer
+
+	se.SetDTLSClientCAs(clientCAs)
+	se.SetDTLSRootCAs(rootCAs)
+	se.SetDTLSKeyLogWriter(&keyBuf)
+
+	called := false
+	se.SetDTLSCustomerCipherSuites(func() []dtls.CipherSuite {
+		called = true
+
+		return nil
+	})
+
+	assert.True(t, se.dtls.insecureSkipHelloVerify)
+	assert.True(t, se.dtls.disableInsecureSkipVerify)
+	assert.Equal(t, dtls.RequireExtendedMasterSecret, se.dtls.extendedMasterSecret)
+	assert.NotNil(t, se.dtls.clientAuth)
+	assert.Equal(t, auth, *se.dtls.clientAuth)
+	assert.Equal(t, clientCAs, se.dtls.clientCAs)
+	assert.Equal(t, rootCAs, se.dtls.rootCAs)
+	_, _ = se.dtls.keyLogWriter.Write([]byte("test"))
+	assert.NotZero(t, keyBuf.Len())
+	_ = se.dtls.customCipherSuites()
+	assert.True(t, called)
+}
+
+func TestSettingEngine_SCTPSetters(t *testing.T) {
+	var se SettingEngine
+
+	se.EnableSCTPZeroChecksum(true)
+	se.SetSCTPMinCwnd(11)
+	se.SetSCTPFastRtxWnd(22)
+	se.SetSCTPCwndCAStep(33)
+
+	assert.True(t, se.sctp.enableZeroChecksum)
+	assert.Equal(t, uint32(11), se.sctp.minCwnd)
+	assert.Equal(t, uint32(22), se.sctp.fastRtxWnd)
+	assert.Equal(t, uint32(33), se.sctp.cwndCAStep)
+}
+
+func TestSettingEngine_HandleUndeclaredSSRCWithoutAnswer(t *testing.T) {
+	var se SettingEngine
+	se.SetHandleUndeclaredSSRCWithoutAnswer(true)
+	assert.True(t, se.handleUndeclaredSSRCWithoutAnswer)
 }
