@@ -1300,6 +1300,17 @@ func findInboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []InboundRTPStream
 	return result
 }
 
+func findOutboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []OutboundRTPStreamStats {
+	result := []OutboundRTPStreamStats{}
+	for _, s := range report {
+		if stats, ok := s.(OutboundRTPStreamStats); ok && stats.SSRC == ssrc {
+			result = append(result, stats)
+		}
+	}
+
+	return result
+}
+
 func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	offerChan := make(chan SessionDescription)
 	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
@@ -1523,6 +1534,40 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 			}
 		}
 	}
+
+	// Check outbound stats on offer PC (sender side)
+	reportPCOffer = offerPC.GetStats()
+	senders := offerPC.GetSenders()
+	for _, s := range senders {
+		if s.Track() == nil {
+			continue
+		}
+		// Find the track's SSRC from parameters
+		params := s.GetParameters()
+		if len(params.Encodings) == 0 {
+			continue
+		}
+		ssrc := params.Encodings[0].SSRC
+		if ssrc == 0 {
+			continue
+		}
+		matches := findOutboundRTPStatsBySSRC(reportPCOffer, ssrc)
+		require.NotEmpty(t, matches)
+
+		for _, outboundStats := range matches {
+			assert.Equal(t, StatsTypeOutboundRTP, outboundStats.Type)
+			assert.Equal(t, ssrc, outboundStats.SSRC)
+			assert.NotEmpty(t, outboundStats.Kind)
+			assert.NotEmpty(t, outboundStats.TransportID)
+			assert.Greater(t, outboundStats.PacketsSent, uint32(0))
+			assert.Greater(t, outboundStats.BytesSent, uint64(0))
+			assert.GreaterOrEqual(t, outboundStats.HeaderBytesSent, uint64(0))
+			assert.GreaterOrEqual(t, outboundStats.FIRCount, uint32(0))
+			assert.GreaterOrEqual(t, outboundStats.PLICount, uint32(0))
+			assert.GreaterOrEqual(t, outboundStats.NACKCount, uint32(0))
+		}
+	}
+
 	assert.NoError(t, err)
 	for i := range offerPC.api.mediaEngine.videoCodecs {
 		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.videoCodecs[i]))

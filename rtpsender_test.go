@@ -10,14 +10,17 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
@@ -557,4 +560,68 @@ func Test_RTPSender_SetReadDeadline_Crash(t *testing.T) {
 	assert.Error(t, rtpSender.SetReadDeadline(time.Time{}), errRTPSenderSendNotCalled)
 	assert.NoError(t, stackA.close())
 	assert.NoError(t, stackB.close())
+}
+
+// TestRTPSender_CollectStats_Mapping validates that collectStats maps
+// interceptor/pkg/stats values into OutboundRTPStreamStats.
+func TestRTPSender_CollectStats_Mapping(t *testing.T) {
+	ssrc := SSRC(1234)
+	ps := uint64(math.MaxUint32) + 42
+	bytes := uint64(98765)
+	hdrBytes := uint64(4321)
+	fir := uint32(3)
+	pli := uint32(5)
+	nack := uint32(7)
+
+	fg := &fakeGetter{s: stats.Stats{
+		OutboundRTPStreamStats: stats.OutboundRTPStreamStats{
+			SentRTPStreamStats: stats.SentRTPStreamStats{
+				PacketsSent: ps,
+				BytesSent:   bytes,
+			},
+			HeaderBytesSent: hdrBytes,
+			FIRCount:        fir,
+			PLICount:        pli,
+			NACKCount:       nack,
+		},
+	}}
+
+	// Create a minimal RTPSender with one track encoding
+	api := &API{}
+	r := &RTPSender{
+		kind: RTPCodecTypeVideo,
+		api:  api,
+	}
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	require.NoError(t, err)
+
+	r.trackEncodings = []*trackEncoding{{
+		track: track,
+		ssrc:  ssrc,
+	}}
+
+	collector := newStatsReportCollector()
+	r.collectStats(collector, fg)
+	report := collector.Ready()
+
+	// Fetch the generated outbound-rtp stat by ID
+	statID := "outbound-rtp-1234"
+	got, ok := report[statID]
+	require.True(t, ok, "missing outbound stat")
+
+	outbound, ok := got.(OutboundRTPStreamStats)
+	require.True(t, ok)
+
+	// Wrap-around semantics for casts
+	assert.Equal(t, uint32(ps), outbound.PacketsSent) //nolint:gosec
+	assert.Equal(t, bytes, outbound.BytesSent)
+	assert.Equal(t, hdrBytes, outbound.HeaderBytesSent)
+	assert.Equal(t, fir, outbound.FIRCount)
+	assert.Equal(t, pli, outbound.PLICount)
+	assert.Equal(t, nack, outbound.NACKCount)
+	assert.Equal(t, StatsTypeOutboundRTP, outbound.Type)
+	assert.Equal(t, ssrc, outbound.SSRC)
+	assert.Equal(t, "video", outbound.Kind)
+	assert.Equal(t, "iceTransport", outbound.TransportID)
 }

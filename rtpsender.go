@@ -9,10 +9,12 @@ package webrtc
 import (
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -509,6 +511,68 @@ func (r *RTPSender) hasStopped() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Emit outbound-rtp stats for each track encoding
+	mid := ""
+	if r.rtpTransceiver != nil {
+		mid = r.rtpTransceiver.Mid()
+	}
+	now := statsTimestampNow()
+	for _, trackEncoding := range r.trackEncodings {
+		collector.Collecting()
+
+		outboundID := fmt.Sprintf("outbound-rtp-%d", uint32(trackEncoding.ssrc))
+
+		codecID := ""
+		if trackEncoding.context != nil && len(trackEncoding.context.params.Codecs) > 0 {
+			codec := trackEncoding.context.params.Codecs[0]
+			if codec.statsID != "" {
+				codecID = codec.statsID
+			}
+		}
+
+		rid := ""
+		if trackEncoding.track != nil && trackEncoding.track.RID() != "" {
+			rid = trackEncoding.track.RID()
+		}
+
+		outboundStats := OutboundRTPStreamStats{
+			Mid:         mid,
+			Rid:         rid,
+			Timestamp:   now,
+			Type:        StatsTypeOutboundRTP,
+			ID:          outboundID,
+			SSRC:        trackEncoding.ssrc,
+			Kind:        r.kind.String(),
+			TransportID: "iceTransport",
+			CodecID:     codecID,
+		}
+
+		stats := statsGetter.Get(uint32(trackEncoding.ssrc))
+		if stats != nil { //nolint:nestif // nested to keep mapping local
+			// Wrap-around casting by design, with warnings if overflow/underflow is detected.
+			ps := stats.OutboundRTPStreamStats.PacketsSent
+			if ps > math.MaxUint32 {
+				// Note: using a simple logger approach since r doesn't have a logger field
+				// In real implementation, we might want to add a logger field to RTPSender
+				fmt.Printf("Warning: Outbound PacketsSent exceeds uint32 and will wrap: %d\n", ps)
+			}
+			outboundStats.PacketsSent = uint32(ps) //nolint:gosec
+
+			outboundStats.BytesSent = stats.OutboundRTPStreamStats.BytesSent
+			outboundStats.HeaderBytesSent = stats.OutboundRTPStreamStats.HeaderBytesSent
+			outboundStats.FIRCount = stats.OutboundRTPStreamStats.FIRCount
+			outboundStats.PLICount = stats.OutboundRTPStreamStats.PLICount
+			outboundStats.NACKCount = stats.OutboundRTPStreamStats.NACKCount
+		}
+
+		collector.Collect(outboundID, outboundStats)
 	}
 }
 
