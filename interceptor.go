@@ -69,6 +69,11 @@ func lookupStats(id string) (stats.Getter, bool) {
 	return nil, false
 }
 
+// cleanupStats removes the stats getter for a given peerconnection.statsId.
+func cleanupStats(id string) {
+	statsGetter.Delete(id)
+}
+
 // key: string (peerconnection.statsId), value: stats.Getter
 var statsGetter sync.Map // nolint:gochecknoglobals
 

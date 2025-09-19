@@ -2481,6 +2481,9 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 	closeErrs = append(closeErrs, doGracefulCloseOps()...) //nolint:makezero // todo fix
 
+	pc.statsGetter = nil
+	cleanupStats(pc.statsID)
+
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
 	closeErrs = append(closeErrs, pc.api.interceptor.Close()) //nolint:makezero // todo fix
 

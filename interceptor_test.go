@@ -384,6 +384,29 @@ func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
 	)
 }
 
+// TestStatsGetterCleanup tests that statsGetter is properly cleaned up to prevent memory leaks.
+func TestStatsGetterCleanup(t *testing.T) {
+	api := NewAPI()
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil after creation")
+
+	statsID := pc.statsID
+	getter, exists := lookupStats(statsID)
+	assert.True(t, exists, "global statsGetter map should contain entry for this PC")
+	assert.NotNil(t, getter, "looked up getter should not be nil")
+	assert.Equal(t, pc.statsGetter, getter, "field and global map getter should match")
+
+	assert.NoError(t, pc.Close())
+
+	assert.Nil(t, pc.statsGetter, "statsGetter field should be nil after close")
+
+	getter, exists = lookupStats(statsID)
+	assert.False(t, exists, "global statsGetter map should not contain entry after close")
+	assert.Nil(t, getter, "looked up getter should be nil after close")
+}
+
 // TestInterceptorNack is an end-to-end test for the NACK sender.
 // It tests that:
 //   - we get a NACK if we negotiated generic NACks;
