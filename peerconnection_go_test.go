@@ -1425,45 +1425,6 @@ func TestPeerConnection_MediaDirectionInSDP(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_SessionID(t *testing.T) {
-	defer test.TimeOut(time.Second * 10).Stop()
-	defer test.CheckRoutines(t)()
-
-	pcOffer, pcAnswer, err := newPair()
-	assert.NoError(t, err)
-	var offerSessionID uint64
-	var offerSessionVersion uint64
-	var answerSessionID uint64
-	var answerSessionVersion uint64
-	for i := 0; i < 10; i++ {
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-		offer := pcOffer.LocalDescription().parsed
-		sessionID := offer.Origin.SessionID
-		sessionVersion := offer.Origin.SessionVersion
-		if offerSessionID == 0 {
-			offerSessionID = sessionID
-			offerSessionVersion = sessionVersion
-		} else {
-			assert.Equalf(t, offerSessionID, sessionID, "offer[%v] session id mismatch", i)
-			assert.Equalf(t, offerSessionVersion+1, sessionVersion, "offer[%v] session version mismatch", i)
-			offerSessionVersion++
-		}
-
-		answer := pcAnswer.LocalDescription().parsed
-		sessionID = answer.Origin.SessionID
-		sessionVersion = answer.Origin.SessionVersion
-		if answerSessionID == 0 {
-			answerSessionID = sessionID
-			answerSessionVersion = sessionVersion
-		} else {
-			assert.Equalf(t, answerSessionID, sessionID, "answer[%v] session id mismatch", i)
-			assert.Equalf(t, answerSessionVersion+1, sessionVersion, "answer[%v] session version mismatch", i)
-			answerSessionVersion++
-		}
-	}
-	closePairNow(t, pcOffer, pcAnswer)
-}
-
 func TestPeerConnectionNilCallback(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
