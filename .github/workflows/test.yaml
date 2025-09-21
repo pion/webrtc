@@ -38,6 +38,15 @@ jobs:
     with:
       go-version: ${{ matrix.go }}
 
+  test-windows:
+    uses: pion/.goassets/.github/workflows/test-windows.reusable.yml@master
+    strategy:
+      matrix:
+        go: ["1.25", "1.24"] # auto-update/supported-go-version-list
+      fail-fast: false
+    with:
+      go-version: ${{ matrix.go }}
+
   test-wasm:
     uses: pion/.goassets/.github/workflows/test-wasm.reusable.yml@master
     with:
