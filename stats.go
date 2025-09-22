@@ -162,6 +162,9 @@ func (s StatsTimestamp) Time() time.Time {
 }
 
 func statsTimestampFrom(t time.Time) StatsTimestamp {
+	if t.IsZero() {
+		return 0
+	}
 	return StatsTimestamp(t.UnixNano() / int64(time.Millisecond))
 }
 

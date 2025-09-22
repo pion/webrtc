@@ -456,9 +456,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 			inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
 			inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
 			inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
-			timestamp := stats.InboundRTPStreamStats.LastPacketReceivedTimestamp
-			inboundStats.LastPacketReceivedTimestamp = StatsTimestamp(
-				timestamp.UnixNano() / int64(time.Millisecond))
+			inboundStats.LastPacketReceivedTimestamp = statsTimestampFrom(stats.InboundRTPStreamStats.LastPacketReceivedTimestamp)
 			inboundStats.FIRCount = stats.InboundRTPStreamStats.FIRCount
 			inboundStats.PLICount = stats.InboundRTPStreamStats.PLICount
 			inboundStats.NACKCount = stats.InboundRTPStreamStats.NACKCount
