@@ -13,7 +13,7 @@ require (
 	github.com/pion/rtp v1.8.22
 	github.com/pion/sctp v1.8.39
 	github.com/pion/sdp/v3 v3.0.16
-	github.com/pion/srtp/v3 v3.0.7
+	github.com/pion/srtp/v3 v3.0.8
 	github.com/pion/stun/v3 v3.0.0
 	github.com/pion/transport/v3 v3.0.7
 	github.com/pion/turn/v4 v4.1.1
