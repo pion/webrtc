@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -32,6 +33,8 @@ type TrackRemote struct {
 	receiver         *RTPReceiver
 	peeked           []byte
 	peekedAttributes interceptor.Attributes
+
+	audioPlayoutStatsProviders []AudioPlayoutStatsProvider
 }
 
 func newTrackRemote(kind RTPCodecType, ssrc, rtxSsrc SSRC, rid string, receiver *RTPReceiver) *TrackRemote {
@@ -235,6 +238,70 @@ func (t *TrackRemote) HasRTX() bool {
 	defer t.mu.RUnlock()
 
 	return t.rtxSsrc != 0
+}
+
+func (t *TrackRemote) addProvider(provider AudioPlayoutStatsProvider) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, p := range t.audioPlayoutStatsProviders {
+		if p == provider {
+			return
+		}
+	}
+
+	t.audioPlayoutStatsProviders = append(t.audioPlayoutStatsProviders, provider)
+}
+
+func (t *TrackRemote) removeProvider(provider AudioPlayoutStatsProvider) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for i, p := range t.audioPlayoutStatsProviders {
+		if p == provider {
+			t.audioPlayoutStatsProviders = append(t.audioPlayoutStatsProviders[:i], t.audioPlayoutStatsProviders[i+1:]...)
+
+			return
+		}
+	}
+}
+
+func (t *TrackRemote) pullAudioPlayoutStats(now time.Time) []AudioPlayoutStats {
+	t.mu.RLock()
+	providers := t.audioPlayoutStatsProviders
+	t.mu.RUnlock()
+
+	if len(providers) == 0 {
+		return nil
+	}
+
+	var allStats []AudioPlayoutStats
+	for _, provider := range providers {
+		stats, ok := provider.Snapshot(now)
+		if !ok {
+			continue
+		}
+
+		if stats.ID == "" {
+			stats.ID = fmt.Sprintf("media-playout-%d", uint32(t.SSRC()))
+		}
+
+		if stats.Type == "" {
+			stats.Type = StatsTypeMediaPlayout
+		}
+
+		if stats.Kind == "" {
+			stats.Kind = string(MediaKindAudio)
+		}
+
+		if stats.Timestamp == 0 {
+			stats.Timestamp = statsTimestampFrom(now)
+		}
+
+		allStats = append(allStats, stats)
+	}
+
+	return allStats
 }
 
 func (t *TrackRemote) setRtxSSRC(ssrc SSRC) {

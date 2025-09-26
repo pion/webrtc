@@ -132,6 +132,143 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	assert.Greater(t, float64(inbound.LastPacketReceivedTimestamp), 0.0)
 }
 
+func TestRTPReceiver_CollectStats_AudioPlayoutPull(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind: RTPCodecTypeAudio,
+		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+	}
+
+	track := newTrackRemote(RTPCodecTypeAudio, 7777, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: track}}
+
+	provider := &fakeAudioPlayoutStatsProvider{
+		stats: AudioPlayoutStats{
+			ID:                   "media-playout-7777",
+			Type:                 StatsTypeMediaPlayout,
+			Kind:                 string(MediaKindAudio),
+			TotalSamplesCount:    960,
+			TotalSamplesDuration: float64(960) / 48000,
+			TotalPlayoutDelay:    0.5,
+		},
+		ok: true,
+	}
+	_ = provider.AddTrack(track)
+
+	collector := newStatsReportCollector()
+	receiver.collectStats(collector, &fakeGetter{})
+	report := collector.Ready()
+
+	got, ok := report["media-playout-7777"]
+	require.True(t, ok, "missing audio playout stats entry")
+
+	playout, ok := got.(AudioPlayoutStats)
+	require.True(t, ok)
+
+	assert.Equal(t, provider.stats.TotalSamplesCount, playout.TotalSamplesCount)
+	assert.Equal(t, provider.stats.TotalSamplesDuration, playout.TotalSamplesDuration)
+	assert.Equal(t, provider.stats.TotalPlayoutDelay, playout.TotalPlayoutDelay)
+	assert.NotZero(t, playout.Timestamp)
+	assert.Equal(t, 1, provider.calls)
+}
+
+func TestRTPReceiver_CollectStats_AudioPlayoutSharedProvider(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind: RTPCodecTypeAudio,
+		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+	}
+
+	trackOne := newTrackRemote(RTPCodecTypeAudio, 5555, 0, "", receiver)
+	trackTwo := newTrackRemote(RTPCodecTypeAudio, 6666, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: trackOne}, {track: trackTwo}}
+
+	provider := &fakeAudioPlayoutStatsProvider{
+		stats: AudioPlayoutStats{
+			ID:                "shared-playout",
+			Type:              StatsTypeMediaPlayout,
+			Kind:              string(MediaKindAudio),
+			TotalSamplesCount: 100,
+		},
+		ok: true,
+	}
+
+	_ = provider.AddTrack(trackOne)
+	_ = provider.AddTrack(trackTwo)
+
+	collector := newStatsReportCollector()
+	receiver.collectStats(collector, &fakeGetter{})
+	report := collector.Ready()
+
+	got, ok := report["shared-playout"]
+	require.True(t, ok, "shared provider stats missing")
+
+	playout, ok := got.(AudioPlayoutStats)
+	require.True(t, ok)
+	assert.Equal(t, provider.stats.TotalSamplesCount, playout.TotalSamplesCount)
+	assert.Equal(t, provider.stats.Type, playout.Type)
+	assert.Equal(t, provider.stats.Kind, playout.Kind)
+	assert.Equal(t, provider.stats.ID, playout.ID)
+	assert.NotZero(t, playout.Timestamp)
+	assert.Equal(t, 2, provider.calls)
+}
+
+func TestRTPReceiver_CollectStats_AudioPlayoutTimestampAlignment(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind: RTPCodecTypeAudio,
+		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+	}
+
+	track := newTrackRemote(RTPCodecTypeAudio, 9999, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: track}}
+
+	provider := &fakeAudioPlayoutStatsProvider{
+		stats: AudioPlayoutStats{
+			ID:                "media-playout-9999",
+			Type:              StatsTypeMediaPlayout,
+			Kind:              string(MediaKindAudio),
+			TotalSamplesCount: 1,
+		},
+		ok: true,
+	}
+
+	_ = provider.AddTrack(track)
+
+	collector := newStatsReportCollector()
+	receiver.collectStats(collector, &fakeGetter{})
+	report := collector.Ready()
+
+	got, ok := report["media-playout-9999"]
+	require.True(t, ok, "playout stats missing")
+	playout, ok := got.(AudioPlayoutStats)
+	require.True(t, ok, "playout stats type assertion failed")
+	require.NotZero(t, provider.lastNow)
+	assert.Equal(t, statsTimestampFrom(provider.lastNow), playout.Timestamp)
+}
+
 type fakeGetter struct{ s stats.Stats }
 
 func (f *fakeGetter) Get(uint32) *stats.Stats { return &f.s }
+
+type fakeAudioPlayoutStatsProvider struct {
+	stats AudioPlayoutStats
+	ok    bool
+
+	calls   int
+	lastNow time.Time
+}
+
+func (f *fakeAudioPlayoutStatsProvider) Snapshot(now time.Time) (AudioPlayoutStats, bool) {
+	f.calls++
+	f.lastNow = now
+
+	return f.stats, f.ok
+}
+
+func (f *fakeAudioPlayoutStatsProvider) AddTrack(track *TrackRemote) error {
+	track.addProvider(f)
+
+	return nil
+}
+
+func (f *fakeAudioPlayoutStatsProvider) RemoveTrack(track *TrackRemote) {
+	track.removeProvider(f)
+}
