@@ -413,6 +413,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		mid = r.tr.Mid()
 	}
 	now := statsTimestampNow()
+	nowTime := now.Time()
 	for trackIndex := range r.tracks {
 		remoteTrack := r.tracks[trackIndex].track
 		if remoteTrack == nil {
@@ -465,6 +466,22 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		}
 
 		collector.Collect(inboundID, inboundStats)
+
+		if remoteTrack.Kind() == RTPCodecTypeAudio {
+			r.collectAudioPlayoutStats(collector, nowTime, remoteTrack)
+		}
+	}
+}
+
+func (r *RTPReceiver) collectAudioPlayoutStats(
+	collector *statsReportCollector,
+	nowTime time.Time,
+	remoteTrack *TrackRemote,
+) {
+	playoutStats := remoteTrack.pullAudioPlayoutStats(nowTime)
+	for _, stats := range playoutStats {
+		collector.Collecting()
+		collector.Collect(stats.ID, stats)
 	}
 }
 

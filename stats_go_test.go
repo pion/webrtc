@@ -2287,3 +2287,97 @@ func TestStatsReport_GetCodecStats_Success(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, want, got)
 }
+
+func TestDefaultAudioPlayoutStatsProvider_AccumulateSnapshot(t *testing.T) {
+	provider := NewAudioPlayoutStatsProvider("media-playout-1001")
+
+	sampleRate := uint32(48000)
+	now := time.Unix(1710000000, 500*int64(time.Millisecond))
+	samplesPerBatch := 960 * 2
+	batches := []struct {
+		delay       time.Duration
+		synthesized bool
+	}{
+		{20 * time.Millisecond, true},
+		{25 * time.Millisecond, true},
+		{25 * time.Millisecond, false},
+	}
+
+	for _, batch := range batches {
+		provider.Accumulate(samplesPerBatch, sampleRate, batch.delay, batch.synthesized)
+	}
+
+	stats, ok := provider.Snapshot(now)
+	require.True(t, ok)
+
+	assert.Equal(t, StatsTypeMediaPlayout, stats.Type)
+	assert.Equal(t, "media-playout-1001", stats.ID)
+	assert.Equal(t, string(MediaKindAudio), stats.Kind)
+	assert.Equal(t, statsTimestampFrom(now), stats.Timestamp)
+
+	samplesPerBatchU64 := uint64(samplesPerBatch) //#nosec G115 -- samplesPerBatch is a small test value
+	expectedSamples := samplesPerBatchU64 * uint64(len(batches))
+	assert.Equal(t, expectedSamples, stats.TotalSamplesCount)
+
+	expectedDuration := float64(expectedSamples) / float64(sampleRate)
+	assert.Equal(t, expectedDuration, stats.TotalSamplesDuration)
+
+	synthesizedDuration := float64(samplesPerBatch*2) / float64(sampleRate)
+	assert.Equal(t, synthesizedDuration, stats.SynthesizedSamplesDuration)
+	assert.EqualValues(t, 1, stats.SynthesizedSamplesEvents)
+
+	totalDelay := 0.0
+	for _, batch := range batches {
+		totalDelay += batch.delay.Seconds() * float64(samplesPerBatch)
+	}
+	assert.Equal(t, totalDelay, stats.TotalPlayoutDelay)
+}
+
+func TestDefaultAudioPlayoutStatsProvider_AddRemoveTrack(t *testing.T) {
+	receiver := &RTPReceiver{closed: make(chan any)}
+	track := newTrackRemote(RTPCodecTypeAudio, 1234, 0, "", receiver)
+	samplesPerBatch := 960
+
+	provider := NewAudioPlayoutStatsProvider("media-playout-device-1")
+
+	err := provider.AddTrack(track)
+	require.NoError(t, err)
+	defer provider.RemoveTrack(track)
+
+	provider.Accumulate(samplesPerBatch, 48000, 10*time.Millisecond, false)
+	stats := track.pullAudioPlayoutStats(time.Now())
+	require.Len(t, stats, 1)
+	assert.Equal(t, "media-playout-device-1", stats[0].ID)
+	assert.EqualValues(t, samplesPerBatch, stats[0].TotalSamplesCount)
+
+	provider.RemoveTrack(track)
+	stats = track.pullAudioPlayoutStats(time.Now())
+	require.Empty(t, stats)
+}
+
+func TestDefaultAudioPlayoutStatsProvider_MultipleProviders(t *testing.T) {
+	receiver := &RTPReceiver{closed: make(chan any)}
+	track := newTrackRemote(RTPCodecTypeAudio, 5555, 0, "", receiver)
+	samplesPerBatch := 960
+
+	provider1 := NewAudioPlayoutStatsProvider("media-playout-speaker")
+	provider2 := NewAudioPlayoutStatsProvider("media-playout-headphones")
+
+	err := provider1.AddTrack(track)
+	require.NoError(t, err)
+	defer provider1.RemoveTrack(track)
+
+	err = provider2.AddTrack(track)
+	require.NoError(t, err)
+	defer provider2.RemoveTrack(track)
+
+	provider1.Accumulate(samplesPerBatch, 48000, 10*time.Millisecond, false)
+	provider2.Accumulate(samplesPerBatch*2, 48000, 15*time.Millisecond, false)
+
+	stats := track.pullAudioPlayoutStats(time.Now())
+	require.Len(t, stats, 2)
+
+	ids := []string{stats[0].ID, stats[1].ID}
+	assert.Contains(t, ids, "media-playout-speaker")
+	assert.Contains(t, ids, "media-playout-headphones")
+}
