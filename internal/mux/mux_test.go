@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
+	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/packetio"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/require"
@@ -22,12 +23,13 @@ func TestNoEndpoints(t *testing.T) {
 	ca, cb := net.Pipe()
 	require.NoError(t, cb.Close())
 
+	attr := transport.NewPacketAttributes()
 	mux := NewMux(Config{
-		Conn:          ca,
+		Conn:          transport.NewNetConnToNetConnSocket(ca),
 		BufferSize:    testPipeBufferSize,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 	})
-	require.NoError(t, mux.dispatch(make([]byte, 1)))
+	require.NoError(t, mux.dispatch(make([]byte, 1), attr))
 	require.NoError(t, mux.Close())
 	require.NoError(t, ca.Close())
 }
@@ -83,7 +85,7 @@ func TestNonFatalRead(t *testing.T) {
 	}}
 
 	mux := NewMux(Config{
-		Conn:          conn,
+		Conn:          transport.NewNetConnToNetConnSocket(conn),
 		BufferSize:    testPipeBufferSize,
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 	})
@@ -112,7 +114,7 @@ func TestNonFatalDispatch(t *testing.T) {
 	in, out := net.Pipe()
 
 	mux := NewMux(Config{
-		Conn:          out,
+		Conn:          transport.NewNetConnToNetConnSocket(out),
 		LoggerFactory: logging.NewDefaultLoggerFactory(),
 		BufferSize:    1500,
 	})
@@ -146,7 +148,7 @@ func BenchmarkDispatch(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		err := mux.dispatch(buf)
+		err := mux.dispatch(buf, transport.NewPacketAttributes())
 		if err != nil {
 			b.Errorf("dispatch: %v", err)
 		}
@@ -165,15 +167,17 @@ func TestPendingQueue(t *testing.T) {
 		log:       factory.NewLogger("mux"),
 	}
 
+	attr := transport.NewPacketAttributes()
+
 	// Assert empty packets don't end up in queue
-	require.NoError(t, mux.dispatch([]byte{}))
+	require.NoError(t, mux.dispatch([]byte{}, attr))
 	require.Equal(t, len(mux.pendingPackets), 0)
 
 	// Test Happy Case
 	inBuffer := []byte{20, 1, 2, 3, 4}
 	outBuffer := make([]byte, len(inBuffer))
 
-	require.NoError(t, mux.dispatch(inBuffer))
+	require.NoError(t, mux.dispatch(inBuffer, attr))
 
 	endpoint := mux.NewEndpoint(MatchDTLS)
 	require.NotNil(t, endpoint)
@@ -185,7 +189,7 @@ func TestPendingQueue(t *testing.T) {
 
 	// Assert limit on pendingPackets
 	for i := 0; i <= 100; i++ {
-		require.NoError(t, mux.dispatch([]byte{64, 65, 66}))
+		require.NoError(t, mux.dispatch([]byte{64, 65, 66}, attr))
 	}
 	require.Equal(t, len(mux.pendingPackets), maxPendingPackets)
 }

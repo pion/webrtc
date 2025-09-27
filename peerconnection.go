@@ -12,7 +12,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -1681,7 +1680,7 @@ func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
 	}
 }
 
-func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -1719,8 +1718,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 
 	// We read the RTP packet to determine the payload type
 	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-
-	i, err := rtpStream.Read(b)
+	i, err := rtpStream.ReadWithAttributes(b, nil)
 	if err != nil {
 		return err
 	}
@@ -1908,7 +1906,7 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() { //nolint:cyclop
 			continue
 		}
 
-		go func(rtpStream io.Reader, ssrc SSRC) {
+		go func(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) {
 			if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
 			}

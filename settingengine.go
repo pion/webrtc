@@ -94,7 +94,7 @@ type SettingEngine struct {
 	disableSRTPReplayProtection               bool
 	disableSRTCPReplayProtection              bool
 	net                                       transport.Net
-	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) io.ReadWriteCloser
+	BufferFactory                             func(packetType packetio.BufferPacketType, ssrc uint32) *packetio.Buffer
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux

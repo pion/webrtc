@@ -7,11 +7,11 @@ package mux
 import (
 	"errors"
 	"io"
-	"net"
 	"sync"
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
+	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/packetio"
 )
 
@@ -26,20 +26,25 @@ const (
 // Config collects the arguments to mux.Mux construction into
 // a single structure.
 type Config struct {
-	Conn          net.Conn
+	Conn          transport.NetConnSocket
 	BufferSize    int
 	LoggerFactory logging.LoggerFactory
 }
 
+type pendingPacket struct {
+	packet []byte
+	attr   *transport.PacketAttributes
+}
+
 // Mux allows multiplexing.
 type Mux struct {
-	nextConn   net.Conn
+	nextConn   transport.NetConnSocket
 	bufferSize int
 	lock       sync.Mutex
 	endpoints  map[*Endpoint]MatchFunc
 	isClosed   bool
 
-	pendingPackets [][]byte
+	pendingPackets []*pendingPacket
 
 	closedCh chan struct{}
 	log      logging.LeveledLogger
@@ -118,8 +123,9 @@ func (m *Mux) readLoop() {
 	}()
 
 	buf := make([]byte, m.bufferSize)
+	attr := transport.NewPacketAttributes()
 	for {
-		n, err := m.nextConn.Read(buf)
+		n, err := m.nextConn.ReadWithAttributes(buf, attr)
 		switch {
 		case errors.Is(err, io.EOF), errors.Is(err, ice.ErrClosed):
 			return
@@ -133,7 +139,7 @@ func (m *Mux) readLoop() {
 			return
 		}
 
-		if err = m.dispatch(buf[:n]); err != nil {
+		if err = m.dispatch(buf[:n], attr); err != nil {
 			if errors.Is(err, io.ErrClosedPipe) {
 				// if the buffer was closed, that's not an error we care to report
 				return
@@ -145,8 +151,8 @@ func (m *Mux) readLoop() {
 	}
 }
 
-func (m *Mux) dispatch(buf []byte) error {
-	if len(buf) == 0 {
+func (m *Mux) dispatch(b []byte, attr *transport.PacketAttributes) error {
+	if len(b) == 0 {
 		m.log.Warnf("Warning: mux: unable to dispatch zero length packet")
 
 		return nil
@@ -156,7 +162,7 @@ func (m *Mux) dispatch(buf []byte) error {
 
 	m.lock.Lock()
 	for e, f := range m.endpoints {
-		if f(buf) {
+		if f(b) {
 			endpoint = e
 
 			break
@@ -169,16 +175,22 @@ func (m *Mux) dispatch(buf []byte) error {
 			if len(m.pendingPackets) >= maxPendingPackets {
 				m.log.Warnf(
 					"Warning: mux: no endpoint for packet starting with %d, not adding to queue size(%d)",
-					buf[0], //nolint:gosec // G602, false positive?
+					b[0], //nolint:gosec // G602, false positive?
 					len(m.pendingPackets),
 				)
 			} else {
 				m.log.Warnf(
 					"Warning: mux: no endpoint for packet starting with %d, adding to queue size(%d)",
-					buf[0], //nolint:gosec // G602, false positive?
+					b[0], //nolint:gosec // G602, false positive?
 					len(m.pendingPackets),
 				)
-				m.pendingPackets = append(m.pendingPackets, append([]byte{}, buf...))
+				// copy the packet bytes and clone the PacketAttributes
+				pp := &pendingPacket{
+					packet: append([]byte{}, b...),
+					attr:   attr.Clone(),
+				}
+
+				m.pendingPackets = append(m.pendingPackets, pp)
 			}
 		}
 
@@ -186,7 +198,7 @@ func (m *Mux) dispatch(buf []byte) error {
 	}
 
 	m.lock.Unlock()
-	_, err := endpoint.buffer.Write(buf)
+	_, err := endpoint.buffer.WriteWithAttributes(b, attr)
 
 	// Expected when bytes are received faster than the endpoint can process them (#2152, #2180)
 	if errors.Is(err, packetio.ErrFull) {
@@ -202,14 +214,14 @@ func (m *Mux) handlePendingPackets(endpoint *Endpoint, matchFunc MatchFunc) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	pendingPackets := make([][]byte, len(m.pendingPackets))
-	for _, buf := range m.pendingPackets {
-		if matchFunc(buf) {
-			if _, err := endpoint.buffer.Write(buf); err != nil {
+	pendingPackets := make([]*pendingPacket, len(m.pendingPackets))
+	for _, p := range m.pendingPackets {
+		if matchFunc(p.packet) {
+			if _, err := endpoint.buffer.WriteWithAttributes(p.packet, p.attr); err != nil {
 				m.log.Warnf("Warning: mux: error writing packet to endpoint from pending queue: %s", err)
 			}
 		} else {
-			pendingPackets = append(pendingPackets, buf) //nolint:makezero // todo fix
+			pendingPackets = append(pendingPackets, p) //nolint:makezero // todo fix
 		}
 	}
 	m.pendingPackets = pendingPackets

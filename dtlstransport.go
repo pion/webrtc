@@ -25,6 +25,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
+	"github.com/pion/transport/v3"
 	"github.com/pion/webrtc/v4/internal/mux"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
@@ -231,13 +232,13 @@ func (t *DTLSTransport) startSRTP() error {
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
 	}
 
-	srtpSession, err := srtp.NewSessionSRTP(t.srtpEndpoint, srtpConfig)
+	srtpSession, err := srtp.NewSessionSRTPWithNewSocket(t.srtpEndpoint, srtpConfig)
 	if err != nil {
 		// nolint
 		return fmt.Errorf("%w: %v", errFailedToStartSRTP, err)
 	}
 
-	srtcpSession, err := srtp.NewSessionSRTCP(t.srtcpEndpoint, srtpConfig)
+	srtcpSession, err := srtp.NewSessionSRTCPWithNewSocket(t.srtcpEndpoint, srtpConfig)
 	if err != nil {
 		// nolint
 		return fmt.Errorf("%w: %v", errFailedToStartSRTCP, err)
@@ -545,8 +546,13 @@ func (t *DTLSTransport) streamsForSSRC(
 		&streamInfo,
 		interceptor.RTPReaderFunc(
 			func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-				n, err = rtpReadStream.Read(in)
+				attr := transport.NewPacketAttributes()
+				n, err = rtpReadStream.ReadWithAttributes(in, attr)
 
+				if a == nil {
+					a = interceptor.Attributes{}
+					a["ECN"] = rtcp.ECN(attr.GetECN())
+				}
 				return n, a, err
 			},
 		),

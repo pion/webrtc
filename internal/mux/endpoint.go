@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
+	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/packetio"
 )
 
@@ -51,6 +52,16 @@ func (e *Endpoint) ReadFrom(p []byte) (int, net.Addr, error) {
 	i, err := e.Read(p)
 
 	return i, nil, err
+}
+
+func (e *Endpoint) ReadWithAttributes(b []byte, attr *transport.PacketAttributes) (int, error) {
+	return e.buffer.ReadWithAttributes(b, attr)
+}
+
+func (e *Endpoint) ReadFromWithAttributes(b []byte, attr *transport.PacketAttributes) (int, net.Addr, error) {
+	n, err := e.ReadWithAttributes(b, attr)
+
+	return n, nil, err
 }
 
 // Write writes len(p) bytes to the underlying conn.
