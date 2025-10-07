@@ -406,7 +406,12 @@ func (t *ICETransport) ensureGatherer() error {
 func (t *ICETransport) collectStats(collector *statsReportCollector) {
 	t.lock.Lock()
 	conn := t.conn
+	selectedCandidatePair, err := t.GetSelectedCandidatePair()
 	t.lock.Unlock()
+
+	if err != nil {
+		t.log.Error(err.Error())
+	}
 
 	collector.Collecting()
 
@@ -419,6 +424,10 @@ func (t *ICETransport) collectStats(collector *statsReportCollector) {
 	if conn != nil {
 		stats.BytesSent = conn.BytesSent()
 		stats.BytesReceived = conn.BytesReceived()
+	}
+
+	if selectedCandidatePair != nil && err == nil {
+		stats.SelectedCandidatePairID = selectedCandidatePair.statsID
 	}
 
 	collector.Collect(stats.ID, stats)
