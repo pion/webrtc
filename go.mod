@@ -23,7 +23,6 @@ require (
 )
 
 require (
-	github.com/SpalkLtd/ice/v4 v4.0.0-20251007205935-499f544f03e3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
