@@ -100,19 +100,24 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	}}
 
 	// Minimal RTPReceiver with one track
-	r := &RTPReceiver{
+	receiver := &RTPReceiver{
 		kind: RTPCodecTypeVideo,
 		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
-	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", r)
-	r.tracks = []trackStreams{{track: tr}}
+	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: tr}}
 
 	collector := newStatsReportCollector()
-	r.collectStats(collector, fg)
+	receiver.collectStats(collector, nil)
 	report := collector.Ready()
 
 	// Fetch the generated inbound-rtp stat by ID
 	statID := "inbound-rtp-1234"
+	_, ok := report[statID]
+	require.False(t, ok, "unexpected inbound stat")
+
+	receiver.collectStats(collector, fg)
+	report = collector.Ready()
 	got, ok := report[statID]
 	require.True(t, ok, "missing inbound stat")
 

@@ -404,6 +404,10 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 }
 
 func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	if statsGetter == nil {
+		return
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -438,32 +442,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 			TransportID: "iceTransport",
 			CodecID:     codecID,
 		}
-
-		stats := statsGetter.Get(uint32(remoteTrack.SSRC()))
-		if stats != nil { //nolint:nestif // nested to keep mapping local
-			// Wrap-around casting by design, with warnings if overflow/underflow is detected.
-			pr := stats.InboundRTPStreamStats.PacketsReceived
-			if pr > math.MaxUint32 {
-				r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
-			}
-			inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
-
-			pl := stats.InboundRTPStreamStats.PacketsLost
-			if pl > math.MaxInt32 || pl < math.MinInt32 {
-				r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
-			}
-			inboundStats.PacketsLost = int32(pl) //nolint:gosec
-
-			inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
-			inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
-			inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
-			timestamp := stats.InboundRTPStreamStats.LastPacketReceivedTimestamp
-			inboundStats.LastPacketReceivedTimestamp = StatsTimestamp(
-				timestamp.UnixNano() / int64(time.Millisecond))
-			inboundStats.FIRCount = stats.InboundRTPStreamStats.FIRCount
-			inboundStats.PLICount = stats.InboundRTPStreamStats.PLICount
-			inboundStats.NACKCount = stats.InboundRTPStreamStats.NACKCount
-		}
+		r.populateInboundStats(&inboundStats, statsGetter, remoteTrack)
 
 		collector.Collect(inboundID, inboundStats)
 
@@ -471,6 +450,40 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 			r.collectAudioPlayoutStats(collector, nowTime, remoteTrack)
 		}
 	}
+}
+
+func (r *RTPReceiver) populateInboundStats(
+	inboundStats *InboundRTPStreamStats,
+	statsGetter stats.Getter,
+	remoteTrack *TrackRemote,
+) {
+	stats := statsGetter.Get(uint32(remoteTrack.SSRC()))
+	if stats == nil {
+		return
+	}
+
+	// Wrap-around casting by design, with warnings if overflow/underflow is detected.
+	pr := stats.InboundRTPStreamStats.PacketsReceived
+	if pr > math.MaxUint32 {
+		r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
+	}
+	inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
+
+	pl := stats.InboundRTPStreamStats.PacketsLost
+	if pl > math.MaxInt32 || pl < math.MinInt32 {
+		r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
+	}
+	inboundStats.PacketsLost = int32(pl) //nolint:gosec
+
+	inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
+	inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
+	inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
+	timestamp := stats.InboundRTPStreamStats.LastPacketReceivedTimestamp
+	inboundStats.LastPacketReceivedTimestamp = StatsTimestamp(
+		timestamp.UnixNano() / int64(time.Millisecond))
+	inboundStats.FIRCount = stats.InboundRTPStreamStats.FIRCount
+	inboundStats.PLICount = stats.InboundRTPStreamStats.PLICount
+	inboundStats.NACKCount = stats.InboundRTPStreamStats.NACKCount
 }
 
 func (r *RTPReceiver) collectAudioPlayoutStats(
