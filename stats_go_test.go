@@ -10,7 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1428,6 +1430,31 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 		})
 	})
 
+	// register OnTrack before we start signaling so we can safely wait for the first RTP packet.
+	var gotFirstPacket atomic.Bool
+	var once sync.Once
+	answerPC.OnTrack(func(tr *TrackRemote, _ *RTPReceiver) {
+		once.Do(func() {
+			go func() {
+				// read one RTP packet to ensure TrackRemote has been initialized.
+				for {
+					_, _, firstPacketErr := tr.ReadRTP()
+
+					if firstPacketErr == nil {
+						gotFirstPacket.Store(true)
+
+						return
+					}
+
+					if errors.Is(firstPacketErr, io.EOF) || errors.Is(firstPacketErr, io.ErrClosedPipe) {
+						return
+					}
+					// retry on transient errors
+				}
+			}()
+		})
+	})
+
 	assert.NoError(t, signalPairForStats(offerPC, answerPC))
 	waitWithTimeout(t, &dcWait)
 
@@ -1473,26 +1500,14 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	}
 	assert.NoError(t, track1.WriteSample(sample))
 
-	// Poll for packets to arrive rather than using a fixed wait time.
-	// This ensures the test is deterministic and fails fast with clear context
-	// if packets don't arrive within the timeout period.
-	assert.Eventually(t, func() bool {
-		reportPCAnswer = answerPC.GetStats()
-		receivers := answerPC.GetReceivers()
-		for _, r := range receivers {
-			for _, tr := range r.Tracks() {
-				if tr.SSRC() == 0 {
-					continue
-				}
-				matches := findInboundRTPStatsBySSRC(reportPCAnswer, tr.SSRC())
-				if len(matches) > 0 && matches[0].PacketsReceived > 0 {
-					return true
-				}
-			}
-		}
-
-		return false
-	}, time.Second, 10*time.Millisecond, "Expected packets to be received")
+	// Wait until the remote track has read one RTP packet (avoids racing GetStats with TrackRemote initialization).
+	assert.Eventually(
+		t,
+		gotFirstPacket.Load,
+		2*time.Second,
+		10*time.Millisecond,
+		"Expected to read an RTP packet",
+	)
 
 	// Get fresh stats after sending the sample
 	reportPCAnswer = answerPC.GetStats()
