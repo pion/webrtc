@@ -14,7 +14,7 @@ import (
 
 // GetConnectionStats is a helper method to return the associated stats for a given PeerConnection.
 func (r StatsReport) GetConnectionStats(conn *PeerConnection) (PeerConnectionStats, bool) {
-	statsID := conn.getStatsID()
+	statsID := conn.ID()
 	stats, ok := r[statsID]
 	if !ok {
 		return PeerConnectionStats{}, false
