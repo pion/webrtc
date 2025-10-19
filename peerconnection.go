@@ -35,8 +35,8 @@ import (
 // peer-to-peer communications with another PeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
 type PeerConnection struct {
-	statsID string
-	mu      sync.RWMutex
+	id string
+	mu sync.RWMutex
 
 	sdpOrigin sdp.Origin
 
@@ -118,7 +118,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// allow better readability to understand what is happening.
 
 	pc := &PeerConnection{
-		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
+		id: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
 		configuration: Configuration{
 			ICEServers:           []ICEServer{},
 			ICETransportPolicy:   ICETransportPolicyAll,
@@ -145,12 +145,12 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	i, err := api.interceptorRegistry.Build(pc.statsID)
+	i, err := api.interceptorRegistry.Build(pc.id)
 	if err != nil {
 		return nil, err
 	}
 
-	if getter, ok := lookupStats(pc.statsID); ok {
+	if getter, ok := lookupStats(pc.id); ok {
 		pc.statsGetter = getter
 	}
 
@@ -597,11 +597,11 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 	return pc.configuration
 }
 
-func (pc *PeerConnection) getStatsID() string {
+func (pc *PeerConnection) ID() string {
 	pc.mu.RLock()
 	defer pc.mu.RUnlock()
 
-	return pc.statsID
+	return pc.id
 }
 
 // hasLocalDescriptionChanged returns whether local media (rtpTransceivers) has changed
@@ -2482,7 +2482,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 	closeErrs = append(closeErrs, doGracefulCloseOps()...)
 
 	pc.statsGetter = nil
-	cleanupStats(pc.statsID)
+	cleanupStats(pc.id)
 
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
 	closeErrs = append(closeErrs, pc.api.interceptor.Close())
@@ -2623,7 +2623,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	stats := PeerConnectionStats{
 		Timestamp:             statsTimestampNow(),
 		Type:                  StatsTypePeerConnection,
-		ID:                    pc.statsID,
+		ID:                    pc.id,
 		DataChannelsAccepted:  dataChannelsAccepted,
 		DataChannelsClosed:    dataChannelsClosed,
 		DataChannelsOpened:    dataChannelsOpened,

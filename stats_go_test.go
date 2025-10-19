@@ -2037,7 +2037,7 @@ func TestUnmarshalSCTPTransportStats_Error(t *testing.T) {
 
 func TestStatsReport_GetConnectionStats_MissingEntry(t *testing.T) {
 	conn := &PeerConnection{}
-	conn.getStatsID()
+	conn.ID()
 
 	r := StatsReport{}
 	got, ok := r.GetConnectionStats(conn)
@@ -2048,7 +2048,7 @@ func TestStatsReport_GetConnectionStats_MissingEntry(t *testing.T) {
 
 func TestStatsReport_GetConnectionStats_WrongType(t *testing.T) {
 	conn := &PeerConnection{}
-	id := conn.getStatsID()
+	id := conn.ID()
 
 	r := StatsReport{
 		id: DataChannelStats{ID: "not-a-pc-stats"},
@@ -2062,7 +2062,7 @@ func TestStatsReport_GetConnectionStats_WrongType(t *testing.T) {
 
 func TestStatsReport_GetConnectionStats_Success(t *testing.T) {
 	conn := &PeerConnection{}
-	id := conn.getStatsID()
+	id := conn.ID()
 
 	want := PeerConnectionStats{
 		ID:        id,

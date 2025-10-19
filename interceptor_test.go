@@ -374,7 +374,7 @@ func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
 
 	// Also assert that the getter stored during interceptor Build matches
 	// the one attached to this PeerConnection.
-	getter, ok := lookupStats(pc.statsID)
+	getter, ok := lookupStats(pc.id)
 	assert.True(t, ok, "lookupStats should return a getter for this statsID")
 	assert.NotNil(t, getter)
 	assert.Equal(t,
@@ -392,7 +392,7 @@ func TestStatsGetterCleanup(t *testing.T) {
 
 	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil after creation")
 
-	statsID := pc.statsID
+	statsID := pc.id
 	getter, exists := lookupStats(statsID)
 	assert.True(t, exists, "global statsGetter map should contain entry for this PC")
 	assert.NotNil(t, getter, "looked up getter should not be nil")
