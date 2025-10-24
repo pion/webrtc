@@ -1,0 +1,247 @@
+
+Peer Connection State has changed: connecting
+eyJ0eXBlIjoiYW5zd2VyIiwic2RwIjoidj0wXHJcbm89LSA0ODQ0NzUwNDYxNDI4ODEwNzc4IDE3NjEzMzc3NjMgSU4gSVA0IDAuMC4wLjBcclxucz0tXHJcbnQ9MCAwXHJcbmE9bXNpZC1zZW1hbnRpYzpXTVMgKlxyXG5hPWZpbmdlcnByaW50OnNoYS0yNTYgNkM6Mjc6N0M6MEE6QkQ6NTA6M0E6M0Y6NTg6QUQ6MTg6OTM6MkY6NjU6RDU6MDU6NTI6Q0E6OTY6NzY6MjU6RUQ6ODY6Njc6RjQ6QTI6Qjk6MjE6ODE6NzU6QTg6NzRcclxuYT1ncm91cDpCVU5ETEUgMFxyXG5tPWFwcGxpY2F0aW9uIDkgVURQL0RUTFMvU0NUUCB3ZWJydGMtZGF0YWNoYW5uZWxcclxuYz1JTiBJUDQgMC4wLjAuMFxyXG5hPXNldHVwOmFjdGl2ZVxyXG5hPW1pZDowXHJcbmE9c2VuZHJlY3ZcclxuYT1zY3RwLXBvcnQ6NTAwMFxyXG5hPW1heC1tZXNzYWdlLXNpemU6MTA3Mzc0MTgyM1xyXG5hPWljZS11ZnJhZzpDYUhPVVVneUh1ZW5IWWtvXHJcbmE9aWNlLXB3ZDppTGxOekFnZnhhVktLRHdlTW5CenV6ZVpFV0RQR3FQRVxyXG5hPWNhbmRpZGF0ZToxNjQ1NzI1MTg2IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE5Ljk3LjEzMiAzNDgzMiB0eXAgaG9zdCB1ZnJhZyBDYUhPVVVneUh1ZW5IWWtvXHJcbmE9Y2FuZGlkYXRlOjE2NDU3MjUxODYgMiB1ZHAgMjEzMDcwNjQzMSAxNzIuMTkuOTcuMTMyIDM0ODMyIHR5cCBob3N0IHVmcmFnIENhSE9VVWd5SHVlbkhZa29cclxuYT1jYW5kaWRhdGU6MjMzNzYyMTM5IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE3LjAuMSAzMzI3NSB0eXAgaG9zdCB1ZnJhZyBDYUhPVVVneUh1ZW5IWWtvXHJcbmE9Y2FuZGlkYXRlOjIzMzc2MjEzOSAyIHVkcCAyMTMwNzA2NDMxIDE3Mi4xNy4wLjEgMzMyNzUgdHlwIGhvc3QgdWZyYWcgQ2FIT1VVZ3lIdWVuSFlrb1xyXG5hPWNhbmRpZGF0ZToxMjU2ODQzNjU3IDEgdWRwIDE2OTQ0OTg4MTUgNzMuMTY1Ljc0LjI5IDY0MDg0IHR5cCBzcmZseCByYWRkciAwLjAuMC4wIHJwb3J0IDM0Njg0IHVmcmFnIENhSE9VVWd5SHVlbkhZa29cclxuYT1jYW5kaWRhdGU6MTI1Njg0MzY1NyAyIHVkcCAxNjk0NDk4ODE1IDczLjE2NS43NC4yOSA2NDA4NCB0eXAgc3JmbHggcmFkZHIgMC4wLjAuMCBycG9ydCAzNDY4NCB1ZnJhZyBDYUhPVVVneUh1ZW5IWWtvXHJcbmE9ZW5kLW9mLWNhbmRpZGF0ZXNcclxuIn0=
+sctp TRACE: 16:29:29.349669 association.go:443: [0xc000510008] updated cwnd=4380 ssthresh=0 inflight=0 (INI)
+Peer Connection State has changed: connected
+sctp DEBUG: 16:29:29.349747 association.go:495: [0xc000510008] sending INIT
+sctp DEBUG: 16:29:29.349759 association.go:1203: [0xc000510008] state change: 'Closed' => 'CookieWait'
+sctp DEBUG: 16:29:29.349751 association.go:662: [0xc000510008] readLoop entered
+sctp DEBUG: 16:29:29.349794 association.go:1285: [0xc000510008] chunkInit received in state 'CookieWait'
+sctp DEBUG: 16:29:29.349788 association.go:690: [0xc000510008] writeLoop entered
+sctp DEBUG: 16:29:29.349803 association.go:1317: [0xc000510008] initial rwnd=1048576
+sctp DEBUG: 16:29:29.349844 association.go:1324: [0xc000510008] use ForwardTSN (on init)
+sctp DEBUG: 16:29:29.349852 association.go:1343: sending INIT ACK
+sctp DEBUG: 16:29:29.349863 association.go:1365: [0xc000510008] sendZeroChecksum=false (on init)
+sctp DEBUG: 16:29:29.452047 association.go:1377: [0xc000510008] chunkInitAck received in state 'CookieWait'
+sctp DEBUG: 16:29:29.452095 association.go:1400: [0xc000510008] initial rwnd=1048576
+sctp TRACE: 16:29:29.452113 association.go:1407: [0xc000510008] updated cwnd=4380 ssthresh=1048576 inflight=0 (INI)
+sctp DEBUG: 16:29:29.452121 association.go:1421: [0xc000510008] use ForwardTSN (on initAck)
+sctp DEBUG: 16:29:29.452127 association.go:1430: [0xc000510008] sendZeroChecksum=false (on initAck)
+sctp DEBUG: 16:29:29.452132 association.go:521: [0xc000510008] sending COOKIE-ECHO
+sctp DEBUG: 16:29:29.452163 association.go:1203: [0xc000510008] state change: 'CookieWait' => 'CookieEchoed'
+sctp DEBUG: 16:29:29.452269 association.go:1478: [0xc000510008] COOKIE-ECHO received in state 'CookieEchoed'
+sctp DEBUG: 16:29:29.452306 association.go:1203: [0xc000510008] state change: 'CookieEchoed' => 'Established'
+sctp DEBUG: 16:29:29.557455 association.go:1524: [0xc000510008] COOKIE-ACK received in state 'Established'
+sctp TRACE: 16:29:29.557500 association.go:1542: [0xc000510008] DATA: tsn=690272651 immediateSack=false len=15
+sctp DEBUG: 16:29:29.557546 association.go:1685: [0xc000510008] accepted a new stream (streamIdentifier: 1)
+sctp DEBUG: 16:29:29.557559 stream.go:208: [1:0xc000510008] reassemblyQueue readable=true
+sctp DEBUG: 16:29:29.557564 stream.go:210: [1:0xc000510008] readNotifier.signal()
+sctp DEBUG: 16:29:29.557568 stream.go:212: [1:0xc000510008] readNotifier.signal() done
+sctp TRACE: 16:29:29.557596 stream.go:376: [1:0xc000510008] bufferedAmount = 4
+sctp DEBUG: 16:29:29.557603 stream.go:107: [1:0xc000510008] reliability params: ordered=true type=0 value=0
+New DataChannel foo 824638440802
+sctp TRACE: 16:29:29.557681 association.go:2475: [0xc000510008] sending ppi=50 tsn=2839789776 ssn=0 sent=1 len=4 (true,true)
+sctp TRACE: 16:29:29.557690 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+Data channel 'foo'-'824638440802' open. Random messages will now be sent to any connected DataChannels every second
+sctp TRACE: 16:29:29.660047 association.go:1991: [0xc000510008] SACK: cumTSN=2839789776 a_rwnd=1048576
+sctp TRACE: 16:29:29.660100 association.go:1793: [0xc000510008] SACK: measured-rtt=102.406431 srtt=102.406431 new-rto=1000.000000
+sctp TRACE: 16:29:29.660111 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789775 -> 2839789776
+sctp TRACE: 16:29:29.660117 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:29.660124 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=4 FR=false pending=0
+sctp TRACE: 16:29:29.660131 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+sctp TRACE: 16:29:29.758649 association.go:3012: [0xc000510008] ack timed out (ackState: 2)
+sctp DEBUG: 16:29:29.758717 association.go:979: [0xc000510008] sending SACK: SACK cumTsnAck=690272651 arwnd=1048576 dupTsn=[]
+Sending 'vawQKsUPwuMwUnQ'
+sctp TRACE: 16:29:30.558381 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:30.558425 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789777 ssn=1 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:30.558448 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:30.964031 association.go:3342: [0xc000510008] PTO fired: probe tsn=2839789777
+sctp TRACE: 16:29:30.964102 association.go:2705: [0xc000510008] retransmitting tsn=2839789777 ssn=1 sent=2
+sctp TRACE: 16:29:30.969684 association.go:1991: [0xc000510008] SACK: cumTSN=2839789777 a_rwnd=1048576
+sctp TRACE: 16:29:30.969720 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789776 -> 2839789777
+sctp TRACE: 16:29:30.969731 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:30.969737 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:30.969742 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+sctp TRACE: 16:29:31.102698 association.go:1991: [0xc000510008] SACK: cumTSN=2839789777 a_rwnd=1048576
+sctp TRACE: 16:29:31.102770 association.go:3171: [0xc000510008] RACK: DSACK/dupTSN seen, inflate reoWnd to 51.203214ms
+Sending 'DOthgblMYzZmXvv'
+sctp TRACE: 16:29:31.558234 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:31.558277 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789778 ssn=2 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:31.558288 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:31.959555 association.go:1991: [0xc000510008] SACK: cumTSN=2839789778 a_rwnd=1048576
+sctp TRACE: 16:29:31.959614 association.go:1793: [0xc000510008] SACK: measured-rtt=401.336849 srtt=139.772733 new-rto=1000.000000
+sctp TRACE: 16:29:31.959625 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789777 -> 2839789778
+sctp TRACE: 16:29:31.959631 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:31.959636 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:31.959641 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'rJSGRYgjmERzhHl'
+sctp TRACE: 16:29:32.558179 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:32.558230 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789779 ssn=3 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:32.558243 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:32.965695 association.go:1991: [0xc000510008] SACK: cumTSN=2839789779 a_rwnd=1048576
+sctp TRACE: 16:29:32.965744 association.go:1793: [0xc000510008] SACK: measured-rtt=407.515125 srtt=173.240532 new-rto=1000.000000
+sctp TRACE: 16:29:32.965765 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789778 -> 2839789779
+sctp TRACE: 16:29:32.965782 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:32.965788 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:32.965793 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'uzblFpNdLrGqqhd'
+sctp TRACE: 16:29:33.558765 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:33.558809 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789780 ssn=4 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:33.558819 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:33.956711 association.go:1991: [0xc000510008] SACK: cumTSN=2839789780 a_rwnd=1048576
+sctp TRACE: 16:29:33.956759 association.go:1793: [0xc000510008] SACK: measured-rtt=397.950666 srtt=201.329299 new-rto=1000.000000
+sctp TRACE: 16:29:33.956770 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789779 -> 2839789780
+sctp TRACE: 16:29:33.956776 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:33.956781 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:33.956786 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'FUKwxSNzIEYvvjQ'
+sctp TRACE: 16:29:34.558504 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:34.558549 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789781 ssn=5 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:34.558561 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:34.964132 association.go:1991: [0xc000510008] SACK: cumTSN=2839789781 a_rwnd=1048576
+sctp TRACE: 16:29:34.964179 association.go:1793: [0xc000510008] SACK: measured-rtt=405.631358 srtt=226.867056 new-rto=1000.000000
+sctp TRACE: 16:29:34.964191 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789780 -> 2839789781
+sctp TRACE: 16:29:34.964197 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:34.964202 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:34.964207 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'JaqnQRFxbmqaTDo'
+sctp TRACE: 16:29:35.557995 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:35.558044 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789782 ssn=6 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:35.558057 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:35.955480 association.go:1991: [0xc000510008] SACK: cumTSN=2839789782 a_rwnd=1048576
+sctp TRACE: 16:29:35.955525 association.go:1793: [0xc000510008] SACK: measured-rtt=397.482388 srtt=248.193973 new-rto=1000.000000
+sctp TRACE: 16:29:35.955547 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789781 -> 2839789782
+sctp TRACE: 16:29:35.955552 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:35.955558 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:35.955563 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'ZxCWOfeNkMbocwk'
+sctp TRACE: 16:29:36.557984 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:36.558032 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789783 ssn=7 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:36.558045 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:36.962476 association.go:1991: [0xc000510008] SACK: cumTSN=2839789783 a_rwnd=1048576
+sctp TRACE: 16:29:36.962529 association.go:1793: [0xc000510008] SACK: measured-rtt=404.497866 srtt=267.731959 new-rto=1000.000000
+sctp TRACE: 16:29:36.962541 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789782 -> 2839789783
+sctp TRACE: 16:29:36.962555 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:36.962583 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:36.962589 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'XEQcVHSajuCSGAo'
+sctp TRACE: 16:29:37.558154 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:37.558212 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789784 ssn=8 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:37.558225 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:37.967559 association.go:1991: [0xc000510008] SACK: cumTSN=2839789784 a_rwnd=1048576
+sctp TRACE: 16:29:37.967612 association.go:1793: [0xc000510008] SACK: measured-rtt=409.400114 srtt=285.440479 new-rto=1000.000000
+sctp TRACE: 16:29:37.967625 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789783 -> 2839789784
+sctp TRACE: 16:29:37.967631 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:37.967636 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:37.967641 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'KrXXdUKootBSDEj'
+sctp TRACE: 16:29:38.558942 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:38.558991 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789785 ssn=9 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:38.559004 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:38.957506 association.go:1991: [0xc000510008] SACK: cumTSN=2839789785 a_rwnd=1048576
+sctp TRACE: 16:29:38.957559 association.go:1793: [0xc000510008] SACK: measured-rtt=398.568450 srtt=299.581475 new-rto=1000.000000
+sctp TRACE: 16:29:38.957570 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789784 -> 2839789785
+sctp TRACE: 16:29:38.957575 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:38.957581 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:38.957586 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'LsxYQtdDQvrWyKk'
+sctp TRACE: 16:29:39.557979 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:39.558022 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789786 ssn=10 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:39.558034 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:39.962441 association.go:1991: [0xc000510008] SACK: cumTSN=2839789786 a_rwnd=1048576
+sctp TRACE: 16:29:39.962490 association.go:1793: [0xc000510008] SACK: measured-rtt=404.468324 srtt=312.692331 new-rto=1000.000000
+sctp TRACE: 16:29:39.962502 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789785 -> 2839789786
+sctp TRACE: 16:29:39.962508 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:39.962513 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:39.962518 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'sJrIBoqJTOCCPKd'
+sctp TRACE: 16:29:40.558895 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:40.558941 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789787 ssn=11 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:40.558952 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:40.967679 association.go:1991: [0xc000510008] SACK: cumTSN=2839789787 a_rwnd=1048576
+sctp TRACE: 16:29:40.967732 association.go:1793: [0xc000510008] SACK: measured-rtt=408.791347 srtt=324.704708 new-rto=1000.000000
+sctp TRACE: 16:29:40.967743 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789786 -> 2839789787
+sctp TRACE: 16:29:40.967748 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:40.967763 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:40.967768 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'QxwzdullUHBottj'
+sctp TRACE: 16:29:41.558529 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:41.558570 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789788 ssn=12 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:41.558583 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:41.959715 association.go:1991: [0xc000510008] SACK: cumTSN=2839789788 a_rwnd=1048576
+sctp TRACE: 16:29:41.959767 association.go:1793: [0xc000510008] SACK: measured-rtt=401.198229 srtt=334.266398 new-rto=1000.000000
+sctp TRACE: 16:29:41.959778 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789787 -> 2839789788
+sctp TRACE: 16:29:41.959784 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:41.959789 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:41.959795 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'wYOyAqIOXxiSwgY'
+sctp TRACE: 16:29:42.558019 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:42.558069 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789789 ssn=13 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:42.558082 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:42.964215 association.go:1991: [0xc000510008] SACK: cumTSN=2839789789 a_rwnd=1048576
+sctp TRACE: 16:29:42.964259 association.go:1793: [0xc000510008] SACK: measured-rtt=406.191905 srtt=343.257087 new-rto=1000.000000
+sctp TRACE: 16:29:42.964270 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789788 -> 2839789789
+sctp TRACE: 16:29:42.964276 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:42.964281 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:42.964286 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'LbpQvilMjkMLdWq'
+sctp TRACE: 16:29:43.558130 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:43.558194 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789790 ssn=14 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:43.558207 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:43.971378 association.go:1991: [0xc000510008] SACK: cumTSN=2839789790 a_rwnd=1048576
+sctp TRACE: 16:29:43.971426 association.go:1793: [0xc000510008] SACK: measured-rtt=413.233457 srtt=352.004133 new-rto=1000.000000
+sctp TRACE: 16:29:43.971439 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789789 -> 2839789790
+sctp TRACE: 16:29:43.971456 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:43.971461 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:43.971466 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'MVjkAdRjYoaNyvu'
+sctp TRACE: 16:29:44.558605 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:44.558656 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789791 ssn=15 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:44.558669 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:44.957695 association.go:1991: [0xc000510008] SACK: cumTSN=2839789791 a_rwnd=1048576
+sctp TRACE: 16:29:44.957741 association.go:1793: [0xc000510008] SACK: measured-rtt=399.086350 srtt=357.889410 new-rto=1000.000000
+sctp TRACE: 16:29:44.957753 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789790 -> 2839789791
+sctp TRACE: 16:29:44.957758 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:44.957763 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:44.957777 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'zSdjKatdwdVMjPj'
+sctp TRACE: 16:29:45.558199 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:45.558251 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789792 ssn=16 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:45.558265 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:45.963496 association.go:1991: [0xc000510008] SACK: cumTSN=2839789792 a_rwnd=1048576
+sctp TRACE: 16:29:45.963545 association.go:1793: [0xc000510008] SACK: measured-rtt=405.294162 srtt=363.815004 new-rto=1000.000000
+sctp TRACE: 16:29:45.963555 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789791 -> 2839789792
+sctp TRACE: 16:29:45.963561 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:45.963566 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:45.963571 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'zSwmpwdzRZJPzQH'
+sctp TRACE: 16:29:46.557926 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:46.557969 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789793 ssn=17 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:46.557980 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:46.968884 association.go:1991: [0xc000510008] SACK: cumTSN=2839789793 a_rwnd=1048576
+sctp TRACE: 16:29:46.968930 association.go:1793: [0xc000510008] SACK: measured-rtt=410.961779 srtt=369.708351 new-rto=1000.000000
+sctp TRACE: 16:29:46.968941 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789792 -> 2839789793
+sctp TRACE: 16:29:46.968947 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:46.968952 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:46.968957 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'YEiskstPBsoOVfQ'
+sctp TRACE: 16:29:47.558035 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:47.558075 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789794 ssn=18 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:47.558086 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:47.955513 association.go:1991: [0xc000510008] SACK: cumTSN=2839789794 a_rwnd=1048576
+sctp TRACE: 16:29:47.955565 association.go:1793: [0xc000510008] SACK: measured-rtt=397.488271 srtt=373.180841 new-rto=1000.000000
+sctp TRACE: 16:29:47.955578 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789793 -> 2839789794
+sctp TRACE: 16:29:47.955583 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:47.955589 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:47.955593 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'DeirDDOuurlXdEa'
+sctp TRACE: 16:29:48.558705 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:48.558750 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789795 ssn=19 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:48.558769 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:48.957414 association.go:1991: [0xc000510008] SACK: cumTSN=2839789795 a_rwnd=1048576
+sctp TRACE: 16:29:48.957461 association.go:1793: [0xc000510008] SACK: measured-rtt=398.711678 srtt=376.372196 new-rto=1000.000000
+sctp TRACE: 16:29:48.957480 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789794 -> 2839789795
+sctp TRACE: 16:29:48.957486 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:48.957492 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:48.957497 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+Sending 'pjHqbnbNNJgSlKR'
+sctp TRACE: 16:29:49.557934 stream.go:376: [1:0xc000510008] bufferedAmount = 15
+sctp TRACE: 16:29:49.557998 association.go:2475: [0xc000510008] sending ppi=51 tsn=2839789796 ssn=20 sent=1 len=15 (true,true)
+sctp TRACE: 16:29:49.558011 association.go:838: [0xc000510008] T3-rtx timer start (pt1)
+sctp TRACE: 16:29:49.960741 association.go:1991: [0xc000510008] SACK: cumTSN=2839789796 a_rwnd=1048576
+sctp TRACE: 16:29:49.960810 association.go:1793: [0xc000510008] SACK: measured-rtt=402.808514 srtt=379.676735 new-rto=1000.000000
+sctp TRACE: 16:29:49.960822 association.go:2034: [0xc000510008] SACK: cumTSN advanced: 2839789795 -> 2839789796
+sctp TRACE: 16:29:49.960827 association.go:1866: [0xc000510008] SACK: no more packet in-flight (pending=0)
+sctp TRACE: 16:29:49.960833 association.go:1893: [0xc000510008] cwnd did not grow: cwnd=4380 ssthresh=1048576 acked=15 FR=false pending=0
+sctp TRACE: 16:29:49.960838 stream.go:465: [1:0xc000510008] bufferedAmount = 0
+signal: interrupt
