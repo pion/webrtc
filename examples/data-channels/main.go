@@ -11,17 +11,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
 )
 
 // nolint:cyclop
 func main() {
+	go func() {
+		_ = http.ListenAndServe("localhost:6060", nil)
+	}()
+
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
+	os.Setenv("PION_LOG_DEBUG", "sctp")
 
 	// Prepare the configuration
 	config := webrtc.Configuration{
@@ -33,7 +41,10 @@ func main() {
 	}
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	se := webrtc.SettingEngine{}
+	se.LoggerFactory = logging.NewDefaultLoggerFactory()
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
+	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}

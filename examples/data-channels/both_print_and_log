@@ -1,0 +1,57 @@
+
+Peer Connection State has changed: connecting
+eyJ0eXBlIjoiYW5zd2VyIiwic2RwIjoidj0wXHJcbm89LSA0NTA3ODU0NjA2NzY3MDM2MDMxIDE3NjEzNDEzOTQgSU4gSVA0IDAuMC4wLjBcclxucz0tXHJcbnQ9MCAwXHJcbmE9bXNpZC1zZW1hbnRpYzpXTVMgKlxyXG5hPWZpbmdlcnByaW50OnNoYS0yNTYgQTI6QTM6Q0M6MUM6OTY6RDM6QjE6RUU6RTE6OTc6MTU6QzU6MjQ6RUY6Mjg6QzM6ODk6ODE6ODY6MDI6NTU6QUU6QzE6RUM6MjU6QTI6OEU6NEU6RjI6NjE6M0I6QTdcclxuYT1ncm91cDpCVU5ETEUgMFxyXG5tPWFwcGxpY2F0aW9uIDkgVURQL0RUTFMvU0NUUCB3ZWJydGMtZGF0YWNoYW5uZWxcclxuYz1JTiBJUDQgMC4wLjAuMFxyXG5hPXNldHVwOmFjdGl2ZVxyXG5hPW1pZDowXHJcbmE9c2VuZHJlY3ZcclxuYT1zY3RwLXBvcnQ6NTAwMFxyXG5hPW1heC1tZXNzYWdlLXNpemU6MTA3Mzc0MTgyM1xyXG5hPWljZS11ZnJhZzpyVW5wbmVOSERhYWNsdXRZXHJcbmE9aWNlLXB3ZDpjc3pWWEFJZWdIVkpib2thUlRySEh4Y09wVmhYbmNMc1xyXG5hPWNhbmRpZGF0ZToxNjQ1NzI1MTg2IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE5Ljk3LjEzMiA1MTU0MyB0eXAgaG9zdCB1ZnJhZyByVW5wbmVOSERhYWNsdXRZXHJcbmE9Y2FuZGlkYXRlOjE2NDU3MjUxODYgMiB1ZHAgMjEzMDcwNjQzMSAxNzIuMTkuOTcuMTMyIDUxNTQzIHR5cCBob3N0IHVmcmFnIHJVbnBuZU5IRGFhY2x1dFlcclxuYT1jYW5kaWRhdGU6MjMzNzYyMTM5IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE3LjAuMSA1MDc1MiB0eXAgaG9zdCB1ZnJhZyByVW5wbmVOSERhYWNsdXRZXHJcbmE9Y2FuZGlkYXRlOjIzMzc2MjEzOSAyIHVkcCAyMTMwNzA2NDMxIDE3Mi4xNy4wLjEgNTA3NTIgdHlwIGhvc3QgdWZyYWcgclVucG5lTkhEYWFjbHV0WVxyXG5hPWNhbmRpZGF0ZToxMjU2ODQzNjU3IDEgdWRwIDE2OTQ0OTg4MTUgNzMuMTY1Ljc0LjI5IDY0MTA5IHR5cCBzcmZseCByYWRkciAwLjAuMC4wIHJwb3J0IDYwNjI3IHVmcmFnIHJVbnBuZU5IRGFhY2x1dFlcclxuYT1jYW5kaWRhdGU6MTI1Njg0MzY1NyAyIHVkcCAxNjk0NDk4ODE1IDczLjE2NS43NC4yOSA2NDEwOSB0eXAgc3JmbHggcmFkZHIgMC4wLjAuMCBycG9ydCA2MDYyNyB1ZnJhZyByVW5wbmVOSERhYWNsdXRZXHJcbmE9ZW5kLW9mLWNhbmRpZGF0ZXNcclxuIn0=
+sctp DEBUG: 17:30:08.534534 association.go:495: [0xc00050a008] sending INIT
+Peer Connection State has changed: connected
+sctp DEBUG: 17:30:08.534615 association.go:1208: [0xc00050a008] state change: 'Closed' => 'CookieWait'
+sctp DEBUG: 17:30:08.534634 association.go:690: [0xc00050a008] writeLoop entered
+sctp DEBUG: 17:30:08.534638 association.go:662: [0xc00050a008] readLoop entered
+sctp DEBUG: 17:30:08.534919 association.go:1290: [0xc00050a008] chunkInit received in state 'CookieWait'
+sctp DEBUG: 17:30:08.534951 association.go:1322: [0xc00050a008] initial rwnd=1048576
+sctp DEBUG: 17:30:08.534963 association.go:1329: [0xc00050a008] use ForwardTSN (on init)
+sctp DEBUG: 17:30:08.534969 association.go:1348: sending INIT ACK
+sctp DEBUG: 17:30:08.534977 association.go:1370: [0xc00050a008] sendZeroChecksum=false (on init)
+sctp DEBUG: 17:30:09.535420 association.go:495: [0xc00050a008] sending INIT
+sctp DEBUG: 17:30:10.037979 association.go:1382: [0xc00050a008] chunkInitAck received in state 'CookieWait'
+sctp DEBUG: 17:30:10.038024 association.go:1405: [0xc00050a008] initial rwnd=1048576
+sctp DEBUG: 17:30:10.038037 association.go:1426: [0xc00050a008] use ForwardTSN (on initAck)
+sctp DEBUG: 17:30:10.038044 association.go:1435: [0xc00050a008] sendZeroChecksum=false (on initAck)
+sctp DEBUG: 17:30:10.038050 association.go:521: [0xc00050a008] sending COOKIE-ECHO
+sctp DEBUG: 17:30:10.038077 association.go:1208: [0xc00050a008] state change: 'CookieWait' => 'CookieEchoed'
+sctp DEBUG: 17:30:10.038092 association.go:1483: [0xc00050a008] COOKIE-ECHO received in state 'CookieEchoed'
+sctp DEBUG: 17:30:10.038099 association.go:1208: [0xc00050a008] state change: 'CookieEchoed' => 'Established'
+sctp DEBUG: 17:30:11.038201 association.go:1382: [0xc00050a008] chunkInitAck received in state 'Established'
+sctp DEBUG: 17:30:11.540907 association.go:1529: [0xc00050a008] COOKIE-ACK received in state 'Established'
+sctp DEBUG: 17:30:11.541193 association.go:1690: [0xc00050a008] accepted a new stream (streamIdentifier: 1)
+sctp DEBUG: 17:30:11.541229 stream.go:208: [1:0xc00050a008] reassemblyQueue readable=true
+sctp DEBUG: 17:30:11.541241 stream.go:210: [1:0xc00050a008] readNotifier.signal()
+sctp DEBUG: 17:30:11.541247 stream.go:212: [1:0xc00050a008] readNotifier.signal() done
+sctp DEBUG: 17:30:11.541284 stream.go:107: [1:0xc00050a008] reliability params: ordered=true type=0 value=0
+New DataChannel foo 824633808946
+Data channel 'foo'-'824633808946' open. Random messages will now be sent to any connected DataChannels every second
+sctp DEBUG: 17:30:11.742132 association.go:984: [0xc00050a008] sending SACK: SACK cumTsnAck=690587229 arwnd=1048576 dupTsn=[]
+[0xc00050a008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=4380 rwnd=1048572 inflight=4
+Sending 'sYIhYFuFdORkTlI'
+sctp DEBUG: 17:30:12.541847 association.go:2724: [0xc00050a008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=4380 rwnd=1048572 inflight=4
+sctp DEBUG: 17:30:12.541906 association.go:2957: [0xc00050a008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+[0xc00050a008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=1200 rwnd=1048572 inflight=4
+sctp DEBUG: 17:30:12.541980 association.go:2724: [0xc00050a008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=1200 rwnd=1048572 inflight=4
+Sending 'aDTRhiJLRrapNwg'
+sctp DEBUG: 17:30:14.043911 association.go:2957: [0xc00050a008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+[0xc00050a008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+sctp DEBUG: 17:30:14.044010 association.go:2724: [0xc00050a008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'AdGRcMXvMapGwTy'
+Sending 'AwhFEWOysYdnZjp'
+sctp DEBUG: 17:30:16.337218 association.go:2957: [0xc00050a008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+[0xc00050a008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+sctp DEBUG: 17:30:16.337299 association.go:2724: [0xc00050a008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'YXjVSzrujAONLxT'
+Sending 'kitiOnaCaVyTXvG'
+Sending 'GwFGPvSreaXZScU'
+Sending 'YfuATiDeNnDjVLo'
+Sending 'XvljvopJwsInDET'
+Sending 'laPQEtqVlaPZVuO'
+Sending 'uyKeeUlhoeqaZFk'
+Sending 'UOdYDujMWfRxvzZ'
+Sending 'roYjcHrZJVnzCXZ'
+signal: interrupt

@@ -1,0 +1,66 @@
+
+Peer Connection State has changed: connecting
+eyJ0eXBlIjoiYW5zd2VyIiwic2RwIjoidj0wXHJcbm89LSAyOTIwMTM2MDA0Mjg4NjM5NTcgMTc2MTM0MTE2MCBJTiBJUDQgMC4wLjAuMFxyXG5zPS1cclxudD0wIDBcclxuYT1tc2lkLXNlbWFudGljOldNUyAqXHJcbmE9ZmluZ2VycHJpbnQ6c2hhLTI1NiBCMzpGQTo5Rjo5OTpFMjo1RDo1MDpBODoyRTowOTpBMDozQTpBNTo3NTpFODo2NDo1OTo0NTpGQzo3RDpCNzozQjo4NToyNTpCMTowRDo5RjpCODpEMzpFRTpBODoxRFxyXG5hPWdyb3VwOkJVTkRMRSAwXHJcbm09YXBwbGljYXRpb24gOSBVRFAvRFRMUy9TQ1RQIHdlYnJ0Yy1kYXRhY2hhbm5lbFxyXG5jPUlOIElQNCAwLjAuMC4wXHJcbmE9c2V0dXA6YWN0aXZlXHJcbmE9bWlkOjBcclxuYT1zZW5kcmVjdlxyXG5hPXNjdHAtcG9ydDo1MDAwXHJcbmE9bWF4LW1lc3NhZ2Utc2l6ZToxMDczNzQxODIzXHJcbmE9aWNlLXVmcmFnOll1TGNhRVh3R09yaE1hSEJcclxuYT1pY2UtcHdkOlJDT3hoaElwSUtDWFpuQVZ2RWRPcG5GU0tOdHdEcGdDXHJcbmE9Y2FuZGlkYXRlOjE2NDU3MjUxODYgMSB1ZHAgMjEzMDcwNjQzMSAxNzIuMTkuOTcuMTMyIDQyOTkyIHR5cCBob3N0IHVmcmFnIFl1TGNhRVh3R09yaE1hSEJcclxuYT1jYW5kaWRhdGU6MTY0NTcyNTE4NiAyIHVkcCAyMTMwNzA2NDMxIDE3Mi4xOS45Ny4xMzIgNDI5OTIgdHlwIGhvc3QgdWZyYWcgWXVMY2FFWHdHT3JoTWFIQlxyXG5hPWNhbmRpZGF0ZToyMzM3NjIxMzkgMSB1ZHAgMjEzMDcwNjQzMSAxNzIuMTcuMC4xIDQwNjU5IHR5cCBob3N0IHVmcmFnIFl1TGNhRVh3R09yaE1hSEJcclxuYT1jYW5kaWRhdGU6MjMzNzYyMTM5IDIgdWRwIDIxMzA3MDY0MzEgMTcyLjE3LjAuMSA0MDY1OSB0eXAgaG9zdCB1ZnJhZyBZdUxjYUVYd0dPcmhNYUhCXHJcbmE9Y2FuZGlkYXRlOjEyNTY4NDM2NTcgMSB1ZHAgMTY5NDQ5ODgxNSA3My4xNjUuNzQuMjkgNjQwOTggdHlwIHNyZmx4IHJhZGRyIDAuMC4wLjAgcnBvcnQgNDE3MTAgdWZyYWcgWXVMY2FFWHdHT3JoTWFIQlxyXG5hPWNhbmRpZGF0ZToxMjU2ODQzNjU3IDIgdWRwIDE2OTQ0OTg4MTUgNzMuMTY1Ljc0LjI5IDY0MDk4IHR5cCBzcmZseCByYWRkciAwLjAuMC4wIHJwb3J0IDQxNzEwIHVmcmFnIFl1TGNhRVh3R09yaE1hSEJcclxuYT1lbmQtb2YtY2FuZGlkYXRlc1xyXG4ifQ==
+Peer Connection State has changed: connected
+New DataChannel foo 824637408338
+Data channel 'foo'-'824637408338' open. Random messages will now be sent to any connected DataChannels every second
+Sending 'WQUJhJofwCNjWsJ'
+[0xc0002f4008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=4380 rwnd=1048572 inflight=4
+[0xc0002f4008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=1200 rwnd=1048572 inflight=4
+Sending 'HYtZCjCURzjFMAJ'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'TodaAPEIHvKvvdL'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'CajyVcPfQJUSIti'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'jCeOWGucwpJMQOp'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'eSxAFkDEdeCTxjZ'
+Sending 'CBepwwRKhOKvztR'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'vJBZsmpNextkiIt'
+Sending 'xboGBimFddvKfSo'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'RAGImuBQwgpqsGQ'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'wLEhSGuyUZiieDm'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'hWvreshZVTQwSmS'
+Sending 'gtEluLCkNNYUNZN'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'wduYRhftfPHALOX'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'XdglOZQldWZYUTv'
+Sending 'yRaZikBMjmSGXfX'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'mLObYQsLZAzdJZf'
+[0xc0002f4008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'tDzYOKpmyKaJGij'
+Sending 'BkloGnuAhWihQJa'
+Sending 'CNqemyZqopObDUb'
+Sending 'IaFICrOjwbVexil'
+Sending 'LjzZTSljVJFlFCt'
+Sending 'ESBQhblzoxCuBxD'
+Sending 'DhnuaUYNVAGRgmJ'
+Sending 'DbPSCxLJsgmWoGt'
+Sending 'NBBPppEcLUAsPhs'
+Sending 'UcDeKftASwccTzC'
+Sending 'UptuSdoEKwdtkqP'
+Sending 'JLywpgfHrIJNqVB'
+Sending 'uOsuqKjthYSeWvp'
+Sending 'vUVEyngZqucXesS'
+Sending 'BECKvHYcNSZrzjA'
+Sending 'WEBezRTiMMnqbwh'
+Sending 'RRSQHkdTiSwgZnw'
+Sending 'pKfYKpFUymsUJWm'
+Sending 'XegpjfXbBpAUhNs'
+Sending 'ngEfVWjKHXcjQpw'
+Sending 'HmIxKmkGSxNImwR'
+Sending 'fPpQnSJlNnucUCq'
+Sending 'ouVKAfHRAyvxSSR'
+Sending 'HIbWeVlnhiSnzng'
+Sending 'DwxcaUUoazaMxtz'
+Sending 'IeVhGDNEKdqNYqD'
+Sending 'MJPlvGorUtrrCvD'
+Sending 'LKTiCERhbSCTSge'
+Sending 'prENFDPUyaWRnoU'
