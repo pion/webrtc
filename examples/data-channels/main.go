@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
 )
@@ -24,21 +23,17 @@ import (
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
-	os.Setenv("PION_LOG_DEBUG", "sctp")
-
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
-			{URLs: []string{"stun:stun.l.google.com:19302"}},
+			{
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
 		},
 	}
 
-	se := webrtc.SettingEngine{}
-	se.LoggerFactory = logging.NewDefaultLoggerFactory()
-
-	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
-
-	peerConnection, err := api.NewPeerConnection(config)
+	// Create a new RTCPeerConnection
+	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
