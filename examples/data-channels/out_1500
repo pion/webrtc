@@ -1,0 +1,100 @@
+
+Peer Connection State has changed: connecting
+eyJ0eXBlIjoiYW5zd2VyIiwic2RwIjoidj0wXHJcbm89LSA1MDM3NDUwNDM1NzUyMjM2ODU4IDE3NjEzMzg3MDMgSU4gSVA0IDAuMC4wLjBcclxucz0tXHJcbnQ9MCAwXHJcbmE9bXNpZC1zZW1hbnRpYzpXTVMgKlxyXG5hPWZpbmdlcnByaW50OnNoYS0yNTYgRTE6QkU6OTI6NEI6MUY6QUE6NDU6QjM6OUU6RTU6MDE6OUE6MTc6RjU6RUY6RDg6MjM6OEE6RTk6OUI6QjM6QzI6QUM6OUI6NUI6RjM6OTA6OUI6RjY6Nzc6QjI6NUVcclxuYT1ncm91cDpCVU5ETEUgMFxyXG5tPWFwcGxpY2F0aW9uIDkgVURQL0RUTFMvU0NUUCB3ZWJydGMtZGF0YWNoYW5uZWxcclxuYz1JTiBJUDQgMC4wLjAuMFxyXG5hPXNldHVwOmFjdGl2ZVxyXG5hPW1pZDowXHJcbmE9c2VuZHJlY3ZcclxuYT1zY3RwLXBvcnQ6NTAwMFxyXG5hPW1heC1tZXNzYWdlLXNpemU6MTA3Mzc0MTgyM1xyXG5hPWljZS11ZnJhZzp3WktLd2xRZFRUdExGbHJPXHJcbmE9aWNlLXB3ZDpUTnJubkZLbGdSZnNNd0ZUU2xXa01DTFhYaVJ1YlFUaFxyXG5hPWNhbmRpZGF0ZToxNjQ1NzI1MTg2IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE5Ljk3LjEzMiA1NTY3NyB0eXAgaG9zdCB1ZnJhZyB3WktLd2xRZFRUdExGbHJPXHJcbmE9Y2FuZGlkYXRlOjE2NDU3MjUxODYgMiB1ZHAgMjEzMDcwNjQzMSAxNzIuMTkuOTcuMTMyIDU1Njc3IHR5cCBob3N0IHVmcmFnIHdaS0t3bFFkVFR0TEZsck9cclxuYT1jYW5kaWRhdGU6MjMzNzYyMTM5IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE3LjAuMSAzNDc0OCB0eXAgaG9zdCB1ZnJhZyB3WktLd2xRZFRUdExGbHJPXHJcbmE9Y2FuZGlkYXRlOjIzMzc2MjEzOSAyIHVkcCAyMTMwNzA2NDMxIDE3Mi4xNy4wLjEgMzQ3NDggdHlwIGhvc3QgdWZyYWcgd1pLS3dsUWRUVHRMRmxyT1xyXG5hPWNhbmRpZGF0ZToxMjU2ODQzNjU3IDEgdWRwIDE2OTQ0OTg4MTUgNzMuMTY1Ljc0LjI5IDY0MDcyIHR5cCBzcmZseCByYWRkciAwLjAuMC4wIHJwb3J0IDM4MjM4IHVmcmFnIHdaS0t3bFFkVFR0TEZsck9cclxuYT1jYW5kaWRhdGU6MTI1Njg0MzY1NyAyIHVkcCAxNjk0NDk4ODE1IDczLjE2NS43NC4yOSA2NDA3MiB0eXAgc3JmbHggcmFkZHIgMC4wLjAuMCBycG9ydCAzODIzOCB1ZnJhZyB3WktLd2xRZFRUdExGbHJPXHJcbmE9ZW5kLW9mLWNhbmRpZGF0ZXNcclxuIn0=
+sctp DEBUG: 16:45:12.712933 association.go:495: [0xc0004dc008] sending INIT
+Peer Connection State has changed: connected
+sctp DEBUG: 16:45:12.713016 association.go:1203: [0xc0004dc008] state change: 'Closed' => 'CookieWait'
+sctp DEBUG: 16:45:12.713024 association.go:662: [0xc0004dc008] readLoop entered
+sctp DEBUG: 16:45:12.713029 association.go:690: [0xc0004dc008] writeLoop entered
+sctp DEBUG: 16:45:12.713064 association.go:1285: [0xc0004dc008] chunkInit received in state 'CookieWait'
+sctp DEBUG: 16:45:12.713072 association.go:1317: [0xc0004dc008] initial rwnd=1048576
+sctp DEBUG: 16:45:12.713078 association.go:1324: [0xc0004dc008] use ForwardTSN (on init)
+sctp DEBUG: 16:45:12.713083 association.go:1343: sending INIT ACK
+sctp DEBUG: 16:45:12.713090 association.go:1365: [0xc0004dc008] sendZeroChecksum=false (on init)
+sctp DEBUG: 16:45:13.713564 association.go:495: [0xc0004dc008] sending INIT
+sctp DEBUG: 16:45:14.216047 association.go:1377: [0xc0004dc008] chunkInitAck received in state 'CookieWait'
+sctp DEBUG: 16:45:14.216090 association.go:1400: [0xc0004dc008] initial rwnd=1048576
+sctp DEBUG: 16:45:14.216102 association.go:1421: [0xc0004dc008] use ForwardTSN (on initAck)
+sctp DEBUG: 16:45:14.216108 association.go:1430: [0xc0004dc008] sendZeroChecksum=false (on initAck)
+sctp DEBUG: 16:45:14.216113 association.go:521: [0xc0004dc008] sending COOKIE-ECHO
+sctp DEBUG: 16:45:14.216120 association.go:1203: [0xc0004dc008] state change: 'CookieWait' => 'CookieEchoed'
+sctp DEBUG: 16:45:14.216385 association.go:1478: [0xc0004dc008] COOKIE-ECHO received in state 'CookieEchoed'
+sctp DEBUG: 16:45:14.216414 association.go:1203: [0xc0004dc008] state change: 'CookieEchoed' => 'Established'
+sctp DEBUG: 16:45:15.216336 association.go:1377: [0xc0004dc008] chunkInitAck received in state 'Established'
+sctp DEBUG: 16:45:15.718890 association.go:1524: [0xc0004dc008] COOKIE-ACK received in state 'Established'
+sctp DEBUG: 16:45:15.719219 association.go:1685: [0xc0004dc008] accepted a new stream (streamIdentifier: 1)
+sctp DEBUG: 16:45:15.719257 stream.go:208: [1:0xc0004dc008] reassemblyQueue readable=true
+sctp DEBUG: 16:45:15.719269 stream.go:210: [1:0xc0004dc008] readNotifier.signal()
+sctp DEBUG: 16:45:15.719275 stream.go:212: [1:0xc0004dc008] readNotifier.signal() done
+sctp DEBUG: 16:45:15.719314 stream.go:107: [1:0xc0004dc008] reliability params: ordered=true type=0 value=0
+New DataChannel foo 824639488418
+Data channel 'foo'-'824639488418' open. Random messages will now be sent to any connected DataChannels every second
+sctp DEBUG: 16:45:15.919742 association.go:979: [0xc0004dc008] sending SACK: SACK cumTsnAck=3880335496 arwnd=1048576 dupTsn=[]
+Sending 'lylWmgWZaJdshMj'
+sctp DEBUG: 16:45:16.720455 association.go:2714: [0xc0004dc008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=4380 rwnd=1048572 inflight=4
+sctp DEBUG: 16:45:16.720542 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:16.720654 association.go:2714: [0xc0004dc008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=4 cwnd=1200 rwnd=1048572 inflight=4
+Sending 'WLdWaZlgJgDXtDW'
+sctp DEBUG: 16:45:18.229010 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:18.229075 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'ilGcmHgelvhbsqb'
+sctp DEBUG: 16:45:19.527863 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:19.527943 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'nwtznbQwvtJrnvQ'
+Sending 'rvWpNdfYUOthYYz'
+sctp DEBUG: 16:45:21.521974 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:21.522055 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'grnkdYFuNfdAMQo'
+sctp DEBUG: 16:45:22.527840 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:22.527909 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'PdzvefYUGuCWVnz'
+Sending 'PZZVaEQszHaTIet'
+sctp DEBUG: 16:45:24.525026 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:24.525097 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'dGNuvlFbhbPATpk'
+Sending 'FDoSCITdeAZQatB'
+sctp DEBUG: 16:45:26.522161 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:26.522246 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'coQokXxKjSWlbFR'
+sctp DEBUG: 16:45:27.527068 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:27.527163 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'wzEaAXHaozWSsAr'
+sctp DEBUG: 16:45:28.532501 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:28.532576 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'naYpeqXIvwhCOJC'
+Sending 'OMWDLVJaQfgYkYH'
+sctp DEBUG: 16:45:30.530756 association.go:2947: [0xc0004dc008] T3-rtx timed out: nRtos=1 cwnd=1200 ssthresh=4800
+sctp DEBUG: 16:45:30.530824 association.go:2714: [0xc0004dc008] retransmitting 2 DATA chunk(s) (T3-rtx): bytes=30 cwnd=1200 rwnd=1048546 inflight=30
+Sending 'tZDJaBWOflNIPhT'
+Sending 'OTRmTzHqkjpLmgy'
+Sending 'lmrWAoTuFKVxwrT'
+Sending 'oNIFGyUQJNowUlM'
+Sending 'WPADuVPFxbdcToA'
+Sending 'ecIUXMvPGhJyrkr'
+Sending 'hdMWQxsDuvRQtSM'
+Sending 'FCzUAhrbJeKAKeS'
+Sending 'LwJRpbgpcDCtlTy'
+Sending 'ktaXseMERczfiUj'
+Sending 'iTKndHFLRWaALOO'
+Sending 'vBdAZBnSxUximFB'
+Sending 'vGUZdchVJEbjXWn'
+Sending 'VbbDqTzYJlbcPQr'
+Sending 'fukbzvVDbWbstMC'
+Sending 'vBFFmDGhLEWSDaB'
+Sending 'WpOSnnuBZkxahYa'
+Sending 'GsnaUhmcVqVqjCH'
+Sending 'zLEruWmwuxlcdwp'
+Sending 'EJgBnrYqxGThBuU'
+Sending 'EPWkfEdUPBmMreu'
+Sending 'KgCxayNxyvdgqTS'
+Sending 'quRnUlxDbmDhdrh'
+Sending 'fTPiEUmSQQtsXJw'
+Sending 'UNIOLWhFkXvnACV'
+Sending 'tzImRTgZnatYSsU'
+Sending 'ZGsyunyDUUZjaXV'
+Sending 'rRNcuILZpiEmRoj'
+Sending 'jiMMhaVRHxHnPds'
+Sending 'SsKjlkXcOlkuLPh'
+Sending 'HUMbDcfbVLEYlaG'
+Sending 'nIymGHgxFlvGEFk'
+signal: interrupt

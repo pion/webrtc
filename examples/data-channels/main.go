@@ -24,7 +24,7 @@ import (
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
-	os.Setenv("PION_LOG_TRACE", "sctp")
+	os.Setenv("PION_LOG_DEBUG", "sctp")
 
 	// Prepare the configuration
 	config := webrtc.Configuration{

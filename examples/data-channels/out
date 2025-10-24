@@ -1,0 +1,87 @@
+
+Peer Connection State has changed: connecting
+eyJ0eXBlIjoiYW5zd2VyIiwic2RwIjoidj0wXHJcbm89LSAxMjkzNjIzODMxMjQzNDU2NzU2IDE3NjEzMzg0ODggSU4gSVA0IDAuMC4wLjBcclxucz0tXHJcbnQ9MCAwXHJcbmE9bXNpZC1zZW1hbnRpYzpXTVMgKlxyXG5hPWZpbmdlcnByaW50OnNoYS0yNTYgRTM6ODg6NzU6ODk6Q0E6MkU6QUU6QjE6QTQ6ODQ6RTc6MjA6MzM6MkM6RjA6NTQ6MEE6OEI6MUI6N0Y6MTk6MzY6NDM6MEU6MDM6Mzc6N0M6QUY6NUI6Q0M6MTY6NkFcclxuYT1ncm91cDpCVU5ETEUgMFxyXG5tPWFwcGxpY2F0aW9uIDkgVURQL0RUTFMvU0NUUCB3ZWJydGMtZGF0YWNoYW5uZWxcclxuYz1JTiBJUDQgMC4wLjAuMFxyXG5hPXNldHVwOmFjdGl2ZVxyXG5hPW1pZDowXHJcbmE9c2VuZHJlY3ZcclxuYT1zY3RwLXBvcnQ6NTAwMFxyXG5hPW1heC1tZXNzYWdlLXNpemU6MTA3Mzc0MTgyM1xyXG5hPWljZS11ZnJhZzpHT2tTSkpJTU9VcGN1TmZvXHJcbmE9aWNlLXB3ZDp5bkxXcHdTeHZDYUNMRU5IbFV6VHZxaGNveFVZaUJSQ1xyXG5hPWNhbmRpZGF0ZToxNjQ1NzI1MTg2IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE5Ljk3LjEzMiA0MTEwMCB0eXAgaG9zdCB1ZnJhZyBHT2tTSkpJTU9VcGN1TmZvXHJcbmE9Y2FuZGlkYXRlOjE2NDU3MjUxODYgMiB1ZHAgMjEzMDcwNjQzMSAxNzIuMTkuOTcuMTMyIDQxMTAwIHR5cCBob3N0IHVmcmFnIEdPa1NKSklNT1VwY3VOZm9cclxuYT1jYW5kaWRhdGU6MjMzNzYyMTM5IDEgdWRwIDIxMzA3MDY0MzEgMTcyLjE3LjAuMSAzNjY0MyB0eXAgaG9zdCB1ZnJhZyBHT2tTSkpJTU9VcGN1TmZvXHJcbmE9Y2FuZGlkYXRlOjIzMzc2MjEzOSAyIHVkcCAyMTMwNzA2NDMxIDE3Mi4xNy4wLjEgMzY2NDMgdHlwIGhvc3QgdWZyYWcgR09rU0pKSU1PVXBjdU5mb1xyXG5hPWNhbmRpZGF0ZToxMjU2ODQzNjU3IDEgdWRwIDE2OTQ0OTg4MTUgNzMuMTY1Ljc0LjI5IDY0MTIyIHR5cCBzcmZseCByYWRkciAwLjAuMC4wIHJwb3J0IDQzNTg2IHVmcmFnIEdPa1NKSklNT1VwY3VOZm9cclxuYT1jYW5kaWRhdGU6MTI1Njg0MzY1NyAyIHVkcCAxNjk0NDk4ODE1IDczLjE2NS43NC4yOSA2NDEyMiB0eXAgc3JmbHggcmFkZHIgMC4wLjAuMCBycG9ydCA0MzU4NiB1ZnJhZyBHT2tTSkpJTU9VcGN1TmZvXHJcbmE9ZW5kLW9mLWNhbmRpZGF0ZXNcclxuIn0=
+sctp DEBUG: 16:41:38.705093 association.go:495: [0xc000518008] sending INIT
+Peer Connection State has changed: connected
+sctp DEBUG: 16:41:38.705149 association.go:1203: [0xc000518008] state change: 'Closed' => 'CookieWait'
+sctp DEBUG: 16:41:38.705162 association.go:690: [0xc000518008] writeLoop entered
+sctp DEBUG: 16:41:38.705164 association.go:662: [0xc000518008] readLoop entered
+sctp DEBUG: 16:41:38.705222 association.go:1285: [0xc000518008] chunkInit received in state 'CookieWait'
+sctp DEBUG: 16:41:38.705244 association.go:1317: [0xc000518008] initial rwnd=1048576
+sctp DEBUG: 16:41:38.705251 association.go:1324: [0xc000518008] use ForwardTSN (on init)
+sctp DEBUG: 16:41:38.705257 association.go:1343: sending INIT ACK
+sctp DEBUG: 16:41:38.705265 association.go:1365: [0xc000518008] sendZeroChecksum=false (on init)
+sctp DEBUG: 16:41:38.707051 association.go:1377: [0xc000518008] chunkInitAck received in state 'CookieWait'
+sctp DEBUG: 16:41:38.707085 association.go:1400: [0xc000518008] initial rwnd=1048576
+sctp DEBUG: 16:41:38.707096 association.go:1421: [0xc000518008] use ForwardTSN (on initAck)
+sctp DEBUG: 16:41:38.707104 association.go:1430: [0xc000518008] sendZeroChecksum=false (on initAck)
+sctp DEBUG: 16:41:38.707110 association.go:521: [0xc000518008] sending COOKIE-ECHO
+sctp DEBUG: 16:41:38.707139 association.go:1203: [0xc000518008] state change: 'CookieWait' => 'CookieEchoed'
+sctp DEBUG: 16:41:38.707260 association.go:1478: [0xc000518008] COOKIE-ECHO received in state 'CookieEchoed'
+sctp DEBUG: 16:41:38.707291 association.go:1203: [0xc000518008] state change: 'CookieEchoed' => 'Established'
+sctp DEBUG: 16:41:38.709764 association.go:1524: [0xc000518008] COOKIE-ACK received in state 'Established'
+sctp DEBUG: 16:41:38.710045 association.go:1685: [0xc000518008] accepted a new stream (streamIdentifier: 1)
+sctp DEBUG: 16:41:38.710075 stream.go:208: [1:0xc000518008] reassemblyQueue readable=true
+sctp DEBUG: 16:41:38.710084 stream.go:210: [1:0xc000518008] readNotifier.signal()
+sctp DEBUG: 16:41:38.710088 stream.go:212: [1:0xc000518008] readNotifier.signal() done
+sctp DEBUG: 16:41:38.710113 stream.go:107: [1:0xc000518008] reliability params: ordered=true type=0 value=0
+New DataChannel foo 824637473778
+Data channel 'foo'-'824637473778' open. Random messages will now be sent to any connected DataChannels every second
+sctp DEBUG: 16:41:38.910435 association.go:979: [0xc000518008] sending SACK: SACK cumTsnAck=1721558253 arwnd=1048576 dupTsn=[]
+Sending 'JqQrNnaPugdBjpC'
+sctp DEBUG: 16:41:39.914913 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'GqwsHWouKfmtrWO'
+sctp DEBUG: 16:41:40.915111 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ovkrACkvUxIpNfi'
+sctp DEBUG: 16:41:41.915670 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'OJIqftpxQjbhmjq'
+sctp DEBUG: 16:41:42.914835 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ZYGBjazGGNwSqwm'
+sctp DEBUG: 16:41:43.914867 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ZlldqtctnaOPSBG'
+sctp DEBUG: 16:41:44.915496 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'gBFNtqgJdSiqizc'
+sctp DEBUG: 16:41:45.915308 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'KGpqEmrDLiezjyU'
+sctp DEBUG: 16:41:46.914541 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'IkCjMbKelLivaHE'
+sctp DEBUG: 16:41:47.914931 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'lWKSyknGvwcfxLY'
+sctp DEBUG: 16:41:48.914727 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'LVQBESVPSwDOMui'
+sctp DEBUG: 16:41:49.915589 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ZhCpKdxVrStvvlG'
+sctp DEBUG: 16:41:50.914405 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'lXISLxrJeMjxfaA'
+sctp DEBUG: 16:41:51.914783 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'sUYSWYInpKvGZMX'
+sctp DEBUG: 16:41:52.914560 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ePYheExdWOzmQTL'
+sctp DEBUG: 16:41:53.915257 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'fgqgltLJzFzEdFa'
+sctp DEBUG: 16:41:54.914617 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'pFXwOwrATtAYnOi'
+sctp DEBUG: 16:41:55.915212 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'DnvgLAGkUwItSVp'
+sctp DEBUG: 16:41:56.915585 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'XEmDZohzrGwNJOW'
+sctp DEBUG: 16:41:57.915137 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'MEaSVxsgbVeUwxQ'
+sctp DEBUG: 16:41:58.915412 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'JtyEoHcHVPLOxVS'
+sctp DEBUG: 16:41:59.915106 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'ddPbpgDlAEvoCEi'
+sctp DEBUG: 16:42:00.914515 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'uZPOLcqvoRJzIxJ'
+sctp DEBUG: 16:42:01.914591 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'NfuZpulAUUtYjTJ'
+sctp DEBUG: 16:42:02.914774 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'oXNUFwufMheggCA'
+sctp DEBUG: 16:42:03.915198 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'gQrOhOUOFBAgBWl'
+sctp DEBUG: 16:42:04.914734 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'aMKeoSeaWEOdUZu'
+sctp DEBUG: 16:42:05.914527 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+Sending 'aKkYuIGobXoHjHn'
+sctp DEBUG: 16:42:06.915347 association.go:2714: [0xc000518008] retransmitting 1 DATA chunk(s) (T3-rtx): bytes=15 cwnd=4380 rwnd=1048561 inflight=15
+signal: interrupt
