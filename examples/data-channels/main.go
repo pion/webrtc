@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pion/logging"
 	"github.com/pion/randutil"
 	"github.com/pion/webrtc/v4"
 )
@@ -23,17 +24,21 @@ import (
 func main() {
 	// Everything below is the Pion WebRTC API! Thanks for using it ❤️.
 
+	os.Setenv("PION_LOG_TRACE", "sctp")
+
 	// Prepare the configuration
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
+			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
 	}
 
-	// Create a new RTCPeerConnection
-	peerConnection, err := webrtc.NewPeerConnection(config)
+	se := webrtc.SettingEngine{}
+	se.LoggerFactory = logging.NewDefaultLoggerFactory()
+
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
+
+	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
 		panic(err)
 	}
@@ -71,11 +76,11 @@ func main() {
 		// Register channel opening handling
 		dataChannel.OnOpen(func() {
 			fmt.Printf(
-				"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n",
+				"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every second\n",
 				dataChannel.Label(), dataChannel.ID(),
 			)
 
-			ticker := time.NewTicker(5 * time.Second)
+			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
 			for range ticker.C {
 				message, sendErr := randutil.GenerateCryptoRandomString(15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
