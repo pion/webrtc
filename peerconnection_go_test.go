@@ -1775,9 +1775,11 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
 	peerConnectionClosed := make(chan struct{})
+	var closeOnce sync.Once
+
 	answerPC.OnConnectionStateChange(func(s PeerConnectionState) {
 		if s == PeerConnectionStateClosed {
-			close(peerConnectionClosed)
+			closeOnce.Do(func() { close(peerConnectionClosed) })
 		}
 	})
 
