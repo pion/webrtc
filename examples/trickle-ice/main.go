@@ -34,11 +34,15 @@ func websocketServer(wsConn *websocket.Conn) {
 
 		outbound, marshalErr := json.Marshal(candidate.ToJSON())
 		if marshalErr != nil {
-			panic(marshalErr)
+			fmt.Println("Marshal ICECandidate error:", marshalErr)
+
+			return
 		}
 
 		if _, err = wsConn.Write(outbound); err != nil {
-			panic(err)
+			fmt.Println("WebSocket write error:", err)
+
+			return
 		}
 	})
 
@@ -51,11 +55,19 @@ func websocketServer(wsConn *websocket.Conn) {
 	// Send the current time via a DataChannel to the remote peer every 3 seconds
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		d.OnOpen(func() {
-			for range time.Tick(time.Second * 3) {
-				if err = d.SendText(time.Now().String()); err != nil {
-					panic(err)
+			fmt.Println(time.Now().Format("15:04:05"), "- DataChannel open")
+			// Periodically send timestamped messages
+			go func() {
+				ticker := time.NewTicker(time.Second * 3)
+				defer ticker.Stop()
+				for range ticker.C {
+					if err := d.SendText(time.Now().String()); err != nil {
+						fmt.Println(time.Now().Format("15:04:05"), "- DataChannel closed, stopping send loop")
+
+						return
+					}
 				}
-			}
+			}()
 		})
 	})
 
@@ -64,7 +76,9 @@ func websocketServer(wsConn *websocket.Conn) {
 		// Read each inbound WebSocket Message
 		n, err := wsConn.Read(buf)
 		if err != nil {
-			panic(err)
+			fmt.Println(time.Now().Format("15:04:05"), "- WebSocket read error:", err)
+
+			return
 		}
 
 		// Unmarshal each inbound WebSocket message
@@ -78,34 +92,46 @@ func websocketServer(wsConn *websocket.Conn) {
 		// assume it is not one.
 		case json.Unmarshal(buf[:n], &offer) == nil && offer.SDP != "":
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				panic(err)
+				fmt.Println("SetRemoteDescription error:", err)
+
+				return
 			}
 
 			answer, answerErr := peerConnection.CreateAnswer(nil)
 			if answerErr != nil {
-				panic(answerErr)
+				fmt.Println("CreateAnswer error:", err)
+
+				return
 			}
 
 			if err = peerConnection.SetLocalDescription(answer); err != nil {
-				panic(err)
+				fmt.Println("SetLocalDescription error:", err)
+
+				return
 			}
 
 			outbound, marshalErr := json.Marshal(answer)
 			if marshalErr != nil {
-				panic(marshalErr)
+				fmt.Println("Marshal answer error:", err)
+
+				return
 			}
 
 			if _, err = wsConn.Write(outbound); err != nil {
-				panic(err)
+				fmt.Println("WebSocket write error:", err)
+
+				return
 			}
 		// Attempt to unmarshal as a ICECandidateInit. If the candidate field is empty
 		// assume it is not one.
 		case json.Unmarshal(buf[:n], &candidate) == nil && candidate.Candidate != "":
 			if err = peerConnection.AddICECandidate(candidate); err != nil {
-				panic(err)
+				fmt.Println("AddICECandidate error:", err)
+
+				return
 			}
 		default:
-			panic("Unknown message")
+			fmt.Println("Unknown WebSocket message")
 		}
 	}
 }
