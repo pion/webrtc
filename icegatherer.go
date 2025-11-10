@@ -369,6 +369,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				ID:            candidateStats.ID,
 				Type:          StatsTypeLocalCandidate,
 				IP:            candidateStats.IP,
+				Address:       candidateStats.Address,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,
@@ -397,6 +398,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				ID:            candidateStats.ID,
 				Type:          StatsTypeRemoteCandidate,
 				IP:            candidateStats.IP,
+				Address:       candidateStats.Address,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,

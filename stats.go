@@ -2310,7 +2310,15 @@ type ICECandidateStats struct {
 
 	// IP is the IP address of the candidate, allowing for IPv4 addresses and
 	// IPv6 addresses, but fully qualified domain names (FQDNs) are not allowed.
+	//
+	// DEPRECATED. Replaced by Address
 	IP string `json:"ip"`
+
+	// Address is the address of the candidate, allowing for IPv4 addresses,
+	// IPv6 addresses, or fully qualified domain names (FQDNs).
+	//
+	// This property was previously named IP and only accepted IP addresses.
+	Address string `json:"address"`
 
 	// Port is the port number of the candidate.
 	Port int32 `json:"port"`
