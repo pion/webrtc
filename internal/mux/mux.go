@@ -123,7 +123,7 @@ func (m *Mux) readLoop() {
 	}()
 
 	buf := make([]byte, m.bufferSize)
-	attr := transport.NewPacketAttributes()
+	attr := transport.NewPacketAttributesWithLen(transport.MaxAttributesLen)
 	for {
 		n, err := m.nextConn.ReadWithAttributes(buf, attr)
 		switch {
@@ -139,7 +139,7 @@ func (m *Mux) readLoop() {
 			return
 		}
 
-		if err = m.dispatch(buf[:n], attr); err != nil {
+		if err = m.dispatch(buf[:n], attr.GetReadPacketAttributes()); err != nil {
 			if errors.Is(err, io.ErrClosedPipe) {
 				// if the buffer was closed, that's not an error we care to report
 				return

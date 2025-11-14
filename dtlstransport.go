@@ -546,12 +546,13 @@ func (t *DTLSTransport) streamsForSSRC(
 		&streamInfo,
 		interceptor.RTPReaderFunc(
 			func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-				attr := transport.NewPacketAttributes()
+				attr := transport.NewPacketAttributesWithLen(10)
 				n, err = rtpReadStream.ReadWithAttributes(in, attr)
 
 				if a == nil {
 					a = interceptor.Attributes{}
-					a["ECN"] = rtcp.ECN(attr.GetECN())
+					a["ECN"] = attr.GetReadPacketAttributes().Buffer[0]
+					fmt.Println("Got packet with ECN at dtlstransport ", a["ECN"])
 				}
 				return n, a, err
 			},

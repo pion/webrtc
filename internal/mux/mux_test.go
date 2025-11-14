@@ -23,7 +23,7 @@ func TestNoEndpoints(t *testing.T) {
 	ca, cb := net.Pipe()
 	require.NoError(t, cb.Close())
 
-	attr := transport.NewPacketAttributes()
+	attr := transport.NewPacketAttributesWithLen(transport.MaxAttributesLen)
 	mux := NewMux(Config{
 		Conn:          transport.NewNetConnToNetConnSocket(ca),
 		BufferSize:    testPipeBufferSize,
@@ -148,7 +148,7 @@ func BenchmarkDispatch(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		err := mux.dispatch(buf, transport.NewPacketAttributes())
+		err := mux.dispatch(buf, transport.NewPacketAttributesWithLen(transport.MaxAttributesLen))
 		if err != nil {
 			b.Errorf("dispatch: %v", err)
 		}
@@ -167,7 +167,7 @@ func TestPendingQueue(t *testing.T) {
 		log:       factory.NewLogger("mux"),
 	}
 
-	attr := transport.NewPacketAttributes()
+	attr := transport.NewPacketAttributesWithLen(transport.MaxAttributesLen)
 
 	// Assert empty packets don't end up in queue
 	require.NoError(t, mux.dispatch([]byte{}, attr))
