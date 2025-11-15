@@ -358,6 +358,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			findFECPayloadType(rtpParameters.Codecs),
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
+			parameters.Codecs,
 		)
 
 		rtpInterceptor := r.api.interceptor.BindLocalStream(
