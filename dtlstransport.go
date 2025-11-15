@@ -551,8 +551,9 @@ func (t *DTLSTransport) streamsForSSRC(
 
 				if a == nil {
 					a = interceptor.Attributes{}
-					a["ECN"] = attr.GetReadPacketAttributes().Buffer[0]
-					fmt.Println("Got packet with ECN at dtlstransport ", a["ECN"])
+					if len(attr.GetReadPacketAttributes().Buffer) > 0 {
+						a["ECN"] = attr.GetReadPacketAttributes().Buffer[0]
+					}
 				}
 				return n, a, err
 			},
