@@ -530,36 +530,42 @@ func (t *DTLSTransport) storeSimulcastStream(
 func (t *DTLSTransport) streamsForSSRC(
 	ssrc SSRC,
 	streamInfo interceptor.StreamInfo,
-) (*srtp.ReadStreamSRTP, interceptor.RTPReader, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
+) (*srtp.ReadStreamSRTP, interceptor.RTPReader, interceptor.RTPProcessor, *srtp.ReadStreamSRTCP, interceptor.RTCPReader, error) {
 	srtpSession, err := t.getSRTPSession()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	rtpReadStream, err := srtpSession.OpenReadStream(uint32(ssrc))
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	rtpInterceptor := t.api.interceptor.BindRemoteStream(
+	rtpProcessor := t.api.interceptor.BindRemoteStream(
 		&streamInfo,
-		interceptor.RTPReaderFunc(
-			func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
-				n, err = rtpReadStream.Read(in)
-
-				return n, a, err
+		interceptor.RTPProcessorFunc(
+			func(s int, in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+				return s, a, nil
 			},
 		),
 	)
 
+	rtpReader := interceptor.RTPReaderFunc(
+		func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
+			n, err = rtpReadStream.Read(in)
+
+			return n, a, err
+		},
+	)
+
 	srtcpSession, err := t.getSRTCPSession()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	rtcpReadStream, err := srtcpSession.OpenReadStream(uint32(ssrc))
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	rtcpInterceptor := t.api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(
@@ -570,5 +576,5 @@ func (t *DTLSTransport) streamsForSSRC(
 		}),
 	)
 
-	return rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, nil
+	return rtpReadStream, rtpReader, rtpProcessor, rtcpReadStream, rtcpInterceptor, nil
 }
