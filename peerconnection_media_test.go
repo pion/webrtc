@@ -73,6 +73,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPReceiverSend := make(chan error)
 
 	trackMetadataValid := make(chan error)
+	peerConnectionConnected := make(chan struct{})
 
 	pcAnswer.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
 		if track.ID() != expectedTrackID {
@@ -143,12 +144,19 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	sender, err := pcOffer.AddTrack(vp8Track)
 	assert.NoError(t, err)
 
+	// Wait for PeerConnection to be fully connected (DTLS + SRTP ready)
+	pcOffer.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			close(peerConnectionConnected)
+		}
+	})
+
 	go func() {
+		// Wait for DTLS/SRTP to be ready before sending media
+		<-peerConnectionConnected
+
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if pcOffer.ICEConnectionState() != ICEConnectionStateConnected {
-				continue
-			}
 			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
 				//nolint:forbidigo // not a test failure
 				fmt.Println(routineErr)
