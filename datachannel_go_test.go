@@ -277,7 +277,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		report := test.CheckRoutines(t)
 		defer report()
 
-		var nCbs int
+		var nCbs uint32
 		buf := make([]byte, 1000)
 
 		offerPC, answerPC, err := newPair()
@@ -315,7 +315,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 			dc.SetBufferedAmountLowThreshold(1500)
 			// The callback function should directly be passed to sctp
 			dc.OnBufferedAmountLow(func() {
-				nCbs++
+				atomic.AddUint32(&nCbs, 1)
 			})
 
 			for i := 0; i < 10; i++ {
@@ -332,7 +332,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 
 		closePair(t, offerPC, answerPC, done)
 
-		assert.True(t, nCbs > 0, "callback should be made at least once")
+		assert.True(t, atomic.LoadUint32(&nCbs) > 0, "callback should be made at least once")
 	})
 }
 
@@ -811,5 +811,47 @@ func TestDataChannelMessageSize(t *testing.T) {
 	})
 
 	<-messagesSent.Done()
+	closePairNow(t, offerPC, answerPC)
+}
+
+func TestOnBufferedAmountLowDeadlock(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+
+	offerDataChannel, err := offerPC.CreateDataChannel("", nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	gotAllMessages, gotAllMessagesCancel := context.WithCancel(context.Background())
+	offerDataChannel.OnOpen(func() {
+		for {
+			select {
+			case <-gotAllMessages.Done():
+				return
+			case <-time.After(5 * time.Millisecond):
+				assert.NoError(t, offerDataChannel.Send([]byte{0xBE, 0xEF}))
+			}
+		}
+	})
+
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		dataChannel.SetBufferedAmountLowThreshold(1)
+
+		var onBufferedAmountLowFired atomic.Bool
+		dataChannel.OnBufferedAmountLow(func() {
+			onBufferedAmountLowFired.Store(true)
+			<-gotAllMessages.Done()
+		})
+
+		var onMessageCount uint32
+		dataChannel.OnMessage(func(msg DataChannelMessage) {
+			if onBufferedAmountLowFired.Load() && atomic.AddUint32(&onMessageCount, 1) == 10 {
+				gotAllMessagesCancel()
+			}
+		})
+	})
+
+	<-gotAllMessages.Done()
 	closePairNow(t, offerPC, answerPC)
 }

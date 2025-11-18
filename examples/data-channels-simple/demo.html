@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+  <!--
+		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+<head>
+  <meta charset="utf-8">
+  <title>DataChannel Test</title>
+</head>
+<body>
+  <h2>📡 WebRTC DataChannel Test</h2>
+  <input id="msg" placeholder="Message">
+  <button id="sendBtn" disabled onclick="sendMsg()">Send</button>
+  <pre id="log"></pre>
+
+  <script>
+    const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+    const channel = pc.createDataChannel("chat");
+
+    // Connection state monitoring
+    pc.onconnectionstatechange = () => log(`🔄 Connection state: ${pc.connectionState}`);
+    pc.oniceconnectionstatechange = () => log(`🧊 ICE state: ${pc.iceConnectionState}`);
+    pc.onsignalingstatechange = () => log(`📞 Signaling state: ${pc.signalingState}`);
+
+    channel.onopen = () => {
+      log("✅ DataChannel opened");
+      document.getElementById("sendBtn").disabled = false;
+    }
+    channel.onmessage = e => log(`📩 Server: ${e.data}`);
+
+    pc.onicecandidate = event => {
+      if(event.candidate){
+        fetch("/candidate", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(event.candidate),
+        });
+      }
+    };
+
+    async function start(){
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const res = await fetch("/offer", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(offer),
+        })
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const answer = await res.json();
+        await pc.setRemoteDescription(answer);
+
+      } catch (err) {
+        log(`❌ Connection failed: ${err.message}`);
+        console.error("Connection error:", err);
+      }
+    }
+
+    function sendMsg(){
+      if(channel.readyState !== "open"){
+        log("❌ Channel not open yet");
+        return;
+      }
+
+      const msg = document.getElementById("msg").value;
+
+      if (msg.trim()) {
+        channel.send(msg);
+        log(`You: ${msg}`);
+        document.getElementById("msg").value = "";
+      }
+    }
+
+    function log(msg){
+      document.getElementById("log").textContent+=msg+"\n";
+    }
+
+    start();
+  </script>
+</body>
+</html>

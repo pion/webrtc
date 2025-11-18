@@ -11,9 +11,9 @@ jobs:
   StandardJS:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22.x
+          node-version: 24.x
       - run: npm install standard
       - run: npx standard

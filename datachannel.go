@@ -707,9 +707,13 @@ func (d *DataChannel) OnBufferedAmountLow(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.onBufferedAmountLow = f
+	d.onBufferedAmountLow = func() {
+		go f()
+	}
 	if d.dataChannel != nil {
-		d.dataChannel.OnBufferedAmountLow(f)
+		d.dataChannel.OnBufferedAmountLow(func() {
+			go f()
+		})
 	}
 }
 

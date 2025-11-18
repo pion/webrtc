@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/pion/interceptor"
@@ -14,6 +15,7 @@ import (
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
 	"github.com/pion/interceptor/pkg/rfc8888"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
@@ -35,8 +37,45 @@ func RegisterDefaultInterceptors(mediaEngine *MediaEngine, interceptorRegistry *
 		return err
 	}
 
+	if err := ConfigureStatsInterceptor(interceptorRegistry); err != nil {
+		return err
+	}
+
 	return ConfigureTWCCSender(mediaEngine, interceptorRegistry)
 }
+
+// ConfigureStatsInterceptor will setup everything necessary for generating RTP stream statistics.
+func ConfigureStatsInterceptor(interceptorRegistry *interceptor.Registry) error {
+	statsInterceptor, err := stats.NewInterceptor()
+	if err != nil {
+		return err
+	}
+	statsInterceptor.OnNewPeerConnection(func(id string, stats stats.Getter) {
+		statsGetter.Store(id, stats)
+	})
+	interceptorRegistry.Add(statsInterceptor)
+
+	return nil
+}
+
+// lookupStats returns the stats getter for a given peerconnection.statsId.
+func lookupStats(id string) (stats.Getter, bool) {
+	if value, exists := statsGetter.Load(id); exists {
+		if getter, ok := value.(stats.Getter); ok {
+			return getter, true
+		}
+	}
+
+	return nil, false
+}
+
+// cleanupStats removes the stats getter for a given peerconnection.statsId.
+func cleanupStats(id string) {
+	statsGetter.Delete(id)
+}
+
+// key: string (peerconnection.statsId), value: stats.Getter
+var statsGetter sync.Map // nolint:gochecknoglobals
 
 // ConfigureRTCPReports will setup everything necessary for generating Sender and Receiver Reports.
 func ConfigureRTCPReports(interceptorRegistry *interceptor.Registry) error {

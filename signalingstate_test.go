@@ -161,3 +161,12 @@ func TestSignalingState_Transitions(t *testing.T) {
 		}
 	}
 }
+
+func TestStateChangeOp_String_SetLocal(t *testing.T) {
+	assert.Equal(t, "SetLocal", stateChangeOpSetLocal.String())
+}
+
+func TestStateChangeOp_String_Default(t *testing.T) {
+	var unknown stateChangeOp = 999
+	assert.Equal(t, "Unknown State Change Operation", unknown.String())
+}

@@ -231,6 +231,10 @@ var (
 	errPeerConnSetIdentityProviderNotImplemented = errors.New("TODO SetIdentityProvider")
 	errPeerConnWriteRTCPOpenWriteStream          = errors.New("WriteRTCP failed to open WriteStream")
 	errPeerConnTranscieverMidNil                 = errors.New("cannot find transceiver with mid")
+	errPeerConnEarlyMediaWithoutAnswer           = errors.New(
+		"cannot process early media without SDP answer," +
+			"use SettingEngine.SetHandleUndeclaredSSRCWithoutAnswer(true) to process without answer",
+	)
 
 	errRTPReceiverDTLSTransportNil            = errors.New("DTLSTransport must not be nil")
 	errRTPReceiverReceiveAlreadyCalled        = errors.New("Receive has already been called")
@@ -240,6 +244,7 @@ var (
 	errRTPSenderTrackNil             = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")
 	errRTPSenderSendAlreadyCalled    = errors.New("Send has already been called")
+	errRTPSenderSendNotCalled        = errors.New("Send has not been called")
 	errRTPSenderStopped              = errors.New("Sender has already been stopped")
 	errRTPSenderTrackRemoved         = errors.New("Sender Track has been removed or replaced to nil")
 	errRTPSenderRidNil               = errors.New("Sender cannot add encoding as rid is empty")

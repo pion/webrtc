@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -351,6 +352,59 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 
 	<-probeReceiverCreated
 	closePairNow(t, offerer, answerer)
+}
+
+// TestStatsInterceptorIsAddedByDefault tests that the stats interceptor
+// is automatically added when creating a PeerConnection with the default API
+// and that its Getter is properly captured.
+func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, pc.Close())
+	}()
+
+	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil with NewPeerConnection")
+
+	// Also assert that the getter stored during interceptor Build matches
+	// the one attached to this PeerConnection.
+	getter, ok := lookupStats(pc.id)
+	assert.True(t, ok, "lookupStats should return a getter for this statsID")
+	assert.NotNil(t, getter)
+	assert.Equal(t,
+		reflect.ValueOf(getter).Pointer(),
+		reflect.ValueOf(pc.statsGetter).Pointer(),
+		"getter returned by lookup should match pc.statsGetter",
+	)
+}
+
+// TestStatsGetterCleanup tests that statsGetter is properly cleaned up to prevent memory leaks.
+func TestStatsGetterCleanup(t *testing.T) {
+	api := NewAPI()
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	assert.NotNil(t, pc.statsGetter, "statsGetter should be non-nil after creation")
+
+	statsID := pc.id
+	getter, exists := lookupStats(statsID)
+	assert.True(t, exists, "global statsGetter map should contain entry for this PC")
+	assert.NotNil(t, getter, "looked up getter should not be nil")
+	assert.Equal(t, pc.statsGetter, getter, "field and global map getter should match")
+
+	assert.NoError(t, pc.Close())
+
+	assert.Nil(t, pc.statsGetter, "statsGetter field should be nil after close")
+
+	getter, exists = lookupStats(statsID)
+	assert.False(t, exists, "global statsGetter map should not contain entry after close")
+	assert.Nil(t, getter, "looked up getter should be nil after close")
 }
 
 // TestInterceptorNack is an end-to-end test for the NACK sender.

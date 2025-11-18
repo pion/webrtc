@@ -10,10 +10,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
+	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -70,6 +73,8 @@ type RTPReceiver struct {
 	api *API
 
 	rtxPool sync.Pool
+
+	log logging.LeveledLogger
 }
 
 // NewRTPReceiver constructs a new RTPReceiver.
@@ -78,7 +83,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		return nil, errRTPReceiverDTLSTransportNil
 	}
 
-	r := &RTPReceiver{
+	rtpReceiver := &RTPReceiver{
 		kind:      kind,
 		transport: transport,
 		api:       api,
@@ -88,9 +93,10 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		rtxPool: sync.Pool{New: func() any {
 			return make([]byte, api.settingEngine.getReceiveMTU())
 		}},
+		log: api.settingEngine.LoggerFactory.NewLogger("RTPReceiver"),
 	}
 
-	return r, nil
+	return rtpReceiver, nil
 }
 
 func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
@@ -272,6 +278,10 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
+		if len(r.tracks) > 1 {
+			r.log.Errorf(useReadSimulcast)
+		}
+
 		return r.tracks[0].rtcpInterceptor.Read(b, a)
 	case <-r.closed:
 		return 0, nil, io.ErrClosedPipe
@@ -391,6 +401,101 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	close(r.closed)
 
 	return err
+}
+
+func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	if statsGetter == nil {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Emit inbound-rtp stats for each track
+	mid := ""
+	if r.tr != nil {
+		mid = r.tr.Mid()
+	}
+	now := statsTimestampNow()
+	nowTime := now.Time()
+	for trackIndex := range r.tracks {
+		remoteTrack := r.tracks[trackIndex].track
+		if remoteTrack == nil {
+			continue
+		}
+
+		collector.Collecting()
+
+		inboundID := fmt.Sprintf("inbound-rtp-%d", uint32(remoteTrack.SSRC()))
+		codecID := ""
+		if remoteTrack.codec.statsID != "" {
+			codecID = remoteTrack.codec.statsID
+		}
+
+		inboundStats := InboundRTPStreamStats{
+			Mid:         mid,
+			Timestamp:   now,
+			Type:        StatsTypeInboundRTP,
+			ID:          inboundID,
+			SSRC:        remoteTrack.SSRC(),
+			Kind:        r.kind.String(),
+			TransportID: "iceTransport",
+			CodecID:     codecID,
+		}
+		r.populateInboundStats(&inboundStats, statsGetter, remoteTrack)
+
+		collector.Collect(inboundID, inboundStats)
+
+		if remoteTrack.Kind() == RTPCodecTypeAudio {
+			r.collectAudioPlayoutStats(collector, nowTime, remoteTrack)
+		}
+	}
+}
+
+func (r *RTPReceiver) populateInboundStats(
+	inboundStats *InboundRTPStreamStats,
+	statsGetter stats.Getter,
+	remoteTrack *TrackRemote,
+) {
+	stats := statsGetter.Get(uint32(remoteTrack.SSRC()))
+	if stats == nil {
+		return
+	}
+
+	// Wrap-around casting by design, with warnings if overflow/underflow is detected.
+	pr := stats.InboundRTPStreamStats.PacketsReceived
+	if pr > math.MaxUint32 {
+		r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
+	}
+	inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
+
+	pl := stats.InboundRTPStreamStats.PacketsLost
+	if pl > math.MaxInt32 || pl < math.MinInt32 {
+		r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
+	}
+	inboundStats.PacketsLost = int32(pl) //nolint:gosec
+
+	inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
+	inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
+	inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
+	timestamp := stats.InboundRTPStreamStats.LastPacketReceivedTimestamp
+	inboundStats.LastPacketReceivedTimestamp = StatsTimestamp(
+		timestamp.UnixNano() / int64(time.Millisecond))
+	inboundStats.FIRCount = stats.InboundRTPStreamStats.FIRCount
+	inboundStats.PLICount = stats.InboundRTPStreamStats.PLICount
+	inboundStats.NACKCount = stats.InboundRTPStreamStats.NACKCount
+}
+
+func (r *RTPReceiver) collectAudioPlayoutStats(
+	collector *statsReportCollector,
+	nowTime time.Time,
+	remoteTrack *TrackRemote,
+) {
+	playoutStats := remoteTrack.pullAudioPlayoutStats(nowTime)
+	for _, stats := range playoutStats {
+		collector.Collecting()
+		collector.Collect(stats.ID, stats)
+	}
 }
 
 func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {

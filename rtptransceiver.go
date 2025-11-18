@@ -8,19 +8,23 @@ package webrtc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
-	mid              atomic.Value // string
-	sender           atomic.Value // *RTPSender
-	receiver         atomic.Value // *RTPReceiver
-	direction        atomic.Value // RTPTransceiverDirection
-	currentDirection atomic.Value // RTPTransceiverDirection
+	mid                    atomic.Value // string
+	sender                 atomic.Value // *RTPSender
+	receiver               atomic.Value // *RTPReceiver
+	direction              atomic.Value // RTPTransceiverDirection
+	currentDirection       atomic.Value // RTPTransceiverDirection
+	currentRemoteDirection atomic.Value // RTPTransceiverDirection
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
@@ -60,19 +64,19 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 		}
 	}
 
-	t.codecs = codecs
+	t.codecs = filterUnattachedRTX(codecs)
 
 	return nil
 }
 
-// Codecs returns list of supported codecs.
+// getCodecs returns list of supported codecs.
 func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
 	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
 	if len(t.codecs) == 0 {
-		return mediaEngineCodecs
+		return filterUnattachedRTX(mediaEngineCodecs)
 	}
 
 	filteredCodecs := []RTPCodecParameters{}
@@ -86,7 +90,97 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 		}
 	}
 
-	return filteredCodecs
+	return filterUnattachedRTX(filteredCodecs)
+}
+
+// match codecs from remote description, used when remote is offerer and creating a transceiver
+// from remote description with the aim of keeping order of codecs in remote description.
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
+	remoteCodecs, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return
+	}
+
+	// make a copy as this slice is modified
+	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
+
+	// find codec matches between what is in remote description and
+	// the transceivers codecs and use payload type registered to
+	// media engine.
+	payloadMapping := make(map[PayloadType]PayloadType) // for RTX re-mapping later
+	filterByMatchType := func(matchFilter codecMatchType) []RTPCodecParameters {
+		filteredCodecs := []RTPCodecParameters{}
+		for remoteCodecIdx := len(remoteCodecs) - 1; remoteCodecIdx >= 0; remoteCodecIdx-- {
+			remoteCodec := remoteCodecs[remoteCodecIdx]
+			if strings.EqualFold(remoteCodec.RTPCodecCapability.MimeType, MimeTypeRTX) {
+				continue
+			}
+
+			matchCodec, matchType := codecParametersFuzzySearch(
+				remoteCodec,
+				leftCodecs,
+			)
+			if matchType == matchFilter {
+				payloadMapping[remoteCodec.PayloadType] = matchCodec.PayloadType
+
+				remoteCodec.PayloadType = matchCodec.PayloadType
+				filteredCodecs = append([]RTPCodecParameters{remoteCodec}, filteredCodecs...)
+
+				// removed matched codec for next round
+				remoteCodecs = append(remoteCodecs[:remoteCodecIdx], remoteCodecs[remoteCodecIdx+1:]...)
+
+				needleFmtp := fmtp.Parse(
+					matchCodec.RTPCodecCapability.MimeType,
+					matchCodec.RTPCodecCapability.ClockRate,
+					matchCodec.RTPCodecCapability.Channels,
+					matchCodec.RTPCodecCapability.SDPFmtpLine,
+				)
+
+				for leftCodecIdx := len(leftCodecs) - 1; leftCodecIdx >= 0; leftCodecIdx-- {
+					leftCodec := leftCodecs[leftCodecIdx]
+					leftCodecFmtp := fmtp.Parse(
+						leftCodec.RTPCodecCapability.MimeType,
+						leftCodec.RTPCodecCapability.ClockRate,
+						leftCodec.RTPCodecCapability.Channels,
+						leftCodec.RTPCodecCapability.SDPFmtpLine,
+					)
+
+					if needleFmtp.Match(leftCodecFmtp) {
+						leftCodecs = append(leftCodecs[:leftCodecIdx], leftCodecs[leftCodecIdx+1:]...)
+
+						break
+					}
+				}
+			}
+		}
+
+		return filteredCodecs
+	}
+
+	filteredCodecs := filterByMatchType(codecMatchExact)
+	filteredCodecs = append(filteredCodecs, filterByMatchType(codecMatchPartial)...)
+
+	// find RTX associations and add those
+	for remotePayloadType, mediaEnginePayloadType := range payloadMapping {
+		remoteRTX := findRTXPayloadType(remotePayloadType, remoteCodecs)
+		if remoteRTX == PayloadType(0) {
+			continue
+		}
+
+		mediaEngineRTX := findRTXPayloadType(mediaEnginePayloadType, leftCodecs)
+		if mediaEngineRTX == PayloadType(0) {
+			continue
+		}
+
+		for _, rtxCodec := range leftCodecs {
+			if rtxCodec.PayloadType == mediaEngineRTX {
+				filteredCodecs = append(filteredCodecs, rtxCodec)
+
+				break
+			}
+		}
+	}
+	_ = t.SetCodecPreferences(filteredCodecs)
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one.
@@ -206,6 +300,18 @@ func (t *RTPTransceiver) getCurrentDirection() RTPTransceiverDirection {
 	return RTPTransceiverDirectionUnknown
 }
 
+func (t *RTPTransceiver) setCurrentRemoteDirection(d RTPTransceiverDirection) {
+	t.currentRemoteDirection.Store(d)
+}
+
+func (t *RTPTransceiver) getCurrentRemoteDirection() RTPTransceiverDirection {
+	if v, ok := t.currentRemoteDirection.Load().(RTPTransceiverDirection); ok {
+		return v
+	}
+
+	return RTPTransceiverDirectionUnknown
+}
+
 func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cyclop
 	if err := t.Sender().ReplaceTrack(track); err != nil {
 		return err
@@ -236,6 +342,37 @@ func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cycl
 	return nil
 }
 
+func (t *RTPTransceiver) isSendAllowed(kind RTPCodecType) bool {
+	if t.kind != kind || t.Sender() != nil {
+		return false
+	}
+
+	// According to https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack, if the
+	// transceiver can be reused only if its currentDirection was never sendrecv or sendonly.
+	// But that will cause sdp to inflate. So we only check currentDirection's current value,
+	// that's worked for all browsers.
+	currentDirection := t.getCurrentDirection()
+	if currentDirection == RTPTransceiverDirectionSendrecv ||
+		currentDirection == RTPTransceiverDirectionSendonly {
+		return false
+	}
+
+	// `currentRemoteDirection` should be checked before using the transceiver for send.
+	// Remote directions could be
+	//   - `sendrecv` or `recvonly` - can send, remote direction will transition from
+	//     `sendrecv` -> `recvonly` if a remote track was removed.
+	//   - `sendonly` or `inactive` - cannot send, remote direction will transitions from
+	//     `sendonly` -> `inactive` if a remote track was removed.
+	//   - `unknown` - can send - we are the offering side and remote direction is unknown
+	currentRemoteDirection := t.getCurrentRemoteDirection()
+	if currentRemoteDirection == RTPTransceiverDirectionSendonly ||
+		currentRemoteDirection == RTPTransceiverDirectionInactive {
+		return false
+	}
+
+	return true
+}
+
 func findByMid(mid string, localTransceivers []*RTPTransceiver) (*RTPTransceiver, []*RTPTransceiver) {
 	for i, t := range localTransceivers {
 		if t.Mid() == mid {
@@ -263,7 +400,7 @@ func satisfyTypeAndDirection(
 				RTPTransceiverDirectionSendonly,
 			}
 		case RTPTransceiverDirectionSendonly:
-			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly, RTPTransceiverDirectionSendrecv}
+			return []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly}
 		case RTPTransceiverDirectionRecvonly:
 			return []RTPTransceiverDirection{RTPTransceiverDirectionSendonly, RTPTransceiverDirectionSendrecv}
 		default:

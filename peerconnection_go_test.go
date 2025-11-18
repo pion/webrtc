@@ -1209,7 +1209,7 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 			"offer sendonly answer sendrecv",
 			RTPTransceiverDirectionSendonly,
 			RTPTransceiverDirectionSendrecv,
-			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv},
+			[]RTPTransceiverDirection{RTPTransceiverDirectionSendrecv, RTPTransceiverDirectionRecvonly},
 		},
 		{
 			"offer recvonly answer sendrecv",
@@ -1285,43 +1285,144 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_SessionID(t *testing.T) {
-	defer test.TimeOut(time.Second * 10).Stop()
-	defer test.CheckRoutines(t)()
+func TestPeerConnection_MediaDirectionInSDP(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
 
-	pcOffer, pcAnswer, err := newPair()
-	assert.NoError(t, err)
-	var offerSessionID uint64
-	var offerSessionVersion uint64
-	var answerSessionID uint64
-	var answerSessionVersion uint64
-	for i := 0; i < 10; i++ {
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-		offer := pcOffer.LocalDescription().parsed
-		sessionID := offer.Origin.SessionID
-		sessionVersion := offer.Origin.SessionVersion
-		if offerSessionID == 0 {
-			offerSessionID = sessionID
-			offerSessionVersion = sessionVersion
-		} else {
-			assert.Equalf(t, offerSessionID, sessionID, "offer[%v] session id mismatch", i)
-			assert.Equalf(t, offerSessionVersion+1, sessionVersion, "offer[%v] session version mismatch", i)
-			offerSessionVersion++
+	report := test.CheckRoutines(t)
+	defer report()
+
+	createTransceiver := func(pc *PeerConnection, dir RTPTransceiverDirection) (*RTPSender, error) {
+		// AddTransceiverFromKind() can't be used with sendonly
+		if dir == RTPTransceiverDirectionSendonly {
+			codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
+
+			track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+			if err != nil {
+				return nil, err
+			}
+
+			transceiver, err := pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
+				{Direction: dir},
+			}...)
+
+			return transceiver.Sender(), err
 		}
 
-		answer := pcAnswer.LocalDescription().parsed
-		sessionID = answer.Origin.SessionID
-		sessionVersion = answer.Origin.SessionVersion
-		if answerSessionID == 0 {
-			answerSessionID = sessionID
-			answerSessionVersion = sessionVersion
-		} else {
-			assert.Equalf(t, answerSessionID, sessionID, "answer[%v] session id mismatch", i)
-			assert.Equalf(t, answerSessionVersion+1, sessionVersion, "answer[%v] session version mismatch", i)
-			answerSessionVersion++
-		}
+		transceiver, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RTPTransceiverInit{Direction: dir},
+		)
+
+		return transceiver.Sender(), err
 	}
-	closePairNow(t, pcOffer, pcAnswer)
+
+	testCases := []struct {
+		remoteDirections         []RTPTransceiverDirection
+		numExpectedTransceivers  int
+		numExpectedMediaSections int
+		localDirections          []RTPTransceiverDirection
+	}{
+		{
+			remoteDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendonly,
+				RTPTransceiverDirectionInactive,
+			},
+			numExpectedTransceivers:  2,
+			numExpectedMediaSections: 1,
+			localDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionRecvonly,
+				RTPTransceiverDirectionInactive,
+			},
+		},
+		{
+			remoteDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionRecvonly,
+			},
+			numExpectedTransceivers:  1,
+			numExpectedMediaSections: 1,
+			localDirections: []RTPTransceiverDirection{
+				RTPTransceiverDirectionSendrecv,
+				RTPTransceiverDirectionSendonly,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run("add track before remote description - "+testCase.remoteDirections[0].String(), func(t *testing.T) {
+			pcOffer, pcAnswer, err := newPair()
+			assert.NoError(t, err)
+
+			// add track to answerer before any remote description, added transceiver will be `sendrecv`
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+			assert.NoError(t, err)
+			_, err = pcAnswer.AddTrack(track)
+			assert.NoError(t, err)
+
+			sender, err := createTransceiver(pcOffer, testCase.remoteDirections[0])
+			assert.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+			assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+			// transceiver created from remote description
+			//  - cannot match track added above if remote direction is `sendonly`
+			//  - can match track added above if remote direction is `sendrecv`
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+			assert.Equal(t, testCase.numExpectedTransceivers, len(pcAnswer.GetTransceivers()))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			assert.NoError(t, err)
+
+			// direction has to be `recvonly` in answer if remote direction is `sendonly`
+			// direction has to be `sendrecv` in answer if remote direction is `sendrecv`
+			parsed, err := answer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok := parsed.MediaDescriptions[0].Attribute(testCase.localDirections[0].String())
+			assert.True(t, ok)
+
+			assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+			assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			// remove the remote track and re-negotiate
+			//  - both directions should become `inactive` if original remote direction was `sendonly`
+			//  - remote direction should become `recvonly and local direction should become `sendonly`
+			//    if original remote direction was `sendrecv`
+			assert.NoError(t, pcOffer.RemoveTrack(sender))
+
+			offer, err = pcOffer.CreateOffer(nil)
+			assert.NoError(t, err)
+
+			// offer direction should have changed to the following after removing track
+			//   - `inactive` if original offer direction was `sendonly`
+			//   - `recvonly` if original offer direction was `sendrecv`
+			parsed, err = offer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok = parsed.MediaDescriptions[0].Attribute(testCase.remoteDirections[1].String())
+			assert.True(t, ok)
+
+			assert.NoError(t, pcOffer.SetLocalDescription(offer))
+			assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err = pcAnswer.CreateAnswer(nil)
+			assert.NoError(t, err)
+
+			// answer direction should have changed to
+			//   - `inactive` if original offer direction was `sendonly`
+			//   - `sendonly` if original offer direction was `sendrecv`
+			parsed, err = answer.Unmarshal()
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.numExpectedMediaSections, len(parsed.MediaDescriptions))
+			_, ok = parsed.MediaDescriptions[0].Attribute(testCase.localDirections[1].String())
+			assert.True(t, ok)
+
+			closePairNow(t, pcOffer, pcAnswer)
+		})
+	}
 }
 
 func TestPeerConnectionNilCallback(t *testing.T) {
@@ -1362,13 +1463,13 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 }
 
 func TestTransceiverCreatedByRemoteSdpHasSameCodecOrderAsRemote(t *testing.T) {
-	t.Run("Codec MatchExact", func(t *testing.T) { //nolint:dupl
+	t.Run("Codec MatchExact and MatchPartial", func(t *testing.T) { //nolint:dupl
 		const remoteSdp = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
 t=0 0
 a=group:BUNDLE 0 1
-m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106
+m=video 60323 UDP/TLS/RTP/SAVPF 98 94 106 49
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
 a=ice-options:google-ice
@@ -1379,8 +1480,10 @@ a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
 a=rtpmap:94 VP8/90000
 a=rtpmap:106 H264/90000
 a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:49 H265/90000
+a=fmtp:49 level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST
 a=sendonly
-m=video 60323 UDP/TLS/RTP/SAVPF 108 98 125
+m=video 60323 UDP/TLS/RTP/SAVPF 49 108 98 125
 a=ice-ufrag:1/MvHwjAyVf27aLu
 a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
 a=ice-options:google-ice
@@ -1392,6 +1495,8 @@ a=rtpmap:108 VP8/90000
 a=sendonly
 a=rtpmap:125 H264/90000
 a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:49 H265/90000
+a=fmtp:49 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST
 `
 		mediaEngine := MediaEngine{}
 		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
@@ -1404,6 +1509,12 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 			},
 			PayloadType: 98,
 		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{
+				MimeTypeH265, 90000, 0, "level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST", nil,
+			},
+			PayloadType: 49,
+		}, RTPCodecTypeVideo))
 
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
@@ -1412,16 +1523,35 @@ a=fmtp:125 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01
 			Type: SDPTypeOffer,
 			SDP:  remoteSdp,
 		}))
+
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
-		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+
 		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
-		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+
+		codecsOfTr1 := pc.GetTransceivers()[0].getCodecs()
+		_, matchType := codecParametersFuzzySearch(codecsOfTr1[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
-		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.EqualValues(t, 98, codecsOfTr1[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[1], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 94, codecOfTr2.PayloadType)
+		assert.EqualValues(t, 94, codecsOfTr1[1].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[2], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 49, codecsOfTr1[2].PayloadType)
+
+		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 94, codecsOfTr2[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
+		// as H.265 (49) is a partial match, it gets pushed to the end
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[2], codecs)
+		assert.Equal(t, codecMatchPartial, matchType)
+		assert.EqualValues(t, 49, codecsOfTr2[2].PayloadType)
+
 		assert.NoError(t, pc.Close())
 	})
 
@@ -1469,21 +1599,34 @@ a=sendonly
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
+
 		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
 			Type: SDPTypeOffer,
 			SDP:  remoteSdp,
 		}))
+
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
-		codecOfTr1 := pc.GetTransceivers()[0].getCodecs()[0]
+
 		codecs := pc.api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo)
-		_, matchType := codecParametersFuzzySearch(codecOfTr1, codecs)
+
+		codecsOfTr1 := pc.GetTransceivers()[0].getCodecs()
+		_, matchType := codecParametersFuzzySearch(codecsOfTr1[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		codecOfTr2 := pc.GetTransceivers()[1].getCodecs()[0]
-		_, matchType = codecParametersFuzzySearch(codecOfTr2, codecs)
+		assert.EqualValues(t, 98, codecsOfTr1[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr1[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 106, codecsOfTr1[1].PayloadType)
+
+		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
 		// h.264/profile-id=640032 should be remap to 106 as same as transceiver 1
-		assert.EqualValues(t, 106, codecOfTr2.PayloadType)
+		assert.EqualValues(t, 106, codecsOfTr2[0].PayloadType)
+		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
+
 		assert.NoError(t, pc.Close())
 	})
 }
@@ -1632,9 +1775,11 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
 	peerConnectionClosed := make(chan struct{})
+	var closeOnce sync.Once
+
 	answerPC.OnConnectionStateChange(func(s PeerConnectionState) {
 		if s == PeerConnectionStateClosed {
-			close(peerConnectionClosed)
+			closeOnce.Do(func() { close(peerConnectionClosed) })
 		}
 	})
 

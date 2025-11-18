@@ -202,14 +202,14 @@ func (m *Mux) handlePendingPackets(endpoint *Endpoint, matchFunc MatchFunc) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	pendingPackets := make([][]byte, len(m.pendingPackets))
+	pendingPackets := make([][]byte, 0, len(m.pendingPackets))
 	for _, buf := range m.pendingPackets {
 		if matchFunc(buf) {
 			if _, err := endpoint.buffer.Write(buf); err != nil {
 				m.log.Warnf("Warning: mux: error writing packet to endpoint from pending queue: %s", err)
 			}
 		} else {
-			pendingPackets = append(pendingPackets, buf) //nolint:makezero // todo fix
+			pendingPackets = append(pendingPackets, buf)
 		}
 	}
 	m.pendingPackets = pendingPackets

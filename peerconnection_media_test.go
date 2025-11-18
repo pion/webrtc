@@ -27,6 +27,7 @@ import (
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	awaitRTCPReceiverSend := make(chan error)
 
 	trackMetadataValid := make(chan error)
+	peerConnectionConnected := make(chan struct{})
 
 	pcAnswer.OnTrack(func(track *TrackRemote, receiver *RTPReceiver) {
 		if track.ID() != expectedTrackID {
@@ -142,12 +144,19 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	sender, err := pcOffer.AddTrack(vp8Track)
 	assert.NoError(t, err)
 
+	// Wait for PeerConnection to be fully connected (DTLS + SRTP ready)
+	pcOffer.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			close(peerConnectionConnected)
+		}
+	})
+
 	go func() {
+		// Wait for DTLS/SRTP to be ready before sending media
+		<-peerConnectionConnected
+
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if pcOffer.ICEConnectionState() != ICEConnectionStateConnected {
-				continue
-			}
 			if routineErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}); routineErr != nil {
 				//nolint:forbidigo // not a test failure
 				fmt.Println(routineErr)
@@ -707,41 +716,357 @@ func TestAddTransceiverFromTrackSendRecv(t *testing.T) {
 }
 
 func TestAddTransceiverAddTrack_Reuse(t *testing.T) {
-	pc, err := NewPeerConnection(Configuration{})
-	assert.NoError(t, err)
-
-	tr, err := pc.AddTransceiverFromKind(
-		RTPCodecTypeVideo,
-		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
-	)
-	assert.NoError(t, err)
-
-	assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
-
-	addTrack := func() (TrackLocal, *RTPSender) {
-		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+	t.Run("reuse test", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		sender, err := pc.AddTrack(track)
+		tr, err := pc.AddTransceiverFromKind(
+			RTPCodecTypeVideo,
+			RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+		)
 		assert.NoError(t, err)
 
-		return track, sender
+		assert.Equal(t, []*RTPTransceiver{tr}, pc.GetTransceivers())
+
+		addTrack := func() (TrackLocal, *RTPSender) {
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+			assert.NoError(t, err)
+
+			sender, err := pc.AddTrack(track)
+			assert.NoError(t, err)
+
+			return track, sender
+		}
+
+		track1, sender1 := addTrack()
+		assert.Equal(t, 1, len(pc.GetTransceivers()))
+		assert.Equal(t, sender1, tr.Sender())
+		assert.Equal(t, track1, tr.Sender().Track())
+		require.NoError(t, pc.RemoveTrack(sender1))
+
+		track2, _ := addTrack()
+		assert.Equal(t, 1, len(pc.GetTransceivers()))
+		assert.Equal(t, track2, tr.Sender().Track())
+
+		addTrack()
+		assert.Equal(t, 2, len(pc.GetTransceivers()))
+
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("reuse remote direction test", func(t *testing.T) {
+		testCases := []struct {
+			remoteDirection         RTPTransceiverDirection
+			remoteDirectionNoSender RTPTransceiverDirection // direction should switch to this on track removal
+			isSendAllowed           bool
+		}{
+			{
+				remoteDirection:         RTPTransceiverDirectionSendrecv,
+				remoteDirectionNoSender: RTPTransceiverDirectionRecvonly,
+				isSendAllowed:           true,
+			},
+			{
+				remoteDirection:         RTPTransceiverDirectionSendonly,
+				remoteDirectionNoSender: RTPTransceiverDirectionInactive,
+				isSendAllowed:           false,
+			},
+		}
+
+		for _, testCase := range testCases {
+			t.Run(testCase.remoteDirection.String(), func(t *testing.T) {
+				pcOffer, pcAnswer, err := newPair()
+				assert.NoError(t, err)
+
+				remoteTrack, err := NewTrackLocalStaticSample(
+					RTPCodecCapability{
+						MimeType:    MimeTypeH264,
+						SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+					},
+					"track-id",
+					"track-label",
+				)
+				assert.NoError(t, err)
+
+				remoteTransceiver, err := pcOffer.AddTransceiverFromTrack(remoteTrack, RTPTransceiverInit{
+					Direction: testCase.remoteDirection,
+				})
+				assert.NoError(t, err)
+
+				var remoteSender *RTPSender
+				for _, tr := range pcOffer.GetTransceivers() {
+					if tr == remoteTransceiver {
+						remoteSender = tr.Sender()
+
+						break
+					}
+				}
+
+				addTrack := func() (TrackLocal, *RTPSender) {
+					track, err1 := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
+					assert.NoError(t, err1)
+
+					sender, err1 := pcAnswer.AddTrack(track)
+					assert.NoError(t, err1)
+
+					return track, sender
+				}
+
+				offer, err := pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				// should have created local transceiver from remote description
+				localTransceivers := pcAnswer.GetTransceivers()
+				assert.Equal(t, 1, len(localTransceivers))
+				assert.Equal(t, testCase.remoteDirection, localTransceivers[0].getCurrentRemoteDirection())
+
+				localTrack, localSender := addTrack()
+				localTransceivers = pcAnswer.GetTransceivers()
+				if testCase.isSendAllowed {
+					assert.Equal(t, 1, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[0].Sender())
+					assert.Equal(t, localTrack, localTransceivers[0].Sender().Track())
+				} else {
+					assert.Equal(t, 2, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[1].Sender())
+					assert.Equal(t, localTrack, localTransceivers[1].Sender().Track())
+				}
+
+				answer, err := pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				// even if send was not allowed and answering side created a new transcever,
+				// it would not have been added to answer because there was no media section
+				// to assign it to, so the offer side should still see only one transceiver.
+				assert.Equal(t, 1, len(pcOffer.GetTransceivers()))
+
+				// remove local track and do a negotiation to clear sender from answer
+				require.NoError(t, pcAnswer.RemoveTrack(localSender))
+
+				offer, err = pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				assert.Equal(t, testCase.remoteDirection, localTransceivers[0].getCurrentRemoteDirection())
+
+				answer, err = pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				// remove remote track from offer to change current remote direction
+				require.NoError(t, pcOffer.RemoveTrack(remoteSender))
+
+				offer, err = pcOffer.CreateOffer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcOffer.SetLocalDescription(offer))
+				assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+				assert.Equal(t, testCase.remoteDirectionNoSender, localTransceivers[0].getCurrentRemoteDirection())
+
+				// try adding again
+				localTrack, localSender = addTrack()
+				localTransceivers = pcAnswer.GetTransceivers()
+				if testCase.isSendAllowed {
+					assert.Equal(t, 1, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[0].Sender())
+					assert.Equal(t, localTrack, localTransceivers[0].Sender().Track())
+				} else {
+					// the unmatched local transceiver should be re-usable
+					assert.Equal(t, 2, len(localTransceivers))
+					assert.Equal(t, localSender, localTransceivers[1].Sender())
+					assert.Equal(t, localTrack, localTransceivers[1].Sender().Track())
+				}
+
+				answer, err = pcAnswer.CreateAnswer(nil)
+				assert.NoError(t, err)
+				assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+				assert.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				closePairNow(t, pcOffer, pcAnswer)
+			})
+		}
+	})
+}
+
+func TestAddTransceiverFromRemoteDescription(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// offer side
+	se := SettingEngine{}
+	se.DisableMediaEngineCopy(true)
+	mediaEngineOffer := &MediaEngine{}
+	// offer side has fewer codecs than answer side
+	for _, codec := range []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=50", nil},
+			PayloadType:        51,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        50,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        52,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=52", nil},
+			PayloadType:        53,
+		},
+	} {
+		assert.NoError(t, mediaEngineOffer.RegisterCodec(codec, RTPCodecTypeVideo))
+	}
+	pcOffer, err := NewAPI(WithSettingEngine(se), WithMediaEngine(mediaEngineOffer)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	// answer side
+	mediaEngineAnswer := &MediaEngine{}
+	// answer has more codecs than offer side and in different order
+	for _, codec := range []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        82,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=82", nil},
+			PayloadType:        83,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        80,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=80", nil},
+			PayloadType:        81,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/av1", 90000, 0, "", nil},
+			PayloadType:        84,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=84", nil},
+			PayloadType:        85,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/h265", 90000, 0, "", nil},
+			PayloadType:        86,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=86", nil},
+			PayloadType:        87,
+		},
+	} {
+		assert.NoError(t, mediaEngineAnswer.RegisterCodec(codec, RTPCodecTypeVideo))
+	}
+	pcAnswer, err := NewAPI(WithMediaEngine(mediaEngineAnswer)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1")
+	require.NoError(t, err)
+
+	_, err = pcOffer.AddTransceiverFromTrack(track1)
+	assert.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+
+	// this should create a transceiver on answer side from remote description and
+	// set codec prefereces with order of codecs in offer using the corresponding
+	// payload types from the media engine codecs
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answerSideTransceivers := pcAnswer.GetTransceivers()
+	assert.Equal(t, 1, len(answerSideTransceivers))
+
+	// media engine updates negotiated codecs from remote description,
+	// so payload type will be what is in the offer
+	// all rtx are placed later and could be in any order
+	checkPreferredCodecs := func(
+		actualPreferredCodecs []RTPCodecParameters,
+		expectedPreferredCodecsPrimary []RTPCodecParameters,
+		expectedPreferredCodecsRTX []RTPCodecParameters,
+	) {
+		assert.Equal(
+			t,
+			len(expectedPreferredCodecsPrimary)+len(expectedPreferredCodecsRTX),
+			len(actualPreferredCodecs),
+		)
+
+		for i, expectedPreferredCodec := range expectedPreferredCodecsPrimary {
+			expectedFmtp := fmtp.Parse(
+				expectedPreferredCodec.RTPCodecCapability.MimeType,
+				expectedPreferredCodec.RTPCodecCapability.ClockRate,
+				expectedPreferredCodec.RTPCodecCapability.Channels,
+				expectedPreferredCodec.RTPCodecCapability.SDPFmtpLine,
+			)
+			actualFmtp := fmtp.Parse(
+				actualPreferredCodecs[i].RTPCodecCapability.MimeType,
+				actualPreferredCodecs[i].RTPCodecCapability.ClockRate,
+				actualPreferredCodecs[i].RTPCodecCapability.Channels,
+				actualPreferredCodecs[i].RTPCodecCapability.SDPFmtpLine,
+			)
+			assert.True(t, expectedFmtp.Match(actualFmtp))
+		}
+
+		for _, expectedPreferredCodec := range expectedPreferredCodecsRTX {
+			expectedFmtp := fmtp.Parse(
+				expectedPreferredCodec.RTPCodecCapability.MimeType,
+				expectedPreferredCodec.RTPCodecCapability.ClockRate,
+				expectedPreferredCodec.RTPCodecCapability.Channels,
+				expectedPreferredCodec.RTPCodecCapability.SDPFmtpLine,
+			)
+
+			found := false
+			for j := len(expectedPreferredCodecsPrimary); j < len(actualPreferredCodecs); j++ {
+				actualFmtp := fmtp.Parse(
+					actualPreferredCodecs[j].RTPCodecCapability.MimeType,
+					actualPreferredCodecs[j].RTPCodecCapability.ClockRate,
+					actualPreferredCodecs[j].RTPCodecCapability.Channels,
+					actualPreferredCodecs[j].RTPCodecCapability.SDPFmtpLine,
+				)
+				if expectedFmtp.Match(actualFmtp) {
+					found = true
+
+					break
+				}
+			}
+			assert.True(t, found)
+		}
 	}
 
-	track1, sender1 := addTrack()
-	assert.Equal(t, 1, len(pc.GetTransceivers()))
-	assert.Equal(t, sender1, tr.Sender())
-	assert.Equal(t, track1, tr.Sender().Track())
-	require.NoError(t, pc.RemoveTrack(sender1))
+	preferredCodecsPrimary := []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp9", 90000, 0, "", nil},
+			PayloadType:        50,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/vp8", 90000, 0, "", nil},
+			PayloadType:        52,
+		},
+	}
+	preferredCodecsRTX := []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=50", nil},
+			PayloadType:        51,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{"video/rtx", 90000, 0, "apt=52", nil},
+			PayloadType:        53,
+		},
+	}
 
-	track2, _ := addTrack()
-	assert.Equal(t, 1, len(pc.GetTransceivers()))
-	assert.Equal(t, track2, tr.Sender().Track())
+	checkPreferredCodecs(answerSideTransceivers[0].getCodecs(), preferredCodecsPrimary, preferredCodecsRTX)
 
-	addTrack()
-	assert.Equal(t, 2, len(pc.GetTransceivers()))
-
-	assert.NoError(t, pc.Close())
+	assert.NoError(t, pcOffer.Close())
+	assert.NoError(t, pcAnswer.Close())
 }
 
 func TestAddTransceiverAddTrack_NewRTPSender_Error(t *testing.T) {

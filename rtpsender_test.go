@@ -504,6 +504,20 @@ func Test_RTPSender_RTX_Support(t *testing.T) {
 	})
 }
 
+type TrackLocalCheckRTCPReaderOnBind struct {
+	*TrackLocalStaticSample
+	t          *testing.T
+	bindCalled chan struct{}
+}
+
+func (s *TrackLocalCheckRTCPReaderOnBind) Bind(ctx TrackLocalContext) (RTPCodecParameters, error) {
+	assert.NotNil(s.t, ctx.RTCPReader())
+	p, err := s.TrackLocalStaticSample.Bind(ctx)
+	close(s.bindCalled)
+
+	return p, err
+}
+
 func Test_RTPSender_RTCPReader_Bind_Not_Nil(t *testing.T) {
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
@@ -528,16 +542,19 @@ func Test_RTPSender_RTCPReader_Bind_Not_Nil(t *testing.T) {
 	assert.NoError(t, peerConnection.Close())
 }
 
-type TrackLocalCheckRTCPReaderOnBind struct {
-	*TrackLocalStaticSample
-	t          *testing.T
-	bindCalled chan struct{}
-}
+func Test_RTPSender_SetReadDeadline_Crash(t *testing.T) {
+	stackA, stackB, err := newORTCPair()
+	assert.NoError(t, err)
 
-func (s *TrackLocalCheckRTCPReaderOnBind) Bind(ctx TrackLocalContext) (RTPCodecParameters, error) {
-	assert.NotNil(s.t, ctx.RTCPReader())
-	p, err := s.TrackLocalStaticSample.Bind(ctx)
-	close(s.bindCalled)
+	assert.NoError(t, signalORTCPair(stackA, stackB))
 
-	return p, err
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := stackA.api.NewRTPSender(track, stackA.dtls)
+	assert.NoError(t, err)
+
+	assert.Error(t, rtpSender.SetReadDeadline(time.Time{}), errRTPSenderSendNotCalled)
+	assert.NoError(t, stackA.close())
+	assert.NoError(t, stackB.close())
 }

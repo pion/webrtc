@@ -44,6 +44,8 @@ const (
 
 	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"
 
+	useReadSimulcast = "Use ReadSimulcast(rid) instead of Read() when multiple tracks are present"
+
 	generatedCertificateOrigin = "WebRTC"
 
 	// AttributeRtxPayloadType is the interceptor attribute added when Read()

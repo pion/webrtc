@@ -39,6 +39,8 @@ type (
 		timebaseNumerator   uint32
 		firstFrameTimestamp uint32
 		clockRate           uint64
+		videoWidth          uint16
+		videoHeight         uint16
 
 		// VP8, VP9
 		currentFrame []byte
@@ -86,6 +88,8 @@ func NewWith(out io.Writer, opts ...Option) (*IVFWriter, error) {
 		timebaseDenominator: 30,
 		timebaseNumerator:   1,
 		clockRate:           90000,
+		videoWidth:          640,
+		videoHeight:         480,
 	}
 
 	for _, o := range opts {
@@ -126,8 +130,8 @@ func (i *IVFWriter) writeHeader() error {
 		return errCodecUnset
 	}
 
-	binary.LittleEndian.PutUint16(header[12:], 640)                   // Width in pixels
-	binary.LittleEndian.PutUint16(header[14:], 480)                   // Height in pixels
+	binary.LittleEndian.PutUint16(header[12:], i.videoWidth)          // Width in pixels
+	binary.LittleEndian.PutUint16(header[14:], i.videoHeight)         // Height in pixels
 	binary.LittleEndian.PutUint32(header[16:], i.timebaseDenominator) // Framerate denominator
 	binary.LittleEndian.PutUint32(header[20:], i.timebaseNumerator)   // Framerate numerator
 	binary.LittleEndian.PutUint32(header[24:], 900)                   // Frame count, will be updated on first Close() call
@@ -335,6 +339,24 @@ func WithCodec(mimeType string) Option {
 		default:
 			return errNoSuchCodec
 		}
+
+		return nil
+	}
+}
+
+func WithWidthAndHeight(width, height uint16) Option {
+	return func(i *IVFWriter) error {
+		i.videoWidth = width
+		i.videoHeight = height
+
+		return nil
+	}
+}
+
+func WithFrameRate(numerator, denominator uint32) Option {
+	return func(i *IVFWriter) error {
+		i.timebaseNumerator = numerator
+		i.timebaseDenominator = denominator
 
 		return nil
 	}

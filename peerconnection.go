@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
@@ -33,8 +35,8 @@ import (
 // peer-to-peer communications with another PeerConnection instance in a
 // browser, or to another endpoint implementing the required protocols.
 type PeerConnection struct {
-	statsID string
-	mu      sync.RWMutex
+	id string
+	mu sync.RWMutex
 
 	sdpOrigin sdp.Origin
 
@@ -91,6 +93,7 @@ type PeerConnection struct {
 	log logging.LeveledLogger
 
 	interceptorRTCPWriter interceptor.RTCPWriter
+	statsGetter           stats.Getter
 }
 
 // NewPeerConnection creates a PeerConnection with the default codecs and interceptors.
@@ -115,7 +118,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// allow better readability to understand what is happening.
 
 	pc := &PeerConnection{
-		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
+		id: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
 		configuration: Configuration{
 			ICEServers:           []ICEServer{},
 			ICETransportPolicy:   ICETransportPolicyAll,
@@ -142,9 +145,13 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
-	i, err := api.interceptorRegistry.Build("")
+	i, err := api.interceptorRegistry.Build(pc.id)
 	if err != nil {
 		return nil, err
+	}
+
+	if getter, ok := lookupStats(pc.id); ok {
+		pc.statsGetter = getter
 	}
 
 	pc.api = &API{
@@ -590,11 +597,11 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 	return pc.configuration
 }
 
-func (pc *PeerConnection) getStatsID() string {
+func (pc *PeerConnection) ID() string {
 	pc.mu.RLock()
 	defer pc.mu.RUnlock()
 
-	return pc.statsID
+	return pc.id
 }
 
 // hasLocalDescriptionChanged returns whether local media (rtpTransceivers) has changed
@@ -1137,6 +1144,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 					return err
 				}
 			}
+			if transceiver != nil {
+				transceiver.setCurrentRemoteDirection(direction)
+			}
 
 			switch {
 			case transceiver == nil:
@@ -1153,25 +1163,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				}
 
 				transceiver = newRTPTransceiver(receiver, nil, localDirection, kind, pc.api)
+				transceiver.setCurrentRemoteDirection(direction)
+				transceiver.setCodecPreferencesFromRemoteDescription(media)
 				pc.mu.Lock()
 				pc.addRTPTransceiver(transceiver)
 				pc.mu.Unlock()
-
-				// if transceiver is create by remote sdp, set prefer codec same as remote peer
-				if codecs, err := codecsFromMediaDescription(media); err == nil {
-					filteredCodecs := []RTPCodecParameters{}
-					for _, codec := range codecs {
-						if c, matchType := codecParametersFuzzySearch(
-							codec,
-							pc.api.mediaEngine.getCodecsByKind(kind),
-						); matchType == codecMatchExact {
-							// if codec match exact, use payloadtype register to mediaengine
-							codec.PayloadType = c.PayloadType
-							filteredCodecs = append(filteredCodecs, codec)
-						}
-					}
-					_ = transceiver.SetCodecPreferences(filteredCodecs)
-				}
 
 			case direction == RTPTransceiverDirectionRecvonly:
 				if transceiver.Direction() == RTPTransceiverDirectionSendrecv {
@@ -1706,10 +1702,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		if track.fecSsrc != nil && ssrc == *track.fecSsrc {
 			return nil
 		}
-		for _, trackSsrc := range track.ssrcs {
-			if ssrc == trackSsrc {
-				return nil
-			}
+		if slices.Contains(track.ssrcs, ssrc) {
+			return nil
 		}
 	}
 
@@ -1719,10 +1713,12 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 	// (urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id and urn:ietf:params:rtp-hdrext:sdes:mid)
 	// and even if the RTP stream contains an incorrect MID or RID.
 	// while this can be incorrect, this is done to maintain compatibility with older behavior.
-	if len(remoteDescription.parsed.MediaDescriptions) == 1 {
-		mediaSection := remoteDescription.parsed.MediaDescriptions[0]
-		if handled, err := pc.handleUndeclaredSSRC(ssrc, mediaSection); handled || err != nil {
-			return err
+	if remoteDescription.Type != SDPTypeAnswer || pc.api.settingEngine.handleUndeclaredSSRCWithoutAnswer {
+		if len(remoteDescription.parsed.MediaDescriptions) == 1 {
+			mediaSection := remoteDescription.parsed.MediaDescriptions[0]
+			if handled, err := pc.handleUndeclaredSSRC(ssrc, mediaSection); handled || err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1748,6 +1744,11 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		RTPHeaderExtensionCapability{sdp.SDESMidURI},
 	)
 	if !audioSupported && !videoSupported {
+		if remoteDescription.Type == SDPTypeAnswer && !pc.api.settingEngine.handleUndeclaredSSRCWithoutAnswer {
+			// if we are offerer, wait for answer with media setion to process this SSRC
+			return errPeerConnEarlyMediaWithoutAnswer
+		}
+
 		// try to find media section by payload type as a last resort for legacy clients.
 		mediaSection, ok := pc.findMediaSectionByPayloadType(payloadType, remoteDescription)
 		if ok {
@@ -2096,28 +2097,24 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	for _, transceiver := range pc.rtpTransceivers {
-		currentDirection := transceiver.getCurrentDirection()
-		// According to https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack, if the
-		// transceiver can be reused only if it's currentDirection never be sendrecv or sendonly.
-		// But that will cause sdp inflate. So we only check currentDirection's current value,
-		// that's worked for all browsers.
-		if transceiver.kind == track.Kind() && transceiver.Sender() == nil &&
-			!(currentDirection == RTPTransceiverDirectionSendrecv || currentDirection == RTPTransceiverDirectionSendonly) {
-			sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
-			if err == nil {
-				err = transceiver.SetSender(sender, track)
-				if err != nil {
-					_ = sender.Stop()
-					transceiver.setSender(nil)
-				}
-			}
-			if err != nil {
-				return nil, err
-			}
-			pc.onNegotiationNeeded()
-
-			return sender, nil
+		if !transceiver.isSendAllowed(track.Kind()) {
+			continue
 		}
+
+		sender, err := pc.api.NewRTPSender(track, pc.dtlsTransport)
+		if err == nil {
+			err = transceiver.SetSender(sender, track)
+			if err != nil {
+				_ = sender.Stop()
+				transceiver.setSender(nil)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		pc.onNegotiationNeeded()
+
+		return sender, nil
 	}
 
 	transceiver, err := pc.newTransceiverFromTrack(RTPTransceiverDirectionSendrecv, track)
@@ -2430,7 +2427,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 	// 2. A Mux stops this chain. It won't close the underlying
 	//    Conn if one of the endpoints is closed down. To
 	//    continue the chain the Mux has to be closed.
-	closeErrs := make([]error, 4)
+	closeErrs := make([]error, 0, 4)
 
 	doGracefulCloseOps := func() []error {
 		if !shouldGracefullyClose {
@@ -2464,10 +2461,10 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	pc.mu.Lock()
 	for _, t := range pc.rtpTransceivers {
-		closeErrs = append(closeErrs, t.Stop()) //nolint:makezero // todo fix
+		closeErrs = append(closeErrs, t.Stop())
 	}
 	if nonMediaBandwidthProbe, ok := pc.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
-		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop()) //nolint:makezero // todo fix
+		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop())
 	}
 	pc.mu.Unlock()
 
@@ -2480,25 +2477,28 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #6)
 	if pc.sctpTransport != nil {
-		closeErrs = append(closeErrs, pc.sctpTransport.Stop()) //nolint:makezero // todo fix
+		closeErrs = append(closeErrs, pc.sctpTransport.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #7)
-	closeErrs = append(closeErrs, pc.dtlsTransport.Stop()) //nolint:makezero // todo fix
+	closeErrs = append(closeErrs, pc.dtlsTransport.Stop())
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
 	if pc.iceTransport != nil && !shouldGracefullyClose {
 		// we will stop gracefully in doGracefulCloseOps
-		closeErrs = append(closeErrs, pc.iceTransport.Stop()) //nolint:makezero // todo fix
+		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 
-	closeErrs = append(closeErrs, doGracefulCloseOps()...) //nolint:makezero // todo fix
+	closeErrs = append(closeErrs, doGracefulCloseOps()...)
+
+	pc.statsGetter = nil
+	cleanupStats(pc.id)
 
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
-	closeErrs = append(closeErrs, pc.api.interceptor.Close()) //nolint:makezero // todo fix
+	closeErrs = append(closeErrs, pc.api.interceptor.Close())
 
 	return util.FlattenErrs(closeErrs)
 }
@@ -2636,7 +2636,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	stats := PeerConnectionStats{
 		Timestamp:             statsTimestampNow(),
 		Type:                  StatsTypePeerConnection,
-		ID:                    pc.statsID,
+		ID:                    pc.id,
 		DataChannelsAccepted:  dataChannelsAccepted,
 		DataChannelsClosed:    dataChannelsClosed,
 		DataChannelsOpened:    dataChannelsOpened,
@@ -2652,6 +2652,11 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		}
 	}
 	pc.mu.Unlock()
+
+	receivers := pc.GetReceivers()
+	for _, receiver := range receivers {
+		receiver.collectStats(statsCollector, pc.statsGetter)
+	}
 
 	pc.api.mediaEngine.collectStats(statsCollector)
 

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -35,10 +36,8 @@ type trackDetails struct {
 
 func trackDetailsForSSRC(trackDetails []trackDetails, ssrc SSRC) *trackDetails {
 	for i := range trackDetails {
-		for j := range trackDetails[i].ssrcs {
-			if trackDetails[i].ssrcs[j] == ssrc {
-				return &trackDetails[i]
-			}
+		if slices.Contains(trackDetails[i].ssrcs, ssrc) {
+			return &trackDetails[i]
 		}
 	}
 
@@ -51,10 +50,8 @@ func trackDetailsForRID(trackDetails []trackDetails, mid, rid string) *trackDeta
 			continue
 		}
 
-		for j := range trackDetails[i].rids {
-			if trackDetails[i].rids[j] == rid {
-				return &trackDetails[i]
-			}
+		if slices.Contains(trackDetails[i].rids, rid) {
+			return &trackDetails[i]
 		}
 	}
 
@@ -64,13 +61,7 @@ func trackDetailsForRID(trackDetails []trackDetails, mid, rid string) *trackDeta
 func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetails {
 	filtered := []trackDetails{}
 	doesTrackHaveSSRC := func(t trackDetails) bool {
-		for i := range t.ssrcs {
-			if t.ssrcs[i] == ssrc {
-				return true
-			}
-		}
-
-		return false
+		return slices.Contains(t.ssrcs, ssrc)
 	}
 
 	for i := range incomingTracks {
@@ -268,10 +259,7 @@ func trackDetailsFromSDP(
 }
 
 func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceiveParameters {
-	encodingSize := len(trackDetails.ssrcs)
-	if len(trackDetails.rids) >= encodingSize {
-		encodingSize = len(trackDetails.rids)
-	}
+	encodingSize := max(len(trackDetails.rids), len(trackDetails.ssrcs))
 
 	encodings := make([]RTPDecodingParameters, encodingSize)
 	for i := range encodings {
@@ -541,7 +529,7 @@ func addSenderSDP(
 	}
 }
 
-//nolint:cyclop
+//nolint:cyclop, gocognit
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -575,7 +563,11 @@ func addTransceiverSDP(
 		media.WithCodec(uint8(codec.PayloadType), name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
-			media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			if feedback.Parameter == "" {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s", codec.PayloadType, feedback.Type))
+			} else {
+				media.WithValueAttribute("rtcp-fb", fmt.Sprintf("%d %s %s", codec.PayloadType, feedback.Type, feedback.Parameter))
+			}
 		}
 	}
 	if len(codecs) == 0 {
@@ -689,13 +681,7 @@ func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 	bundleTags := strings.Split(*matchBundleGroup, " ")
 
 	return func(midValue string) bool {
-		for _, tag := range bundleTags {
-			if tag == midValue {
-				return true
-			}
-		}
-
-		return false
+		return slices.Contains(bundleTags, midValue)
 	}
 }
 
