@@ -1397,7 +1397,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
+ //nolint:cyclop
+ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30) //nolint
 	defer lim.Stop()
 
