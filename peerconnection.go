@@ -1780,10 +1780,14 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)
-	readStream, interceptor, rtcpReadStream, rtcpInterceptor, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
+	result, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
 	if err != nil {
 		return err
 	}
+	readStream := result.rtpReadStream
+	interceptor := result.rtpInterceptor
+	rtcpReadStream := result.rtcpReadStream
+	rtcpInterceptor := result.rtcpInterceptor
 
 	// try to read simulcast IDs from the packet we already have
 	var mid, rid, rsid string

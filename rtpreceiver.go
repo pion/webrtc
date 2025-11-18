@@ -231,22 +231,29 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			codec,
 			globalParams.HeaderExtensions,
 		)
-		var err error
 
-		//nolint:lll // # TODO refactor
-		if streams.rtpReadStream, streams.rtpInterceptor, streams.rtcpReadStream, streams.rtcpInterceptor, err = r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo); err != nil {
+		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo)
+		if err != nil {
 			return err
 		}
+		streams.rtpReadStream = result.rtpReadStream
+		streams.rtpInterceptor = result.rtpInterceptor
+		streams.rtcpReadStream = result.rtcpReadStream
+		streams.rtcpInterceptor = result.rtcpInterceptor
 
 		if rtxSsrc := parameters.Encodings[i].RTX.SSRC; rtxSsrc != 0 {
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, codec, globalParams.HeaderExtensions)
-			rtpReadStream, rtpInterceptor, rtcpReadStream, rtcpInterceptor, err := r.transport.streamsForSSRC(
+			result, err = r.transport.streamsForSSRC(
 				rtxSsrc,
 				*streamInfo,
 			)
 			if err != nil {
 				return err
 			}
+			rtpReadStream := result.rtpReadStream
+			rtpInterceptor := result.rtpInterceptor
+			rtcpReadStream := result.rtcpReadStream
+			rtcpInterceptor := result.rtcpInterceptor
 
 			if err = r.receiveForRtx(
 				rtxSsrc,
