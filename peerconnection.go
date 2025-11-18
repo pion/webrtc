@@ -1785,7 +1785,20 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return err
 	}
 
+	// try to read simulcast IDs from the packet we already have
 	var mid, rid, rsid string
+	if _, err = handleUnknownRTPPacket(
+		b[:i], uint8(midExtensionID), //nolint:gosec // G115
+		uint8(streamIDExtensionID),       //nolint:gosec // G115
+		uint8(repairStreamIDExtensionID), //nolint:gosec // G115
+		&mid,
+		&rid,
+		&rsid,
+	); err != nil {
+		return err
+	}
+
+	// if the first packet didn't contain simuilcast IDs, then probe more packets
 	var paddingOnly bool
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
 		if mid == "" || (rid == "" && rsid == "") {
@@ -1799,7 +1812,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				return err
 			}
 
-			if _, paddingOnly, err = handleUnknownRTPPacket(
+			if paddingOnly, err = handleUnknownRTPPacket(
 				b[:i], uint8(midExtensionID), //nolint:gosec // G115
 				uint8(streamIDExtensionID),       //nolint:gosec // G115
 				uint8(repairStreamIDExtensionID), //nolint:gosec // G115

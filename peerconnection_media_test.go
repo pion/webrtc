@@ -1397,7 +1397,8 @@ func TestPeerConnection_Start_Right_Receiver(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
-func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
+//nolint:cyclop,maintidx
+func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30) //nolint
 	defer lim.Stop()
 
@@ -1452,6 +1453,114 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) { //nolint:cyclop
 		peerConnectionConnected.Wait()
 
 		<-seenFiveStreams.Done()
+
+		closePairNow(t, offerer, answerer)
+		close(testFinished)
+	})
+
+	// Assert that we can send just one packet with Simulcast IDs (using extensions) and they will be properly received
+	t.Run("ExtractIDs", func(t *testing.T) {
+		offerer, answerer, err := newPair()
+		assert.NoError(t, err)
+
+		rids := []string{"layer_1", "layer_2", "layer_3"}
+		ridSelected := rids[0]
+
+		onTrackCalled := &atomic.Bool{}
+		answerer.OnTrack(func(remote *TrackRemote, receiver *RTPReceiver) {
+			assert.Equal(t, remote.rid, ridSelected)
+			onTrackCalled.Store(true)
+		})
+
+		vp8WriterA, err := NewTrackLocalStaticRTP(
+			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID(rids[0]),
+		)
+		assert.NoError(t, err)
+
+		vp8WriterB, err := NewTrackLocalStaticRTP(
+			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID(rids[1]),
+		)
+		assert.NoError(t, err)
+
+		vp8WriterC, err := NewTrackLocalStaticRTP(
+			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID(rids[2]),
+		)
+		assert.NoError(t, err)
+
+		sender, err := offerer.AddTrack(vp8WriterA)
+		assert.NoError(t, err)
+		assert.NotNil(t, sender)
+
+		assert.NoError(t, sender.AddEncoding(vp8WriterB))
+		assert.NoError(t, sender.AddEncoding(vp8WriterC))
+
+		assert.NoError(t, signalPair(offerer, answerer))
+
+		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
+		peerConnectionConnected.Wait()
+
+		parameters := sender.GetParameters()
+
+		var midID, ridID uint8
+		for _, extension := range parameters.HeaderExtensions {
+			switch extension.URI {
+			case sdp.SDESMidURI:
+				midID = uint8(extension.ID) //nolint:gosec // G115
+			case sdp.SDESRTPStreamIDURI:
+				ridID = uint8(extension.ID) //nolint:gosec // G115
+			}
+		}
+		assert.NotZero(t, midID)
+		assert.NotZero(t, ridID)
+
+		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
+		testFinished := make(chan struct{})
+		seenOneStream, seenOneStreamCancel := context.WithCancel(context.Background())
+
+		go func() {
+			sentOnePacket := false
+
+			senderTrack := vp8WriterA
+
+			for {
+				select {
+				case <-testFinished:
+					return
+				case <-ticker.C:
+					answerer.dtlsTransport.lock.Lock()
+					if len(answerer.dtlsTransport.simulcastStreams) >= 1 {
+						seenOneStreamCancel()
+					}
+					answerer.dtlsTransport.lock.Unlock()
+
+					senderTrack.mu.Lock()
+
+					// We send just one packet with the RID, that's the point of this test
+					if !sentOnePacket && len(senderTrack.bindings) > 0 {
+						sentOnePacket = true
+
+						header := &rtp.Header{
+							Version: 2,
+							SSRC:    util.RandUint32(),
+						}
+						header.Extension = true
+						header.ExtensionProfile = 0x1000
+						assert.NoError(t, header.SetExtension(midID, []byte("0")))
+						assert.NoError(t, header.SetExtension(ridID, []byte(ridSelected)))
+
+						_, err = senderTrack.bindings[0].writeStream.WriteRTP(header, []byte{0, 1, 2, 3, 4, 5})
+						assert.NoError(t, err)
+					}
+
+					senderTrack.mu.Unlock()
+				}
+			}
+		}()
+
+		<-seenOneStream.Done()
+
+		assert.Equal(t, true, onTrackCalled.Load())
 
 		closePairNow(t, offerer, answerer)
 		close(testFinished)
