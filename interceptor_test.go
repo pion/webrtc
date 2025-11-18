@@ -488,7 +488,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 
 	<-pc1Connected
 
-	var gotNack bool
+	var gotNack atomic.Bool
 	rtcpDone := make(chan struct{})
 	go func() {
 		defer close(rtcpDone)
@@ -512,7 +512,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 						pn.Nacks[0].LostPackets,
 						rtcp.PacketBitmap(0),
 					)
-					gotNack = true
+					gotNack.Store(true)
 				}
 			}
 		}
@@ -556,8 +556,8 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	if requestNack {
-		assert.True(t, gotNack, "Expected to get a NACK, got none")
+		assert.True(t, gotNack.Load(), "Expected to get a NACK, got none")
 	} else {
-		assert.False(t, gotNack, "Expected to get no NACK, got one")
+		assert.False(t, gotNack.Load(), "Expected to get no NACK, got one")
 	}
 }
