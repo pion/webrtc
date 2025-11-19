@@ -9,9 +9,11 @@ package webrtc
 //
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,6 +23,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
@@ -560,4 +563,191 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	} else {
 		assert.False(t, gotNack.Load(), "Expected to get no NACK, got one")
 	}
+}
+
+// Verifies correct NACK/RTX behavior and reproduces the scenario from
+// Pion Issue #3063. The second RTP packet is intentionally dropped; the test
+// expects exactly one NACK and one RTX for this lost packet. After both events
+// occur, a short grace period ensures no duplicate NACK/RTX messages appear.
+// Any additional NACK or RTX triggers a test failure.
+func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
+	t.Skip()
+	defer test.TimeOut(time.Second * 10).Stop()
+
+	type RTXTestState struct {
+		sync.Mutex
+
+		lostSeq   uint16
+		nackCount int
+		rtxCount  int
+
+		inGrace    bool
+		isClosed   bool
+		graceTimer chan struct{}
+		done       chan struct{}
+
+		errorMessage string
+	}
+
+	state := &RTXTestState{
+		done:       make(chan struct{}, 1),
+		graceTimer: make(chan struct{}, 1),
+	}
+
+	pcOffer, pcAnswer, wan := createVNetPair(t, nil)
+
+	mediaPacketCount := 0
+
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		h := &rtp.Header{}
+		if _, err := h.Unmarshal(c.UserData()); err != nil {
+			return true
+		}
+
+		if h.PayloadType == 96 {
+			state.Lock()
+			mediaPacketCount++
+			state.Unlock()
+
+			if mediaPacketCount == 2 {
+				state.Lock()
+				state.lostSeq = h.SequenceNumber
+				state.Unlock()
+
+				return false
+			}
+		}
+
+		return true
+	})
+
+	track, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := pcOffer.AddTrack(track)
+	assert.NoError(t, err)
+
+	startGracePeriod := func() {
+		if state.inGrace {
+			return
+		}
+
+		state.inGrace = true
+
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			close(state.graceTimer)
+		}()
+	}
+
+	triggerFailure := func(msg string) {
+		if state.isClosed {
+			return
+		}
+		state.errorMessage = msg
+		state.isClosed = true
+		close(state.done)
+	}
+
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			n, _, rtcpErr := rtpSender.Read(rtcpBuf)
+			if rtcpErr != nil {
+				return
+			}
+
+			ps, err2 := rtcp.Unmarshal(rtcpBuf[:n])
+			assert.NoError(t, err2)
+
+			for _, p := range ps {
+				pn, ok := p.(*rtcp.TransportLayerNack)
+				if !ok {
+					continue
+				}
+
+				packetID := pn.Nacks[0].PacketID
+
+				state.Lock()
+				if packetID == state.lostSeq {
+					state.nackCount++
+
+					if state.nackCount == 1 && state.rtxCount == 1 && !state.inGrace {
+						startGracePeriod()
+					}
+
+					if state.nackCount > 1 && state.inGrace {
+						triggerFailure(
+							fmt.Sprintf("received multiple NACKs for lost packet (seq=%d)", state.lostSeq))
+						state.Unlock()
+
+						return
+					}
+				}
+				state.Unlock()
+			}
+		}
+	}()
+
+	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		for {
+			pkt, _, readRTPErr := track.ReadRTP()
+			if errors.Is(readRTPErr, io.EOF) {
+				return
+			} else if pkt.PayloadType == 0 {
+				continue
+			}
+
+			state.Lock()
+			if pkt.SequenceNumber == state.lostSeq {
+				state.rtxCount++
+
+				if state.nackCount == 1 && state.rtxCount == 1 && !state.inGrace {
+					startGracePeriod()
+				}
+
+				if state.rtxCount > 1 && state.inGrace {
+					triggerFailure(fmt.Sprintf(
+						"received multiple RTX retransmissions for lost packet (seq=%d)", state.lostSeq))
+					state.Unlock()
+
+					return
+				}
+			}
+			state.Unlock()
+		}
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	func() {
+		for {
+			select {
+			case <-time.After(20 * time.Millisecond):
+				writeErr := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second})
+				assert.NoError(t, writeErr)
+
+			case <-state.done:
+				state.Lock()
+				msg := state.errorMessage
+				state.Unlock()
+
+				assert.FailNow(t, msg)
+
+				return
+			case <-state.graceTimer:
+
+				return
+			}
+		}
+	}()
+
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, pcOffer, pcAnswer)
+
+	state.Lock()
+	assert.Equal(t, 1, state.nackCount)
+	assert.Equal(t, 1, state.rtxCount)
+	state.Unlock()
 }
