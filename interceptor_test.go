@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -574,11 +575,14 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 	defer test.TimeOut(time.Second * 10).Stop()
 
 	type RTXTestState struct {
+		sync.Mutex
+
 		lostSeq   uint16
 		nackCount int
 		rtxCount  int
 
 		inGrace    bool
+		isClosed   bool
 		graceTimer chan struct{}
 		done       chan struct{}
 
@@ -601,10 +605,14 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 		}
 
 		if h.PayloadType == 96 {
+			state.Lock()
 			mediaPacketCount++
+			state.Unlock()
 
 			if mediaPacketCount == 2 {
+				state.Lock()
 				state.lostSeq = h.SequenceNumber
+				state.Unlock()
 
 				return false
 			}
@@ -633,6 +641,15 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 		}()
 	}
 
+	triggerFailure := func(msg string) {
+		if state.isClosed {
+			return
+		}
+		state.errorMessage = msg
+		state.isClosed = true
+		close(state.done)
+	}
+
 	go func() {
 		rtcpBuf := make([]byte, 1500)
 		for {
@@ -652,6 +669,7 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 
 				packetID := pn.Nacks[0].PacketID
 
+				state.Lock()
 				if packetID == state.lostSeq {
 					state.nackCount++
 
@@ -660,13 +678,14 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 					}
 
 					if state.nackCount > 1 && state.inGrace {
-						state.errorMessage = fmt.Sprintf(
-							"received multiple NACKs for lost packet (seq=%d)", state.lostSeq)
-						close(state.done)
+						triggerFailure(
+							fmt.Sprintf("received multiple NACKs for lost packet (seq=%d)", state.lostSeq))
+						state.Unlock()
 
 						return
 					}
 				}
+				state.Unlock()
 			}
 		}
 	}()
@@ -680,6 +699,7 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 				continue
 			}
 
+			state.Lock()
 			if pkt.SequenceNumber == state.lostSeq {
 				state.rtxCount++
 
@@ -688,13 +708,14 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 				}
 
 				if state.rtxCount > 1 && state.inGrace {
-					state.errorMessage = fmt.Sprintf(
-						"received multiple RTX retransmissions for lost packet (seq=%d)", state.lostSeq)
-					close(state.done)
+					triggerFailure(fmt.Sprintf(
+						"received multiple RTX retransmissions for lost packet (seq=%d)", state.lostSeq))
+					state.Unlock()
 
 					return
 				}
 			}
+			state.Unlock()
 		}
 	})
 
@@ -708,7 +729,11 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 				assert.NoError(t, writeErr)
 
 			case <-state.done:
-				assert.FailNow(t, state.errorMessage)
+				state.Lock()
+				msg := state.errorMessage
+				state.Unlock()
+
+				assert.FailNow(t, msg)
 
 				return
 			case <-state.graceTimer:
@@ -721,6 +746,8 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, pcOffer, pcAnswer)
 
+	state.Lock()
 	assert.Equal(t, 1, state.nackCount)
 	assert.Equal(t, 1, state.rtxCount)
+	state.Unlock()
 }
