@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// An invalid fingerprint MUST cause PeerConnectionState to go to PeerConnectionStateFailed.
+// An invalid fingerprint MUST cause DTLSTransport to go to failed state.
 func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
-	lim := test.TimeOut(time.Second * 5)
+	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
@@ -35,6 +35,31 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 
 	defer closePairNow(t, pcOffer, pcAnswer)
 
+	// Set up DTLS state tracking BEFORE starting the connection process
+	// to avoid missing the state transition
+	offerDTLSFailed := make(chan struct{})
+	answerDTLSFailed := make(chan struct{})
+	pcOffer.SCTP().Transport().OnStateChange(func(state DTLSTransportState) {
+		if state == DTLSTransportStateFailed {
+			select {
+			case <-offerDTLSFailed:
+				// Already closed
+			default:
+				close(offerDTLSFailed)
+			}
+		}
+	})
+	pcAnswer.SCTP().Transport().OnStateChange(func(state DTLSTransportState) {
+		if state == DTLSTransportStateFailed {
+			select {
+			case <-answerDTLSFailed:
+				// Already closed
+			default:
+				close(answerDTLSFailed)
+			}
+		}
+	})
+
 	offerChan := make(chan SessionDescription)
 	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
 		if candidate == nil {
@@ -42,6 +67,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		}
 	})
 
+	// Also wait for PeerConnection to close (may take longer due to cleanup)
 	offerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcOffer)
 	answerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcAnswer)
 
@@ -77,6 +103,23 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		assert.Fail(t, "timed out waiting to receive offer")
 	}
 
+	// Wait for DTLS to fail (should happen quickly after ICE connects, ~1-2 seconds normally,
+	// but may take longer with race detector due to ICE connectivity checks)
+	select {
+	case <-offerDTLSFailed:
+		// Expected - offer DTLS failed due to invalid fingerprint
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for offer DTLS to fail")
+	}
+
+	select {
+	case <-answerDTLSFailed:
+		// Expected - answer DTLS failed due to invalid fingerprint
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for answer DTLS to fail")
+	}
+
+	// Wait for PeerConnection to close (may take longer due to cleanup)
 	offerConnectionHasClosed.Wait()
 	answerConnectionHasClosed.Wait()
 
