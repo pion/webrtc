@@ -340,6 +340,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 			ClientAuth:         dtls.RequireAnyClientCert,
 			LoggerFactory:      t.api.settingEngine.LoggerFactory,
 			InsecureSkipVerify: !t.api.settingEngine.dtls.disableInsecureSkipVerify,
+			CipherSuites:       t.api.settingEngine.dtls.cipherSuites,
 			CustomCipherSuites: t.api.settingEngine.dtls.customCipherSuites,
 		}, nil
 	}

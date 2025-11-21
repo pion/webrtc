@@ -74,6 +74,7 @@ type SettingEngine struct {
 		clientCAs                     *x509.CertPool
 		rootCAs                       *x509.CertPool
 		keyLogWriter                  io.Writer
+		cipherSuites                  []dtls.CipherSuiteID
 		customCipherSuites            func() []dtls.CipherSuite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
@@ -497,8 +498,15 @@ func (e *SettingEngine) SetSCTPMaxMessageSize(maxMessageSize uint32) {
 	e.sctp.maxMessageSize = maxMessageSize
 }
 
-// SetDTLSCustomerCipherSuites allows the user to specify a list of DTLS CipherSuites.
-// This allow usage of Ciphers that are reserved for private usage.
+// SetDTLSCipherSuites allows the user to specify a list of DTLS CipherSuites.
+// This allow to control which ciphers implemented by pion/dtls are used during the DTLS handshake.
+// It can be used for DTLS connection hardening.
+func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtls.CipherSuiteID) {
+	e.dtls.cipherSuites = cipherSuites
+}
+
+// SetDTLSCustomerCipherSuites allows the user to specify a list of custom DTLS CipherSuites.
+// It allows to use custom/private DTLS CipherSuites in addition to the ones implemented by pion/dtls.
 func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
 	e.dtls.customCipherSuites = customCipherSuites
 }
