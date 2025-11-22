@@ -2381,6 +2381,7 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 				return false // Drop this packet
 			}
 		}
+
 		return true
 	})
 
@@ -2447,12 +2448,14 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 					return
 				}
 				if !assert.Equal(t, uint32(rtxSsrc), rtxSSRC, "Unexpected RTX SSRC") {
+
 					return
 				}
 
 				// RTX detected successfully
 				if rtxDetected.CompareAndSwap(false, true) {
 					rtxReadCancel()
+
 					return
 				}
 			}
@@ -2474,9 +2477,11 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 				writeErr := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second})
 				assert.NoError(t, writeErr)
 			case <-rtxRead.Done():
+
 				return
 			case <-rtxTimeout.C:
-				t.Fatal("RTX packet not detected within timeout - NACK/RTX mechanism may not be working")
+				assert.Fail(t, "RTX packet not detected within timeout - NACK/RTX mechanism may not be working")
+
 				return
 			}
 		}
