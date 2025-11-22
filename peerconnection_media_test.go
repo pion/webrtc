@@ -2448,7 +2448,6 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 					return
 				}
 				if !assert.Equal(t, uint32(rtxSsrc), rtxSSRC, "Unexpected RTX SSRC") {
-
 					return
 				}
 
