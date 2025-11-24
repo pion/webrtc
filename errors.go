@@ -175,6 +175,9 @@ var (
 	// and the requested SSRC was ignored.
 	ErrSimulcastProbeOverflow = errors.New("simulcast probe limit has been reached, new SSRC has been discarded")
 
+	// ErrSDPUnmarshalling indicates that the SDP could not be unmarshalled.
+	ErrSDPUnmarshalling = errors.New("failed to unmarshal SDP")
+
 	errDetachNotEnabled                 = errors.New("enable detaching by calling webrtc.DetachDataChannels()")
 	errDetachBeforeOpened               = errors.New("datachannel not opened yet, try calling Detach from OnOpen")
 	errDtlsTransportNotStarted          = errors.New("the DTLS transport has not started yet")

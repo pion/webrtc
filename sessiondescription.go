@@ -4,6 +4,8 @@
 package webrtc
 
 import (
+	"fmt"
+
 	"github.com/pion/sdp/v3"
 )
 
@@ -20,6 +22,9 @@ type SessionDescription struct {
 func (sd *SessionDescription) Unmarshal() (*sdp.SessionDescription, error) {
 	sd.parsed = &sdp.SessionDescription{}
 	err := sd.parsed.UnmarshalString(sd.SDP)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSDPUnmarshalling, err)
+	}
 
-	return sd.parsed, err
+	return sd.parsed, nil
 }

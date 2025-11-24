@@ -85,3 +85,13 @@ func TestSessionDescription_Unmarshal(t *testing.T) {
 	// check if the two parsed results _really_ match, could be affected by internal caching
 	assert.True(t, reflect.DeepEqual(parsed1, parsed2))
 }
+
+func TestSessionDescription_UnmarshalError(t *testing.T) {
+	desc := SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  "invalid sdp",
+	}
+	assert.Nil(t, desc.parsed)
+	_, err := desc.Unmarshal()
+	assert.ErrorIs(t, err, ErrSDPUnmarshalling)
+}
