@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/pion/datachannel v1.5.10
 	github.com/pion/dtls/v3 v3.0.7
-	github.com/pion/ice/v4 v4.0.10
+	github.com/pion/ice/v4 v4.0.11
 	github.com/pion/interceptor v0.1.42
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
@@ -27,7 +27,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
-	github.com/pion/mdns/v2 v2.0.7 // indirect
+	github.com/pion/mdns/v2 v2.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
