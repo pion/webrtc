@@ -8,12 +8,18 @@ package webrtc
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtp"
 )
+
+type peekedPacket struct {
+	payload    []byte
+	attributes interceptor.Attributes
+}
 
 // TrackRemote represents a single inbound source of media.
 type TrackRemote struct {
@@ -30,9 +36,9 @@ type TrackRemote struct {
 	params      RTPParameters
 	rid         string
 
-	receiver         *RTPReceiver
-	peeked           []byte
-	peekedAttributes interceptor.Attributes
+	receiver *RTPReceiver
+
+	peekedPackets []*peekedPacket
 
 	audioPlayoutStatsProviders []AudioPlayoutStatsProvider
 }
@@ -116,25 +122,22 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, err error) {
 	t.mu.RLock()
 	receiver := t.receiver
-	peeked := t.peeked != nil
+	var peekedPkt *peekedPacket
+	if len(t.peekedPackets) != 0 {
+		peekedPkt = t.peekedPackets[0]
+		t.peekedPackets = t.peekedPackets[1:]
+	}
 	t.mu.RUnlock()
 
-	if peeked {
-		t.mu.Lock()
-		data := t.peeked
-		attributes = t.peekedAttributes
+	if receiver.haveClosed() {
+		return 0, nil, io.EOF
+	}
 
-		t.peeked = nil
-		t.peekedAttributes = nil
-		t.mu.Unlock()
-		// someone else may have stolen our packet when we
-		// released the lock.  Deal with it.
-		if data != nil {
-			n = copy(b, data)
-			err = t.checkAndUpdateTrack(b)
+	if peekedPkt != nil {
+		n = copy(b, peekedPkt.payload)
+		err = t.checkAndUpdateTrack(b)
 
-			return n, attributes, err
-		}
+		return n, peekedPkt.attributes, err
 	}
 
 	// If there's a separate RTX track and an RTX packet is available, return that
@@ -142,17 +145,15 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		n = copy(b, rtxPacketReceived.pkt)
 		attributes = rtxPacketReceived.attributes
 		rtxPacketReceived.release()
-		err = nil
-	} else {
-		// If there's no separate RTX track (or there's a separate RTX track but no RTX packet waiting), wait for and return
-		// a packet from the main track
-		n, attributes, err = receiver.readRTP(b, t)
-		if err != nil {
-			return n, attributes, err
-		}
 
-		err = t.checkAndUpdateTrack(b)
+		return n, attributes, nil
 	}
+
+	n, attributes, err = receiver.readRTP(b, t)
+	if err != nil {
+		return n, attributes, err
+	}
+	err = t.checkAndUpdateTrack(b)
 
 	return n, attributes, err
 }
@@ -212,8 +213,7 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 	// that case.
 	data := make([]byte, n)
 	n = copy(data, b[:n])
-	t.peeked = data
-	t.peekedAttributes = a
+	t.peekedPackets = append(t.peekedPackets, &peekedPacket{payload: data, attributes: a})
 	t.mu.Unlock()
 
 	return

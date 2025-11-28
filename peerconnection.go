@@ -12,7 +12,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -1688,7 +1687,7 @@ func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
 	}
 }
 
-func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop,lll
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -1725,7 +1724,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 	// We read the RTP packet to determine the payload type
 	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 
-	i, err := rtpStream.Read(b)
+	i, err := rtpStream.Peek(b)
 	if err != nil {
 		return err
 	}
@@ -1802,6 +1801,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 		return err
 	}
 
+	peekedPackets := []*peekedPacket{}
+
 	// if the first packet didn't contain simuilcast IDs, then probe more packets
 	var paddingOnly bool
 	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
@@ -1811,10 +1812,15 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				readCount--
 			}
 
-			i, _, err := interceptor.Read(b, nil)
+			i, attributes, err := interceptor.Read(b, nil)
 			if err != nil {
 				return err
 			}
+
+			peekedPackets = append(peekedPackets, &peekedPacket{
+				payload:    slices.Clone(b[:i]),
+				attributes: attributes,
+			})
 
 			if paddingOnly, err = handleUnknownRTPPacket(
 				b[:i], uint8(midExtensionID), //nolint:gosec // G115
@@ -1851,6 +1857,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) err
 				interceptor,
 				rtcpReadStream,
 				rtcpInterceptor,
+				peekedPackets,
 			)
 			if err != nil {
 				return err
@@ -1930,7 +1937,7 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() { //nolint:cyclop
 			continue
 		}
 
-		go func(rtpStream io.Reader, ssrc SSRC) {
+		go func(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) {
 			if err := pc.handleIncomingSSRC(rtpStream, ssrc); err != nil {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
 			}
