@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/interceptor"
@@ -64,8 +65,9 @@ type RTPReceiver struct {
 
 	tracks []trackStreams
 
-	closed, received chan any
-	mu               sync.RWMutex
+	closed               atomic.Bool
+	closedChan, received chan any
+	mu                   sync.RWMutex
 
 	tr *RTPTransceiver
 
@@ -84,12 +86,12 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 	}
 
 	rtpReceiver := &RTPReceiver{
-		kind:      kind,
-		transport: transport,
-		api:       api,
-		closed:    make(chan any),
-		received:  make(chan any),
-		tracks:    []trackStreams{},
+		kind:       kind,
+		transport:  transport,
+		api:        api,
+		closedChan: make(chan any),
+		received:   make(chan any),
+		tracks:     []trackStreams{},
 		rtxPool: sync.Pool{New: func() any {
 			return make([]byte, api.settingEngine.getReceiveMTU())
 		}},
@@ -290,7 +292,7 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 		}
 
 		return r.tracks[0].rtcpInterceptor.Read(b, a)
-	case <-r.closed:
+	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
 }
@@ -315,7 +317,7 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.
 
 		return rtcpInterceptor.Read(b, a)
 
-	case <-r.closed:
+	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
 }
@@ -359,6 +361,10 @@ func (r *RTPReceiver) haveReceived() bool {
 	}
 }
 
+func (r *RTPReceiver) haveClosed() bool {
+	return r.closed.Load()
+}
+
 // Stop irreversibly stops the RTPReceiver.
 func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	r.mu.Lock()
@@ -366,7 +372,7 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	var err error
 
 	select {
-	case <-r.closed:
+	case <-r.closedChan:
 		return err
 	default:
 	}
@@ -405,7 +411,8 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	default:
 	}
 
-	close(r.closed)
+	close(r.closedChan)
+	r.closed.Store(true)
 
 	return err
 }
@@ -519,7 +526,7 @@ func (r *RTPReceiver) streamsForTrack(t *TrackRemote) *trackStreams {
 func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-	case <-r.closed:
+	case <-r.closedChan:
 		return 0, nil, io.EOF
 	}
 
@@ -540,6 +547,7 @@ func (r *RTPReceiver) receiveForRid(
 	rtpInterceptor interceptor.RTPReader,
 	rtcpReadStream *srtp.ReadStreamSRTCP,
 	rtcpInterceptor interceptor.RTCPReader,
+	peekedPackets []*peekedPacket,
 ) (*TrackRemote, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -551,6 +559,7 @@ func (r *RTPReceiver) receiveForRid(
 			r.tracks[i].track.codec = params.Codecs[0]
 			r.tracks[i].track.params = params
 			r.tracks[i].track.ssrc = SSRC(streamInfo.SSRC)
+			r.tracks[i].track.peekedPackets = peekedPackets
 			r.tracks[i].track.mu.Unlock()
 
 			r.tracks[i].streamInfo = streamInfo
@@ -651,7 +660,7 @@ func (r *RTPReceiver) receiveForRtx(
 			copy(b[headerLength:i-2], b[headerLength+2:i])
 
 			select {
-			case <-r.closed:
+			case <-r.closedChan:
 				r.rtxPool.Put(b) // nolint:staticcheck
 
 				return

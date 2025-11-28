@@ -215,7 +215,7 @@ func (p *defaultAudioPlayoutStatsProvider) AddTrack(track *TrackRemote) error {
 		}
 
 		select {
-		case <-receiver.closed:
+		case <-receiver.closedChan:
 			p.removeTrackInternal(track)
 		case <-ctx.Done():
 			return

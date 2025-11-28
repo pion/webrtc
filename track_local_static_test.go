@@ -827,8 +827,7 @@ func Test_TrackRemote_ReadRTP_UnmarshalError(t *testing.T) {
 	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", recv)
 
 	tr.mu.Lock()
-	tr.peeked = []byte{0x80, 96}
-	tr.peekedAttributes = nil
+	tr.peekedPackets = []*peekedPacket{{payload: []byte{0x80, 96}}}
 	tr.mu.Unlock()
 
 	pkt, attrs, err := tr.ReadRTP()

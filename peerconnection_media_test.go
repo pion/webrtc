@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -2062,14 +2063,13 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 	assert.NotZero(t, ridID)
 	assert.NotZero(t, rsid)
 
-	err = signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
+	assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
 		// Original chrome sdp contains no ssrc info https://pastebin.com/raw/JTjX6zg6
 		re := regexp.MustCompile("(?m)[\r\n]+^.*a=ssrc.*$")
 		res := re.ReplaceAllString(sdp, "")
 
 		return res
-	})
-	assert.NoError(t, err)
+	}))
 
 	// padding only packets should not affect simulcast probe
 	var sequenceNumber uint16
@@ -2492,4 +2492,105 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 	// Close peer connections before stopping the network
 	closePairNow(t, pcOffer, pcAnswer)
 	assert.NoError(t, wan.Stop())
+}
+
+// Assert that we don't drop any packets during the probe.
+func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const rtpPktCount = 10
+	pcOffer, pcAnswer, wan := createVNetPair(t, nil)
+
+	rids := []string{"a", "b", "c"}
+	vp8WriterA, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[0]),
+	)
+	assert.NoError(t, err)
+
+	vp8WriterB, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[1]),
+	)
+	assert.NoError(t, err)
+
+	vp8WriterC, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[2]),
+	)
+	assert.NoError(t, err)
+
+	sender, err := pcOffer.AddTrack(vp8WriterA)
+	assert.NoError(t, err)
+	assert.NotNil(t, sender)
+
+	assert.NoError(t, sender.AddEncoding(vp8WriterB))
+	assert.NoError(t, sender.AddEncoding(vp8WriterC))
+
+	expectedBuffer := make([]byte, outboundMTU*rtpPktCount)
+	_, err = rand.Read(expectedBuffer)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+		actualBuffer := []byte{}
+
+		for i := 0; i < rtpPktCount; i++ {
+			pkt, _, err := trackRemote.ReadRTP()
+			assert.NoError(t, err)
+
+			actualBuffer = append(actualBuffer, pkt.Payload...)
+		}
+
+		assert.Equal(t, actualBuffer, expectedBuffer)
+		cancel()
+	})
+
+	var midID, ridID uint8
+	for _, extension := range sender.GetParameters().HeaderExtensions {
+		switch extension.URI {
+		case sdp.SDESMidURI:
+			midID = uint8(extension.ID) //nolint:gosec // G115
+		case sdp.SDESRTPStreamIDURI:
+			ridID = uint8(extension.ID) //nolint:gosec // G115
+		}
+	}
+	assert.NotZero(t, midID)
+	assert.NotZero(t, ridID)
+
+	assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
+		// Original chrome sdp contains no ssrc info https://pastebin.com/raw/JTjX6zg6
+		re := regexp.MustCompile("(?m)[\r\n]+^.*a=ssrc.*$")
+		res := re.ReplaceAllString(sdp, "")
+
+		return res
+	}))
+
+	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+	peerConnectionConnected.Wait()
+
+	for sequenceNumber := uint16(0); sequenceNumber < rtpPktCount; sequenceNumber++ {
+		pkt := &rtp.Packet{
+			Header: rtp.Header{
+				Version:        2,
+				PayloadType:    96,
+				SequenceNumber: sequenceNumber,
+			},
+		}
+
+		// Make sure that packets for Stream received before MID/RID don't get dropped
+		if sequenceNumber > 3 {
+			assert.NoError(t, pkt.SetExtension(midID, []byte("0")))
+			assert.NoError(t, pkt.SetExtension(ridID, []byte(vp8WriterA.RID())))
+		}
+
+		offset := int(sequenceNumber) * outboundMTU
+		pkt.Payload = expectedBuffer[offset : offset+outboundMTU]
+		assert.NoError(t, vp8WriterA.WriteRTP(pkt))
+	}
+
+	<-ctx.Done()
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, pcOffer, pcAnswer)
 }
