@@ -724,7 +724,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			return SessionDescription{}, err
 		}
 
-		if options.ICETricklingSupported {
+		if options != nil && options.ICETricklingSupported {
 			descr.WithICETrickleAdvertised()
 		}
 
@@ -886,7 +886,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, err
 	}
 
-	if options.ICETricklingSupported {
+	if options != nil && options.ICETricklingSupported {
 		descr.WithICETrickleAdvertised()
 	}
 
