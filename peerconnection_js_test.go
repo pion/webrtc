@@ -104,3 +104,20 @@ func TestValueToICEServer(t *testing.T) {
 		assert.Equal(t, testCase, s)
 	}
 }
+
+func TestPeerConnectionCanTrickleICECandidatesJS(t *testing.T) {
+	pc := &PeerConnection{
+		underlying: js.ValueOf(map[string]any{
+			"canTrickleIceCandidates": true,
+		}),
+	}
+	assert.Equal(t, ICETrickleCapabilitySupported, pc.CanTrickleICECandidates())
+
+	pc.underlying = js.ValueOf(map[string]any{
+		"canTrickleIceCandidates": false,
+	})
+	assert.Equal(t, ICETrickleCapabilityUnsupported, pc.CanTrickleICECandidates())
+
+	pc.underlying = js.ValueOf(map[string]any{})
+	assert.Equal(t, ICETrickleCapabilityUnknown, pc.CanTrickleICECandidates())
+}

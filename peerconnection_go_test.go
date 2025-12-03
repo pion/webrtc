@@ -2203,3 +2203,40 @@ func TestAddICECandidate__DroppingOldGenerationCandidates(t *testing.T) {
 
 	closePairNow(t, pc, remotePC)
 }
+
+func TestPeerConnectionCanTrickleICECandidatesGo(t *testing.T) {
+	offerPC, answerPC, wan := createVNetPair(t, nil)
+	var err error
+	defer func() {
+		assert.NoError(t, wan.Stop())
+		closePairNow(t, offerPC, answerPC)
+	}()
+
+	_, err = offerPC.CreateDataChannel("trickle", nil)
+	assert.NoError(t, err)
+
+	offer, err := offerPC.CreateOffer(&OfferOptions{
+		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	assert.Equal(t, ICETrickleCapabilityUnknown, answerPC.CanTrickleICECandidates())
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+	assert.Equal(t, ICETrickleCapabilitySupported, answerPC.CanTrickleICECandidates())
+
+	noTrickleOfferPC, noTrickleAnswerPC, noTrickleWAN := createVNetPair(t, nil)
+	defer func() {
+		assert.NoError(t, noTrickleWAN.Stop())
+		closePairNow(t, noTrickleOfferPC, noTrickleAnswerPC)
+	}()
+
+	_, err = noTrickleOfferPC.CreateDataChannel("notrickle", nil)
+	assert.NoError(t, err)
+
+	noTrickleOffer, err := noTrickleOfferPC.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, noTrickleOfferPC.SetLocalDescription(noTrickleOffer))
+	assert.Equal(t, ICETrickleCapabilityUnknown, noTrickleAnswerPC.CanTrickleICECandidates())
+	assert.NoError(t, noTrickleAnswerPC.SetRemoteDescription(noTrickleOffer))
+	assert.Equal(t, ICETrickleCapabilityUnsupported, noTrickleAnswerPC.CanTrickleICECandidates())
+}

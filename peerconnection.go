@@ -65,6 +65,8 @@ type PeerConnection struct {
 
 	lastOffer  string
 	lastAnswer string
+	// Whether the remote endpoint can accept trickled ICE candidates.
+	canTrickleICECandidates ICETrickleCapability
 
 	// a value containing the last known greater mid value
 	// we internally generate mids as numbers. Needed since JSEP
@@ -1104,6 +1106,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if _, err := desc.Unmarshal(); err != nil {
 		return err
 	}
+
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
 		return err
 	}
@@ -1111,6 +1114,20 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if err := pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
 		return err
 	}
+
+	canTrickle := hasICETrickleOption(desc.parsed)
+	pc.mu.Lock()
+	switch desc.Type {
+	case SDPTypeOffer, SDPTypeAnswer, SDPTypePranswer:
+		if canTrickle {
+			pc.canTrickleICECandidates = ICETrickleCapabilitySupported
+		} else {
+			pc.canTrickleICECandidates = ICETrickleCapabilityUnsupported
+		}
+	default:
+		pc.canTrickleICECandidates = ICETrickleCapabilityUnknown
+	}
+	pc.mu.Unlock()
 
 	// Disable RTX/FEC on RTPSenders if the remote didn't support it
 	for _, sender := range pc.GetSenders() {
@@ -2581,6 +2598,15 @@ func (pc *PeerConnection) PendingRemoteDescription() *SessionDescription {
 	defer pc.mu.RUnlock()
 
 	return pc.pendingRemoteDescription
+}
+
+// CanTrickleICECandidates reports whether the remote endpoint indicated
+// support for receiving trickled ICE candidates.
+func (pc *PeerConnection) CanTrickleICECandidates() ICETrickleCapability {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	return pc.canTrickleICECandidates
 }
 
 // SignalingState attribute returns the signaling state of the

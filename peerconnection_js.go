@@ -463,6 +463,21 @@ func (pc *PeerConnection) PendingRemoteDescription() *SessionDescription {
 	return valueToSessionDescription(desc)
 }
 
+// CanTrickleICECandidates reports whether the remote endpoint indicated
+// support for receiving trickled ICE candidates.
+func (pc *PeerConnection) CanTrickleICECandidates() ICETrickleCapability {
+	val := pc.underlying.Get("canTrickleIceCandidates")
+	if val.IsNull() || val.IsUndefined() {
+		return ICETrickleCapabilityUnknown
+	}
+
+	if val.Bool() {
+		return ICETrickleCapabilitySupported
+	}
+
+	return ICETrickleCapabilityUnsupported
+}
+
 // SignalingState returns the signaling state of the PeerConnection instance.
 func (pc *PeerConnection) SignalingState() SignalingState {
 	rawState := pc.underlying.Get("signalingState").String()
@@ -714,6 +729,7 @@ func valueToSessionDescription(descValue js.Value) *SessionDescription {
 	if descValue.IsNull() || descValue.IsUndefined() {
 		return nil
 	}
+
 	return &SessionDescription{
 		Type: NewSDPType(descValue.Get("type").String()),
 		SDP:  descValue.Get("sdp").String(),

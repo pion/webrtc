@@ -806,3 +806,18 @@ func TestPeerConnection_SessionID(t *testing.T) {
 	}
 	closePairNow(t, pcOffer, pcAnswer)
 }
+
+func TestICETrickleCapabilityString(t *testing.T) {
+	tests := []struct {
+		value    ICETrickleCapability
+		expected string
+	}{
+		{ICETrickleCapabilityUnknown, "unknown"},
+		{ICETrickleCapabilitySupported, "supported"},
+		{ICETrickleCapabilityUnsupported, "unsupported"},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, tt.value.String())
+	}
+}
