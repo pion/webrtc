@@ -1787,6 +1787,58 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 	closePairNow(t, offerPC, answerPC)
 }
 
+func TestICETricklingSupported(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(&OfferOptions{
+		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, offer.SDP, "a=ice-options:trickle")
+	assert.NoError(t, pc.Close())
+
+	pcAnswer, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	offerSDP := strings.Join([]string{
+		"v=0",
+		"o=- 0 0 IN IP4 127.0.0.1",
+		"s=-",
+		"t=0 0",
+		"a=group:BUNDLE 0",
+		"a=ice-ufrag:someufrag",
+		"a=ice-pwd:somepwd",
+		"a=fingerprint:sha-256 " +
+			"F7:BF:B4:42:5B:44:C0:B9:49:70:6D:26:D7:3E:E6:08:B1:5B:25:2E:32:88:50:B6:3C:BE:4E:18:A7:2C:85:7C",
+		"a=msid-semantic: WMS *",
+		"m=audio 9 UDP/TLS/RTP/SAVPF 111",
+		"c=IN IP4 0.0.0.0",
+		"a=rtcp:9 IN IP4 0.0.0.0",
+		"a=mid:0",
+		"a=rtcp-mux",
+		"a=setup:actpass",
+		"a=rtpmap:111 opus/48000/2",
+		"",
+	}, "\r\n")
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  offerSDP,
+	}))
+
+	answer, err := pcAnswer.CreateAnswer(&AnswerOptions{
+		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, answer.SDP, "a=ice-options:trickle")
+
+	assert.NoError(t, pcAnswer.Close())
+}
+
 // https://github.com/pion/webrtc/issues/2690
 func TestPeerConnectionTrickleMediaStreamIdentification(t *testing.T) {
 	const remoteSdp = `v=0

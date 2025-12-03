@@ -718,6 +718,10 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			return SessionDescription{}, err
 		}
 
+		if options != nil && options.ICETricklingSupported {
+			descr.WithICETrickleAdvertised()
+		}
+
 		updateSDPOrigin(&pc.sdpOrigin, descr)
 		sdpBytes, err := descr.Marshal()
 		if err != nil {
@@ -842,7 +846,7 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 // CreateAnswer starts the PeerConnection and generates the localDescription.
 //
 //nolint:cyclop
-func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, error) {
+func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	remoteDesc := pc.RemoteDescription()
 	switch {
@@ -874,6 +878,10 @@ func (pc *PeerConnection) CreateAnswer(*AnswerOptions) (SessionDescription, erro
 	descr, err := pc.generateMatchedSDP(pc.rtpTransceivers, useIdentity, false /*includeUnmatched */, connectionRole)
 	if err != nil {
 		return SessionDescription{}, err
+	}
+
+	if options != nil && options.ICETricklingSupported {
+		descr.WithICETrickleAdvertised()
 	}
 
 	updateSDPOrigin(&pc.sdpOrigin, descr)
