@@ -718,14 +718,14 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			return SessionDescription{}, err
 		}
 
+		if options != nil && options.ICETricklingSupported {
+			descr.WithICETrickleAdvertised()
+		}
+
 		updateSDPOrigin(&pc.sdpOrigin, descr)
 		sdpBytes, err := descr.Marshal()
 		if err != nil {
 			return SessionDescription{}, err
-		}
-
-		if options != nil && options.ICETricklingSupported {
-			descr.WithICETrickleAdvertised()
 		}
 
 		offer = SessionDescription{
@@ -880,14 +880,14 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		return SessionDescription{}, err
 	}
 
+	if options != nil && options.ICETricklingSupported {
+		descr.WithICETrickleAdvertised()
+	}
+
 	updateSDPOrigin(&pc.sdpOrigin, descr)
 	sdpBytes, err := descr.Marshal()
 	if err != nil {
 		return SessionDescription{}, err
-	}
-
-	if options != nil && options.ICETricklingSupported {
-		descr.WithICETrickleAdvertised()
 	}
 
 	desc := SessionDescription{
