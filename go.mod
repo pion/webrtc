@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/pion/datachannel v1.5.10
 	github.com/pion/dtls/v3 v3.0.7
-	github.com/pion/ice/v4 v4.0.11
+	github.com/pion/ice/v4 v4.0.12
 	github.com/pion/interceptor v0.1.42
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
