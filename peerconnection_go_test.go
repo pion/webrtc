@@ -1812,7 +1812,8 @@ func TestICETricklingSupported(t *testing.T) {
 		"a=group:BUNDLE 0",
 		"a=ice-ufrag:someufrag",
 		"a=ice-pwd:somepwd",
-		"a=fingerprint:sha-256 F7:BF:B4:42:5B:44:C0:B9:49:70:6D:26:D7:3E:E6:08:B1:5B:25:2E:32:88:50:B6:3C:BE:4E:18:A7:2C:85:7C",
+		"a=fingerprint:sha-256 " +
+			"F7:BF:B4:42:5B:44:C0:B9:49:70:6D:26:D7:3E:E6:08:B1:5B:25:2E:32:88:50:B6:3C:BE:4E:18:A7:2C:85:7C",
 		"a=msid-semantic: WMS *",
 		"m=audio 9 UDP/TLS/RTP/SAVPF 111",
 		"c=IN IP4 0.0.0.0",
