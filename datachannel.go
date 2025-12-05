@@ -707,13 +707,23 @@ func (d *DataChannel) OnBufferedAmountLow(f func()) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.onBufferedAmountLow = func() {
-		go f()
-	}
+	onBufferedAmountLow := d.makeBufferedAmountLowHandler(f)
+	d.onBufferedAmountLow = onBufferedAmountLow
+
 	if d.dataChannel != nil {
-		d.dataChannel.OnBufferedAmountLow(func() {
-			go f()
-		})
+		d.dataChannel.OnBufferedAmountLow(onBufferedAmountLow)
+	}
+}
+
+func (d *DataChannel) makeBufferedAmountLowHandler(f func()) func() {
+	return func() {
+		go func() {
+			if d.ReadyState() != DataChannelStateOpen {
+				return
+			}
+
+			f()
+		}()
 	}
 }
 

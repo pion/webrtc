@@ -855,3 +855,49 @@ func TestOnBufferedAmountLowDeadlock(t *testing.T) {
 	<-gotAllMessages.Done()
 	closePairNow(t, offerPC, answerPC)
 }
+
+func TestOnBufferedAmountLowRespectsReadyState(t *testing.T) {
+	t.Run("fires when open", func(t *testing.T) {
+		dc := &DataChannel{}
+		dc.setReadyState(DataChannelStateOpen)
+
+		called := make(chan struct{}, 1)
+		dc.OnBufferedAmountLow(func() {
+			called <- struct{}{}
+		})
+
+		dc.mu.RLock()
+		handler := dc.onBufferedAmountLow
+		dc.mu.RUnlock()
+
+		handler()
+
+		select {
+		case <-called:
+		case <-time.After(time.Second):
+			assert.Fail(t, "expected OnBufferedAmountLow to fire when open")
+		}
+	})
+
+	t.Run("skips when not open", func(t *testing.T) {
+		dc := &DataChannel{}
+		dc.setReadyState(DataChannelStateClosing)
+
+		called := make(chan struct{}, 1)
+		dc.OnBufferedAmountLow(func() {
+			called <- struct{}{}
+		})
+
+		dc.mu.RLock()
+		handler := dc.onBufferedAmountLow
+		dc.mu.RUnlock()
+
+		handler()
+
+		select {
+		case <-called:
+			assert.Fail(t, "expected OnBufferedAmountLow to be ignored when not open")
+		case <-time.After(50 * time.Millisecond):
+		}
+	})
+}
