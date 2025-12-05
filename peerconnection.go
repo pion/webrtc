@@ -713,6 +713,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 				useIdentity,
 				true, /*includeUnmatched */
 				connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+				false,
 			)
 		}
 
@@ -877,7 +878,13 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	descr, err := pc.generateMatchedSDP(pc.rtpTransceivers, useIdentity, false /*includeUnmatched */, connectionRole)
+	descr, err := pc.generateMatchedSDP(
+		pc.rtpTransceivers,
+		useIdentity,
+		false, /*includeUnmatched */
+		connectionRole,
+		pc.api.settingEngine.ignoreRidPauseForRecv,
+	)
 	if err != nil {
 		return SessionDescription{}, err
 	}
@@ -2861,6 +2868,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		pc.ICEGatheringState(),
 		nil,
 		pc.api.settingEngine.getSCTPMaxMessageSize(),
+		false,
 	)
 }
 
@@ -2872,6 +2880,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity, includeUnmatched bool,
 	connectionRole sdp.ConnectionRole,
+	ignoreRidPauseForRecv bool,
 ) (*sdp.SessionDescription, error) {
 	desc, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
@@ -3031,6 +3040,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 		pc.ICEGatheringState(),
 		bundleGroup,
 		pc.api.settingEngine.getSCTPMaxMessageSize(),
+		ignoreRidPauseForRecv,
 	)
 }
 

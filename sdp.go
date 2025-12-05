@@ -542,6 +542,7 @@ func addTransceiverSDP(
 	dtlsRole sdp.ConnectionRole,
 	iceGatheringState ICEGatheringState,
 	mediaSection mediaSection,
+	ignoreRidPauseForRecv bool,
 ) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
@@ -630,7 +631,7 @@ func addTransceiverSDP(
 		for _, rid := range mediaSection.rids {
 			ridID := rid.id
 			media.WithValueAttribute(sdpAttributeRid, ridID+" recv")
-			if rid.paused {
+			if rid.paused && !ignoreRidPauseForRecv {
 				ridID = "~" + ridID
 			}
 			recvRids = append(recvRids, ridID)
@@ -703,6 +704,7 @@ func populateSDP(
 	iceGatheringState ICEGatheringState,
 	matchBundleGroup *string,
 	sctpMaxMessageSize uint32,
+	ignoreRidPauseForRecv bool,
 ) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
@@ -756,6 +758,7 @@ func populateSDP(
 				connectionRole,
 				iceGatheringState,
 				section,
+				ignoreRidPauseForRecv,
 			)
 			if err != nil {
 				return nil, err
