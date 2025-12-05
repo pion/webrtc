@@ -417,10 +417,10 @@ func TestIVFWriter_WithFrameRate(t *testing.T) {
 	}, buffer.Bytes())
 }
 
-func TestIVFWriter_WithTimebase(t *testing.T) {
+func TestIVFWriter_WithDirectPTS(t *testing.T) {
 	buffer := &bytes.Buffer{}
 
-	writer, err := NewWith(buffer, WithTimebase(1, 90000))
+	writer, err := NewWith(buffer, WithFrameRate(1, 90000), WithDirectPTS())
 	assert.NoError(t, err)
 	assert.True(t, writer.directPTS)
 	assert.Equal(t, uint32(1), writer.timebaseNumerator)
@@ -429,10 +429,10 @@ func TestIVFWriter_WithTimebase(t *testing.T) {
 	assert.NoError(t, writer.Close())
 }
 
-func TestIVFWriter_Timebase_VP8(t *testing.T) {
+func TestIVFWriter_DirectPTS_VP8(t *testing.T) {
 	buffer := &bytes.Buffer{}
 
-	writer, err := NewWith(buffer, WithCodec(mimeTypeVP8), WithTimebase(1, 90000))
+	writer, err := NewWith(buffer, WithCodec(mimeTypeVP8), WithFrameRate(1, 90000), WithDirectPTS())
 	assert.NoError(t, err)
 
 	// Write keyframe with timestamp 0.
@@ -498,10 +498,10 @@ func TestIVFWriter_Timebase_VP8(t *testing.T) {
 	assert.Equal(t, uint64(6000), pts2, "Second frame PTS should be 6000")
 }
 
-func TestIVFWriter_Timebase_Precision(t *testing.T) {
+func TestIVFWriter_DirectPTS_Precision(t *testing.T) {
 	buffer := &bytes.Buffer{}
 
-	writer, err := NewWith(buffer, WithCodec(mimeTypeVP8), WithTimebase(1, 90000))
+	writer, err := NewWith(buffer, WithCodec(mimeTypeVP8), WithFrameRate(1, 90000), WithDirectPTS())
 	assert.NoError(t, err)
 
 	// Simulate 15fps video (6000 RTP ticks per frame at 90kHz).
@@ -551,7 +551,7 @@ func TestIVFWriter_Timebase_Precision(t *testing.T) {
 }
 
 func TestIVFWriter_BackwardCompatibility(t *testing.T) {
-	// Test that default behavior (without WithTimebase) remains unchanged.
+	// Test that default behavior (without WithDirectPTS) remains unchanged.
 	buffer := &bytes.Buffer{}
 
 	writer, err := NewWith(buffer, WithCodec(mimeTypeVP8))

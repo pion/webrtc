@@ -382,23 +382,18 @@ func WithFrameRate(numerator, denominator uint32) Option {
 	}
 }
 
-// WithTimebase sets the IVF timebase (numerator/denominator) and enables
-// direct use of RTP timestamps as PTS values.
+// WithDirectPTS enables direct use of RTP timestamps as PTS values
+// without millisecond conversion.
 //
-// The timebase defines the time unit for PTS values in the IVF container.
-// For example, WithTimebase(1, 90000) means each PTS unit represents 1/90000 seconds.
-//
-// When this option is used, RTP timestamps are written directly as PTS values
-// without millisecond conversion, preserving full timestamp precision.
-// This is ideal for accurate timing when converting RTP streams to IVF.
+// When this option is used, RTP timestamps are written directly as PTS values,
+// preserving full timestamp precision. Use WithFrameRate to set the appropriate
+// timebase (e.g., WithFrameRate(1, 90000) for standard 90kHz RTP clock).
 //
 // Example usage for standard RTP video (90kHz clock rate):
 //
-//	WithTimebase(1, 90000)
-func WithTimebase(numerator, denominator uint32) Option {
+//	NewWith(file, WithFrameRate(1, 90000), WithDirectPTS())
+func WithDirectPTS() Option {
 	return func(i *IVFWriter) error {
-		i.timebaseNumerator = numerator
-		i.timebaseDenominator = denominator
 		i.directPTS = true
 
 		return nil
