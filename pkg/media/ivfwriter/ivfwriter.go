@@ -42,6 +42,8 @@ type (
 		videoWidth          uint16
 		videoHeight         uint16
 
+		directPTS bool
+
 		// VP8, VP9
 		currentFrame []byte
 
@@ -149,8 +151,18 @@ func (i *IVFWriter) timestampToPts(timestamp uint64) uint64 {
 func (i *IVFWriter) writeFrame(frame []byte, timestamp uint64) error {
 	frameHeader := make([]byte, 12)
 	//nolint:gosec // G115
-	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame)))          // Frame length
-	binary.LittleEndian.PutUint64(frameHeader[4:], i.timestampToPts(timestamp)) // PTS
+	binary.LittleEndian.PutUint32(frameHeader[0:], uint32(len(frame))) // Frame length
+
+	var pts uint64
+	if i.directPTS {
+		// Direct PTS mode: use timestamp directly as PTS.
+		pts = timestamp
+	} else {
+		// Existing behavior: convert using timebase.
+		pts = i.timestampToPts(timestamp)
+	}
+	binary.LittleEndian.PutUint64(frameHeader[4:], pts) // PTS
+
 	i.count++
 
 	if _, err := i.ioWriter.Write(frameHeader); err != nil {
@@ -172,15 +184,23 @@ func (i *IVFWriter) WriteRTP(packet *rtp.Packet) error {
 	if i.count == 0 {
 		i.firstFrameTimestamp = packet.Timestamp
 	}
-	relativeTstampMs := 1000 * uint64(packet.Timestamp-i.firstFrameTimestamp) / i.clockRate
+
+	var timestamp uint64
+	if i.directPTS {
+		// Direct PTS mode: use RTP timestamp directly (no millisecond conversion).
+		timestamp = uint64(packet.Timestamp - i.firstFrameTimestamp)
+	} else {
+		// Existing behavior: convert to milliseconds first.
+		timestamp = 1000 * uint64(packet.Timestamp-i.firstFrameTimestamp) / i.clockRate
+	}
 
 	switch i.codec {
 	case codecVP8:
-		return i.writeVP8(packet, relativeTstampMs)
+		return i.writeVP8(packet, timestamp)
 	case codecVP9:
-		return i.writeVP9(packet, relativeTstampMs)
+		return i.writeVP9(packet, timestamp)
 	case codecAV1:
-		return i.writeAV1(packet, relativeTstampMs)
+		return i.writeAV1(packet, timestamp)
 	default:
 		return errCodecUnset
 	}
@@ -357,6 +377,24 @@ func WithFrameRate(numerator, denominator uint32) Option {
 	return func(i *IVFWriter) error {
 		i.timebaseNumerator = numerator
 		i.timebaseDenominator = denominator
+
+		return nil
+	}
+}
+
+// WithDirectPTS enables direct use of RTP timestamps as PTS values
+// without millisecond conversion.
+//
+// When this option is used, RTP timestamps are written directly as PTS values,
+// preserving full timestamp precision. Use WithFrameRate to set the appropriate
+// timebase (e.g., WithFrameRate(1, 90000) for standard 90kHz RTP clock).
+//
+// Example usage for standard RTP video (90kHz clock rate):
+//
+//	NewWith(file, WithFrameRate(1, 90000), WithDirectPTS())
+func WithDirectPTS() Option {
+	return func(i *IVFWriter) error {
+		i.directPTS = true
 
 		return nil
 	}
