@@ -301,6 +301,10 @@ func (d *DataChannel) OnBufferedAmountLow(f func()) {
 		defer oldHandler.Release()
 	}
 	onBufferedAmountLow := js.FuncOf(func(this js.Value, args []js.Value) any {
+		if d.ReadyState() != DataChannelStateOpen {
+			return js.Undefined()
+		}
+
 		go f()
 		return js.Undefined()
 	})
