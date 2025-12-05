@@ -651,6 +651,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 				ICEGatheringStateNew,
 				nil,
 				0,
+				false,
 			)
 			assert.NoError(t, err)
 
@@ -665,7 +666,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 	t.Run("Per-Session Description Fingerprints", fingerprintTest(false, 1))
 }
 
-func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
+func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 	t.Run("rid", func(t *testing.T) {
 		se := SettingEngine{}
 
@@ -705,6 +706,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
 		)
 		assert.Nil(t, err)
 
@@ -720,6 +722,68 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 					ridFound++
 				}
 				if rid.id == "ridPaused" && rid.paused {
+					ridFound++
+				}
+			}
+		}
+		assert.Equal(t, 2, ridFound, "All rid keys should be present")
+	})
+	t.Run("rid - ignore paused", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetIgnoreRidPauseForRecv(true)
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		rids := []*simulcastRid{
+			{
+				id:        "ridkey",
+				attrValue: "some",
+			},
+			{
+				id:        "ridPaused",
+				attrValue: "some2",
+				paused:    true,
+			},
+		}
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, rids: rids}}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+		)
+		assert.Nil(t, err)
+
+		// Test contains rid map keys
+		var ridFound int
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media != string(MediaKindVideo) {
+				continue
+			}
+			ridsInSDP := getRids(desc)
+			for _, rid := range ridsInSDP {
+				if rid.id == "ridkey" && !rid.paused {
+					ridFound++
+				}
+				if rid.id == "ridPaused" && !rid.paused {
 					ridFound++
 				}
 			}
@@ -764,6 +828,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -804,6 +869,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -862,6 +928,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.NoError(t, err)
 
@@ -895,6 +962,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -925,6 +993,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -969,6 +1038,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1009,6 +1079,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			&matchedBundle,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1051,6 +1122,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			&matchedBundle,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1084,6 +1156,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 		)
 		assert.Nil(t, err)
 

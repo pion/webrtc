@@ -111,6 +111,7 @@ type SettingEngine struct {
 	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
+	ignoreRidPauseForRecv                     bool
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
@@ -584,4 +585,10 @@ func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
 // processing early media of non-simulcast tracks.
 func (e *SettingEngine) SetHandleUndeclaredSSRCWithoutAnswer(handleUndeclaredSSRCWithoutAnswer bool) {
 	e.handleUndeclaredSSRCWithoutAnswer = handleUndeclaredSSRCWithoutAnswer
+}
+
+// SetIgnoreRidPauseForRecv controls if SDP `a=simulcast:recv` will include the paused attribute of a RID
+// (simulcast layer).
+func (e *SettingEngine) SetIgnoreRidPauseForRecv(ignoreRidPauseForRecv bool) {
+	e.ignoreRidPauseForRecv = ignoreRidPauseForRecv
 }
