@@ -371,6 +371,26 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	dtlsConfig.ClientHelloMessageHook = t.api.settingEngine.dtls.clientHelloMessageHook
 	dtlsConfig.ServerHelloMessageHook = t.api.settingEngine.dtls.serverHelloMessageHook
 	dtlsConfig.CertificateRequestMessageHook = t.api.settingEngine.dtls.certificateRequestMessageHook
+	dtlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _verifiedChains [][]*x509.Certificate) error {
+		if len(rawCerts) == 0 {
+			return errNoRemoteCertificate
+		}
+
+		t.lock.Lock()
+		defer t.lock.Unlock()
+		t.remoteCertificate = rawCerts[0]
+
+		if t.api.settingEngine.disableCertificateFingerprintVerification {
+			return nil
+		}
+
+		parsedRemoteCert, parseErr := x509.ParseCertificate(t.remoteCertificate)
+		if parseErr != nil {
+			return parseErr
+		}
+
+		return t.validateFingerPrint(parsedRemoteCert)
+	}
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
@@ -419,44 +439,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 		t.onStateChange(DTLSTransportStateFailed)
 
 		return ErrNoSRTPProtectionProfile
-	}
-
-	// Check the fingerprint if a certificate was exchanged
-	connectionState, ok := dtlsConn.ConnectionState()
-	if !ok {
-		t.onStateChange(DTLSTransportStateFailed)
-
-		return errNoRemoteCertificate
-	}
-
-	if len(connectionState.PeerCertificates) == 0 {
-		t.onStateChange(DTLSTransportStateFailed)
-
-		return errNoRemoteCertificate
-	}
-	t.remoteCertificate = connectionState.PeerCertificates[0]
-
-	if !t.api.settingEngine.disableCertificateFingerprintVerification { //nolint:nestif
-		parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
-		if err != nil {
-			if closeErr := dtlsConn.Close(); closeErr != nil {
-				t.log.Error(err.Error())
-			}
-
-			t.onStateChange(DTLSTransportStateFailed)
-
-			return err
-		}
-
-		if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
-			if closeErr := dtlsConn.Close(); closeErr != nil {
-				t.log.Error(err.Error())
-			}
-
-			t.onStateChange(DTLSTransportStateFailed)
-
-			return err
-		}
 	}
 
 	t.conn = dtlsConn
