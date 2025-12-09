@@ -32,6 +32,52 @@ func TestNoEndpoints(t *testing.T) {
 	require.NoError(t, ca.Close())
 }
 
+func TestEndpointDeadline(t *testing.T) {
+	tests := []struct {
+		name        string
+		setDeadline func(*Endpoint, time.Time) error
+	}{
+		{
+			name:        "SetReadDeadline",
+			setDeadline: (*Endpoint).SetReadDeadline,
+		},
+		{
+			name:        "SetDeadline",
+			setDeadline: (*Endpoint).SetDeadline,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lim := test.TimeOut(2 * time.Second)
+			defer lim.Stop()
+
+			ca, cb := net.Pipe()
+			defer func() {
+				_ = ca.Close()
+				_ = cb.Close()
+			}()
+
+			mux := NewMux(Config{
+				Conn:          ca,
+				BufferSize:    testPipeBufferSize,
+				LoggerFactory: logging.NewDefaultLoggerFactory(),
+			})
+
+			endpoint := mux.NewEndpoint(MatchAll)
+			require.NoError(t, tt.setDeadline(endpoint, time.Now().Add(10*time.Millisecond)))
+
+			_, err := endpoint.Read(make([]byte, testPipeBufferSize))
+			require.Error(t, err)
+			var netErr interface{ Timeout() bool }
+			require.ErrorAs(t, err, &netErr)
+			require.True(t, netErr.Timeout())
+
+			require.NoError(t, mux.Close())
+		})
+	}
+}
+
 type muxErrorConnReadResult struct {
 	err  error
 	data []byte

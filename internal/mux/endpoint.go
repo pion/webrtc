@@ -80,14 +80,16 @@ func (e *Endpoint) RemoteAddr() net.Addr {
 	return e.mux.nextConn.RemoteAddr()
 }
 
-// SetDeadline is a stub.
-func (e *Endpoint) SetDeadline(time.Time) error {
-	return nil
+// SetDeadline sets the read deadline for this Endpoint.
+// Write deadlines are not supported because writes go directly to the shared
+// underlying connection and are non-blocking for this endpoint.
+func (e *Endpoint) SetDeadline(t time.Time) error {
+	return e.buffer.SetReadDeadline(t)
 }
 
-// SetReadDeadline is a stub.
-func (e *Endpoint) SetReadDeadline(time.Time) error {
-	return nil
+// SetReadDeadline sets the read deadline for this Endpoint.
+func (e *Endpoint) SetReadDeadline(t time.Time) error {
+	return e.buffer.SetReadDeadline(t)
 }
 
 // SetWriteDeadline is a stub.
