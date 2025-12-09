@@ -1,0 +1,164 @@
+<html>
+<!--
+		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+
+<head>
+  <title>play-from-disk-renegotiation</title>
+</head>
+
+<body>
+  <button onclick="window.addVideo()"> Add Video </button><br />
+  <button onclick="window.removeVideo()"> Remove Video </button><br />
+
+  <h3> Media </h3>
+  <video id="remoteVideo" autoplay playsinline controls muted></video>
+  <audio id="remoteAudio" autoplay controls></audio>
+
+  <h3> Logs </h3>
+  <div id="logs"></div>
+</body>
+
+<script>
+  let activeVideos = 0
+  let remoteStream = null;
+  let pc = new RTCPeerConnection({
+    iceServers: [
+      {
+        urls: 'stun:stun.l.google.com:19302'
+      }
+    ]
+  })
+
+  pc.ontrack = function (event) {
+    console.log('收到轨道:', event.track.kind, event.track.id);
+    remoteStream = event.streams[0];
+
+    const remoteVideo = document.getElementById('remoteVideo');
+    const remoteAudio = document.getElementById('remoteAudio');
+
+    if (event.track.kind === 'video') {
+      console.log('设置视频流');
+      if (remoteVideo) {
+        remoteVideo.srcObject = remoteStream;
+        // 视频元素默认静音，避免回声
+        remoteVideo.muted = true;
+        remoteVideo.volume = 0;
+        remoteVideo.playsInline = true;
+
+        remoteVideo.play().catch(error => {
+          console.log('视频自动播放被阻止:', error.message);
+        });
+      }
+    } else if (event.track.kind === 'audio') {
+      console.log('设置音频流');
+
+      // 设置视频元素的音频（如果有视频流）
+      if (remoteVideo && remoteVideo.srcObject) {
+        // 确保视频元素的音频不被静音
+        remoteVideo.muted = false;
+        remoteVideo.volume = 1.0;
+        remoteVideo.play().catch(error => {
+          console.log('视频元素音频播放失败:', error.message);
+        });
+      }
+
+      // 同时设置独立的音频元素
+      if (remoteAudio) {
+        // 为音频元素创建只包含音频轨道的流
+        const audioOnlyStream = new MediaStream(remoteStream.getAudioTracks());
+        remoteAudio.srcObject = audioOnlyStream;
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1.0;
+
+        remoteAudio.play().then(() => {
+          console.log('音频元素播放成功');
+        }).catch(error => {
+          console.log('音频自动播放被阻止:', error.message);
+        });
+      }
+    }
+
+    // 监听轨道状态变化
+    event.track.addEventListener('ended', () => {
+      console.log(event.track.kind + '轨道已结束');
+    });
+
+    event.track.addEventListener('mute', () => {
+      console.log(event.track.kind + '轨道已静音');
+    });
+
+    event.track.addEventListener('unmute', () => {
+      console.log(event.track.kind + '轨道已取消静音');
+    });
+  }
+
+  let doSignaling = method => {
+    pc.createOffer()
+      .then(offer => {
+        pc.setLocalDescription(offer)
+
+        return fetch(`/${method}`, {
+          method: 'post',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(offer)
+        })
+      })
+      .then(res => res.json())
+      .then(res => pc.setRemoteDescription(res))
+      .catch(alert)
+  }
+
+  // Create a noop DataChannel. By default PeerConnections do not connect
+  // if they have no media tracks or DataChannels
+  pc.createDataChannel('noop')
+  doSignaling('createPeerConnection')
+
+  window.addVideo = () => {
+    if (pc.getTransceivers().length <= activeVideos) {
+      pc.addTransceiver('video')
+      pc.addTransceiver('audio')  // Add audio transceiver for audio track
+      activeVideos++
+    }
+
+    doSignaling('addVideo')
+  };
+
+  window.removeVideo = () => {
+    doSignaling('removeVideo')
+  };
+
+  // 启动音频播放（响应用户交互）
+  window.startAudioPlayback = () => {
+    const remoteVideo = document.getElementById('remoteVideo');
+    const remoteAudio = document.getElementById('remoteAudio');
+
+    console.log('尝试启动音频播放...');
+
+    if (remoteVideo && remoteVideo.srcObject) {
+      remoteVideo.muted = false;
+      remoteVideo.volume = 1.0;
+      remoteVideo.play().then(() => {
+        console.log('视频元素播放成功');
+      }).catch(error => {
+        console.log('视频元素播放失败:', error.message);
+      });
+    }
+
+    if (remoteAudio && remoteAudio.srcObject) {
+      remoteAudio.muted = false;
+      remoteAudio.volume = 1.0;
+      remoteAudio.play().then(() => {
+        console.log('音频元素播放成功');
+      }).catch(error => {
+        console.log('音频元素播放失败:', error.message);
+      });
+    }
+  };
+</script>
+
+</html>
