@@ -121,3 +121,24 @@ func TestPeerConnectionCanTrickleICECandidatesJS(t *testing.T) {
 	pc.underlying = js.ValueOf(map[string]any{})
 	assert.Equal(t, ICETrickleCapabilityUnknown, pc.CanTrickleICECandidates())
 }
+
+func TestDTLSTransportGetRemoteCertificateMock(t *testing.T) {
+	expected := []byte{0x01, 0x02, 0x03, 0x04}
+
+	u8 := js.Global().Get("Uint8Array").New(len(expected))
+	if n := js.CopyBytesToJS(u8, expected); n != len(expected) {
+		t.Fatalf("copied %d bytes to Uint8Array; expected %d", n, len(expected))
+	}
+	certBuffer := u8.Get("buffer")
+
+	getRemoteCertificates := js.FuncOf(func(this js.Value, args []js.Value) any {
+		return js.ValueOf([]any{certBuffer})
+	})
+	defer getRemoteCertificates.Release()
+
+	mockTransport := js.Global().Get("Object").New()
+	mockTransport.Set("getRemoteCertificates", getRemoteCertificates)
+
+	dtlsTransport := &DTLSTransport{underlying: mockTransport}
+	assert.Equal(t, expected, dtlsTransport.GetRemoteCertificate())
+}
