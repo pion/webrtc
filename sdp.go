@@ -924,7 +924,7 @@ type identifiedMediaDescription struct {
 	SDPMLineIndex    uint16
 }
 
-func extractICEDetailsFromMedia(
+func extractICEDetailsFromMedia( //nolint:cyclop
 	media *identifiedMediaDescription,
 	log logging.LeveledLogger,
 ) (string, string, []ICECandidate, error) {
@@ -939,26 +939,54 @@ func extractICEDetailsFromMedia(
 	if pwd, havePwd := descr.Attribute("ice-pwd"); havePwd {
 		remotePwd = pwd
 	}
-	for _, a := range descr.Attributes {
-		if a.IsICECandidate() {
-			c, err := ice.UnmarshalCandidate(a.Value)
-			if err != nil {
-				if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
-					log.Warnf("Discarding remote candidate: %s", err)
 
-					continue
+	// track the last error we saw while parsing candidates.
+	// if we end up with no valid candidates then return prevErr.
+	var prevErr error
+
+	for _, attr := range descr.Attributes {
+		if !attr.IsICECandidate() {
+			continue
+		}
+
+		cand, err := ice.UnmarshalCandidate(attr.Value)
+		if err != nil {
+			// similar to AddICECandidate
+			if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
+				if log != nil {
+					log.Warnf("Discarding remote candidate: %s", err)
 				}
 
-				return "", "", nil, err
+				continue
 			}
 
-			candidate, err := newICECandidateFromICE(c, media.SDPMid, media.SDPMLineIndex)
-			if err != nil {
-				return "", "", nil, err
+			if log != nil {
+				log.Warnf("Failed to parse remote candidate %q: %v", attr.Value, err)
 			}
 
-			candidates = append(candidates, candidate)
+			prevErr = err
+
+			continue
 		}
+
+		candidate, err := newICECandidateFromICE(cand, media.SDPMid, media.SDPMLineIndex)
+		if err != nil {
+			if log != nil {
+				log.Warnf("Failed to convert remote candidate %q: %v", attr.Value, err)
+			}
+
+			prevErr = err
+
+			continue
+		}
+
+		candidates = append(candidates, candidate)
+	}
+
+	// if we saw only invalid candidates then  bubble up the last error
+	// so SetRemoteDescription fails with prevErr.
+	if len(candidates) == 0 && prevErr != nil {
+		return "", "", nil, prevErr
 	}
 
 	return remoteUfrag, remotePwd, candidates, nil
