@@ -118,7 +118,7 @@ func TestExtractFingerprint(t *testing.T) {
 	})
 }
 
-func TestExtractICEDetails(t *testing.T) {
+func TestExtractICEDetails(t *testing.T) { //nolint:maintidx
 	const defaultUfrag = "defaultUfrag"
 	const defaultPwd = "defaultPwd"
 	const invalidUfrag = "invalidUfrag"
@@ -308,6 +308,115 @@ func TestExtractICEDetails(t *testing.T) {
 		assert.Equal(t, details.Candidates[0].Typ, ICECandidateTypeHost)
 		assert.Equal(t, details.Candidates[0].SDPMid, "video")
 		assert.Equal(t, details.Candidates[0].SDPMLineIndex, uint16(1))
+	})
+
+	t.Run("ignores malformed candidates when at least one valid candidate is present", func(t *testing.T) {
+		sdp := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+						// valid candidate
+						{Key: "candidate", Value: "1 1 udp 2122162783 192.168.84.254 46492 typ host generation 0"},
+						// malformed candidate (bad priority)
+						{Key: "candidate", Value: "1 1 udp not-a-priority 192.168.84.254 50000 typ host generation 0"},
+					},
+				},
+			},
+		}
+
+		details, err := extractICEDetails(sdp, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, len(details.Candidates), 1)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
+		assert.Equal(t, details.Candidates[0].Address, "192.168.84.254")
+		assert.Equal(t, details.Candidates[0].Port, uint16(46492))
+	})
+
+	// this test is similar to the previous one, but with the order of candidates is intentionally reversed
+	// to ensure that a malformed candidate doesn't force an early exit and that a valid candidate is still processed.
+	t.Run("ignores malformed candidates with invalid candidates before valid candidate", func(t *testing.T) {
+		sdp := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+						// malformed candidate (bad priority)
+						{Key: "candidate", Value: "1 0 udp not-a-priority 192.168.84.254 50000 typ host generation 0"},
+						// malformed candidate (bad priority)
+						{Key: "candidate", Value: "1 1 udp not-a-priority 192.168.84.254 50000 typ host generation 1"},
+						// valid candidate
+						{Key: "candidate", Value: "1 1 udp 2122162783 192.168.84.254 46492 typ host generation 0"},
+					},
+				},
+			},
+		}
+
+		details, err := extractICEDetails(sdp, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, len(details.Candidates), 1)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
+		assert.Equal(t, details.Candidates[0].Address, "192.168.84.254")
+		assert.Equal(t, details.Candidates[0].Port, uint16(46492))
+	})
+
+	t.Run("returns error when all candidates are malformed", func(t *testing.T) {
+		sdp := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+						// only malformed candidate (bad priority)
+						{Key: "candidate", Value: "1 1 udp not-a-priority 192.168.84.254 50000 typ host generation 0"},
+					},
+				},
+			},
+		}
+
+		_, err := extractICEDetails(sdp, nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("unknown candidate types are ignored", func(t *testing.T) {
+		sdp := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "audio",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "ice-ufrag", Value: defaultUfrag},
+						{Key: "ice-pwd", Value: defaultPwd},
+						// candidate with unknown type -> should be discarded, but not fatal
+						{Key: "candidate", Value: "1 1 udp 2122162783 192.168.84.254 46492 typ zzz generation 0"},
+					},
+				},
+			},
+		}
+
+		details, err := extractICEDetails(sdp, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, details.Ufrag, defaultUfrag)
+		assert.Equal(t, details.Password, defaultPwd)
+		assert.Equal(t, len(details.Candidates), 0)
 	})
 }
 
