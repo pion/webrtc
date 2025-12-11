@@ -15,7 +15,6 @@ const (
 	pageHeaderTypeBeginningOfStream = 0x02
 	pageHeaderSignature             = "OggS"
 
-	idPageSignature         = "OpusHead"
 	idPageBasePayloadLength = 19
 	pageHeaderLen           = 27
 )
@@ -39,8 +38,12 @@ type OggReader struct {
 	doChecksum           bool
 }
 
-// OggHeader is the metadata from the first two pages
-// in the file (ID and Comment)
+// OggHeader contains Opus codec metadata parsed from an Opus ID page.
+// This header is extracted from an Ogg page payload that starts with the OpusHead
+// signature (the first page of an Opus stream in an Ogg container).
+//
+// Use OggPageHeader.OpusPacketType() to classify a page payload as OpusHead,
+// and OggPageHeader.ParseOpusHeader() to parse the OpusHead payload.
 //
 // https://tools.ietf.org/html/rfc7845.html#section-3
 type OggHeader struct {
@@ -57,6 +60,16 @@ type OggHeader struct {
 	ChannelMapping string
 }
 
+// ParseOpusHead parses an Opus head from the page payload.
+func ParseOpusHead(payload []byte) (*OggHeader, error) {
+	header := parseBasicHeaderFields(payload)
+	if err := parseChannelMapping(header, payload); err != nil {
+		return nil, err
+	}
+
+	return header, nil
+}
+
 // OggPageHeader is the metadata for a Page
 // Pages are the fundamental unit of multiplexing in an Ogg stream
 //
@@ -67,15 +80,76 @@ type OggPageHeader struct {
 	sig           [4]byte
 	version       uint8
 	headerType    uint8
-	serial        uint32
+	Serial        uint32
 	index         uint32
 	segmentsCount uint8
 }
 
+type HeaderType string
+
+const (
+	headerUnknown HeaderType = ""
+	HeaderOpusID  HeaderType = "OpusHead"
+)
+
+func opusPayloadSignature(payload []byte) (HeaderType, bool) {
+	if len(payload) < 8 {
+		return headerUnknown, false
+	}
+
+	sig := HeaderType(payload[:8])
+	if sig == HeaderOpusID {
+		return sig, true
+	}
+
+	return headerUnknown, false
+}
+
+// HeaderType classifies the page.
+func (p *OggPageHeader) HeaderType(payload []byte) (HeaderType, bool) {
+	sig, ok := opusPayloadSignature(payload)
+
+	if !ok || (sig == HeaderOpusID && p.headerType != pageHeaderTypeBeginningOfStream) {
+		return headerUnknown, false
+	}
+
+	return sig, true
+}
+
+type Option func(*OggReader) error
+
 // NewWith returns a new Ogg reader and Ogg header
 // with an io.Reader input.
+// Deprecated: Use NewWithOptions instead.
 func NewWith(in io.Reader) (*OggReader, *OggHeader, error) {
 	return newWith(in /* doChecksum */, true)
+}
+
+// NewWithOptions returns a new Ogg reader.
+func NewWithOptions(in io.Reader, options ...Option) (*OggReader, error) {
+	reader := &OggReader{
+		stream:        in,
+		checksumTable: generateChecksumTable(),
+		doChecksum:    true,
+	}
+
+	for _, option := range options {
+		if err := option(reader); err != nil {
+			return nil, err
+		}
+	}
+
+	return reader, nil
+}
+
+// WithDoChecksum is an option to set the doChecksum flag
+// Default is true.
+func WithDoChecksum(doChecksum bool) Option {
+	return func(o *OggReader) error {
+		o.doChecksum = doChecksum
+
+		return nil
+	}
 }
 
 func newWith(in io.Reader, doChecksum bool) (*OggReader, *OggHeader, error) {
@@ -89,7 +163,7 @@ func newWith(in io.Reader, doChecksum bool) (*OggReader, *OggHeader, error) {
 		doChecksum:    doChecksum,
 	}
 
-	header, err := reader.readHeaders()
+	header, err := reader.readOpusHeader()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -97,13 +171,13 @@ func newWith(in io.Reader, doChecksum bool) (*OggReader, *OggHeader, error) {
 	return reader, header, nil
 }
 
-func (o *OggReader) readHeaders() (*OggHeader, error) {
+func (o *OggReader) readOpusHeader() (*OggHeader, error) {
 	payload, pageHeader, err := o.ParseNextPage()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := validatePageHeader(pageHeader, payload); err != nil {
+	if err := validateOpusPageHeader(pageHeader, payload); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +189,7 @@ func (o *OggReader) readHeaders() (*OggHeader, error) {
 	return header, nil
 }
 
-func validatePageHeader(pageHeader *OggPageHeader, payload []byte) error {
+func validateOpusPageHeader(pageHeader *OggPageHeader, payload []byte) error {
 	if string(pageHeader.sig[:]) != pageHeaderSignature {
 		return errBadIDPageSignature
 	}
@@ -128,8 +202,8 @@ func validatePageHeader(pageHeader *OggPageHeader, payload []byte) error {
 		return errBadIDPageLength
 	}
 
-	if s := string(payload[:8]); s != idPageSignature {
-		return errBadIDPagePayloadSignature
+	if sig, ok := opusPayloadSignature(payload); !ok || sig != HeaderOpusID {
+		return fmt.Errorf("%w: expected OpusHead, got %s", errBadIDPagePayloadSignature, sig)
 	}
 
 	return nil
@@ -203,7 +277,7 @@ func (o *OggReader) ParseNextPage() ([]byte, *OggPageHeader, error) { //nolint:c
 	pageHeader.version = header[4]
 	pageHeader.headerType = header[5]
 	pageHeader.GranulePosition = binary.LittleEndian.Uint64(header[6 : 6+8])
-	pageHeader.serial = binary.LittleEndian.Uint32(header[14 : 14+4])
+	pageHeader.Serial = binary.LittleEndian.Uint32(header[14 : 14+4])
 	pageHeader.index = binary.LittleEndian.Uint32(header[18 : 18+4])
 	pageHeader.segmentsCount = header[26]
 
