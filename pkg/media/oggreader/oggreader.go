@@ -7,6 +7,7 @@ package oggreader
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -14,20 +15,20 @@ const (
 	pageHeaderTypeBeginningOfStream = 0x02
 	pageHeaderSignature             = "OggS"
 
-	idPageSignature = "OpusHead"
-
-	pageHeaderLen       = 27
-	idPagePayloadLength = 19
+	idPageSignature         = "OpusHead"
+	idPageBasePayloadLength = 19
+	pageHeaderLen           = 27
 )
 
 var (
-	errNilStream                 = errors.New("stream is nil")
-	errBadIDPageSignature        = errors.New("bad header signature")
-	errBadIDPageType             = errors.New("wrong header, expected beginning of stream")
-	errBadIDPageLength           = errors.New("payload for id page must be 19 bytes")
-	errBadIDPagePayloadSignature = errors.New("bad payload signature")
-	errShortPageHeader           = errors.New("not enough data for payload header")
-	errChecksumMismatch          = errors.New("expected and actual checksum do not match")
+	errNilStream                       = errors.New("stream is nil")
+	errBadIDPageSignature              = errors.New("bad header signature")
+	errBadIDPageType                   = errors.New("wrong header, expected beginning of stream")
+	errBadIDPageLength                 = errors.New("payload for id page must be 19 bytes")
+	errBadIDPagePayloadSignature       = errors.New("bad payload signature")
+	errShortPageHeader                 = errors.New("not enough data for payload header")
+	errChecksumMismatch                = errors.New("expected and actual checksum do not match")
+	errUnsupportedChannelMappingFamily = errors.New("unsupported channel mapping family")
 )
 
 // OggReader is used to read Ogg files and return page payloads.
@@ -43,12 +44,17 @@ type OggReader struct {
 //
 // https://tools.ietf.org/html/rfc7845.html#section-3
 type OggHeader struct {
-	ChannelMap uint8
-	Channels   uint8
-	OutputGain uint16
-	PreSkip    uint16
-	SampleRate uint32
-	Version    uint8
+	ChannelMap   uint8
+	Channels     uint8
+	OutputGain   uint16
+	PreSkip      uint16
+	SampleRate   uint32
+	Version      uint8
+	StreamCount  uint8
+	CoupledCount uint8
+	// ChannelMapping we store it as a string to be comparable (maps/struct equality)
+	// while still holding raw bytes.
+	ChannelMapping string
 }
 
 // OggPageHeader is the metadata for a Page
@@ -97,23 +103,40 @@ func (o *OggReader) readHeaders() (*OggHeader, error) {
 		return nil, err
 	}
 
-	header := &OggHeader{}
+	if err := validatePageHeader(pageHeader, payload); err != nil {
+		return nil, err
+	}
+
+	header := parseBasicHeaderFields(payload)
+	if err := parseChannelMapping(header, payload); err != nil {
+		return nil, err
+	}
+
+	return header, nil
+}
+
+func validatePageHeader(pageHeader *OggPageHeader, payload []byte) error {
 	if string(pageHeader.sig[:]) != pageHeaderSignature {
-		return nil, errBadIDPageSignature
+		return errBadIDPageSignature
 	}
 
 	if pageHeader.headerType != pageHeaderTypeBeginningOfStream {
-		return nil, errBadIDPageType
+		return errBadIDPageType
 	}
 
-	if len(payload) != idPagePayloadLength {
-		return nil, errBadIDPageLength
+	if len(payload) < idPageBasePayloadLength {
+		return errBadIDPageLength
 	}
 
 	if s := string(payload[:8]); s != idPageSignature {
-		return nil, errBadIDPagePayloadSignature
+		return errBadIDPagePayloadSignature
 	}
 
+	return nil
+}
+
+func parseBasicHeaderFields(payload []byte) *OggHeader {
+	header := &OggHeader{}
 	header.Version = payload[8]
 	header.Channels = payload[9]
 	header.PreSkip = binary.LittleEndian.Uint16(payload[10:12])
@@ -121,7 +144,44 @@ func (o *OggReader) readHeaders() (*OggHeader, error) {
 	header.OutputGain = binary.LittleEndian.Uint16(payload[16:18])
 	header.ChannelMap = payload[18]
 
-	return header, nil
+	return header
+}
+
+// parseChannelMapping parses channel mapping data based on the channel map family.
+// https://datatracker.ietf.org/doc/html/rfc7845#section-5.1.1
+// family mapping of 2 and 3 are defined in https://datatracker.ietf.org/doc/html/rfc8486
+func parseChannelMapping(header *OggHeader, payload []byte) error {
+	switch header.ChannelMap {
+	case 0:
+		return validatePayloadLength(payload, idPageBasePayloadLength)
+	case 1, 2, 255:
+		return parseExtendedChannelMapping(header, payload)
+	case 3:
+		return fmt.Errorf("%w: ambisonics family type 3 is not supported", errUnsupportedChannelMappingFamily)
+	default:
+		return errUnsupportedChannelMappingFamily
+	}
+}
+
+func validatePayloadLength(payload []byte, expectedLen int) error {
+	if len(payload) != expectedLen {
+		return errBadIDPageLength
+	}
+
+	return nil
+}
+
+func parseExtendedChannelMapping(header *OggHeader, payload []byte) error {
+	expectedPayloadLen := 21 + int(header.Channels)
+	if err := validatePayloadLength(payload, expectedPayloadLen); err != nil {
+		return err
+	}
+
+	header.StreamCount = payload[19]
+	header.CoupledCount = payload[20]
+	header.ChannelMapping = string(payload[21 : 21+header.Channels])
+
+	return nil
 }
 
 // ParseNextPage reads from stream and returns Ogg page payload, header,
