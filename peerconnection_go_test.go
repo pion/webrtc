@@ -793,6 +793,70 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+func TestMulticastDNSHostNameConnection(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerHostName := fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	answerHostName := fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	for offerHostName == answerHostName {
+		answerHostName = fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	}
+
+	offerSettingEngine := SettingEngine{}
+	offerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	offerSettingEngine.SetMulticastDNSHostName(offerHostName)
+
+	answerSettingEngine := SettingEngine{}
+	answerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	answerSettingEngine.SetMulticastDNSHostName(answerHostName)
+
+	pcOffer, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+
+	pcAnswer, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	connected.Wait()
+
+	offerLocal := pcOffer.LocalDescription()
+	assert.NotNil(t, offerLocal)
+	if offerLocal != nil {
+		assert.Contains(t, offerLocal.SDP, offerHostName)
+	}
+
+	answerLocal := pcAnswer.LocalDescription()
+	assert.NotNil(t, answerLocal)
+	if answerLocal != nil {
+		assert.Contains(t, answerLocal.SDP, answerHostName)
+	}
+
+	offerRemote := pcOffer.RemoteDescription()
+	assert.NotNil(t, offerRemote)
+	if offerRemote != nil {
+		assert.Contains(t, offerRemote.SDP, answerHostName)
+	}
+
+	answerRemote := pcAnswer.RemoteDescription()
+	assert.NotNil(t, answerRemote)
+	if answerRemote != nil {
+		assert.Contains(t, answerRemote.SDP, offerHostName)
+	}
+}
+
 func TestICERestart(t *testing.T) {
 	extractCandidates := func(sdp string) (candidates []string) {
 		sc := bufio.NewScanner(strings.NewReader(sdp))
