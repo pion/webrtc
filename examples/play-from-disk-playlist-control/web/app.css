@@ -1,0 +1,144 @@
+/* SPDX-FileCopyrightText: 2024 The Pion community <https://pion.ly>
+ * SPDX-License-Identifier: MIT
+ */
+
+body {
+  font-family: sans-serif;
+  margin: 1.5rem;
+  color: #121212;
+}
+h2 {
+  margin-top: 0;
+}
+
+code {
+  background: #eef1f7;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+input[type="text"] {
+  padding: 0.5rem;
+  min-width: 220px;
+}
+
+button {
+  padding: 0.5rem 0.75rem;
+  background: #0d6efd;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0b5ed7;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+audio {
+  width: 100%;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.card {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.logs {
+  min-height: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #eceff4;
+}
+
+.list li:last-child {
+  border-bottom: none;
+}
+
+.list .current {
+  font-weight: bold;
+  color: #0d6efd;
+}
+
+.label {
+  font-size: 0.85rem;
+  color: #5a6572;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.track {
+  font-size: 1.2rem;
+  margin-top: 0.25rem;
+}
+
+.artist {
+  color: #5a6572;
+}
+
+.meta {
+  color: #5a6572;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 820px) {
+  body {
+    margin: 1rem;
+  }
+
+  .player {
+    grid-template-columns: 1fr;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 540px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  input[type="text"] {
+    width: 100%;
+  }
+
+  button {
+    width: 100%;
+  }
+}

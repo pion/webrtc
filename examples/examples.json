@@ -42,6 +42,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Play from Disk Audio Control",
+		"link": "play-from-disk-playlist-control",
+		"description": "The play-from-disk-playlist-control example demonstrates how to play an opus playlist from a file saved to disk, and control the playlist playback from the browser.",
+		"type": "browser"
+	},
+	{
 		"title": "Insertable Streams",
 		"link": "insertable-streams",
 		"description": "The insertable-streams example demonstrates how Pion can be used to send E2E encrypted video and decrypt via insertable streams in the browser.",

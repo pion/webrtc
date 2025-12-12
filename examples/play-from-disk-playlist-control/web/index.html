@@ -1,0 +1,45 @@
+<!--
+SPDX-FileCopyrightText: 2024 The Pion community <https://pion.ly>
+SPDX-License-Identifier: MIT
+-->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ogg Playlist over SCTP</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header>
+    <h2>Ogg Playlist over RTP, control over SCTP</h2>
+    <p>Server hosts both the WebRTC sender and this page. It streams Opus from <code>playlist.ogg</code>, shares metadata over a DataChannel, and lets you jump between tracks.</p>
+  </header>
+
+  <section class="controls">
+    <button id="startButton" onclick="startSession()">Start Session</button>
+    <input id="commandInput" type="text" placeholder="next | prev | 1 | 2 ..." aria-label="Command">
+    <button onclick="sendCommand()">Send</button>
+    <button onclick="sendPrev()">Prev</button>
+    <button onclick="sendNext()">Next</button>
+  </section>
+
+  <section class="player">
+    <audio id="remoteAudio" controls autoplay></audio>
+    <div id="nowPlaying" class="card">Waiting for playlist...</div>
+  </section>
+
+  <section class="grid">
+    <div>
+      <h3>Playlist</h3>
+      <ul id="playlist" class="card list"></ul>
+    </div>
+    <div>
+      <h3>Logs</h3>
+      <div id="logs" class="card logs"></div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
