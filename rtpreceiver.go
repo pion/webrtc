@@ -257,7 +257,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			rtcpReadStream := result.rtcpReadStream
 			rtcpInterceptor := result.rtcpInterceptor
 
-			if err = r.receiveForRtx(
+			if err = r.receiveForRtxInternal(
 				rtxSsrc,
 				"",
 				streamInfo,
@@ -552,6 +552,10 @@ func (r *RTPReceiver) receiveForRid(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if r.haveClosed() {
+		return nil, io.EOF
+	}
+
 	for i := range r.tracks {
 		if r.tracks[i].track.RID() == rid {
 			r.tracks[i].track.mu.Lock()
@@ -576,8 +580,6 @@ func (r *RTPReceiver) receiveForRid(
 }
 
 // receiveForRtx starts a routine that processes the repair stream.
-//
-//nolint:cyclop
 func (r *RTPReceiver) receiveForRtx(
 	ssrc SSRC,
 	rsid string,
@@ -587,6 +589,34 @@ func (r *RTPReceiver) receiveForRtx(
 	rtcpReadStream *srtp.ReadStreamSRTCP,
 	rtcpInterceptor interceptor.RTCPReader,
 ) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.receiveForRtxInternal(
+		ssrc,
+		rsid,
+		streamInfo,
+		rtpReadStream,
+		rtpInterceptor,
+		rtcpReadStream,
+		rtcpInterceptor,
+	)
+}
+
+//nolint:gocognit,cyclop
+func (r *RTPReceiver) receiveForRtxInternal(
+	ssrc SSRC,
+	rsid string,
+	streamInfo *interceptor.StreamInfo,
+	rtpReadStream *srtp.ReadStreamSRTP,
+	rtpInterceptor interceptor.RTPReader,
+	rtcpReadStream *srtp.ReadStreamSRTCP,
+	rtcpInterceptor interceptor.RTCPReader,
+) error {
+	if r.haveClosed() {
+		return io.EOF
+	}
+
 	var track *trackStreams
 	if ssrc != 0 && len(r.tracks) == 1 {
 		track = &r.tracks[0]
