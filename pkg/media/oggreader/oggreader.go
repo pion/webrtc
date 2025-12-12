@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 var (
 	errNilStream                       = errors.New("stream is nil")
 	errBadIDPageSignature              = errors.New("bad header signature")
+	errBadOpusTagsSignature            = errors.New("bad opus tags signature")
 	errBadIDPageType                   = errors.New("wrong header, expected beginning of stream")
 	errBadIDPageLength                 = errors.New("payload for id page must be 19 bytes")
 	errBadIDPagePayloadSignature       = errors.New("bad payload signature")
@@ -88,8 +90,9 @@ type OggPageHeader struct {
 type HeaderType string
 
 const (
-	headerUnknown HeaderType = ""
-	HeaderOpusID  HeaderType = "OpusHead"
+	headerUnknown  HeaderType = ""
+	HeaderOpusID   HeaderType = "OpusHead"
+	HeaderOpusTags HeaderType = "OpusTags"
 )
 
 func opusPayloadSignature(payload []byte) (HeaderType, bool) {
@@ -98,7 +101,7 @@ func opusPayloadSignature(payload []byte) (HeaderType, bool) {
 	}
 
 	sig := HeaderType(payload[:8])
-	if sig == HeaderOpusID {
+	if sig == HeaderOpusID || sig == HeaderOpusTags {
 		return sig, true
 	}
 
@@ -353,4 +356,126 @@ func generateChecksumTable() *[256]uint32 {
 	}
 
 	return &table
+}
+
+// OpusTags is the metadata for an OpusTags page.
+// https://www.xiph.org/vorbis/doc/v-comment.html
+type OpusTags struct {
+	Vendor       string
+	UserComments []UserComment
+}
+
+// UserComment is a key-value pair of a vorbis comment.
+type UserComment struct {
+	Comment string
+	Value   string
+}
+
+// ParseOpusTags parses an OpusTags from the page payload.
+// https://datatracker.ietf.org/doc/html/rfc7845#section-5.2
+func ParseOpusTags(payload []byte) (*OpusTags, error) {
+	const (
+		headerMagicLen = 8
+		u32Size        = 4
+		minHeaderLen   = headerMagicLen + u32Size + u32Size
+	)
+
+	if err := validateOpusTagsHeader(payload, minHeaderLen); err != nil {
+		return nil, err
+	}
+
+	vendor, vendorEnd, err := parseVendorString(payload, headerMagicLen, u32Size, minHeaderLen)
+	if err != nil {
+		return nil, err
+	}
+
+	userComments, err := parseUserComments(payload, vendorEnd, u32Size)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OpusTags{
+		Vendor:       vendor,
+		UserComments: userComments,
+	}, nil
+}
+
+func validateOpusTagsHeader(payload []byte, minHeaderLen int) error {
+	if len(payload) < minHeaderLen {
+		return fmt.Errorf("%w: payload too short", errBadOpusTagsSignature)
+	}
+
+	got := HeaderType(payload[:8])
+	if got != HeaderOpusTags {
+		return fmt.Errorf("%w: expected %q, got %q", errBadOpusTagsSignature, HeaderOpusTags, got)
+	}
+
+	return nil
+}
+
+func parseVendorString(payload []byte, headerMagicLen, u32Size, minHeaderLen int) (string, int, error) {
+	vendorLen32 := binary.LittleEndian.Uint32(payload[headerMagicLen : headerMagicLen+u32Size])
+	if int(vendorLen32) > len(payload)-minHeaderLen {
+		return "", 0, fmt.Errorf("%w: payload too short for vendor string", errBadOpusTagsSignature)
+	}
+	vendorLen := int(vendorLen32)
+
+	vendorStart := headerMagicLen + u32Size
+	vendorEnd := vendorStart + vendorLen
+	if vendorEnd+u32Size > len(payload) {
+		return "", 0, fmt.Errorf("%w: payload too short for vendor+comment count", errBadOpusTagsSignature)
+	}
+
+	vendor := string(payload[vendorStart:vendorEnd])
+
+	return vendor, vendorEnd, nil
+}
+
+func parseUserComments(payload []byte, vendorEnd, u32Size int) ([]UserComment, error) {
+	userCommentCount32 := binary.LittleEndian.Uint32(payload[vendorEnd : vendorEnd+u32Size])
+	if int(userCommentCount32) > (len(payload)-vendorEnd)/u32Size {
+		return nil, fmt.Errorf("%w: unreasonable comment count", errBadOpusTagsSignature)
+	}
+	userCommentCount := int(userCommentCount32)
+
+	pos := vendorEnd + u32Size
+	userComments := make([]UserComment, userCommentCount)
+
+	for i := range userComments {
+		comment, nextPos, err := parseSingleUserComment(payload, pos, u32Size, i)
+		if err != nil {
+			return nil, err
+		}
+		userComments[i] = comment
+		pos = nextPos
+	}
+
+	return userComments, nil
+}
+
+func parseSingleUserComment(payload []byte, pos, u32Size, index int) (UserComment, int, error) {
+	if pos+u32Size > len(payload) {
+		return UserComment{}, 0, fmt.Errorf("%w: payload too short for comment len %d", errBadOpusTagsSignature, index)
+	}
+
+	commentLen32 := binary.LittleEndian.Uint32(payload[pos : pos+u32Size])
+	pos += u32Size
+
+	commentLen := int(commentLen32)
+	if commentLen < 0 || pos+commentLen > len(payload) {
+		return UserComment{}, 0, fmt.Errorf("%w: payload too short for comment %d", errBadOpusTagsSignature, index)
+	}
+
+	comment := string(payload[pos : pos+commentLen])
+	pos += commentLen
+
+	parts := strings.SplitN(comment, "=", 2)
+	if len(parts) != 2 {
+		return UserComment{}, 0, fmt.Errorf("%w: invalid comment %d", errBadOpusTagsSignature, index)
+	}
+
+	return UserComment{
+		Comment: parts[0],
+		Value:   parts[1],
+	}, pos, nil
 }

@@ -6,6 +6,7 @@ package oggreader
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"io"
 	"testing"
@@ -536,4 +537,344 @@ func TestOggReader_MultiTrackFile(t *testing.T) {
 	assert.NotEqual(t, pageHeaders[0].Serial, pageHeaders[1].Serial, "Serial numbers should be different")
 
 	t.Logf("Multi-track file: found %d headers", len(headers))
+}
+
+// buildOpusTagsPayload builds an OpusTags payload.
+func buildOpusTagsPayload(vendor string, comments []UserComment) []byte {
+	payload := []byte("OpusTags")
+
+	vendorBytes := []byte(vendor)
+	vendorLen := make([]byte, 4)
+	//nolint:gosec // G115: test-only, sized by construction
+	binary.LittleEndian.PutUint32(vendorLen, uint32(len(vendorBytes)))
+	payload = append(payload, vendorLen...)
+	payload = append(payload, vendorBytes...)
+
+	commentCount := make([]byte, 4)
+	//nolint:gosec // G115: test-only, sized by construction
+	binary.LittleEndian.PutUint32(commentCount, uint32(len(comments)))
+	payload = append(payload, commentCount...)
+
+	for _, c := range comments {
+		comment := c.Comment + "=" + c.Value
+		commentBytes := []byte(comment)
+		commentLen := make([]byte, 4)
+		//nolint:gosec // G115: test-only, sized by construction
+		binary.LittleEndian.PutUint32(commentLen, uint32(len(commentBytes)))
+		payload = append(payload, commentLen...)
+		payload = append(payload, commentBytes...)
+	}
+
+	return payload
+}
+
+// buildOggPage builds a complete Ogg page with header, segment table, and payload.
+func buildOggPage(serial uint32, pageIndex uint32, headerType uint8, payload []byte) []byte {
+	serialBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(serialBytes, serial)
+
+	indexBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(indexBytes, pageIndex)
+
+	// Build segment table (single segment containing entire payload)
+	segmentTable := []byte{byte(len(payload))}
+
+	// Build page header (27 bytes)
+	header := []byte{
+		0x4f, 0x67, 0x67, 0x53, // "OggS"
+		0x00,                                           // version
+		headerType,                                     // header type
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // granule position
+		serialBytes[0], serialBytes[1], serialBytes[2], serialBytes[3], // serial number
+		indexBytes[0], indexBytes[1], indexBytes[2], indexBytes[3], // page sequence number
+		0x00, 0x00, 0x00, 0x00, // checksum (will be zero, checksum disabled in test)
+		0x01, // page segments count
+	}
+
+	page := make([]byte, 0, len(header)+len(segmentTable)+len(payload))
+	page = append(page, header...)
+	page = append(page, segmentTable...)
+	page = append(page, payload...)
+
+	return page
+}
+
+// buildOpusHeadPayload builds an OpusHead payload.
+func buildOpusHeadPayload(
+	version, channels uint8,
+	preskip uint16,
+	sampleRate uint32,
+	outputGain uint16,
+	channelMap uint8,
+) []byte {
+	payload := []byte("OpusHead")
+	payload = append(payload, version)
+	payload = append(payload, channels)
+
+	preskipBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(preskipBytes, preskip)
+	payload = append(payload, preskipBytes...)
+
+	sampleRateBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(sampleRateBytes, sampleRate)
+	payload = append(payload, sampleRateBytes...)
+
+	outputGainBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(outputGainBytes, outputGain)
+	payload = append(payload, outputGainBytes...)
+	payload = append(payload, channelMap)
+
+	return payload
+}
+
+// buildTwoTrackOggContainer builds a complete two-track Ogg container.
+// Track 1: OpusHead (index 0) + OpusTags (index 1).
+// Track 2: OpusHead (index 0) + OpusTags (index 1).
+func buildTwoTrackOggContainer(
+	serial1, serial2 uint32,
+	track1Comments, track2Comments []UserComment,
+) []byte {
+	opusHeadPayload := buildOpusHeadPayload(1, 2, 0x0138, 48000, 0, 0)
+
+	vendor := "TestVendor"
+	track1TagsPayload := buildOpusTagsPayload(vendor, track1Comments)
+	track2TagsPayload := buildOpusTagsPayload(vendor, track2Comments)
+
+	track1OpusHeadPage := buildOggPage(serial1, 0, pageHeaderTypeBeginningOfStream, opusHeadPayload)
+	track1OpusTagsPage := buildOggPage(serial1, 1, 0, track1TagsPayload)
+	track2OpusHeadPage := buildOggPage(serial2, 0, pageHeaderTypeBeginningOfStream, opusHeadPayload)
+	track2OpusTagsPage := buildOggPage(serial2, 1, 0, track2TagsPayload)
+
+	totalLen := len(track1OpusHeadPage) + len(track1OpusTagsPage) +
+		len(track2OpusHeadPage) + len(track2OpusTagsPage)
+	container := make([]byte, 0, totalLen)
+	container = append(container, track1OpusHeadPage...)
+	container = append(container, track1OpusTagsPage...)
+	container = append(container, track2OpusHeadPage...)
+	container = append(container, track2OpusTagsPage...)
+
+	return container
+}
+
+func processPages(reader *OggReader) ([]HeaderType, []*OpusTags, error) {
+	var headersFound []HeaderType
+	var opusTagsFound []*OpusTags
+
+	for {
+		payload, pageHeader, err := reader.ParseNextPage()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, nil, err
+		}
+
+		sig, ok := pageHeader.HeaderType(payload)
+		if !ok {
+			continue
+		}
+
+		headersFound = append(headersFound, sig)
+		if sig == HeaderOpusTags {
+			tags, err := ParseOpusTags(payload)
+			if err != nil {
+				return nil, nil, err
+			}
+			if tags != nil {
+				opusTagsFound = append(opusTagsFound, tags)
+			}
+		}
+	}
+
+	return headersFound, opusTagsFound, nil
+}
+
+func countHeaderTypes(headersFound []HeaderType) (int, int) {
+	opusIDCount := 0
+	opusTagsCount := 0
+	for _, h := range headersFound {
+		switch h {
+		case HeaderOpusID:
+			opusIDCount++
+		case HeaderOpusTags:
+			opusTagsCount++
+		default:
+		}
+	}
+
+	return opusIDCount, opusTagsCount
+}
+
+func userCommentsToMap(comments []UserComment) map[string]string {
+	out := make(map[string]string, len(comments))
+	for _, c := range comments {
+		out[c.Comment] = c.Value
+	}
+
+	return out
+}
+
+func TestOggReader_DetectHeadersAndTags(t *testing.T) {
+	serial1 := uint32(0xd03ed35d)
+	serial2 := uint32(0xfa6e13f0)
+
+	track1Title := hex.EncodeToString([]byte{
+		0x6e, 0x65, 0x76, 0x65, 0x72, 0x20, 0x67, 0x6f, 0x6e, 0x6e, 0x61, 0x20,
+		0x67, 0x69, 0x76, 0x65, 0x20, 0x79, 0x6f, 0x75, 0x20, 0x75, 0x70,
+	})
+
+	track1Comments := []UserComment{
+		{Comment: "title", Value: track1Title},
+		{Comment: "encoder", Value: "test-encoder-v1.0"},
+	}
+	track2Comments := []UserComment{
+		{Comment: "title", Value: "Noise Track 2"},
+		{Comment: "encoder", Value: "test-encoder-v1.0"},
+	}
+	data := buildTwoTrackOggContainer(serial1, serial2, track1Comments, track2Comments)
+
+	reader, err := NewWithOptions(bytes.NewReader(data), WithDoChecksum(false))
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+
+	headersFound, opusTagsFound, err := processPages(reader)
+	assert.NoError(t, err)
+
+	assert.Greater(t, len(headersFound), 0, "Should find at least one header or tag")
+
+	opusIDCount, opusTagsCount := countHeaderTypes(headersFound)
+
+	assert.Equal(t, 2, opusIDCount, "Should find exactly 2 OpusHead pages")
+	assert.Equal(t, 2, opusTagsCount, "Should find exactly 2 OpusTags pages")
+
+	assert.Equal(t, 2, len(opusTagsFound), "Should parse 2 OpusTags")
+
+	assert.Equal(t, "TestVendor", opusTagsFound[0].Vendor)
+	assert.Equal(t, "TestVendor", opusTagsFound[1].Vendor)
+
+	track1 := userCommentsToMap(opusTagsFound[0].UserComments)
+	track2 := userCommentsToMap(opusTagsFound[1].UserComments)
+
+	assert.Equal(t, track1Title, track1["title"])
+	assert.Equal(t, "test-encoder-v1.0", track1["encoder"])
+	assert.Equal(t, "Noise Track 2", track2["title"])
+	assert.Equal(t, "test-encoder-v1.0", track2["encoder"])
+}
+
+func TestParseOpusTagsErrors(t *testing.T) {
+	makeHeader := func(length int) []byte {
+		payload := make([]byte, length)
+		copy(payload, []byte(HeaderOpusTags))
+
+		return payload
+	}
+
+	tests := []struct {
+		name       string
+		payload    []byte
+		errMessage string
+	}{
+		{
+			name:       "payload too short",
+			payload:    []byte("short"),
+			errMessage: "payload too short",
+		},
+		{
+			name:       "bad signature",
+			payload:    append([]byte("OpusHead"), make([]byte, 8)...), // length 16, wrong magic
+			errMessage: "expected \"OpusTags\"",
+		},
+		{
+			name: "vendor length longer than payload",
+			payload: func() []byte {
+				payload := makeHeader(20)
+				binary.LittleEndian.PutUint32(payload[8:], 10) // vendor length larger than remaining bytes
+
+				return payload
+			}(),
+			errMessage: "vendor string",
+		},
+		{
+			name: "unreasonable comment count",
+			payload: func() []byte {
+				payload := makeHeader(17) // 8 (magic) + 4 (vendor len) + 1 (vendor) + 4 (comment count)
+				binary.LittleEndian.PutUint32(payload[8:], 1)
+				payload[12] = 'v'
+				binary.LittleEndian.PutUint32(payload[13:], 3) // comment count too large for remaining payload
+
+				return payload
+			}(),
+			errMessage: "unreasonable comment count",
+		},
+		{
+			name: "payload too short for first comment length",
+			payload: func() []byte {
+				payload := makeHeader(16) // exactly header + vendor len + comment count, but no room for comment len
+				binary.LittleEndian.PutUint32(payload[8:], 0)
+				binary.LittleEndian.PutUint32(payload[12:], 1)
+
+				return payload
+			}(),
+			errMessage: "comment len 0",
+		},
+		{
+			name: "payload too short for comment data",
+			payload: func() []byte {
+				payload := makeHeader(20) // room for comment len, but not the comment itself
+				binary.LittleEndian.PutUint32(payload[8:], 0)
+				binary.LittleEndian.PutUint32(payload[12:], 1)
+				binary.LittleEndian.PutUint32(payload[16:], 10) // comment claims 10 bytes, none available
+
+				return payload
+			}(),
+			errMessage: "comment 0",
+		},
+		{
+			name: "invalid comment format",
+			payload: func() []byte {
+				comment := []byte("novalue")
+				payload := makeHeader(20 + len(comment)) // 8 magic + 4 vendor len + 4 comment count + 4 comment len + comment
+
+				binary.LittleEndian.PutUint32(payload[8:], 0)                     // vendor length
+				binary.LittleEndian.PutUint32(payload[12:], 1)                    // one comment
+				binary.LittleEndian.PutUint32(payload[16:], uint32(len(comment))) //nolint:gosec
+				copy(payload[20:], comment)                                       // missing '=' separator
+
+				return payload
+			}(),
+			errMessage: "invalid comment 0",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			tags, err := ParseOpusTags(tc.payload)
+			assert.Nil(t, tags)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, errBadOpusTagsSignature)
+			assert.ErrorContains(t, err, tc.errMessage)
+		})
+	}
+}
+
+func TestParseVendorStringMissingCommentCount(t *testing.T) {
+	const (
+		headerMagicLen = 8
+		u32Size        = 4
+	)
+
+	// Build payload with just enough room for magic, vendor length, and vendor string
+	// but not enough for the comment count field to trigger the vendor error path.
+	payload := make([]byte, headerMagicLen+u32Size+1) // 13 bytes total
+	copy(payload, []byte(HeaderOpusTags))
+	binary.LittleEndian.PutUint32(payload[headerMagicLen:], 1) // vendor length
+	payload[headerMagicLen+u32Size] = 'v'                      // single vendor byte
+
+	vendor, end, err := parseVendorString(payload, headerMagicLen, u32Size, headerMagicLen+u32Size)
+	assert.Empty(t, vendor)
+	assert.Zero(t, end)
+	assert.ErrorIs(t, err, errBadOpusTagsSignature)
+	assert.ErrorContains(t, err, "vendor+comment count")
 }
