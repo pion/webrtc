@@ -249,6 +249,255 @@ func TestLegacyNAT1To1AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	})
 }
 
+func TestICEGatherer_SetCandidateTypesVNet(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const (
+		turnIP    = "10.0.0.1"
+		clientIP  = "10.0.0.2"
+		turnPort  = 3478
+		username  = "user"
+		password  = "pass"
+		realm     = "pion.ly"
+		timeout   = 3 * time.Second
+		turnProto = "udp"
+	)
+
+	loggerFactory := logging.NewDefaultLoggerFactory()
+
+	router, err := vnet.NewRouter(&vnet.RouterConfig{
+		CIDR:          "10.0.0.0/24",
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	turnNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{turnIP}})
+	assert.NoError(t, err)
+	clientNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{clientIP}})
+	assert.NoError(t, err)
+
+	assert.NoError(t, router.AddNet(turnNet))
+	assert.NoError(t, router.AddNet(clientNet))
+	assert.NoError(t, router.Start())
+	defer func() {
+		assert.NoError(t, router.Stop())
+	}()
+
+	turnListener, err := turnNet.ListenPacket("udp4", net.JoinHostPort(turnIP, fmt.Sprintf("%d", turnPort)))
+	assert.NoError(t, err)
+
+	authKey := turn.GenerateAuthKey(username, realm, password)
+	turnServer, err := turn.NewServer(turn.ServerConfig{
+		Realm: realm,
+		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
+			if u == username && r == realm {
+				return authKey, true
+			}
+
+			return nil, false
+		},
+		PacketConnConfigs: []turn.PacketConnConfig{
+			{
+				PacketConn: turnListener,
+				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
+					RelayAddress: net.ParseIP(turnIP),
+					Address:      turnIP,
+					Net:          turnNet,
+				},
+			},
+		},
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, turnServer.Close())
+	}()
+
+	iceServer := ICEServer{
+		URLs:           []string{fmt.Sprintf("turn:%s:%d?transport=%s", turnIP, turnPort, turnProto)},
+		Username:       username,
+		Credential:     password,
+		CredentialType: ICECredentialTypePassword,
+	}
+
+	collect := func(t *testing.T, candidateTypes []ICECandidateType, servers []ICEServer) []ICECandidate {
+		t.Helper()
+
+		settingEngine := SettingEngine{}
+		settingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+		settingEngine.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+		settingEngine.SetNet(clientNet)
+		assert.NoError(t, settingEngine.SetCandidateTypes(candidateTypes))
+
+		gatherer, err := NewAPI(WithSettingEngine(settingEngine)).NewICEGatherer(ICEGatherOptions{
+			ICEServers: servers,
+		})
+		assert.NoError(t, err)
+		defer func() {
+			assert.NoError(t, gatherer.Close())
+		}()
+
+		done := make(chan struct{})
+		var candidates []ICECandidate
+		gatherer.OnLocalCandidate(func(c *ICECandidate) {
+			if c == nil {
+				close(done)
+			} else {
+				candidates = append(candidates, *c)
+			}
+		})
+
+		assert.NoError(t, gatherer.Gather())
+
+		select {
+		case <-done:
+		case <-time.After(timeout):
+			assert.Fail(t, "gathering did not complete")
+		}
+
+		return candidates
+	}
+
+	t.Run("HostOnly", func(t *testing.T) {
+		candidates := collect(t, []ICECandidateType{ICECandidateTypeHost}, nil)
+		if assert.NotEmpty(t, candidates) {
+			for _, c := range candidates {
+				assert.Equal(t, ICECandidateTypeHost, c.Typ)
+			}
+		}
+	})
+
+	t.Run("RelayOnly", func(t *testing.T) {
+		candidates := collect(t, []ICECandidateType{ICECandidateTypeRelay}, []ICEServer{iceServer})
+		if assert.NotEmpty(t, candidates) {
+			for _, c := range candidates {
+				assert.Equal(t, ICECandidateTypeRelay, c.Typ)
+			}
+		}
+	})
+}
+
+func TestICEGatherer_SetCandidateTypesSrflxOnlyVNet(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const (
+		stunIP     = "1.2.3.4"
+		stunPort   = 3478
+		externalIP = "1.2.3.10"
+		localIP    = "10.0.0.1"
+		realm      = "pion.ly"
+		timeout    = 3 * time.Second
+	)
+
+	loggerFactory := logging.NewDefaultLoggerFactory()
+
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{
+		CIDR:          "1.2.3.0/24",
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	stunNet, err := vnet.NewNet(&vnet.NetConfig{
+		StaticIP: stunIP,
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, wan.AddNet(stunNet))
+
+	clientLAN, err := vnet.NewRouter(&vnet.RouterConfig{
+		StaticIPs: []string{fmt.Sprintf("%s/%s", externalIP, localIP)},
+		CIDR:      "10.0.0.0/24",
+		NATType: &vnet.NATType{
+			Mode: vnet.NATModeNAT1To1,
+		},
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	clientNet, err := vnet.NewNet(&vnet.NetConfig{
+		StaticIP: localIP,
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, clientLAN.AddNet(clientNet))
+	assert.NoError(t, wan.AddRouter(clientLAN))
+	assert.NoError(t, wan.Start())
+	defer func() {
+		assert.NoError(t, wan.Stop())
+	}()
+
+	stunListener, err := stunNet.ListenPacket("udp4", net.JoinHostPort(stunIP, fmt.Sprintf("%d", stunPort)))
+	assert.NoError(t, err)
+
+	turnServer, err := turn.NewServer(turn.ServerConfig{
+		Realm:         realm,
+		LoggerFactory: loggerFactory,
+		PacketConnConfigs: []turn.PacketConnConfig{
+			{
+				PacketConn: stunListener,
+				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
+					RelayAddress: net.ParseIP(stunIP),
+					Address:      "0.0.0.0",
+					Net:          stunNet,
+				},
+			},
+		},
+	})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, turnServer.Close())
+	}()
+
+	iceServer := ICEServer{
+		URLs: []string{fmt.Sprintf("stun:%s:%d", stunIP, stunPort)},
+	}
+
+	se := SettingEngine{}
+	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+	se.SetNet(clientNet)
+	assert.NoError(t, se.SetCandidateTypes([]ICECandidateType{ICECandidateTypeSrflx}))
+
+	gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{
+		ICEServers: []ICEServer{iceServer},
+	})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, gatherer.Close())
+	}()
+
+	done := make(chan struct{})
+	var candidates []ICECandidate
+	gatherer.OnLocalCandidate(func(c *ICECandidate) {
+		if c == nil {
+			close(done)
+		} else {
+			candidates = append(candidates, *c)
+		}
+	})
+
+	assert.NoError(t, gatherer.Gather())
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		assert.Fail(t, "gathering did not complete")
+	}
+
+	if assert.NotEmpty(t, candidates) {
+		for _, c := range candidates {
+			assert.Equal(t, ICECandidateTypeSrflx, c.Typ)
+			assert.Equal(t, externalIP, c.Address)
+		}
+	}
+}
+
 func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 20)
 	defer lim.Stop()

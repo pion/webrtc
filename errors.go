@@ -194,6 +194,9 @@ var (
 	errICEInvalidConvertCandidateType = errors.New(
 		"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type",
 	)
+	errSettingEngineLiteWithNonHostCandidates = errors.New(
+		"SetCandidateTypes only supports ICECandidateTypeHost when ICELite is enabled",
+	)
 	errICEAgentNotExist            = errors.New("ICEAgent does not exist")
 	errICECandiatesCoversionFailed = errors.New("unable to convert ICE candidates to ICECandidates")
 	errICERoleUnknown              = errors.New("unknown ICE Role")

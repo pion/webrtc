@@ -120,11 +120,26 @@ func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
 }
 
 func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
+	candidateTypes := g.api.settingEngine.candidates.candidateTypes
+
+	if g.gatherPolicy == ICETransportPolicyRelay {
+		for _, candidate := range candidateTypes {
+			if candidate != ice.CandidateTypeRelay {
+				g.log.Warnf("ICETransportPolicyRelay is set. gathering is limited to relay candidates")
+
+				break
+			}
+		}
+
+		return []ice.CandidateType{ice.CandidateTypeRelay}
+	}
+
 	if g.api.settingEngine.candidates.ICELite {
 		return []ice.CandidateType{ice.CandidateTypeHost}
 	}
-	if g.gatherPolicy == ICETransportPolicyRelay {
-		return []ice.CandidateType{ice.CandidateTypeRelay}
+
+	if len(candidateTypes) > 0 {
+		return candidateTypes
 	}
 
 	return nil
