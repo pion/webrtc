@@ -170,8 +170,13 @@ func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
 	if g.api.settingEngine.candidates.ICELite {
 		return []ice.CandidateType{ice.CandidateTypeHost}
 	}
-	if g.gatherPolicy == ICETransportPolicyRelay {
+
+	switch g.gatherPolicy {
+	case ICETransportPolicyRelay:
 		return []ice.CandidateType{ice.CandidateTypeRelay}
+	case ICETransportPolicyNoHost:
+		return []ice.CandidateType{ice.CandidateTypeServerReflexive, ice.CandidateTypeRelay}
+	default:
 	}
 
 	return nil
