@@ -26,7 +26,7 @@ type Config struct {
 	SetDatagramHandler func(func([]byte) error) func()
 	TransportClosed    <-chan struct{}
 	NetConn            netconn.Config
-	OnClose            func()
+	OnClose            func(error)
 }
 
 // Conn pumps a DetachedConn and exposes only its plaintext application data as
@@ -143,7 +143,7 @@ func (c *Conn) processEvents() {
 				// report handshake failure before OnClose initiates shutdown.
 				c.notify(err)
 				if c.ready {
-					_ = c.close(false)
+					_ = c.close(false, err)
 					c.eventMu.Unlock()
 
 					return
@@ -242,11 +242,11 @@ func (c *Conn) shutdown(flushEvents bool) error {
 	defer c.eventMu.Unlock()
 	c.driveMu.Lock()
 
-	return c.close(flushEvents)
+	return c.close(flushEvents, nil)
 }
 
-func (c *Conn) close(flushEvents bool) error {
-	var onClose func()
+func (c *Conn) close(flushEvents bool, cause error) error {
+	var onClose func(error)
 	if !c.closed {
 		c.closed = true
 		c.closeErr = util.FlattenErrs([]error{c.stop(flushEvents), c.Conn.Close()})
@@ -257,7 +257,7 @@ func (c *Conn) close(flushEvents bool) error {
 	err := c.closeErr
 	c.driveMu.Unlock()
 	if onClose != nil {
-		onClose()
+		onClose(cause)
 	}
 
 	return err
