@@ -75,6 +75,26 @@ func TestSetNAT1To1IPs(t *testing.T) {
 	assert.Equal(t, typ, settingEngine.candidates.NAT1To1IPCandidateType, "Failed to set NAT1To1IPCandidateType")
 }
 
+func TestSetCandidateTypes(t *testing.T) {
+	settingEngine := SettingEngine{}
+
+	assert.NoError(t, settingEngine.SetCandidateTypes([]ICECandidateType{ICECandidateTypeHost, ICECandidateTypeRelay}))
+	assert.Equal(t,
+		[]ice.CandidateType{ice.CandidateTypeHost, ice.CandidateTypeRelay},
+		settingEngine.candidates.candidateTypes,
+	)
+
+	settingEngine.SetLite(true)
+	assert.NoError(t, settingEngine.SetCandidateTypes([]ICECandidateType{ICECandidateTypeHost}))
+	assert.ErrorIs(
+		t, settingEngine.SetCandidateTypes([]ICECandidateType{ICECandidateTypeSrflx}),
+		errSettingEngineLiteWithNonHostCandidates,
+	)
+	assert.ErrorIs(
+		t, settingEngine.SetCandidateTypes([]ICECandidateType{ICECandidateTypeUnknown}), errICECandidateTypeUnknown,
+	)
+}
+
 func TestSetAnsweringDTLSRole(t *testing.T) {
 	s := SettingEngine{}
 	assert.Error(

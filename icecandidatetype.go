@@ -112,3 +112,18 @@ func (t *ICECandidateType) UnmarshalText(b []byte) error {
 
 	return err
 }
+
+func (t ICECandidateType) toICE() (ice.CandidateType, error) {
+	switch t {
+	case ICECandidateTypeHost:
+		return ice.CandidateTypeHost, nil
+	case ICECandidateTypeSrflx:
+		return ice.CandidateTypeServerReflexive, nil
+	case ICECandidateTypePrflx:
+		return ice.CandidateTypePeerReflexive, nil
+	case ICECandidateTypeRelay:
+		return ice.CandidateTypeRelay, nil
+	default:
+		return ice.CandidateType(t), fmt.Errorf("%w: %s", errICECandidateTypeUnknown, t.String())
+	}
+}

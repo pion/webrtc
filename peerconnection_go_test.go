@@ -30,6 +30,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/turn/v4"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -793,6 +794,70 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+func TestMulticastDNSHostNameConnection(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerHostName := fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	answerHostName := fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	for offerHostName == answerHostName {
+		answerHostName = fmt.Sprintf("pion-mdns-%s.local", strings.ToLower(util.MathRandAlpha(12)))
+	}
+
+	offerSettingEngine := SettingEngine{}
+	offerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	offerSettingEngine.SetMulticastDNSHostName(offerHostName)
+
+	answerSettingEngine := SettingEngine{}
+	answerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	answerSettingEngine.SetMulticastDNSHostName(answerHostName)
+
+	pcOffer, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+
+	pcAnswer, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	connected.Wait()
+
+	offerLocal := pcOffer.LocalDescription()
+	assert.NotNil(t, offerLocal)
+	if offerLocal != nil {
+		assert.Contains(t, offerLocal.SDP, offerHostName)
+	}
+
+	answerLocal := pcAnswer.LocalDescription()
+	assert.NotNil(t, answerLocal)
+	if answerLocal != nil {
+		assert.Contains(t, answerLocal.SDP, answerHostName)
+	}
+
+	offerRemote := pcOffer.RemoteDescription()
+	assert.NotNil(t, offerRemote)
+	if offerRemote != nil {
+		assert.Contains(t, offerRemote.SDP, answerHostName)
+	}
+
+	answerRemote := pcAnswer.RemoteDescription()
+	assert.NotNil(t, answerRemote)
+	if answerRemote != nil {
+		assert.Contains(t, answerRemote.SDP, offerHostName)
+	}
+}
+
 func TestICERestart(t *testing.T) {
 	extractCandidates := func(sdp string) (candidates []string) {
 		sc := bufio.NewScanner(strings.NewReader(sdp))
@@ -974,6 +1039,131 @@ func TestICERestart_Error_Handling(t *testing.T) {
 
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, offerPeerConnection, answerPeerConnection)
+}
+
+func TestPeerConnection_SetCandidateTypesSrflxOnlyVNet(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 20)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const (
+		stunIP        = "1.2.3.4"
+		stunPort      = 3478
+		offerExtIP    = "1.2.3.10"
+		offerLocalIP  = "10.0.0.1"
+		answerExtIP   = "1.2.3.11"
+		answerLocalIP = "10.0.1.1"
+		realm         = "pion.ly"
+	)
+
+	loggerFactory := logging.NewDefaultLoggerFactory()
+
+	router, err := vnet.NewRouter(&vnet.RouterConfig{
+		CIDR:          "1.2.3.0/24",
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	stunNet, err := vnet.NewNet(&vnet.NetConfig{StaticIP: stunIP})
+	assert.NoError(t, err)
+	assert.NoError(t, router.AddNet(stunNet))
+
+	offerLAN, err := vnet.NewRouter(&vnet.RouterConfig{
+		StaticIPs: []string{fmt.Sprintf("%s/%s", offerExtIP, offerLocalIP)},
+		CIDR:      "10.0.0.0/24",
+		NATType: &vnet.NATType{
+			Mode: vnet.NATModeNAT1To1,
+		},
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIP: offerLocalIP})
+	assert.NoError(t, err)
+	assert.NoError(t, offerLAN.AddNet(offerNet))
+	assert.NoError(t, router.AddRouter(offerLAN))
+
+	answerLAN, err := vnet.NewRouter(&vnet.RouterConfig{
+		StaticIPs: []string{fmt.Sprintf("%s/%s", answerExtIP, answerLocalIP)},
+		CIDR:      "10.0.1.0/24",
+		NATType: &vnet.NATType{
+			Mode: vnet.NATModeNAT1To1,
+		},
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIP: answerLocalIP})
+	assert.NoError(t, err)
+	assert.NoError(t, answerLAN.AddNet(answerNet))
+	assert.NoError(t, router.AddRouter(answerLAN))
+
+	assert.NoError(t, router.Start())
+	defer func() {
+		assert.NoError(t, router.Stop())
+	}()
+
+	stunListener, err := stunNet.ListenPacket("udp4", net.JoinHostPort(stunIP, fmt.Sprintf("%d", stunPort)))
+	assert.NoError(t, err)
+
+	authKey := turn.GenerateAuthKey("user", realm, "pass")
+	turnServer, err := turn.NewServer(turn.ServerConfig{
+		Realm: realm,
+		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
+			return authKey, true
+		},
+		PacketConnConfigs: []turn.PacketConnConfig{
+			{
+				PacketConn: stunListener,
+				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
+					RelayAddress: net.ParseIP(stunIP),
+					Address:      "0.0.0.0",
+					Net:          stunNet,
+				},
+			},
+		},
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, turnServer.Close())
+	}()
+
+	iceServer := ICEServer{
+		URLs: []string{fmt.Sprintf("stun:%s:%d", stunIP, stunPort)},
+	}
+
+	buildSettingEngine := func(n *vnet.Net) SettingEngine {
+		se := SettingEngine{}
+		se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+		se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+		se.SetICETimeouts(2*time.Second, 4*time.Second, 500*time.Millisecond)
+		se.SetNet(n)
+		assert.NoError(t, se.SetCandidateTypes([]ICECandidateType{ICECandidateTypeSrflx}))
+
+		return se
+	}
+
+	offerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(offerNet))).NewPeerConnection(Configuration{
+		ICEServers: []ICEServer{iceServer},
+	})
+	assert.NoError(t, err)
+
+	answerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(answerNet))).NewPeerConnection(Configuration{
+		ICEServers: []ICEServer{iceServer},
+	})
+	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
+
+	_, err = offerPC.CreateDataChannel("data", nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+	connected.Wait()
 }
 
 type trackRecords struct {
