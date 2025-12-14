@@ -46,6 +46,48 @@ type ICEGatherer struct {
 	sdpMLineIndex atomic.Uint32 // uint16
 }
 
+// ICEAddressRewriteMode controls whether a rule replaces or appends candidates.
+type ICEAddressRewriteMode byte
+
+const (
+	ICEAddressRewriteModeUnspecified ICEAddressRewriteMode = iota
+	ICEAddressRewriteReplace
+	ICEAddressRewriteAppend
+)
+
+func (r ICEAddressRewriteMode) toICE() ice.AddressRewriteMode {
+	return ice.AddressRewriteMode(r)
+}
+
+// ICEAddressRewriteRule represents a rule for remapping candidate addresses.
+type ICEAddressRewriteRule struct {
+	External        []string
+	Local           string
+	Iface           string
+	CIDR            string
+	AsCandidateType ICECandidateType
+	Mode            ICEAddressRewriteMode
+	Networks        []NetworkType
+}
+
+func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
+	candidateType := r.AsCandidateType.toICE()
+	mode := r.Mode.toICE()
+	networks := toICENetworkTypes(r.Networks)
+
+	rule := ice.AddressRewriteRule{
+		External:        append([]string(nil), r.External...),
+		Local:           r.Local,
+		Iface:           r.Iface,
+		CIDR:            r.CIDR,
+		AsCandidateType: candidateType,
+		Mode:            mode,
+		Networks:        networks,
+	}
+
+	return rule
+}
+
 // NewICEGatherer creates a new NewICEGatherer.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
@@ -80,7 +122,10 @@ func (g *ICEGatherer) createAgent() error {
 		return nil
 	}
 
-	options := g.buildAgentOptions()
+	options, err := g.buildAgentOptions()
+	if err != nil {
+		return err
+	}
 
 	agent, err := ice.NewAgentWithOptions(options...)
 	if err != nil {
@@ -92,7 +137,7 @@ func (g *ICEGatherer) createAgent() error {
 	return nil
 }
 
-func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
+func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
 	candidateTypes := g.resolveCandidateTypes()
 	nat1To1CandiTyp := g.resolveNAT1To1CandidateType()
 	mDNSMode := g.sanitizedMDNSMode()
@@ -103,7 +148,12 @@ func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
 	}
 
 	options = append(options, g.credentialOptions()...)
-	options = append(options, g.natRewriteOptions(nat1To1CandiTyp)...)
+
+	rewriteOptions, err := g.addressRewriteOptions(nat1To1CandiTyp)
+	if err != nil {
+		return nil, err
+	}
+	options = append(options, rewriteOptions...)
 	options = append(options, g.timeoutOptions()...)
 	options = append(options, g.miscOptions()...)
 	options = append(options, g.renominationOptions()...)
@@ -113,12 +163,7 @@ func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
 		requestedNetworkTypes = supportedNetworkTypes()
 	}
 
-	var networkTypes []ice.NetworkType
-	for _, typ := range requestedNetworkTypes {
-		networkTypes = append(networkTypes, ice.NetworkType(typ))
-	}
-
-	return append(options, ice.WithNetworkTypes(networkTypes))
+	return append(options, ice.WithNetworkTypes(toICENetworkTypes(requestedNetworkTypes))), nil
 }
 
 func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
@@ -181,19 +226,29 @@ func (g *ICEGatherer) credentialOptions() []ice.AgentOption {
 	}
 }
 
-func (g *ICEGatherer) natRewriteOptions(candidateType ice.CandidateType) []ice.AgentOption {
-	if len(g.api.settingEngine.candidates.NAT1To1IPs) == 0 {
-		return nil
+func (g *ICEGatherer) addressRewriteOptions(candidateType ice.CandidateType) ([]ice.AgentOption, error) {
+	rules := g.api.settingEngine.candidates.addressRewriteRules
+	nat1To1IPs := g.api.settingEngine.candidates.NAT1To1IPs
+	if len(rules) > 0 && len(nat1To1IPs) > 0 {
+		return nil, errAddressRewriteWithNAT1To1
+	}
+
+	if len(rules) > 0 {
+		return []ice.AgentOption{ice.WithAddressRewriteRules(rules...)}, nil
+	}
+
+	if len(nat1To1IPs) == 0 {
+		return nil, nil
 	}
 
 	return []ice.AgentOption{
 		ice.WithAddressRewriteRules(
 			legacyNAT1To1AddressRewriteRules(
-				g.api.settingEngine.candidates.NAT1To1IPs,
+				nat1To1IPs,
 				candidateType,
 			)...,
 		),
-	}
+	}, nil
 }
 
 func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {

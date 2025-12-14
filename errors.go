@@ -199,6 +199,7 @@ var (
 	errICERoleUnknown              = errors.New("unknown ICE Role")
 	errICEProtocolUnknown          = errors.New("unknown protocol")
 	errICEGathererNotStarted       = errors.New("gatherer not started")
+	errAddressRewriteWithNAT1To1   = errors.New("address rewrite rules cannot be combined with NAT1To1IPs")
 
 	errNetworkTypeUnknown = errors.New("unknown network type")
 

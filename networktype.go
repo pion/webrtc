@@ -62,7 +62,7 @@ func (t NetworkType) String() string {
 }
 
 // Protocol returns udp or tcp.
-func (t NetworkType) Protocol() string {
+func (t NetworkType) Protocol() string { //nolint:staticcheck
 	switch t {
 	case NetworkTypeUDP4:
 		return "udp"
@@ -107,4 +107,21 @@ func getNetworkType(iceNetworkType ice.NetworkType) (NetworkType, error) {
 	default:
 		return NetworkTypeUnknown, fmt.Errorf("%w: %s", errNetworkTypeUnknown, iceNetworkType.String())
 	}
+}
+
+func toICENetworkTypes(networkTypes []NetworkType) []ice.NetworkType {
+	if len(networkTypes) == 0 {
+		return nil
+	}
+
+	converted := make([]ice.NetworkType, 0, len(networkTypes))
+	for _, networkType := range networkTypes {
+		converted = append(converted, networkType.toICE())
+	}
+
+	return converted
+}
+
+func (networkType NetworkType) toICE() ice.NetworkType {
+	return ice.NetworkType(networkType)
 }

@@ -54,6 +54,7 @@ type SettingEngine struct {
 		IPFilter                 func(net.IP) (keep bool)
 		NAT1To1IPs               []string
 		NAT1To1IPCandidateType   ICECandidateType
+		addressRewriteRules      []ice.AddressRewriteRule
 		MulticastDNSMode         ice.MulticastDNSMode
 		MulticastDNSHostName     string
 		UsernameFragment         string
@@ -329,9 +330,41 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 // with the public IP. The host candidate is still available along with mDNS
 // capabilities unaffected. Also, you cannot give STUN server URL at the same time.
 // It will result in an error otherwise.
+//
+// Deprecated: Use SetICEAddressRewriteRules instead. To mirror the legacy
+// behavior, supply ICEAddressRewriteRule with External set to ips, AsCandidateType
+// set to candidateType, and Mode set to ICEAddressRewriteReplace for host
+// candidates or ICEAddressRewriteAppend for server reflexive candidates.
+// Or leave Mode unspecified to use the default behavior;
+// replace for host candidates and append for server reflexive candidates.
 func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
+}
+
+// SetICEAddressRewriteRules configures address rewrite rules for candidate publication.
+// These rules provide fine-grained control over which local addresses are replaced or
+// supplemented with external IPs.
+// This replaces the legacy NAT1To1 settings, which will be deprecated in the future.
+func (e *SettingEngine) SetICEAddressRewriteRules(rules ...ICEAddressRewriteRule) error {
+	if len(rules) == 0 {
+		e.candidates.addressRewriteRules = nil
+
+		return nil
+	}
+
+	if len(e.candidates.NAT1To1IPs) > 0 {
+		return errAddressRewriteWithNAT1To1
+	}
+
+	converted := make([]ice.AddressRewriteRule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, rule.toICE())
+	}
+
+	e.candidates.addressRewriteRules = converted
+
+	return nil
 }
 
 // SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful

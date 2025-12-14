@@ -126,6 +126,58 @@ func TestSetNAT1To1IPs(t *testing.T) {
 	assert.Equal(t, typ, settingEngine.candidates.NAT1To1IPCandidateType, "Failed to set NAT1To1IPCandidateType")
 }
 
+func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
+	se := SettingEngine{}
+	assert.Nil(t, se.candidates.addressRewriteRules)
+
+	assert.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
+		External:        []string{"198.51.100.1"},
+		AsCandidateType: ICECandidateTypeHost,
+		Mode:            ICEAddressRewriteReplace,
+	}))
+	assert.NotNil(t, se.candidates.addressRewriteRules)
+	assert.Len(t, se.candidates.addressRewriteRules, 1)
+
+	se.SetNAT1To1IPs([]string{"203.0.113.1"}, ICECandidateTypeHost)
+	assert.NoError(t, se.SetICEAddressRewriteRules())
+	assert.Nil(t, se.candidates.addressRewriteRules)
+
+	assert.ErrorIs(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
+		External:        []string{"198.51.100.2"},
+		AsCandidateType: ICECandidateTypeHost,
+		Mode:            ICEAddressRewriteReplace,
+	}), errAddressRewriteWithNAT1To1)
+}
+
+// ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost demonstrates
+// replacing host candidates with a fixed public address using the rewrite API.
+func ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost() {
+	var se SettingEngine
+
+	_ = se.SetICEAddressRewriteRules(
+		ICEAddressRewriteRule{
+			External:        []string{"198.51.100.1"},
+			AsCandidateType: ICECandidateTypeHost,
+			Mode:            ICEAddressRewriteReplace,
+		},
+	)
+}
+
+// ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx demonstrates
+// appending a server reflexive candidate that advertises a public address while
+// still keeping the host candidate.
+func ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx() {
+	var se SettingEngine
+
+	_ = se.SetICEAddressRewriteRules(
+		ICEAddressRewriteRule{
+			External:        []string{"198.51.100.2"},
+			AsCandidateType: ICECandidateTypeSrflx,
+			Mode:            ICEAddressRewriteAppend,
+		},
+	)
+}
+
 func TestSetAnsweringDTLSRole(t *testing.T) {
 	s := SettingEngine{}
 	assert.Error(
