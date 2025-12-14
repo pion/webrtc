@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
@@ -105,6 +106,7 @@ func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
 	options = append(options, g.natRewriteOptions(nat1To1CandiTyp)...)
 	options = append(options, g.timeoutOptions()...)
 	options = append(options, g.miscOptions()...)
+	options = append(options, g.renominationOptions()...)
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
 	if len(requestedNetworkTypes) == 0 {
@@ -242,6 +244,31 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 
 	if g.api.settingEngine.iceMaxBindingRequests != nil {
 		opts = append(opts, ice.WithMaxBindingRequests(*g.api.settingEngine.iceMaxBindingRequests))
+	}
+
+	return opts
+}
+
+func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
+	renom := g.api.settingEngine.renomination
+	if !renom.enabled && !renom.automatic {
+		return nil
+	}
+
+	generator := renom.generator
+	opts := []ice.AgentOption{
+		ice.WithRenomination(func() uint32 {
+			return generator()
+		}),
+	}
+
+	if renom.automatic {
+		interval := time.Duration(0)
+		if renom.automaticInterval != nil {
+			interval = *renom.automaticInterval
+		}
+
+		opts = append(opts, ice.WithAutomaticRenomination(interval))
 	}
 
 	return opts

@@ -55,6 +55,57 @@ func TestSetConnectionTimeout(t *testing.T) {
 	assert.Equal(t, *s.timeout.ICEKeepaliveInterval, 3*time.Second)
 }
 
+func TestICERenomination(t *testing.T) {
+	t.Run("EnableWithDefaultGenerator", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination())
+
+		assert.True(t, s.renomination.enabled)
+		assert.NotNil(t, s.renomination.generator)
+		assert.Equal(t, uint32(1), s.renomination.generator())
+		assert.Equal(t, uint32(2), s.renomination.generator())
+	})
+
+	t.Run("AutomaticRenominationUsesExistingGenerator", func(t *testing.T) {
+		var calls uint32
+		settings := SettingEngine{}
+		customGen := func() uint32 {
+			calls++
+
+			return 100 + calls
+		}
+
+		interval := 2 * time.Second
+		assert.NoError(t, settings.SetICERenomination(
+			WithRenominationGenerator(customGen),
+			WithRenominationInterval(interval),
+		))
+
+		assert.True(t, settings.renomination.enabled)
+		assert.True(t, settings.renomination.automatic)
+		if assert.NotNil(t, settings.renomination.automaticInterval) {
+			assert.Equal(t, interval, *settings.renomination.automaticInterval)
+		}
+		assert.Equal(t, uint32(101), settings.renomination.generator())
+	})
+
+	t.Run("AutomaticRenominationEnablesGenerator", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination())
+
+		assert.True(t, s.renomination.enabled)
+		assert.True(t, s.renomination.automatic)
+		assert.Nil(t, s.renomination.automaticInterval)
+		assert.NotNil(t, s.renomination.generator)
+	})
+
+	t.Run("InvalidInterval", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(0)), errInvalidRenominationInterval)
+		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(-1*time.Second)), errInvalidRenominationInterval)
+	})
+}
+
 func TestDetachDataChannels(t *testing.T) {
 	s := SettingEngine{}
 	assert.False(t, s.detach.DataChannels)

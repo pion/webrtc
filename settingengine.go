@@ -9,6 +9,7 @@ package webrtc
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -45,7 +46,8 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait *time.Duration
 		ICESTUNGatherTimeout      *time.Duration
 	}
-	candidates struct {
+	renomination renominationSettings
+	candidates   struct {
 		ICELite                  bool
 		ICENetworkTypes          []NetworkType
 		InterfaceFilter          func(string) (keep bool)
@@ -112,6 +114,68 @@ type SettingEngine struct {
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
+}
+
+type renominationSettings struct {
+	enabled           bool
+	generator         ice.NominationValueGenerator
+	automatic         bool
+	automaticInterval *time.Duration
+}
+
+// NominationValueGenerator generates nomination values for ICE renomination.
+type NominationValueGenerator func() uint32
+
+func (f NominationValueGenerator) toIce() ice.NominationValueGenerator {
+	return ice.NominationValueGenerator(f)
+}
+
+// RenominationOption allows configuring ICE renomination behavior.
+type RenominationOption func(*renominationSettings)
+
+// WithRenominationGenerator overrides the default nomination value generator.
+func WithRenominationGenerator(generator NominationValueGenerator) RenominationOption {
+	return func(cfg *renominationSettings) {
+		cfg.generator = generator.toIce()
+	}
+}
+
+// WithRenominationInterval sets the interval for automatic renomination checks.
+// Passing zero or a negative duration returns an error from SetICERenomination.
+func WithRenominationInterval(interval time.Duration) RenominationOption {
+	return func(cfg *renominationSettings) {
+		i := interval
+		cfg.automaticInterval = &i
+	}
+}
+
+var errInvalidRenominationInterval = errors.New("renomination interval must be greater than zero")
+
+// SetICERenomination configures ICE renomination using options for generator and scheduling.
+// Manual control is not exposed yet. This always enables automatic renomination with the default
+// generator unless a custom one is provided.
+func (e *SettingEngine) SetICERenomination(options ...RenominationOption) error {
+	cfg := e.renomination
+	for _, opt := range options {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+
+	if cfg.automaticInterval != nil && *cfg.automaticInterval <= 0 {
+		return errInvalidRenominationInterval
+	}
+
+	if cfg.generator == nil {
+		cfg.generator = ice.DefaultNominationValueGenerator()
+	}
+
+	e.renomination.enabled = true
+	e.renomination.generator = cfg.generator
+	e.renomination.automatic = true
+	e.renomination.automaticInterval = cfg.automaticInterval
+
+	return nil
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
