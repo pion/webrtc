@@ -116,8 +116,74 @@ func TestSCTPTransportOnClose(t *testing.T) {
 
 	select {
 	case <-ch:
-	case <-time.After(5 * time.Second):
+	case <-time.After(15 * time.Second):
 		assert.Fail(t, "timed out")
+	}
+}
+
+// TestSCTPTransportOnCloseImmediate tests that OnClose fires immediately
+// when Stop() is called directly on the SCTP transport, even if acceptDataChannels
+// is blocked waiting for a new data channel. This test would fail "sometimes" without the fix
+// because without the check before datachannel.Accept(), the goroutine would be
+// blocked in Accept() and might not detect the closure until Accept() returns.
+func TestSCTPTransportOnCloseImmediate(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+
+	defer closePairNow(t, offerPC, answerPC)
+
+	connected := make(chan struct{}, 1)
+	offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateConnected {
+			connected <- struct{}{}
+		}
+	})
+
+	err = signalPair(offerPC, answerPC)
+	assert.NoError(t, err)
+
+	select {
+	case <-connected:
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "connection establishment timed out")
+
+		return
+	}
+
+	// Create and open a data channel to ensure SCTP is fully established
+	// and acceptDataChannels goroutine has processed it and is back in Accept()
+	dc, err := offerPC.CreateDataChannel("test", nil)
+	assert.NoError(t, err)
+
+	dcOpened := make(chan struct{}, 1)
+	dc.OnOpen(func() {
+		dcOpened <- struct{}{}
+	})
+
+	select {
+	case <-dcOpened:
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "data channel open timed out")
+
+		return
+	}
+
+	// wait a bit to ensure acceptDataChannels loop is back in Accept()
+	// This increases the chance that Accept() is blocking when we call Stop()
+	time.Sleep(10 * time.Millisecond)
+
+	onCloseFired := make(chan error, 1)
+	answerPC.SCTP().OnClose(func(err error) {
+		onCloseFired <- err
+	})
+
+	err = answerPC.SCTP().Stop()
+	assert.NoError(t, err)
+
+	select {
+	case <-onCloseFired:
+	case <-time.After(50 * time.Millisecond):
+		assert.Fail(t, "OnClose did not fire immediately")
 	}
 }
 

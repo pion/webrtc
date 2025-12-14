@@ -190,6 +190,17 @@ func (r *SCTPTransport) acceptDataChannels(
 	}
 ACCEPT:
 	for {
+		// check if the association has been stopped before calling accept.
+		r.lock.RLock()
+		currentAssoc := r.sctpAssociation
+		shouldStop := currentAssoc == nil || currentAssoc != assoc
+		r.lock.RUnlock()
+		if shouldStop {
+			r.onClose(nil)
+
+			return
+		}
+
 		dc, err := datachannel.Accept(assoc, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
