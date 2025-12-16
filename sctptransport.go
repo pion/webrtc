@@ -53,6 +53,8 @@ type SCTPTransport struct {
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
 
+	localSctpInit []byte
+
 	api *API
 	log logging.LeveledLogger
 }
@@ -107,6 +109,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if maxMessageSize == 0 {
 		maxMessageSize = sctpMaxMessageSizeUnsetValue
 	}
+	remoteSctpInit := capabilities.SctpInit
 
 	dtlsTransport := r.Transport()
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
@@ -124,6 +127,8 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		MinCwnd:              r.api.settingEngine.sctp.minCwnd,
 		FastRtxWnd:           r.api.settingEngine.sctp.fastRtxWnd,
 		CwndCAStep:           r.api.settingEngine.sctp.cwndCAStep,
+		LocalSctpInit:        r.localSctpInit,
+		RemoteSctpInit:       remoteSctpInit,
 	})
 	if err != nil {
 		return err
@@ -455,4 +460,16 @@ func (r *SCTPTransport) BufferedAmount() int {
 	}
 
 	return r.sctpAssociation.BufferedAmount()
+}
+
+// The caller should hold the lock.
+func (r *SCTPTransport) GetSctpInit() []byte {
+	if len(r.localSctpInit) == 0 {
+		r.localSctpInit, _ = sctp.GenerateOutOfBandToken(sctp.Config{
+			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
+			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
+		})
+	}
+
+	return r.localSctpInit
 }
