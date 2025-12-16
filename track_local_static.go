@@ -226,10 +226,12 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP.
 type TrackLocalStaticSample struct {
+	mu         sync.Mutex
 	packetizer rtp.Packetizer
 	sequencer  rtp.Sequencer
 	rtpTrack   *TrackLocalStaticRTP
 	clockRate  float64
+	remainder  float64
 }
 
 // NewTrackLocalStaticSample returns a TrackLocalStaticSample.
@@ -329,22 +331,36 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 	s.rtpTrack.mu.RLock()
 	packetizer := s.packetizer
 	clockRate := s.clockRate
+	sequencer := s.sequencer
 	s.rtpTrack.mu.RUnlock()
-
 	if packetizer == nil {
 		return nil
 	}
 
+	s.mu.Lock()
+	remainder := s.remainder
+
 	// skip packets by the number of previously dropped packets
 	for i := uint16(0); i < sample.PrevDroppedPackets; i++ {
-		s.sequencer.NextSequenceNumber()
+		sequencer.NextSequenceNumber()
 	}
 
-	samples := uint32(sample.Duration.Seconds() * clockRate)
+	tickF := sample.Duration.Seconds() * clockRate
+
 	if sample.PrevDroppedPackets > 0 {
-		packetizer.SkipSamples(samples * uint32(sample.PrevDroppedPackets))
+		dropTotal := tickF*float64(sample.PrevDroppedPackets) + remainder
+		dropTicks := uint32(dropTotal)
+		remainder = dropTotal - float64(dropTicks)
+		packetizer.SkipSamples(dropTicks)
 	}
-	packets := packetizer.Packetize(sample.Data, samples)
+
+	curTotal := tickF + remainder
+	curTicks := uint32(curTotal)
+	remainder = curTotal - float64(curTicks)
+
+	s.remainder = remainder
+	packets := packetizer.Packetize(sample.Data, curTicks)
+	s.mu.Unlock()
 
 	writeErrs := []error{}
 	for _, p := range packets {
