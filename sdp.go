@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -368,6 +369,7 @@ func addDataMediaSection(
 	dtlsRole sdp.ConnectionRole,
 	iceGatheringState ICEGatheringState,
 	sctpMaxMessageSize uint32,
+	sctpInit []byte,
 ) error {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
@@ -387,10 +389,14 @@ func addDataMediaSection(
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
+		// TODO: do not hardcode this.
 		WithPropertyAttribute("sctp-port:5000").
 		WithValueAttribute("max-message-size", fmt.Sprintf("%d", sctpMaxMessageSize)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
+	if len(sctpInit) != 0 {
+		media = media.WithValueAttribute("sctp-init", base64.StdEncoding.EncodeToString(sctpInit))
+	}
 	for _, f := range dtlsFingerprints {
 		media = media.WithFingerprint(f.Algorithm, strings.ToUpper(f.Value))
 	}
@@ -668,6 +674,7 @@ type mediaSection struct {
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool
+	sctpInit        []byte
 	matchExtensions map[string]int
 	rids            []*simulcastRid
 }
@@ -741,6 +748,7 @@ func populateSDP(
 				connectionRole,
 				iceGatheringState,
 				sctpMaxMessageSize,
+				section.sctpInit,
 			); err != nil {
 				return nil, err
 			}
@@ -1208,4 +1216,21 @@ func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
 	}
 
 	return 0
+}
+
+func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
+	var err error
+	var decoded []byte
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == "sctp-init" {
+			decoded, err = base64.StdEncoding.DecodeString(a.Value)
+			if err == nil {
+				return decoded, nil
+			}
+
+			return nil, err
+		}
+	}
+
+	return nil, nil
 }
