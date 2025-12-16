@@ -145,6 +145,7 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 		if nalFound {
 			nal := newNal(reader.nalBuffer)
 			nal.parseHeader()
+
 			break
 		}
 
