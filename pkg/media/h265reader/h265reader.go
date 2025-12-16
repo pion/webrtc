@@ -150,13 +150,6 @@ func (reader *H265Reader) NextNAL() (*NAL, error) {
 		readByte := buffer[0]
 		nalFound := reader.processByte(readByte)
 		if nalFound {
-			naluType := NalUnitType((reader.nalBuffer[0] & 0x7E) >> 1)
-			if naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei {
-				reader.nalBuffer = nil
-
-				continue
-			}
-
 			break
 		}
 

@@ -90,6 +90,39 @@ func TestH265Reader_processByte(t *testing.T) {
 	assert.Equal(t, 0, reader.countOfConsecutiveZeroBytes)
 }
 
+func TestH265Reader_SEIPrefixSuffixNotSkipped(t *testing.T) {
+	// Build a small Annex-B stream: VPS, PrefixSEI, SuffixSEI, SPS
+	// NAL header is 2 bytes. NAL unit type is encoded in bits 1..6 of the first byte.
+	stream := []byte{
+		0x0, 0x0, 0x0, 0x1, 0x40, 0x01, 0xFF, // VPS (type 32)
+		0x0, 0x0, 0x0, 0x1, 0x4E, 0x01, 0xFF, // PrefixSEI (type 39)
+		0x0, 0x0, 0x0, 0x1, 0x50, 0x01, 0xFF, // SuffixSEI (type 40)
+		0x0, 0x0, 0x0, 0x1, 0x42, 0x01, 0xFF, // SPS (type 33)
+	}
+
+	reader, err := NewReader(bytes.NewReader(stream))
+	assert.NoError(t, err)
+
+	nal1, err := reader.NextNAL()
+	assert.NoError(t, err)
+	assert.Equal(t, NalUnitTypeVps, nal1.NalUnitType)
+
+	nal2, err := reader.NextNAL()
+	assert.NoError(t, err)
+	assert.Equal(t, NalUnitTypePrefixSei, nal2.NalUnitType)
+
+	nal3, err := reader.NextNAL()
+	assert.NoError(t, err)
+	assert.Equal(t, NalUnitTypeSuffixSei, nal3.NalUnitType)
+
+	nal4, err := reader.NextNAL()
+	assert.NoError(t, err)
+	assert.Equal(t, NalUnitTypeSps, nal4.NalUnitType)
+
+	_, err = reader.NextNAL()
+	assert.Equal(t, io.EOF, err)
+}
+
 func TestNAL_parseHeader(t *testing.T) {
 	// Test VPS NAL header parsing
 	data := []byte{0x40, 0x01, 0x0C, 0x01} // VPS NAL unit
