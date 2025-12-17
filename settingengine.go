@@ -115,6 +115,7 @@ type SettingEngine struct {
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
+	enableSped                                bool
 }
 
 type renominationSettings struct {
@@ -415,7 +416,7 @@ func (e *SettingEngine) SetMulticastDNSHostName(hostName string) {
 	e.candidates.MulticastDNSHostName = hostName
 }
 
-// SetICECredentials sets a staic uFrag/uPwd to be used by pion/ice
+// SetICECredentials sets a static ice-ufrag/ice-pwd to be used by pion/ice
 //
 // This is useful if you want to do signalless WebRTC session,
 // or having a reproducible environment with static credentials.
@@ -457,7 +458,7 @@ func (e *SettingEngine) DisableSRTCPReplayProtection(isDisabled bool) {
 }
 
 // SetSDPMediaLevelFingerprints configures the logic for DTLS Fingerprint insertion
-// If true, fingerprints will be inserted in the sdp at the fingerprint
+// If true, fingerprints will be inserted in the sdp at the media
 // level, instead of the session level. This helps with compatibility with
 // some webrtc implementations.
 func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints bool) {
@@ -688,4 +689,9 @@ func (e *SettingEngine) SetHandleUndeclaredSSRCWithoutAnswer(handleUndeclaredSSR
 // (simulcast layer).
 func (e *SettingEngine) SetIgnoreRidPauseForRecv(ignoreRidPauseForRecv bool) {
 	e.ignoreRidPauseForRecv = ignoreRidPauseForRecv
+}
+
+// Enable SPED (dtls-in-stun)
+func (e *SettingEngine) EnableSped(enable bool) {
+	e.enableSped = enable
 }

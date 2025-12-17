@@ -2,6 +2,11 @@ module github.com/pion/webrtc/v4
 
 go 1.21.0
 
+replace github.com/pion/sctp => /home/fippo/pion/sctp
+replace github.com/pion/dtls/v3 => /home/fippo/pion/dtls
+replace github.com/pion/stun/v3 => /home/fippo/pion/stun
+replace github.com/pion/ice/v4 => /home/fippo/pion/ice
+
 require (
 	github.com/pion/datachannel v1.6.0
 	github.com/pion/dtls/v3 v3.0.10
@@ -28,6 +33,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/mdns/v2 v2.1.0 // indirect
+	github.com/pion/transport/v3 v3.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.33.0 // indirect

@@ -45,6 +45,11 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 			return
 		}
 
+		// Enable SPED.
+		s := webrtc.SettingEngine{}
+		s.EnableSped(true)
+		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+
 		var err error
 		*pc, err = webrtc.NewPeerConnection(webrtc.Configuration{
 			BundlePolicy: webrtc.BundlePolicyMaxBundle,
