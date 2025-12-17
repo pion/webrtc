@@ -2360,3 +2360,29 @@ func TestPeerConnectionCanTrickleICECandidatesGo(t *testing.T) {
 	assert.NoError(t, noTrickleAnswerPC.SetRemoteDescription(noTrickleOffer))
 	assert.Equal(t, ICETrickleCapabilityUnsupported, noTrickleAnswerPC.CanTrickleICECandidates())
 }
+
+func TestCreateAnswerActiveOfferPassiveAnswer(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	activeDesc := SessionDescription{Type: SDPTypeOffer, SDP: strings.ReplaceAll(minimalOffer, "actpass", "active")}
+	assert.NoError(t, pc.SetRemoteDescription(activeDesc))
+	answer, err := pc.CreateAnswer(nil)
+	assert.NoError(t, err)
+	answerRole := dtlsRoleFromRemoteSDP(answer.parsed)
+	assert.Equal(t, answerRole, DTLSRoleServer)
+	assert.NoError(t, pc.Close())
+}
+
+func TestCreateAnswerPassiveOfferActiveAnswer(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	passiveDesc := SessionDescription{Type: SDPTypeOffer, SDP: strings.ReplaceAll(minimalOffer, "actpass", "passive")}
+	assert.NoError(t, pc.SetRemoteDescription(passiveDesc))
+	answer, err := pc.CreateAnswer(nil)
+	assert.NoError(t, err)
+	answerRole := dtlsRoleFromRemoteSDP(answer.parsed)
+	assert.Equal(t, answerRole, DTLSRoleClient)
+	assert.NoError(t, pc.Close())
+}
