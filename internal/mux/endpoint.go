@@ -70,12 +70,12 @@ func (e *Endpoint) WriteTo(p []byte, _ net.Addr) (int, error) {
 	return e.Write(p)
 }
 
-// LocalAddr is a stub.
+// LocalAddr returns the local network address, if known.
 func (e *Endpoint) LocalAddr() net.Addr {
 	return e.mux.nextConn.LocalAddr()
 }
 
-// RemoteAddr is a stub.
+// RemoteAddr returns the remote network address, if known.
 func (e *Endpoint) RemoteAddr() net.Addr {
 	return e.mux.nextConn.RemoteAddr()
 }
