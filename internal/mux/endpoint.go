@@ -80,21 +80,24 @@ func (e *Endpoint) RemoteAddr() net.Addr {
 	return e.mux.nextConn.RemoteAddr()
 }
 
-// SetDeadline sets the read deadline for this Endpoint.
-// Write deadlines are not supported because writes go directly to the shared
-// underlying connection and are non-blocking for this endpoint.
+// SetDeadline sets the read and write deadlines on the shared underlying
+// connection. Because the connection is shared, this applies to all endpoints
+// on the mux. Per-endpoint read deadlines can be set with SetReadDeadline.
 func (e *Endpoint) SetDeadline(t time.Time) error {
-	return e.buffer.SetReadDeadline(t)
+	return e.mux.nextConn.SetDeadline(t)
 }
 
-// SetReadDeadline sets the read deadline for this Endpoint.
+// SetReadDeadline sets the read deadline for this Endpoint's internal
+// packet buffer. This timeout applies only to reads from this Endpoint,
+// not to the shared underlying connection.
 func (e *Endpoint) SetReadDeadline(t time.Time) error {
 	return e.buffer.SetReadDeadline(t)
 }
 
-// SetWriteDeadline is a stub.
-func (e *Endpoint) SetWriteDeadline(time.Time) error {
-	return nil
+// SetWriteDeadline sets the write deadline on the shared underlying connection.
+// Because the connection is shared, this applies to all endpoints on the mux.
+func (e *Endpoint) SetWriteDeadline(t time.Time) error {
+	return e.mux.nextConn.SetWriteDeadline(t)
 }
 
 // SetOnClose is a user set callback that

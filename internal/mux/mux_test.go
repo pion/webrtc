@@ -4,6 +4,7 @@
 package mux
 
 import (
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -41,10 +42,6 @@ func TestEndpointDeadline(t *testing.T) {
 			name:        "SetReadDeadline",
 			setDeadline: (*Endpoint).SetReadDeadline,
 		},
-		{
-			name:        "SetDeadline",
-			setDeadline: (*Endpoint).SetDeadline,
-		},
 	}
 
 	for _, tt := range tests {
@@ -76,6 +73,89 @@ func TestEndpointDeadline(t *testing.T) {
 			require.NoError(t, mux.Close())
 		})
 	}
+}
+
+type writeDeadlineConn struct {
+	net.Conn
+	writeDeadline time.Time
+}
+
+func (w *writeDeadlineConn) SetWriteDeadline(t time.Time) error {
+	w.writeDeadline = t
+
+	if w.Conn == nil {
+		return nil
+	}
+
+	return w.Conn.SetWriteDeadline(t)
+}
+
+func TestEndpointSetWriteDeadline(t *testing.T) {
+	lim := test.TimeOut(2 * time.Second)
+	defer lim.Stop()
+
+	ca, cb := net.Pipe()
+	defer func() {
+		_ = cb.Close()
+	}()
+
+	rdConn := &writeDeadlineConn{Conn: ca}
+
+	mux := NewMux(Config{
+		Conn:          rdConn,
+		BufferSize:    testPipeBufferSize,
+		LoggerFactory: logging.NewDefaultLoggerFactory(),
+	})
+
+	endpoint := mux.NewEndpoint(MatchAll)
+	deadline := time.Now().Add(10 * time.Millisecond)
+	require.NoError(t, endpoint.SetWriteDeadline(deadline))
+	require.WithinDuration(t, deadline, rdConn.writeDeadline, time.Millisecond)
+
+	require.NoError(t, mux.Close())
+}
+
+type writeDeadlineErrorConn struct {
+	net.Conn
+	deadlineErr error
+}
+
+func (w *writeDeadlineErrorConn) SetDeadline(t time.Time) error {
+	if w.deadlineErr != nil {
+		return w.deadlineErr
+	}
+
+	return nil
+}
+
+var errDeadlineTest = errors.New("write deadline failed")
+
+func TestEndpointSetDeadlineWriteDeadlineError(t *testing.T) {
+	lim := test.TimeOut(2 * time.Second)
+	defer lim.Stop()
+
+	ca, cb := net.Pipe()
+	defer func() {
+		_ = ca.Close()
+		_ = cb.Close()
+	}()
+
+	rdConn := &writeDeadlineErrorConn{Conn: ca, deadlineErr: errDeadlineTest}
+
+	mux := NewMux(Config{
+		Conn:          rdConn,
+		BufferSize:    testPipeBufferSize,
+		LoggerFactory: logging.NewDefaultLoggerFactory(),
+	})
+
+	endpoint := mux.NewEndpoint(MatchAll)
+	err := endpoint.SetDeadline(time.Now().Add(10 * time.Millisecond))
+	require.Error(t, err)
+	require.ErrorIs(t, err, errDeadlineTest)
+
+	require.NoError(t, mux.Close())
+	require.NoError(t, ca.Close())
+	require.NoError(t, rdConn.Close())
 }
 
 type muxErrorConnReadResult struct {
