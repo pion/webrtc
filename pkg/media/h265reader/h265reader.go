@@ -26,6 +26,10 @@ var (
 	errDataIsNotH265Stream = errors.New("data is not a H265/HEVC bitstream")
 )
 
+func (reader *H265Reader) shouldSkipNAL(naluType NalUnitType) bool {
+	return !reader.includeSEI && (naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei)
+}
+
 // NewReader creates new H265Reader.
 func NewReader(in io.Reader) (*H265Reader, error) {
 	if in == nil {
@@ -183,7 +187,7 @@ func (reader *H265Reader) NextNAL() (*NAL, error) {
 		nalFound := reader.processByte(readByte)
 		if nalFound {
 			naluType := NalUnitType((reader.nalBuffer[0] & 0x7E) >> 1)
-			if !reader.includeSEI && (naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei) {
+			if reader.shouldSkipNAL(naluType) {
 				reader.nalBuffer = nil
 
 				continue
