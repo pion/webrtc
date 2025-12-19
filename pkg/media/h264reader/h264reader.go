@@ -18,6 +18,7 @@ type H264Reader struct {
 	nalPrefixParsed             bool
 	readBuffer                  []byte
 	tmpReadBuf                  []byte
+	includeSEI                  bool
 }
 
 var (
@@ -37,9 +38,40 @@ func NewReader(in io.Reader) (*H264Reader, error) {
 		nalPrefixParsed: false,
 		readBuffer:      make([]byte, 0),
 		tmpReadBuf:      make([]byte, 4096),
+		includeSEI:      false,
 	}
 
 	return reader, nil
+}
+
+// Option configures the behavior of H264Reader.
+type Option func(*H264Reader) error
+
+// NewReaderWithOptions creates new H264Reader with options.
+// The default behavior is to skip SEI NAL units.
+func NewReaderWithOptions(in io.Reader, options ...Option) (*H264Reader, error) {
+	reader, err := NewReader(in)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, option := range options {
+		if err := option(reader); err != nil {
+			return nil, err
+		}
+	}
+
+	return reader, nil
+}
+
+// WithIncludeSEI controls whether SEI (Supplemental Enhancement Information) NAL units are returned.
+// Default is false (SEI is skipped).
+func WithIncludeSEI(include bool) Option {
+	return func(r *H264Reader) error {
+		r.includeSEI = include
+
+		return nil
+	}
 }
 
 // NAL H.264 Network Abstraction Layer.
@@ -145,7 +177,7 @@ func (reader *H264Reader) NextNAL() (*NAL, error) {
 		if nalFound {
 			nal := newNal(reader.nalBuffer)
 			nal.parseHeader()
-			if nal.UnitType == NalUnitTypeSEI {
+			if !reader.includeSEI && nal.UnitType == NalUnitTypeSEI {
 				reader.nalBuffer = nil
 
 				continue

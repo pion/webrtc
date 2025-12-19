@@ -102,6 +102,32 @@ func TestSkipSEI(t *testing.T) {
 	require.Equal(byte(0xAB), nal.Data[0])
 }
 
+func TestIncludeSEI(t *testing.T) {
+	require := require.New(t)
+	h264Bytes := []byte{
+		0x0, 0x0, 0x0, 0x1, 0xAA,
+		0x0, 0x0, 0x0, 0x1, 0x6, // SEI
+		0x0, 0x0, 0x0, 0x1, 0xAB,
+	}
+
+	reader, err := NewReaderWithOptions(bytes.NewReader(h264Bytes), WithIncludeSEI(true))
+	require.NoError(err)
+	require.NotNil(reader)
+
+	nal, err := reader.NextNAL()
+	require.NoError(err)
+	require.Equal(byte(0xAA), nal.Data[0])
+
+	nal, err = reader.NextNAL()
+	require.NoError(err)
+	require.Equal(NalUnitTypeSEI, nal.UnitType)
+	require.Equal(byte(0x6), nal.Data[0])
+
+	nal, err = reader.NextNAL()
+	require.NoError(err)
+	require.Equal(byte(0xAB), nal.Data[0])
+}
+
 func TestIssue1734_NextNal(t *testing.T) {
 	tt := [...][]byte{
 		[]byte("\x00\x00\x010\x00\x00\x01\x00\x00\x01"),

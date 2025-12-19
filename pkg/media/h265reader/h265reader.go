@@ -18,12 +18,17 @@ type H265Reader struct {
 	nalPrefixParsed             bool
 	readBuffer                  []byte
 	tmpReadBuf                  []byte
+	includeSEI                  bool
 }
 
 var (
 	errNilReader           = errors.New("stream is nil")
 	errDataIsNotH265Stream = errors.New("data is not a H265/HEVC bitstream")
 )
+
+func (reader *H265Reader) shouldSkipNAL(naluType NalUnitType) bool {
+	return !reader.includeSEI && (naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei)
+}
 
 // NewReader creates new H265Reader.
 func NewReader(in io.Reader) (*H265Reader, error) {
@@ -37,9 +42,40 @@ func NewReader(in io.Reader) (*H265Reader, error) {
 		nalPrefixParsed: false,
 		readBuffer:      make([]byte, 0),
 		tmpReadBuf:      make([]byte, 4096),
+		includeSEI:      false,
 	}
 
 	return reader, nil
+}
+
+// Option configures the behavior of H265Reader.
+type Option func(*H265Reader) error
+
+// NewReaderWithOptions creates new H265Reader with options.
+// The default behavior is to skip SEI NAL units.
+func NewReaderWithOptions(in io.Reader, options ...Option) (*H265Reader, error) {
+	reader, err := NewReader(in)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, option := range options {
+		if err := option(reader); err != nil {
+			return nil, err
+		}
+	}
+
+	return reader, nil
+}
+
+// WithIncludeSEI controls whether SEI (Supplemental Enhancement Information) NAL units are returned.
+// Default is false (SEI is skipped).
+func WithIncludeSEI(include bool) Option {
+	return func(r *H265Reader) error {
+		r.includeSEI = include
+
+		return nil
+	}
 }
 
 // NAL H.265/HEVC Network Abstraction Layer.
@@ -151,7 +187,7 @@ func (reader *H265Reader) NextNAL() (*NAL, error) {
 		nalFound := reader.processByte(readByte)
 		if nalFound {
 			naluType := NalUnitType((reader.nalBuffer[0] & 0x7E) >> 1)
-			if naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei {
+			if reader.shouldSkipNAL(naluType) {
 				reader.nalBuffer = nil
 
 				continue
