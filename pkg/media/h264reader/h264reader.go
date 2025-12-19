@@ -69,6 +69,7 @@ func NewReaderWithOptions(in io.Reader, options ...Option) (*H264Reader, error) 
 func WithIncludeSEI(include bool) Option {
 	return func(r *H264Reader) error {
 		r.includeSEI = include
+
 		return nil
 	}
 }
