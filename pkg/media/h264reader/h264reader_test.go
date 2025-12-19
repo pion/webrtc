@@ -83,7 +83,7 @@ func TestEOF(t *testing.T) {
 	testFunction(h264Bytes3)
 }
 
-func TestSEINotSkipped(t *testing.T) {
+func TestSkipSEI(t *testing.T) {
 	require := require.New(t)
 	h264Bytes := []byte{
 		0x0, 0x0, 0x0, 0x1, 0xAA,
@@ -96,11 +96,6 @@ func TestSEINotSkipped(t *testing.T) {
 	nal, err := reader.NextNAL()
 	require.Nil(err)
 	require.Equal(byte(0xAA), nal.Data[0])
-
-	nal, err = reader.NextNAL()
-	require.Nil(err)
-	require.Equal(byte(0x6), nal.Data[0])
-	require.Equal(NalUnitTypeSEI, nal.UnitType)
 
 	nal, err = reader.NextNAL()
 	require.Nil(err)
