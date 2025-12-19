@@ -55,6 +55,57 @@ func TestSetConnectionTimeout(t *testing.T) {
 	assert.Equal(t, *s.timeout.ICEKeepaliveInterval, 3*time.Second)
 }
 
+func TestICERenomination(t *testing.T) {
+	t.Run("EnableWithDefaultGenerator", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination())
+
+		assert.True(t, s.renomination.enabled)
+		assert.NotNil(t, s.renomination.generator)
+		assert.Equal(t, uint32(1), s.renomination.generator())
+		assert.Equal(t, uint32(2), s.renomination.generator())
+	})
+
+	t.Run("AutomaticRenominationUsesExistingGenerator", func(t *testing.T) {
+		var calls uint32
+		settings := SettingEngine{}
+		customGen := func() uint32 {
+			calls++
+
+			return 100 + calls
+		}
+
+		interval := 2 * time.Second
+		assert.NoError(t, settings.SetICERenomination(
+			WithRenominationGenerator(customGen),
+			WithRenominationInterval(interval),
+		))
+
+		assert.True(t, settings.renomination.enabled)
+		assert.True(t, settings.renomination.automatic)
+		if assert.NotNil(t, settings.renomination.automaticInterval) {
+			assert.Equal(t, interval, *settings.renomination.automaticInterval)
+		}
+		assert.Equal(t, uint32(101), settings.renomination.generator())
+	})
+
+	t.Run("AutomaticRenominationEnablesGenerator", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination())
+
+		assert.True(t, s.renomination.enabled)
+		assert.True(t, s.renomination.automatic)
+		assert.Nil(t, s.renomination.automaticInterval)
+		assert.NotNil(t, s.renomination.generator)
+	})
+
+	t.Run("InvalidInterval", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(0)), errInvalidRenominationInterval)
+		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(-1*time.Second)), errInvalidRenominationInterval)
+	})
+}
+
 func TestDetachDataChannels(t *testing.T) {
 	s := SettingEngine{}
 	assert.False(t, s.detach.DataChannels)
@@ -73,6 +124,58 @@ func TestSetNAT1To1IPs(t *testing.T) {
 	settingEngine.SetNAT1To1IPs(ips, typ)
 	assert.Equal(t, ips, settingEngine.candidates.NAT1To1IPs, "Failed to set NAT1To1IPs")
 	assert.Equal(t, typ, settingEngine.candidates.NAT1To1IPCandidateType, "Failed to set NAT1To1IPCandidateType")
+}
+
+func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
+	se := SettingEngine{}
+	assert.Nil(t, se.candidates.addressRewriteRules)
+
+	assert.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
+		External:        []string{"198.51.100.1"},
+		AsCandidateType: ICECandidateTypeHost,
+		Mode:            ICEAddressRewriteReplace,
+	}))
+	assert.NotNil(t, se.candidates.addressRewriteRules)
+	assert.Len(t, se.candidates.addressRewriteRules, 1)
+
+	se.SetNAT1To1IPs([]string{"203.0.113.1"}, ICECandidateTypeHost)
+	assert.NoError(t, se.SetICEAddressRewriteRules())
+	assert.Nil(t, se.candidates.addressRewriteRules)
+
+	assert.ErrorIs(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
+		External:        []string{"198.51.100.2"},
+		AsCandidateType: ICECandidateTypeHost,
+		Mode:            ICEAddressRewriteReplace,
+	}), errAddressRewriteWithNAT1To1)
+}
+
+// ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost demonstrates
+// replacing host candidates with a fixed public address using the rewrite API.
+func ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost() {
+	var se SettingEngine
+
+	_ = se.SetICEAddressRewriteRules(
+		ICEAddressRewriteRule{
+			External:        []string{"198.51.100.1"},
+			AsCandidateType: ICECandidateTypeHost,
+			Mode:            ICEAddressRewriteReplace,
+		},
+	)
+}
+
+// ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx demonstrates
+// appending a server reflexive candidate that advertises a public address while
+// still keeping the host candidate.
+func ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx() {
+	var se SettingEngine
+
+	_ = se.SetICEAddressRewriteRules(
+		ICEAddressRewriteRule{
+			External:        []string{"198.51.100.2"},
+			AsCandidateType: ICECandidateTypeSrflx,
+			Mode:            ICEAddressRewriteAppend,
+		},
+	)
 }
 
 func TestSetAnsweringDTLSRole(t *testing.T) {

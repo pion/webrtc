@@ -21,17 +21,23 @@ const (
 	// ICETransportPolicyRelay indicates only media relay candidates such
 	// as candidates passing through a TURN server are used.
 	ICETransportPolicyRelay
+
+	// ICETransportPolicyNoHost indicates only non-host candidates are used.
+	ICETransportPolicyNoHost
 )
 
 // This is done this way because of a linter.
 const (
-	iceTransportPolicyRelayStr = "relay"
-	iceTransportPolicyAllStr   = "all"
+	iceTransportPolicyRelayStr  = "relay"
+	iceTransportPolicyNoHostStr = "nohost"
+	iceTransportPolicyAllStr    = "all"
 )
 
 // NewICETransportPolicy takes a string and converts it to ICETransportPolicy.
 func NewICETransportPolicy(raw string) ICETransportPolicy {
 	switch raw {
+	case iceTransportPolicyNoHostStr:
+		return ICETransportPolicyNoHost
 	case iceTransportPolicyRelayStr:
 		return ICETransportPolicyRelay
 	default:
@@ -41,6 +47,8 @@ func NewICETransportPolicy(raw string) ICETransportPolicy {
 
 func (t ICETransportPolicy) String() string {
 	switch t {
+	case ICETransportPolicyNoHost:
+		return iceTransportPolicyNoHostStr
 	case ICETransportPolicyRelay:
 		return iceTransportPolicyRelayStr
 	case ICETransportPolicyAll:

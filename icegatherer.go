@@ -8,8 +8,10 @@ package webrtc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
@@ -44,6 +46,48 @@ type ICEGatherer struct {
 	sdpMLineIndex atomic.Uint32 // uint16
 }
 
+// ICEAddressRewriteMode controls whether a rule replaces or appends candidates.
+type ICEAddressRewriteMode byte
+
+const (
+	ICEAddressRewriteModeUnspecified ICEAddressRewriteMode = iota
+	ICEAddressRewriteReplace
+	ICEAddressRewriteAppend
+)
+
+func (r ICEAddressRewriteMode) toICE() ice.AddressRewriteMode {
+	return ice.AddressRewriteMode(r)
+}
+
+// ICEAddressRewriteRule represents a rule for remapping candidate addresses.
+type ICEAddressRewriteRule struct {
+	External        []string
+	Local           string
+	Iface           string
+	CIDR            string
+	AsCandidateType ICECandidateType
+	Mode            ICEAddressRewriteMode
+	Networks        []NetworkType
+}
+
+func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
+	candidateType := r.AsCandidateType.toICE()
+	mode := r.Mode.toICE()
+	networks := toICENetworkTypes(r.Networks)
+
+	rule := ice.AddressRewriteRule{
+		External:        append([]string(nil), r.External...),
+		Local:           r.Local,
+		Iface:           r.Iface,
+		CIDR:            r.CIDR,
+		AsCandidateType: candidateType,
+		Mode:            mode,
+		Networks:        networks,
+	}
+
+	return rule
+}
+
 // NewICEGatherer creates a new NewICEGatherer.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
@@ -70,7 +114,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 	}, nil
 }
 
-func (g *ICEGatherer) createAgent() error { //nolint:cyclop
+func (g *ICEGatherer) createAgent() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -78,72 +122,12 @@ func (g *ICEGatherer) createAgent() error { //nolint:cyclop
 		return nil
 	}
 
-	candidateTypes := []ice.CandidateType{}
-	if g.api.settingEngine.candidates.ICELite {
-		candidateTypes = append(candidateTypes, ice.CandidateTypeHost)
-	} else if g.gatherPolicy == ICETransportPolicyRelay {
-		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
+	options, err := g.buildAgentOptions()
+	if err != nil {
+		return err
 	}
 
-	var nat1To1CandiTyp ice.CandidateType
-	switch g.api.settingEngine.candidates.NAT1To1IPCandidateType {
-	case ICECandidateTypeHost:
-		nat1To1CandiTyp = ice.CandidateTypeHost
-	case ICECandidateTypeSrflx:
-		nat1To1CandiTyp = ice.CandidateTypeServerReflexive
-	default:
-		nat1To1CandiTyp = ice.CandidateTypeUnspecified
-	}
-
-	mDNSMode := g.api.settingEngine.candidates.MulticastDNSMode
-	if mDNSMode != ice.MulticastDNSModeDisabled && mDNSMode != ice.MulticastDNSModeQueryAndGather {
-		// If enum is in state we don't recognized default to MulticastDNSModeQueryOnly
-		mDNSMode = ice.MulticastDNSModeQueryOnly
-	}
-
-	config := &ice.AgentConfig{
-		Lite:                   g.api.settingEngine.candidates.ICELite,
-		Urls:                   g.validatedServers,
-		PortMin:                g.api.settingEngine.ephemeralUDP.PortMin,
-		PortMax:                g.api.settingEngine.ephemeralUDP.PortMax,
-		DisconnectedTimeout:    g.api.settingEngine.timeout.ICEDisconnectedTimeout,
-		FailedTimeout:          g.api.settingEngine.timeout.ICEFailedTimeout,
-		KeepaliveInterval:      g.api.settingEngine.timeout.ICEKeepaliveInterval,
-		LoggerFactory:          g.api.settingEngine.LoggerFactory,
-		CandidateTypes:         candidateTypes,
-		HostAcceptanceMinWait:  g.api.settingEngine.timeout.ICEHostAcceptanceMinWait,
-		SrflxAcceptanceMinWait: g.api.settingEngine.timeout.ICESrflxAcceptanceMinWait,
-		PrflxAcceptanceMinWait: g.api.settingEngine.timeout.ICEPrflxAcceptanceMinWait,
-		RelayAcceptanceMinWait: g.api.settingEngine.timeout.ICERelayAcceptanceMinWait,
-		STUNGatherTimeout:      g.api.settingEngine.timeout.ICESTUNGatherTimeout,
-		InterfaceFilter:        g.api.settingEngine.candidates.InterfaceFilter,
-		IPFilter:               g.api.settingEngine.candidates.IPFilter,
-		NAT1To1IPs:             g.api.settingEngine.candidates.NAT1To1IPs,
-		NAT1To1IPCandidateType: nat1To1CandiTyp,
-		IncludeLoopback:        g.api.settingEngine.candidates.IncludeLoopbackCandidate,
-		Net:                    g.api.settingEngine.net,
-		MulticastDNSMode:       mDNSMode,
-		MulticastDNSHostName:   g.api.settingEngine.candidates.MulticastDNSHostName,
-		LocalUfrag:             g.api.settingEngine.candidates.UsernameFragment,
-		LocalPwd:               g.api.settingEngine.candidates.Password,
-		TCPMux:                 g.api.settingEngine.iceTCPMux,
-		UDPMux:                 g.api.settingEngine.iceUDPMux,
-		ProxyDialer:            g.api.settingEngine.iceProxyDialer,
-		DisableActiveTCP:       g.api.settingEngine.iceDisableActiveTCP,
-		MaxBindingRequests:     g.api.settingEngine.iceMaxBindingRequests,
-		BindingRequestHandler:  g.api.settingEngine.iceBindingRequestHandler,
-	}
-
-	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
-	if len(requestedNetworkTypes) == 0 {
-		requestedNetworkTypes = supportedNetworkTypes()
-	}
-
-	for _, typ := range requestedNetworkTypes {
-		config.NetworkTypes = append(config.NetworkTypes, ice.NetworkType(typ))
-	}
-
-	agent, err := ice.NewAgent(config)
+	agent, err := ice.NewAgentWithOptions(options...)
 	if err != nil {
 		return err
 	}
@@ -151,6 +135,232 @@ func (g *ICEGatherer) createAgent() error { //nolint:cyclop
 	g.agent = agent
 
 	return nil
+}
+
+func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
+	candidateTypes := g.resolveCandidateTypes()
+	nat1To1CandiTyp := g.resolveNAT1To1CandidateType()
+	mDNSMode := g.sanitizedMDNSMode()
+
+	options := g.baseAgentOptions(mDNSMode)
+	if len(candidateTypes) > 0 {
+		options = append(options, ice.WithCandidateTypes(candidateTypes))
+	}
+
+	options = append(options, g.credentialOptions()...)
+
+	rewriteOptions, err := g.addressRewriteOptions(nat1To1CandiTyp)
+	if err != nil {
+		return nil, err
+	}
+	options = append(options, rewriteOptions...)
+	options = append(options, g.timeoutOptions()...)
+	options = append(options, g.miscOptions()...)
+	options = append(options, g.renominationOptions()...)
+
+	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
+	if len(requestedNetworkTypes) == 0 {
+		requestedNetworkTypes = supportedNetworkTypes()
+	}
+
+	return append(options, ice.WithNetworkTypes(toICENetworkTypes(requestedNetworkTypes))), nil
+}
+
+func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
+	if g.api.settingEngine.candidates.ICELite {
+		return []ice.CandidateType{ice.CandidateTypeHost}
+	}
+
+	switch g.gatherPolicy {
+	case ICETransportPolicyRelay:
+		return []ice.CandidateType{ice.CandidateTypeRelay}
+	case ICETransportPolicyNoHost:
+		return []ice.CandidateType{ice.CandidateTypeServerReflexive, ice.CandidateTypeRelay}
+	default:
+	}
+
+	return nil
+}
+
+func (g *ICEGatherer) resolveNAT1To1CandidateType() ice.CandidateType {
+	switch g.api.settingEngine.candidates.NAT1To1IPCandidateType {
+	case ICECandidateTypeHost:
+		return ice.CandidateTypeHost
+	case ICECandidateTypeSrflx:
+		return ice.CandidateTypeServerReflexive
+	default:
+		return ice.CandidateTypeUnspecified
+	}
+}
+
+func (g *ICEGatherer) sanitizedMDNSMode() ice.MulticastDNSMode {
+	mode := g.api.settingEngine.candidates.MulticastDNSMode
+	if mode == ice.MulticastDNSModeDisabled || mode == ice.MulticastDNSModeQueryAndGather {
+		return mode
+	}
+
+	return ice.MulticastDNSModeQueryOnly
+}
+
+func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.AgentOption {
+	return []ice.AgentOption{
+		ice.WithICELite(g.api.settingEngine.candidates.ICELite),
+		ice.WithUrls(g.validatedServers),
+		ice.WithPortRange(g.api.settingEngine.ephemeralUDP.PortMin, g.api.settingEngine.ephemeralUDP.PortMax),
+		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
+		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
+		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter),
+		ice.WithNet(g.api.settingEngine.net),
+		ice.WithMulticastDNSMode(mDNSMode),
+		ice.WithTCPMux(g.api.settingEngine.iceTCPMux),
+		ice.WithUDPMux(g.api.settingEngine.iceUDPMux),
+		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
+		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
+	}
+}
+
+func (g *ICEGatherer) credentialOptions() []ice.AgentOption {
+	ufrag := g.api.settingEngine.candidates.UsernameFragment
+	pass := g.api.settingEngine.candidates.Password
+	if ufrag == "" && pass == "" {
+		return nil
+	}
+
+	return []ice.AgentOption{
+		ice.WithLocalCredentials(g.api.settingEngine.candidates.UsernameFragment, g.api.settingEngine.candidates.Password),
+	}
+}
+
+func (g *ICEGatherer) addressRewriteOptions(candidateType ice.CandidateType) ([]ice.AgentOption, error) {
+	rules := g.api.settingEngine.candidates.addressRewriteRules
+	nat1To1IPs := g.api.settingEngine.candidates.NAT1To1IPs
+	if len(rules) > 0 && len(nat1To1IPs) > 0 {
+		return nil, errAddressRewriteWithNAT1To1
+	}
+
+	if len(rules) > 0 {
+		return []ice.AgentOption{ice.WithAddressRewriteRules(rules...)}, nil
+	}
+
+	if len(nat1To1IPs) == 0 {
+		return nil, nil
+	}
+
+	return []ice.AgentOption{
+		ice.WithAddressRewriteRules(
+			legacyNAT1To1AddressRewriteRules(
+				nat1To1IPs,
+				candidateType,
+			)...,
+		),
+	}, nil
+}
+
+func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {
+	opts := make([]ice.AgentOption, 0, 8)
+
+	if g.api.settingEngine.timeout.ICEDisconnectedTimeout != nil {
+		opts = append(opts, ice.WithDisconnectedTimeout(*g.api.settingEngine.timeout.ICEDisconnectedTimeout))
+	}
+	if g.api.settingEngine.timeout.ICEFailedTimeout != nil {
+		opts = append(opts, ice.WithFailedTimeout(*g.api.settingEngine.timeout.ICEFailedTimeout))
+	}
+	if g.api.settingEngine.timeout.ICEKeepaliveInterval != nil {
+		opts = append(opts, ice.WithKeepaliveInterval(*g.api.settingEngine.timeout.ICEKeepaliveInterval))
+	}
+	if g.api.settingEngine.timeout.ICEHostAcceptanceMinWait != nil {
+		opts = append(opts, ice.WithHostAcceptanceMinWait(*g.api.settingEngine.timeout.ICEHostAcceptanceMinWait))
+	}
+	if g.api.settingEngine.timeout.ICESrflxAcceptanceMinWait != nil {
+		opts = append(opts, ice.WithSrflxAcceptanceMinWait(*g.api.settingEngine.timeout.ICESrflxAcceptanceMinWait))
+	}
+	if g.api.settingEngine.timeout.ICEPrflxAcceptanceMinWait != nil {
+		opts = append(opts, ice.WithPrflxAcceptanceMinWait(*g.api.settingEngine.timeout.ICEPrflxAcceptanceMinWait))
+	}
+	if g.api.settingEngine.timeout.ICERelayAcceptanceMinWait != nil {
+		opts = append(opts, ice.WithRelayAcceptanceMinWait(*g.api.settingEngine.timeout.ICERelayAcceptanceMinWait))
+	}
+	if g.api.settingEngine.timeout.ICESTUNGatherTimeout != nil {
+		opts = append(opts, ice.WithSTUNGatherTimeout(*g.api.settingEngine.timeout.ICESTUNGatherTimeout))
+	}
+
+	return opts
+}
+
+func (g *ICEGatherer) miscOptions() []ice.AgentOption {
+	opts := make([]ice.AgentOption, 0, 4)
+
+	if g.api.settingEngine.candidates.MulticastDNSHostName != "" {
+		opts = append(opts, ice.WithMulticastDNSHostName(g.api.settingEngine.candidates.MulticastDNSHostName))
+	}
+
+	if g.api.settingEngine.candidates.IncludeLoopbackCandidate {
+		opts = append(opts, ice.WithIncludeLoopback())
+	}
+
+	if g.api.settingEngine.iceDisableActiveTCP {
+		opts = append(opts, ice.WithDisableActiveTCP())
+	}
+
+	if g.api.settingEngine.iceMaxBindingRequests != nil {
+		opts = append(opts, ice.WithMaxBindingRequests(*g.api.settingEngine.iceMaxBindingRequests))
+	}
+
+	return opts
+}
+
+func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
+	renom := g.api.settingEngine.renomination
+	if !renom.enabled && !renom.automatic {
+		return nil
+	}
+
+	generator := renom.generator
+	opts := []ice.AgentOption{
+		ice.WithRenomination(func() uint32 {
+			return generator()
+		}),
+	}
+
+	if renom.automatic {
+		interval := time.Duration(0)
+		if renom.automaticInterval != nil {
+			interval = *renom.automaticInterval
+		}
+
+		opts = append(opts, ice.WithAutomaticRenomination(interval))
+	}
+
+	return opts
+}
+
+func legacyNAT1To1AddressRewriteRules(ips []string, candidateType ice.CandidateType) []ice.AddressRewriteRule {
+	catchAll := make([]string, 0, len(ips))
+	rules := make([]ice.AddressRewriteRule, 0, len(ips)+1)
+
+	for _, ip := range ips {
+		splits := strings.SplitN(ip, "/", 2)
+
+		if len(splits) == 2 {
+			rules = append(rules, ice.AddressRewriteRule{
+				External:        []string{splits[0]},
+				Local:           splits[1],
+				AsCandidateType: candidateType,
+			})
+			catchAll = append(catchAll, splits[0])
+		} else {
+			catchAll = append(catchAll, ip)
+		}
+	}
+
+	if len(catchAll) > 0 {
+		rules = append(rules, ice.AddressRewriteRule{
+			External:        catchAll,
+			AsCandidateType: candidateType,
+		})
+	}
+
+	return rules
 }
 
 // Gather ICE candidates.

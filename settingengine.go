@@ -9,6 +9,7 @@ package webrtc
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -45,13 +46,15 @@ type SettingEngine struct {
 		ICERelayAcceptanceMinWait *time.Duration
 		ICESTUNGatherTimeout      *time.Duration
 	}
-	candidates struct {
+	renomination renominationSettings
+	candidates   struct {
 		ICELite                  bool
 		ICENetworkTypes          []NetworkType
 		InterfaceFilter          func(string) (keep bool)
 		IPFilter                 func(net.IP) (keep bool)
 		NAT1To1IPs               []string
 		NAT1To1IPCandidateType   ICECandidateType
+		addressRewriteRules      []ice.AddressRewriteRule
 		MulticastDNSMode         ice.MulticastDNSMode
 		MulticastDNSHostName     string
 		UsernameFragment         string
@@ -112,6 +115,68 @@ type SettingEngine struct {
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
+}
+
+type renominationSettings struct {
+	enabled           bool
+	generator         ice.NominationValueGenerator
+	automatic         bool
+	automaticInterval *time.Duration
+}
+
+// NominationValueGenerator generates nomination values for ICE renomination.
+type NominationValueGenerator func() uint32
+
+func (f NominationValueGenerator) toIce() ice.NominationValueGenerator {
+	return ice.NominationValueGenerator(f)
+}
+
+// RenominationOption allows configuring ICE renomination behavior.
+type RenominationOption func(*renominationSettings)
+
+// WithRenominationGenerator overrides the default nomination value generator.
+func WithRenominationGenerator(generator NominationValueGenerator) RenominationOption {
+	return func(cfg *renominationSettings) {
+		cfg.generator = generator.toIce()
+	}
+}
+
+// WithRenominationInterval sets the interval for automatic renomination checks.
+// Passing zero or a negative duration returns an error from SetICERenomination.
+func WithRenominationInterval(interval time.Duration) RenominationOption {
+	return func(cfg *renominationSettings) {
+		i := interval
+		cfg.automaticInterval = &i
+	}
+}
+
+var errInvalidRenominationInterval = errors.New("renomination interval must be greater than zero")
+
+// SetICERenomination configures ICE renomination using options for generator and scheduling.
+// Manual control is not exposed yet. This always enables automatic renomination with the default
+// generator unless a custom one is provided.
+func (e *SettingEngine) SetICERenomination(options ...RenominationOption) error {
+	cfg := e.renomination
+	for _, opt := range options {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+
+	if cfg.automaticInterval != nil && *cfg.automaticInterval <= 0 {
+		return errInvalidRenominationInterval
+	}
+
+	if cfg.generator == nil {
+		cfg.generator = ice.DefaultNominationValueGenerator()
+	}
+
+	e.renomination.enabled = true
+	e.renomination.generator = cfg.generator
+	e.renomination.automatic = true
+	e.renomination.automaticInterval = cfg.automaticInterval
+
+	return nil
 }
 
 func (e *SettingEngine) getSCTPMaxMessageSize() uint32 {
@@ -265,9 +330,41 @@ func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 // with the public IP. The host candidate is still available along with mDNS
 // capabilities unaffected. Also, you cannot give STUN server URL at the same time.
 // It will result in an error otherwise.
+//
+// Deprecated: Use SetICEAddressRewriteRules instead. To mirror the legacy
+// behavior, supply ICEAddressRewriteRule with External set to ips, AsCandidateType
+// set to candidateType, and Mode set to ICEAddressRewriteReplace for host
+// candidates or ICEAddressRewriteAppend for server reflexive candidates.
+// Or leave Mode unspecified to use the default behavior;
+// replace for host candidates and append for server reflexive candidates.
 func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
 	e.candidates.NAT1To1IPs = ips
 	e.candidates.NAT1To1IPCandidateType = candidateType
+}
+
+// SetICEAddressRewriteRules configures address rewrite rules for candidate publication.
+// These rules provide fine-grained control over which local addresses are replaced or
+// supplemented with external IPs.
+// This replaces the legacy NAT1To1 settings, which will be deprecated in the future.
+func (e *SettingEngine) SetICEAddressRewriteRules(rules ...ICEAddressRewriteRule) error {
+	if len(rules) == 0 {
+		e.candidates.addressRewriteRules = nil
+
+		return nil
+	}
+
+	if len(e.candidates.NAT1To1IPs) > 0 {
+		return errAddressRewriteWithNAT1To1
+	}
+
+	converted := make([]ice.AddressRewriteRule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, rule.toICE())
+	}
+
+	e.candidates.addressRewriteRules = converted
+
+	return nil
 }
 
 // SetIncludeLoopbackCandidate enable pion to gather loopback candidates, it is useful
