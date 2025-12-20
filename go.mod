@@ -12,7 +12,7 @@ require (
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/rtp v1.8.27
 	github.com/pion/sctp v1.8.41
-	github.com/pion/sdp/v3 v3.0.16
+	github.com/pion/sdp/v3 v3.0.17
 	github.com/pion/srtp/v3 v3.0.9
 	github.com/pion/stun/v3 v3.0.2
 	github.com/pion/transport/v3 v3.1.1
