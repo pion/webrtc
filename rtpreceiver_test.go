@@ -8,6 +8,7 @@ package webrtc
 
 import (
 	"context"
+	"io"
 	"math"
 	"testing"
 	"time"
@@ -67,6 +68,73 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 	<-seenPacket.Done()
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, sender, receiver)
+}
+
+func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	dtlsTransport, err := api.NewDTLSTransport(nil, nil)
+	require.NoError(t, err)
+
+	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, dtlsTransport)
+	require.NoError(t, err)
+
+	receiver.configureReceive(RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{
+			{
+				RTPCodingParameters: RTPCodingParameters{
+					RID:  "rid",
+					SSRC: 1111,
+					RTX: RTPRtxParameters{
+						SSRC: 2222,
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, receiver.Stop())
+
+	params := RTPParameters{
+		Codecs: []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
+			},
+		},
+	}
+	ridStreamInfo := &interceptor.StreamInfo{SSRC: 1111}
+	rtxStreamInfo := &interceptor.StreamInfo{SSRC: 2222}
+	readCalled := make(chan struct{}, 1)
+	rtpInterceptor := interceptor.RTPReaderFunc(
+		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			select {
+			case readCalled <- struct{}{}:
+			default:
+			}
+
+			return 0, a, io.EOF
+		},
+	)
+
+	for i := 0; i < 50; i++ {
+		track, err := receiver.receiveForRid("rid", params, ridStreamInfo, nil, nil, nil, nil, nil)
+		assert.Nil(t, track)
+		assert.ErrorIs(t, err, io.EOF)
+
+		err = receiver.receiveForRtx(SSRC(0), "rid", rtxStreamInfo, nil, rtpInterceptor, nil, nil)
+		assert.ErrorIs(t, err, io.EOF)
+	}
+
+	select {
+	case <-readCalled:
+		assert.Fail(t, "repair reader invoked after Stop")
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 // TestRTPReceiver_CollectStats_Mapping validates that collectStats maps
