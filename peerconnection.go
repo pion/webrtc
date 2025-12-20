@@ -724,6 +724,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		if options != nil && options.ICETricklingSupported {
 			descr.WithICETrickleAdvertised()
 		}
+		if pc.api.settingEngine.renomination.enabled {
+			descr.WithICERenomination()
+		}
 
 		updateSDPOrigin(&pc.sdpOrigin, descr)
 		sdpBytes, err := descr.Marshal()
@@ -891,6 +894,9 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	if options != nil && options.ICETricklingSupported {
 		descr.WithICETrickleAdvertised()
+	}
+	if pc.api.settingEngine.renomination.enabled {
+		descr.WithICERenomination()
 	}
 
 	updateSDPOrigin(&pc.sdpOrigin, descr)
