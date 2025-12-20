@@ -742,7 +742,7 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 
 // readRTX returns an RTX packet if one is available on the RTX track, otherwise returns nil.
 func (r *RTPReceiver) readRTX(reader *TrackRemote) *rtxPacketWithAttributes {
-	if !reader.HasRTX() {
+	if !reader.HasRTX() || r.haveClosed() {
 		return nil
 	}
 

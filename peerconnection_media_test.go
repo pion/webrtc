@@ -2164,6 +2164,165 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 	assert.Greater(t, rtxPacketRead.Load(), int32(0), "no rtx packet read")
 }
 
+func TestPeerConnection_Simulcast_LateRIDRSIDAfterReceiverClosed(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	rids := []string{"a", "b"}
+	pcOffer, pcAnswer, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	vp8WriterAStatic, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[0]),
+	)
+	require.NoError(t, err)
+
+	vp8WriterBStatic, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[1]),
+	)
+	require.NoError(t, err)
+
+	vp8WriterA, vp8WriterB := &simulcastTestTrackLocal{vp8WriterAStatic}, &simulcastTestTrackLocal{vp8WriterBStatic}
+
+	sender, err := pcOffer.AddTrack(vp8WriterA)
+	require.NoError(t, err)
+	require.NotNil(t, sender)
+	require.NoError(t, sender.AddEncoding(vp8WriterB))
+
+	receiverStopped := make(chan struct{})
+	var stopOnce sync.Once
+	var receiverOnce sync.Once
+	var answerReceiver *RTPReceiver
+	ridMap := map[string]struct{}{}
+	var ridMu sync.Mutex
+
+	pcAnswer.OnTrack(func(trackRemote *TrackRemote, receiver *RTPReceiver) {
+		receiverOnce.Do(func() {
+			answerReceiver = receiver
+		})
+
+		ridMu.Lock()
+		ridMap[trackRemote.RID()] = struct{}{}
+		ready := len(ridMap) == len(rids)
+		ridMu.Unlock()
+
+		if ready {
+			stopOnce.Do(func() {
+				assert.NoError(t, receiver.Stop())
+				close(receiverStopped)
+			})
+		}
+	})
+
+	parameters := sender.GetParameters()
+	var midID, ridID, rsidID uint8
+	for _, extension := range parameters.HeaderExtensions {
+		switch extension.URI {
+		case sdp.SDESMidURI:
+			midID = uint8(extension.ID) //nolint:gosec // G115
+		case sdp.SDESRTPStreamIDURI:
+			ridID = uint8(extension.ID) //nolint:gosec // G115
+		case sdp.SDESRepairRTPStreamIDURI:
+			rsidID = uint8(extension.ID) //nolint:gosec // G115
+		}
+	}
+	require.NotZero(t, midID)
+	require.NotZero(t, ridID)
+	require.NotZero(t, rsidID)
+
+	require.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
+		re := regexp.MustCompile("(?m)[\r\n]+^.*a=ssrc.*$")
+
+		return re.ReplaceAllString(sdp, "")
+	}))
+
+	sequenceNumber := uint16(0)
+	deadline := time.Now().Add(10 * time.Second)
+
+sendRIDs:
+	for {
+		assert.False(t, time.Now().After(deadline), "timed out waiting for receiver to stop")
+
+		for i, track := range []*simulcastTestTrackLocal{vp8WriterA, vp8WriterB} {
+			sequenceNumber++
+			pkt := &rtp.Packet{
+				Header: rtp.Header{
+					Version:        2,
+					SequenceNumber: sequenceNumber,
+					PayloadType:    96,
+					SSRC:           uint32(i + 1), //nolint:gosec // G115
+				},
+				Payload: []byte{0x00},
+			}
+			require.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+			require.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
+			require.NoError(t, track.WriteRTP(pkt))
+		}
+
+		select {
+		case <-receiverStopped:
+			break sendRIDs
+		default:
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	assert.NotNil(t, answerReceiver, "expected receiver to be set")
+
+	assertNoRepairStreams := func() {
+		answerReceiver.mu.RLock()
+		defer answerReceiver.mu.RUnlock()
+
+		for _, track := range answerReceiver.tracks {
+			assert.Nil(t, track.repairStreamChannel, "expected repair stream channel to be nil")
+		}
+	}
+
+	assertNoRepairStreams()
+
+	for i := 0; i < 50; i++ {
+		sequenceNumber++
+		pkt := &rtp.Packet{
+			Header: rtp.Header{
+				Version:        2,
+				SequenceNumber: sequenceNumber,
+				PayloadType:    96,
+				SSRC:           uint32(1000 + i), //nolint:gosec // G115
+			},
+			Payload: []byte{0x00},
+		}
+		require.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+		require.NoError(t, pkt.Header.SetExtension(ridID, []byte(vp8WriterA.RID())))
+		require.NoError(t, vp8WriterA.WriteRTP(pkt))
+	}
+
+	for i := 0; i < 50; i++ {
+		sequenceNumber++
+		pkt := &rtp.Packet{
+			Header: rtp.Header{
+				Version:        2,
+				SequenceNumber: sequenceNumber,
+				PayloadType:    97,
+				SSRC:           uint32(2000 + i), //nolint:gosec // G115
+			},
+			Payload: []byte{0x00, 0x00, 0x00, 0x00, 0x00},
+		}
+		require.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+		require.NoError(t, pkt.Header.SetExtension(ridID, []byte(vp8WriterA.RID())))
+		require.NoError(t, pkt.Header.SetExtension(rsidID, []byte(vp8WriterA.RID())))
+		require.NoError(t, vp8WriterA.WriteRTP(pkt))
+	}
+
+	for i := 0; i < 10; i++ {
+		assertNoRepairStreams()
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 // Everytime we receive a new SSRC we probe it and try to determine the proper way to handle it.
 // In most cases a Track explicitly declares a SSRC and a OnTrack is fired. In two cases we don't
 // know the SSRC ahead of time
