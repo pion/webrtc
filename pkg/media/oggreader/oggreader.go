@@ -123,7 +123,11 @@ type Option func(*OggReader) error
 
 // NewWith returns a new Ogg reader and Ogg header
 // with an io.Reader input.
-// Deprecated: Use NewWithOptions instead.
+//
+// Warning: NewWith only parses the first OpusHead (a single logical bitstream/track)
+// and returns a single OggHeader. If you need to handle Ogg containers with multiple
+// Opus headers/tracks, use NewWithOptions and scan pages (e.g. via ParseNextPage)
+// to find and parse each OpusHead.
 func NewWith(in io.Reader) (*OggReader, *OggHeader, error) {
 	return newWith(in /* doChecksum */, true)
 }
