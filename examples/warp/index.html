@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <!--
+		SPDX-FileCopyrightText: 2025 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+<head>
+  <meta charset="utf-8">
+  <title>WARP: Faster WebRTC with SNAP and SPED</title>
+</head>
+<body>
+  <h2>📡 WebRTC DataChannel Test</h2>
+  <div>
+    <label><input type="checkbox" id="dtlsRole" />Act as DTLS client</label>
+    <button id="startBtn" onclick="start()">Start</button>
+  </div>
+  <input id="msg" placeholder="Message">
+  <button id="sendBtn" disabled onclick="sendMsg()">Send</button>
+  <pre id="log"></pre>
+
+  <script>
+    const pc = new RTCPeerConnection();
+    const channel = pc.createDataChannel("chat");
+
+    pc.onconnectionstatechange = async () => {
+        log(`🔄 Connection state: ${pc.connectionState}`);
+        if (pc.connectionState === 'connected') {
+            const stats = await pc.getStats();
+            const transport = [...stats.values()].find(o => o.type === 'transport');
+            if (transport) {
+                log(`DTLS role: ${transport.dtlsRole}`);
+                const pair = stats.get(transport.selectedCandidatePairId);
+                if (pair) {
+                    log(`RTT: ${pair.totalRoundTripTime / pair.responsesReceived}`);
+                }
+            }
+        }
+    }
+    pc.oniceconnectionstatechange = () => log(`🧊 ICE state: ${pc.iceConnectionState}`);
+    pc.onsignalingstatechange = () => log(`📞 Signaling state: ${pc.signalingState}`);
+
+    channel.onopen = () => {
+      log("✅ DataChannel opened");
+      document.getElementById("sendBtn").disabled = false;
+    }
+    channel.onmessage = e => log(`📩 Server: ${e.data}`);
+
+    pc.onicecandidate = event => {
+      if(event.candidate){
+        fetch("/candidate", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(event.candidate),
+        });
+      }
+    };
+    pc.ondatachannel = event => {
+        log("Server opened a channel", event.channel.name)
+        event.channel.onmessage = (ev) => {
+          log(`Server sent: ${ev.data}`)
+        }
+    };
+
+    async function start(){
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("dtlsRole").disabled = true;
+      try {
+        await pc.setLocalDescription();
+        const offer = pc.localDescription;
+        if (offer.sdp.indexOf("\na=sctp-init:") !== -1) {
+          log("✅ sctp-init found in offer, SNAP is supported");
+        }
+
+        const sdp = document.getElementById("dtlsRole").checked
+          ? offer.sdp.replace("actpass", "active")
+          : offer.sdp;
+        // TODO: parameters to disable SPED/SNAP?
+        const res = await fetch("/offer", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({type: "offer", sdp}),
+        })
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const answer = await res.json();
+        if (answer.sdp.indexOf("\na=sctp-init:") !== -1) {
+          log("✅ sctp-init found in answer, SNAP is supported");
+        }
+        await pc.setRemoteDescription(answer);
+
+      } catch (err) {
+        log(`❌ Connection failed: ${err.message}`);
+        console.error("Connection error:", err);
+      }
+    }
+
+    function sendMsg(){
+      const msg = document.getElementById("msg").value;
+
+      if (msg.trim()) {
+        channel.send(msg);
+        log(`You: ${msg}`);
+        document.getElementById("msg").value = "";
+      }
+    }
+
+    function log(msg){
+      document.getElementById("log").textContent+=msg+"\n";
+    }
+
+
+  </script>
+</body>
+</html>
