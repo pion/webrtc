@@ -91,6 +91,7 @@ type SettingEngine struct {
 		minCwnd              uint32
 		fastRtxWnd           uint32
 		cwndCAStep           uint32
+		enableSnap           bool
 	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
@@ -588,6 +589,11 @@ func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32)
 // latency and CPU usage. This feature is not backwards compatible so is disabled by default.
 func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 	e.sctp.enableZeroChecksum = isEnabled
+}
+
+// EnableSnap enables the use of the SNAP connect optimization.
+func (e *SettingEngine) EnableSnap(isEnabled bool) {
+	e.sctp.enableSnap = isEnabled
 }
 
 // SetSCTPMaxMessageSize sets the largest message we are willing to accept.

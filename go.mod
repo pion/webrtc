@@ -2,8 +2,6 @@ module github.com/pion/webrtc/v4
 
 go 1.21
 
-replace github.com/pion/sctp => /home/fippo/pion/sctp
-
 require (
 	github.com/pion/datachannel v1.5.10
 	github.com/pion/dtls/v3 v3.0.9
