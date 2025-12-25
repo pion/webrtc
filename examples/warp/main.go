@@ -45,8 +45,13 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 			return
 		}
 
+		// Enable SNAP.
+		s := webrtc.SettingEngine{}
+		s.EnableSnap(true)
+		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+
 		var err error
-		*pc, err = webrtc.NewPeerConnection(webrtc.Configuration{
+		*pc, err = api.NewPeerConnection(webrtc.Configuration{
 			BundlePolicy: webrtc.BundlePolicyMaxBundle,
 		})
 		if err != nil {
