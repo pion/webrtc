@@ -2126,6 +2126,25 @@ func TestICEGatherer_ContinualGatheringPolicy(t *testing.T) {
 		se.SetICEContinualGatheringPolicy(ice.GatherOnce)
 		assert.Equal(t, ice.GatherOnce, se.iceContinualGatheringPolicy)
 	})
+
+	t.Run("PolicyPassedToAgent", func(t *testing.T) {
+		lim := test.TimeOut(time.Second * 10)
+		defer lim.Stop()
+
+		report := test.CheckRoutines(t)
+		defer report()
+
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherContinually)
+
+		gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
+		assert.NoError(t, err)
+
+		err = gatherer.createAgent()
+		assert.NoError(t, err)
+
+		assert.NoError(t, gatherer.Close())
+	})
 }
 
 func TestICEGatherer_RenominationOptionsDisabled(t *testing.T) {
