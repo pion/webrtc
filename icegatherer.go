@@ -157,6 +157,7 @@ func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
 	options = append(options, g.timeoutOptions()...)
 	options = append(options, g.miscOptions()...)
 	options = append(options, g.renominationOptions()...)
+	options = append(options, g.continualGatheringOptions()...)
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
 	if len(requestedNetworkTypes) == 0 {
@@ -332,6 +333,15 @@ func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
 	}
 
 	return opts
+}
+
+func (g *ICEGatherer) continualGatheringOptions() []ice.AgentOption {
+	policy := g.api.settingEngine.iceContinualGatheringPolicy
+	if policy == 0 {
+		return nil
+	}
+
+	return []ice.AgentOption{ice.WithContinualGatheringPolicy(policy)}
 }
 
 func legacyNAT1To1AddressRewriteRules(ips []string, candidateType ice.CandidateType) []ice.AddressRewriteRule {

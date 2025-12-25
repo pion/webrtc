@@ -105,6 +105,7 @@ type SettingEngine struct {
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
 	iceBindingRequestHandler                  func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool //nolint:lll
+	iceContinualGatheringPolicy               ice.ContinualGatheringPolicy
 	disableMediaEngineCopy                    bool
 	disableMediaEngineMultipleCodecs          bool
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
@@ -660,6 +661,17 @@ func (e *SettingEngine) SetICEBindingRequestHandler(
 	bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool,
 ) {
 	e.iceBindingRequestHandler = bindingRequestHandler
+}
+
+// SetICEContinualGatheringPolicy sets the policy for gathering ICE candidates.
+// When set to GatherContinually, the ICE agent monitors for network changes and
+// gathers new candidates when interfaces are added or removed. This changes the
+// observable ICE behavior:
+// - ICEGatheringState remains in "gathering" and never transitions to "complete".
+// - OnICECandidate(nil) is never called, as gathering never finishes.
+// Applications should use trickle ICE and not wait for gathering to complete.
+func (e *SettingEngine) SetICEContinualGatheringPolicy(policy ice.ContinualGatheringPolicy) {
+	e.iceContinualGatheringPolicy = policy
 }
 
 // SetFireOnTrackBeforeFirstRTP sets if firing the OnTrack event should happen
