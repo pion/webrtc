@@ -2828,7 +2828,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 	pc.sctpTransport.lock.Lock()
 
 	var localSctpInit []byte
-	if pc.sctpTransport.dataChannelsRequested != 0 {
+	if pc.sctpTransport.dataChannelsRequested != 0 && pc.api.settingEngine.sctp.enableSnap {
 		localSctpInit = pc.sctpTransport.GetSctpInit()
 	}
 	defer pc.sctpTransport.lock.Unlock()
@@ -2945,7 +2945,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 
 		if media.MediaName.Media == mediaSectionApplication {
 			init, _ := getSctpInit(media)
-			if init != nil {
+			if init != nil && pc.api.settingEngine.sctp.enableSnap {
 				pc.sctpTransport.lock.Lock()
 				localSctpInit = pc.sctpTransport.GetSctpInit()
 				pc.sctpTransport.lock.Unlock()
