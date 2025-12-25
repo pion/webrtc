@@ -2109,6 +2109,25 @@ func TestICEGatherer_RenominationOptions(t *testing.T) {
 	assert.NotNil(t, se.renomination.generator)
 }
 
+func TestICEGatherer_ContinualGatheringPolicy(t *testing.T) {
+	t.Run("DefaultIsUnset", func(t *testing.T) {
+		se := SettingEngine{}
+		assert.Equal(t, ice.ContinualGatheringPolicy(0), se.iceContinualGatheringPolicy)
+	})
+
+	t.Run("SetPolicyGatherContinually", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherContinually)
+		assert.Equal(t, ice.GatherContinually, se.iceContinualGatheringPolicy)
+	})
+
+	t.Run("SetPolicyGatherOnce", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherOnce)
+		assert.Equal(t, ice.GatherOnce, se.iceContinualGatheringPolicy)
+	})
+}
+
 func TestICEGatherer_RenominationOptionsDisabled(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
