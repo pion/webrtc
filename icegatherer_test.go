@@ -2109,6 +2109,44 @@ func TestICEGatherer_RenominationOptions(t *testing.T) {
 	assert.NotNil(t, se.renomination.generator)
 }
 
+func TestICEGatherer_ContinualGatheringPolicy(t *testing.T) {
+	t.Run("DefaultIsUnset", func(t *testing.T) {
+		se := SettingEngine{}
+		assert.Equal(t, ice.ContinualGatheringPolicy(0), se.iceContinualGatheringPolicy)
+	})
+
+	t.Run("SetPolicyGatherContinually", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherContinually)
+		assert.Equal(t, ice.GatherContinually, se.iceContinualGatheringPolicy)
+	})
+
+	t.Run("SetPolicyGatherOnce", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherOnce)
+		assert.Equal(t, ice.GatherOnce, se.iceContinualGatheringPolicy)
+	})
+
+	t.Run("PolicyPassedToAgent", func(t *testing.T) {
+		lim := test.TimeOut(time.Second * 10)
+		defer lim.Stop()
+
+		report := test.CheckRoutines(t)
+		defer report()
+
+		se := SettingEngine{}
+		se.SetICEContinualGatheringPolicy(ice.GatherContinually)
+
+		gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
+		assert.NoError(t, err)
+
+		err = gatherer.createAgent()
+		assert.NoError(t, err)
+
+		assert.NoError(t, gatherer.Close())
+	})
+}
+
 func TestICEGatherer_RenominationOptionsDisabled(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
