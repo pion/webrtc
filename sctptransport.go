@@ -122,14 +122,15 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		LoggerFactory:        r.api.settingEngine.LoggerFactory,
 		RTOMax:               float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond),
 		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
-		MaxMessageSize:       maxMessageSize,
 		MTU:                  outboundMTU,
 		MinCwnd:              r.api.settingEngine.sctp.minCwnd,
 		FastRtxWnd:           r.api.settingEngine.sctp.fastRtxWnd,
 		CwndCAStep:           r.api.settingEngine.sctp.cwndCAStep,
+	}, sctp.SctpOptions{
+		MaxMessageSize:       maxMessageSize,
 		LocalSctpInit:        r.localSctpInit,
 		RemoteSctpInit:       remoteSctpInit,
-	})
+    })
 	if err != nil {
 		return err
 	}
