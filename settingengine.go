@@ -591,8 +591,8 @@ func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 	e.sctp.enableZeroChecksum = isEnabled
 }
 
-// EnableSnap enables the use of the SNAP connect optimization.
-func (e *SettingEngine) EnableSnap(isEnabled bool) {
+// EnableSctpSnap enables the use of the SCTP SNAP connect optimization.
+func (e *SettingEngine) EnableSctpSnap(isEnabled bool) {
 	e.sctp.enableSnap = isEnabled
 }
 
