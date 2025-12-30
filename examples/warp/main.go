@@ -46,7 +46,7 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 
 		// Enable SNAP.
 		s := webrtc.SettingEngine{}
-		s.EnableSnap(true)
+		s.EnableSctpSnap(true)
 		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 
 		var err error
