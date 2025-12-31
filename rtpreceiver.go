@@ -644,10 +644,12 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	track.repairRtcpInterceptor = rtcpInterceptor
 	track.repairStreamChannel = make(chan rtxPacketWithAttributes, 50)
 
+	repairInterceptor := track.repairInterceptor
+	repairStreamChannel := track.repairStreamChannel
 	go func() {
 		for {
 			b := r.rtxPool.Get().([]byte) // nolint:forcetypeassert
-			i, attributes, err := track.repairInterceptor.Read(b, nil)
+			i, attributes, err := repairInterceptor.Read(b, nil)
 			if err != nil {
 				r.rtxPool.Put(b) // nolint:staticcheck
 
@@ -694,7 +696,7 @@ func (r *RTPReceiver) receiveForRtxInternal(
 				r.rtxPool.Put(b) // nolint:staticcheck
 
 				return
-			case track.repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes, pool: &r.rtxPool}:
+			case repairStreamChannel <- rtxPacketWithAttributes{pkt: b[:i-2], attributes: attributes, pool: &r.rtxPool}:
 			default:
 				// skip the RTX packet if the repair stream channel is full, could be blocked in the application's read loop
 			}
@@ -752,12 +754,17 @@ func (r *RTPReceiver) readRTX(reader *TrackRemote) *rtxPacketWithAttributes {
 		return nil
 	}
 
+	r.mu.RLock()
+	var ch chan rtxPacketWithAttributes
 	if t := r.streamsForTrack(reader); t != nil {
-		select {
-		case rtxPacketReceived := <-t.repairStreamChannel:
-			return &rtxPacketReceived
-		default:
-		}
+		ch = t.repairStreamChannel
+	}
+	r.mu.RUnlock()
+
+	select {
+	case rtxPacketReceived := <-ch:
+		return &rtxPacketReceived
+	default:
 	}
 
 	return nil
