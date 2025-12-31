@@ -1827,19 +1827,16 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 	rtcpInterceptor := result.rtcpInterceptor
 
 	// try to read simulcast IDs from the packet we already have
-	var mid, rid, rsid string
-	if _, err = handleUnknownRTPPacket(
+	mid, rid, rsid, _, err := handleUnknownRTPPacket(
 		b[:i], uint8(midExtensionID), //nolint:gosec // G115
 		uint8(streamIDExtensionID),       //nolint:gosec // G115
 		uint8(repairStreamIDExtensionID), //nolint:gosec // G115
-		&mid,
-		&rid,
-		&rsid,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	peekedPackets := []*peekedPacket{}
+	peekedPackets := []*peekedPacket(nil)
 
 	// if the first packet didn't contain simuilcast IDs, then probe more packets
 	var paddingOnly bool
@@ -1860,14 +1857,12 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 				attributes: attributes,
 			})
 
-			if paddingOnly, err = handleUnknownRTPPacket(
+			mid, rid, rsid, paddingOnly, err = handleUnknownRTPPacket(
 				b[:i], uint8(midExtensionID), //nolint:gosec // G115
 				uint8(streamIDExtensionID),       //nolint:gosec // G115
 				uint8(repairStreamIDExtensionID), //nolint:gosec // G115
-				&mid,
-				&rid,
-				&rsid,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 

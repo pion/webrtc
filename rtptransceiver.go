@@ -427,32 +427,31 @@ func handleUnknownRTPPacket(
 	midExtensionID,
 	streamIDExtensionID,
 	repairStreamIDExtensionID uint8,
-	mid, rid, rsid *string,
-) (paddingOnly bool, err error) {
+) (mid, rid, rsid string, paddingOnly bool, err error) {
 	rp := &rtp.Packet{}
 	if err = rp.Unmarshal(buf); err != nil {
-		return false, err
+		return mid, rid, rsid, false, err
 	}
 
 	if rp.Padding && len(rp.Payload) == 0 {
-		paddingOnly = true
+		return mid, rid, rsid, true, nil
 	}
 
 	if !rp.Header.Extension {
-		return paddingOnly, nil
+		return mid, rid, rsid, false, nil
 	}
 
 	if payload := rp.GetExtension(midExtensionID); payload != nil {
-		*mid = string(payload)
+		mid = string(payload)
 	}
 
 	if payload := rp.GetExtension(streamIDExtensionID); payload != nil {
-		*rid = string(payload)
+		rid = string(payload)
 	}
 
 	if payload := rp.GetExtension(repairStreamIDExtensionID); payload != nil {
-		*rsid = string(payload)
+		rsid = string(payload)
 	}
 
-	return paddingOnly, nil
+	return mid, rid, rsid, false, nil
 }
