@@ -1766,7 +1766,7 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 		<-tracksReady.Done()
 
-		// padding only packets should not affect simulcast probe
+		// Padding-only packets should not exhaust the remaining simulcast probe budget.
 		var sequenceNumber uint16
 		for sequenceNumber = 0; sequenceNumber < simulcastProbeCount+10; sequenceNumber++ {
 			time.Sleep(20 * time.Millisecond)
@@ -1777,7 +1777,7 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 						Version:        2,
 						SequenceNumber: sequenceNumber,
 						PayloadType:    96,
-						Padding:        true,
+						Padding:        sequenceNumber >= simulcastProbeCount-1,
 					},
 					Payload: []byte{0x00, 0x02},
 				}
