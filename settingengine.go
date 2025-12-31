@@ -664,6 +664,12 @@ func (e *SettingEngine) SetICEBindingRequestHandler(
 }
 
 // SetICEContinualGatheringPolicy sets the policy for gathering ICE candidates.
+// When set to GatherContinually, the ICE agent monitors for network changes and
+// gathers new candidates when interfaces are added or removed. This changes the
+// observable ICE behavior:
+// - ICEGatheringState remains in "gathering" and never transitions to "complete".
+// - OnICECandidate(nil) is never called, as gathering never finishes.
+// Applications should use trickle ICE and not wait for gathering to complete.
 func (e *SettingEngine) SetICEContinualGatheringPolicy(policy ice.ContinualGatheringPolicy) {
 	e.iceContinualGatheringPolicy = policy
 }
