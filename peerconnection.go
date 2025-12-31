@@ -1725,7 +1725,7 @@ func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
 	}
 }
 
-func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:gocyclo,gocognit,cyclop,lll
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:gocyclo,maintidx,gocognit,cyclop,lll
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -1840,35 +1840,35 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 
 	// if the first packet didn't contain simuilcast IDs, then probe more packets
 	var paddingOnly bool
-	for readCount := 0; readCount <= simulcastProbeCount; readCount++ {
-		if mid == "" || (rid == "" && rsid == "") {
-			// skip padding only packets for probing
-			if paddingOnly {
-				readCount--
-			}
-
-			i, attributes, err := interceptor.Read(b, nil)
-			if err != nil {
-				return err
-			}
-
-			peekedPackets = append(peekedPackets, &peekedPacket{
-				payload:    slices.Clone(b[:i]),
-				attributes: attributes,
-			})
-
-			mid, rid, rsid, paddingOnly, err = handleUnknownRTPPacket(
-				b[:i], uint8(midExtensionID), //nolint:gosec // G115
-				uint8(streamIDExtensionID),       //nolint:gosec // G115
-				uint8(repairStreamIDExtensionID), //nolint:gosec // G115
-			)
-			if err != nil {
-				return err
-			}
-
-			continue
+	readCount := 0
+	for (mid == "" || (rid == "" && rsid == "")) && readCount < simulcastProbeCount {
+		// skip padding only packets for probing
+		if paddingOnly {
+			readCount--
 		}
 
+		i, attributes, err := interceptor.Read(b, nil)
+		if err != nil {
+			return err
+		}
+
+		peekedPackets = append(peekedPackets, &peekedPacket{
+			payload:    slices.Clone(b[:i]),
+			attributes: attributes,
+		})
+
+		mid, rid, rsid, paddingOnly, err = handleUnknownRTPPacket(
+			b[:i], uint8(midExtensionID), //nolint:gosec // G115
+			uint8(streamIDExtensionID),       //nolint:gosec // G115
+			uint8(repairStreamIDExtensionID), //nolint:gosec // G115
+		)
+		if err != nil {
+			return err
+		}
+		readCount++
+	}
+
+	if mid != "" && (rid != "" || rsid != "") {
 		for _, t := range pc.GetTransceivers() {
 			receiver := t.Receiver()
 			if t.Mid() != mid || receiver == nil {
@@ -1876,7 +1876,11 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				return receiver.receiveForRtx(
+					SSRC(0), rsid, streamInfo,
+					readStream, interceptor,
+					rtcpReadStream, rtcpInterceptor,
+				)
 			}
 
 			track, err := receiver.receiveForRid(
