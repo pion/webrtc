@@ -869,7 +869,15 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	connectionRole := connectionRoleFromDtlsRole(pc.api.settingEngine.answeringDTLSRole)
 	if connectionRole == sdp.ConnectionRole(0) {
-		connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
+		dtlsRole := dtlsRoleFromRemoteSDP(remoteDesc.parsed)
+		switch dtlsRole {
+		case DTLSRoleClient:
+			connectionRole = connectionRoleFromDtlsRole(DTLSRoleServer)
+		case DTLSRoleServer:
+			connectionRole = connectionRoleFromDtlsRole(DTLSRoleClient)
+		default:
+			connectionRole = connectionRoleFromDtlsRole(defaultDtlsRoleAnswer)
+		}
 
 		// If one of the agents is lite and the other one is not, the lite agent must be the controlled agent.
 		// If both or neither agents are lite the offering agent is controlling.
