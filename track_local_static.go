@@ -33,7 +33,8 @@ type TrackLocalStaticRTP struct {
 	codec             RTPCodecCapability
 	payloader         func(RTPCodecCapability) (rtp.Payloader, error)
 	id, rid, streamID string
-	rtpTimestamp      *uint32
+	initalTimestamp   *uint32
+	initialSeqNumber  *uint16
 }
 
 // NewTrackLocalStaticRTP returns a TrackLocalStaticRTP.
@@ -73,7 +74,14 @@ func WithPayloader(h func(RTPCodecCapability) (rtp.Payloader, error)) func(*Trac
 // WithRTPTimestamp set the initial RTP timestamp for the track.
 func WithRTPTimestamp(timestamp uint32) func(*TrackLocalStaticRTP) {
 	return func(s *TrackLocalStaticRTP) {
-		s.rtpTimestamp = &timestamp
+		s.initalTimestamp = &timestamp
+	}
+}
+
+// WithRTPSequenceNumber sets the initial RTP sequence number for the track.
+func WithRTPSequenceNumber(sequenceNumber uint16) func(*TrackLocalStaticRTP) {
+	return func(s *TrackLocalStaticRTP) {
+		s.initialSeqNumber = &sequenceNumber
 	}
 }
 
@@ -296,12 +304,18 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 		return codec, err
 	}
 
-	s.sequencer = rtp.NewRandomSequencer()
-
 	options := []rtp.PacketizerOption{}
 
-	if s.rtpTrack.rtpTimestamp != nil {
-		options = append(options, rtp.WithTimestamp(*s.rtpTrack.rtpTimestamp))
+	if s.rtpTrack.initalTimestamp != nil {
+		options = append(options, rtp.WithTimestamp(*s.rtpTrack.initalTimestamp))
+	}
+
+	if s.rtpTrack.initialSeqNumber != nil {
+		s.sequencer = rtp.NewFixedSequencer(*s.rtpTrack.initialSeqNumber)
+	}
+
+	if s.sequencer == nil {
+		s.sequencer = rtp.NewRandomSequencer()
 	}
 
 	s.packetizer = rtp.NewPacketizerWithOptions(
