@@ -9,6 +9,7 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"math"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -495,6 +496,47 @@ func Test_TrackLocalStatic_Timestamp(t *testing.T) {
 		assert.GreaterOrEqual(t, pkt.Timestamp, initialTimestamp)
 		// not accurate, but some grace period for slow CI test runners.
 		assert.LessOrEqual(t, pkt.Timestamp, initialTimestamp+100000)
+
+		onTrackFiredFunc()
+	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{track})
+
+	<-onTrackFired.Done()
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func Test_TrackLocalStatic_SequenceNumber(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	initialSeqNumber := uint16(12345)
+	track, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+		WithRTPSequenceNumber(initialSeqNumber),
+	)
+	assert.NoError(t, err)
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	_, err = pcOffer.AddTrack(track)
+	assert.NoError(t, err)
+
+	onTrackFired, onTrackFiredFunc := context.WithCancel(context.Background())
+	pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+		pkt, _, err := trackRemote.ReadRTP()
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, pkt.SequenceNumber, initialSeqNumber)
+		// not accurate, but some grace period for slow CI test runners.
+		assert.LessOrEqual(t, math.Abs(float64(pkt.SequenceNumber-initialSeqNumber)), 15.0)
 
 		onTrackFiredFunc()
 	})

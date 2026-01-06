@@ -10,12 +10,14 @@ import (
 	"context"
 	"io"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
+	"github.com/pion/rtp"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -135,6 +137,178 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 		assert.Fail(t, "repair reader invoked after Stop")
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind:       RTPCodecTypeVideo,
+		received:   make(chan any),
+		closedChan: make(chan any),
+		rtxPool: sync.Pool{New: func() any {
+			return make([]byte, 1200)
+		}},
+	}
+
+	receiver.configureReceive(RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{
+			{
+				RTPCodingParameters: RTPCodingParameters{
+					RID:  "rid",
+					SSRC: 1111,
+					RTX: RTPRtxParameters{
+						SSRC: 2222,
+					},
+				},
+			},
+		},
+	})
+
+	params := RTPParameters{
+		Codecs: []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
+				PayloadType:        96,
+			},
+		},
+	}
+	ridStreamInfo := &interceptor.StreamInfo{SSRC: 1111}
+	track, err := receiver.receiveForRid("rid", params, ridStreamInfo, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	close(receiver.received)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = receiver.readRTX(track)
+			}
+		}
+	}()
+
+	repairStreamInfo := &interceptor.StreamInfo{SSRC: 2222}
+	rtpInterceptor := interceptor.RTPReaderFunc(
+		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			return 0, a, io.EOF
+		},
+	)
+
+	for i := 0; i < 50; i++ {
+		require.NoError(t, receiver.receiveForRtx(SSRC(2222), "", repairStreamInfo, nil, rtpInterceptor, nil, nil))
+	}
+
+	close(stop)
+	<-done
+}
+
+func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind:       RTPCodecTypeVideo,
+		received:   make(chan any),
+		closedChan: make(chan any),
+		rtxPool: sync.Pool{New: func() any {
+			return make([]byte, 1200)
+		}},
+	}
+
+	receiver.configureReceive(RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{
+			{RTPCodingParameters: RTPCodingParameters{RID: "low", SSRC: 1111}},
+			{RTPCodingParameters: RTPCodingParameters{RID: "high", SSRC: 2222}},
+		},
+	})
+
+	params := RTPParameters{
+		Codecs: []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
+				PayloadType:        96,
+			},
+		},
+	}
+
+	lowPkt, err := rtp.Packet{
+		Header: rtp.Header{
+			Version:        2,
+			PayloadType:    96,
+			SequenceNumber: 1,
+			Timestamp:      1,
+			SSRC:           1111,
+		},
+		Payload: []byte{0x01},
+	}.Marshal()
+	require.NoError(t, err)
+
+	lowCh := make(chan []byte, 10)
+	lowInterceptor := interceptor.RTPReaderFunc(
+		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			pkt, ok := <-lowCh
+			if !ok {
+				return 0, a, io.EOF
+			}
+
+			n := copy(b, pkt)
+
+			return n, a, nil
+		},
+	)
+	lowTrack, err := receiver.receiveForRid(
+		"low", params, &interceptor.StreamInfo{SSRC: 1111}, nil, lowInterceptor, nil, nil, nil,
+	)
+	require.NoError(t, err)
+	lowTrack.mu.Lock()
+	lowTrack.payloadType = 96
+	lowTrack.codec = params.Codecs[0]
+	lowTrack.params = params
+	lowTrack.mu.Unlock()
+
+	close(receiver.received)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 5; i++ {
+			_, _, err = lowTrack.Read(make([]byte, 1500))
+			require.NoError(t, err)
+		}
+	}()
+
+	repairStreamInfo := &interceptor.StreamInfo{SSRC: 3333}
+	repairInterceptor := interceptor.RTPReaderFunc(
+		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			return 0, a, io.EOF
+		},
+	)
+	require.NoError(t, receiver.receiveForRtx(
+		SSRC(0), "low", repairStreamInfo, nil, repairInterceptor, nil, nil,
+	))
+
+	highInterceptor := interceptor.RTPReaderFunc(
+		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			return 0, a, io.EOF
+		},
+	)
+	_, err = receiver.receiveForRid(
+		"high", params, &interceptor.StreamInfo{SSRC: 2222}, nil, highInterceptor, nil, nil, nil,
+	)
+	require.NoError(t, err)
+	receiver.tracks[1].track.mu.Lock()
+	receiver.tracks[1].track.payloadType = 96
+	receiver.tracks[1].track.codec = params.Codecs[0]
+	receiver.tracks[1].track.params = params
+	receiver.tracks[1].track.mu.Unlock()
+
+	for i := 0; i < 5; i++ {
+		lowCh <- lowPkt
+	}
+	close(lowCh)
+	wg.Wait()
 }
 
 // TestRTPReceiver_CollectStats_Mapping validates that collectStats maps
