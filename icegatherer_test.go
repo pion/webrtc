@@ -111,6 +111,26 @@ func TestICEGatherer_InvalidMDNSHostName(t *testing.T) {
 	assert.ErrorIs(t, err, ice.ErrInvalidMulticastDNSHostName)
 }
 
+func TestICEGatherer_updateServers(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, gatherer.validatedServersCount())
+
+	newServers := []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}}
+	err = gatherer.updateServers(newServers, ICETransportPolicyAll)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, gatherer.validatedServersCount())
+
+	assert.NoError(t, gatherer.Close())
+}
+
 func TestLegacyNAT1To1AddressRewriteRules(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		assert.Empty(t, legacyNAT1To1AddressRewriteRules(nil, ice.CandidateTypeHost))

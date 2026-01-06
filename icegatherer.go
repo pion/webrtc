@@ -114,6 +114,40 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 	}, nil
 }
 
+// updateServers updates the ICE servers and gather policy.
+// If called before gathering starts, the new servers will be used for initial gathering.
+// If called after gathering has started, the new servers will be used on the next ICE restart.
+func (g *ICEGatherer) updateServers(servers []ICEServer, policy ICETransportPolicy) error {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	var validatedServers []*stun.URI
+	for _, server := range servers {
+		urls, err := server.urls()
+		if err != nil {
+			return err
+		}
+		validatedServers = append(validatedServers, urls...)
+	}
+
+	g.validatedServers = validatedServers
+	g.gatherPolicy = policy
+
+	if g.agent != nil {
+		return g.agent.UpdateOptions(ice.WithUrls(validatedServers))
+	}
+
+	return nil
+}
+
+// validatedServersCount returns the number of validated ICE server URLs.
+func (g *ICEGatherer) validatedServersCount() int {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	return len(g.validatedServers)
+}
+
 func (g *ICEGatherer) createAgent() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()

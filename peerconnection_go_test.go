@@ -30,6 +30,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/turn/v4"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -204,6 +205,10 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 					return pc, err
 				}
 
+				if pc.iceGatherer.validatedServersCount() != 0 {
+					return pc, fmt.Errorf("%w: expected 0 validated servers", ErrUnknownType)
+				}
+
 				err = pc.SetConfiguration(Configuration{
 					ICEServers: []ICEServer{
 						{
@@ -228,6 +233,11 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 				})
 				if err != nil {
 					return pc, err
+				}
+
+				// Verify ICE gatherer received the new servers.
+				if pc.iceGatherer.validatedServersCount() != 2 {
+					return pc, fmt.Errorf("%w: expected 2 validated servers", ErrUnknownType)
 				}
 
 				return pc, nil
@@ -1038,6 +1048,140 @@ func TestICERestart_Error_Handling(t *testing.T) {
 
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, offerPeerConnection, answerPeerConnection)
+}
+
+func TestPeerConnection_ICERestart_SetConfiguration_NewServers(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Set up vnet with a STUN server.
+	const (
+		offerIP  = "1.2.3.4"
+		answerIP = "1.2.3.5"
+		stunIP   = "1.2.3.100"
+		stunPort = 3478
+	)
+
+	loggerFactory := logging.NewDefaultLoggerFactory()
+
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{
+		CIDR:          "1.2.3.0/24",
+		LoggerFactory: loggerFactory,
+	})
+	assert.NoError(t, err)
+
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{offerIP}})
+	assert.NoError(t, err)
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{answerIP}})
+	assert.NoError(t, err)
+	stunNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{stunIP}})
+	assert.NoError(t, err)
+
+	assert.NoError(t, wan.AddNet(offerNet))
+	assert.NoError(t, wan.AddNet(answerNet))
+	assert.NoError(t, wan.AddNet(stunNet))
+	assert.NoError(t, wan.Start())
+
+	// Create STUN server.
+	stunListener, err := stunNet.ListenPacket("udp4", fmt.Sprintf("%s:%d", stunIP, stunPort))
+	assert.NoError(t, err)
+	stunServer, err := turn.NewServer(turn.ServerConfig{
+		Realm:         "pion.ly",
+		LoggerFactory: loggerFactory,
+		PacketConnConfigs: []turn.PacketConnConfig{
+			{
+				PacketConn: stunListener,
+				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
+					RelayAddress: net.ParseIP(stunIP),
+					Address:      "0.0.0.0",
+					Net:          stunNet,
+				},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	// Create peer connections.
+	offerSettingEngine := SettingEngine{}
+	offerSettingEngine.SetNet(offerNet)
+	offerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
+
+	answerSettingEngine := SettingEngine{}
+	answerSettingEngine.SetNet(answerNet)
+	answerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
+
+	offerPC, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPC, err := NewAPI(WithSettingEngine(answerSettingEngine)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = offerPC.CreateDataChannel("test", nil)
+	assert.NoError(t, err)
+
+	// Initial negotiation without STUN servers.
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	offerGatherComplete := GatheringCompletePromise(offerPC)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatherComplete
+
+	// Verify initial offer has no srflx candidates.
+	assert.NotContains(t, offerPC.LocalDescription().SDP, "srflx",
+		"should not have srflx candidates without STUN servers")
+
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	answerGatherComplete := GatheringCompletePromise(answerPC)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatherComplete
+
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	// Update configuration with local STUN server.
+	stunURL := fmt.Sprintf("stun:%s:%d", stunIP, stunPort)
+	newConfig := Configuration{
+		ICEServers: []ICEServer{
+			{URLs: []string{stunURL}},
+		},
+	}
+	assert.Equal(t, 0, offerPC.iceGatherer.validatedServersCount())
+	err = offerPC.SetConfiguration(newConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, offerPC.iceGatherer.validatedServersCount())
+
+	// Trigger ICE restart.
+	offer, err = offerPC.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+
+	offerGatherComplete = GatheringCompletePromise(offerPC)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatherComplete
+
+	// Verify the offer now has srflx candidates from the STUN server.
+	assert.Contains(t, offerPC.LocalDescription().SDP, "srflx",
+		"should have srflx candidates after restart with STUN servers")
+
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+
+	answer, err = answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	answerGatherComplete = GatheringCompletePromise(answerPC)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatherComplete
+
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	assert.NoError(t, stunServer.Close())
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, offerPC, answerPC)
 }
 
 type trackRecords struct {
