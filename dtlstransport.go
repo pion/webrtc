@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,7 +49,7 @@ type DTLSTransport struct {
 	onStateChangeHandler   func(DTLSTransportState)
 	internalOnCloseHandler func()
 
-	conn *dtls.Conn
+	conn DTLSConn
 
 	srtpSession, srtcpSession   atomic.Value
 	srtpEndpoint, srtcpEndpoint *mux.Endpoint
@@ -59,6 +61,19 @@ type DTLSTransport struct {
 	api *API
 	log logging.LeveledLogger
 }
+
+// DTLSConn exposes the portion of the DTLS connection used by DTLSTransport.
+// It can be implemented to allow replacement at runtime.
+type DTLSConn interface {
+	net.Conn
+	ConnectionState() (dtls.State, bool)
+	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
+	RemoteSRTPMasterKeyIdentifier() ([]byte, bool)
+	HandshakeContext(ctx context.Context) error
+	Handshake() error
+}
+
+type dtlsConnFactory func(role DTLSRole, conn net.Conn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
 
 type simulcastStreamPair struct {
 	srtp  *srtp.ReadStreamSRTP
@@ -192,6 +207,19 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	return t.remoteCertificate
 }
 
+// GetRemoteSRTPMasterKeyIdentifier returns the identifier negotiated by DTLS for SRTP.
+// It returns false when the connection is not established or the identifier is unavailable.
+func (t *DTLSTransport) GetRemoteSRTPMasterKeyIdentifier() ([]byte, bool) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	if t.conn == nil {
+		return nil, false
+	}
+
+	return t.conn.RemoteSRTPMasterKeyIdentifier()
+}
+
 func (t *DTLSTransport) startSRTP() error {
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
@@ -300,6 +328,32 @@ func (t *DTLSTransport) role() DTLSRole {
 	return defaultDtlsRoleAnswer
 }
 
+func (t *DTLSTransport) createDTLSConn(
+	role DTLSRole,
+	conn net.Conn,
+	remoteAddr net.Addr,
+	config *dtls.Config,
+) (DTLSConn, error) {
+	if factory := t.api.settingEngine.dtls.connFactory; factory != nil {
+		return factory(role, conn, remoteAddr, config)
+	}
+
+	return defaultDTLSConnFactory(role, conn, remoteAddr, config)
+}
+
+func defaultDTLSConnFactory(
+	role DTLSRole,
+	conn net.Conn,
+	remoteAddr net.Addr,
+	config *dtls.Config,
+) (DTLSConn, error) {
+	if role == DTLSRoleClient {
+		return dtls.Client(conn, remoteAddr, config)
+	}
+
+	return dtls.Server(conn, remoteAddr, config)
+}
+
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:gocognit,cyclop
 	// Take lock and prepare connection, we must not hold the lock
@@ -345,7 +399,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 		}, nil
 	}
 
-	var dtlsConn *dtls.Conn
 	dtlsEndpoint := t.iceTransport.newEndpoint(mux.MatchDTLS)
 	dtlsEndpoint.SetOnClose(t.internalOnCloseHandler)
 	role, dtlsConfig, err := prepareTransport()
@@ -394,11 +447,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
-	if role == DTLSRoleClient {
-		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
-	} else {
-		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
-	}
+	dtlsConn, err := t.createDTLSConn(role, dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
 
 	if err == nil {
 		if t.api.settingEngine.dtls.connectContextMaker != nil {
