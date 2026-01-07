@@ -21,8 +21,11 @@ import (
 
 func signalCandidate(addr string, candidate *webrtc.ICECandidate) error {
 	payload := []byte(candidate.ToJSON().Candidate)
-	resp, err := http.Post(fmt.Sprintf("http://%s/candidate", addr), // nolint:noctx
-		"application/json; charset=utf-8", bytes.NewReader(payload))
+	resp, err := http.Post( // nolint:noctx
+		fmt.Sprintf("http://%s/candidate", addr),
+		"application/json; charset=utf-8",
+		bytes.NewReader(payload),
+	)
 	if err != nil {
 		return err
 	}
@@ -32,7 +35,7 @@ func signalCandidate(addr string, candidate *webrtc.ICECandidate) error {
 
 // nolint:gocognit, cyclop
 func main() {
-	offerAddr := flag.String("offer-address", "localhost:50000", "Address that the Offer HTTP server is hosted on.")
+	offerAddr := flag.String("offer-address", "127.0.0.1:50000", "Address that the Offer HTTP server is hosted on.")
 	answerAddr := flag.String("answer-address", ":60000", "Address that the Answer HTTP server is hosted on.")
 	flag.Parse()
 
@@ -55,8 +58,8 @@ func main() {
 		panic(err)
 	}
 	defer func() {
-		if err := peerConnection.Close(); err != nil {
-			fmt.Printf("cannot close peerConnection: %v\n", err)
+		if closeErr := peerConnection.Close(); closeErr != nil {
+			fmt.Printf("cannot close peerConnection: %v\n", closeErr)
 		}
 	}()
 
@@ -81,7 +84,7 @@ func main() {
 	// A HTTP handler that allows the other Pion instance to send us ICE candidates
 	// This allows us to add ICE candidates faster, we don't have to wait for STUN or TURN
 	// candidates which may be slower
-	http.HandleFunc("/candidate", func(res http.ResponseWriter, req *http.Request) { //nolint: revive
+	http.HandleFunc("/candidate", func(res http.ResponseWriter, req *http.Request) { // nolint: revive
 		candidate, candidateErr := io.ReadAll(req.Body)
 		if candidateErr != nil {
 			panic(candidateErr)
@@ -96,12 +99,12 @@ func main() {
 	// A HTTP handler that processes a SessionDescription given to us from the other Pion process
 	http.HandleFunc("/sdp", func(res http.ResponseWriter, req *http.Request) { // nolint: revive
 		sdp := webrtc.SessionDescription{}
-		if err := json.NewDecoder(req.Body).Decode(&sdp); err != nil {
-			panic(err)
+		if decodeErr := json.NewDecoder(req.Body).Decode(&sdp); decodeErr != nil {
+			panic(decodeErr)
 		}
 
-		if err := peerConnection.SetRemoteDescription(sdp); err != nil {
-			panic(err)
+		if setErr := peerConnection.SetRemoteDescription(sdp); setErr != nil {
+			panic(setErr)
 		}
 
 		// Create an answer to send to the other process
@@ -115,7 +118,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		resp, err := http.Post( //nolint:noctx
+		resp, err := http.Post( // nolint:noctx
 			fmt.Sprintf("http://%s/sdp", *offerAddr),
 			"application/json; charset=utf-8",
 			bytes.NewReader(payload),
@@ -133,13 +136,13 @@ func main() {
 		}
 
 		candidatesMux.Lock()
+		defer candidatesMux.Unlock()
+
 		for _, c := range pendingCandidates {
-			onICECandidateErr := signalCandidate(*offerAddr, c)
-			if onICECandidateErr != nil {
+			if onICECandidateErr := signalCandidate(*offerAddr, c); onICECandidateErr != nil {
 				panic(onICECandidateErr)
 			}
 		}
-		candidatesMux.Unlock()
 	})
 
 	// Set the handler for Peer connection state
@@ -166,39 +169,45 @@ func main() {
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(dataChannel *webrtc.DataChannel) {
 		fmt.Printf("New DataChannel %s %d\n", dataChannel.Label(), dataChannel.ID())
-
-		// Register channel opening handling
-		dataChannel.OnOpen(func() {
-			fmt.Printf(
-				"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n",
-				dataChannel.Label(), dataChannel.ID(),
-			)
-
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				message, sendTextErr := randutil.GenerateCryptoRandomString(
-					15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-				)
-				if sendTextErr != nil {
-					panic(sendTextErr)
-				}
-
-				// Send the message as text
-				fmt.Printf("Sending '%s'\n", message)
-				if sendTextErr = dataChannel.SendText(message); sendTextErr != nil {
-					panic(sendTextErr)
-				}
-			}
-		})
-
-		// Register text message handling
-		dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
-			fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label(), string(msg.Data))
-		})
+		setupDataChannel(dataChannel)
 	})
 
 	// Start HTTP server that accepts requests from the offer process to exchange SDP and Candidates
 	// nolint: gosec
-	panic(http.ListenAndServe(*answerAddr, nil))
+	go func() { panic(http.ListenAndServe(*answerAddr, nil)) }()
+
+	// Block forever
+	select {}
+}
+
+func setupDataChannel(dataChannel *webrtc.DataChannel) {
+	// Register channel opening handling
+	dataChannel.OnOpen(func() {
+		fmt.Printf(
+			"Data channel '%s'-'%d' open. Random messages will now be sent to any connected DataChannels every 5 seconds\n",
+			dataChannel.Label(), dataChannel.ID(),
+		)
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			message, sendTextErr := randutil.GenerateCryptoRandomString(
+				15, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+			)
+			if sendTextErr != nil {
+				panic(sendTextErr)
+			}
+
+			// Send the message as text
+			fmt.Printf("Sending '%s'\n", message)
+			if sendTextErr = dataChannel.SendText(message); sendTextErr != nil {
+				panic(sendTextErr)
+			}
+		}
+	})
+
+	// Register text message handling
+	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
+		fmt.Printf("Message from DataChannel '%s': '%s'\n", dataChannel.Label(), string(msg.Data))
+	})
 }
