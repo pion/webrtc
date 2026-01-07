@@ -807,6 +807,23 @@ func TestPeerConnection_SessionID(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+func TestSctpSnap(t *testing.T) {
+	s := SettingEngine{}
+	s.EnableSnap(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	closePairNow(t, offer, answer)
+}
+
 func TestICETrickleCapabilityString(t *testing.T) {
 	tests := []struct {
 		value    ICETrickleCapability
