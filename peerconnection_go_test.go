@@ -2369,7 +2369,7 @@ func TestCreateAnswerActiveOfferPassiveAnswer(t *testing.T) {
 	assert.NoError(t, pc.SetRemoteDescription(activeDesc))
 	answer, err := pc.CreateAnswer(nil)
 	assert.NoError(t, err)
-	answerRole := dtlsRoleFromRemoteSDP(answer.parsed)
+	answerRole := dtlsRoleFromSDP(answer.parsed)
 	assert.Equal(t, answerRole, DTLSRoleServer)
 	assert.NoError(t, pc.Close())
 }
@@ -2382,7 +2382,7 @@ func TestCreateAnswerPassiveOfferActiveAnswer(t *testing.T) {
 	assert.NoError(t, pc.SetRemoteDescription(passiveDesc))
 	answer, err := pc.CreateAnswer(nil)
 	assert.NoError(t, err)
-	answerRole := dtlsRoleFromRemoteSDP(answer.parsed)
+	answerRole := dtlsRoleFromSDP(answer.parsed)
 	assert.Equal(t, answerRole, DTLSRoleClient)
 	assert.NoError(t, pc.Close())
 }

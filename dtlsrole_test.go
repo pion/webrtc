@@ -31,7 +31,7 @@ func TestDTLSRole_String(t *testing.T) {
 	}
 }
 
-func TestDTLSRoleFromRemoteSDP(t *testing.T) {
+func TestDTLSRoleFromSDP(t *testing.T) {
 	parseSDP := func(raw string) *sdp.SessionDescription {
 		parsed := &sdp.SessionDescription{}
 		assert.NoError(t, parsed.Unmarshal([]byte(raw)))
@@ -77,7 +77,7 @@ a=setup:%s
 	for _, testCase := range testCases {
 		assert.Equal(t,
 			testCase.expectedRole,
-			dtlsRoleFromRemoteSDP(testCase.sessionDescription),
+			dtlsRoleFromSDP(testCase.sessionDescription),
 			"TestDTLSRoleFromSDP (%s)", testCase.test,
 		)
 	}
