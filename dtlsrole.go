@@ -58,10 +58,9 @@ func (r DTLSRole) String() string {
 	}
 }
 
-// Iterate a SessionDescription from a remote to determine if an explicit
-// role can been determined from it. The decision is made from the first role we we parse.
-// If no role can be found we return DTLSRoleAuto.
-func dtlsRoleFromRemoteSDP(sessionDescription *sdp.SessionDescription) DTLSRole {
+// Extract the dtls role from a session description. The decision is made from
+// the first role we we parse. If no role can be found we return DTLSRoleAuto.
+func dtlsRoleFromSDP(sessionDescription *sdp.SessionDescription) DTLSRole {
 	if sessionDescription == nil {
 		return DTLSRoleAuto
 	}
