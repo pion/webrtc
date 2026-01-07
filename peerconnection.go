@@ -869,7 +869,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	connectionRole := connectionRoleFromDtlsRole(pc.api.settingEngine.answeringDTLSRole)
 	if connectionRole == sdp.ConnectionRole(0) {
-		dtlsRole := dtlsRoleFromRemoteSDP(remoteDesc.parsed)
+		dtlsRole := dtlsRoleFromSDP(remoteDesc.parsed)
 		switch dtlsRole {
 		case DTLSRoleClient:
 			connectionRole = connectionRoleFromDtlsRole(DTLSRoleServer)
@@ -1311,7 +1311,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	pc.ops.Enqueue(func() {
 		pc.startTransports(
 			iceRole,
-			dtlsRoleFromRemoteSDP(desc.parsed),
+			dtlsRoleFromSDP(desc.parsed),
 			iceDetails.Ufrag,
 			iceDetails.Password,
 			fingerprint,
