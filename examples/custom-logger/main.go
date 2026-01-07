@@ -32,7 +32,7 @@ func (c customLogger) Debugf(format string, args ...any) {
 }
 func (c customLogger) Info(msg string) { fmt.Printf("customLogger Info: %s\n", msg) }
 func (c customLogger) Infof(format string, args ...any) {
-	c.Trace(fmt.Sprintf(format, args...))
+	c.Info(fmt.Sprintf(format, args...))
 }
 func (c customLogger) Warn(msg string) { fmt.Printf("customLogger Warn: %s\n", msg) }
 func (c customLogger) Warnf(format string, args ...any) {
