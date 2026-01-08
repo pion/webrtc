@@ -63,9 +63,3 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 
 	return cert
 }
-
-// GetRemoteSRTPMasterKeyIdentifier returns the identifier negotiated by DTLS for SRTP.
-// It returns false when the identifier is unavailable in the JS runtime.
-func (t *DTLSTransport) GetRemoteSRTPMasterKeyIdentifier() ([]byte, bool) {
-	return nil, false
-}
