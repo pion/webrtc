@@ -878,3 +878,49 @@ func TestParseVendorStringMissingCommentCount(t *testing.T) {
 	assert.ErrorIs(t, err, errBadOpusTagsSignature)
 	assert.ErrorContains(t, err, "vendor+comment count")
 }
+
+func TestParseOpusHead_EmptyPayload_NoPanic(t *testing.T) {
+	_, err := ParseOpusHead([]byte{})
+	assert.Error(t, err)
+}
+
+func TestParseOpusHead_ChannelMappingSliceOverflow_NoPanic(t *testing.T) {
+	const channels uint8 = 235
+
+	payload := makeOpusHeadWithChannelMapping(channels, 1)
+
+	h, err := ParseOpusHead(payload)
+	assert.NoError(t, err)
+
+	assert.Equal(t, len(h.ChannelMapping), int(channels))
+}
+
+func makeOpusHeadWithChannelMapping(channels uint8, mappingFamily uint8) []byte {
+	baseLen := 19
+	totalLen := baseLen
+	if mappingFamily != 0 {
+		totalLen = 21 + int(channels)
+	}
+
+	pack := make([]byte, totalLen)
+	copy(pack[0:8], []byte("OpusHead"))
+
+	pack[8] = 1
+	pack[9] = channels
+
+	binary.LittleEndian.PutUint16(pack[10:12], 0)
+	binary.LittleEndian.PutUint32(pack[12:16], 48000)
+	binary.LittleEndian.PutUint16(pack[16:18], 0)
+	pack[18] = mappingFamily
+
+	if mappingFamily != 0 {
+		pack[19] = channels
+		pack[20] = 0
+
+		for i := 0; i < int(channels); i++ {
+			pack[21+i] = uint8(i) //nolint:gosec // G115: test-only, uint8(i) is in range
+		}
+	}
+
+	return pack
+}

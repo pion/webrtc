@@ -64,6 +64,10 @@ type OggHeader struct {
 
 // ParseOpusHead parses an Opus head from the page payload.
 func ParseOpusHead(payload []byte) (*OggHeader, error) {
+	if len(payload) < idPageBasePayloadLength {
+		return nil, errBadIDPageLength
+	}
+
 	header := parseBasicHeaderFields(payload)
 	if err := parseChannelMapping(header, payload); err != nil {
 		return nil, err
@@ -260,7 +264,7 @@ func parseExtendedChannelMapping(header *OggHeader, payload []byte) error {
 
 	header.StreamCount = payload[19]
 	header.CoupledCount = payload[20]
-	header.ChannelMapping = string(payload[21 : 21+header.Channels])
+	header.ChannelMapping = string(payload[21:expectedPayloadLen])
 
 	return nil
 }
