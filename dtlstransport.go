@@ -68,7 +68,6 @@ type DTLSConn interface {
 	net.Conn
 	ConnectionState() (dtls.State, bool)
 	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
-	RemoteSRTPMasterKeyIdentifier() ([]byte, bool)
 	HandshakeContext(ctx context.Context) error
 	Handshake() error
 }
@@ -207,19 +206,6 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	return t.remoteCertificate
 }
 
-// GetRemoteSRTPMasterKeyIdentifier returns the identifier negotiated by DTLS for SRTP.
-// It returns false when the connection is not established or the identifier is unavailable.
-func (t *DTLSTransport) GetRemoteSRTPMasterKeyIdentifier() ([]byte, bool) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	if t.conn == nil {
-		return nil, false
-	}
-
-	return t.conn.RemoteSRTPMasterKeyIdentifier()
-}
-
 func (t *DTLSTransport) startSRTP() error {
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
@@ -334,11 +320,11 @@ func (t *DTLSTransport) createDTLSConn(
 	remoteAddr net.Addr,
 	config *dtls.Config,
 ) (DTLSConn, error) {
-	if factory := t.api.settingEngine.dtls.connFactory; factory != nil {
-		return factory(role, conn, remoteAddr, config)
+	factory := t.api.settingEngine.dtls.connFactory
+	if factory == nil {
+		factory = defaultDTLSConnFactory
 	}
-
-	return defaultDTLSConnFactory(role, conn, remoteAddr, config)
+	return factory(role, conn, remoteAddr, config)
 }
 
 func defaultDTLSConnFactory(
@@ -349,9 +335,9 @@ func defaultDTLSConnFactory(
 ) (DTLSConn, error) {
 	if role == DTLSRoleClient {
 		return dtls.Client(conn, remoteAddr, config)
+	} else {
+		return dtls.Server(conn, remoteAddr, config)
 	}
-
-	return dtls.Server(conn, remoteAddr, config)
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
