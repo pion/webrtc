@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v4/test"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )

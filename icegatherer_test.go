@@ -19,8 +19,8 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v3"
-	"github.com/pion/transport/v3/test"
-	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/turn/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -166,7 +166,7 @@ func TestLegacyNAT1To1AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, router.AddNet(nw))
@@ -278,7 +278,7 @@ func TestICEAddressRewriteRulesWithNAT1To1Conflict(t *testing.T) {
 		require.NoError(t, err)
 
 		nw, err := vnet.NewNet(&vnet.NetConfig{
-			StaticIP: "10.0.0.1",
+			StaticIPs: []string{"10.0.0.1"},
 		})
 		require.NoError(t, err)
 		require.NoError(t, router.AddNet(nw))
@@ -361,7 +361,7 @@ func TestICEGatherer_NoHostPolicyVNet(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	stunNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: stunIP,
+		StaticIPs: []string{stunIP},
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, wan.AddNet(stunNet))
@@ -377,7 +377,7 @@ func TestICEGatherer_NoHostPolicyVNet(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, clientLAN.AddNet(clientNet))
@@ -504,7 +504,7 @@ func TestICEGatherer_AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	require.NoError(t, err)
 
 	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
@@ -642,7 +642,7 @@ func TestICEGatherer_AddressRewriteRuleFilters(t *testing.T) { //nolint:cyclop
 		require.NoError(t, err)
 
 		nw, err := vnet.NewNet(&vnet.NetConfig{
-			StaticIP: localIP,
+			StaticIPs: []string{localIP},
 		})
 		require.NoError(t, err)
 		require.NoError(t, router.AddNet(nw))
@@ -759,7 +759,7 @@ func TestICEGatherer_AddressRewriteSrflxReplace(t *testing.T) {
 	require.NoError(t, err)
 
 	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
@@ -818,7 +818,7 @@ func TestICEGatherer_AddressRewriteSrflxAppendWithCatchAll(t *testing.T) {
 	require.NoError(t, err)
 
 	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
@@ -939,7 +939,7 @@ func TestICEGatherer_AddressRewriteIfaceScope(t *testing.T) {
 	require.NoError(t, err)
 
 	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: localIP,
+		StaticIPs: []string{localIP},
 	})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
@@ -1105,11 +1105,11 @@ func TestICEGatherer_AddressRewriteRelayVNet(t *testing.T) { //nolint:cyclop
 	require.NoError(t, err)
 
 	turnNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: turnIP,
+		StaticIPs: []string{turnIP},
 	})
 	require.NoError(t, err)
 	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: clientIP,
+		StaticIPs: []string{clientIP},
 	})
 	require.NoError(t, err)
 
@@ -1206,11 +1206,11 @@ func TestICEGatherer_AddressRewriteRelayAppendVNet(t *testing.T) { //nolint:cycl
 	require.NoError(t, err)
 
 	turnNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: turnIP,
+		StaticIPs: []string{turnIP},
 	})
 	require.NoError(t, err)
 	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: clientIP,
+		StaticIPs: []string{clientIP},
 	})
 	require.NoError(t, err)
 
@@ -1683,7 +1683,7 @@ func TestICEGatherer_SrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, err)
 
 	stunNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIP: stunIP,
+		StaticIPs: []string{stunIP},
 	})
 	assert.NoError(t, err)
 	assert.NoError(t, wan.AddNet(stunNet))

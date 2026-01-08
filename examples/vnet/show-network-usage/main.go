@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/webrtc/v4"
 )
 
