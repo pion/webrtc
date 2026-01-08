@@ -62,14 +62,14 @@ type DTLSTransport struct {
 	log logging.LeveledLogger
 }
 
-// DTLSConn exposes the portion of the DTLS connection used by DTLSTransport.
-// It can be implemented to allow replacement at runtime.
+// DTLSConn wraps the DTLS connection used by DTLSTransport.
+// It can be injected via SettingEngine to allow replacement at runtime.
 type DTLSConn interface {
 	net.Conn
 	ConnectionState() (dtls.State, bool)
-	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
-	HandshakeContext(ctx context.Context) error
 	Handshake() error
+	HandshakeContext(ctx context.Context) error
+	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
 }
 
 type dtlsConnFactory func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
