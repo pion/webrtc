@@ -485,6 +485,13 @@ func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
 		}
 	}
 
+	// onGatheringCompleteHandler is used solely by the GatheringCompletePromise helper and the common usage
+	// for that helper is aided by ensuring that this completion is fired in case the PC/ICEGatherer are closed
+	// before gathering actually completes. If things have already completed then this should be a no-op
+	if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
+		handler()
+	}
+
 	g.agent = nil
 	g.setState(ICEGathererStateClosed)
 
