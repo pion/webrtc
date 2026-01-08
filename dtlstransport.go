@@ -66,13 +66,45 @@ type DTLSTransport struct {
 // It can be injected via SettingEngine to allow replacement at runtime.
 type DTLSConn interface {
 	net.Conn
-	ConnectionState() (dtls.State, bool)
 	Handshake() error
 	HandshakeContext(ctx context.Context) error
 	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
+	SRTPKeyingMaterialExporter() (srtp.KeyingMaterialExporter, error)
 }
 
+// dtlsConnFactory is a factory function for creating a DTLS connection.
 type dtlsConnFactory func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
+
+// pionDTLSConn wraps a *dtls.Conn to implement the DTLSConn interface.
+// The only thing we need to implement is the SRTPKeyingMaterialExporter method,
+// all other methods are thunks to the underlying *dtls.Conn.
+type pionDTLSConn struct {
+	conn *dtls.Conn
+}
+
+func (c *pionDTLSConn) Close() error                       { return c.conn.Close() }
+func (c *pionDTLSConn) Read(b []byte) (int, error)         { return c.conn.Read(b) }
+func (c *pionDTLSConn) Write(b []byte) (int, error)        { return c.conn.Write(b) }
+func (c *pionDTLSConn) LocalAddr() net.Addr                { return c.conn.LocalAddr() }
+func (c *pionDTLSConn) RemoteAddr() net.Addr               { return c.conn.RemoteAddr() }
+func (c *pionDTLSConn) SetDeadline(t time.Time) error      { return c.conn.SetDeadline(t) }
+func (c *pionDTLSConn) SetReadDeadline(t time.Time) error  { return c.conn.SetReadDeadline(t) }
+func (c *pionDTLSConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
+func (c *pionDTLSConn) Handshake() error                   { return c.conn.Handshake() }
+func (c *pionDTLSConn) HandshakeContext(ctx context.Context) error {
+	return c.conn.HandshakeContext(ctx)
+}
+func (c *pionDTLSConn) SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool) {
+	return c.conn.SelectedSRTPProtectionProfile()
+}
+func (c *pionDTLSConn) SRTPKeyingMaterialExporter() (srtp.KeyingMaterialExporter, error) {
+	connState, ok := c.conn.ConnectionState()
+	if !ok {
+		return nil, fmt.Errorf("failed to get DTLS ConnectionState")
+	}
+
+	return &connState, nil
+}
 
 type simulcastStreamPair struct {
 	srtp  *srtp.ReadStreamSRTP
@@ -240,13 +272,13 @@ func (t *DTLSTransport) startSRTP() error {
 		)
 	}
 
-	connState, ok := t.conn.ConnectionState()
-	if !ok {
+	exporter, err := t.conn.SRTPKeyingMaterialExporter()
+	if err != nil {
 		// nolint
-		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
 	}
 
-	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.role() == DTLSRoleClient)
+	err = srtpConfig.ExtractSessionKeysFromDTLS(exporter, t.role() == DTLSRoleClient)
 	if err != nil {
 		// nolint
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
@@ -333,11 +365,17 @@ func defaultDTLSConnFactory(
 	remoteAddr net.Addr,
 	config *dtls.Config,
 ) (DTLSConn, error) {
+	var dtlsConn *dtls.Conn
+	var err error
 	if role == DTLSRoleClient {
-		return dtls.Client(conn, remoteAddr, config)
+		dtlsConn, err = dtls.Client(conn, remoteAddr, config)
 	} else {
-		return dtls.Server(conn, remoteAddr, config)
+		dtlsConn, err = dtls.Server(conn, remoteAddr, config)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return &pionDTLSConn{conn: dtlsConn}, nil
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
