@@ -72,7 +72,7 @@ type SettingEngine struct {
 		retransmissionInterval        time.Duration
 		ellipticCurves                []dtlsElliptic.Curve
 		connectContextMaker           func() (context.Context, func())
-		connFactory                   func(role DTLSRole, conn net.Conn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
+		connFactory                   func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
 		extendedMasterSecret          dtls.ExtendedMasterSecretType
 		clientAuth                    *dtls.ClientAuthType
 		clientCAs                     *x509.CertPool
@@ -555,7 +555,7 @@ func (e *SettingEngine) SetDTLSConnectContextMaker(connectContextMaker func() (c
 // SetDTLSConnFactory overrides the DTLS connection creation for DTLSTransport.
 // If nil, the default pion/dtls Client/Server constructors are used.
 func (e *SettingEngine) SetDTLSConnFactory(
-	factory func(role DTLSRole, conn net.Conn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error),
+	factory func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error),
 ) {
 	e.dtls.connFactory = factory
 }

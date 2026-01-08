@@ -73,7 +73,7 @@ type DTLSConn interface {
 	Handshake() error
 }
 
-type dtlsConnFactory func(role DTLSRole, conn net.Conn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
+type dtlsConnFactory func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
 
 type simulcastStreamPair struct {
 	srtp  *srtp.ReadStreamSRTP
@@ -330,7 +330,7 @@ func (t *DTLSTransport) role() DTLSRole {
 
 func (t *DTLSTransport) createDTLSConn(
 	role DTLSRole,
-	conn net.Conn,
+	conn net.PacketConn,
 	remoteAddr net.Addr,
 	config *dtls.Config,
 ) (DTLSConn, error) {
@@ -343,7 +343,7 @@ func (t *DTLSTransport) createDTLSConn(
 
 func defaultDTLSConnFactory(
 	role DTLSRole,
-	conn net.Conn,
+	conn net.PacketConn,
 	remoteAddr net.Addr,
 	config *dtls.Config,
 ) (DTLSConn, error) {
