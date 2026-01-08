@@ -251,6 +251,29 @@ func TestLegacyNAT1To1AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	})
 }
 
+func TestMapPortHandler(t *testing.T) {
+	lim := test.TimeOut(time.Second * 5)
+	defer lim.Stop()
+
+	t.Run("EmptyHandler", func(t *testing.T) {
+		se := SettingEngine{}
+		gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{})
+	})
+
+	t.Run("FixedHandler", func(t *testing.T) {
+		se := SettingEngine{}
+		se.SetMapPortHanlder(func(cand ice.Candidate) int {
+			return 8080
+		}, ice.CandidateTypeHost)
+		candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{})
+		for _, c := range candidates {
+			if c.Typ == ICECandidateType(ice.CandidateTypeHost) {
+				require.Equal(t, uint16(8080), c.Port)
+			}
+		}
+	})
+}
+
 func TestICEAddressRewriteRulesWithNAT1To1Conflict(t *testing.T) {
 	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()

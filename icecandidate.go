@@ -55,6 +55,10 @@ func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineInde
 	if err != nil {
 		return ICECandidate{}, err
 	}
+	port := candidate.Port()
+	if candidate.GetMappedPort() != 0 {
+		port = candidate.GetMappedPort()
+	}
 
 	newCandidate := ICECandidate{
 		statsID:       candidate.ID(),
@@ -62,7 +66,7 @@ func newICECandidateFromICE(candidate ice.Candidate, sdpMid string, sdpMLineInde
 		Priority:      candidate.Priority(),
 		Address:       candidate.Address(),
 		Protocol:      protocol,
-		Port:          uint16(candidate.Port()), //nolint:gosec // G115
+		Port:          uint16(port), //nolint:gosec // G115
 		Component:     candidate.Component(),
 		Typ:           typ,
 		TCPType:       candidate.TCPType().String(),

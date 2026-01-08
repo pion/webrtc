@@ -157,6 +157,8 @@ func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
 	options = append(options, g.timeoutOptions()...)
 	options = append(options, g.miscOptions()...)
 	options = append(options, g.renominationOptions()...)
+	options = append(options, ice.WithMapPortHandler(g.api.settingEngine.candidates.MapPortHandler,
+		g.api.settingEngine.candidates.MapPortCandTyp))
 
 	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
 	if len(requestedNetworkTypes) == 0 {

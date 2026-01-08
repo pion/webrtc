@@ -60,6 +60,8 @@ type SettingEngine struct {
 		UsernameFragment         string
 		Password                 string
 		IncludeLoopbackCandidate bool
+		MapPortHandler           func(candidate ice.Candidate) int
+		MapPortCandTyp           ice.CandidateType
 	}
 	replayProtection struct {
 		DTLS  *uint
@@ -371,6 +373,13 @@ func (e *SettingEngine) SetICEAddressRewriteRules(rules ...ICEAddressRewriteRule
 // for some VM have public IP mapped to loopback interface.
 func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 	e.candidates.IncludeLoopbackCandidate = include
+}
+
+// SetMapPortHanlder registers a callback function to modify advertised port.
+// The candTyp specifies the candidate type the callback handler applies to.
+func (e *SettingEngine) SetMapPortHanlder(handler func(candidate ice.Candidate) int, candType ice.CandidateType) {
+	e.candidates.MapPortHandler = handler
+	e.candidates.MapPortCandTyp = candType
 }
 
 // SetAnsweringDTLSRole sets the DTLS role that is selected when offering
