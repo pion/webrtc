@@ -25,7 +25,7 @@ const (
 type H265Writer struct {
 	writer       io.Writer
 	hasKeyFrame  bool
-	cachedPacket *codecs.H265Packet
+	cachedPacket *codecs.H265Depacketizer
 }
 
 // New builds a new H265 writer.
@@ -59,7 +59,7 @@ func (h *H265Writer) WriteRTP(packet *rtp.Packet) error {
 	}
 
 	if h.cachedPacket == nil {
-		h.cachedPacket = &codecs.H265Packet{}
+		h.cachedPacket = &codecs.H265Depacketizer{}
 	}
 
 	data, err := h.cachedPacket.Unmarshal(packet.Payload)
