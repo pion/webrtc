@@ -72,7 +72,7 @@ func NewWith(stream io.Reader) (*IVFReader, *IVFFileHeader, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if header.TimebaseDenominator == 0 {
+	if header.TimebaseDenominator == 0 || header.TimebaseNumerator == 0 {
 		return nil, nil, errInvalidMediaTimebase
 	}
 	reader.timebaseDenominator = header.TimebaseDenominator

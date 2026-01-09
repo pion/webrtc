@@ -55,6 +55,20 @@ func TestIVFReader_ParseValidFileHeader(t *testing.T) {
 	assert.Equal(uint32(0), header.unused, "bytes should be unused")
 }
 
+func TestIVFReader_ErrorOnZeroTimebaseNumerator(t *testing.T) {
+	assert := assert.New(t)
+	ivf := buildIVFContainer(&[]byte{})
+	headerBytes := ivf.Bytes()
+	for i := 20; i < 24; i++ {
+		headerBytes[i] = 0
+	}
+
+	reader, header, err := NewWith(ivf)
+	assert.Nil(reader, "Reader should not be created for invalid timebase")
+	assert.Nil(header, "Header should be nil when timebase numerator is zero")
+	assert.Equal(errInvalidMediaTimebase, err, "zero timebase numerator should be invalid")
+}
+
 func TestIVFReader_ParseValidFrames(t *testing.T) {
 	assert := assert.New(t)
 
