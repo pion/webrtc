@@ -20,6 +20,7 @@ import (
 
 	"github.com/pion/interceptor"
 	mock_interceptor "github.com/pion/interceptor/pkg/mock"
+	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v4/test"
@@ -264,7 +265,16 @@ func TestConfigureFlexFEC03_FECParameters(t *testing.T) {
 	fecPayloadType := PayloadType(120)
 	assert.NoError(t, ConfigureFlexFEC03(fecPayloadType, mediaEngine, interceptorRegistry))
 
-	assert.NoError(t, RegisterDefaultInterceptors(mediaEngine, interceptorRegistry))
+	// Register default interceptors. Options are passed to make codecov happy.
+	assert.NoError(t, RegisterDefaultInterceptorsWithOptions(mediaEngine, interceptorRegistry,
+		WithInterceptorLoggerFactory(logging.NewDefaultLoggerFactory()),
+		WithNackGeneratorOptions(),
+		WithNackResponderOptions(),
+		WithReportReceiverOptions(),
+		WithReportSenderOptions(),
+		WithStatsInterceptorOptions(),
+		WithTWCCOptions(),
+	))
 
 	api := NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(interceptorRegistry))
 
