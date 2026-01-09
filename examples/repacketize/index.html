@@ -1,0 +1,28 @@
+<!--
+	SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+	SPDX-License-Identifier: MIT
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pion - Repacketize Example</title>
+    <script src="index.js" defer></script>
+</head>
+<body>
+    <label for="codec">Codec: </label>
+    <select id="codec">
+        <option value="H264" selected>H.264</option>
+        <option value="H265">H.265</option>
+        <option value="VP8">VP8</option>
+        <option value="VP9">VP9</option>
+        <option value="AV1">AV1</option>
+    </select>
+    <button id="start">Start</button>
+    <br />
+    <video id="screen" autoplay hidden></video>
+    <video id="received" autoplay hidden></video>
+    <br />
+    <div id="logs"></div>
+</body>
+</html>
