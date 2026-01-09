@@ -67,9 +67,44 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		}
 	})
 
-	// Also wait for PeerConnection to close (may take longer due to cleanup)
-	offerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcOffer)
-	answerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcAnswer)
+	// Track PeerConnection state transitions - need single handler since OnConnectionStateChange replaces
+	offerConnectionHasFailed := make(chan struct{})
+	offerConnectionHasClosed := make(chan struct{})
+	pcOffer.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateFailed {
+			select {
+			case <-offerConnectionHasFailed:
+			default:
+				close(offerConnectionHasFailed)
+			}
+		}
+		if state == PeerConnectionStateClosed {
+			select {
+			case <-offerConnectionHasClosed:
+			default:
+				close(offerConnectionHasClosed)
+			}
+		}
+	})
+
+	answerConnectionHasFailed := make(chan struct{})
+	answerConnectionHasClosed := make(chan struct{})
+	pcAnswer.OnConnectionStateChange(func(state PeerConnectionState) {
+		if state == PeerConnectionStateFailed {
+			select {
+			case <-answerConnectionHasFailed:
+			default:
+				close(answerConnectionHasFailed)
+			}
+		}
+		if state == PeerConnectionStateClosed {
+			select {
+			case <-answerConnectionHasClosed:
+			default:
+				close(answerConnectionHasClosed)
+			}
+		}
+	})
 
 	_, err = pcOffer.CreateDataChannel("unusedDataChannel", nil)
 	assert.NoError(t, err)
@@ -119,9 +154,35 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		assert.Fail(t, "timed out waiting for answer DTLS to fail")
 	}
 
+	// Verify PeerConnection state transitions to "failed" (per W3C WebRTC spec)
+	// "Any of the RTCIceTransports or RTCDtlsTransports are in a 'failed' state"
+	// should result in PeerConnectionStateFailed
+	select {
+	case <-offerConnectionHasFailed:
+		// Expected - offer PeerConnection reached failed state
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for offer PeerConnection to reach failed state")
+	}
+
+	select {
+	case <-answerConnectionHasFailed:
+		// Expected - answer PeerConnection reached failed state
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for answer PeerConnection to reach failed state")
+	}
+
 	// Wait for PeerConnection to close (may take longer due to cleanup)
-	offerConnectionHasClosed.Wait()
-	answerConnectionHasClosed.Wait()
+	select {
+	case <-offerConnectionHasClosed:
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for offer PeerConnection to close")
+	}
+
+	select {
+	case <-answerConnectionHasClosed:
+	case <-time.After(7 * time.Second):
+		assert.Fail(t, "timed out waiting for answer PeerConnection to close")
+	}
 
 	assert.Contains(
 		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(),
