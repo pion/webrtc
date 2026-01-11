@@ -775,8 +775,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	g, err := pc.api.NewICEGatherer(ICEGatherOptions{
-		ICEServers:      pc.configuration.getICEServers(),
-		ICEGatherPolicy: pc.configuration.ICETransportPolicy,
+		ICEServers:           pc.configuration.getICEServers(),
+		ICEGatherPolicy:      pc.configuration.ICETransportPolicy,
+		ICECandidatePoolSize: pc.configuration.ICECandidatePoolSize,
 	})
 	if err != nil {
 		return nil, err
