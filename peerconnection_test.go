@@ -339,6 +339,56 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
+// Assert that candidates are gathered immediately on construction when ICECandidatePoolSize is set,
+// but are presumed pooled until SetLocalDescription is called.
+func TestPeerConnection_ICECandidatePool(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pc, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 1,
+	})
+	assert.NoError(t, err)
+
+	candidateEmitted := make(chan struct{})
+	var emitOnce sync.Once
+	pc.OnICECandidate(func(c *ICECandidate) {
+		if c != nil {
+			emitOnce.Do(func() { close(candidateEmitted) })
+		}
+	})
+
+	assert.Eventually(t, func() bool {
+		return pc.ICEGatheringState() != ICEGatheringStateNew
+	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
+
+	// Candidates should be trapped in the pool and NOT emitted via OnICECandidate yet.
+	select {
+	case <-candidateEmitted:
+		assert.Fail(t, "Candidates emitted before SetLocalDescription")
+	case <-time.After(200 * time.Millisecond):
+		// Pass: No candidates emitted
+	}
+
+	// Trigger Flush via SetLocalDescription
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pc.SetLocalDescription(offer))
+
+	// The pooled candidates should be released immediately.
+	select {
+	case <-candidateEmitted:
+		// Success: Candidates flushed
+	case <-time.After(time.Second):
+		assert.Fail(t, "No candidates emitted after SetLocalDescription (Flush logic failed)")
+	}
+
+	assert.NoError(t, pc.Close())
+}
+
 const minimalOffer = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
