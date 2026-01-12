@@ -29,6 +29,11 @@ type RTPTransceiver struct {
 
 	kind RTPCodecType
 
+	// rtpHeaderEncryptionNegotiated tracks whether Cryptex was present in the SDP that most
+	// recently negotiated this transceiver's mid. It stays false until this transceiver has
+	// participated in a completed offer/answer exchange.
+	rtpHeaderEncryptionNegotiated atomic.Bool
+
 	api *API
 	mu  sync.RWMutex
 }
@@ -250,6 +255,37 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 	}
 
 	return RTPTransceiverDirection(0)
+}
+
+// RTPHeaderEncryptionNegotiated reports if RFC 9335 RTP Header Extension Encryption ("Cryptex")
+// has been negotiated and is enabled for this transceiver. It returns false until this transceiver
+// has participated in a completed offer/answer exchange, even if Cryptex is active on other
+// transceivers sharing the same transport.
+func (t *RTPTransceiver) RTPHeaderEncryptionNegotiated() bool {
+	if !t.rtpHeaderEncryptionNegotiated.Load() {
+		return false
+	}
+
+	var dtlsTransport *DTLSTransport
+	if sender := t.Sender(); sender != nil {
+		dtlsTransport = sender.Transport()
+	}
+	if dtlsTransport == nil {
+		if receiver := t.Receiver(); receiver != nil {
+			dtlsTransport = receiver.Transport()
+		}
+	}
+	if dtlsTransport == nil {
+		return false
+	}
+
+	return dtlsTransport.rtpHeaderEncryptionNegotiated()
+}
+
+// setRTPHeaderEncryptionNegotiated records whether Cryptex was present in the SDP that most
+// recently negotiated this transceiver's mid.
+func (t *RTPTransceiver) setRTPHeaderEncryptionNegotiated(negotiated bool) {
+	t.rtpHeaderEncryptionNegotiated.Store(negotiated)
 }
 
 // Stop irreversibly stops the RTPTransceiver.
