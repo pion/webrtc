@@ -200,6 +200,12 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		}
 	})
 
+	if pc.configuration.ICECandidatePoolSize > 0 {
+		if err := pc.iceGatherer.Gather(); err != nil {
+			return nil, err
+		}
+	}
+
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
@@ -590,8 +596,10 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 		pc.configuration.AlwaysNegotiateDataChannels = configuration.AlwaysNegotiateDataChannels
 	}
 
-	// Step #8: ICE candidate pool size is not implemented in pion/webrtc.
-	// The value is stored in configuration but candidate pooling is not supported.
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #8)
+	// If the new ICE candidate pool size changes the existing setting,
+	// this may result in immediate gathering of new pooled candidates,
+	// or discarding of existing pooled candidates
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #9)
 	// Update the ICE gatherer so new servers take effect at the next gathering phase.
@@ -1112,6 +1120,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	if ok {
 		pc.iceGatherer.setMediaStreamIdentification(mediaSection.SDPMid, mediaSection.SDPMLineIndex)
 	}
+
+	pc.iceGatherer.flushCandidates()
 
 	if pc.iceGatherer.State() == ICEGathererStateNew {
 		return pc.iceGatherer.Gather()

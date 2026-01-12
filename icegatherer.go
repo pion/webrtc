@@ -46,7 +46,7 @@ type ICEGatherer struct {
 	sdpMLineIndex atomic.Uint32 // uint16
 
 	// ICE candidate pooling as much as pool size
-	candidatePool        []ICECandidate
+	candidatePool        []ice.Candidate
 	iceCandidatePoolSize uint8
 }
 
@@ -115,7 +115,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		log:                  api.settingEngine.LoggerFactory.NewLogger("ice"),
 		sdpMid:               atomic.Value{},
 		sdpMLineIndex:        atomic.Uint32{},
-		candidatePool:        make([]ICECandidate, 0, opts.ICECandidatePoolSize),
+		candidatePool:        make([]ice.Candidate, 0, opts.ICECandidatePoolSize),
 		iceCandidatePoolSize: opts.ICECandidatePoolSize,
 	}, nil
 }
@@ -139,7 +139,7 @@ func (g *ICEGatherer) updateServers(servers []ICEServer, policy ICETransportPoli
 	g.validatedServers = validatedServers
 	g.gatherPolicy = policy
 
-	if g.agent != nil {
+	if g.agent != nil && g.State() != ICEGathererStateGathering {
 		return g.agent.UpdateOptions(ice.WithUrls(validatedServers))
 	}
 
@@ -436,6 +436,17 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 		sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
 
 		if candidate != nil {
+			g.lock.Lock()
+			if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
+				if len(g.candidatePool) < int(g.iceCandidatePoolSize) {
+					g.candidatePool = append(g.candidatePool, candidate)
+				}
+				g.lock.Unlock()
+
+				return
+			}
+			g.lock.Unlock()
+
 			c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
 			if err != nil {
 				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
@@ -460,6 +471,36 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 func (g *ICEGatherer) setMediaStreamIdentification(mid string, mLineIndex uint16) {
 	g.sdpMid.Store(mid)
 	g.sdpMLineIndex.Store(uint32(mLineIndex))
+}
+
+func (g *ICEGatherer) flushCandidates() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	onLocalCandidateHandler := func(*ICECandidate) {}
+	if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
+		onLocalCandidateHandler = handler
+	}
+
+	sdpMid := ""
+	if mid, ok := g.sdpMid.Load().(string); ok {
+		sdpMid = mid
+	}
+
+	sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
+
+	for _, candidate := range g.candidatePool {
+		c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
+		if err != nil {
+			g.log.Warnf("Failed to convert pooled ice.Candidate: %s", err)
+
+			continue
+		}
+		onLocalCandidateHandler(&c)
+	}
+
+	g.candidatePool = nil
+	g.iceCandidatePoolSize = 0
 }
 
 // Close prunes all local candidates, and closes the ports.
