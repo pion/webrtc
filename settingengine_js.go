@@ -13,6 +13,8 @@ type SettingEngine struct {
 	detach struct {
 		DataChannels bool
 	}
+
+	disableRTPHeaderEncryption bool
 }
 
 // DetachDataChannels enables detaching data channels. When enabled
@@ -20,4 +22,10 @@ type SettingEngine struct {
 // DataChannel.Detach method.
 func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
+}
+
+// DisableRTPHeaderEncryption disables RFC 9335 Cryptex negotiation.
+// When isDisabled is true, the PeerConnection will not advertise Cryptex in generated SDP.
+func (e *SettingEngine) DisableRTPHeaderEncryption(isDisabled bool) {
+	e.disableRTPHeaderEncryption = isDisabled
 }
