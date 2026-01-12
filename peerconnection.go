@@ -1122,6 +1122,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	pc.iceGatherer.flushCandidates()
+	pc.iceGatherer.clearCandidatePool()
 
 	if pc.iceGatherer.State() == ICEGathererStateNew {
 		return pc.iceGatherer.Gather()
@@ -1347,6 +1348,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		)
 		if weOffer {
 			pc.startRTP(false, &desc, currentTransceivers)
+		}
+
+		// RFC 9429 5.11
+		if weOffer {
+			pc.iceGatherer.clearCandidatePool()
 		}
 	})
 

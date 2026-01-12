@@ -498,6 +498,11 @@ func (g *ICEGatherer) flushCandidates() {
 		}
 		onLocalCandidateHandler(&c)
 	}
+}
+
+func (g *ICEGatherer) clearCandidatePool() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
 	g.candidatePool = nil
 	g.iceCandidatePoolSize = 0
