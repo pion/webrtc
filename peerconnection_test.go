@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -342,6 +343,10 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 // Assert that candidates are gathered immediately on construction when ICECandidatePoolSize is set,
 // but are presumed pooled until SetLocalDescription is called.
 func TestPeerConnection_ICECandidatePool(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("Skipping ICECandidatePool test on WASM")
+	}
+
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
