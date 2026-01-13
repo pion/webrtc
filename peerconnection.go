@@ -597,7 +597,8 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #8)
-	// TODO: If the new ICE candidate pool size changes the existing setting, //nolint:godox
+	// nolint:godox
+	// TODO: If the new ICE candidate pool size changes the existing setting,
 	// this may result in immediate gathering of new pooled candidates,
 	// or discarding of existing pooled candidates
 
