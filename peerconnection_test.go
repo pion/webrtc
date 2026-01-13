@@ -354,7 +354,7 @@ func TestPeerConnection_ICECandidatePool(t *testing.T) {
 	defer report()
 
 	pc, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 1,
+		ICECandidatePoolSize: 5,
 	})
 	assert.NoError(t, err)
 
@@ -371,12 +371,17 @@ func TestPeerConnection_ICECandidatePool(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
 
 	// Candidates should be trapped in the pool and NOT emitted via OnICECandidate yet.
-	select {
-	case <-candidateEmitted:
-		assert.Fail(t, "Candidates emitted before SetLocalDescription")
-	case <-time.After(200 * time.Millisecond):
-		// Pass: No candidates emitted
-	}
+	assert.Eventually(t, func() bool {
+		select {
+		case <-candidateEmitted:
+			return false
+		default:
+			// Accessing internal state to verify they are pooled
+			candidates, _ := pc.iceGatherer.GetLocalCandidates()
+
+			return len(candidates) > 0
+		}
+	}, time.Second*5, 20*time.Millisecond, "Candidates should be gathered into pool but not emitted")
 
 	// Trigger Flush via SetLocalDescription
 	offer, err := pc.CreateOffer(nil)

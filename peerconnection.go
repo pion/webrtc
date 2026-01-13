@@ -1350,11 +1350,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		if weOffer {
 			pc.startRTP(false, &desc, currentTransceivers)
 		}
-
-		// RFC 9429 5.11
-		if weOffer {
-			pc.iceGatherer.clearCandidatePool()
-		}
 	})
 
 	return nil

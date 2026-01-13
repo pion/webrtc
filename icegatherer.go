@@ -45,7 +45,7 @@ type ICEGatherer struct {
 	sdpMid        atomic.Value  // string
 	sdpMLineIndex atomic.Uint32 // uint16
 
-	// ICE candidate pooling as much as pool size
+	// Used for ICE candidate pooling
 	candidatePool        []ice.Candidate
 	iceCandidatePoolSize uint8
 }
@@ -139,7 +139,8 @@ func (g *ICEGatherer) updateServers(servers []ICEServer, policy ICETransportPoli
 	g.validatedServers = validatedServers
 	g.gatherPolicy = policy
 
-	if g.agent != nil && g.State() != ICEGathererStateGathering {
+	if g.agent != nil && (g.State() != ICEGathererStateGathering ||
+		g.iceCandidatePoolSize == 0) {
 		return g.agent.UpdateOptions(ice.WithUrls(validatedServers))
 	}
 
@@ -438,9 +439,7 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 		if candidate != nil {
 			g.lock.Lock()
 			if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
-				if len(g.candidatePool) < int(g.iceCandidatePoolSize) {
-					g.candidatePool = append(g.candidatePool, candidate)
-				}
+				g.candidatePool = append(g.candidatePool, candidate)
 				g.lock.Unlock()
 
 				return
