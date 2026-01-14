@@ -244,10 +244,7 @@ func CertificateFromPEM(pems string) (*Certificate, error) { //nolint: cyclop
 func (c Certificate) PEM() (string, error) {
 	// First write the X509 certificate
 	var builder strings.Builder
-	xcertBytes := make(
-		[]byte, base64.StdEncoding.EncodedLen(len(c.x509Cert.Raw)))
-	base64.StdEncoding.Encode(xcertBytes, c.x509Cert.Raw)
-	err := pem.Encode(&builder, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
+	err := pem.Encode(&builder, &pem.Block{Type: "CERTIFICATE", Bytes: c.x509Cert.Raw})
 	if err != nil {
 		return "", fmt.Errorf("failed to pem encode the X certificate: %w", err)
 	}
