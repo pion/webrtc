@@ -577,7 +577,12 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 			pc.LocalDescription() != nil {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize}
 		}
-		pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
+
+		// Currently, there is no logic implemented to handle runtime changes to this value.
+		// Commenting out to prevent unexpected behavior.
+		// nolint:godox
+		// TODO: Re-enable this in a future update when proper handling is implemented.
+		// pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4-6)

@@ -455,8 +455,18 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 			onLocalCandidateHandler(&c)
 		} else {
 			g.setState(ICEGathererStateComplete)
-
 			onGatheringCompleteHandler()
+
+			// If gathering completes before flushing (i.e., before SetLocalDescription), avoid triggering nil.
+			// Users expect valid candidates to be emitted before the nil completion signal.
+			g.lock.Lock()
+			if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
+				g.lock.Unlock()
+
+				return
+			}
+			g.lock.Unlock()
+
 			onLocalCandidateHandler(nil)
 		}
 	}); err != nil {
@@ -496,6 +506,12 @@ func (g *ICEGatherer) flushCandidates() {
 			continue
 		}
 		onLocalCandidateHandler(&c)
+	}
+
+	// If this is true, gathering completed before flushing,
+	// so trigger nil to notify the user that all candidates have been gathered.
+	if g.State() == ICEGathererStateComplete {
+		onLocalCandidateHandler(nil)
 	}
 }
 
