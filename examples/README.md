@@ -19,6 +19,7 @@ For more full featured examples that use 3rd party libraries see our **[example-
 * [Simulcast](simulcast): The simulcast example demonstrates how to accept and demux 1 Track that contains 3 Simulcast streams. It then returns the media as 3 independent Tracks back to the sender.
 * [Swap Tracks](swap-tracks): The swap-tracks example demonstrates deeper usage of the Pion Media API. The server accepts 3 media streams, and then dynamically routes them back as a single stream to the user.
 * [RTCP Processing](rtcp-processing) The rtcp-processing example demonstrates Pion's RTCP APIs. This allow access to media statistics and control information.
+* [Quick Switch](quick-switch) Use WebRTC to switch quickly between video feeds. Similiar to swap-tracks, but user controls when video is switched and uses static files.
 
 #### Data Channel API
 * [Data Channels](data-channels): The data-channels example shows how you can send/recv DataChannel messages from a web browser.

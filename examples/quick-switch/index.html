@@ -1,0 +1,45 @@
+<html>
+<!--
+		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+		SPDX-License-Identifier: MIT
+	-->
+
+<head>
+    <title>quick-switch</title>
+</head>
+
+<body>
+    <video id="video" autoplay muted playsinline width="500" height="500"></video>
+    <button id="nextVideo"> Next Video </button><br />
+</body>
+
+<script>
+    let peerConnection = new RTCPeerConnection()
+    peerConnection.addTransceiver('video', {direction: 'recvonly'})
+    peerConnection.ontrack = function (event) {
+        document.getElementById('video').srcObject = event.streams[0]
+    }
+
+    let dataChannel = peerConnection.createDataChannel('')
+    dataChannel.onopen = () => {
+        document.getElementById('nextVideo').onclick = () => {
+            dataChannel.send('')
+        }
+    }
+
+    peerConnection.createOffer()
+        .then(offer => peerConnection.setLocalDescription(offer)
+            .then(() => fetch(`/whip`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/sdp'
+                },
+                body: offer.sdp
+            }))
+        )
+        .then(res => res.text())
+        .then(res => peerConnection.setRemoteDescription({type: 'answer', sdp: res}))
+        .catch(alert)
+</script>
+
+</html>
