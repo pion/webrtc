@@ -522,14 +522,6 @@ func (g *ICEGatherer) flushCandidates() {
 	}
 }
 
-func (g *ICEGatherer) clearCandidatePool() {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.candidatePool = nil
-	g.iceCandidatePoolSize = 0
-}
-
 // Close prunes all local candidates, and closes the ports.
 func (g *ICEGatherer) Close() error {
 	return g.close(false /* shouldGracefullyClose */)
