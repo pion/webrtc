@@ -1128,7 +1128,6 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 
 	pc.iceGatherer.flushCandidates()
-	pc.iceGatherer.clearCandidatePool()
 
 	if pc.iceGatherer.State() == ICEGathererStateNew {
 		return pc.iceGatherer.Gather()

@@ -484,7 +484,10 @@ func (g *ICEGatherer) setMediaStreamIdentification(mid string, mLineIndex uint16
 
 func (g *ICEGatherer) flushCandidates() {
 	g.lock.Lock()
-	defer g.lock.Unlock()
+
+	candidates := g.candidatePool
+	g.candidatePool = nil
+	g.iceCandidatePoolSize = 0
 
 	onLocalCandidateHandler := func(*ICECandidate) {}
 	if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
@@ -498,7 +501,11 @@ func (g *ICEGatherer) flushCandidates() {
 
 	sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
 
-	for _, candidate := range g.candidatePool {
+	currentState := g.State()
+
+	g.lock.Unlock()
+
+	for _, candidate := range candidates {
 		c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
 		if err != nil {
 			g.log.Warnf("Failed to convert pooled ice.Candidate: %s", err)
@@ -510,7 +517,7 @@ func (g *ICEGatherer) flushCandidates() {
 
 	// If this is true, gathering completed before flushing,
 	// so trigger nil to notify the user that all candidates have been gathered.
-	if g.State() == ICEGathererStateComplete {
+	if currentState == ICEGathererStateComplete {
 		onLocalCandidateHandler(nil)
 	}
 }
