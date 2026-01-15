@@ -340,65 +340,6 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-// Assert that candidates are gathered immediately on construction when ICECandidatePoolSize is set,
-// but are presumed pooled until SetLocalDescription is called.
-func TestPeerConnection_ICECandidatePool(t *testing.T) {
-	if runtime.GOARCH == "wasm" {
-		t.Skip("Skipping ICECandidatePool test on WASM")
-	}
-
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	pc, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 5,
-	})
-	assert.NoError(t, err)
-
-	candidateEmitted := make(chan struct{})
-	var emitOnce sync.Once
-	pc.OnICECandidate(func(c *ICECandidate) {
-		if c != nil {
-			emitOnce.Do(func() { close(candidateEmitted) })
-		}
-	})
-
-	assert.Eventually(t, func() bool {
-		return pc.ICEGatheringState() != ICEGatheringStateNew
-	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
-
-	// Candidates should be trapped in the pool and NOT emitted via OnICECandidate yet.
-	assert.Eventually(t, func() bool {
-		select {
-		case <-candidateEmitted:
-			return false
-		default:
-			// Accessing internal state to verify they are pooled
-			candidates, _ := pc.iceGatherer.GetLocalCandidates()
-
-			return len(candidates) > 0
-		}
-	}, time.Second*5, 20*time.Millisecond, "Candidates should be gathered into pool but not emitted")
-
-	// Trigger Flush via SetLocalDescription
-	offer, err := pc.CreateOffer(nil)
-	assert.NoError(t, err)
-	assert.NoError(t, pc.SetLocalDescription(offer))
-
-	// The pooled candidates should be released immediately.
-	select {
-	case <-candidateEmitted:
-		// Success: Candidates flushed
-	case <-time.After(time.Second):
-		assert.Fail(t, "No candidates emitted after SetLocalDescription (Flush logic failed)")
-	}
-
-	assert.NoError(t, pc.Close())
-}
-
 const minimalOffer = `v=0
 o=- 4596489990601351948 2 IN IP4 127.0.0.1
 s=-
@@ -758,6 +699,89 @@ func TestGatherOnSetLocalDescription(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, err)
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	<-pcAnswerGathered
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
+// Assert that candidates are flushed by calling SetLocalDescription if ICECandidatePoolSize > 0.
+func TestFlushOnSetLocalDescription(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("Skipping ICECandidatePool test on WASM")
+	}
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOfferFlushStarted := make(chan SessionDescription)
+	pcAnswerFlushStarted := make(chan SessionDescription)
+
+	var offerOnce sync.Once
+	var answerOnce sync.Once
+
+	pcOffer, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 5,
+	})
+	assert.NoError(t, err)
+
+	// We need to create a data channel in order to set mid
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	assert.NoError(t, err)
+
+	pcOffer.OnICECandidate(func(i *ICECandidate) {
+		offerOnce.Do(func() {
+			close(pcOfferFlushStarted)
+		})
+	})
+
+	// Assert that ICEGatheringState changes immediately
+	assert.Eventually(t, func() bool {
+		return pcOffer.ICEGatheringState() != ICEGatheringStateNew
+	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
+
+	// Assert that no events are fired before SetLocalDescription
+	select {
+	case <-pcOfferFlushStarted:
+		assert.Fail(t, "Flush started before SetLocalDescription")
+	case <-time.After(time.Second):
+	}
+
+	// Verify that candidates are flushed immediately after SetLocalDescription
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-pcOfferFlushStarted
+
+	// Create Answer PeerConnection
+	pcAnswer, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 5,
+	})
+	assert.NoError(t, err)
+
+	pcAnswer.OnICECandidate(func(i *ICECandidate) {
+		answerOnce.Do(func() {
+			close(pcAnswerFlushStarted)
+		})
+	})
+
+	// Assert that ICEGatheringState changes immediately
+	assert.Eventually(t, func() bool {
+		return pcAnswer.ICEGatheringState() != ICEGatheringStateNew
+	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	select {
+	case <-pcAnswerFlushStarted:
+		assert.Fail(t, "Flush started before SetLocalDescription")
+	case <-time.After(time.Second):
+	}
+
+	// Verify that candidates are flushed immediately after SetLocalDescription
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-pcAnswerFlushStarted
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
