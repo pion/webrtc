@@ -583,6 +583,7 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 		// nolint:godox
 		// TODO: Re-enable this in a future update when proper handling is implemented.
 		// pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
+		pc.log.Warn("Changing ICECandidatePoolSize is not yet supported. The new value will be ignored.")
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4-6)
@@ -606,6 +607,9 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 	// TODO: If the new ICE candidate pool size changes the existing setting,
 	// this may result in immediate gathering of new pooled candidates,
 	// or discarding of existing pooled candidates
+	if pc.configuration.ICECandidatePoolSize != configuration.ICECandidatePoolSize {
+		pc.log.Warn("Dynamic ICE candidate pool adjustment is not yet supported")
+	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #9)
 	// Update the ICE gatherer so new servers take effect at the next gathering phase.

@@ -499,11 +499,11 @@ func (g *ICEGatherer) flushCandidates() {
 		sdpMid = mid
 	}
 
+	g.lock.Unlock()
+
 	sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
 
 	currentState := g.State()
-
-	g.lock.Unlock()
 
 	for _, candidate := range candidates {
 		c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
