@@ -3,9 +3,9 @@ Upstream-Name: Pion
 Source: https://github.com/pion/
 
 Files: README.md DESIGN.md **/README.md AUTHORS.txt renovate.json go.mod go.sum **/go.mod **/go.sum .eslintrc.json package.json examples.json sfu-ws/flutter/.gitignore sfu-ws/flutter/pubspec.yaml c-data-channels/webrtc.h examples/examples.json yarn.lock
-Copyright: 2023 The Pion community <https://pion.ly>
+Copyright: 2026 The Pion community <https://pion.ly>
 License: MIT
 
 Files: testdata/seed/* testdata/fuzz/* **/testdata/fuzz/* api/*.txt
-Copyright: 2023 The Pion community <https://pion.ly>
+Copyright: 2026 The Pion community <https://pion.ly>
 License: CC0-1.0
