@@ -250,6 +250,7 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 
 	pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
 	pc.configuration.SDPSemantics = configuration.SDPSemantics
+	pc.configuration.AlwaysNegotiateDataChannels = configuration.AlwaysNegotiateDataChannels
 
 	sanitizedICEServers := configuration.getICEServers()
 	if len(sanitizedICEServers) > 0 {
@@ -582,6 +583,12 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #7)
 	pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
+
+	// AlwaysNegotiateDataChannels is treated like other zero-value configuration
+	// fields: only a non-zero value (true) updates the existing setting.
+	if configuration.AlwaysNegotiateDataChannels {
+		pc.configuration.AlwaysNegotiateDataChannels = configuration.AlwaysNegotiateDataChannels
+	}
 
 	// Step #8: ICE candidate pool size is not implemented in pion/webrtc.
 	// The value is stored in configuration but candidate pooling is not supported.
@@ -2790,7 +2797,7 @@ func (pc *PeerConnection) startRTP(
 	}
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
-	if d := haveDataChannel(remoteDesc); d != nil {
+	if d := haveDataChannel(remoteDesc); d != nil && d.MediaName.Port.Value != 0 {
 		pc.startSCTP(getMaxMessageSize(d))
 	}
 }
@@ -2848,7 +2855,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 			mediaSections = append(mediaSections, mediaSection{id: "audio", transceivers: audio})
 		}
 
-		if pc.sctpTransport.dataChannelsRequested != 0 {
+		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
 			mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 		}
 	} else {
@@ -2859,7 +2866,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 			mediaSections = append(mediaSections, mediaSection{id: t.Mid(), transceivers: []*RTPTransceiver{t}})
 		}
 
-		if pc.sctpTransport.dataChannelsRequested != 0 {
+		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
 			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
 		}
 	}
@@ -3019,7 +3026,8 @@ func (pc *PeerConnection) generateMatchedSDP(
 			}
 		}
 
-		if pc.sctpTransport.dataChannelsRequested != 0 && !alreadyHaveApplicationMediaSection {
+		if (pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0) &&
+			!alreadyHaveApplicationMediaSection {
 			if detectedPlanB {
 				mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 			} else {

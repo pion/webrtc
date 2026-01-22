@@ -37,5 +37,9 @@ type Configuration struct {
 	// ICECandidatePoolSize describes the size of the prefetched ICE pool.
 	ICECandidatePoolSize uint8
 
+	// AlwaysNegotiateDataChannels specifies whether the application prefers
+	// to always negotiate data channels in the initial SDP offer.
+	AlwaysNegotiateDataChannels bool
+
 	Certificates []Certificate `json:"certificates,omitempty"`
 }

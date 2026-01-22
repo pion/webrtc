@@ -118,6 +118,23 @@ func valueToStrings(val js.Value) []string {
 	return result
 }
 
+func valueToBoolOrFalse(val js.Value) bool {
+	if val.IsNull() || val.IsUndefined() {
+		return false
+	}
+
+	return val.Bool()
+}
+
+func valueToBoolPointer(val js.Value) *bool {
+	if val.IsNull() || val.IsUndefined() {
+		return nil
+	}
+	b := val.Bool()
+
+	return &b
+}
+
 func stringPointerToValue(val *string) js.Value {
 	if val == nil {
 		return js.Undefined()
@@ -130,6 +147,14 @@ func uint16PointerToValue(val *uint16) js.Value {
 		return js.Undefined()
 	}
 	return js.ValueOf(*val)
+}
+
+func boolToValueOrUndefined(val bool) js.Value {
+	if !val {
+		return js.Undefined()
+	}
+
+	return js.ValueOf(val)
 }
 
 func boolPointerToValue(val *bool) js.Value {

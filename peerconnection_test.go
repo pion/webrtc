@@ -31,17 +31,46 @@ func newPair() (pcOffer *PeerConnection, pcAnswer *PeerConnection, err error) {
 	return pca, pcb, nil
 }
 
-func signalPairWithModification(
+type signalPairOptions struct {
+	disableInitialDataChannel bool
+	modificationFunc          func(string) string
+}
+
+func withModificationFunc(f func(string) string) func(*signalPairOptions) {
+	return func(o *signalPairOptions) {
+		o.modificationFunc = f
+	}
+}
+
+func withDisableInitialDataChannel(disable bool) func(*signalPairOptions) {
+	return func(o *signalPairOptions) {
+		o.disableInitialDataChannel = disable
+	}
+}
+
+func signalPairWithOptions(
 	pcOffer *PeerConnection,
 	pcAnswer *PeerConnection,
-	modificationFunc func(string) string,
+	opts ...func(*signalPairOptions),
 ) error {
-	// Note(albrow): We need to create a data channel in order to trigger ICE
-	// candidate gathering in the background for the JavaScript/Wasm bindings. If
-	// we don't do this, the complete offer including ICE candidates will never be
-	// generated.
-	if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
-		return err
+	var options signalPairOptions
+	for _, o := range opts {
+		o(&options)
+	}
+
+	modificationFunc := options.modificationFunc
+	if modificationFunc == nil {
+		modificationFunc = func(s string) string { return s }
+	}
+
+	if !options.disableInitialDataChannel {
+		// Note(albrow): We need to create a data channel in order to trigger ICE
+		// candidate gathering in the background for the JavaScript/Wasm bindings. If
+		// we don't do this, the complete offer including ICE candidates will never be
+		// generated.
+		if _, err := pcOffer.CreateDataChannel("initial_data_channel", nil); err != nil {
+			return err
+		}
 	}
 
 	offer, err := pcOffer.CreateOffer(nil)
@@ -70,6 +99,18 @@ func signalPairWithModification(
 	<-answerGatheringComplete
 
 	return pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription())
+}
+
+func signalPairWithModification(
+	pcOffer *PeerConnection,
+	pcAnswer *PeerConnection,
+	modificationFunc func(string) string,
+) error {
+	return signalPairWithOptions(
+		pcOffer,
+		pcAnswer,
+		withModificationFunc(modificationFunc),
+	)
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
@@ -168,10 +209,11 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 							Username: "unittest",
 						},
 					},
-					ICETransportPolicy:   ICETransportPolicyAll,
-					BundlePolicy:         BundlePolicyBalanced,
-					RTCPMuxPolicy:        RTCPMuxPolicyRequire,
-					ICECandidatePoolSize: 5,
+					ICETransportPolicy:          ICETransportPolicyAll,
+					BundlePolicy:                BundlePolicyBalanced,
+					RTCPMuxPolicy:               RTCPMuxPolicyRequire,
+					ICECandidatePoolSize:        5,
+					AlwaysNegotiateDataChannels: true,
 				})
 				if err != nil {
 					return pc, err
@@ -251,6 +293,14 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			},
 			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize},
 		},
+		{
+			name: "enable AlwaysNegotiateDataChannels",
+			init: func() (*PeerConnection, error) {
+				return NewPeerConnection(Configuration{})
+			},
+			config:  Configuration{AlwaysNegotiateDataChannels: true},
+			wantErr: nil,
+		},
 	} {
 		pc, err := test.init()
 		assert.NoError(t, err, "SetConfiguration %q: init failed", test.name)
@@ -285,6 +335,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
+	assert.False(t, actual.AlwaysNegotiateDataChannels)
 	assert.NoError(t, pc.Close())
 }
 
