@@ -561,12 +561,13 @@ func (pc *PeerConnection) SCTP() *SCTPTransport {
 // js.Undefined(), which will result in the default value being used.
 func configurationToValue(configuration Configuration) js.Value {
 	return js.ValueOf(map[string]any{
-		"iceServers":           iceServersToValue(configuration.ICEServers),
-		"iceTransportPolicy":   stringEnumToValueOrUndefined(configuration.ICETransportPolicy.String()),
-		"bundlePolicy":         stringEnumToValueOrUndefined(configuration.BundlePolicy.String()),
-		"rtcpMuxPolicy":        stringEnumToValueOrUndefined(configuration.RTCPMuxPolicy.String()),
-		"peerIdentity":         stringToValueOrUndefined(configuration.PeerIdentity),
-		"iceCandidatePoolSize": uint8ToValueOrUndefined(configuration.ICECandidatePoolSize),
+		"iceServers":                  iceServersToValue(configuration.ICEServers),
+		"iceTransportPolicy":          stringEnumToValueOrUndefined(configuration.ICETransportPolicy.String()),
+		"bundlePolicy":                stringEnumToValueOrUndefined(configuration.BundlePolicy.String()),
+		"rtcpMuxPolicy":               stringEnumToValueOrUndefined(configuration.RTCPMuxPolicy.String()),
+		"peerIdentity":                stringToValueOrUndefined(configuration.PeerIdentity),
+		"iceCandidatePoolSize":        uint8ToValueOrUndefined(configuration.ICECandidatePoolSize),
+		"alwaysNegotiateDataChannels": boolToValueOrUndefined(configuration.AlwaysNegotiateDataChannels),
 
 		// Note: Certificates are not currently supported.
 		// "certificates": configuration.Certificates,
@@ -616,12 +617,13 @@ func valueToConfiguration(configValue js.Value) Configuration {
 		return Configuration{}
 	}
 	return Configuration{
-		ICEServers:           valueToICEServers(configValue.Get("iceServers")),
-		ICETransportPolicy:   NewICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
-		BundlePolicy:         newBundlePolicy(valueToStringOrZero(configValue.Get("bundlePolicy"))),
-		RTCPMuxPolicy:        newRTCPMuxPolicy(valueToStringOrZero(configValue.Get("rtcpMuxPolicy"))),
-		PeerIdentity:         valueToStringOrZero(configValue.Get("peerIdentity")),
-		ICECandidatePoolSize: valueToUint8OrZero(configValue.Get("iceCandidatePoolSize")),
+		ICEServers:                  valueToICEServers(configValue.Get("iceServers")),
+		ICETransportPolicy:          NewICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
+		BundlePolicy:                newBundlePolicy(valueToStringOrZero(configValue.Get("bundlePolicy"))),
+		RTCPMuxPolicy:               newRTCPMuxPolicy(valueToStringOrZero(configValue.Get("rtcpMuxPolicy"))),
+		PeerIdentity:                valueToStringOrZero(configValue.Get("peerIdentity")),
+		ICECandidatePoolSize:        valueToUint8OrZero(configValue.Get("iceCandidatePoolSize")),
+		AlwaysNegotiateDataChannels: valueToBoolOrFalse(configValue.Get("alwaysNegotiateDataChannels")),
 
 		// Note: Certificates are not supported.
 		// Certificates []Certificate
