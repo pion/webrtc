@@ -51,7 +51,7 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 
 		var err error
-		*pc, err = webrtc.NewPeerConnection(webrtc.Configuration{
+		*pc, err = api.NewPeerConnection(webrtc.Configuration{
 			BundlePolicy: webrtc.BundlePolicyMaxBundle,
 		})
 		if err != nil {

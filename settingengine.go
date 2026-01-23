@@ -691,7 +691,7 @@ func (e *SettingEngine) SetIgnoreRidPauseForRecv(ignoreRidPauseForRecv bool) {
 	e.ignoreRidPauseForRecv = ignoreRidPauseForRecv
 }
 
-// Enable SPED (dtls-in-stun)
+// EnableSped enabled SPED/dtls-in-stun.
 func (e *SettingEngine) EnableSped(enable bool) {
 	e.enableSped = enable
 }

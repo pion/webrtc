@@ -165,6 +165,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 
 	if err != nil {
 		t.lock.Lock()
+
 		return err
 	}
 
@@ -477,18 +478,19 @@ func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
 	return agent.SetRemoteCredentials(newUfrag, newPwd)
 }
 
-// Piggyback forwards a raw packet to the ICE Agent
-func (t *ICETransport) Piggyback(packet []byte) bool {
+// Piggyback forwards a raw packet to the ICE Agent.
+func (t *ICETransport) Piggyback(packet []byte, end bool) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	agent := t.gatherer.getAgent()
 	if agent == nil {
 		t.log.Warnf("%w: unable to Piggyback", errICEAgentNotExist)
+
 		return false
 	}
 
-	return agent.Piggyback(packet)
+	return agent.Piggyback(packet, end)
 }
 
 func (t *ICETransport) ReportDtlsPacket(packet []byte) {
@@ -498,6 +500,7 @@ func (t *ICETransport) ReportDtlsPacket(packet []byte) {
 	agent := t.gatherer.getAgent()
 	if agent == nil {
 		t.log.Warnf("%w: unable report DTLS packet", errICEAgentNotExist)
+
 		return
 	}
 	agent.ReportDtlsPacket(packet)

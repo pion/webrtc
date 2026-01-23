@@ -397,9 +397,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 
 	// Configure DTLS for SPED.
 	if t.api.settingEngine.enableSped {
-		dtlsConfig.OutboundHandshakePacketInterceptor = func(packet []byte) bool {
+		dtlsConfig.OutboundHandshakePacketInterceptor = func(packet []byte, end bool) bool {
 			// Forward the packet to the ICE transport for piggybacking.
-			return t.iceTransport.Piggyback(packet)
+			return t.iceTransport.Piggyback(packet, end)
 		}
 		dtlsConfig.InboundHandshakePacketNotifier = func(packet []byte) {
 			t.iceTransport.ReportDtlsPacket(packet)
@@ -467,7 +467,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 	if t.api.settingEngine.enableSped {
-		t.iceTransport.Piggyback(nil)
+		t.iceTransport.Piggyback(nil, true)
 		t.iceTransport.SetDtlsCallback(nil)
 	}
 
