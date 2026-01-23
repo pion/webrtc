@@ -44,8 +44,9 @@ type DTLSTransport struct {
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
 
-	onStateChangeHandler   func(DTLSTransportState)
-	internalOnCloseHandler func()
+	onStateChangeHandler         func(DTLSTransportState)
+	internalOnStateChangeHandler func(DTLSTransportState)
+	internalOnCloseHandler       func()
 
 	conn *dtls.Conn
 
@@ -120,8 +121,10 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 // onStateChange requires the caller holds the lock.
 func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
 	t.state = state
-	handler := t.onStateChangeHandler
-	if handler != nil {
+	if handler := t.onStateChangeHandler; handler != nil {
+		handler(state)
+	}
+	if handler := t.internalOnStateChangeHandler; handler != nil {
 		handler(state)
 	}
 }
@@ -386,10 +389,18 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 
 		parsedRemoteCert, parseErr := x509.ParseCertificate(t.remoteCertificate)
 		if parseErr != nil {
+			t.onStateChange(DTLSTransportStateFailed)
+
 			return parseErr
 		}
 
-		return t.validateFingerPrint(parsedRemoteCert)
+		if fpErr := t.validateFingerPrint(parsedRemoteCert); fpErr != nil {
+			t.onStateChange(DTLSTransportStateFailed)
+
+			return fpErr
+		}
+
+		return nil
 	}
 
 	// Connect as DTLS Client/Server, function is blocking and we
