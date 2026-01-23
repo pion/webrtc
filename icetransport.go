@@ -9,6 +9,7 @@ package webrtc
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,6 +41,8 @@ type ICETransport struct {
 
 	loggerFactory logging.LoggerFactory
 
+	dtlsCallback func(packet []byte, rAddr net.Addr)
+
 	log logging.LeveledLogger
 }
 
@@ -70,7 +73,7 @@ func (t *ICETransport) GetSelectedCandidatePair() (*ICECandidatePair, error) {
 }
 
 // GetSelectedCandidatePairStats returns the selected candidate pair stats on which packets are sent
-// if there is no selected pair empty stats, false is returned to indicate stats not available.
+// if there is no selected pair, false is returned to indicate stats are not available.
 func (t *ICETransport) GetSelectedCandidatePairStats() (ICECandidatePairStats, bool) {
 	return t.gatherer.getSelectedCandidatePairStats()
 }
@@ -108,6 +111,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	if agent == nil {
 		return fmt.Errorf("%w: unable to start ICETransport", errICEAgentNotExist)
 	}
+	agent.SetDtlsCallback(t.dtlsCallback)
 
 	if err := agent.OnConnectionStateChange(func(iceState ice.ConnectionState) {
 		state := newICETransportStateFromICE(iceState)
@@ -146,17 +150,28 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(ctx,
+		iceConn, err = agent.StartDial(
 			params.UsernameFragment,
 			params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(ctx,
+		iceConn, err = agent.StartAccept(
 			params.UsernameFragment,
 			params.Password)
 
 	default:
 		err = errICERoleUnknown
+	}
+
+	if err != nil {
+		t.lock.Lock()
+
+		return err
+	}
+
+	if !t.gatherer.api.settingEngine.enableSped {
+		// Note: this blocks until a pair is found.
+		err = agent.AwaitConnect(ctx)
 	}
 
 	// Reacquire the lock to set the connection/mux
@@ -179,6 +194,16 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	t.mux = mux.NewMux(config)
 
 	return nil
+}
+
+func (t *ICETransport) SetDtlsCallback(cb func(packet []byte, rAddr net.Addr)) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if agent := t.gatherer.getAgent(); agent != nil {
+		agent.SetDtlsCallback(cb)
+	} else {
+		t.dtlsCallback = cb
+	}
 }
 
 // restart is not exposed currently because ORTC has users create a whole new ICETransport
@@ -451,4 +476,32 @@ func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
 	}
 
 	return agent.SetRemoteCredentials(newUfrag, newPwd)
+}
+
+// Piggyback forwards a raw packet to the ICE Agent.
+func (t *ICETransport) Piggyback(packet []byte, end bool) bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		t.log.Warnf("%w: unable to Piggyback", errICEAgentNotExist)
+
+		return false
+	}
+
+	return agent.Piggyback(packet, end)
+}
+
+func (t *ICETransport) ReportDtlsPacket(packet []byte) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		t.log.Warnf("%w: unable report DTLS packet", errICEAgentNotExist)
+
+		return
+	}
+	agent.ReportDtlsPacket(packet)
 }
