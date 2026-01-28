@@ -173,7 +173,7 @@ func TestNew(t *testing.T) {
 		BundlePolicy:         BundlePolicyMaxCompat,
 		RTCPMuxPolicy:        RTCPMuxPolicyNegotiate,
 		PeerIdentity:         "unittest",
-		ICECandidatePoolSize: 5,
+		ICECandidatePoolSize: 1,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, pc)
@@ -195,7 +195,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			name: "valid",
 			init: func() (*PeerConnection, error) {
 				pc, err := NewPeerConnection(Configuration{
-					ICECandidatePoolSize: 5,
+					ICECandidatePoolSize: 1,
 				})
 				if err != nil {
 					return pc, err
@@ -213,7 +213,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 					ICETransportPolicy:          ICETransportPolicyAll,
 					BundlePolicy:                BundlePolicyBalanced,
 					RTCPMuxPolicy:               RTCPMuxPolicyRequire,
-					ICECandidatePoolSize:        5,
+					ICECandidatePoolSize:        1,
 					AlwaysNegotiateDataChannels: true,
 				})
 				if err != nil {
@@ -721,7 +721,7 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 	var answerOnce sync.Once
 
 	pcOffer, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 5,
+		ICECandidatePoolSize: 1,
 	})
 	assert.NoError(t, err)
 
@@ -755,7 +755,7 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 
 	// Create Answer PeerConnection
 	pcAnswer, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 5,
+		ICECandidatePoolSize: 1,
 	})
 	assert.NoError(t, err)
 
@@ -783,6 +783,14 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	<-pcAnswerFlushStarted
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestSetICECandidatePoolSizeLarge(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 2,
+	})
+	assert.Nil(t, pc)
+	assert.Equal(t, &rtcerr.NotSupportedError{Err: errICECandidatePoolSizeTooLarge}, err)
 }
 
 // Assert that SetRemoteDescription handles invalid states.

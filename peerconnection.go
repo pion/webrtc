@@ -251,6 +251,11 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 	}
 
 	if configuration.ICECandidatePoolSize != 0 {
+		// Issue #2892, ice candidate pool size greater than 1 is not supported
+		if configuration.ICECandidatePoolSize > 1 {
+			return &rtcerr.NotSupportedError{Err: errICECandidatePoolSizeTooLarge}
+		}
+
 		pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
 	}
 

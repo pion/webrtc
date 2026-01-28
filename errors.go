@@ -278,6 +278,8 @@ var (
 		"cannot convert to StatsICECandidatePairStateSucceeded invalid ice candidate state",
 	)
 
+	errICECandidatePoolSizeTooLarge = errors.New("ice candidate pool size greater than 1 is not supported")
+
 	errInvalidICECredentialTypeString = errors.New("invalid ICECredentialType")
 	errInvalidICEServer               = errors.New("invalid ICEServer")
 

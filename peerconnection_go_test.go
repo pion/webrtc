@@ -85,7 +85,7 @@ func TestNew_Go(t *testing.T) {
 			RTCPMuxPolicy:        RTCPMuxPolicyNegotiate,
 			PeerIdentity:         "unittest",
 			Certificates:         []Certificate{*certificate},
-			ICECandidatePoolSize: 5,
+			ICECandidatePoolSize: 1,
 		})
 		assert.Nil(t, err)
 		assert.NotNil(t, pc)
@@ -200,7 +200,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 				pc, err := api.NewPeerConnection(Configuration{
 					PeerIdentity:         "unittest",
 					Certificates:         []Certificate{*certificate1},
-					ICECandidatePoolSize: 5,
+					ICECandidatePoolSize: 1,
 				})
 				if err != nil {
 					return pc, err
@@ -230,7 +230,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 					RTCPMuxPolicy:        RTCPMuxPolicyRequire,
 					PeerIdentity:         "unittest",
 					Certificates:         []Certificate{*certificate1},
-					ICECandidatePoolSize: 5,
+					ICECandidatePoolSize: 1,
 				})
 				if err != nil {
 					return pc, err
