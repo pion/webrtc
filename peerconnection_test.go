@@ -786,6 +786,10 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 }
 
 func TestSetICECandidatePoolSizeLarge(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("Skipping ICECandidatePool test on WASM")
+	}
+
 	pc, err := NewPeerConnection(Configuration{
 		ICECandidatePoolSize: 2,
 	})
