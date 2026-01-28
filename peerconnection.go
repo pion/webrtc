@@ -200,6 +200,12 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		}
 	})
 
+	if pc.configuration.ICECandidatePoolSize > 0 {
+		if err := pc.iceGatherer.Gather(); err != nil {
+			return nil, err
+		}
+	}
+
 	pc.interceptorRTCPWriter = pc.api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(pc.writeRTCP))
 
 	return pc, nil
@@ -245,6 +251,11 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 	}
 
 	if configuration.ICECandidatePoolSize != 0 {
+		// Issue #2892, ice candidate pool size greater than 1 is not supported
+		if configuration.ICECandidatePoolSize > 1 {
+			return &rtcerr.NotSupportedError{Err: errICECandidatePoolSizeTooLarge}
+		}
+
 		pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
 	}
 
@@ -571,7 +582,13 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 			pc.LocalDescription() != nil {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingICECandidatePoolSize}
 		}
-		pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
+
+		// Currently, there is no logic implemented to handle runtime changes to this value.
+		// Commenting out to prevent unexpected behavior.
+		// nolint:godox
+		// TODO: Re-enable this in a future update when proper handling is implemented.
+		// pc.configuration.ICECandidatePoolSize = configuration.ICECandidatePoolSize
+		pc.log.Warn("Changing ICECandidatePoolSize is not yet supported. The new value will be ignored.")
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #4-6)
@@ -590,8 +607,14 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 		pc.configuration.AlwaysNegotiateDataChannels = configuration.AlwaysNegotiateDataChannels
 	}
 
-	// Step #8: ICE candidate pool size is not implemented in pion/webrtc.
-	// The value is stored in configuration but candidate pooling is not supported.
+	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #8)
+	// nolint:godox
+	// TODO: If the new ICE candidate pool size changes the existing setting,
+	// this may result in immediate gathering of new pooled candidates,
+	// or discarding of existing pooled candidates
+	if pc.configuration.ICECandidatePoolSize != configuration.ICECandidatePoolSize {
+		pc.log.Warn("Dynamic ICE candidate pool adjustment is not yet supported")
+	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #9)
 	// Update the ICE gatherer so new servers take effect at the next gathering phase.
@@ -775,8 +798,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 func (pc *PeerConnection) createICEGatherer() (*ICEGatherer, error) {
 	g, err := pc.api.NewICEGatherer(ICEGatherOptions{
-		ICEServers:      pc.configuration.getICEServers(),
-		ICEGatherPolicy: pc.configuration.ICETransportPolicy,
+		ICEServers:           pc.configuration.getICEServers(),
+		ICEGatherPolicy:      pc.configuration.ICETransportPolicy,
+		ICECandidatePoolSize: pc.configuration.ICECandidatePoolSize,
 	})
 	if err != nil {
 		return nil, err
@@ -1111,6 +1135,8 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	if ok {
 		pc.iceGatherer.setMediaStreamIdentification(mediaSection.SDPMid, mediaSection.SDPMLineIndex)
 	}
+
+	pc.iceGatherer.flushCandidates()
 
 	if pc.iceGatherer.State() == ICEGathererStateNew {
 		return pc.iceGatherer.Gather()

@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -172,7 +173,7 @@ func TestNew(t *testing.T) {
 		BundlePolicy:         BundlePolicyMaxCompat,
 		RTCPMuxPolicy:        RTCPMuxPolicyNegotiate,
 		PeerIdentity:         "unittest",
-		ICECandidatePoolSize: 5,
+		ICECandidatePoolSize: 1,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, pc)
@@ -194,7 +195,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			name: "valid",
 			init: func() (*PeerConnection, error) {
 				pc, err := NewPeerConnection(Configuration{
-					ICECandidatePoolSize: 5,
+					ICECandidatePoolSize: 1,
 				})
 				if err != nil {
 					return pc, err
@@ -212,7 +213,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 					ICETransportPolicy:          ICETransportPolicyAll,
 					BundlePolicy:                BundlePolicyBalanced,
 					RTCPMuxPolicy:               RTCPMuxPolicyRequire,
-					ICECandidatePoolSize:        5,
+					ICECandidatePoolSize:        1,
 					AlwaysNegotiateDataChannels: true,
 				})
 				if err != nil {
@@ -699,6 +700,101 @@ func TestGatherOnSetLocalDescription(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 	<-pcAnswerGathered
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+// Assert that candidates are flushed by calling SetLocalDescription if ICECandidatePoolSize > 0.
+func TestFlushOnSetLocalDescription(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("Skipping ICECandidatePool test on WASM")
+	}
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOfferFlushStarted := make(chan SessionDescription)
+	pcAnswerFlushStarted := make(chan SessionDescription)
+
+	var offerOnce sync.Once
+	var answerOnce sync.Once
+
+	pcOffer, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 1,
+	})
+	assert.NoError(t, err)
+
+	// We need to create a data channel in order to set mid
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	assert.NoError(t, err)
+
+	pcOffer.OnICECandidate(func(i *ICECandidate) {
+		offerOnce.Do(func() {
+			close(pcOfferFlushStarted)
+		})
+	})
+
+	// Assert that ICEGatheringState changes immediately
+	assert.Eventually(t, func() bool {
+		return pcOffer.ICEGatheringState() != ICEGatheringStateNew
+	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
+
+	// Assert that no events are fired before SetLocalDescription
+	select {
+	case <-pcOfferFlushStarted:
+		assert.Fail(t, "Flush started before SetLocalDescription")
+	case <-time.After(time.Second):
+	}
+
+	// Verify that candidates are flushed immediately after SetLocalDescription
+	offer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-pcOfferFlushStarted
+
+	// Create Answer PeerConnection
+	pcAnswer, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 1,
+	})
+	assert.NoError(t, err)
+
+	pcAnswer.OnICECandidate(func(i *ICECandidate) {
+		answerOnce.Do(func() {
+			close(pcAnswerFlushStarted)
+		})
+	})
+
+	// Assert that ICEGatheringState changes immediately
+	assert.Eventually(t, func() bool {
+		return pcAnswer.ICEGatheringState() != ICEGatheringStateNew
+	}, time.Second, 10*time.Millisecond, "ICEGatheringState should switch to Gathering or Complete immediately")
+
+	assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	select {
+	case <-pcAnswerFlushStarted:
+		assert.Fail(t, "Flush started before SetLocalDescription")
+	case <-time.After(time.Second):
+	}
+
+	// Verify that candidates are flushed immediately after SetLocalDescription
+	answer, err := pcAnswer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-pcAnswerFlushStarted
+	closePairNow(t, pcOffer, pcAnswer)
+}
+
+func TestSetICECandidatePoolSizeLarge(t *testing.T) {
+	if runtime.GOARCH == "wasm" {
+		t.Skip("Skipping ICECandidatePool test on WASM")
+	}
+
+	pc, err := NewPeerConnection(Configuration{
+		ICECandidatePoolSize: 2,
+	})
+	assert.Nil(t, pc)
+	assert.Equal(t, &rtcerr.NotSupportedError{Err: errICECandidatePoolSizeTooLarge}, err)
 }
 
 // Assert that SetRemoteDescription handles invalid states.
