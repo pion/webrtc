@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,7 +49,7 @@ type DTLSTransport struct {
 	onStateChangeHandler   func(DTLSTransportState)
 	internalOnCloseHandler func()
 
-	conn *dtls.Conn
+	conn DTLSConn
 
 	srtpSession, srtcpSession   atomic.Value
 	srtpEndpoint, srtcpEndpoint *mux.Endpoint
@@ -58,6 +60,50 @@ type DTLSTransport struct {
 
 	api *API
 	log logging.LeveledLogger
+}
+
+// DTLSConn wraps the DTLS connection used by DTLSTransport.
+// It can be injected via SettingEngine to allow replacement at runtime.
+type DTLSConn interface {
+	net.Conn
+	Handshake() error
+	HandshakeContext(ctx context.Context) error
+	SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool)
+	SRTPKeyingMaterialExporter() (srtp.KeyingMaterialExporter, error)
+}
+
+// dtlsConnFactory is a factory function for creating a DTLS connection.
+type dtlsConnFactory func(role DTLSRole, conn net.PacketConn, remoteAddr net.Addr, config *dtls.Config) (DTLSConn, error)
+
+// pionDTLSConn wraps a *dtls.Conn to implement the DTLSConn interface.
+// The only thing we need to implement is the SRTPKeyingMaterialExporter method,
+// all other methods are thunks to the underlying *dtls.Conn.
+type pionDTLSConn struct {
+	conn *dtls.Conn
+}
+
+func (c *pionDTLSConn) Close() error                       { return c.conn.Close() }
+func (c *pionDTLSConn) Read(b []byte) (int, error)         { return c.conn.Read(b) }
+func (c *pionDTLSConn) Write(b []byte) (int, error)        { return c.conn.Write(b) }
+func (c *pionDTLSConn) LocalAddr() net.Addr                { return c.conn.LocalAddr() }
+func (c *pionDTLSConn) RemoteAddr() net.Addr               { return c.conn.RemoteAddr() }
+func (c *pionDTLSConn) SetDeadline(t time.Time) error      { return c.conn.SetDeadline(t) }
+func (c *pionDTLSConn) SetReadDeadline(t time.Time) error  { return c.conn.SetReadDeadline(t) }
+func (c *pionDTLSConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
+func (c *pionDTLSConn) Handshake() error                   { return c.conn.Handshake() }
+func (c *pionDTLSConn) HandshakeContext(ctx context.Context) error {
+	return c.conn.HandshakeContext(ctx)
+}
+func (c *pionDTLSConn) SelectedSRTPProtectionProfile() (dtls.SRTPProtectionProfile, bool) {
+	return c.conn.SelectedSRTPProtectionProfile()
+}
+func (c *pionDTLSConn) SRTPKeyingMaterialExporter() (srtp.KeyingMaterialExporter, error) {
+	connState, ok := c.conn.ConnectionState()
+	if !ok {
+		return nil, fmt.Errorf("failed to get DTLS ConnectionState")
+	}
+
+	return &connState, nil
 }
 
 type simulcastStreamPair struct {
@@ -226,13 +272,13 @@ func (t *DTLSTransport) startSRTP() error {
 		)
 	}
 
-	connState, ok := t.conn.ConnectionState()
-	if !ok {
+	exporter, err := t.conn.SRTPKeyingMaterialExporter()
+	if err != nil {
 		// nolint
-		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
 	}
 
-	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.role() == DTLSRoleClient)
+	err = srtpConfig.ExtractSessionKeysFromDTLS(exporter, t.role() == DTLSRoleClient)
 	if err != nil {
 		// nolint
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
@@ -300,6 +346,38 @@ func (t *DTLSTransport) role() DTLSRole {
 	return defaultDtlsRoleAnswer
 }
 
+func (t *DTLSTransport) createDTLSConn(
+	role DTLSRole,
+	conn net.PacketConn,
+	remoteAddr net.Addr,
+	config *dtls.Config,
+) (DTLSConn, error) {
+	factory := t.api.settingEngine.dtls.connFactory
+	if factory == nil {
+		factory = defaultDTLSConnFactory
+	}
+	return factory(role, conn, remoteAddr, config)
+}
+
+func defaultDTLSConnFactory(
+	role DTLSRole,
+	conn net.PacketConn,
+	remoteAddr net.Addr,
+	config *dtls.Config,
+) (DTLSConn, error) {
+	var dtlsConn *dtls.Conn
+	var err error
+	if role == DTLSRoleClient {
+		dtlsConn, err = dtls.Client(conn, remoteAddr, config)
+	} else {
+		dtlsConn, err = dtls.Server(conn, remoteAddr, config)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &pionDTLSConn{conn: dtlsConn}, nil
+}
+
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:gocognit,cyclop
 	// Take lock and prepare connection, we must not hold the lock
@@ -345,7 +423,6 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 		}, nil
 	}
 
-	var dtlsConn *dtls.Conn
 	dtlsEndpoint := t.iceTransport.newEndpoint(mux.MatchDTLS)
 	dtlsEndpoint.SetOnClose(t.internalOnCloseHandler)
 	role, dtlsConfig, err := prepareTransport()
@@ -394,11 +471,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 
 	// Connect as DTLS Client/Server, function is blocking and we
 	// must not hold the DTLSTransport lock
-	if role == DTLSRoleClient {
-		dtlsConn, err = dtls.Client(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
-	} else {
-		dtlsConn, err = dtls.Server(dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
-	}
+	dtlsConn, err := t.createDTLSConn(role, dtlsEndpoint, dtlsEndpoint.RemoteAddr(), dtlsConfig)
 
 	if err == nil {
 		if t.api.settingEngine.dtls.connectContextMaker != nil {
