@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -2666,5 +2667,32 @@ func TestAlwaysNegotiateDataChannels_CreateDataChannel(t *testing.T) { //nolint:
 	case <-remoteOpened:
 	case <-time.After(5 * time.Second):
 		assert.FailNow(t, "timed out waiting for remote data channel open")
+	}
+}
+
+func TestNoDuplicatedAttributesInMediaDescriptions(t *testing.T) { //nolint:cyclop
+	pcOffer, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, pcOffer.Close())
+	}()
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+
+	for _, md := range offer.parsed.MediaDescriptions {
+		attrs := make([]string, 0)
+		for _, attr := range md.Attributes {
+			str := fmt.Sprintf("%s %s", attr.Key, attr.Value)
+			assert.Falsef(t, slices.Contains(attrs, str), "duplicate attribute found: %s", str)
+			attrs = append(attrs, str)
+		}
 	}
 }
