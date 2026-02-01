@@ -328,16 +328,28 @@ func (m *MediaEngine) RegisterFeedback(feedback RTCPFeedback, typ RTPCodecType) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if typ == RTPCodecTypeVideo {
+	addUniqueFeedback := func(existing []RTCPFeedback) []RTCPFeedback {
+		for _, f := range existing {
+			if strings.EqualFold(f.Type, feedback.Type) && strings.EqualFold(f.Parameter, feedback.Parameter) {
+				return existing
+			}
+		}
+
+		return append(existing, feedback)
+	}
+
+	switch typ {
+	case RTPCodecTypeVideo:
 		for i, v := range m.videoCodecs {
-			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
+			v.RTCPFeedback = addUniqueFeedback(v.RTCPFeedback)
 			m.videoCodecs[i] = v
 		}
-	} else if typ == RTPCodecTypeAudio {
+	case RTPCodecTypeAudio:
 		for i, v := range m.audioCodecs {
-			v.RTCPFeedback = append(v.RTCPFeedback, feedback)
+			v.RTCPFeedback = addUniqueFeedback(v.RTCPFeedback)
 			m.audioCodecs[i] = v
 		}
+	default:
 	}
 }
 
