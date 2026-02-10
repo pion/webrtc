@@ -88,7 +88,13 @@ func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory)
 }
 
 // Start incoming connectivity checks based on its configured role.
-func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *ICERole) error { //nolint:cyclop
+func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
+	return t.StartContext(context.Background(), gatherer, params, role)
+}
+
+// StartContext incoming connectivity checks based on its configured role.
+// If the context is cancelled, the ICE transport will stop.
+func (t *ICETransport) StartContext(ctx context.Context, gatherer *ICEGatherer, params ICEParameters, role *ICERole) error { //nolint:cyclop
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -135,7 +141,7 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 	}
 	t.role = *role
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(ctx)
 	t.ctxCancel = ctxCancel
 
 	// Drop the lock here to allow ICE candidates to be
