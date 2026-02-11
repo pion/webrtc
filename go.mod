@@ -1,6 +1,6 @@
 module github.com/pion/webrtc/v4
 
-go 1.21.0
+go 1.24
 
 require (
 	github.com/pion/datachannel v1.6.0
