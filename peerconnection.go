@@ -187,6 +187,11 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	}
 	pc.dtlsTransport = dtlsTransport
 
+	// Wire up DTLS state change handler to update PeerConnection state
+	pc.dtlsTransport.internalOnStateChangeHandler = func(state DTLSTransportState) {
+		pc.updateConnectionState(pc.ICEConnectionState(), state)
+	}
+
 	// Create the SCTP transport
 	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
 
@@ -2473,6 +2478,18 @@ func (pc *PeerConnection) GracefulClose() error {
 func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyclop
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+
+	// Per W3C WebRTC spec, if DTLS is in "failed" state, the PeerConnection should
+	// transition to "failed" before "closed". Check and report failed state before
+	// setting isClosed, which would prevent the failed state from being reported.
+	// Also check for "connecting" state - if DTLS handshake started but never completed
+	// when close is called, treat it as a failure (e.g., remote peer closed during handshake).
+	if pc.dtlsTransport != nil {
+		dtlsState := pc.dtlsTransport.State()
+		if dtlsState == DTLSTransportStateFailed || dtlsState == DTLSTransportStateConnecting {
+			pc.updateConnectionState(pc.ICEConnectionState(), DTLSTransportStateFailed)
+		}
+	}
 
 	pc.mu.Lock()
 	// A lock in this critical section is needed because pc.isClosed and
