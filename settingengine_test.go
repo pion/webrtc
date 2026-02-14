@@ -106,6 +106,19 @@ func TestICERenomination(t *testing.T) {
 	})
 }
 
+func TestICEContinualGatheringPolicy(t *testing.T) {
+	t.Run("DefaultIsZero", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.Equal(t, ice.ContinualGatheringPolicy(0), s.iceContinualGatheringPolicy)
+	})
+
+	t.Run("SetPolicy", func(t *testing.T) {
+		s := SettingEngine{}
+		s.SetICEContinualGatheringPolicy(ice.GatherContinually)
+		assert.Equal(t, ice.GatherContinually, s.iceContinualGatheringPolicy)
+	})
+}
+
 func TestDetachDataChannels(t *testing.T) {
 	s := SettingEngine{}
 	assert.False(t, s.detach.DataChannels)
