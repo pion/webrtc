@@ -418,6 +418,7 @@ func (t *ICETransport) Stats() TransportStats {
 		stats.BytesSent = conn.BytesSent()
 		stats.BytesReceived = conn.BytesReceived()
 	}
+
 	return stats
 }
 
