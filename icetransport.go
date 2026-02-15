@@ -94,7 +94,9 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 
 // StartContext incoming connectivity checks based on its configured role.
 // If the context is canceled, the ICE transport will stop.
-func (t *ICETransport) StartContext(ctx context.Context, gatherer *ICEGatherer, params ICEParameters, role *ICERole) error { //nolint:cyclop
+//
+//nolint:cyclop
+func (t *ICETransport) StartContext(ctx context.Context, gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
