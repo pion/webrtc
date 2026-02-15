@@ -403,24 +403,27 @@ func (t *ICETransport) ensureGatherer() error {
 	return nil
 }
 
-func (t *ICETransport) collectStats(collector *statsReportCollector) {
+// Stats reports the current statistics of the ICETransport.
+func (t *ICETransport) Stats() TransportStats {
 	t.lock.Lock()
 	conn := t.conn
 	t.lock.Unlock()
-
-	collector.Collecting()
 
 	stats := TransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
 		Type:      StatsTypeTransport,
 		ID:        "iceTransport",
 	}
-
 	if conn != nil {
 		stats.BytesSent = conn.BytesSent()
 		stats.BytesReceived = conn.BytesReceived()
 	}
+	return stats
+}
 
+func (t *ICETransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats := t.Stats()
 	collector.Collect(stats.ID, stats)
 }
 
