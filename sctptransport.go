@@ -389,9 +389,8 @@ func (r *SCTPTransport) State() SCTPTransportState {
 	return r.state
 }
 
-func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
-	collector.Collecting()
-
+// Stats reports the current statistics of the SCTPTransport.
+func (r *SCTPTransport) Stats() SCTPTransportStats {
 	stats := SCTPTransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
 		Type:      StatsTypeSCTPTransport,
@@ -407,7 +406,12 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 		stats.ReceiverWindow = association.RWND()
 		stats.MTU = association.MTU()
 	}
+	return stats
+}
 
+func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats := r.Stats()
 	collector.Collect(stats.ID, stats)
 }
 
