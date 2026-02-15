@@ -96,7 +96,12 @@ func (t *ICETransport) Start(gatherer *ICEGatherer, params ICEParameters, role *
 // If the context is canceled, the ICE transport will stop.
 //
 //nolint:cyclop
-func (t *ICETransport) StartContext(ctx context.Context, gatherer *ICEGatherer, params ICEParameters, role *ICERole) error {
+func (t *ICETransport) StartContext(
+	ctx context.Context,
+	gatherer *ICEGatherer,
+	params ICEParameters,
+	role *ICERole,
+) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
