@@ -53,6 +53,10 @@ var (
 	// RTCPMuxPolicy was made after PeerConnection has been initialized.
 	ErrModifyingRTCPMuxPolicy = errors.New("rtcp mux policy cannot be modified")
 
+	// errModifyingRTPHeaderEncryptionPolicy indicates that an attempt to modify
+	// RTPHeaderEncryptionPolicy was made after PeerConnection has been initialized.
+	errModifyingRTPHeaderEncryptionPolicy = errors.New("rtp header encryption policy cannot be modified")
+
 	// ErrModifyingICECandidatePoolSize indicates that an attempt to modify
 	// ICECandidatePoolSize was made after PeerConnection has been initialized.
 	ErrModifyingICECandidatePoolSize = errors.New("ice candidate pool size cannot be modified")
@@ -134,6 +138,10 @@ var (
 
 	// ErrNoSRTPProtectionProfile indicates that the DTLS handshake completed and no SRTP Protection Profile was chosen.
 	ErrNoSRTPProtectionProfile = errors.New("DTLS Handshake completed and no SRTP Protection Profile was chosen")
+
+	// ErrRTPHeaderEncryptionRequired indicates that the local endpoint requires
+	// RFC 9335 Cryptex negotiation, but the remote SDP did not negotiate it.
+	ErrRTPHeaderEncryptionRequired = errors.New("rtp header extension encryption required")
 
 	// ErrFailedToGenerateCertificateFingerprint indicates that we failed to generate the fingerprint
 	// used for comparing certificates.
