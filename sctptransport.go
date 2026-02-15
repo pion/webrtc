@@ -406,6 +406,7 @@ func (r *SCTPTransport) Stats() SCTPTransportStats {
 		stats.ReceiverWindow = association.RWND()
 		stats.MTU = association.MTU()
 	}
+
 	return stats
 }
 
