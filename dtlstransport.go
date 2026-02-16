@@ -7,6 +7,7 @@
 package webrtc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -301,7 +302,22 @@ func (t *DTLSTransport) role() DTLSRole {
 }
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
-func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:gocognit,cyclop
+func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
+	ctx := context.Background()
+	if t.api.settingEngine.dtls.connectContextMaker != nil {
+		var cancel func()
+		ctx, cancel = t.api.settingEngine.dtls.connectContextMaker()
+		defer cancel()
+	}
+	return t.StartContext(ctx, remoteParameters)
+}
+
+// StartContext starts DTLS transport negotiation with the parameters of the remote DTLS
+// transport. If the context is canceled before the DTLS handshake is complete, the handshake
+// is interrupted and an error is returned.
+//
+//nolint:gocognit,cyclop
+func (t *DTLSTransport) StartContext(ctx context.Context, remoteParameters DTLSParameters) error {
 	// Take lock and prepare connection, we must not hold the lock
 	// when connecting
 	prepareTransport := func() (DTLSRole, *dtls.Config, error) {
@@ -401,12 +417,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error { //nolint:
 	}
 
 	if err == nil {
-		if t.api.settingEngine.dtls.connectContextMaker != nil {
-			handshakeCtx, _ := t.api.settingEngine.dtls.connectContextMaker()
-			err = dtlsConn.HandshakeContext(handshakeCtx)
-		} else {
-			err = dtlsConn.Handshake()
-		}
+		err = dtlsConn.HandshakeContext(ctx)
 	}
 
 	// Re-take the lock, nothing beyond here is blocking
