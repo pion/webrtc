@@ -405,9 +405,9 @@ func (t *ICETransport) ensureGatherer() error {
 
 // Stats reports the current statistics of the ICETransport.
 func (t *ICETransport) Stats() TransportStats {
-	t.lock.Lock()
+	t.lock.RLock()
 	conn := t.conn
-	t.lock.Unlock()
+	t.lock.RUnlock()
 
 	stats := TransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
