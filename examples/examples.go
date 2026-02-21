@@ -52,7 +52,7 @@ func serve(addr string) error {
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		url := req.URL.Path
 		if url == "/wasm_exec.js" {
-			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "misc/wasm/"))).ServeHTTP(res, req)
+			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "lib/wasm/"))).ServeHTTP(res, req)
 
 			return
 		}
