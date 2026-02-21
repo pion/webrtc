@@ -761,3 +761,126 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 	assert.Equal(t, 1, state.rtxCount)
 	state.Unlock()
 }
+
+// TestNackNotSentForRTX verifies that NACKs are never emitted with
+// MediaSSRC equal to the RTX SSRC. See RFC 4588 section 6.3, NACKs
+// MUST be sent only for the original RTP stream.
+func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
+	defer test.TimeOut(time.Second * 20).Stop()
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const numPackets = 20
+
+	var (
+		nackCount    uint32
+		badNackCount uint32
+		rtxSSRC      atomic.Uint32
+	)
+
+	me := &MediaEngine{}
+	assert.NoError(t, me.RegisterDefaultCodecs())
+	ir := &interceptor.Registry{}
+	ir.Add(&mock_interceptor.Factory{
+		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) {
+			return &mock_interceptor.Interceptor{
+				BindRTCPWriterFn: func(writer interceptor.RTCPWriter) interceptor.RTCPWriter {
+					return interceptor.RTCPWriterFunc(
+						func(pkts []rtcp.Packet, attrs interceptor.Attributes) (int, error) {
+							for _, p := range pkts {
+								if pn, ok := p.(*rtcp.TransportLayerNack); ok {
+									atomic.AddUint32(&nackCount, 1)
+									if pn.MediaSSRC == rtxSSRC.Load() {
+										atomic.AddUint32(&badNackCount, 1)
+									}
+								}
+							}
+
+							return writer.Write(pkts, attrs)
+						},
+					)
+				},
+			}, nil
+		},
+	})
+	assert.NoError(t, RegisterDefaultInterceptors(me, ir))
+
+	pcOffer, pcAnswer, wan := createVNetPair(t, ir)
+
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion",
+	)
+	assert.NoError(t, err)
+	rtpSender, err := pcOffer.AddTrack(track)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	params := rtpSender.GetParameters()
+	mediaPayloadType := uint8(params.Codecs[0].PayloadType)
+	rtxSSRC.Store(uint32(params.Encodings[0].RTX.SSRC))
+
+	// Drop every 4th media packet and every 2nd RTX packet.
+	var mediaCount, rtxPktCount atomic.Uint32
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		h := &rtp.Header{}
+		if _, parseErr := h.Unmarshal(c.UserData()); parseErr != nil {
+			return true
+		}
+		if h.PayloadType == mediaPayloadType {
+			if mediaCount.Add(1)%4 == 0 {
+				return false
+			}
+		}
+		if h.SSRC == rtxSSRC.Load() {
+			if rtxPktCount.Add(1)%2 == 0 {
+				return false
+			}
+		}
+
+		return true
+	})
+
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			if _, _, readErr := rtpSender.Read(buf); readErr != nil {
+				return
+			}
+		}
+	}()
+
+	done := make(chan struct{})
+	pcAnswer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		for {
+			if _, _, readErr := remote.ReadRTP(); readErr != nil {
+				break
+			}
+		}
+		close(done)
+	})
+
+	go func() {
+		for i := 0; i < numPackets; i++ {
+			time.Sleep(20 * time.Millisecond)
+			var p rtp.Packet
+			p.Version = 2
+			p.Marker = true
+			p.PayloadType = 96
+			p.SequenceNumber = uint16(i)         //nolint:gosec // G115
+			p.Timestamp = uint32(i * 90000 / 50) //nolint:gosec // G115
+			p.Payload = []byte{42}
+			assert.NoError(t, track.WriteRTP(&p))
+		}
+	}()
+
+	time.Sleep(time.Second)
+
+	assert.True(t, atomic.LoadUint32(&nackCount) > 0, "expected at least one NACK")
+	assert.Equal(t, uint32(0), atomic.LoadUint32(&badNackCount),
+		"NACKs must never target the RTX SSRC")
+
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, pcOffer, pcAnswer)
+	<-done
+}
