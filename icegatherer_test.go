@@ -2400,6 +2400,34 @@ func TestICEGatherer_RenominationSwitchesPair(t *testing.T) { //nolint:cyclop
 	assert.False(t, initialPair.Remote.Equal(finalPair.Remote), "expected remote candidate to change after renomination")
 }
 
+func TestICEGatherer_GracefulCloseDuringAgentActivity(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	onStateChangeCalled := make(chan struct{})
+
+	gatherer.OnStateChange(func(state ICEGathererState) {
+		if state == ICEGathererStateComplete {
+			close(onStateChangeCalled)
+
+			// Yield the agent goroutine long enough for GracefulClose
+			// to acquire g.lock before we return and hit g.lock too.
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+
+	err = gatherer.Gather()
+	assert.NoError(t, err)
+
+	<-onStateChangeCalled
+
+	err = gatherer.GracefulClose()
+	assert.NoError(t, err)
+}
+
 func buildRenominationVNetPair(
 	t *testing.T,
 	enableRenomination bool,
