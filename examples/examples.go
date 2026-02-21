@@ -40,6 +40,19 @@ func main() {
 	}
 }
 
+// getWasmExecDir returns the directory containing wasm_exec.js.
+// Go 1.24+ moved wasm_exec.js from misc/wasm/ to lib/wasm/.
+// This function checks both locations for backward compatibility.
+func getWasmExecDir() string {
+	// Go 1.24+ uses lib/wasm/
+	newPath := filepath.Join(build.Default.GOROOT, "lib/wasm/")
+	if _, err := os.Stat(filepath.Join(newPath, "wasm_exec.js")); err == nil {
+		return newPath
+	}
+	// Go 1.23 and earlier uses misc/wasm/
+	return filepath.Join(build.Default.GOROOT, "misc/wasm/")
+}
+
 func serve(addr string) error {
 	// Load the examples
 	examples := getExamples()
@@ -52,7 +65,7 @@ func serve(addr string) error {
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		url := req.URL.Path
 		if url == "/wasm_exec.js" {
-			http.FileServer(http.Dir(filepath.Join(build.Default.GOROOT, "misc/wasm/"))).ServeHTTP(res, req)
+			http.FileServer(http.Dir(getWasmExecDir())).ServeHTTP(res, req)
 
 			return
 		}
