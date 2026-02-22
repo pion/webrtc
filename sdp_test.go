@@ -1275,6 +1275,47 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			}
 		}
 	})
+	t.Run("cryptex", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, cryptex: true}}
+
+		d := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+		)
+		assert.NoError(t, err)
+
+		found := false
+		for _, md := range offerSdp.MediaDescriptions {
+			if md.MediaName.Media != string(MediaKindVideo) {
+				continue
+			}
+			_, ok := md.Attribute(sdp.AttrKeyCryptex)
+			found = found || ok
+		}
+		assert.True(t, found, "expected a=cryptex on video media section")
+	})
 }
 
 func TestGetRIDs(t *testing.T) {

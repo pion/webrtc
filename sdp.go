@@ -364,6 +364,7 @@ func addDataMediaSection(
 	shouldAddCandidates bool,
 	dtlsFingerprints []DTLSFingerprint,
 	midValue string,
+	cryptex bool,
 	iceParams ICEParameters,
 	candidates []ICECandidate,
 	dtlsRole sdp.ConnectionRole,
@@ -391,6 +392,10 @@ func addDataMediaSection(
 		WithPropertyAttribute("sctp-port:5000").
 		WithValueAttribute("max-message-size", fmt.Sprintf("%d", sctpMaxMessageSize)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
+
+	if cryptex {
+		media = media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	}
 
 	for _, f := range dtlsFingerprints {
 		media = media.WithFingerprint(f.Algorithm, strings.ToUpper(f.Value))
@@ -640,6 +645,10 @@ func addTransceiverSDP(
 		media.WithValueAttribute(sdpAttributeSimulcast, "recv "+strings.Join(recvRids, ";"))
 	}
 
+	if mediaSection.cryptex {
+		media = media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	}
+
 	addSenderSDP(mediaSection, isPlanB, media)
 
 	media = media.WithPropertyAttribute(transceiver.Direction().String())
@@ -671,6 +680,7 @@ type mediaSection struct {
 	data            bool
 	matchExtensions map[string]int
 	rids            []*simulcastRid
+	cryptex         bool
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
@@ -737,6 +747,7 @@ func populateSDP(
 				shouldAddCandidates,
 				mediaDtlsFingerprints,
 				section.id,
+				section.cryptex,
 				iceParams,
 				candidates,
 				connectionRole,
@@ -1192,6 +1203,16 @@ func isIceLiteSet(desc *sdp.SessionDescription) bool {
 func isExtMapAllowMixedSet(desc *sdp.SessionDescription) bool {
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == sdp.AttrKeyExtMapAllowMixed {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isCryptexSet(desc *sdp.MediaDescription) bool {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyCryptex {
 			return true
 		}
 	}

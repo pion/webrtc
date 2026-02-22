@@ -29,6 +29,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
+	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/turn/v4"
@@ -52,6 +54,69 @@ func (api *API) newPair(cfg Configuration) (pcOffer *PeerConnection, pcAnswer *P
 	}
 
 	return pca, pcb, nil
+}
+
+func waitForSRTPReady(t *testing.T, pc *PeerConnection) {
+	t.Helper()
+
+	timer := time.NewTimer(20 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case <-pc.dtlsTransport.srtpReady:
+		return
+	case <-timer.C:
+		assert.FailNow(t, "timed out waiting for SRTP startup")
+	}
+}
+
+func hasCryptexForMedia(t *testing.T, sdpStr string, mediaKind string) bool {
+	t.Helper()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(sdpStr)))
+
+	for _, md := range parsed.MediaDescriptions {
+		if md.MediaName.Media != mediaKind {
+			continue
+		}
+
+		return isCryptexSet(md)
+	}
+
+	assert.FailNowf(t, "media kind %s not found in SDP", mediaKind)
+
+	return false
+}
+
+func hasCryptexForSession(t *testing.T, sdpStr string) bool {
+	t.Helper()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(sdpStr)))
+
+	if _, hasCryptex := parsed.Attribute(sdp.AttrKeyCryptex); hasCryptex {
+		return true
+	}
+
+	return false
+}
+
+func dtlsCryptexMode(pc *PeerConnection) srtp.CryptexMode {
+	pc.dtlsTransport.lock.RLock()
+	defer pc.dtlsTransport.lock.RUnlock()
+
+	return pc.dtlsTransport.cryptexMode
+}
+
+func findTransceiverByKind(pc *PeerConnection, kind RTPCodecType) *RTPTransceiver {
+	for _, tr := range pc.GetTransceivers() {
+		if tr != nil && tr.Kind() == kind {
+			return tr
+		}
+	}
+
+	return nil
 }
 
 func TestNew_Go(t *testing.T) {
@@ -285,6 +350,16 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 			},
 			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials},
 		},
+		{
+			name: "update RTPHeaderEncryptionPolicy",
+			init: func() (*PeerConnection, error) {
+				return NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy},
+		},
 	} {
 		pc, err := test.init()
 		assert.NoErrorf(t, err, "SetConfiguration %q: init failed", test.name)
@@ -304,6 +379,7 @@ func TestPeerConnection_GetConfiguration_Go(t *testing.T) {
 
 	cfg := pc.GetConfiguration()
 	assert.Equal(t, false, cfg.AlwaysNegotiateDataChannels)
+	assert.Equal(t, RTPHeaderEncryptionPolicyNegotiate, cfg.RTPHeaderEncryptionPolicy)
 
 	assert.NoError(t, pc.Close())
 }
@@ -2694,5 +2770,507 @@ func TestNoDuplicatedAttributesInMediaDescriptions(t *testing.T) { //nolint:cycl
 			assert.Falsef(t, slices.Contains(attrs, str), "duplicate attribute found: %s", str)
 			attrs = append(attrs, str)
 		}
+	}
+}
+
+func TestCryptexNegotiatedInSDP(t *testing.T) {
+	var desc sdp.SessionDescription
+
+	// Empty SDP
+	desc = sdp.SessionDescription{}
+	negotiatedForAnyMedia, negotiatedForAllMedia := cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+
+	// Cryptex in session-level attribute
+	desc = sdp.SessionDescription{}
+	desc.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Cryptex in media-level attribute in all medias
+	desc = sdp.SessionDescription{}
+	media := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media2.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Cryptex in media-level attribute in some medias
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+
+	// Ignore application section
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "application",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Ignore medias with port 0
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 0},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// No cryptex anywhere
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+}
+
+func TestCryptexAttributeInOffer(t *testing.T) {
+	// Check if Cryptex attribute is correctly added to offer SDP based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, pcOffer.Close()) }()
+
+			_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+
+			assert.False(t, hasCryptexForSession(t, offer.SDP))
+
+			hasVideoCryptex := hasCryptexForMedia(t, offer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, offer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, offer.SDP, mediaSectionApplication)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.True(t, hasVideoCryptex, "expected a=cryptex on offer video m-line")
+				assert.True(t, hasAudioCryptex, "expected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+		})
+	}
+}
+
+//nolint:cyclop,dupl
+func TestCryptexAttributeInAnswerForOfferWithCryptex(t *testing.T) {
+	// Check if Cryptex attribute is correctly added to answer SDP based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings when offer contains Cryptex attribute.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			require.NoError(t, err)
+			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+			require.NoError(t, pcAnswer.SetLocalDescription(answer))
+			<-answerGatheringComplete
+			answer = *pcAnswer.LocalDescription()
+
+			assert.False(t, hasCryptexForSession(t, answer.SDP))
+
+			hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.True(t, hasVideoCryptex, "expected a=cryptex on offer video m-line")
+				assert.True(t, hasAudioCryptex, "expected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+
+			require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			waitForSRTPReady(t, pcAnswer)
+			waitForSRTPReady(t, pcOffer)
+
+			answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+			answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+			require.NotNil(t, answerVideoTr)
+			require.NotNil(t, answerAudioTr)
+
+			if policy == RTPHeaderEncryptionPolicyDisable {
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			} else {
+				assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcOffer))
+				if policy == RTPHeaderEncryptionPolicyRequire {
+					assert.Equal(t, srtp.CryptexModeRequired, dtlsCryptexMode(pcAnswer))
+				} else {
+					assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcAnswer))
+				}
+
+				assert.True(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			}
+		})
+	}
+}
+
+func TestCryptexAttributeInAnswerForOfferWithoutCryptex(t *testing.T) {
+	// Check how answer SDP Cryptex attribute negotiation behaves based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings when offer does NOT contain Cryptex attribute.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			err = pcAnswer.SetRemoteDescription(offer)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable, RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate:
+				var answer SessionDescription
+				answer, err = pcAnswer.CreateAnswer(nil)
+				require.NoError(t, err)
+				answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+				require.NoError(t, pcAnswer.SetLocalDescription(answer))
+				<-answerGatheringComplete
+				answer = *pcAnswer.LocalDescription()
+
+				require.NoError(t, err)
+				hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+				hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+				hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+
+				require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				waitForSRTPReady(t, pcAnswer)
+				waitForSRTPReady(t, pcOffer)
+				answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+				answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+				require.NotNil(t, answerVideoTr)
+				require.NotNil(t, answerAudioTr)
+
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			case RTPHeaderEncryptionPolicyRequire:
+				require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired, "expected error for offer without Cryptex")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+		})
+	}
+}
+
+func TestCryptexAttributeInAnswerMissingWhenOffererRequiresCryptex(t *testing.T) {
+	// Check that answer SDP without Cryptex attribute is rejected when offerer requires Cryptex.
+
+	pcOffer, err := NewPeerConnection(Configuration{
+		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
+	})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{
+		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
+	})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	err = pcOffer.SetRemoteDescription(answer)
+	require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired, "expected error for answer without Cryptex")
+}
+
+//nolint:cyclop,dupl
+func TestCryptexAttributeInAnswerForSessionLevelCryptex(t *testing.T) {
+	// Check if Cryptex attribute added at session-level in offer results in correct answer SDP
+	// based on RtpHeaderEncryptionPolicy and SettingEngine.DisableRTPHeaderEncryption settings.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			// Manually add session-level cryptex attribute and remove media-level cryptex attributes from offer
+			offerSDP := &sdp.SessionDescription{}
+			require.NoError(t, offerSDP.Unmarshal([]byte(offer.SDP)))
+			offerSDP.WithPropertyAttribute(sdp.AttrKeyCryptex)
+			for _, md := range offerSDP.MediaDescriptions {
+				md.Attributes = slices.DeleteFunc(md.Attributes, func(a sdp.Attribute) bool {
+					return a.Key == sdp.AttrKeyCryptex
+				})
+			}
+			offerSDPBytes, err := offerSDP.Marshal()
+			require.NoError(t, err)
+			offer.SDP = string(offerSDPBytes)
+
+			require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			require.NoError(t, err)
+			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+			require.NoError(t, pcAnswer.SetLocalDescription(answer))
+			<-answerGatheringComplete
+			answer = *pcAnswer.LocalDescription()
+
+			assert.False(t, hasCryptexForSession(t, answer.SDP))
+
+			hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.True(t, hasVideoCryptex, "expected a=cryptex on offer video m-line")
+				assert.True(t, hasAudioCryptex, "expected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+
+			require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			waitForSRTPReady(t, pcOffer)
+			waitForSRTPReady(t, pcAnswer)
+			answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+			answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+			require.NotNil(t, answerVideoTr)
+			require.NotNil(t, answerAudioTr)
+
+			if policy == RTPHeaderEncryptionPolicyDisable {
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			} else {
+				assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcOffer))
+				if policy == RTPHeaderEncryptionPolicyRequire {
+					assert.Equal(t, srtp.CryptexModeRequired, dtlsCryptexMode(pcAnswer))
+				} else {
+					assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcAnswer))
+				}
+
+				assert.True(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			}
+		})
 	}
 }
