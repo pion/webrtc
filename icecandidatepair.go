@@ -17,6 +17,10 @@ func newICECandidatePairStatsID(localID, remoteID string) string {
 }
 
 func (p *ICECandidatePair) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+
 	return fmt.Sprintf("(local) %s <-> (remote) %s", p.Local, p.Remote)
 }
 

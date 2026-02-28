@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	mock_interceptor "github.com/pion/interceptor/pkg/mock"
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtp"
@@ -518,4 +519,84 @@ func (f *fakeAudioPlayoutStatsProvider) AddTrack(track *TrackRemote) error {
 
 func (f *fakeAudioPlayoutStatsProvider) RemoveTrack(track *TrackRemote) {
 	track.removeProvider(f)
+}
+
+func TestRTPReceiverRTXStreamInfoMimeType(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// Collect all StreamInfos bound on the remote (receiver) side
+	var (
+		boundStreamInfos []*interceptor.StreamInfo
+	)
+
+	mockInterceptor := &mock_interceptor.Interceptor{
+		BindRemoteStreamFn: func(info *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
+			boundStreamInfos = append(boundStreamInfos, info)
+
+			return reader
+		},
+	}
+
+	ir := &interceptor.Registry{}
+	ir.Add(&mock_interceptor.Factory{
+		NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) { return mockInterceptor, nil },
+	})
+
+	sender, receiver, err := NewAPI(WithInterceptorRegistry(ir)).newPair(Configuration{})
+	assert.NoError(t, err)
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	_, err = sender.AddTrack(track)
+	assert.NoError(t, err)
+
+	// Signal and wait until the receiver fires OnTrack (stream is negotiated + receiving)
+	trackReceived, trackReceivedCancel := context.WithCancel(context.Background())
+	receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
+		trackReceivedCancel()
+	})
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	// Send samples until the receiver sees the track (RTX SSRC gets registered during Receive)
+	func() {
+		ticker := time.NewTicker(time.Millisecond * 20)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-trackReceived.Done():
+				return
+			case <-ticker.C:
+				assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
+			}
+		}
+	}()
+
+	// Assert: exactly one bound stream must have MimeType == MimeTypeRTX
+	count := 0
+	for _, info := range boundStreamInfos {
+		if info.MimeType == MimeTypeRTX {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count,
+		"expected exactly one RTX StreamInfo with MimeType %q, got %d (all types: %v)",
+		MimeTypeRTX, count, mimeTypes(boundStreamInfos))
+
+	closePairNow(t, sender, receiver)
+}
+
+// helper to print all mime types for debugging.
+func mimeTypes(infos []*interceptor.StreamInfo) []string {
+	out := make([]string, len(infos))
+	for i, info := range infos {
+		out[i] = info.MimeType
+	}
+
+	return out
 }
