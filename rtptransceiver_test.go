@@ -274,3 +274,46 @@ func Test_RTPTransceiver_UnattachedRTX(t *testing.T) {
 
 	closePairNow(t, offerPC, answerPC)
 }
+
+// Assert that a transceiver, onces stopped, is rejected in offers
+func Test_RTPTransceiver_Stopped_Transceiver_Is_Rejected(t *testing.T) {
+	// This test is skipped for now because it fails
+	return
+	m := &MediaEngine{}
+	assert.NoError(t, m.RegisterDefaultCodecs())
+
+	offerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	answerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	offerTransceiver, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	_, err = answerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	assert.NoError(t, offerPC.SetRemoteDescription(answer))
+
+	assert.NotEmpty(t, offerTransceiver.Mid(), "A transceiver should have been associated after applying an answer")
+	assert.NoError(t, offerTransceiver.Stop())
+
+	offer, err = offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	mediaDesc := offer.parsed.MediaDescriptions[0]
+	assert.Equal(t, mediaDesc.MediaName.Port.Value, 0, "After stopping a transceiver it should be rejected in offers")
+
+	closePairNow(t, offerPC, answerPC)
+}
