@@ -248,6 +248,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			// NACKs MUST be sent only for the original RTP stream.
 			rtxCodec := codec
 			rtxCodec.RTCPFeedback = nil
+			rtxCodec.MimeType = MimeTypeRTX
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, rtxCodec, globalParams.HeaderExtensions)
 			result, err = r.transport.streamsForSSRC(
 				rtxSsrc,
