@@ -43,6 +43,7 @@ type DTLSTransport struct {
 	remoteCertificate     []byte
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
+	cryptexMode           srtp.CryptexMode
 
 	onStateChangeHandler   func(DTLSTransportState)
 	internalOnCloseHandler func()
@@ -192,12 +193,20 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	return t.remoteCertificate
 }
 
-func (t *DTLSTransport) startSRTP() error {
+// startSRTP requires the caller holds the lock.
+func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		BufferFactory: t.api.settingEngine.BufferFactory,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
+
+	if t.cryptexMode == srtp.CryptexModeEnabled || t.cryptexMode == srtp.CryptexModeRequired {
+		opt := srtp.Cryptex(t.cryptexMode)
+		srtpConfig.LocalOptions = append(srtpConfig.LocalOptions, opt)
+		srtpConfig.RemoteOptions = append(srtpConfig.RemoteOptions, opt)
+	}
+
 	if t.api.settingEngine.replayProtection.SRTP != nil {
 		srtpConfig.RemoteOptions = append(
 			srtpConfig.RemoteOptions,
@@ -708,4 +717,27 @@ func (t *DTLSTransport) streamsForSSRC(
 		rtcpReadStream:  rtcpReadStream,
 		rtcpInterceptor: rtcpInterceptor,
 	}, nil
+}
+
+func (t *DTLSTransport) getCryptexMode() srtp.CryptexMode {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.cryptexMode
+}
+
+func (t *DTLSTransport) setCryptexMode(mode srtp.CryptexMode) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.cryptexMode = mode
+}
+
+// rtpHeaderEncryptionNegotiated reports if RFC 9335 RTP Header Extension Encryption ("Cryptex")
+// has been negotiated and is enabled for this transceiver.
+func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.cryptexMode == srtp.CryptexModeEnabled || t.cryptexMode == srtp.CryptexModeRequired
 }

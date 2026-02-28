@@ -253,6 +253,25 @@ func (t *RTPTransceiver) Direction() RTPTransceiverDirection {
 	return RTPTransceiverDirection(0)
 }
 
+// RTPHeaderEncryptionNegotiated reports if RFC 9335 RTP Header Extension Encryption ("Cryptex")
+// has been negotiated and is enabled for this transceiver.
+func (t *RTPTransceiver) RTPHeaderEncryptionNegotiated() bool {
+	var dtlsTransport *DTLSTransport
+	if sender := t.Sender(); sender != nil {
+		dtlsTransport = sender.Transport()
+	}
+	if dtlsTransport == nil {
+		if receiver := t.Receiver(); receiver != nil {
+			dtlsTransport = receiver.Transport()
+		}
+	}
+	if dtlsTransport == nil {
+		return false
+	}
+
+	return dtlsTransport.rtpHeaderEncryptionNegotiated()
+}
+
 // Stop irreversibly stops the RTPTransceiver.
 func (t *RTPTransceiver) Stop() error {
 	if sender := t.Sender(); sender != nil {

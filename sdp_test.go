@@ -761,6 +761,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 				nil,
 				0,
 				false,
+				false,
 			)
 			assert.NoError(t, err)
 
@@ -816,6 +817,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			se.ignoreRidPauseForRecv,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -878,6 +880,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			se.ignoreRidPauseForRecv,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -938,6 +941,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -978,6 +982,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 			false,
 		)
 		assert.Nil(t, err)
@@ -1038,6 +1043,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.NoError(t, err)
 
@@ -1072,6 +1078,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1102,6 +1109,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEGatheringStateComplete,
 			nil,
 			se.getSCTPMaxMessageSize(),
+			false,
 			false,
 		)
 		assert.Nil(t, err)
@@ -1148,6 +1156,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1188,6 +1197,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEGatheringStateComplete,
 			&matchedBundle,
 			se.getSCTPMaxMessageSize(),
+			false,
 			false,
 		)
 		assert.Nil(t, err)
@@ -1232,6 +1242,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			&matchedBundle,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1266,6 +1277,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			nil,
 			se.getSCTPMaxMessageSize(),
 			false,
+			false,
 		)
 		assert.Nil(t, err)
 
@@ -1274,6 +1286,83 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 				assert.False(t, strings.HasSuffix(a.String(), " "))
 			}
 		}
+	})
+	t.Run("cryptex media-level", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, cryptex: true}}
+
+		d := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			false,
+		)
+		assert.NoError(t, err)
+
+		found := false
+		for _, md := range offerSdp.MediaDescriptions {
+			if md.MediaName.Media != string(MediaKindVideo) {
+				continue
+			}
+			_, ok := md.Attribute(sdp.AttrKeyCryptex)
+			found = found || ok
+		}
+		assert.True(t, found, "expected a=cryptex on video media section")
+	})
+	t.Run("cryptex session-level", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
+
+		d := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			true,
+		)
+		assert.NoError(t, err)
+
+		_, ok := offerSdp.Attribute(sdp.AttrKeyCryptex)
+		assert.True(t, ok, "expected session-level a=cryptex")
 	})
 }
 
