@@ -82,6 +82,7 @@ type SettingEngine struct {
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
 		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
+		supportedProtocols            []string
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
@@ -627,6 +628,15 @@ func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
 	hook func(handshake.MessageCertificateRequest) handshake.Message,
 ) {
 	e.dtls.certificateRequestMessageHook = hook
+}
+
+// SetDTLSSupportedProtocols sets the supported application protocols (ALPN) for the DTLS handshake.
+// Note: RFC 8833 defines two application protocols for WebRTC:
+//   - `webrtc` - mixed media and data communications using SRTP and data channels.
+//   - `c-webrtc` - WebRTC with a promise to protect media confidentiality.
+
+func (e *SettingEngine) SetDTLSSupportedProtocols(protocols ...string) {
+	e.dtls.supportedProtocols = protocols
 }
 
 // SetSCTPRTOMax sets the maximum retransmission timeout.

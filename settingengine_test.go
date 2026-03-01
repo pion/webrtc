@@ -690,6 +690,7 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	se.SetDTLSRootCAs(rootCAs)
 	se.SetDTLSKeyLogWriter(&keyBuf)
 	se.SetDTLSCipherSuites(dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+	se.SetDTLSSupportedProtocols("webrtc")
 
 	called := false
 	se.SetDTLSCustomerCipherSuites(func() []dtls.CipherSuite {
@@ -712,6 +713,7 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	}, se.dtls.cipherSuites)
 	_ = se.dtls.customCipherSuites()
+	assert.Equal(t, []string{"webrtc"}, se.dtls.supportedProtocols)
 	assert.True(t, called)
 }
 

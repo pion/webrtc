@@ -380,6 +380,13 @@ func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
 			},
 			wantExtra: 7,
 		},
+		{
+			name: "SupportedProtocols",
+			configure: func(se *SettingEngine) {
+				se.dtls.supportedProtocols = []string{"webrtc", "c-webrtc"}
+			},
+			wantExtra: 1,
+		},
 	}
 
 	for _, tc := range tests {
