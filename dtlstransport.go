@@ -417,6 +417,13 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 		sharedOpts = append(sharedOpts, dtls.WithKeyLogWriter(t.api.settingEngine.dtls.keyLogWriter))
 	}
 
+	if len(t.api.settingEngine.dtls.supportedProtocols) > 0 {
+		sharedOpts = append(
+			sharedOpts,
+			dtls.WithSupportedProtocols(t.api.settingEngine.dtls.supportedProtocols...),
+		)
+	}
+
 	return sharedOpts
 }
 
