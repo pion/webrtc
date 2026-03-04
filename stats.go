@@ -281,6 +281,10 @@ type InboundRTPStreamStats struct {
 	// null. Otherwise, this member is not present.
 	Mid string `json:"mid"`
 
+	// Rid only exists if a rid has been set for this RTP stream.
+	// Must not exist for audio.
+	Rid string `json:"rid,omitempty"`
+
 	// Timestamp is the timestamp associated with this object.
 	Timestamp StatsTimestamp `json:"timestamp"`
 

@@ -452,6 +452,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		}
 
 		inboundStats := InboundRTPStreamStats{
+			Rid:         remoteTrack.RID(),
 			Mid:         mid,
 			Timestamp:   now,
 			Type:        StatsTypeInboundRTP,
