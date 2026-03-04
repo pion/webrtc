@@ -600,3 +600,50 @@ func mimeTypes(infos []*interceptor.StreamInfo) []string {
 
 	return out
 }
+
+// TestRTPReceiver_CollectStats_RID validates that collectStats correctly maps RID
+// from TrackRemote into InboundRTPStreamStats.
+func TestRTPReceiver_CollectStats_RID(t *testing.T) {
+	ssrc := SSRC(1234)
+
+	fg := &fakeGetter{s: stats.Stats{}}
+
+	receiver := &RTPReceiver{
+		kind: RTPCodecTypeVideo,
+		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+	}
+
+	// Case 1: RID empty
+	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: tr}}
+
+	collector := newStatsReportCollector()
+	receiver.collectStats(collector, fg)
+	report := collector.Ready()
+
+	statID := "inbound-rtp-1234"
+	got, ok := report[statID]
+	require.True(t, ok)
+
+	inbound, ok := got.(InboundRTPStreamStats)
+	require.True(t, ok)
+
+	assert.Equal(t, "", inbound.Rid)
+
+	// Case 2: RID present
+	rid := "f"
+	tr = newTrackRemote(RTPCodecTypeVideo, ssrc, 0, rid, receiver)
+	receiver.tracks = []trackStreams{{track: tr}}
+
+	collector = newStatsReportCollector()
+	receiver.collectStats(collector, fg)
+	report = collector.Ready()
+
+	got, ok = report[statID]
+	require.True(t, ok)
+
+	inbound, ok = got.(InboundRTPStreamStats)
+	require.True(t, ok)
+
+	assert.Equal(t, rid, inbound.Rid)
+}

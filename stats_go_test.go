@@ -82,6 +82,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 }
 `
 	inboundRTPStreamStats := InboundRTPStreamStats{
+		Rid:                            "q",
 		Mid:                            "1",
 		Timestamp:                      1688978831527.718,
 		ID:                             "IT01A2184088143",
@@ -156,6 +157,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 	inboundRTPStreamStatsJSON := `
 {
   "mid": "1",
+  "rid": "q",
   "timestamp": 1688978831527.718,
   "id": "IT01A2184088143",
   "type": "inbound-rtp",
