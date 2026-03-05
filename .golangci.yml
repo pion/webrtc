@@ -41,6 +41,7 @@ linters:
     - maintidx         # maintidx measures the maintainability index of each function.
     - makezero         # Finds slice declarations with non-zero initial length
     - misspell         # Finds commonly misspelled English words in comments
+    - modernize        # Replace and suggests simplifications to code
     - nakedret         # Finds naked returns in functions greater than a specified function length
     - nestif           # Reports deeply nested if statements
     - nilerr           # Finds the code that returns nil even if it checks that the error is not nil.
