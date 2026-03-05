@@ -1027,3 +1027,105 @@ func (p *countingPacketizer) EnableAbsSendTime(value int)                  {}
 func (p *countingPacketizer) SkipSamples(skippedSamples uint32) {
 	p.totalSamples += uint64(skippedSamples)
 }
+
+type sampleExtensionChecker struct {
+	dummyWriter
+
+	t         *testing.T
+	errorTest bool
+	called    atomic.Uint32
+}
+
+func (c *sampleExtensionChecker) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
+	c.called.Add(1)
+	assert.True(c.t, header.Extension)
+	assert.EqualValues(c.t, "hello", header.GetExtension(1))
+	if !c.errorTest {
+		assert.EqualValues(c.t, "world", header.GetExtension(2))
+	} else {
+		assert.Nil(c.t, header.GetExtension(2))
+	}
+
+	return 0, nil
+}
+
+func TestTrackLocalStaticSample_WriteSampleWithExtensions(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	checker := &sampleExtensionChecker{
+		t: t,
+	}
+
+	track.rtpTrack.mu.Lock()
+	track.rtpTrack.bindings = []trackBinding{{
+		id:          "b1",
+		ssrc:        0x1234,
+		payloadType: 96,
+		writeStream: checker,
+	}}
+	fp := &fakePacketizer{}
+	track.packetizer = fp
+	track.rtpTrack.mu.Unlock()
+
+	sample := media.Sample{
+		Data:     []byte("hi"),
+		Duration: 20 * time.Millisecond,
+	}
+	extension1 := SampleRTPExtension{
+		ID:      1,
+		Payload: []byte("hello"),
+	}
+	extension2 := SampleRTPExtension{
+		ID:      2,
+		Payload: []byte("world"),
+	}
+	err = track.WriteSampleWithExtensions(sample, extension1, extension2)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, checker.called.Load())
+}
+
+func TestTrackLocalStaticSample_WriteSampleWithExtensions_Error(t *testing.T) {
+	track, err := NewTrackLocalStaticSample(
+		RTPCodecCapability{MimeType: MimeTypeVP8},
+		"video",
+		"pion",
+	)
+	require.NoError(t, err)
+
+	checker := &sampleExtensionChecker{
+		t:         t,
+		errorTest: true,
+	}
+
+	track.rtpTrack.mu.Lock()
+	track.rtpTrack.bindings = []trackBinding{{
+		id:          "b1",
+		ssrc:        0x1234,
+		payloadType: 96,
+		writeStream: checker,
+	}}
+	fp := &fakePacketizer{}
+	track.packetizer = fp
+	track.rtpTrack.mu.Unlock()
+
+	sample := media.Sample{
+		Data:     []byte("hi"),
+		Duration: 20 * time.Millisecond,
+	}
+	extension1 := SampleRTPExtension{
+		ID:      1,
+		Payload: []byte("hello"),
+	}
+	extension2 := SampleRTPExtension{
+		ID:      2,
+		Payload: []byte("this is a long extension payload that will trigger an error"),
+	}
+	err = track.WriteSampleWithExtensions(sample, extension1, extension2)
+	assert.ErrorContains(t, err, "one byte extension")
+	require.EqualValues(t, 2, checker.called.Load())
+}
