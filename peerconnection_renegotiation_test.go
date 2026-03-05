@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -92,7 +91,6 @@ func TestPeerConnection_Renegotiation_AddRecvonlyTransceiver(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			lim := test.TimeOut(time.Second * 30)
 			defer lim.Stop()
@@ -987,7 +985,7 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 		}
 	})
 
-	for i := 0; i < expectedTrackCount; i++ {
+	for range expectedTrackCount {
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 		assert.NoError(t, err)
 
@@ -1233,7 +1231,7 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	})
 
 	ssrcReuse := sender.GetParameters().Encodings[0].SSRC
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		assert.NoError(t, vp8Track.WriteRTP(&rtp.Packet{Header: rtp.Header{Version: 2}, Payload: []byte{0, 1, 2, 3, 4, 5}}))
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -1255,7 +1253,7 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 	assert.True(t, sender3.rtpTransceiver == pcOffer.GetTransceivers()[2])
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		assert.NoError(t, vp8Track.WriteRTP(&rtp.Packet{Header: rtp.Header{Version: 2}, Payload: []byte{0, 1, 2, 3, 4, 5}}))
 		time.Sleep(20 * time.Millisecond)
 	}

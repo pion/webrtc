@@ -135,7 +135,6 @@ func TestHasICETrickleOption(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			desc := SessionDescription{Type: SDPTypeOffer, SDP: tc.sdp}
 			_, err := desc.Unmarshal()

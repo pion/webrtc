@@ -353,14 +353,14 @@ func generateChecksumTable() *[256]uint32 {
 
 	for i := range table {
 		r := uint32(i) << 24 //nolint:gosec // G115
-		for j := 0; j < 8; j++ {
+		for range 8 {
 			if (r & 0x80000000) != 0 {
 				r = (r << 1) ^ poly
 			} else {
 				r <<= 1
 			}
-			table[i] = (r & 0xffffffff)
 		}
+		table[i] = (r & 0xffffffff) //nolint:gosec // no out of bounds access here.
 	}
 
 	return &table

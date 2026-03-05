@@ -52,7 +52,6 @@ func TestIsKeyFrame(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := isKeyFrame(tt.payload)
 			assert.Equal(t, tt.want, got)
@@ -123,7 +122,6 @@ func TestWriteRTP(t *testing.T) {
 	var reuseH264Writer *H264Writer
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			writer := &bytes.Buffer{}
 			h264Writer := &H264Writer{

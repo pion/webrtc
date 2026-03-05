@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // play-from-disk-renegotiation demonstrates Pion WebRTC's renegotiation abilities.
 package main

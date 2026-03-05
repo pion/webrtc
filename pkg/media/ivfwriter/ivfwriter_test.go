@@ -536,7 +536,7 @@ func TestIVFWriter_DirectPTS_Precision(t *testing.T) {
 	offset := 32 // Start after IVF header.
 
 	var lastPTS uint64
-	for idx := 0; idx < 225; idx++ {
+	for range 225 {
 		frameSize := uint32(data[offset]) | uint32(data[offset+1])<<8 |
 			uint32(data[offset+2])<<16 | uint32(data[offset+3])<<24
 		lastPTS = uint64(data[offset+4]) | uint64(data[offset+5])<<8 |

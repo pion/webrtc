@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // save-to-disk is a simple application that shows how to record your webcam/microphone using
 // Pion WebRTC and save VP8/Opus to disk.

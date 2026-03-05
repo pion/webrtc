@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // custom-logger is an example of how the Pion API provides an customizable logging API
 package main

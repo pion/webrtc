@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // bandwidth-estimation-from-disk demonstrates how to use Pion's Bandwidth Estimation APIs.
 package main

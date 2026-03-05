@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -218,7 +217,7 @@ func TestPeerConnection_GracefulCloseWithIncomingMessages(t *testing.T) {
 	})
 
 	// send 50 messages, then close pcOffer, and then send another 50
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if i == 50 {
 			assert.NoError(t, pcOffer.GracefulClose())
 		}
@@ -272,7 +271,7 @@ func TestPeerConnection_GracefulCloseConcurrent(t *testing.T) {
 			const gracefulCloseConcurrency = 50
 			var wg sync.WaitGroup
 			wg.Add(gracefulCloseConcurrency)
-			for i := 0; i < gracefulCloseConcurrency; i++ {
+			for range gracefulCloseConcurrency {
 				go func() {
 					defer wg.Done()
 					assert.NoError(t, pc.GracefulClose())

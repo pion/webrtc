@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package main
 
@@ -109,7 +108,7 @@ func proxyHandleConn(clientConn net.Conn) {
 	}
 
 	// Establish a connection to the target server
-	targetConn, err := net.Dial("tcp", req.URL.Host) // nolint: noctx
+	targetConn, err := net.Dial("tcp", req.URL.Host) // nolint:noctx,gosec
 	if err != nil {
 		panic(err)
 	}

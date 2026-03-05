@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // quick-switch demonstrates Pion WebRTC's ability to quickly switch between videos.
 package main

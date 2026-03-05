@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -58,7 +57,7 @@ type SettingEngine struct {
 		MulticastDNSMode         ice.MulticastDNSMode
 		MulticastDNSHostName     string
 		UsernameFragment         string
-		Password                 string
+		Password                 string //nolint:gosec // not a secret.
 		IncludeLoopbackCandidate bool
 	}
 	replayProtection struct {

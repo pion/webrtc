@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -512,7 +511,7 @@ func (d *DataChannel) DetachWithDeadline() (datachannel.ReadWriteCloserDeadliner
 	d.sctpTransport.lock.Lock()
 	n := len(d.sctpTransport.dataChannels)
 	j := 0
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if d == d.sctpTransport.dataChannels[i] {
 			continue
 		}

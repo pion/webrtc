@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -1316,7 +1315,7 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	parseCreds := func(sdp string) (string, string) {
 		var ufrag, pwd string
-		for _, l := range strings.Split(sdp, "\n") {
+		for l := range strings.SplitSeq(sdp, "\n") {
 			l = strings.TrimSpace(l)
 			if after, ok := strings.CutPrefix(l, "a=ice-ufrag:"); ok {
 				ufrag = after

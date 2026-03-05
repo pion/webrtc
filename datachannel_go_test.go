@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -208,7 +207,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 			answerDC.OnOpen(func() {
 				assert.Equal(t, answerBufferedAmountLowThreshold, answerDC.BufferedAmountLowThreshold(), "value mismatch")
 
-				for i := 0; i < nPacketsToSend; i++ {
+				for range nPacketsToSend {
 					e := answerDC.Send(buf)
 					assert.NoError(t, e, "Failed to send string on data channel")
 				}
@@ -239,7 +238,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		offerDC.OnOpen(func() {
 			assert.Equal(t, offerBufferedAmountLowThreshold, offerDC.BufferedAmountLowThreshold(), "value mismatch")
 
-			for i := 0; i < nPacketsToSend; i++ {
+			for range nPacketsToSend {
 				e := offerDC.Send(buf)
 				assert.NoError(t, e, "Failed to send string on data channel")
 				// assert.Equal(t, (i+1)*len(buf), int(offerDC.BufferedAmount()), "unexpected bufferedAmount")
@@ -318,7 +317,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 				atomic.AddUint32(&nCbs, 1)
 			})
 
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				assert.NoError(t, dc.Send(buf), "Failed to send string on data channel")
 				assert.Equal(t, uint64(1500), dc.BufferedAmountLowThreshold(), "value mismatch")
 				// assert.Equal(t, (i+1)*len(buf), int(dc.BufferedAmount()), "unexpected bufferedAmount")

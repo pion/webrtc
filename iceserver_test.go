@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -36,7 +35,7 @@ func TestICEServer_validate(t *testing.T) {
 			{ICEServer{
 				URLs:     []string{"turn:192.158.29.39?transport=udp"},
 				Username: "unittest",
-				Credential: OAuthCredential{
+				Credential: OAuthCredential{ //nolint:gosec // not hardcoded credentials.
 					MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 					AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ5VhNDgeMR3+ZlZ35byg972fW8QjpEl7bx91YLBPFsIhsxloWcXPhA==",
 				},

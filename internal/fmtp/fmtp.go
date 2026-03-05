@@ -37,7 +37,7 @@ func defaultChannels(mimeType string) uint16 {
 func parseParameters(line string) map[string]string {
 	parameters := make(map[string]string)
 
-	for _, p := range strings.Split(line, ";") {
+	for p := range strings.SplitSeq(line, ";") {
 		pp := strings.SplitN(strings.TrimSpace(p), "=", 2)
 		key := strings.ToLower(pp[0])
 		var value string

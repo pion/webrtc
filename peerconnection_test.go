@@ -919,7 +919,7 @@ func TestPeerConnection_SessionID(t *testing.T) {
 	var offerSessionVersion uint64
 	var answerSessionID uint64
 	var answerSessionVersion uint64
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 		var offer sdp.SessionDescription
 		assert.NoError(t, offer.UnmarshalString(pcOffer.LocalDescription().SDP))

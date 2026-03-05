@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // ice-tcp demonstrates Pion WebRTC's ICE TCP abilities.
 package main

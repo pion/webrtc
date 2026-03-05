@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -298,8 +297,8 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid {
 		if space := strings.Index(simulcastAttr, " "); space > 0 {
 			simulcastAttr = simulcastAttr[space+1:]
 		}
-		ridStates := strings.Split(simulcastAttr, ";")
-		for _, ridState := range ridStates {
+		ridStates := strings.SplitSeq(simulcastAttr, ";")
+		for ridState := range ridStates {
 			if ridState[:1] == "~" {
 				ridID := ridState[1:]
 				for _, rid := range rids {
@@ -994,7 +993,7 @@ func extractICEDetailsFromMedia( //nolint:cyclop
 
 type sdpICEDetails struct {
 	Ufrag      string
-	Password   string
+	Password   string //nolint:gosec // not a secret.
 	Candidates []ICECandidate
 }
 
