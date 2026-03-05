@@ -345,7 +345,6 @@ func TestICECandidateExtensions_ToJSON(t *testing.T) {
 	}
 
 	for _, cand := range candidates {
-		cand := cand
 		candidate, err := ice.UnmarshalCandidate(cand.candidate)
 		assert.NoError(t, err)
 

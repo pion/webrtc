@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // repacketize demonstrates how many video codecs can be received, depacketized
 // and packetized by Pion over RTP.

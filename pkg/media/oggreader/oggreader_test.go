@@ -52,7 +52,7 @@ func buildUnknownMappingFamilyContainer(mappingFamily, channels uint8) []byte {
 		mappingFamily,
 	}
 
-	segmentTable := []byte{byte(len(payload))}
+	segmentTable := []byte{byte(len(payload))} //nolint:gosec // G115: test-only, sized by construction.
 
 	header := []byte{
 		0x4f, 0x67, 0x67, 0x53, // "OggS"
@@ -92,7 +92,7 @@ func buildChannelMappingFamilyContainer(
 	}
 	payload = append(payload, mapping...)
 
-	segmentTable := []byte{byte(len(payload))}
+	segmentTable := []byte{byte(len(payload))} //nolint:gosec // G115: test-only, sized by construction.
 
 	header := []byte{
 		0x4f, 0x67, 0x67, 0x53, // "OggS"
@@ -222,7 +222,6 @@ func TestOggReader_ChannelMappingFamily1(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			reader, err := NewWithOptions(
 				bytes.NewReader(buildChannelMappingFamilyContainer(1, tc.channels, tc.streams, tc.coupled, tc.channelMap)),
@@ -268,7 +267,6 @@ func TestOggReader_KnownChannelMappingFamilies(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			container := buildChannelMappingFamilyContainer(
 				tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap,
@@ -320,7 +318,6 @@ func TestOggReader_ParseExtraFieldsForNonZeroMappingFamily(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			container := buildChannelMappingFamilyContainer(
 				tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap,
@@ -577,7 +574,7 @@ func buildOggPage(serial uint32, pageIndex uint32, headerType uint8, payload []b
 	binary.LittleEndian.PutUint32(indexBytes, pageIndex)
 
 	// Build segment table (single segment containing entire payload)
-	segmentTable := []byte{byte(len(payload))}
+	segmentTable := []byte{byte(len(payload))} //nolint:gosec // G115: test-only, sized by construction.
 
 	// Build page header (27 bytes)
 	header := []byte{
@@ -848,7 +845,6 @@ func TestParseOpusTagsErrors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			tags, err := ParseOpusTags(tc.payload)
 			assert.Nil(t, tags)

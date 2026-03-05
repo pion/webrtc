@@ -7,6 +7,6 @@ package webrtc
 // and password and other ICE-related parameters.
 type ICEParameters struct {
 	UsernameFragment string `json:"usernameFragment"`
-	Password         string `json:"password"`
+	Password         string `json:"password"` //nolint:gosec // not a secret.
 	ICELite          bool   `json:"iceLite"`
 }

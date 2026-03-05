@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // simulcast demonstrates of how to handle incoming track with multiple simulcast rtp streams and show all them back.
 package main

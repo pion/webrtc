@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 	"time"
 
@@ -244,10 +244,8 @@ func (t *TrackRemote) addProvider(provider AudioPlayoutStatsProvider) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	for _, p := range t.audioPlayoutStatsProviders {
-		if p == provider {
-			return
-		}
+	if slices.Contains(t.audioPlayoutStatsProviders, provider) {
+		return
 	}
 
 	t.audioPlayoutStatsProviders = append(t.audioPlayoutStatsProviders, provider)

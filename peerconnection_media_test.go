@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -1218,7 +1217,7 @@ func TestPlanBMediaExchange(t *testing.T) {
 		assert.NoError(t, err)
 
 		outboundTracks := []*TrackLocalStaticSample{}
-		for i := 0; i < trackCount; i++ {
+		for range trackCount {
 			outboundTracks = append(outboundTracks, addSingleTrack(pcOffer))
 		}
 
@@ -1709,7 +1708,7 @@ func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
 		return track
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		addTrack()
 	}
 	for _, tr := range pc.GetTransceivers() {
@@ -1719,7 +1718,7 @@ func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
 	var wg sync.WaitGroup
 	tracks := make([]*TrackLocalStaticSample, 10)
 	wg.Add(10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(j int) {
 			tracks[j] = addTrack()
 			wg.Done()
@@ -2115,7 +2114,7 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 
 	assertRidCorrect(t)
 
-	for i := 0; i < simulcastProbeCount+10; i++ {
+	for range simulcastProbeCount + 10 {
 		sequenceNumber++
 		time.Sleep(10 * time.Millisecond)
 
@@ -2284,7 +2283,7 @@ sendRIDs:
 
 	assertNoRepairStreams()
 
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		sequenceNumber++
 		pkt := &rtp.Packet{
 			Header: rtp.Header{
@@ -2300,7 +2299,7 @@ sendRIDs:
 		require.NoError(t, vp8WriterA.WriteRTP(pkt))
 	}
 
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		sequenceNumber++
 		pkt := &rtp.Packet{
 			Header: rtp.Header{
@@ -2317,7 +2316,7 @@ sendRIDs:
 		require.NoError(t, vp8WriterA.WriteRTP(pkt))
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		assertNoRepairStreams()
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -2423,7 +2422,7 @@ func TestPeerConnection_Simulcast_NoDataChannel(t *testing.T) {
 		connectionWg.Wait()
 
 		var seqNo uint16
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			pkt := &rtp.Packet{
 				Header: rtp.Header{
 					Version:        2,
@@ -2545,8 +2544,7 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 	})
 
 	// Create context for coordinated cleanup
-	testCtx, testCancel := context.WithCancel(context.Background())
-	defer testCancel()
+	testCtx := t.Context()
 
 	// RTCP reader with proper cleanup
 	go func() {
@@ -2695,7 +2693,7 @@ func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cycl
 	pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
 		actualBuffer := []byte{}
 
-		for i := 0; i < rtpPktCount; i++ {
+		for range rtpPktCount {
 			pkt, _, err := trackRemote.ReadRTP()
 			assert.NoError(t, err)
 
@@ -2729,7 +2727,7 @@ func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cycl
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
 	peerConnectionConnected.Wait()
 
-	for sequenceNumber := uint16(0); sequenceNumber < rtpPktCount; sequenceNumber++ {
+	for sequenceNumber := range uint16(rtpPktCount) {
 		pkt := &rtp.Packet{
 			Header: rtp.Header{
 				Version:        2,

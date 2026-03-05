@@ -14,5 +14,5 @@ type OAuthCredential struct {
 
 	// AccessToken is a base64-encoded format. This is an encrypted
 	// self-contained token that is opaque to the application.
-	AccessToken string
+	AccessToken string //nolint:gosec // not a secret.
 }

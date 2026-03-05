@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -191,7 +190,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 	// nolint:varnamelen
 	const N = 10
 	done := make(chan struct{}, N)
-	for i := 0; i < N; i++ {
+	for range N {
 		go func() {
 			// Use Detach data channels mode
 			s := SettingEngine{}
@@ -285,7 +284,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 		}()
 	}
 
-	for i := 0; i < N; i++ {
+	for range N {
 		select {
 		case <-done:
 		case <-time.After(20 * time.Second):

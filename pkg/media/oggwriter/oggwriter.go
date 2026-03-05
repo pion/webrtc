@@ -272,14 +272,14 @@ func generateChecksumTable() *[256]uint32 {
 
 	for i := range table {
 		remainder := uint32(i) << 24 //nolint:gosec // G115
-		for j := 0; j < 8; j++ {
+		for range 8 {
 			if (remainder & 0x80000000) != 0 {
 				remainder = (remainder << 1) ^ poly
 			} else {
 				remainder <<= 1
 			}
-			table[i] = (remainder & 0xffffffff)
 		}
+		table[i] = (remainder & 0xffffffff) //nolint:gosec // no out of bounds access here.
 	}
 
 	return &table

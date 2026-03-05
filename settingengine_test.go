@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -562,7 +561,7 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	rawDC := <-detachChan
 	assert.NoError(t, rawDC.SetWriteDeadline(time.Now().Add(time.Second)))
 	buf := make([]byte, 1000)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, err = rawDC.Write(buf)
 		if err != nil {
 			break

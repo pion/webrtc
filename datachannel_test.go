@@ -98,7 +98,7 @@ func benchmarkDataChannelSend(b *testing.B, numChannels int) {
 	})
 
 	var wg sync.WaitGroup
-	for i := 0; i < numChannels; i++ {
+	for i := range numChannels {
 		label := fmt.Sprintf("dc-%d", i)
 		open[label] = make(chan bool)
 		wg.Add(1)

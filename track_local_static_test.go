@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -351,7 +350,7 @@ func Test_TrackLocalStatic_Padding(t *testing.T) {
 		assert.Equal(t, track.PayloadType(), PayloadType(100))
 		assert.Equal(t, track.Codec().RTPCodecCapability.MimeType, "video/VP8")
 
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			// Padding payload
 			p, _, e := track.ReadRTP()
 			assert.NoError(t, e)
@@ -922,7 +921,7 @@ func TestTrackLocalStaticSample_WriteSample_NoTimestampDrift(t *testing.T) {
 	track.sequencer = rtp.NewRandomSequencer()
 	track.rtpTrack.mu.Unlock()
 
-	for i := 0; i < numFrames; i++ {
+	for range numFrames {
 		err := track.WriteSample(media.Sample{
 			Data:     []byte{0x00},
 			Duration: frameDuration,
@@ -971,7 +970,7 @@ func TestTrackLocalStaticSample_WriteSample_DroppedPackets_NoDrift(t *testing.T)
 	var expectedTotal uint64
 	var remainder float64
 
-	for i := 0; i < numFrames; i++ {
+	for i := range numFrames {
 		var drops uint16
 		if (i+1)%300 == 0 {
 			drops = uint16((i/300)%3 + 1) //nolint:gosec

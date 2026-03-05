@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -732,7 +731,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 		},
 	}
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		media[i].transceivers[0].setSender(&RTPSender{})
 		media[i].transceivers[0].setDirection(RTPTransceiverDirectionSendonly)
 	}

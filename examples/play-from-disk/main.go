@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // play-from-disk demonstrates how to send video and/or audio to your browser from files saved to disk.
 package main

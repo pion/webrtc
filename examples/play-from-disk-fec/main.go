@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // play-from-disk-fec demonstrates how to use forward error correction (FlexFEC-03)
 // while sending video to your Chrome-based browser from files saved to disk.

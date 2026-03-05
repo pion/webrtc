@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // stats demonstrates how to use the webrtc-stats implementation provided by Pion WebRTC.
 package main

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // ogg-playlist-sctp streams Opus pages from single or multi-track Ogg containers,
 // exposes the playlist over a DataChannel, and lets the browser switch tracks.

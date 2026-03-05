@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -74,7 +73,7 @@ func TestNew_Go(t *testing.T) {
 						"turns:google.de?transport=tcp",
 					},
 					Username: "unittest",
-					Credential: OAuthCredential{
+					Credential: OAuthCredential{ //nolint:gosec // not hardcoded credentials.
 						MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 					},
@@ -219,7 +218,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 								"turns:google.de?transport=tcp",
 							},
 							Username: "unittest",
-							Credential: OAuthCredential{
+							Credential: OAuthCredential{ //nolint:gosec // not hardcoded credentials.
 								MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 								AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 							},
