@@ -230,6 +230,15 @@ func (s *TrackLocalStaticRTP) Write(b []byte) (n int, err error) {
 	return len(b), s.writeRTP(packet)
 }
 
+// SampleRTPExtension is a RTP extension that can be added to packets generated
+// when writing Samples to a TrackLocalStaticSample.
+type SampleRTPExtension struct {
+	// ID is the negotiated extension id.
+	ID uint8
+	// Payload is the payload of the extension to add to the packet.
+	Payload []byte
+}
+
 // TrackLocalStaticSample is a TrackLocal that has a pre-set codec and accepts Samples.
 // If you wish to send a RTP Packet use TrackLocalStaticRTP.
 type TrackLocalStaticSample struct {
@@ -340,7 +349,7 @@ func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 // If one PeerConnection fails the packets will still be sent to
 // all PeerConnections. The error message will contain the ID of the failed
 // PeerConnections so you can remove them.
-func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
+func (s *TrackLocalStaticSample) WriteSample(sample media.Sample, extensions ...SampleRTPExtension) error {
 	s.rtpTrack.mu.RLock()
 	packetizer := s.packetizer
 	clockRate := s.clockRate
@@ -377,6 +386,11 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 
 	writeErrs := []error{}
 	for _, p := range packets {
+		for _, e := range extensions {
+			if err := p.SetExtension(e.ID, e.Payload); err != nil {
+				writeErrs = append(writeErrs, err)
+			}
+		}
 		if err := s.rtpTrack.WriteRTP(p); err != nil {
 			writeErrs = append(writeErrs, err)
 		}
