@@ -1,6 +1,6 @@
 module github.com/pion/webrtc/v4
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/pion/datachannel v1.6.0
@@ -19,7 +19,7 @@ require (
 	github.com/pion/turn/v4 v4.1.4
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.51.0
 )
 
 require (
