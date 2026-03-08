@@ -126,8 +126,8 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		FastRtxWnd:           r.api.settingEngine.sctp.fastRtxWnd,
 		CwndCAStep:           r.api.settingEngine.sctp.cwndCAStep,
 		MaxMessageSize:       maxMessageSize,
-		LocalSctpInit:        r.localSctpInit,
-		RemoteSctpInit:       remoteSctpInit,
+		LocalSctpInit:        string(r.localSctpInit),
+		RemoteSctpInit:       string(remoteSctpInit),
 	})
 	if err != nil {
 		return err
