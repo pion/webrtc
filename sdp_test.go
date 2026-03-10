@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -1560,4 +1561,27 @@ a=sendrecv
 			assert.NoError(t, peerConnection.Close())
 		})
 	}
+}
+
+func TestSctpInit(t *testing.T) {
+	t.Run("base64-encoded sctp-init is valid", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="}}},
+			},
+		}
+		init, err := getSctpInit(s.MediaDescriptions[0])
+		assert.NoError(t, err)
+		assert.Equal(t, init, []uint8("CookieMonster"))
+	})
+	t.Run("Not base64-encoded sctp-init is rejected", func(t *testing.T) {
+		s := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "*"}}},
+			},
+		}
+		_, err := getSctpInit(s.MediaDescriptions[0])
+		var corruptInputError base64.CorruptInputError
+		assert.ErrorAs(t, err, &corruptInputError)
+	})
 }

@@ -1219,16 +1219,13 @@ func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
 }
 
 func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
-	var err error
-	var decoded []byte
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == "sctp-init" {
-			decoded, err = base64.StdEncoding.DecodeString(a.Value)
-			if err == nil {
-				return decoded, nil
+			decoded, err := base64.StdEncoding.DecodeString(a.Value)
+			if err != nil {
+				return nil, err
 			}
-
-			return nil, err
+			return decoded, nil
 		}
 	}
 
