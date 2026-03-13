@@ -17,6 +17,7 @@ require (
 	github.com/pion/stun/v3 v3.1.1
 	github.com/pion/transport/v4 v4.0.1
 	github.com/pion/turn/v4 v4.1.4
+	github.com/pion/turn/v5 v5.0.3
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.50.0
@@ -32,6 +33,6 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/time v0.10.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
