@@ -43,11 +43,15 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 	defer report()
 
 	sender, receiver, wan := createVNetPair(t, &interceptor.Registry{})
+	defer func() {
+		assert.NoError(t, wan.Stop())
+		closePairNow(t, sender, receiver)
+	}()
 
 	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 
-	_, err = sender.AddTrack(track)
+	rtpSender, err := sender.AddTrack(track)
 	assert.NoError(t, err)
 
 	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
@@ -71,14 +75,26 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, sender, receiver)
 
-	assert.NoError(t, signalPair(sender, receiver))
+	offer, err := sender.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGathered := GatheringCompletePromise(sender)
+	require.NoError(t, sender.SetLocalDescription(offer))
+	<-offerGathered
+	require.NoError(t, receiver.SetRemoteDescription(*sender.LocalDescription()))
+	answer, err := receiver.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGathered := GatheringCompletePromise(receiver)
+	require.NoError(t, receiver.SetLocalDescription(answer))
+	receivers := receiver.GetReceivers()
+	require.Len(t, receivers, 1)
+	require.Error(t, receivers[0].SetReadDeadlineSimulcastSSRC(time.Now(), rtpSender.GetParameters().Encodings[0].SSRC))
+	<-answerGathered
+	require.NoError(t, sender.SetRemoteDescription(*receiver.LocalDescription()))
 
 	<-peerConnectionsConnected
 	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
 
 	<-seenPacket.Done()
-	assert.NoError(t, wan.Stop())
-	closePairNow(t, sender, receiver)
 }
 
 func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
