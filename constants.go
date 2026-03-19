@@ -38,6 +38,8 @@ const (
 
 	sdpAttributeSimulcast = "simulcast"
 
+	ssrcGroupSimulcast = "SIM"
+
 	outboundMTU = 1200
 
 	sctpOutboundMTU = 1191
