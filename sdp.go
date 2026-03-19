@@ -250,6 +250,16 @@ func trackDetailsFromSDP(
 			}
 
 			tracksInMediaSection = []trackDetails{simulcastTrack}
+		} else if ssrcs := getSimulcastSSRCs(log, media); len(ssrcs) != 0 && trackID != "" && streamID != "" {
+			simulcastTrack := trackDetails{
+				mid:      midValue,
+				kind:     codecType,
+				streamID: streamID,
+				id:       trackID,
+				ssrcs:    ssrcs,
+			}
+
+			tracksInMediaSection = []trackDetails{simulcastTrack}
 		}
 
 		incomingTracks = append(incomingTracks, tracksInMediaSection...)
@@ -314,6 +324,29 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid {
 	}
 
 	return rids
+}
+
+func getSimulcastSSRCs(log logging.LeveledLogger, media *sdp.MediaDescription) []SSRC {
+	var ssrcs []SSRC
+	for _, attr := range media.Attributes {
+		if attr.Key == sdp.AttrKeySSRCGroup {
+			split := strings.Split(attr.Value, " ")
+			if split[0] == ssrcGroupSimulcast {
+				for _, v := range split[1:] {
+					ssrc, err := strconv.ParseUint(v, 10, 32)
+					if err != nil {
+						log.Warnf("Failed to parse SSRC: %v", err)
+
+						continue
+					}
+
+					ssrcs = append(ssrcs, SSRC(ssrc))
+				}
+			}
+		}
+	}
+
+	return ssrcs
 }
 
 func addCandidatesToMediaDescriptions(

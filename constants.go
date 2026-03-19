@@ -38,6 +38,8 @@ const (
 
 	sdpAttributeSimulcast = "simulcast"
 
+	ssrcGroupSimulcast = "SIM"
+
 	outboundMTU = 1200
 
 	rtpPayloadTypeBitmask = 0x7F

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
@@ -656,6 +657,45 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		assert.Equal(t, 2, len(tracks))
 		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
 		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc)
+	})
+
+	t.Run("simulcast ssrc-group", func(t *testing.T) {
+		log := logging.NewDefaultLoggerFactory().NewLogger("test")
+		descr := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 invalid 5000"},
+					},
+				},
+			},
+		}
+
+		tracks := trackDetailsFromSDP(log, descr)
+		assert.Equal(t, 2, len(tracks))
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[0].ssrcs)
+		assert.Equal(t, []SSRC{3000, 5000}, tracks[1].ssrcs)
 	})
 }
 
