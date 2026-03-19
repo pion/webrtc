@@ -1784,10 +1784,14 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 
 	// If a SSRC already exists in the RemoteDescription don't perform heuristics upon it
 	for _, track := range trackDetailsFromSDP(pc.log, remoteDescription.parsed) {
-		if track.rtxSsrc != nil && ssrc == *track.rtxSsrc {
+		if slices.ContainsFunc(track.rtxSsrc, func(s *SSRC) bool {
+			return s != nil && ssrc == *s
+		}) {
 			return nil
 		}
-		if track.fecSsrc != nil && ssrc == *track.fecSsrc {
+		if slices.ContainsFunc(track.fecSsrc, func(s *SSRC) bool {
+			return s != nil && ssrc == *s
+		}) {
 			return nil
 		}
 		if slices.Contains(track.ssrcs, ssrc) {

@@ -29,8 +29,8 @@ type trackDetails struct {
 	streamID string
 	id       string
 	ssrcs    []SSRC
-	rtxSsrc  *SSRC
-	fecSsrc  *SSRC
+	rtxSsrc  []*SSRC
+	fecSsrc  []*SSRC
 	rids     []string
 }
 
@@ -136,7 +136,7 @@ func trackDetailsFromSDP(
 						for i := range tracksInMediaSection {
 							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
 								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = &repairSsrc
+								tracksInMediaSection[i].rtxSsrc = []*SSRC{&repairSsrc}
 							}
 						}
 					}
@@ -164,7 +164,7 @@ func trackDetailsFromSDP(
 						for i := range tracksInMediaSection {
 							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
 								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = &repairSsrc
+								tracksInMediaSection[i].fecSsrc = []*SSRC{&repairSsrc}
 							}
 						}
 					}
@@ -221,13 +221,13 @@ func trackDetailsFromSDP(
 				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
 						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
+						trackDetails.rtxSsrc = []*SSRC{&repairSsrc}
 					}
 				}
 				for r, baseSsrc := range fecRepairFlows {
 					if baseSsrc == ssrc {
 						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
+						trackDetails.fecSsrc = []*SSRC{&fecSsrc}
 					}
 				}
 
@@ -258,6 +258,26 @@ func trackDetailsFromSDP(
 				id:       trackID,
 				ssrcs:    ssrcs,
 			}
+			if len(rtxRepairFlows) > 0 {
+				simulcastTrack.rtxSsrc = make([]*SSRC, len(ssrcs))
+				for rtx, base := range rtxRepairFlows {
+					baseSsrc := SSRC(base) //nolint:gosec // G115
+					if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+						repairSsrc := SSRC(rtx) //nolint:gosec // G115
+						simulcastTrack.rtxSsrc[pos] = &repairSsrc
+					}
+				}
+			}
+			if len(fecRepairFlows) > 0 {
+				simulcastTrack.fecSsrc = make([]*SSRC, len(ssrcs))
+				for fec, base := range fecRepairFlows {
+					baseSsrc := SSRC(base) //nolint:gosec // G115
+					if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+						fecSsrc := SSRC(fec) //nolint:gosec // G115
+						simulcastTrack.fecSsrc[pos] = &fecSsrc
+					}
+				}
+			}
 
 			tracksInMediaSection = []trackDetails{simulcastTrack}
 		}
@@ -280,12 +300,12 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 			encodings[i].SSRC = trackDetails.ssrcs[i]
 		}
 
-		if trackDetails.rtxSsrc != nil {
-			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc
+		if len(trackDetails.rtxSsrc) > i && trackDetails.rtxSsrc[i] != nil {
+			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc[i]
 		}
 
-		if trackDetails.fecSsrc != nil {
-			encodings[i].FEC.SSRC = *trackDetails.fecSsrc
+		if len(trackDetails.fecSsrc) > i && trackDetails.fecSsrc[i] != nil {
+			encodings[i].FEC.SSRC = *trackDetails.fecSsrc[i]
 		}
 	}
 
