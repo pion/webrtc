@@ -639,6 +639,10 @@ func addTransceiverSDP(
 		media.WithValueAttribute(sdpAttributeSimulcast, "recv "+strings.Join(recvRids, ";"))
 	}
 
+	if mediaSection.cryptex {
+		media = media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	}
+
 	addSenderSDP(mediaSection, isPlanB, media)
 
 	media = media.WithPropertyAttribute(transceiver.Direction().String())
@@ -670,6 +674,7 @@ type mediaSection struct {
 	data            bool
 	matchExtensions map[string]int
 	rids            []*simulcastRid
+	cryptex         bool
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
@@ -687,7 +692,7 @@ func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 
 // populateSDP serializes a PeerConnections state into an SDP.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func populateSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -704,6 +709,7 @@ func populateSDP(
 	matchBundleGroup *string,
 	sctpMaxMessageSize uint32,
 	ignoreRidPauseForRecv bool,
+	cryptexAtSessionLevel bool,
 ) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
@@ -720,6 +726,8 @@ func populateSDP(
 		bundleValue += " " + midValue
 		bundleCount++
 	}
+
+	haveActiveRTPMedia := false
 
 	for i, section := range mediaSections {
 		if section.data && len(section.transceivers) != 0 {
@@ -771,6 +779,15 @@ func populateSDP(
 				descr.MediaDescriptions[len(descr.MediaDescriptions)-1].MediaName.Port = sdp.RangedPort{Value: 0}
 			}
 		}
+
+		// Determine if we have any active RTP m-lines.
+		// We only add session-level Cryptex if there is at least one RTP m-line with a non-zero port.
+		if !section.data {
+			md := descr.MediaDescriptions[len(descr.MediaDescriptions)-1]
+			if md.MediaName.Port.Value != 0 && md.MediaName.Media != mediaSectionApplication {
+				haveActiveRTPMedia = true
+			}
+		}
 	}
 
 	if !mediaDescriptionFingerprint {
@@ -786,6 +803,10 @@ func populateSDP(
 
 	if isExtmapAllowMixed {
 		descr = descr.WithPropertyAttribute(sdp.AttrKeyExtMapAllowMixed)
+	}
+
+	if cryptexAtSessionLevel && haveActiveRTPMedia {
+		descr.WithPropertyAttribute(sdp.AttrKeyCryptex)
 	}
 
 	if bundleCount > 0 {
@@ -1191,6 +1212,16 @@ func isIceLiteSet(desc *sdp.SessionDescription) bool {
 func isExtMapAllowMixedSet(desc *sdp.SessionDescription) bool {
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == sdp.AttrKeyExtMapAllowMixed {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isCryptexSet(desc *sdp.MediaDescription) bool {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == sdp.AttrKeyCryptex {
 			return true
 		}
 	}
