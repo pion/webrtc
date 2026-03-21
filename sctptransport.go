@@ -115,7 +115,14 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
 		return errSCTPTransportDTLS
 	}
-	sctpAssociation, err := sctp.ClientWithOptions(r.sctpClientOptions(dtlsTransport.conn, maxMessageSize)...)
+	opts := r.sctpClientOptions(dtlsTransport.conn, maxMessageSize)
+	if len(r.localSctpInit) > 0 && len(remoteSctpInit) > 0 {
+		opts = append(
+			opts,
+			sctp.WithSNAP(r.localSctpInit, remoteSctpInit),
+		)
+	}
+	sctpAssociation, err := sctp.ClientWithOptions(opts...)
 	if err != nil {
 		return err
 	}
