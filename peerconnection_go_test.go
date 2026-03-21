@@ -2695,3 +2695,20 @@ func TestNoDuplicatedAttributesInMediaDescriptions(t *testing.T) { //nolint:cycl
 		}
 	}
 }
+
+func TestSctpSnap(t *testing.T) {
+	s := SettingEngine{}
+	s.EnableSctpSnap(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	closePairNow(t, offer, answer)
+}
