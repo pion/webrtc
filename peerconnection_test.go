@@ -956,7 +956,7 @@ func TestPeerConnection_SessionID(t *testing.T) {
 
 func TestSctpSnap(t *testing.T) {
 	s := SettingEngine{}
-	s.EnableSnap(true)
+	s.EnableSctpSnap(true)
 	api := NewAPI(WithSettingEngine(s))
 
 	offer, err := api.NewPeerConnection(Configuration{})

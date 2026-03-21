@@ -389,7 +389,6 @@ func addDataMediaSection(
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithPropertyAttribute(RTPTransceiverDirectionSendrecv.String()).
-		// TODO: do not hardcode this.
 		WithPropertyAttribute("sctp-port:5000").
 		WithValueAttribute("max-message-size", fmt.Sprintf("%d", sctpMaxMessageSize)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
@@ -1225,6 +1224,7 @@ func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			return decoded, nil
 		}
 	}

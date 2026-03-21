@@ -2829,7 +2829,7 @@ func (pc *PeerConnection) startRTP(
 	}
 }
 
-// generateUnmatchedSDP generates an SDP that doesn't take remote state into account
+// generateUnmatchedSDP generates an SDP that doesn't take remote state into account.
 // This is used for the initial call for CreateOffer.
 //
 //nolint:cyclop
@@ -2899,7 +2899,11 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		}
 
 		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
-			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true, sctpInit: localSctpInit})
+			mediaSections = append(mediaSections, mediaSection{
+				id:       strconv.Itoa(len(mediaSections)),
+				data:     true,
+				sctpInit: localSctpInit,
+			})
 		}
 	}
 
@@ -2927,10 +2931,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 	)
 }
 
-// generateMatchedSDP generates a SDP and takes the remote state into account
+// generateMatchedSDP generates a SDP and takes the remote state into account.
 // This is used everytime we have a RemoteDescription
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:gocognit,gocyclo,cyclop,maintidx
 func (pc *PeerConnection) generateMatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity, includeUnmatched bool,
@@ -3071,7 +3075,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 			if detectedPlanB {
 				mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 			} else {
-				mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true, sctpInit: localSctpInit})
+				mediaSections = append(mediaSections, mediaSection{
+					id:       strconv.Itoa(len(mediaSections)),
+					data:     true,
+					sctpInit: localSctpInit,
+				})
 			}
 		}
 	} else if remoteDescription != nil {

@@ -99,6 +99,8 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
+//
+//nolint:cyclop
 func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
@@ -508,6 +510,7 @@ func (r *SCTPTransport) BufferedAmount() int {
 	return r.sctpAssociation.BufferedAmount()
 }
 
+// GetSctpInit returns the current sctp-init attribute and caches the last created.
 // The caller should hold the lock.
 func (r *SCTPTransport) GetSctpInit() []byte {
 	if len(r.localSctpInit) == 0 {
