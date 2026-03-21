@@ -8,6 +8,7 @@ package webrtc
 import (
 	"errors"
 	"io"
+	"net"
 	"sync"
 	"time"
 
@@ -111,19 +112,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
 		return errSCTPTransportDTLS
 	}
-	sctpAssociation, err := sctp.Client(sctp.Config{
-		NetConn:              dtlsTransport.conn,
-		MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
-		EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
-		LoggerFactory:        r.api.settingEngine.LoggerFactory,
-		RTOMax:               float64(r.api.settingEngine.sctp.rtoMax) / float64(time.Millisecond),
-		BlockWrite:           r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite,
-		MaxMessageSize:       maxMessageSize,
-		MTU:                  outboundMTU,
-		MinCwnd:              r.api.settingEngine.sctp.minCwnd,
-		FastRtxWnd:           r.api.settingEngine.sctp.fastRtxWnd,
-		CwndCAStep:           r.api.settingEngine.sctp.cwndCAStep,
-	})
+	sctpAssociation, err := sctp.ClientWithOptions(r.sctpClientOptions(dtlsTransport.conn, maxMessageSize)...)
 	if err != nil {
 		return err
 	}
@@ -154,6 +143,54 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	go r.acceptDataChannels(sctpAssociation, dataChannels)
 
 	return nil
+}
+
+func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint32) []sctp.ClientOption {
+	opts := []sctp.ClientOption{
+		sctp.WithNetConn(netConn),
+		sctp.WithLoggerFactory(r.api.settingEngine.LoggerFactory),
+		sctp.WithMTU(outboundMTU),
+		sctp.WithMaxMessageSize(maxMessageSize),
+	}
+
+	return append(opts, r.optionalSCTPClientOptions()...)
+}
+
+func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
+	opts := make([]sctp.ClientOption, 0, 7)
+
+	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
+		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
+	}
+
+	if r.api.settingEngine.sctp.enableZeroChecksum {
+		opts = append(opts, sctp.WithEnableZeroChecksum(true))
+	}
+
+	if r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite {
+		opts = append(opts, sctp.WithBlockWrite(true))
+	}
+
+	if r.api.settingEngine.sctp.rtoMax > 0 {
+		opts = append(
+			opts,
+			sctp.WithRTOMax(float64(r.api.settingEngine.sctp.rtoMax)/float64(time.Millisecond)),
+		)
+	}
+
+	if r.api.settingEngine.sctp.minCwnd != 0 {
+		opts = append(opts, sctp.WithMinCwnd(r.api.settingEngine.sctp.minCwnd))
+	}
+
+	if r.api.settingEngine.sctp.fastRtxWnd != 0 {
+		opts = append(opts, sctp.WithFastRtxWnd(r.api.settingEngine.sctp.fastRtxWnd))
+	}
+
+	if r.api.settingEngine.sctp.cwndCAStep != 0 {
+		opts = append(opts, sctp.WithCwndCAStep(r.api.settingEngine.sctp.cwndCAStep))
+	}
+
+	return opts
 }
 
 // Stop stops the SCTPTransport.
