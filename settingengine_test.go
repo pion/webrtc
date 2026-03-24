@@ -616,16 +616,21 @@ func TestSettingEngine_CandidateFiltersAndNetworkTypes(t *testing.T) {
 
 	ifFilter := func(name string) bool { return name == "eth0" }
 	ipFilter := func(ip net.IP) bool { return ip.IsLoopback() }
+	remoteIPFilter := func(ip net.IP) bool { return ip.IsPrivate() }
 
 	se.SetInterfaceFilter(ifFilter)
 	se.SetIPFilter(ipFilter)
+	se.SetRemoteIPFilter(remoteIPFilter)
 	se.SetIncludeLoopbackCandidate(true)
 
 	assert.NotNil(t, se.candidates.InterfaceFilter)
 	assert.NotNil(t, se.candidates.IPFilter)
+	assert.NotNil(t, se.candidates.RemoteIPFilter)
 	assert.True(t, se.candidates.InterfaceFilter("eth0"))
 	assert.False(t, se.candidates.InterfaceFilter("wlan0"))
 	assert.True(t, se.candidates.IPFilter(net.IPv4(127, 0, 0, 1)))
+	assert.True(t, se.candidates.RemoteIPFilter(net.IPv4(10, 0, 0, 1)))
+	assert.False(t, se.candidates.RemoteIPFilter(net.IPv4(8, 8, 8, 8)))
 	assert.True(t, se.candidates.IncludeLoopbackCandidate)
 }
 
