@@ -51,6 +51,7 @@ type SettingEngine struct {
 		ICENetworkTypes          []NetworkType
 		InterfaceFilter          func(string) (keep bool)
 		IPFilter                 func(net.IP) (keep bool)
+		RemoteIPFilter           func(net.IP) (keep bool)
 		NAT1To1IPs               []string
 		NAT1To1IPCandidateType   ICECandidateType
 		addressRewriteRules      []ice.AddressRewriteRule
@@ -303,6 +304,13 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) (keep bool)) {
 // the amount of information you wish to expose to the remote peer.
 func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
 	e.candidates.IPFilter = filter
+}
+
+// SetRemoteIPFilter sets the filtering function for remote candidate IP addresses.
+// This can be used to whitelist or blacklist remote candidate IPs before they are
+// added to the ICE agent.
+func (e *SettingEngine) SetRemoteIPFilter(filter func(net.IP) (keep bool)) {
+	e.candidates.RemoteIPFilter = filter
 }
 
 // SetNAT1To1IPs sets a list of external IP addresses of 1:1 (D)NAT

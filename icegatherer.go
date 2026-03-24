@@ -251,6 +251,7 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
 		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
 		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter),
+		ice.WithRemoteIPFilter(g.api.settingEngine.candidates.RemoteIPFilter),
 		ice.WithNet(g.api.settingEngine.net),
 		ice.WithMulticastDNSMode(mDNSMode),
 		ice.WithTCPMux(g.api.settingEngine.iceTCPMux),
