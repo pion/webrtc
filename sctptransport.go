@@ -53,6 +53,8 @@ type SCTPTransport struct {
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
 
+	localSctpInit []byte
+
 	api *API
 	log logging.LeveledLogger
 }
@@ -97,6 +99,8 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
+//
+//nolint:cyclop
 func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if r.isStarted {
 		return nil
@@ -107,12 +111,20 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if maxMessageSize == 0 {
 		maxMessageSize = sctpMaxMessageSizeUnsetValue
 	}
+	remoteSctpInit := []byte(capabilities.sctpInit)
 
 	dtlsTransport := r.Transport()
 	if dtlsTransport == nil || dtlsTransport.conn == nil {
 		return errSCTPTransportDTLS
 	}
-	sctpAssociation, err := sctp.ClientWithOptions(r.sctpClientOptions(dtlsTransport.conn, maxMessageSize)...)
+	opts := r.sctpClientOptions(dtlsTransport.conn, maxMessageSize)
+	if len(r.localSctpInit) > 0 && len(remoteSctpInit) > 0 {
+		opts = append(
+			opts,
+			sctp.WithSNAP(r.localSctpInit, remoteSctpInit),
+		)
+	}
+	sctpAssociation, err := sctp.ClientWithOptions(opts...)
 	if err != nil {
 		return err
 	}
@@ -496,4 +508,21 @@ func (r *SCTPTransport) BufferedAmount() int {
 	}
 
 	return r.sctpAssociation.BufferedAmount()
+}
+
+// GetSctpInit returns the current sctp-init attribute and caches the last created.
+// The caller should hold the lock.
+func (r *SCTPTransport) GetSctpInit() []byte {
+	if len(r.localSctpInit) == 0 {
+		var err error
+		r.localSctpInit, err = sctp.GenerateOutOfBandToken(sctp.Config{
+			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
+			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
+		})
+		if err != nil {
+			r.log.Warnf("Failed to create sctp-init: %v", err)
+		}
+	}
+
+	return r.localSctpInit
 }
