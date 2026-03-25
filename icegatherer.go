@@ -363,6 +363,9 @@ func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
 			return generator()
 		}),
 	}
+	if renom.attributeType != nil {
+		opts = append(opts, ice.WithNominationAttribute(*renom.attributeType))
+	}
 
 	if renom.automatic {
 		interval := time.Duration(0)

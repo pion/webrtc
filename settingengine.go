@@ -124,6 +124,7 @@ type renominationSettings struct {
 	generator         ice.NominationValueGenerator
 	automatic         bool
 	automaticInterval *time.Duration
+	attributeType     *uint16
 }
 
 // NominationValueGenerator generates nomination values for ICE renomination.
@@ -152,9 +153,18 @@ func WithRenominationInterval(interval time.Duration) RenominationOption {
 	}
 }
 
+// WithRenominationNominationAttribute overrides the STUN attribute type used for ICE renomination.
+// If unset, the underlying ICE agent default is used.
+func WithRenominationNominationAttribute(attrType uint16) RenominationOption {
+	return func(cfg *renominationSettings) {
+		a := attrType
+		cfg.attributeType = &a
+	}
+}
+
 var errInvalidRenominationInterval = errors.New("renomination interval must be greater than zero")
 
-// SetICERenomination configures ICE renomination using options for generator and scheduling.
+// SetICERenomination configures ICE renomination using options for generator, scheduling, and attribute type.
 // Manual control is not exposed yet. This always enables automatic renomination with the default
 // generator unless a custom one is provided.
 func (e *SettingEngine) SetICERenomination(options ...RenominationOption) error {
@@ -177,6 +187,7 @@ func (e *SettingEngine) SetICERenomination(options ...RenominationOption) error 
 	e.renomination.generator = cfg.generator
 	e.renomination.automatic = true
 	e.renomination.automaticInterval = cfg.automaticInterval
+	e.renomination.attributeType = cfg.attributeType
 
 	return nil
 }

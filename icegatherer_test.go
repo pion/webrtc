@@ -2128,6 +2128,16 @@ func TestICEGatherer_RenominationOptions(t *testing.T) {
 	assert.NotNil(t, se.renomination.generator)
 }
 
+func TestICEGatherer_RenominationInvalidAttributeFailsAtCreateAgent(t *testing.T) {
+	se := SettingEngine{}
+	assert.NoError(t, se.SetICERenomination(WithRenominationNominationAttribute(0x0000)))
+
+	gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	assert.ErrorIs(t, gatherer.createAgent(), ice.ErrInvalidNominationAttribute)
+}
+
 func TestICEGatherer_RenominationOptionsDisabled(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
@@ -2769,6 +2779,7 @@ func makeSrflxCandidateInit(c ICECandidate) ICECandidateInit {
 func buildStagedRenominationPair(
 	t *testing.T,
 	bindingHandler func(*stun.Message, ice.Candidate, ice.Candidate, *ice.CandidatePair) bool,
+	renominationOptions ...RenominationOption,
 ) (*PeerConnection, *PeerConnection, *stagedCandidateSender, *stagedCandidateSender, func()) {
 	t.Helper()
 
@@ -2807,7 +2818,11 @@ func buildStagedRenominationPair(
 	// prefer srflx/prflx nomination first so the test reliably observes the switch to host via renomination.
 	offerSE.SetSrflxAcceptanceMinWait(0)
 	offerSE.SetHostAcceptanceMinWait(3 * time.Second)
-	assert.NoError(t, offerSE.SetICERenomination(WithRenominationInterval(200*time.Millisecond)))
+	configuredRenominationOptions := append(
+		[]RenominationOption{WithRenominationInterval(200 * time.Millisecond)},
+		renominationOptions...,
+	)
+	assert.NoError(t, offerSE.SetICERenomination(configuredRenominationOptions...))
 
 	answerSE := SettingEngine{}
 	answerSE.SetNet(answerNet)
@@ -2816,7 +2831,7 @@ func buildStagedRenominationPair(
 	answerSE.SetICETimeouts(5*time.Second, 15*time.Second, 200*time.Millisecond)
 	answerSE.SetSrflxAcceptanceMinWait(0)
 	answerSE.SetHostAcceptanceMinWait(3 * time.Second)
-	assert.NoError(t, answerSE.SetICERenomination(WithRenominationInterval(200*time.Millisecond)))
+	assert.NoError(t, answerSE.SetICERenomination(configuredRenominationOptions...))
 	if bindingHandler != nil {
 		answerSE.SetICEBindingRequestHandler(bindingHandler)
 	}
