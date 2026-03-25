@@ -98,10 +98,30 @@ func TestICERenomination(t *testing.T) {
 		assert.NotNil(t, s.renomination.generator)
 	})
 
+	t.Run("CustomAttribute", func(t *testing.T) {
+		const customAttr = uint16(0x0042)
+
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination(WithRenominationNominationAttribute(customAttr)))
+
+		assert.True(t, s.renomination.enabled)
+		if assert.NotNil(t, s.renomination.attributeType) {
+			assert.Equal(t, customAttr, *s.renomination.attributeType)
+		}
+	})
+
 	t.Run("InvalidInterval", func(t *testing.T) {
 		s := SettingEngine{}
 		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(0)), errInvalidRenominationInterval)
 		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(-1*time.Second)), errInvalidRenominationInterval)
+	})
+
+	t.Run("InvalidAttribute", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination(WithRenominationNominationAttribute(0x0000)))
+		if assert.NotNil(t, s.renomination.attributeType) {
+			assert.Equal(t, uint16(0x0000), *s.renomination.attributeType)
+		}
 	})
 }
 
