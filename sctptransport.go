@@ -514,10 +514,14 @@ func (r *SCTPTransport) BufferedAmount() int {
 // The caller should hold the lock.
 func (r *SCTPTransport) GetSctpInit() []byte {
 	if len(r.localSctpInit) == 0 {
-		r.localSctpInit, _ = sctp.GenerateOutOfBandToken(sctp.Config{
+		var err error
+		r.localSctpInit, err = sctp.GenerateOutOfBandToken(sctp.Config{
 			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
 			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		})
+		if err != nil {
+			r.log.Warnf("Failed to create sctp-init: %v", err)
+		}
 	}
 
 	return r.localSctpInit
