@@ -7,5 +7,5 @@ package webrtc
 type SCTPCapabilities struct {
 	MaxMessageSize uint32 `json:"maxMessageSize"`
 	// Note: this is the binary sctp-init, not the base64 encoded version.
-	SctpInit string `json:"sctpInit"`
+	sctpInit string
 }

@@ -111,7 +111,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if maxMessageSize == 0 {
 		maxMessageSize = sctpMaxMessageSizeUnsetValue
 	}
-	remoteSctpInit := []byte(capabilities.SctpInit)
+	remoteSctpInit := []byte(capabilities.sctpInit)
 
 	dtlsTransport := r.Transport()
 	if dtlsTransport == nil || dtlsTransport.conn == nil {

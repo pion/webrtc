@@ -1651,7 +1651,7 @@ func (pc *PeerConnection) startSCTP(maxMessageSize uint32, remoteSctpInit []byte
 	// Start sctp
 	if err := pc.sctpTransport.Start(SCTPCapabilities{
 		MaxMessageSize: maxMessageSize,
-		SctpInit:       string(remoteSctpInit),
+		sctpInit:       string(remoteSctpInit),
 	}); err != nil {
 		pc.log.Warnf("Failed to start SCTP: %s", err)
 		if err = pc.sctpTransport.Stop(); err != nil {
