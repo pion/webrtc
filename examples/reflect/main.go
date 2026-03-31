@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // reflect demonstrates how with one PeerConnection you can send video to Pion and have the packets sent back
 package main

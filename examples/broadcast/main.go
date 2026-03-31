@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // broadcast demonstrates how to broadcast a video to many peers, while only requiring the broadcaster to upload once.
 package main

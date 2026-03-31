@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -452,6 +451,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		}
 
 		inboundStats := InboundRTPStreamStats{
+			Rid:         remoteTrack.RID(),
 			Mid:         mid,
 			Timestamp:   now,
 			Type:        StatsTypeInboundRTP,

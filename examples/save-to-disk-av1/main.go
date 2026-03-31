@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // save-to-disk-av1 is a simple application that shows how to save a video to disk using AV1.
 package main

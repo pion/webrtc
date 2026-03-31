@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // swap-tracks demonstrates how to swap multiple incoming tracks on a single outgoing track.
 package main

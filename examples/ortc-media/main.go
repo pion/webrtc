@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // ortc demonstrates Pion WebRTC's ORTC capabilities.
 package main

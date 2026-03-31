@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // show-network-usage shows the amount of packets flowing through the vnet
 package main

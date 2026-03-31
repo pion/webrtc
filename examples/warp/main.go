@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // WARP (SNAP+SPED) testbed.
 package main
@@ -45,8 +44,13 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 			return
 		}
 
+		// Enable SNAP.
+		s := webrtc.SettingEngine{}
+		s.EnableSctpSnap(true)
+		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
+
 		var err error
-		*pc, err = webrtc.NewPeerConnection(webrtc.Configuration{
+		*pc, err = api.NewPeerConnection(webrtc.Configuration{
 			BundlePolicy: webrtc.BundlePolicyMaxBundle,
 		})
 		if err != nil {

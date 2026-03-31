@@ -22,7 +22,7 @@ func TestOperations_Enqueue(t *testing.T) {
 	})
 	defer ops.GracefulClose()
 
-	for resultSet := 0; resultSet < 100; resultSet++ {
+	for resultSet := range 100 {
 		results := make([]int, 16)
 		resultSetCopy := resultSet
 		for i := range results {
@@ -65,7 +65,7 @@ func TestOperations_GracefulClose(t *testing.T) {
 		counterMu.Unlock()
 	}
 	const times = 25
-	for i := 0; i < times; i++ {
+	for range times {
 		ops.Enqueue(incFunc)
 	}
 	ops.Done()
@@ -75,7 +75,7 @@ func TestOperations_GracefulClose(t *testing.T) {
 	assert.Equal(t, counterCur, times)
 
 	ops.GracefulClose()
-	for i := 0; i < times; i++ {
+	for range times {
 		ops.Enqueue(incFunc)
 	}
 	ops.Done()

@@ -409,7 +409,6 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 		0xFFF8, // check upper boundary
 		0xFFFE, // check upper boundary
 	} {
-		seqStart := seqStart
 		t.Run(fmt.Sprintf("From%d", seqStart), func(t *testing.T) {
 			fd := New(10, &fakeDepacketizer{}, 1)
 
@@ -421,7 +420,7 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 			pkt5 := &rtp.Packet{Header: rtp.Header{SequenceNumber: 12 + seqStart, Timestamp: 120}, Payload: []byte{0x05}}
 			fd.Push(pkt5)
 
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				assert.Nilf(
 					t, fd.buffer[(i+int(seqStart))%0x10000],
 					"Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i,
@@ -521,7 +520,7 @@ func TestSampleBuilderData(t *testing.T) {
 		alwaysHead:  true,
 	}, 1)
 	validSamples := 0
-	for i := 0; i < 0x20000; i++ {
+	for i := range 0x20000 {
 		packet := rtp.Packet{
 			Header: rtp.Header{
 				SequenceNumber: uint16(i),      //nolint:gosec // G115
@@ -555,7 +554,7 @@ func TestSampleBuilderPacketUnreference(t *testing.T) {
 		atomic.AddInt64(&refs, -1)
 	}
 
-	for i := 0; i < 0x20000; i++ {
+	for i := range 0x20000 {
 		atomic.AddInt64(&refs, 1)
 		packet := rtp.Packet{
 			Header: rtp.Header{

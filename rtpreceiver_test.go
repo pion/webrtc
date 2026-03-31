@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -124,7 +123,7 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 		},
 	)
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		track, err := receiver.receiveForRid("rid", params, ridStreamInfo, nil, nil, nil, nil, nil)
 		assert.Nil(t, track)
 		assert.ErrorIs(t, err, io.EOF)
@@ -199,7 +198,7 @@ func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
 		},
 	)
 
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		require.NoError(t, receiver.receiveForRtx(SSRC(2222), "", repairStreamInfo, nil, rtpInterceptor, nil, nil))
 	}
 
@@ -274,7 +273,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			_, _, err = lowTrack.Read(make([]byte, 1500))
 			require.NoError(t, err)
 		}
@@ -305,7 +304,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	receiver.tracks[1].track.params = params
 	receiver.tracks[1].track.mu.Unlock()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		lowCh <- lowPkt
 	}
 	close(lowCh)
@@ -599,4 +598,51 @@ func mimeTypes(infos []*interceptor.StreamInfo) []string {
 	}
 
 	return out
+}
+
+// TestRTPReceiver_CollectStats_RID validates that collectStats correctly maps RID
+// from TrackRemote into InboundRTPStreamStats.
+func TestRTPReceiver_CollectStats_RID(t *testing.T) {
+	ssrc := SSRC(1234)
+
+	fg := &fakeGetter{s: stats.Stats{}}
+
+	receiver := &RTPReceiver{
+		kind: RTPCodecTypeVideo,
+		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+	}
+
+	// Case 1: RID empty
+	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", receiver)
+	receiver.tracks = []trackStreams{{track: tr}}
+
+	collector := newStatsReportCollector()
+	receiver.collectStats(collector, fg)
+	report := collector.Ready()
+
+	statID := "inbound-rtp-1234"
+	got, ok := report[statID]
+	require.True(t, ok)
+
+	inbound, ok := got.(InboundRTPStreamStats)
+	require.True(t, ok)
+
+	assert.Equal(t, "", inbound.Rid)
+
+	// Case 2: RID present
+	rid := "f"
+	tr = newTrackRemote(RTPCodecTypeVideo, ssrc, 0, rid, receiver)
+	receiver.tracks = []trackStreams{{track: tr}}
+
+	collector = newStatsReportCollector()
+	receiver.collectStats(collector, fg)
+	report = collector.Ready()
+
+	got, ok = report[statID]
+	require.True(t, ok)
+
+	inbound, ok = got.(InboundRTPStreamStats)
+	require.True(t, ok)
+
+	assert.Equal(t, rid, inbound.Rid)
 }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -1648,10 +1647,11 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 }
 
 // Start SCTP subsystem.
-func (pc *PeerConnection) startSCTP(maxMessageSize uint32) {
+func (pc *PeerConnection) startSCTP(maxMessageSize uint32, remoteSctpInit []byte) {
 	// Start sctp
 	if err := pc.sctpTransport.Start(SCTPCapabilities{
 		MaxMessageSize: maxMessageSize,
+		sctpInit:       string(remoteSctpInit),
 	}); err != nil {
 		pc.log.Warnf("Failed to start SCTP: %s", err)
 		if err = pc.sctpTransport.Stop(); err != nil {
@@ -2824,11 +2824,12 @@ func (pc *PeerConnection) startRTP(
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
 	if d := haveDataChannel(remoteDesc); d != nil && d.MediaName.Port.Value != 0 {
-		pc.startSCTP(getMaxMessageSize(d))
+		remoteSctpInit, _ := getSctpInit(d)
+		pc.startSCTP(getMaxMessageSize(d), remoteSctpInit)
 	}
 }
 
-// generateUnmatchedSDP generates an SDP that doesn't take remote state into account
+// generateUnmatchedSDP generates an SDP that doesn't take remote state into account.
 // This is used for the initial call for CreateOffer.
 //
 //nolint:cyclop
@@ -2857,6 +2858,11 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 
 	// Needed for pc.sctpTransport.dataChannelsRequested
 	pc.sctpTransport.lock.Lock()
+
+	var localSctpInit []byte
+	if pc.sctpTransport.dataChannelsRequested != 0 && pc.api.settingEngine.sctp.enableSnap {
+		localSctpInit = pc.sctpTransport.GetSctpInit()
+	}
 	defer pc.sctpTransport.lock.Unlock()
 
 	if isPlanB { //nolint:nestif
@@ -2893,7 +2899,11 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		}
 
 		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
-			mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+			mediaSections = append(mediaSections, mediaSection{
+				id:       strconv.Itoa(len(mediaSections)),
+				data:     true,
+				sctpInit: localSctpInit,
+			})
 		}
 	}
 
@@ -2921,10 +2931,10 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 	)
 }
 
-// generateMatchedSDP generates a SDP and takes the remote state into account
-// this is used everytime we have a RemoteDescription
+// generateMatchedSDP generates a SDP and takes the remote state into account.
+// This is used everytime we have a RemoteDescription
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:gocognit,gocyclo,cyclop,maintidx
 func (pc *PeerConnection) generateMatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity, includeUnmatched bool,
@@ -2962,6 +2972,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 
 	mediaSections := []mediaSection{}
 	alreadyHaveApplicationMediaSection := false
+	var localSctpInit []byte
 	for _, media := range remoteDescription.parsed.MediaDescriptions {
 		midValue := getMidValue(media)
 		if midValue == "" {
@@ -2969,7 +2980,14 @@ func (pc *PeerConnection) generateMatchedSDP(
 		}
 
 		if media.MediaName.Media == mediaSectionApplication {
-			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true})
+			init, _ := getSctpInit(media)
+			if init != nil && pc.api.settingEngine.sctp.enableSnap {
+				pc.sctpTransport.lock.Lock()
+				localSctpInit = pc.sctpTransport.GetSctpInit()
+				pc.sctpTransport.lock.Unlock()
+			}
+
+			mediaSections = append(mediaSections, mediaSection{id: midValue, data: true, sctpInit: localSctpInit})
 			alreadyHaveApplicationMediaSection = true
 
 			continue
@@ -3057,7 +3075,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 			if detectedPlanB {
 				mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 			} else {
-				mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
+				mediaSections = append(mediaSections, mediaSection{
+					id:       strconv.Itoa(len(mediaSections)),
+					data:     true,
+					sctpInit: localSctpInit,
+				})
 			}
 		}
 	} else if remoteDescription != nil {

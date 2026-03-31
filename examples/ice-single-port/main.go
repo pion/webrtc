@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // ice-single-port demonstrates Pion WebRTC's ability to serve many PeerConnections on a single port.
 package main

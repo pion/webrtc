@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // ice-proxy demonstrates Pion WebRTC's proxy abilities.
 package main

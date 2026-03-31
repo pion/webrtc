@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // insertable-streams demonstrates how to use insertable streams with Pion
 package main

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -252,6 +251,7 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
 		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
 		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter),
+		ice.WithRemoteIPFilter(g.api.settingEngine.candidates.RemoteIPFilter),
 		ice.WithNet(g.api.settingEngine.net),
 		ice.WithMulticastDNSMode(mDNSMode),
 		ice.WithTCPMux(g.api.settingEngine.iceTCPMux),
@@ -362,6 +362,9 @@ func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
 		ice.WithRenomination(func() uint32 {
 			return generator()
 		}),
+	}
+	if renom.attributeType != nil {
+		opts = append(opts, ice.WithNominationAttribute(*renom.attributeType))
 	}
 
 	if renom.automatic {

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
 import (
 	"bufio"
 	"context"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -59,6 +59,101 @@ func TestGenerateDataChannelID(t *testing.T) {
 			t, testCase.s.dataChannelIDsUsed, *idPtr,
 			"expected new id to be added to the map",
 		)
+	}
+}
+
+func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer func() {
+		_ = clientConn.Close()
+		_ = serverConn.Close()
+	}()
+
+	baseAPI := NewAPI()
+	baseTransport := &SCTPTransport{api: baseAPI}
+	baseCount := len(baseTransport.sctpClientOptions(clientConn, defaultMaxSCTPMessageSize))
+
+	tests := []struct {
+		name      string
+		configure func(*SettingEngine)
+		wantExtra int
+	}{
+		{
+			name: "MaxReceiveBufferSize",
+			configure: func(se *SettingEngine) {
+				se.sctp.maxReceiveBufferSize = 1024
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "EnableZeroChecksum",
+			configure: func(se *SettingEngine) {
+				se.sctp.enableZeroChecksum = true
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "BlockWrite",
+			configure: func(se *SettingEngine) {
+				se.detach.DataChannels = true
+				se.dataChannelBlockWrite = true
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "RTOMax",
+			configure: func(se *SettingEngine) {
+				se.sctp.rtoMax = time.Second
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "MinCwnd",
+			configure: func(se *SettingEngine) {
+				se.sctp.minCwnd = 11
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "FastRtxWnd",
+			configure: func(se *SettingEngine) {
+				se.sctp.fastRtxWnd = 22
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "CwndCAStep",
+			configure: func(se *SettingEngine) {
+				se.sctp.cwndCAStep = 33
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "AllOptional",
+			configure: func(se *SettingEngine) {
+				se.sctp.maxReceiveBufferSize = 1024
+				se.sctp.enableZeroChecksum = true
+				se.detach.DataChannels = true
+				se.dataChannelBlockWrite = true
+				se.sctp.rtoMax = time.Second
+				se.sctp.minCwnd = 11
+				se.sctp.fastRtxWnd = 22
+				se.sctp.cwndCAStep = 33
+			},
+			wantExtra: 7,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			api := NewAPI()
+			tc.configure(api.settingEngine)
+
+			transport := &SCTPTransport{api: api}
+			opts := transport.sctpClientOptions(clientConn, defaultMaxSCTPMessageSize)
+
+			assert.Len(t, opts, baseCount+tc.wantExtra)
+		})
 	}
 }
 
@@ -191,7 +286,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 	// nolint:varnamelen
 	const N = 10
 	done := make(chan struct{}, N)
-	for i := 0; i < N; i++ {
+	for range N {
 		go func() {
 			// Use Detach data channels mode
 			s := SettingEngine{}
@@ -285,7 +380,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 		}()
 	}
 
-	for i := 0; i < N; i++ {
+	for range N {
 		select {
 		case <-done:
 		case <-time.After(20 * time.Second):

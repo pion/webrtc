@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -74,7 +73,7 @@ func TestNew_Go(t *testing.T) {
 						"turns:google.de?transport=tcp",
 					},
 					Username: "unittest",
-					Credential: OAuthCredential{
+					Credential: OAuthCredential{ //nolint:gosec // not hardcoded credentials.
 						MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 						AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 					},
@@ -219,7 +218,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 								"turns:google.de?transport=tcp",
 							},
 							Username: "unittest",
-							Credential: OAuthCredential{
+							Credential: OAuthCredential{ //nolint:gosec // not hardcoded credentials.
 								MACKey:      "WmtzanB3ZW9peFhtdm42NzUzNG0=",
 								AccessToken: "AAwg3kPHWPfvk9bDFL936wYvkoctMADzQ==",
 							},
@@ -2695,4 +2694,21 @@ func TestNoDuplicatedAttributesInMediaDescriptions(t *testing.T) { //nolint:cycl
 			attrs = append(attrs, str)
 		}
 	}
+}
+
+func TestSctpSnap(t *testing.T) {
+	s := SettingEngine{}
+	s.EnableSctpSnap(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	peerConnectionsConnected.Wait()
+
+	closePairNow(t, offer, answer)
 }

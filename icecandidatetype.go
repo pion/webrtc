@@ -114,5 +114,6 @@ func (t *ICECandidateType) UnmarshalText(b []byte) error {
 }
 
 func (r ICECandidateType) toICE() ice.CandidateType {
+	//nolint:gosec // G115, no overflow, ICECandidateType matches ice.CandidateType in granularity.
 	return ice.CandidateType(r)
 }

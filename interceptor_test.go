@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -533,7 +532,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 
 	done := make(chan struct{})
 	pc2.OnTrack(func(track2 *TrackRemote, _ *RTPReceiver) {
-		for i := 0; i < numPackets; i++ {
+		for i := range numPackets {
 			if i == 1 {
 				continue
 			}
@@ -545,7 +544,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	})
 
 	go func() {
-		for i := 0; i < numPackets; i++ {
+		for i := range numPackets {
 			time.Sleep(20 * time.Millisecond)
 			if i == 1 {
 				continue
@@ -861,7 +860,7 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 	})
 
 	go func() {
-		for i := 0; i < numPackets; i++ {
+		for i := range numPackets {
 			time.Sleep(20 * time.Millisecond)
 			var p rtp.Packet
 			p.Version = 2

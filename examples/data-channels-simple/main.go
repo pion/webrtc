@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // simple-datachannel is a simple datachannel demo that auto connects.
 package main

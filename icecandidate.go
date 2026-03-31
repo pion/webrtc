@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pion/ice/v4"
 )
@@ -151,17 +152,17 @@ func (c ICECandidate) ToICE() (cand ice.Candidate, err error) {
 }
 
 func (c *ICECandidate) setExtensions(ext []ice.CandidateExtension) {
-	var extensions string
+	var extensions strings.Builder
 
 	for i := range ext {
 		if i > 0 {
-			extensions += " "
+			extensions.WriteString(" ")
 		}
 
-		extensions += ext[i].Key + " " + ext[i].Value
+		extensions.WriteString(ext[i].Key + " " + ext[i].Value)
 	}
 
-	c.extensions = extensions
+	c.extensions = extensions.String()
 }
 
 func (c *ICECandidate) exportExtensions(cand ice.Candidate) error {

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
@@ -99,10 +98,30 @@ func TestICERenomination(t *testing.T) {
 		assert.NotNil(t, s.renomination.generator)
 	})
 
+	t.Run("CustomAttribute", func(t *testing.T) {
+		const customAttr = uint16(0x0042)
+
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination(WithRenominationNominationAttribute(customAttr)))
+
+		assert.True(t, s.renomination.enabled)
+		if assert.NotNil(t, s.renomination.attributeType) {
+			assert.Equal(t, customAttr, *s.renomination.attributeType)
+		}
+	})
+
 	t.Run("InvalidInterval", func(t *testing.T) {
 		s := SettingEngine{}
 		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(0)), errInvalidRenominationInterval)
 		assert.ErrorIs(t, s.SetICERenomination(WithRenominationInterval(-1*time.Second)), errInvalidRenominationInterval)
+	})
+
+	t.Run("InvalidAttribute", func(t *testing.T) {
+		s := SettingEngine{}
+		assert.NoError(t, s.SetICERenomination(WithRenominationNominationAttribute(0x0000)))
+		if assert.NotNil(t, s.renomination.attributeType) {
+			assert.Equal(t, uint16(0x0000), *s.renomination.attributeType)
+		}
 	})
 }
 
@@ -562,7 +581,7 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	rawDC := <-detachChan
 	assert.NoError(t, rawDC.SetWriteDeadline(time.Now().Add(time.Second)))
 	buf := make([]byte, 1000)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, err = rawDC.Write(buf)
 		if err != nil {
 			break
@@ -617,16 +636,21 @@ func TestSettingEngine_CandidateFiltersAndNetworkTypes(t *testing.T) {
 
 	ifFilter := func(name string) bool { return name == "eth0" }
 	ipFilter := func(ip net.IP) bool { return ip.IsLoopback() }
+	remoteIPFilter := func(ip net.IP) bool { return ip.IsPrivate() }
 
 	se.SetInterfaceFilter(ifFilter)
 	se.SetIPFilter(ipFilter)
+	se.SetRemoteIPFilter(remoteIPFilter)
 	se.SetIncludeLoopbackCandidate(true)
 
 	assert.NotNil(t, se.candidates.InterfaceFilter)
 	assert.NotNil(t, se.candidates.IPFilter)
+	assert.NotNil(t, se.candidates.RemoteIPFilter)
 	assert.True(t, se.candidates.InterfaceFilter("eth0"))
 	assert.False(t, se.candidates.InterfaceFilter("wlan0"))
 	assert.True(t, se.candidates.IPFilter(net.IPv4(127, 0, 0, 1)))
+	assert.True(t, se.candidates.RemoteIPFilter(net.IPv4(10, 0, 0, 1)))
+	assert.False(t, se.candidates.RemoteIPFilter(net.IPv4(8, 8, 8, 8)))
 	assert.True(t, se.candidates.IncludeLoopbackCandidate)
 }
 
@@ -690,6 +714,7 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	se.SetDTLSRootCAs(rootCAs)
 	se.SetDTLSKeyLogWriter(&keyBuf)
 	se.SetDTLSCipherSuites(dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+	se.SetDTLSSupportedProtocols("webrtc")
 
 	called := false
 	se.SetDTLSCustomerCipherSuites(func() []dtls.CipherSuite {
@@ -712,6 +737,7 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	}, se.dtls.cipherSuites)
 	_ = se.dtls.customCipherSuites()
+	assert.Equal(t, []string{"webrtc"}, se.dtls.supportedProtocols)
 	assert.True(t, called)
 }
 

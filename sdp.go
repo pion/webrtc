@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 package webrtc
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -298,8 +298,8 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid {
 		if space := strings.Index(simulcastAttr, " "); space > 0 {
 			simulcastAttr = simulcastAttr[space+1:]
 		}
-		ridStates := strings.Split(simulcastAttr, ";")
-		for _, ridState := range ridStates {
+		ridStates := strings.SplitSeq(simulcastAttr, ";")
+		for ridState := range ridStates {
 			if ridState[:1] == "~" {
 				ridID := ridState[1:]
 				for _, rid := range rids {
@@ -369,6 +369,7 @@ func addDataMediaSection(
 	dtlsRole sdp.ConnectionRole,
 	iceGatheringState ICEGatheringState,
 	sctpMaxMessageSize uint32,
+	sctpInit []byte,
 ) error {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
@@ -392,6 +393,9 @@ func addDataMediaSection(
 		WithValueAttribute("max-message-size", fmt.Sprintf("%d", sctpMaxMessageSize)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password)
 
+	if len(sctpInit) != 0 {
+		media = media.WithValueAttribute("sctp-init", base64.StdEncoding.EncodeToString(sctpInit))
+	}
 	for _, f := range dtlsFingerprints {
 		media = media.WithFingerprint(f.Algorithm, strings.ToUpper(f.Value))
 	}
@@ -669,6 +673,7 @@ type mediaSection struct {
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool
+	sctpInit        []byte
 	matchExtensions map[string]int
 	rids            []*simulcastRid
 }
@@ -742,6 +747,7 @@ func populateSDP(
 				connectionRole,
 				iceGatheringState,
 				sctpMaxMessageSize,
+				section.sctpInit,
 			); err != nil {
 				return nil, err
 			}
@@ -994,7 +1000,7 @@ func extractICEDetailsFromMedia( //nolint:cyclop
 
 type sdpICEDetails struct {
 	Ufrag      string
-	Password   string
+	Password   string //nolint:gosec // not a secret.
 	Candidates []ICECandidate
 }
 
@@ -1209,4 +1215,19 @@ func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
 	}
 
 	return 0
+}
+
+func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
+	for _, a := range desc.Attributes {
+		if strings.TrimSpace(a.Key) == "sctp-init" {
+			decoded, err := base64.StdEncoding.DecodeString(a.Value)
+			if err != nil {
+				return nil, err
+			}
+
+			return decoded, nil
+		}
+	}
+
+	return nil, nil
 }

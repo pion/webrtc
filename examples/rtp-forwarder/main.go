@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 //go:build !js
-// +build !js
 
 // rtp-forwarder shows how to forward your webcam/microphone via RTP using Pion WebRTC.
 package main
