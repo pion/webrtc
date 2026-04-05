@@ -16,10 +16,10 @@ on:
   pull_request:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   tidy:
-    uses: pion/.goassets/.github/workflows/tidy-check.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/tidy-check.reusable.yml@main
     with:
       go-version: "1.25" # auto-update/latest-go-version

@@ -17,4 +17,4 @@ on:
 
 jobs:
   check:
-    uses: pion/.goassets/.github/workflows/api.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/api.reusable.yml@main

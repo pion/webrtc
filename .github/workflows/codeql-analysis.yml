@@ -19,10 +19,10 @@ on:
     - cron: '23 5 * * 0'
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - '**.go'
 
 jobs:
   analyze:
-    uses: pion/.goassets/.github/workflows/codeql-analysis.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/codeql-analysis.reusable.yml@main

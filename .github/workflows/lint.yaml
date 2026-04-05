@@ -17,4 +17,6 @@ on:
 
 jobs:
   lint:
-    uses: pion/.goassets/.github/workflows/lint.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/lint.reusable.yml@main
+    with:
+      golangci-lint-version: v2.10.1

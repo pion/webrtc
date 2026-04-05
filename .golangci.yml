@@ -146,3 +146,6 @@ formatters:
     - goimports        # Goimports does everything that gofmt does. Additionally it checks unused imports
   exclusions:
     generated: lax
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
