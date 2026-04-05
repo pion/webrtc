@@ -16,7 +16,7 @@ set -eu
 SCRIPT_PATH="$(realpath "$(dirname "$0")")"
 GOASSETS_PATH="${SCRIPT_PATH}/.goassets"
 
-GOASSETS_REF=${GOASSETS_REF:-master}
+GOASSETS_REF=${GOASSETS_REF:-main}
 
 if [ -d "${GOASSETS_PATH}" ]; then
   if ! git -C "${GOASSETS_PATH}" diff --exit-code; then

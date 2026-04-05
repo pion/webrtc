@@ -19,4 +19,4 @@ on:
 
 jobs:
   lint:
-    uses: pion/.goassets/.github/workflows/reuse.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/reuse.reusable.yml@main
