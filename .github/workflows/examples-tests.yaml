@@ -4,10 +4,10 @@ name: Examples Tests
 on:
   pull_request:
     branches:
-      - master
+      - main
   push:
     branches:
-      - master
+      - main
 
 jobs:
   pion-to-pion-test:

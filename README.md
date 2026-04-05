@@ -13,7 +13,7 @@
   <br>
   <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/pion/webrtc/test.yaml">
   <a href="https://pkg.go.dev/github.com/pion/webrtc/v4"><img src="https://pkg.go.dev/badge/github.com/pion/webrtc/v4.svg" alt="Go Reference"></a>
-  <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+  <a href="https://codecov.io/gh/pion/webrtc"><img src="https://codecov.io/gh/pion/webrtc/branch/main/graph/badge.svg" alt="Coverage Status"></a>
   <a href="https://goreportcard.com/report/github.com/pion/webrtc/v4"><img src="https://goreportcard.com/badge/github.com/pion/webrtc/v4" alt="Go Report Card"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
@@ -92,12 +92,12 @@ He is available to talk about Pion or general WebRTC questions, feel free to rea
 * IVF, Ogg, H264 and Matroska provided for easy sending and saving
 * [getUserMedia](https://github.com/pion/mediadevices) implementation (Requires Cgo)
 * Easy integration with x264, libvpx, GStreamer and ffmpeg.
-* [Simulcast](https://github.com/pion/webrtc/tree/master/examples/simulcast)
-* [SVC](https://github.com/pion/rtp/blob/master/codecs/vp9_packet.go#L138)
+* [Simulcast](https://github.com/pion/webrtc/tree/main/examples/simulcast)
+* [SVC](https://github.com/pion/rtp/blob/main/codecs/vp9_packet.go#L138)
 * [NACK](https://github.com/pion/interceptor/pull/4)
-* [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/master/pkg/report)
-* [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/master/pkg/twcc)
-* [Bandwidth Estimation](https://github.com/pion/webrtc/tree/master/examples/bandwidth-estimation-from-disk)
+* [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/main/pkg/report)
+* [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/main/pkg/twcc)
+* [Bandwidth Estimation](https://github.com/pion/webrtc/tree/main/examples/bandwidth-estimation-from-disk)
 
 #### Security
 * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA for DTLS v1.2
