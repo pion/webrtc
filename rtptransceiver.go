@@ -432,12 +432,10 @@ func handleUnknownRTPPacket(
 		return mid, rid, rsid, false, err
 	}
 
-	if rp.Padding && len(rp.Payload) == 0 {
-		return mid, rid, rsid, true, nil
-	}
+	isPaddingOnlyPacket := rp.Padding && len(rp.Payload) == 0
 
 	if !rp.Header.Extension {
-		return mid, rid, rsid, false, nil
+		return mid, rid, rsid, isPaddingOnlyPacket, nil
 	}
 
 	if payload := rp.GetExtension(midExtensionID); payload != nil {
@@ -452,5 +450,5 @@ func handleUnknownRTPPacket(
 		rsid = string(payload)
 	}
 
-	return mid, rid, rsid, false, nil
+	return mid, rid, rsid, isPaddingOnlyPacket, nil
 }
