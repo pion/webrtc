@@ -2070,8 +2070,15 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates.
-func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
-	remoteDesc := pc.RemoteDescription()
+func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error { //nolint:cyclop
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	remoteDesc := pc.currentRemoteDescription
+	if pc.pendingRemoteDescription != nil {
+		remoteDesc = pc.pendingRemoteDescription
+	}
+
 	if remoteDesc == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
@@ -2112,7 +2119,23 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
 		return err
 	}
 
-	return pc.iceTransport.AddRemoteCandidate(&c)
+	err = pc.iceTransport.AddRemoteCandidate(&c)
+	if err != nil {
+		return err
+	}
+
+	if pc.pendingRemoteDescription != nil {
+		if err := pc.pendingRemoteDescription.UpdateWithCandidate(candidate); err != nil {
+			return err
+		}
+	}
+	if pc.currentRemoteDescription != nil {
+		if err := pc.currentRemoteDescription.UpdateWithCandidate(candidate); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Return true if the sdp contains a specific ufrag.

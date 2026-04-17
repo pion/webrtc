@@ -56,6 +56,47 @@ func (sd *SessionDescription) Unmarshal() (*sdp.SessionDescription, error) {
 	return sd.parsed, nil
 }
 
+// UpdateWithCandidate adds a candidate to the SDP.
+func (sd *SessionDescription) UpdateWithCandidate(candidate ICECandidateInit) error { //nolint:cyclop
+	// Work on a fresh parse rather than the cached sd.parsed: that structure
+	// may be concurrently read by the operations queue (e.g. dtlsRoleFromSDP,
+	// startRTP) so mutating its MediaDescriptions would race.
+	parsed := &sdp.SessionDescription{}
+	if err := parsed.UnmarshalString(sd.SDP); err != nil {
+		return fmt.Errorf("%w: %w", ErrSDPUnmarshalling, err)
+	}
+
+	var targetMedia *sdp.MediaDescription
+	if candidate.SDPMid != nil {
+		for _, m := range parsed.MediaDescriptions {
+			if mid, ok := m.Attribute(sdp.AttrKeyMID); ok && mid == *candidate.SDPMid {
+				targetMedia = m
+
+				break
+			}
+		}
+	} else if candidate.SDPMLineIndex != nil {
+		if int(*candidate.SDPMLineIndex) < len(parsed.MediaDescriptions) {
+			targetMedia = parsed.MediaDescriptions[*candidate.SDPMLineIndex]
+		}
+	}
+
+	if targetMedia == nil {
+		return nil
+	}
+
+	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+	targetMedia.WithValueAttribute("candidate", candidateValue)
+
+	marshaled, err := parsed.Marshal()
+	if err != nil {
+		return err
+	}
+	sd.SDP = string(marshaled)
+
+	return nil
+}
+
 func hasICETrickleOption(desc *sdp.SessionDescription) bool {
 	if value, ok := desc.Attribute(sdp.AttrKeyICEOptions); ok && hasTrickleOptionValue(value) {
 		return true
