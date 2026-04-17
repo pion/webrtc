@@ -2737,7 +2737,7 @@ func startTrickleRenomination(
 	answer, err := answerPC.CreateAnswer(nil)
 	assert.NoError(t, err)
 	assert.NoError(t, answerPC.SetLocalDescription(answer))
-	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+	assert.NoError(t, offerPC.SetRemoteDescription(answer))
 
 	assert.NoError(t, offerSender.flushSrflx())
 	assert.NoError(t, answerSender.flushSrflx())

@@ -1268,3 +1268,47 @@ func TestICETrickleCapabilityString(t *testing.T) {
 		assert.Equal(t, tt.expected, tt.value.String())
 	}
 }
+
+func TestPeerConnection_AddICECandidateUpdatesRemoteDescription(t *testing.T) {
+	for _, target := range []string{"mid", "index", "all"} {
+		t.Run(target, func(t *testing.T) {
+			pc, err := NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() { assert.NoError(t, pc.Close()) }()
+
+			_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pc.CreateDataChannel("test-channel", nil)
+			require.NoError(t, err)
+			offer, err := pc.CreateOffer(nil)
+			require.NoError(t, err)
+			require.NoError(t, pc.SetRemoteDescription(offer))
+
+			candidateStr := "candidate:1 1 udp 1 1.2.3.4 1234 typ relay raddr 0.0.0.0 rport 0"
+			index := uint16(0)
+			candidate := ICECandidateInit{Candidate: candidateStr, SDPMLineIndex: &index}
+			if target == "mid" {
+				mid := "0"
+				candidate.SDPMid = &mid
+				index = 1
+			}
+			snapshot := pc.RemoteDescription()
+			originalSDP := snapshot.SDP
+			assert.NoError(t, pc.AddICECandidate(candidate))
+			assert.Equal(t, originalSDP, snapshot.SDP)
+
+			remoteSDP := pc.RemoteDescription().SDP
+			assert.Contains(t, remoteSDP, candidateStr)
+			assert.Less(t, strings.Index(remoteSDP, candidateStr), strings.Index(remoteSDP, "m=application"))
+
+			candidate.Candidate = ""
+			if target == "all" {
+				candidate = ICECandidateInit{}
+			}
+			for range 2 {
+				require.NoError(t, pc.AddICECandidate(candidate))
+				assert.Equal(t, remoteSDP, pc.RemoteDescription().SDP)
+			}
+		})
+	}
+}
