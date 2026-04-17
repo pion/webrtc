@@ -1053,6 +1053,26 @@ func TestICERestart(t *testing.T) {
 	assert.NoError(t, offerPC.SetLocalDescription(offer))
 	assert.NoError(t, answerPC.SetRemoteDescription(offer))
 
+	currentSDP := answerPC.CurrentRemoteDescription().SDP
+	parsed, err := offer.Unmarshal()
+	require.NoError(t, err)
+	ufrag, ok := parsed.MediaDescriptions[0].Attribute("ice-ufrag")
+	require.True(t, ok)
+	candidateStr := "candidate:1 1 udp 1 1.2.3.4 1234 typ host"
+	index := uint16(0)
+	for _, candidate := range []ICECandidateInit{
+		{Candidate: candidateStr, UsernameFragment: &ufrag},
+		{Candidate: candidateStr + " ufrag " + ufrag},
+		{Candidate: candidateStr},
+		{},
+	} {
+		candidate.SDPMLineIndex = &index
+		assert.NoError(t, answerPC.AddICECandidate(candidate))
+		assert.Equal(t, currentSDP, answerPC.CurrentRemoteDescription().SDP)
+	}
+	assert.Contains(t, answerPC.PendingRemoteDescription().SDP, candidateStr)
+	assert.NotContains(t, answerPC.PendingRemoteDescription().SDP, "a=end-of-candidates")
+
 	answer, err := answerPC.CreateAnswer(nil)
 	assert.NoError(t, err)
 
@@ -1438,6 +1458,10 @@ func TestEmptyCandidate(t *testing.T) {
 			"1234567",
 			nil, nil, nil,
 		}, true},
+		{ICECandidateInit{
+			Candidate:     "candidate:1 1 udp 1 2001:db8::1%eth0\r\na=x-injected:yes 1234 typ host",
+			SDPMLineIndex: new(uint16),
+		}, true},
 	}
 
 	for i, testCase := range testCases {
@@ -1448,7 +1472,9 @@ func TestEmptyCandidate(t *testing.T) {
 		assert.NoErrorf(t, err, "Case %d failed", i)
 
 		if testCase.expectError {
+			originalSDP := peerConn.RemoteDescription().SDP
 			assert.Error(t, peerConn.AddICECandidate(testCase.ICECandidate))
+			assert.Equal(t, originalSDP, peerConn.RemoteDescription().SDP)
 		} else {
 			assert.NoError(t, peerConn.AddICECandidate(testCase.ICECandidate))
 		}

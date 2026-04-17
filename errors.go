@@ -211,6 +211,7 @@ var (
 
 	errICEConnectionNotStarted        = errors.New("ICE connection not started")
 	errICECandidateTypeUnknown        = errors.New("unknown candidate type")
+	errICECandidateInvalid            = errors.New("ICE candidate must not contain carriage returns or newlines")
 	errICEInvalidConvertCandidateType = errors.New(
 		"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type",
 	)
