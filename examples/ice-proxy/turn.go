@@ -8,7 +8,7 @@ package main
 import (
 	"net"
 
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 )
 
 func newTURNServer() *turn.Server {
@@ -18,9 +18,9 @@ func newTURNServer() *turn.Server {
 	}
 
 	server, err := turn.NewServer(turn.ServerConfig{
-		AuthHandler: func(_, realm string, _ net.Addr) ([]byte, bool) {
+		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
 			// Accept any request with provided username and password.
-			return turn.GenerateAuthKey(turnUsername, realm, turnPassword), true
+			return turnUsername, turn.GenerateAuthKey(turnUsername, ra.Realm, turnPassword), true
 		},
 		ListenerConfigs: []turn.ListenerConfig{
 			{
