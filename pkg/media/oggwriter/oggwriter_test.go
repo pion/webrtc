@@ -5,10 +5,13 @@ package oggwriter
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/pion/rtp"
+	"github.com/pion/webrtc/v4/pkg/media/oggreader"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -160,6 +163,153 @@ func TestOggWriter_LargePayload(t *testing.T) {
 	err = writer.WriteRTP(validPacket)
 	assert.NoError(t, err)
 
-	data := writer.createPage(rawPkt, pageHeaderTypeContinuationOfStream, 0, 1)
+	data := createPageForSerial(
+		writer.checksumTable,
+		rawPkt,
+		pageHeaderTypeContinuationOfStream,
+		0,
+		writer.track.serial,
+		1,
+	)
 	assert.Equal(t, uint8(4), data[26])
+}
+
+func validOpusPacketForTest(t *testing.T, timestamp, ssrc uint32) *rtp.Packet {
+	t.Helper()
+	rawPkt := []byte{
+		0x90, 0xe0, 0x69, 0x8f, 0xd9, 0xc2, 0x93, 0xda, 0x1c, 0x64,
+		0x27, 0x82, 0x00, 0x01, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x98, 0x36, 0xbe, 0x88, 0x9e,
+	}
+
+	packet := &rtp.Packet{
+		Header: rtp.Header{
+			Marker:           true,
+			Extension:        true,
+			ExtensionProfile: 1,
+			Version:          2,
+			PayloadType:      111,
+			SequenceNumber:   27023,
+			Timestamp:        timestamp,
+			SSRC:             ssrc,
+			CSRC:             []uint32{},
+		},
+		Payload: rawPkt[20:],
+	}
+	assert.NoError(t, packet.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
+
+	return packet
+}
+
+func TestOggWriter_NewWriterWith(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	serial1 := uint32(0x01020304)
+	serial2 := uint32(0x05060708)
+
+	writer, err := NewWriterWith(buffer, 48000, 2)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track1, err := writer.NewTrack(1111, WithSerial(serial1))
+	assert.NoError(t, err)
+	assert.NotNil(t, track1)
+	track2, err := writer.NewTrack(2222, WithSerial(serial2))
+	assert.NoError(t, err)
+	assert.NotNil(t, track2)
+
+	assert.NoError(t, track1.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
+	assert.NoError(t, track2.WriteRTP(validOpusPacketForTest(t, 2000, 2222)))
+
+	reader, err := oggreader.NewWithOptions(bytes.NewReader(buffer.Bytes()))
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+
+	var opusHeadSerials []uint32
+	var opusTagsSerials []uint32
+	var audioSerials []uint32
+	var audioGranules []uint64
+
+	for {
+		payload, pageHeader, parseErr := reader.ParseNextPage()
+		if errors.Is(parseErr, io.EOF) {
+			break
+		}
+		assert.NoError(t, parseErr)
+
+		headerType, ok := pageHeader.HeaderType(payload)
+		if ok {
+			switch headerType {
+			case oggreader.HeaderOpusID:
+				opusHeadSerials = append(opusHeadSerials, pageHeader.Serial)
+			case oggreader.HeaderOpusTags:
+				opusTagsSerials = append(opusTagsSerials, pageHeader.Serial)
+			default:
+			}
+
+			continue
+		}
+
+		audioSerials = append(audioSerials, pageHeader.Serial)
+		audioGranules = append(audioGranules, pageHeader.GranulePosition)
+	}
+
+	assert.Equal(t, []uint32{serial1, serial2}, opusHeadSerials)
+	assert.Equal(t, []uint32{serial1, serial2}, opusTagsSerials)
+	assert.Equal(t, []uint32{serial1, serial2}, audioSerials)
+	assert.Equal(t, []uint64{1, 1}, audioGranules)
+}
+
+func TestOggWriter_MultiTrackRejectsDuplicateTrackSSRC(t *testing.T) {
+	writer, err := NewWriterWith(&bytes.Buffer{}, 48000, 2)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track, err := writer.NewTrack(1111, WithSerial(0x01020304))
+	assert.NoError(t, err)
+	assert.NotNil(t, track)
+
+	track, err = writer.NewTrack(1111, WithSerial(0x05060708))
+	assert.ErrorIs(t, err, errDuplicateTrackSSRC)
+	assert.Nil(t, track)
+}
+
+func TestOggWriter_MultiTrackRejectsDuplicateTrackSerial(t *testing.T) {
+	writer, err := NewWriterWith(&bytes.Buffer{}, 48000, 2)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track, err := writer.NewTrack(1111, WithSerial(0x01020304))
+	assert.NoError(t, err)
+	assert.NotNil(t, track)
+
+	track, err = writer.NewTrack(2222, WithSerial(0x01020304))
+	assert.ErrorIs(t, err, errDuplicateTrackSerial)
+	assert.Nil(t, track)
+}
+
+func TestOggWriter_MultiTrackRejectsTrackCreationAfterWrite(t *testing.T) {
+	writer, err := NewWriterWith(&bytes.Buffer{}, 48000, 2)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track1, err := writer.NewTrack(1111, WithSerial(0x01020304))
+	assert.NoError(t, err)
+	assert.NotNil(t, track1)
+
+	assert.NoError(t, track1.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
+
+	track2, err := writer.NewTrack(2222, WithSerial(0x05060708))
+	assert.ErrorIs(t, err, errTracksStarted)
+	assert.Nil(t, track2)
+}
+
+func TestOggWriter_NewWithPreservesLegacyStreamMode(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "oggwriter-*.ogg")
+	assert.NoError(t, err)
+
+	writer, err := NewWith(file, 48000, 2)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+	assert.Nil(t, writer.fd)
+
+	assert.NoError(t, writer.Close())
 }
