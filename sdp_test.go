@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
@@ -590,10 +591,12 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		assert.Equal(t, RTPCodecTypeVideo, track.kind)
 		assert.Equal(t, SSRC(3000), track.ssrcs[0])
 		assert.Equal(t, "video_trk_label", track.streamID)
-		require.NotNil(t, track.rtxSsrc, "missing RTX ssrc for video track")
-		assert.Equal(t, SSRC(4000), *track.rtxSsrc)
-		require.NotNil(t, track.fecSsrc, "missing FEC ssrc for video track")
-		assert.Equal(t, SSRC(5000), *track.fecSsrc)
+		require.Len(t, track.rtxSsrc, 1)
+		require.NotNil(t, track.rtxSsrc[0], "missing RTX ssrc for video track")
+		assert.Equal(t, SSRC(4000), *track.rtxSsrc[0])
+		require.Len(t, track.fecSsrc, 1)
+		require.NotNil(t, track.fecSsrc[0], "missing FEC ssrc for video track")
+		assert.Equal(t, SSRC(5000), *track.fecSsrc[0])
 	})
 
 	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
@@ -654,8 +657,98 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 2, len(tracks))
-		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc)
+		require.Len(t, tracks[0].rtxSsrc, 1)
+		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc[0])
+		require.Len(t, tracks[1].rtxSsrc, 1)
+		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc[0])
+	})
+
+	t.Run("simulcast ssrc-group", func(t *testing.T) {
+		log := logging.NewDefaultLoggerFactory().NewLogger("test")
+		descr := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 invalid 5000"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "3100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+						{Key: "ssrc-group", Value: "FID 3000 3100"},
+						{Key: "ssrc-group", Value: "FID 4000 4100"},
+						{Key: "ssrc-group", Value: "FID 5000 5100"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "3100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5100 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+						{Key: "ssrc-group", Value: "FEC-FR 3000 3100"},
+						{Key: "ssrc-group", Value: "FEC-FR 4000 4100"},
+						{Key: "ssrc-group", Value: "FEC-FR 5000 5100"},
+					},
+				},
+			},
+		}
+
+		tracks := trackDetailsFromSDP(log, descr)
+		assert.Equal(t, 4, len(tracks))
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[0].ssrcs)
+		assert.Equal(t, []SSRC{3000, 5000}, tracks[1].ssrcs)
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[2].ssrcs)
+		if assert.Len(t, tracks[2].rtxSsrc, 3) {
+			assert.Equal(t, SSRC(3100), *tracks[2].rtxSsrc[0])
+			assert.Equal(t, SSRC(4100), *tracks[2].rtxSsrc[1])
+			assert.Equal(t, SSRC(5100), *tracks[2].rtxSsrc[2])
+		}
+		if assert.Len(t, tracks[3].fecSsrc, 3) {
+			assert.Equal(t, SSRC(3100), *tracks[3].fecSsrc[0])
+			assert.Equal(t, SSRC(4100), *tracks[3].fecSsrc[1])
+			assert.Equal(t, SSRC(5100), *tracks[3].fecSsrc[2])
+		}
 	})
 }
 

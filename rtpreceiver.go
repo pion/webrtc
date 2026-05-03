@@ -326,6 +326,33 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.
 	}
 }
 
+// ReadSimulcastSSRC reads incoming RTCP for this RTPReceiver for given SSRC.
+func (r *RTPReceiver) ReadSimulcastSSRC(b []byte, ssrc SSRC) (n int, a interceptor.Attributes, err error) {
+	select {
+	case <-r.received:
+		var rtcpInterceptor interceptor.RTCPReader
+
+		r.mu.Lock()
+		for _, t := range r.tracks {
+			if t.track != nil && t.track.ssrc == ssrc {
+				rtcpInterceptor = t.rtcpInterceptor
+
+				break
+			}
+		}
+		r.mu.Unlock()
+
+		if rtcpInterceptor == nil {
+			return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+		}
+
+		return rtcpInterceptor.Read(b, a)
+
+	case <-r.closedChan:
+		return 0, nil, io.ErrClosedPipe
+	}
+}
+
 // ReadRTCP is a convenience method that wraps Read and unmarshal for you.
 // It also runs any configured interceptors.
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
@@ -347,6 +374,19 @@ func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) 
 func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
 	b := make([]byte, r.api.settingEngine.getReceiveMTU())
 	i, attributes, err := r.ReadSimulcast(b, rid)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pkts, err := rtcp.Unmarshal(b[:i])
+
+	return pkts, attributes, err
+}
+
+// ReadSimulcastSSRCRTCP is a convenience method that wraps ReadSimulcastSSRC and unmarshal for you.
+func (r *RTPReceiver) ReadSimulcastSSRCRTCP(ssrc SSRC) ([]rtcp.Packet, interceptor.Attributes, error) {
+	b := make([]byte, r.api.settingEngine.getReceiveMTU())
+	i, attributes, err := r.ReadSimulcastSSRC(b, ssrc)
 	if err != nil {
 		return nil, nil, err
 	}
