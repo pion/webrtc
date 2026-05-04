@@ -62,6 +62,76 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
+func TestGenerateDataChannelIDRespectsMaxChannels(t *testing.T) {
+	t.Run("ClientLimit", func(t *testing.T) {
+		maxChannels := uint16(4)
+		transport := &SCTPTransport{
+			maxChannels:        &maxChannels,
+			dataChannelIDsUsed: make(map[uint16]struct{}),
+		}
+
+		for _, expectedID := range []uint16{0, 2} {
+			idPtr := new(uint16)
+			err := transport.generateAndSetDataChannelID(DTLSRoleClient, &idPtr)
+			require.NoError(t, err)
+			require.Equal(t, expectedID, *idPtr)
+		}
+
+		idPtr := new(uint16)
+		err := transport.generateAndSetDataChannelID(DTLSRoleClient, &idPtr)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrMaxDataChannelID)
+	})
+
+	t.Run("ServerLimit", func(t *testing.T) {
+		maxChannels := uint16(5)
+		transport := &SCTPTransport{
+			maxChannels:        &maxChannels,
+			dataChannelIDsUsed: make(map[uint16]struct{}),
+		}
+
+		for _, expectedID := range []uint16{1, 3} {
+			idPtr := new(uint16)
+			err := transport.generateAndSetDataChannelID(DTLSRoleServer, &idPtr)
+			require.NoError(t, err)
+			require.Equal(t, expectedID, *idPtr)
+		}
+
+		idPtr := new(uint16)
+		err := transport.generateAndSetDataChannelID(DTLSRoleServer, &idPtr)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrMaxDataChannelID)
+	})
+}
+
+func TestGenerateDataChannelIDCanReuseReleasedID(t *testing.T) {
+	maxChannels := uint16(4)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: make(map[uint16]struct{}),
+	}
+
+	firstID := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &firstID))
+	require.Equal(t, uint16(0), *firstID)
+
+	secondID := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &secondID))
+	require.Equal(t, uint16(2), *secondID)
+
+	thirdID := new(uint16)
+	err := transport.generateAndSetDataChannelID(DTLSRoleClient, &thirdID)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrMaxDataChannelID)
+
+	// Simulate an SCTP stream reset completing and releasing stream id 0.
+	delete(transport.dataChannelIDsUsed, *firstID)
+
+	reusedID := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reusedID))
+	require.Equal(t, *firstID, *reusedID)
+}
+
 func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 	clientConn, serverConn := net.Pipe()
 	defer func() {
