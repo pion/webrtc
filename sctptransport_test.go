@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/sctp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,6 +61,28 @@ func TestGenerateDataChannelID(t *testing.T) {
 			"expected new id to be added to the map",
 		)
 	}
+}
+
+func TestSCTPTransportMetadataNotReady(t *testing.T) {
+	metadata, ok := (&SCTPTransport{}).Metadata()
+	assert.False(t, ok)
+	assert.Equal(t, SCTPTransportMetadata{}, metadata)
+}
+
+func TestNewSCTPTransportMetadata(t *testing.T) {
+	metadata := newSCTPTransportMetadata(sctp.AssociationMetadata{
+		MessageInterleavingEnabled:   true,
+		PartialReliabilityMode:       sctp.PartialReliabilityModeIForwardTSN,
+		ZeroChecksumSendingEnabled:   true,
+		ZeroChecksumReceivingEnabled: true,
+	})
+
+	assert.Equal(t, SCTPTransportMetadata{
+		MessageInterleavingEnabled:   true,
+		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
+		ZeroChecksumSendingEnabled:   true,
+		ZeroChecksumReceivingEnabled: true,
+	}, metadata)
 }
 
 func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {

@@ -1625,6 +1625,12 @@ func TestUnmarshalStatsJSON_SCTPTransport(t *testing.T) {
 		"receiverWindow": 2048,
 		"mtu": 1200,
 		"unackData": 7,
+		"metadata": {
+			"messageInterleavingEnabled": true,
+			"partialReliabilityMode": "i-forward-tsn",
+			"zeroChecksumSendingEnabled": true,
+			"zeroChecksumReceivingEnabled": true
+		},
 		"bytesSent": 12345,
 		"bytesReceived": 67890
 	}`)
@@ -1642,6 +1648,13 @@ func TestUnmarshalStatsJSON_SCTPTransport(t *testing.T) {
 	assert.EqualValues(t, 2048, st.ReceiverWindow)
 	assert.EqualValues(t, 1200, st.MTU)
 	assert.EqualValues(t, 7, st.UNACKData)
+	require.NotNil(t, st.Metadata)
+	assert.Equal(t, &SCTPTransportMetadata{
+		MessageInterleavingEnabled:   true,
+		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
+		ZeroChecksumSendingEnabled:   true,
+		ZeroChecksumReceivingEnabled: true,
+	}, st.Metadata)
 	assert.EqualValues(t, 12345, st.BytesSent)
 	assert.EqualValues(t, 67890, st.BytesReceived)
 }
@@ -2003,6 +2016,12 @@ func TestUnmarshalSCTPTransportStats_Success(t *testing.T) {
 		"receiverWindow": 1024,
 		"mtu": 1200,
 		"unackData": 3,
+		"metadata": {
+			"messageInterleavingEnabled": true,
+			"partialReliabilityMode": "i-forward-tsn",
+			"zeroChecksumSendingEnabled": true,
+			"zeroChecksumReceivingEnabled": true
+		},
 		"bytesSent": 1000,
 		"bytesReceived": 2000
 	}`)
@@ -2019,6 +2038,13 @@ func TestUnmarshalSCTPTransportStats_Success(t *testing.T) {
 	assert.Equal(t, uint32(1024), got.ReceiverWindow)
 	assert.Equal(t, uint32(1200), got.MTU)
 	assert.Equal(t, uint32(3), got.UNACKData)
+	require.NotNil(t, got.Metadata)
+	assert.Equal(t, &SCTPTransportMetadata{
+		MessageInterleavingEnabled:   true,
+		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
+		ZeroChecksumSendingEnabled:   true,
+		ZeroChecksumReceivingEnabled: true,
+	}, got.Metadata)
 	assert.Equal(t, uint64(1000), got.BytesSent)
 	assert.Equal(t, uint64(2000), got.BytesReceived)
 }
