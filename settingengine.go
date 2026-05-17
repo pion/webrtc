@@ -93,6 +93,7 @@ type SettingEngine struct {
 		fastRtxWnd           uint32
 		cwndCAStep           uint32
 		enableSnap           bool
+		enableInterleaving   *bool
 	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
@@ -613,6 +614,12 @@ func (e *SettingEngine) EnableSCTPZeroChecksum(isEnabled bool) {
 // EnableSctpSnap enables the use of the SCTP SNAP connect optimization.
 func (e *SettingEngine) EnableSctpSnap(isEnabled bool) {
 	e.sctp.enableSnap = isEnabled
+}
+
+// EnableSCTPInterleaving controls whether SCTP negotiates RFC 8260 user message interleaving.
+// If this setting is not called, the underlying SCTP default is used.
+func (e *SettingEngine) EnableSCTPInterleaving(isEnabled bool) {
+	e.sctp.enableInterleaving = &isEnabled
 }
 
 // SetSCTPMaxMessageSize sets the largest message we are willing to accept.

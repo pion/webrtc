@@ -169,7 +169,7 @@ func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint3
 }
 
 func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
-	opts := make([]sctp.ClientOption, 0, 7)
+	opts := make([]sctp.ClientOption, 0, 8)
 
 	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
 		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
@@ -200,6 +200,10 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 
 	if r.api.settingEngine.sctp.cwndCAStep != 0 {
 		opts = append(opts, sctp.WithCwndCAStep(r.api.settingEngine.sctp.cwndCAStep))
+	}
+
+	if r.api.settingEngine.sctp.enableInterleaving != nil {
+		opts = append(opts, sctp.WithEnableInterleaving(*r.api.settingEngine.sctp.enableInterleaving))
 	}
 
 	return opts
@@ -515,14 +519,30 @@ func (r *SCTPTransport) BufferedAmount() int {
 func (r *SCTPTransport) GetSctpInit() []byte {
 	if len(r.localSctpInit) == 0 {
 		var err error
-		r.localSctpInit, err = sctp.GenerateOutOfBandToken(sctp.Config{
-			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
-			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
-		})
+		opts := r.optionalSCTPTokenOptions()
+		r.localSctpInit, err = sctp.GenerateOutOfBandToken(opts...)
 		if err != nil {
 			r.log.Warnf("Failed to create sctp-init: %v", err)
 		}
 	}
 
 	return r.localSctpInit
+}
+
+func (r *SCTPTransport) optionalSCTPTokenOptions() []sctp.ClientOption {
+	opts := make([]sctp.ClientOption, 0, 3)
+
+	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
+		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
+	}
+
+	if r.api.settingEngine.sctp.enableZeroChecksum {
+		opts = append(opts, sctp.WithEnableZeroChecksum(true))
+	}
+
+	if r.api.settingEngine.sctp.enableInterleaving != nil {
+		opts = append(opts, sctp.WithEnableInterleaving(*r.api.settingEngine.sctp.enableInterleaving))
+	}
+
+	return opts
 }

@@ -125,6 +125,19 @@ func TestICERenomination(t *testing.T) {
 	})
 }
 
+func TestEnableSCTPInterleaving(t *testing.T) {
+	settings := SettingEngine{}
+	assert.Nil(t, settings.sctp.enableInterleaving)
+
+	settings.EnableSCTPInterleaving(true)
+	assert.NotNil(t, settings.sctp.enableInterleaving)
+	assert.True(t, *settings.sctp.enableInterleaving)
+
+	settings.EnableSCTPInterleaving(false)
+	assert.NotNil(t, settings.sctp.enableInterleaving)
+	assert.False(t, *settings.sctp.enableInterleaving)
+}
+
 func TestDetachDataChannels(t *testing.T) {
 	s := SettingEngine{}
 	assert.False(t, s.detach.DataChannels)

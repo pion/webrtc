@@ -271,6 +271,7 @@ func runStack(
 		sctp.WithMTU(outboundMTU),
 		sctp.WithMaxMessageSize(maxMessageSize),
 		sctp.WithLoggerFactory(logging.NewDefaultLoggerFactory()),
+		sctp.WithEnableInterleaving(true),
 	)
 	if err != nil {
 		return err

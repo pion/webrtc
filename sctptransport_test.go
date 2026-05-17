@@ -129,6 +129,20 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			wantExtra: 1,
 		},
 		{
+			name: "EnableInterleavingTrue",
+			configure: func(se *SettingEngine) {
+				se.EnableSCTPInterleaving(true)
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "EnableInterleavingFalse",
+			configure: func(se *SettingEngine) {
+				se.EnableSCTPInterleaving(false)
+			},
+			wantExtra: 1,
+		},
+		{
 			name: "AllOptional",
 			configure: func(se *SettingEngine) {
 				se.sctp.maxReceiveBufferSize = 1024
@@ -139,8 +153,9 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 				se.sctp.minCwnd = 11
 				se.sctp.fastRtxWnd = 22
 				se.sctp.cwndCAStep = 33
+				se.EnableSCTPInterleaving(false)
 			},
-			wantExtra: 7,
+			wantExtra: 8,
 		},
 	}
 
@@ -153,6 +168,69 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			opts := transport.sctpClientOptions(clientConn, defaultMaxSCTPMessageSize)
 
 			assert.Len(t, opts, baseCount+tc.wantExtra)
+		})
+	}
+}
+
+func TestSCTPTransport_optionalSCTPTokenOptions(t *testing.T) {
+	tests := []struct {
+		name      string
+		configure func(*SettingEngine)
+		wantLen   int
+	}{
+		{
+			name:    "Default",
+			wantLen: 0,
+		},
+		{
+			name: "MaxReceiveBufferSize",
+			configure: func(se *SettingEngine) {
+				se.sctp.maxReceiveBufferSize = 1024
+			},
+			wantLen: 1,
+		},
+		{
+			name: "EnableZeroChecksum",
+			configure: func(se *SettingEngine) {
+				se.sctp.enableZeroChecksum = true
+			},
+			wantLen: 1,
+		},
+		{
+			name: "EnableInterleavingTrue",
+			configure: func(se *SettingEngine) {
+				se.EnableSCTPInterleaving(true)
+			},
+			wantLen: 1,
+		},
+		{
+			name: "EnableInterleavingFalse",
+			configure: func(se *SettingEngine) {
+				se.EnableSCTPInterleaving(false)
+			},
+			wantLen: 1,
+		},
+		{
+			name: "AllOptional",
+			configure: func(se *SettingEngine) {
+				se.sctp.maxReceiveBufferSize = 1024
+				se.sctp.enableZeroChecksum = true
+				se.EnableSCTPInterleaving(false)
+			},
+			wantLen: 3,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			api := NewAPI()
+			if tc.configure != nil {
+				tc.configure(api.settingEngine)
+			}
+
+			transport := &SCTPTransport{api: api}
+
+			assert.Len(t, transport.optionalSCTPTokenOptions(), tc.wantLen)
 		})
 	}
 }
