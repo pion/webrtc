@@ -361,6 +361,27 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
+func TestPeerConnection_OnDataChannel_DefaultHandlerClosesChannel(t *testing.T) {
+	api := NewAPI()
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	dc := &DataChannel{api: api}
+	dc.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc) })
+	assert.Equal(t, DataChannelStateClosing, dc.ReadyState())
+
+	pc.OnDataChannel(nil)
+	dc2 := &DataChannel{api: api}
+	dc2.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc2) })
+	assert.Equal(t, DataChannelStateClosing, dc2.ReadyState())
+
+	assert.NoError(t, pc.Close())
+}
+
 // This test asserts that nothing deadlocks we try to shutdown when DTLS is in flight
 // We ensure that DTLS is in flight by removing the mux func for it, so all inbound DTLS is lost.
 func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
