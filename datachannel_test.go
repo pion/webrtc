@@ -6,6 +6,7 @@ package webrtc
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -133,23 +134,36 @@ func benchmarkDataChannelSend(b *testing.B, numChannels int) { //nolint:cyclop
 		waitForBenchmarkDataChannelOpen(b, label, "remote", signal.remote)
 	}
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
 	errCh := make(chan error, numChannels)
 	var wg sync.WaitGroup
 	wg.Add(len(dataChannels))
 	for _, dc := range dataChannels {
-		go func() {
+		go func(dc *DataChannel) {
 			defer wg.Done()
 
 			for n := 0; n < b.N/numChannels; n++ {
+				if dc.ReadyState() != DataChannelStateOpen {
+					return
+				}
+
 				if err := dc.SendText("Ping"); err != nil {
+					if dc.ReadyState() != DataChannelStateOpen ||
+						strings.Contains(err.Error(), "non-established state") {
+						return
+					}
+
 					errCh <- fmt.Errorf("unexpected error sending data (label=%q): %w", dc.Label(), err)
 
 					return
 				}
 			}
-		}()
+		}(dc)
 	}
 	wg.Wait()
+	b.StopTimer()
 	close(errCh)
 
 	for err := range errCh {
