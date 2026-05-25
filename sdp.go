@@ -282,7 +282,7 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) []*simulcastRid {
+func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 	rids := []*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
@@ -300,7 +300,7 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid {
 		}
 		ridStates := strings.SplitSeq(simulcastAttr, ";")
 		for ridState := range ridStates {
-			if ridState[:1] == "~" {
+			if len(ridState) > 0 && ridState[:1] == "~" {
 				ridID := ridState[1:]
 				for _, rid := range rids {
 					if rid.id == ridID {
