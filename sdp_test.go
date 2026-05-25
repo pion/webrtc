@@ -1306,6 +1306,71 @@ func TestGetRIDs(t *testing.T) {
 	}
 }
 
+// TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
+// a=simulcast: attribute contains empty tokens (trailing ";", ";;", or a
+// direction-only value with no rid list).
+func TestGetRIDs_EmptySimulcastTokens(t *testing.T) {
+	cases := []struct {
+		name          string
+		simulcastVal  string
+		ridAttrs      []string
+		wantPausedIDs []string
+	}{
+		{
+			name:         "trailing semicolon",
+			simulcastVal: "send 1;",
+			ridAttrs:     []string{"1 send", "2 send"},
+		},
+		{
+			name:          "double semicolon",
+			simulcastVal:  "send 1;;~2",
+			ridAttrs:      []string{"1 send", "2 send"},
+			wantPausedIDs: []string{"2"},
+		},
+		{
+			name:         "empty rid list after direction",
+			simulcastVal: "send ",
+			ridAttrs:     []string{"1 send"},
+		},
+		{
+			name:         "direction only no space",
+			simulcastVal: "send",
+			ridAttrs:     []string{"1 send"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := []sdp.Attribute{
+				{Key: sdpAttributeSimulcast, Value: tc.simulcastVal},
+			}
+			for _, v := range tc.ridAttrs {
+				attrs = append(attrs, sdp.Attribute{Key: sdpAttributeRid, Value: v})
+			}
+			media := &sdp.MediaDescription{
+				MediaName:  sdp.MediaName{Media: "video"},
+				Attributes: attrs,
+			}
+
+			// Must not panic.
+			rids := getRids(media)
+
+			for _, pausedID := range tc.wantPausedIDs {
+				found := false
+				for _, rid := range rids {
+					if rid.id == pausedID {
+						assert.True(t, rid.paused, "rid %q should be paused", pausedID)
+						found = true
+
+						break
+					}
+				}
+				assert.True(t, found, "rid %q not found in result", pausedID)
+			}
+		})
+	}
+}
+
 func TestCodecsFromMediaDescription(t *testing.T) {
 	t.Run("Codec Only", func(t *testing.T) {
 		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
