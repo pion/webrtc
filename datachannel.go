@@ -53,6 +53,7 @@ type DataChannel struct {
 	onOpenHandler       func()
 	dialHandlerOnce     sync.Once
 	onDialHandler       func()
+	closeHandlerOnce    sync.Once
 	onCloseHandler      func()
 	onBufferedAmountLow func()
 	onErrorHandler      func(error)
@@ -284,8 +285,14 @@ func (d *DataChannel) onDial() {
 // prior to GracefulClose.
 func (d *DataChannel) OnClose(f func()) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.closeHandlerOnce = sync.Once{}
 	d.onCloseHandler = f
+	d.mu.Unlock()
+
+	if d.ReadyState() == DataChannelStateClosed {
+		// If the data channel is already closed, call the handler immediately.
+		go d.closeHandlerOnce.Do(f)
+	}
 }
 
 func (d *DataChannel) onClose() {
@@ -294,7 +301,7 @@ func (d *DataChannel) onClose() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go handler()
+		go d.closeHandlerOnce.Do(handler)
 	}
 }
 

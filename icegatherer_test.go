@@ -20,7 +20,7 @@ import (
 	"github.com/pion/stun/v3"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1145,12 +1145,12 @@ func TestICEGatherer_AddressRewriteRelayVNet(t *testing.T) { //nolint:cyclop
 	authKey := turn.GenerateAuthKey("user", "pion.ly", "pass")
 	turnServer, err := turn.NewServer(turn.ServerConfig{
 		Realm: "pion.ly",
-		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
-			if u == "user" && r == "pion.ly" {
-				return authKey, true
+		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
+			if ra.Username == "user" && ra.Realm == "pion.ly" {
+				return ra.Username, authKey, true
 			}
 
-			return nil, false
+			return "", nil, false
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
@@ -1246,12 +1246,12 @@ func TestICEGatherer_AddressRewriteRelayAppendVNet(t *testing.T) { //nolint:cycl
 	authKey := turn.GenerateAuthKey("user", "pion.ly", "pass")
 	turnServer, err := turn.NewServer(turn.ServerConfig{
 		Realm: "pion.ly",
-		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
-			if u == "user" && r == "pion.ly" {
-				return authKey, true
+		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
+			if ra.Username == "user" && ra.Realm == "pion.ly" {
+				return ra.Username, authKey, true
 			}
 
-			return nil, false
+			return "", nil, false
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
@@ -1752,8 +1752,8 @@ func TestICEGatherer_SrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 	authKey := turn.GenerateAuthKey("user", "pion.ly", "pass")
 	turnServer, err := turn.NewServer(turn.ServerConfig{
 		Realm: "pion.ly",
-		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
-			return authKey, true
+		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
+			return ra.Username, authKey, true
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
@@ -2001,12 +2001,12 @@ func TestICEGatherer_RelayAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 	authKey := turn.GenerateAuthKey(username, realm, password)
 	turnServer, err := turn.NewServer(turn.ServerConfig{
 		Realm: realm,
-		AuthHandler: func(u, r string, _ net.Addr) ([]byte, bool) {
-			if u == username && r == realm {
-				return authKey, true
+		AuthHandler: func(ra *turn.RequestAttributes) (string, []byte, bool) {
+			if ra.Username == username && ra.Realm == realm {
+				return ra.Username, authKey, true
 			}
 
-			return nil, false
+			return "", nil, false
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{

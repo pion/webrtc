@@ -30,3 +30,9 @@ func (r *SCTPTransport) Transport() *DTLSTransport {
 		underlying: underlying,
 	}
 }
+
+// Metadata returns negotiated SCTP association metadata. The ok return value is
+// always false in the js/wasm build because browsers do not expose this metadata.
+func (r *SCTPTransport) Metadata() (SCTPTransportMetadata, bool) {
+	return SCTPTransportMetadata{}, false
+}

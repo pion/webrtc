@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -30,7 +31,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -358,6 +359,27 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	<-onTrackCalled
 	<-onICEConnectionStateChangeCalled
 	<-onDataChannelCalled
+	assert.NoError(t, pc.Close())
+}
+
+func TestPeerConnection_OnDataChannel_DefaultHandlerClosesChannel(t *testing.T) {
+	api := NewAPI()
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	dc := &DataChannel{api: api}
+	dc.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc) })
+	assert.Equal(t, DataChannelStateClosing, dc.ReadyState())
+
+	pc.OnDataChannel(nil)
+	dc2 := &DataChannel{api: api}
+	dc2.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc2) })
+	assert.Equal(t, DataChannelStateClosing, dc2.ReadyState())
+
 	assert.NoError(t, pc.Close())
 }
 
@@ -789,6 +811,19 @@ func TestPopulateLocalCandidates(t *testing.T) {
 	})
 }
 
+func configureMulticastDNS(s *SettingEngine) {
+	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	s.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+	s.SetIncludeLoopbackCandidate(true)
+	s.SetIPFilter(func(ip net.IP) bool {
+		return ip.IsLoopback() && ip.To4() != nil
+	})
+}
+
 // Assert that two agents that only generate mDNS candidates can connect.
 func TestMulticastDNSCandidates(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -798,20 +833,20 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&s)
 
 	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
-	assert.NoError(t, err)
-
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
 
 	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	defer onDataChannelCancel()
 	pcAnswer.OnDataChannel(func(*DataChannel) {
 		onDataChannelCancel()
 	})
-	<-onDataChannel.Done()
 
-	closePairNow(t, pcOffer, pcAnswer)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+	<-onDataChannel.Done()
 }
 
 func TestMulticastDNSHostNameConnection(t *testing.T) {
@@ -828,11 +863,11 @@ func TestMulticastDNSHostNameConnection(t *testing.T) {
 	}
 
 	offerSettingEngine := SettingEngine{}
-	offerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&offerSettingEngine)
 	offerSettingEngine.SetMulticastDNSHostName(offerHostName)
 
 	answerSettingEngine := SettingEngine{}
-	answerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&answerSettingEngine)
 	answerSettingEngine.SetMulticastDNSHostName(answerHostName)
 
 	pcOffer, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})

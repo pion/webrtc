@@ -19,6 +19,6 @@ on:
 
 jobs:
   release:
-    uses: pion/.goassets/.github/workflows/release.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/release.reusable.yml@main
     with:
       go-version: "1.25" # auto-update/latest-go-version

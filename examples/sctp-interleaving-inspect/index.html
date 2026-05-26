@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+  <!--
+    SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+    SPDX-License-Identifier: MIT
+  -->
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SCTP Interleaving Inspector</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        background: #f7f8fb;
+        color: #1d2430;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(320px, 420px) 1fr;
+        min-height: 100vh;
+      }
+      aside {
+        background: #ffffff;
+        border-right: 1px solid #d8dde8;
+        padding: 20px;
+      }
+      section {
+        padding: 20px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0 0 16px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 22px 0 10px;
+        text-transform: uppercase;
+        color: #526070;
+      }
+      button, input {
+        font: inherit;
+      }
+      button {
+        border: 1px solid #aeb7c6;
+        background: #ffffff;
+        color: #1d2430;
+        border-radius: 6px;
+        padding: 8px 11px;
+      }
+      button.primary {
+        background: #1664d9;
+        border-color: #1664d9;
+        color: #fff;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.67;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      label {
+        font-size: 13px;
+        color: #3d4652;
+      }
+      input {
+        min-width: 0;
+        border: 1px solid #b9c2d0;
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      .status-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid #d8dde8;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fbfcfe;
+      }
+      .status strong {
+        font-size: 13px;
+      }
+      .status span {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+      .metric {
+        display: grid;
+        gap: 4px;
+        border: 1px solid #d8dde8;
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fbfcfe;
+      }
+      .metric strong {
+        font-size: 13px;
+      }
+      .metric span {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: #3d4652;
+      }
+      .yes {
+        color: #087443;
+      }
+      .no {
+        color: #9a3412;
+      }
+      .unknown {
+        color: #6b7280;
+      }
+      .packets {
+        overflow: auto;
+        border: 1px solid #d8dde8;
+        border-radius: 6px;
+        background: #ffffff;
+        max-height: 52vh;
+      }
+      .packet-grid {
+        font-size: 13px;
+      }
+      .packet-header,
+      .packet-row {
+        display: grid;
+        grid-template-columns: 56px 96px 80px minmax(220px, 1fr);
+        align-items: start;
+      }
+      .packet-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f2f4f8;
+        color: #526070;
+        font-weight: 650;
+      }
+      .packet-row {
+        border-top: 1px solid #e6e9f0;
+      }
+      .packet-cell {
+        padding: 7px 8px;
+      }
+      .packet-meta {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+      #log {
+        border: 1px solid #d8dde8;
+        border-radius: 6px;
+        background: #0f1720;
+        color: #dce7f7;
+        padding: 10px;
+        min-height: 150px;
+        max-height: 32vh;
+        overflow: auto;
+      }
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid #d8dde8;
+        }
+        .packet-header,
+        .packet-row {
+          grid-template-columns: 44px 84px 70px minmax(160px, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <aside>
+        <h1>SCTP Interleaving Inspector</h1>
+        <div class="row">
+          <button id="connect" class="primary">Connect</button>
+          <button id="send" disabled>Send probe</button>
+          <button id="bulk" disabled>Send bulk</button>
+          <button id="pressure" disabled>Pressure test</button>
+        </div>
+
+        <div class="field">
+          <label for="message">Probe message</label>
+          <input id="message" value="hello over data channel">
+        </div>
+
+        <h2>Status</h2>
+        <div class="status-grid">
+          <div class="status"><strong>Connection</strong><span id="connection">idle</span></div>
+          <div class="status"><strong>github.com/pion/sctp</strong><span id="sctpVersion">loading</span></div>
+          <div class="status"><strong>Browser advertises I-DATA</strong><span id="rxAdvertised" class="unknown">unknown</span></div>
+          <div class="status"><strong>Pion advertises I-DATA</strong><span id="txAdvertised" class="unknown">unknown</span></div>
+          <div class="status"><strong>Browser sent I-DATA</strong><span id="rxIData" class="unknown">unknown</span></div>
+          <div class="status"><strong>Pion sent I-DATA</strong><span id="txIData" class="unknown">unknown</span></div>
+          <div class="status"><strong>Legacy DATA seen</strong><span id="legacyData" class="unknown">unknown</span></div>
+        </div>
+
+        <h2>Pressure</h2>
+        <div class="status-grid">
+          <div class="metric"><strong>Bulk payload</strong><span id="pressureBulk">idle</span></div>
+          <div class="metric"><strong>Control pings</strong><span id="pressurePings">idle</span></div>
+          <div class="metric"><strong>Latency</strong><span id="pressureLatency">idle</span></div>
+        </div>
+
+      </aside>
+
+      <section>
+        <h2>Plain SCTP packets</h2>
+        <div class="packets">
+          <div class="packet-grid">
+            <div class="packet-header">
+              <div class="packet-cell">#</div>
+              <div class="packet-cell">Direction</div>
+              <div class="packet-cell">Bytes</div>
+              <div class="packet-cell">Chunks</div>
+            </div>
+            <div id="packets"></div>
+          </div>
+        </div>
+
+        <h2>Log</h2>
+        <pre id="log"></pre>
+      </section>
+    </main>
+
+    <script>
+      let pc;
+      let control;
+      let bulk;
+      let probe;
+      let packetCount = 0;
+      let pressureRun = null;
+      const sessionID = crypto.randomUUID();
+      const state = {
+        rxAdvertised: "unknown",
+        txAdvertised: "unknown",
+        rxIData: "unknown",
+        txIData: "unknown",
+        legacyData: "unknown",
+      };
+
+      const eventSource = new EventSource(`/events?session=${encodeURIComponent(sessionID)}`);
+      eventSource.onmessage = event => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "packet") {
+          addPacket(msg);
+        } else {
+          log(`[${msg.kind}] ${msg.message}`);
+        }
+      };
+
+      fetch("/status")
+        .then(r => r.json())
+        .then(status => {
+      document.getElementById("sctpVersion").textContent = status.sctp;
+        });
+
+      document.getElementById("connect").onclick = () => connect();
+      document.getElementById("send").onclick = () => {
+        const msg = document.getElementById("message").value;
+        control.send(msg);
+        probe.send(new Uint8Array([1, 2, 3, 4, 5]));
+        log(`[browser] sent probe messages`);
+      };
+      document.getElementById("bulk").onclick = () => {
+        const payload = new Uint8Array(512 * 1024);
+        crypto.getRandomValues(payload.subarray(0, 65536));
+        bulk.send(payload);
+        control.send("bulk queued after binary payload");
+        log(`[browser] sent ${payload.byteLength} byte bulk payload`);
+      };
+      document.getElementById("pressure").onclick = () => runPressureTest();
+
+      async function connect() {
+        resetView();
+        document.getElementById("connect").disabled = true;
+
+        try {
+          pc = new RTCPeerConnection();
+          pc.onconnectionstatechange = () => {
+            document.getElementById("connection").textContent = pc.connectionState;
+            log(`[browser] connection ${pc.connectionState}`);
+          };
+          pc.oniceconnectionstatechange = () => log(`[browser] ICE ${pc.iceConnectionState}`);
+
+          control = pc.createDataChannel("control");
+          bulk = pc.createDataChannel("bulk");
+          bulk.binaryType = "arraybuffer";
+          probe = pc.createDataChannel("probe");
+          for (const channel of [control, bulk, probe]) {
+            channel.onopen = () => {
+              log(`[browser] ${channel.label} open`);
+              document.getElementById("send").disabled = false;
+              document.getElementById("bulk").disabled = false;
+              document.getElementById("pressure").disabled = false;
+            };
+            channel.onmessage = event => handleChannelMessage(channel, event);
+          }
+
+          await pc.setLocalDescription(await pc.createOffer());
+          await waitForIceGatheringComplete(pc);
+
+          const res = await fetch(`/offer?session=${encodeURIComponent(sessionID)}`, {
+            method: "POST",
+            headers: {"content-type": "application/sdp"},
+            body: pc.localDescription.sdp,
+          });
+          if (!res.ok) {
+            throw new Error(await res.text());
+          }
+
+          const answer = await res.text();
+          await pc.setRemoteDescription({type: "answer", sdp: answer});
+        } catch (err) {
+          log(`[error] ${err.message}`);
+          document.getElementById("connect").disabled = false;
+        }
+      }
+
+      function waitForIceGatheringComplete(peer) {
+        if (peer.iceGatheringState === "complete") {
+          return Promise.resolve();
+        }
+        return new Promise(resolve => {
+          peer.addEventListener("icegatheringstatechange", () => {
+            if (peer.iceGatheringState === "complete") {
+              resolve();
+            }
+          });
+        });
+      }
+
+      function addPacket(packet) {
+        packetCount += 1;
+        for (const chunk of packet.chunks) {
+          if (chunk.type === 1 || chunk.type === 2) {
+            if (packet.direction === "rx") state.rxAdvertised = chunk.interleavingAdvertised ? "yes" : "no";
+            if (packet.direction === "tx") state.txAdvertised = chunk.interleavingAdvertised ? "yes" : "no";
+          }
+          if ((chunk.type === 0 || chunk.type === 64) && packet.direction === "rx") {
+            state.rxIData = chunk.type === 64 ? "yes" : "no";
+          }
+          if ((chunk.type === 0 || chunk.type === 64) && packet.direction === "tx") {
+            state.txIData = chunk.type === 64 ? "yes" : "no";
+          }
+          if (chunk.type === 0) state.legacyData = "yes";
+          if (chunk.type === 64 && state.legacyData === "unknown") state.legacyData = "no";
+        }
+        renderState();
+
+        const row = document.createElement("div");
+        row.className = "packet-row";
+        const chunks = packet.chunks.map(chunk => {
+          const suffix = chunk.interleavingAdvertised ? " advertises I-DATA" : "";
+          return `${chunk.name}(${chunk.type})${suffix}`;
+        }).join(", ");
+        row.innerHTML = `
+          <div class="packet-cell packet-meta">${packetCount}</div>
+          <div class="packet-cell packet-meta">${packet.direction}</div>
+          <div class="packet-cell packet-meta">${packet.size}</div>
+          <div class="packet-cell"><pre>${chunks}</pre></div>
+        `;
+        const packets = document.getElementById("packets");
+        packets.prepend(row);
+        while (packets.children.length > 600) {
+          packets.lastElementChild.remove();
+        }
+      }
+
+      function handleChannelMessage(channel, event) {
+        if (channel === control && typeof event.data === "string" && event.data.startsWith("server-pressure:")) {
+          recordServerPressureProbe(event.data);
+          return;
+        }
+        if (channel === bulk && pressureRun && event.data instanceof ArrayBuffer) {
+          pressureRun.bulkDone = true;
+          pressureRun.bulkBytes = event.data.byteLength;
+          setMetric("pressureBulk", `bulk complete: ${formatBytes(event.data.byteLength)}`);
+          setTimeout(() => finishPressureTest(), 1000);
+          return;
+        }
+        log(`[pion:${channel.label}] ${event.data}`);
+      }
+
+      async function runPressureTest() {
+        if (!control || !bulk || control.readyState !== "open" || bulk.readyState !== "open") {
+          log("[pressure] channels are not open");
+          return;
+        }
+
+        const button = document.getElementById("pressure");
+        button.disabled = true;
+        const runID = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        pressureRun = {
+          id: runID,
+          received: 0,
+          beforeBulk: 0,
+          afterBulk: 0,
+          bulkDone: false,
+          bulkBytes: 0,
+          startedAt: performance.now(),
+          timeout: null,
+        };
+
+        setMetric("pressureBulk", "starting server-to-browser bulk transfer");
+        setMetric("pressurePings", "0 before bulk, 0 after bulk");
+        setMetric("pressureLatency", "waiting for server probes");
+
+        const response = await fetch(
+          `/server-pressure?session=${encodeURIComponent(sessionID)}&run=${encodeURIComponent(runID)}`,
+          {method: "POST"}
+        );
+        if (!response.ok) {
+          setMetric("pressureBulk", await response.text());
+          button.disabled = false;
+          pressureRun = null;
+          return;
+        }
+
+        log("[pressure] server is sending one throttled 2 MiB bulk message and control probes");
+        pressureRun.timeout = setTimeout(() => {
+          if (pressureRun && pressureRun.id === runID) {
+            finishPressureTest();
+          }
+        }, 30000);
+      }
+
+      function recordServerPressureProbe(message) {
+        const parts = message.split(":");
+        if (!pressureRun || parts.length !== 3 || parts[1] !== pressureRun.id) {
+          log(`[pion:control] ${message}`);
+          return;
+        }
+
+        pressureRun.received += 1;
+        if (pressureRun.bulkDone) {
+          pressureRun.afterBulk += 1;
+        } else {
+          pressureRun.beforeBulk += 1;
+        }
+        setMetric("pressurePings", `${pressureRun.beforeBulk} before bulk, ${pressureRun.afterBulk} after bulk`);
+        renderPressureLatency();
+      }
+
+      function finishPressureTest() {
+        if (!pressureRun) {
+          return;
+        }
+        if (pressureRun.timeout) {
+          clearTimeout(pressureRun.timeout);
+        }
+        renderPressureLatency();
+        const elapsed = ((performance.now() - pressureRun.startedAt) / 1000).toFixed(1);
+        const result = pressureRun.beforeBulk > 0
+          ? `control survived: ${pressureRun.beforeBulk} probes arrived before bulk completed (${elapsed}s)`
+          : `control blocked: no probes arrived before bulk completed or timeout (${elapsed}s)`;
+        setMetric("pressureBulk", result);
+        document.getElementById("pressure").disabled = false;
+        pressureRun = null;
+      }
+
+      function renderPressureLatency() {
+        if (!pressureRun || pressureRun.received === 0) {
+          setMetric("pressureLatency", "waiting");
+          return;
+        }
+        const elapsed = ((performance.now() - pressureRun.startedAt) / 1000).toFixed(1);
+        setMetric("pressureLatency", `${pressureRun.received} probes in ${elapsed}s`);
+      }
+
+      function setMetric(id, value) {
+        document.getElementById(id).textContent = value;
+      }
+
+      function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      function formatBytes(value) {
+        if (value >= 1024 * 1024) {
+          return `${(value / 1024 / 1024).toFixed(1)} MiB`;
+        }
+        if (value >= 1024) {
+          return `${(value / 1024).toFixed(1)} KiB`;
+        }
+        return `${value} B`;
+      }
+
+      function renderState() {
+        setTriState("rxAdvertised", state.rxAdvertised);
+        setTriState("txAdvertised", state.txAdvertised);
+        setTriState("rxIData", state.rxIData);
+        setTriState("txIData", state.txIData);
+        setTriState("legacyData", state.legacyData);
+      }
+
+      function setTriState(id, value) {
+        const el = document.getElementById(id);
+        el.textContent = value;
+        el.className = value;
+      }
+
+      function resetView() {
+        packetCount = 0;
+        Object.keys(state).forEach(key => state[key] = "unknown");
+        renderState();
+        document.getElementById("packets").textContent = "";
+        document.getElementById("log").textContent = "";
+        document.getElementById("connect").disabled = false;
+        document.getElementById("send").disabled = true;
+        document.getElementById("bulk").disabled = true;
+        document.getElementById("pressure").disabled = true;
+        pressureRun = null;
+        setMetric("pressureBulk", "idle");
+        setMetric("pressurePings", "idle");
+        setMetric("pressureLatency", "idle");
+      }
+
+      function log(message) {
+        const logEl = document.getElementById("log");
+        logEl.textContent += `${message}\n`;
+        // dont scroll if the log is not at the bottom :)
+        if (logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight) {
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      }
+    </script>
+  </body>
+</html>

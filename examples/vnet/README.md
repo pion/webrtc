@@ -2,7 +2,7 @@
 vnet is the virtual network layer for Pion. This allows developers to simulate issues that cause issues
 with production WebRTC deployments.
 
-See the full documentation for vnet [here](https://github.com/pion/transport/tree/master/vnet#vnet)
+See the full documentation for vnet [here](https://github.com/pion/transport/tree/main/vnet#vnet)
 
 ## What can vnet do
 * Simulate different network topologies. Assert when a STUN/TURN server is actually needed.

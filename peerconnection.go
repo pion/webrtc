@@ -140,6 +140,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
+	pc.onDataChannelHandler = pc.defaultOnDataChannelHandler
 	pc.ops = newOperations(pc.updateNegotiationNeededFlagOnEmptyChain, pc.onNegotiationNeeded)
 
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
@@ -296,10 +297,27 @@ func (pc *PeerConnection) onSignalingStateChange(newState SignalingState) {
 
 // OnDataChannel sets an event handler which is invoked when a data
 // channel message arrives from a remote peer.
+// When handler is nil, the default handler will be used which closes
+// the incoming data channel immediately.
 func (pc *PeerConnection) OnDataChannel(f func(*DataChannel)) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
+	if f == nil {
+		pc.onDataChannelHandler = pc.defaultOnDataChannelHandler
+
+		return
+	}
 	pc.onDataChannelHandler = f
+}
+
+func (pc *PeerConnection) defaultOnDataChannelHandler(d *DataChannel) {
+	if d == nil {
+		return
+	}
+
+	if err := d.Close(); err != nil {
+		pc.log.Warnf("Failed to close undeclared DataChannel: %v", err)
+	}
 }
 
 // OnNegotiationNeeded sets an event handler which is invoked when

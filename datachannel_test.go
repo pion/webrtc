@@ -6,6 +6,7 @@ package webrtc
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -80,45 +81,104 @@ func BenchmarkDataChannelSend16(b *testing.B) { benchmarkDataChannelSend(b, 16) 
 func BenchmarkDataChannelSend32(b *testing.B) { benchmarkDataChannelSend(b, 32) }
 
 // See https://github.com/pion/webrtc/issues/1516
-func benchmarkDataChannelSend(b *testing.B, numChannels int) {
+func benchmarkDataChannelSend(b *testing.B, numChannels int) { //nolint:cyclop
 	b.Helper()
 
 	offerPC, answerPC, err := newPair()
 	if err != nil {
 		b.Fatalf("Failed to create a PC pair for testing")
 	}
+	defer closePairNow(b, offerPC, answerPC)
 
-	open := make(map[string]chan bool)
+	type openSignal struct {
+		local  chan struct{}
+		remote chan struct{}
+	}
+
+	open := make(map[string]openSignal, numChannels)
 	answerPC.OnDataChannel(func(d *DataChannel) {
-		if _, ok := open[d.Label()]; !ok {
+		signal, ok := open[d.Label()]
+		if !ok {
 			// Ignore anything unknown channel label.
 			return
 		}
-		d.OnOpen(func() { open[d.Label()] <- true })
+		d.OnOpen(func() { close(signal.remote) })
 	})
 
-	var wg sync.WaitGroup
+	dataChannels := make([]*DataChannel, 0, numChannels)
 	for i := range numChannels {
 		label := fmt.Sprintf("dc-%d", i)
-		open[label] = make(chan bool)
-		wg.Add(1)
-		dc, err := offerPC.CreateDataChannel(label, nil)
-		assert.NoError(b, err)
+		signal := openSignal{
+			local:  make(chan struct{}),
+			remote: make(chan struct{}),
+		}
+		open[label] = signal
 
-		dc.OnOpen(func() {
-			<-open[label]
-			for n := 0; n < b.N/numChannels; n++ {
-				if err := dc.SendText("Ping"); err != nil {
-					b.Fatalf("Unexpected error sending data (label=%q): %v", label, err)
-				}
-			}
-			wg.Done()
-		})
+		var dc *DataChannel
+		dc, err = offerPC.CreateDataChannel(label, nil)
+		if err != nil {
+			b.Fatalf("Failed to create data channel %q: %v", label, err)
+		}
+
+		dc.OnOpen(func() { close(signal.local) })
+		dataChannels = append(dataChannels, dc)
 	}
 
-	assert.NoError(b, signalPair(offerPC, answerPC))
+	err = signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true))
+	if err != nil {
+		b.Fatalf("Failed to signal PeerConnection pair: %v", err)
+	}
+
+	for label, signal := range open {
+		waitForBenchmarkDataChannelOpen(b, label, "local", signal.local)
+		waitForBenchmarkDataChannelOpen(b, label, "remote", signal.remote)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	errCh := make(chan error, numChannels)
+	var wg sync.WaitGroup
+	wg.Add(len(dataChannels))
+	for _, dc := range dataChannels {
+		go func(dc *DataChannel) {
+			defer wg.Done()
+
+			for n := 0; n < b.N/numChannels; n++ {
+				if dc.ReadyState() != DataChannelStateOpen {
+					return
+				}
+
+				if err := dc.SendText("Ping"); err != nil {
+					if dc.ReadyState() != DataChannelStateOpen ||
+						strings.Contains(err.Error(), "non-established state") {
+						return
+					}
+
+					errCh <- fmt.Errorf("unexpected error sending data (label=%q): %w", dc.Label(), err)
+
+					return
+				}
+			}
+		}(dc)
+	}
 	wg.Wait()
-	closePairNow(b, offerPC, answerPC)
+	b.StopTimer()
+	close(errCh)
+
+	for err := range errCh {
+		b.Error(err)
+	}
+}
+
+func waitForBenchmarkDataChannelOpen(b *testing.B, label, side string, open <-chan struct{}) {
+	b.Helper()
+
+	select {
+	case <-open:
+	case <-time.After(10 * time.Second):
+		b.Fatalf("Timed out waiting for %s data channel %q to open", side, label)
+	}
 }
 
 func TestDataChannel_Open(t *testing.T) {

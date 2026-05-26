@@ -18,6 +18,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "SCTP Interleaving Inspector",
+		"link": "sctp-interleaving",
+		"description": "The sctp-interleaving example inspects plaintext SCTP packets between DTLS and SCTP so you can see whether I-DATA interleaving was advertised and observed.",
+		"type": "browser"
+	},
+	{
 		"title": "Reflect",
 		"link": "reflect",
 		"description": "The reflect example demonstrates how to have Pion send back to the user exactly what it receives using the same PeerConnection.",

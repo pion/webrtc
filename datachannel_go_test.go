@@ -64,6 +64,31 @@ func TestDataChannel_EventHandlers(t *testing.T) {
 	<-onMessageCalled
 }
 
+func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
+	dc := &DataChannel{}
+	dc.setReadyState(DataChannelStateClosed)
+
+	called := atomic.Int32{}
+	done := make(chan struct{})
+
+	dc.OnClose(func() {
+		if called.Add(1) == 1 {
+			close(done)
+		}
+	})
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		assert.Fail(t, "OnClose did not fire immediately for closed DataChannel")
+	}
+
+	// Simulate additional close signaling and verify nonce prevents duplicate calls.
+	dc.onClose()
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(1), called.Load())
+}
+
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
@@ -612,6 +637,10 @@ func TestDataChannel_Dial(t *testing.T) {
 
 		offerPC, answerPC, err := newPair()
 		assert.NoError(t, err)
+
+		// Accept incoming data channels without closing them; without this the
+		// default handler would close the channel before the offer side opens it.
+		answerPC.OnDataChannel(func(_ *DataChannel) {})
 
 		d, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		assert.NoError(t, err)
