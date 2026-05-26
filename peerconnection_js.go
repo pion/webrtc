@@ -402,11 +402,13 @@ func (pc *PeerConnection) Close() (err error) {
 
 	// Release any handlers as required by the syscall/js API.
 	// Null out each JS property before Release() to prevent "call to released
-	// function" panics.
-	//
-	// Keep terminal state handlers installed here because close() transitions
-	// happen asynchronously and applications may still expect final state-change
-	// notifications after Close() returns.
+	// function": close() queues browser events (e.g. iceconnectionstatechange)
+	// that fire asynchronously; if Release() runs first, those callbacks call a
+	// Go FuncOf that is no longer in funcs[].
+	if pc.onSignalingStateChangeHandler != nil {
+		pc.underlying.Set("onsignalingstatechange", js.Null())
+		pc.onSignalingStateChangeHandler.Release()
+	}
 	if pc.onDataChannelHandler != nil {
 		pc.underlying.Set("ondatachannel", js.Null())
 		pc.onDataChannelHandler.Release()
@@ -414,6 +416,14 @@ func (pc *PeerConnection) Close() (err error) {
 	if pc.onNegotiationNeededHandler != nil {
 		pc.underlying.Set("onnegotiationneeded", js.Null())
 		pc.onNegotiationNeededHandler.Release()
+	}
+	if pc.onConnectionStateChangeHandler != nil {
+		pc.underlying.Set("onconnectionstatechange", js.Null())
+		pc.onConnectionStateChangeHandler.Release()
+	}
+	if pc.onICEConnectionStateChangeHandler != nil {
+		pc.underlying.Set("oniceconnectionstatechange", js.Null())
+		pc.onICEConnectionStateChangeHandler.Release()
 	}
 	if pc.onICECandidateHandler != nil {
 		pc.underlying.Set("onicecandidate", js.Null())
