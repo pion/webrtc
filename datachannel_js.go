@@ -180,32 +180,22 @@ func (d *DataChannel) Close() (err error) {
 	d.underlying.Call("close")
 
 	// Release any handlers as required by the syscall/js API.
-	// Null out each JS property before Release() to prevent "call to released
-	// function": close() queues browser events (e.g. close, closing) that fire
-	// asynchronously; if Release() runs first, those callbacks call a Go FuncOf
-	// that is no longer in funcs[].
 	if d.onOpenHandler != nil {
-		d.underlying.Set("onopen", js.Null())
 		d.onOpenHandler.Release()
 	}
 	if d.onCloseHandler != nil {
-		d.underlying.Set("onclose", js.Null())
 		d.onCloseHandler.Release()
 	}
 	if d.onClosingHandler != nil {
-		d.underlying.Set("onclosing", js.Null())
 		d.onClosingHandler.Release()
 	}
 	if d.onMessageHandler != nil {
-		d.underlying.Set("onmessage", js.Null())
 		d.onMessageHandler.Release()
 	}
 	if d.onBufferedAmountLow != nil {
-		d.underlying.Set("onbufferedamountlow", js.Null())
 		d.onBufferedAmountLow.Release()
 	}
 	if d.onErrorHandler != nil {
-		d.underlying.Set("onerror", js.Null())
 		d.onErrorHandler.Release()
 	}
 
