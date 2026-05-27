@@ -32,6 +32,10 @@ type DataChannel struct {
 	onBufferedAmountLow *js.Func
 	onErrorHandler      *js.Func
 
+	// onCloseFunc retains the user-provided OnClose callback so it can still be
+	// invoked from a self-releasing wrapper installed by Close().
+	onCloseFunc func()
+
 	// A reference to the associated api object used by this datachannel
 	api *API
 }
@@ -63,6 +67,7 @@ func (d *DataChannel) OnClose(f func()) {
 		oldHandler := d.onCloseHandler
 		defer oldHandler.Release()
 	}
+	d.onCloseFunc = f
 	onCloseHandler := js.FuncOf(func(this js.Value, args []js.Value) any {
 		go f()
 		return js.Undefined()
@@ -177,31 +182,59 @@ func (d *DataChannel) Close() (err error) {
 		}
 	}()
 
-	d.underlying.Call("close")
-
-	// Release any handlers as required by the syscall/js API.
+	// Nullify and release handlers that should not fire after Close is called.
 	if d.onOpenHandler != nil {
 		d.underlying.Set("onopen", js.Null())
 		d.onOpenHandler.Release()
-	}
-	if d.onCloseHandler != nil {
-		d.onCloseHandler.Release()
+		d.onOpenHandler = nil
 	}
 	if d.onClosingHandler != nil {
 		d.underlying.Set("onclosing", js.Null())
 		d.onClosingHandler.Release()
+		d.onClosingHandler = nil
 	}
 	if d.onMessageHandler != nil {
 		d.underlying.Set("onmessage", js.Null())
 		d.onMessageHandler.Release()
+		d.onMessageHandler = nil
 	}
 	if d.onBufferedAmountLow != nil {
 		d.underlying.Set("onbufferedamountlow", js.Null())
 		d.onBufferedAmountLow.Release()
+		d.onBufferedAmountLow = nil
 	}
-	if d.onErrorHandler != nil {
-		d.onErrorHandler.Release()
+
+	// Defer nullifying onclose and onerror until the channel has fully closed.
+	// An error event may still fire during the close handshake (between calling
+	// close() and the onclose event), and the user-provided OnClose callback
+	// must still be invoked. The wrapper installed below fires the user's
+	// OnClose callback (if any) and then nullifies/releases both onclose and
+	// onerror on the underlying JS object.
+	oldCloseHandler := d.onCloseHandler
+	oldErrorHandler := d.onErrorHandler
+	closeFunc := d.onCloseFunc
+	var wrapperHandler js.Func
+	wrapperHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
+		if closeFunc != nil {
+			go closeFunc()
+		}
+		d.underlying.Set("onclose", js.Null())
+		wrapperHandler.Release()
+		if oldErrorHandler != nil {
+			d.underlying.Set("onerror", js.Null())
+			oldErrorHandler.Release()
+		}
+		return js.Undefined()
+	})
+	d.underlying.Set("onclose", wrapperHandler)
+	if oldCloseHandler != nil {
+		oldCloseHandler.Release()
 	}
+	d.onCloseHandler = nil
+	d.onCloseFunc = nil
+	d.onErrorHandler = nil
+
+	d.underlying.Call("close")
 
 	return nil
 }
