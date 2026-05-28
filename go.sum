@@ -67,8 +67,8 @@ github.com/pion/transport/v3 v3.1.1 h1:Tr684+fnnKlhPceU+ICdrw6KKkTms+5qHMgw6bIkY
 github.com/pion/transport/v3 v3.1.1/go.mod h1:+c2eewC5WJQHiAA46fkMMzoYZSuGzA/7E2FPrOYHctQ=
 github.com/pion/transport/v4 v4.0.2 h1:ifYlPqNwsy6aKQ9y8yzxXlHae5431ZrH2avkD/Rn6Tk=
 github.com/pion/transport/v4 v4.0.2/go.mod h1:06hFI+jCFcok2X2MekVufNZ/uzNZXivGBPfviSVcjgM=
-github.com/pion/turn/v5 v5.0.4 h1:xKAnP1b5eCnjFPd55OgxkqIVoyzbHKZa06SxZ3fopXQ=
-github.com/pion/turn/v5 v5.0.4/go.mod h1:zbPsMp+fIVhKt5uWu2jcjk88FcoRbGMBSzVsaTuhcmM=
+github.com/pion/turn/v5 v5.0.5 h1:ltXDpINXyBNWEjNAuksr8GTD7ACJ+2f3BX24V7kAmtQ=
+github.com/pion/turn/v5 v5.0.5/go.mod h1:zbPsMp+fIVhKt5uWu2jcjk88FcoRbGMBSzVsaTuhcmM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sclevine/agouti v3.0.0+incompatible h1:8IBJS6PWz3uTlMP3YBIR5f+KAldcGuOeFkFbUWfBgK4=
