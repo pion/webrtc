@@ -36,6 +36,10 @@ type DataChannel struct {
 	// invoked from a self-releasing wrapper installed by Close().
 	onCloseFunc func()
 
+	// closeWrapperInstalled guards the self-releasing onclose wrapper in Close()
+	// so repeated Close calls don't override the first wrapper before it fires.
+	closeWrapperInstalled bool
+
 	// A reference to the associated api object used by this datachannel
 	api *API
 }
@@ -207,28 +211,32 @@ func (d *DataChannel) Close() (err error) {
 	// Defer nullifying onclose and onerror until the channel has fully closed.
 	// An error event may still fire during the close handshake (between calling
 	// close() and the onclose event), and the user-provided OnClose callback
-	// must still be invoked. The wrapper installed below fires the user's
-	// OnClose callback (if any) and then nullifies/releases both onclose and
-	// onerror on the underlying JS object.
-	oldCloseHandler := d.onCloseHandler
-	oldErrorHandler := d.onErrorHandler
-	closeFunc := d.onCloseFunc
-	var wrapperHandler js.Func
-	wrapperHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
-		if closeFunc != nil {
-			go closeFunc()
+	// must still be invoked. Install the wrapper only once so repeated Close()
+	// calls don't override the original wrapper before it fires.
+	if !d.closeWrapperInstalled {
+		oldCloseHandler := d.onCloseHandler
+		oldErrorHandler := d.onErrorHandler
+		closeFunc := d.onCloseFunc
+
+		var wrapperHandler js.Func
+		wrapperHandler = js.FuncOf(func(this js.Value, args []js.Value) any {
+			if closeFunc != nil {
+				go closeFunc()
+			}
+			d.underlying.Set("onclose", js.Null())
+			wrapperHandler.Release()
+			if oldErrorHandler != nil {
+				d.underlying.Set("onerror", js.Null())
+				oldErrorHandler.Release()
+			}
+			d.closeWrapperInstalled = false
+			return js.Undefined()
+		})
+		d.underlying.Set("onclose", wrapperHandler)
+		d.closeWrapperInstalled = true
+		if oldCloseHandler != nil {
+			oldCloseHandler.Release()
 		}
-		d.underlying.Set("onclose", js.Null())
-		wrapperHandler.Release()
-		if oldErrorHandler != nil {
-			d.underlying.Set("onerror", js.Null())
-			oldErrorHandler.Release()
-		}
-		return js.Undefined()
-	})
-	d.underlying.Set("onclose", wrapperHandler)
-	if oldCloseHandler != nil {
-		oldCloseHandler.Release()
 	}
 	d.onCloseHandler = nil
 	d.onCloseFunc = nil
