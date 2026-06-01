@@ -774,7 +774,7 @@ func TestDefaults(t *testing.T) {
 	} {
 		t.Run(ca.mimeType, func(t *testing.T) {
 			assert.Equal(t, ca.clockRate, defaultClockRate(ca.mimeType))
-			assert.Equal(t, ca.channels, defaultChannels(ca.mimeType))
+			assert.Equal(t, ca.channels, DefaultChannels(ca.mimeType))
 		})
 	}
 }

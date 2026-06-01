@@ -19,6 +19,7 @@ import (
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v5/internal/fmtp"
 )
 
 // trackDetails represents any media source that can be represented in a SDP
@@ -1064,6 +1065,8 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 		val, err := strconv.ParseUint(codec.EncodingParameters, 10, 16)
 		if err == nil {
 			channels = uint16(val)
+		} else if codec.EncodingParameters == "" {
+			channels = fmtp.DefaultChannels(mediaDescr.MediaName.Media + "/" + codec.Name)
 		}
 
 		feedback := []RTCPFeedback{}
