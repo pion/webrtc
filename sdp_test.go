@@ -1245,12 +1245,29 @@ func TestGetRIDs(t *testing.T) {
 }
 
 func TestCodecsFromMediaDescription(t *testing.T) {
-	t.Run("Codec Only", func(t *testing.T) {
-		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{MediaName: sdp.MediaName{Media: "audio", Formats: []string{"111"}}, Attributes: []sdp.Attribute{{Key: "rtpmap", Value: "111 opus/48000/2"}}})
+	for _, testCase := range []struct {
+		media, rtpmap string
+		channels      uint16
+	}{
+		{"audio", "opus/48000/2", 2},
+		{"audio", "G722/8000", 1},
+		{"audio", "OpUs/48000", 2},
+		{"audio", "L16/44100/2", 2},
+		{"video", "VP8/90000", 0},
+		{"audio", "G722/8000/0", 0},
+		{"audio", "G722/8000/invalid", 0},
+	} {
+		t.Run(testCase.rtpmap, func(t *testing.T) {
+			codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
+				MediaName:  sdp.MediaName{Media: testCase.media, Formats: []string{"111"}},
+				Attributes: []sdp.Attribute{{Key: "rtpmap", Value: "111 " + testCase.rtpmap}},
+			})
 
-		assert.Equal(t, codecs, []RTPCodecParameters{{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "", []RTCPFeedback{}}, PayloadType: 111}})
-		assert.NoError(t, err)
-	})
+			require.NoError(t, err)
+			require.Len(t, codecs, 1)
+			assert.Equal(t, testCase.channels, codecs[0].Channels)
+		})
+	}
 
 	t.Run("Codec with fmtp/rtcp-fb", func(t *testing.T) {
 		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
