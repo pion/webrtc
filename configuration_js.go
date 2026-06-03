@@ -41,5 +41,9 @@ type Configuration struct {
 	// to always negotiate data channels in the initial SDP offer.
 	AlwaysNegotiateDataChannels bool
 
+	// RTPHeaderEncryptionPolicy affects whether RTP header extension encryption
+	// (RFC 9335 Cryptex) is negotiated.
+	RTPHeaderEncryptionPolicy RTPHeaderEncryptionPolicy
+
 	Certificates []Certificate `json:"certificates,omitempty"`
 }
