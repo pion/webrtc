@@ -3093,6 +3093,9 @@ func (pc *PeerConnection) generateMatchedSDP(
 			if detectedPlanB {
 				mediaSections = append(mediaSections, mediaSection{id: "data", data: true})
 			} else {
+				if localSctpInit == nil && pc.api.settingEngine.sctp.enableSnap {
+					localSctpInit = pc.sctpTransport.GetSctpInit()
+				}
 				mediaSections = append(mediaSections, mediaSection{
 					id:       strconv.Itoa(len(mediaSections)),
 					data:     true,
