@@ -2747,3 +2747,67 @@ func TestSctpSnap(t *testing.T) {
 
 	closePairNow(t, offer, answer)
 }
+
+func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.EnableSctpSnap(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offerPC, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPC, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	// Round 1: media only, no data channel, so this negotiation carries no
+	// sctp-init at all.
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
+	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	connected.Wait()
+
+	// Round 2: add a data channel and renegotiate.
+	dataChannel, err := offerPC.CreateDataChannel("snap", nil)
+	assert.NoError(t, err)
+	opened := make(chan struct{})
+	dataChannel.OnOpen(func() { close(opened) })
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+	// The offer introducing the data section must advertise sctp-init even though
+	// the previous remote description had no data section to copy it from.
+	assert.Contains(t, offer.SDP, "a=sctp-init:", "renegotiation offer adding a data channel must advertise sctp-init")
+
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+	// The answer responds with its own sctp-init, completing the SNAP exchange.
+	assert.Contains(t, answer.SDP, "a=sctp-init:", "answer to a SNAP offer must advertise sctp-init")
+
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	// SNAP having engaged on both sides, the channel must come up end to end.
+	select {
+	case <-opened:
+	case <-time.After(time.Second * 10):
+		assert.Fail(t, "data channel added during renegotiation never opened")
+	}
+
+	closePairNow(t, offerPC, answerPC)
+}
