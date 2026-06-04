@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -967,4 +968,36 @@ func TestICETrickleCapabilityString(t *testing.T) {
 	for _, tt := range tests {
 		assert.Equal(t, tt.expected, tt.value.String())
 	}
+}
+
+func TestPeerConnection_AddICECandidateUpdatesRemoteDescription(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+
+	_, err = pc.CreateDataChannel("test-channel", nil)
+	assert.NoError(t, err)
+
+	offer, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, pc.SetRemoteDescription(offer))
+
+	candidateStr := "candidate:1 1 udp 1 1.2.3.4 1234 typ relay raddr 0.0.0.0 rport 0"
+	index := uint16(0)
+	assert.NoError(t, pc.AddICECandidate(ICECandidateInit{
+		Candidate:     candidateStr,
+		SDPMLineIndex: &index,
+	}))
+
+	remoteSDP := pc.RemoteDescription().SDP
+	assert.Contains(t, remoteSDP, candidateStr)
+
+	candidateIndex := strings.Index(remoteSDP, candidateStr)
+	dataChannelIndex := strings.Index(remoteSDP, "m=application")
+	assert.True(t, candidateIndex < dataChannelIndex, "Candidate should appear before the data channel m-line")
+
+	assert.NoError(t, pc.Close())
 }
