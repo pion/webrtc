@@ -174,6 +174,12 @@ func (t *ICETransport) StartContext(
 	// Reacquire the lock to set the connection/mux
 	t.lock.Lock()
 	if err != nil {
+		if ctx.Err() != nil {
+			t.lock.Unlock()
+			_ = t.Stop()
+			t.lock.Lock()
+		}
+
 		return err
 	}
 
