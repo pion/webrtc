@@ -467,8 +467,6 @@ func (d *DataChannel) SendText(s string) error {
 }
 
 func (d *DataChannel) ensureOpen() error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	if d.ReadyState() != DataChannelStateOpen {
 		return io.ErrClosedPipe
 	}
