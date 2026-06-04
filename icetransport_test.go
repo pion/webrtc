@@ -39,7 +39,7 @@ func TestICETransport_StartContextClosesOnCancel(t *testing.T) {
 
 	controlling := ICERoleControlling
 	err = transport.StartContext(ctx, nil, params, &controlling)
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, ICEGathererStateClosed, gatherer.State())
 	assert.Nil(t, gatherer.getAgent())
 }
