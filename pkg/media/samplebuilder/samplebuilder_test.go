@@ -666,7 +666,7 @@ func TestSampleBuilder_FlushResetsState(t *testing.T) {
 	})
 
 	samples := []*media.Sample{}
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if sample := fd.Pop(); sample != nil {
 			samples = append(samples, sample)
 		}
