@@ -318,9 +318,16 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	}
 	samples := afterTimestamp - sampleTimestamp
 
+	var duration time.Duration
+	if s.sampleRate == 0 {
+		duration = 0
+	} else {
+		duration = time.Duration(samples) * time.Second / time.Duration(s.sampleRate)
+	}
+
 	sample := &media.Sample{
 		Data:               data,
-		Duration:           time.Duration(samples) * time.Second / time.Duration(s.sampleRate),
+		Duration:           duration,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
 		Metadata:           metadata,

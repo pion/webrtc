@@ -826,6 +826,11 @@ func BenchmarkSampleBuilderFragmented(b *testing.B) {
 	}
 }
 
+func TestNewZeroSampleRate(t *testing.T) {
+	sb := New(50, &fakeDepacketizer{}, 0)
+	assert.NotNil(t, sb)
+}
+
 func BenchmarkSampleBuilderFragmentedLoss(b *testing.B) {
 	fd := New(100, &fakeDepacketizer{}, 1)
 	b.ResetTimer()
