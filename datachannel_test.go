@@ -14,6 +14,7 @@ import (
 
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // expectedLabel represents the label of the data channel we are trying to test.
@@ -275,6 +276,53 @@ func TestDataChannel_Open(t *testing.T) {
 		assert.Len(t, answerOpenCalls, 1)
 		assert.Len(t, offerOpenCalls, 1)
 	})
+}
+
+func TestDataChannel_BundleOnlyPortZero(t *testing.T) {
+	offerPC, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, offerPC.Close()) }()
+
+	answerPC, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, answerPC.Close()) }()
+
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	dataChannel, err := offerPC.CreateDataChannel(expectedLabel, nil)
+	require.NoError(t, err)
+	answerPC.OnDataChannel(func(*DataChannel) {})
+
+	offer, err := offerPC.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
+	require.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	const applicationMLine = "m=application 9 UDP/DTLS/SCTP webrtc-datachannel"
+	require.Contains(t, offerPC.LocalDescription().SDP, applicationMLine)
+	bundleOnlyOfferSDP := strings.Replace(
+		offerPC.LocalDescription().SDP,
+		applicationMLine,
+		"m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only",
+		1,
+	)
+	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  bundleOnlyOfferSDP,
+	}))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
+	require.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	require.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	require.Eventually(t, func() bool {
+		return dataChannel.ReadyState() == DataChannelStateOpen
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 func TestDataChannel_Send(t *testing.T) { //nolint:cyclop

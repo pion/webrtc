@@ -2841,9 +2841,12 @@ func (pc *PeerConnection) startRTP(
 	}
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
-	if d := haveDataChannel(remoteDesc); d != nil && d.MediaName.Port.Value != 0 {
-		remoteSctpInit, _ := getSctpInit(d)
-		pc.startSCTP(getMaxMessageSize(d), remoteSctpInit)
+	if d := haveDataChannel(remoteDesc); d != nil {
+		// RFC 8843 Section 6 permits bundle-only media sections to use port zero.
+		if _, bundleOnly := d.Attribute("bundle-only"); d.MediaName.Port.Value != 0 || bundleOnly {
+			remoteSctpInit, _ := getSctpInit(d)
+			pc.startSCTP(getMaxMessageSize(d), remoteSctpInit)
+		}
 	}
 }
 
