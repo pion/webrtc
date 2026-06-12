@@ -13,6 +13,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -319,7 +320,16 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 		return t.failStart(err)
 	}
 
+	// Configure ICE for SPED after we created the DTLS transport.
+	if t.api.settingEngine.enableSped {
+		t.iceTransport.SetDtlsCallback(func(packet []byte, rAddr net.Addr) {
+			dtlsConn.InjectInboundPacket(packet, rAddr)
+		})
+	}
+
+	// This awaits the DTLS handshake.
 	if err = t.handshakeDTLS(dtlsConn); err != nil {
+		fmt.Println("DTLS handshake complete")
 		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsConn.Close()
 
@@ -368,7 +378,8 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 		dtls.WithCertificates(certificate),
 		dtls.WithSRTPProtectionProfiles(t.srtpProtectionProfiles()...),
 		dtls.WithExtendedMasterSecret(t.api.settingEngine.dtls.extendedMasterSecret),
-		dtls.WithInsecureSkipVerify(!t.api.settingEngine.dtls.disableInsecureSkipVerify),
+		// TODO: this should be the default, DTLS runs over ICE which *hopefully* checks the source.
+		dtls.WithInsecureSkipVerify(true),
 		dtls.WithLoggerFactory(t.api.settingEngine.LoggerFactory),
 		dtls.WithVerifyPeerCertificate(t.verifyPeerCertificateFunc()),
 	}
@@ -380,10 +391,25 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 		)
 	}
 
+	// TODO: should this initially be set to one day for SPED?
 	if t.api.settingEngine.dtls.retransmissionInterval > 0 {
 		sharedOpts = append(
 			sharedOpts,
 			dtls.WithFlightInterval(t.api.settingEngine.dtls.retransmissionInterval),
+		)
+	}
+
+	// Configure DTLS for SPED.
+	if t.api.settingEngine.enableSped {
+		sharedOpts = append(
+			sharedOpts,
+			dtls.WithOutboundHandshakePacketInterceptor(func(packet []byte, end bool) bool {
+				// Forward the packet to the ICE transport for piggybacking.
+				return t.iceTransport.Piggyback(packet, end)
+			}),
+			dtls.WithInboundHandshakePacketNotifier(func(packet []byte) {
+				t.iceTransport.ReportDtlsPacket(packet)
+			}),
 		)
 	}
 
@@ -559,6 +585,10 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	t.srtpProtectionProfile = srtpProtectionProfile
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
+	if t.api.settingEngine.enableSped {
+		t.iceTransport.Piggyback(nil, true)
+		t.iceTransport.SetDtlsCallback(nil)
+	}
 
 	return t.startSRTP()
 }

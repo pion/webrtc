@@ -2788,6 +2788,7 @@ func (pc *PeerConnection) startTransports(
 	dtlsRole DTLSRole,
 	remoteUfrag, remotePwd, fingerprint, fingerprintHash string,
 ) {
+	fmt.Println("START ICE", time.Now())
 	// Start the ice transport
 	err := pc.iceTransport.Start(
 		pc.iceGatherer,
@@ -2817,6 +2818,7 @@ func (pc *PeerConnection) startTransports(
 		}()
 	}
 
+	fmt.Println("START DTLS", time.Now(), dtlsRole)
 	// Start the dtls transport
 	err = pc.dtlsTransport.Start(DTLSParameters{
 		Role:         dtlsRole,
