@@ -1,0 +1,12 @@
+fix: default audio channels to 1 when not specified in SDP
+
+RFC 4556 Section 6 states that for audio streams, the encoding
+parameters indicate the number of channels, and this parameter
+is OPTIONAL and may be omitted if the number of channels is one.
+
+Previously, codecsFromMediaDescription defaulted channels to 0
+when not specified. This caused codec matching issues after PR #3021
+added channel count verification, breaking G722 and other audio
+codecs that omit the channel count from their rtpmap line.
+
+Fixes #3127
