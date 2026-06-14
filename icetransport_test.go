@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,6 +15,34 @@ import (
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestICETransport_StartContextClosesOnCancel(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	api := NewAPI()
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	remoteGatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	params, err := remoteGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, remoteGatherer.Close())
+	}()
+
+	transport := api.NewICETransport(gatherer)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	controlling := ICERoleControlling
+	err = transport.StartContext(ctx, nil, params, &controlling)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, ICEGathererStateClosed, gatherer.State())
+	assert.Nil(t, gatherer.getAgent())
+}
 
 func TestICETransport_OnConnectionStateChange(t *testing.T) {
 	report := test.CheckRoutines(t)
