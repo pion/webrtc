@@ -3,7 +3,7 @@ module github.com/pion/webrtc/v4
 go 1.24.0
 
 require (
-	github.com/pion/datachannel v1.6.0
+	github.com/pion/datachannel v1.6.1
 	github.com/pion/dtls/v3 v3.1.4
 	github.com/pion/ice/v4 v4.2.7
 	github.com/pion/interceptor v0.1.45
