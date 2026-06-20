@@ -303,7 +303,7 @@ func (t *DTLSTransport) role() DTLSRole {
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	ctx := context.Background()
-	if t.api.settingEngine.dtls.connectContextMaker != nil {
+	if t.api != nil && t.api.settingEngine.dtls.connectContextMaker != nil {
 		var cancel func()
 		ctx, cancel = t.api.settingEngine.dtls.connectContextMaker()
 		defer cancel()

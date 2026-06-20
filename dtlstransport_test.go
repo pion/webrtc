@@ -216,7 +216,7 @@ func (c *failingPacketConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *failingPacketConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestDTLSTransport_Start_ErrICEConnectionNotStarted(t *testing.T) {
-	transport := &DTLSTransport{api: NewAPI(), state: DTLSTransportStateNew}
+	transport := &DTLSTransport{state: DTLSTransportStateNew}
 
 	err := transport.Start(DTLSParameters{Role: DTLSRoleServer})
 	assert.ErrorIs(t, err, errICEConnectionNotStarted)
