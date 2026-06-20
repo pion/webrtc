@@ -44,6 +44,35 @@ func TestICETransport_StartContextClosesOnCancel(t *testing.T) {
 	assert.Nil(t, gatherer.getAgent())
 }
 
+func TestICETransport_StartContextClearsCancelOnRoleError(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	api := NewAPI()
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, gatherer.Close())
+	}()
+
+	remoteGatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, remoteGatherer.Close())
+	}()
+
+	params, err := remoteGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	transport := api.NewICETransport(gatherer)
+	role := ICERoleUnknown
+	err = transport.StartContext(context.Background(), nil, params, &role)
+	assert.ErrorIs(t, err, errICERoleUnknown)
+	assert.Nil(t, transport.ctxCancel)
+	assert.NotEqual(t, ICEGathererStateClosed, gatherer.State())
+	assert.NotNil(t, gatherer.getAgent())
+}
+
 func TestICETransport_OnConnectionStateChange(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
