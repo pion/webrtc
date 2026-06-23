@@ -120,7 +120,7 @@ func TestICETransport_StartContextStopDoesNotReportCallerCancel(t *testing.T) {
 			err,
 		)
 	case <-time.After(time.Second):
-		t.Fatal("StartContext did not return after Stop")
+		assert.FailNow(t, "StartContext did not return after Stop")
 	}
 }
 
