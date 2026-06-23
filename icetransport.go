@@ -147,7 +147,8 @@ func (t *ICETransport) StartContext(
 	}
 	t.role = *role
 
-	ctx, ctxCancel := context.WithCancel(ctx)
+	callerCtx := ctx
+	operationCtx, ctxCancel := context.WithCancel(callerCtx)
 	t.ctxCancel = ctxCancel
 
 	// Drop the lock here to allow ICE candidates to be
@@ -158,12 +159,12 @@ func (t *ICETransport) StartContext(
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(ctx,
+		iceConn, err = agent.Dial(operationCtx,
 			params.UsernameFragment,
 			params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(ctx,
+		iceConn, err = agent.Accept(operationCtx,
 			params.UsernameFragment,
 			params.Password)
 
@@ -174,7 +175,7 @@ func (t *ICETransport) StartContext(
 	// Reacquire the lock to set the connection/mux
 	t.lock.Lock()
 	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := callerCtx.Err(); ctxErr != nil {
 			t.lock.Unlock()
 			_ = t.Stop()
 			t.lock.Lock()
