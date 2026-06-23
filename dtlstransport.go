@@ -302,22 +302,19 @@ func (t *DTLSTransport) role() DTLSRole {
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
-	ctx := context.Background()
-	if t.api != nil && t.api.settingEngine.dtls.connectContextMaker != nil {
-		var cancel func()
-		ctx, cancel = t.api.settingEngine.dtls.connectContextMaker()
-		if cancel != nil {
-			defer cancel()
-		}
-	}
-
-	return t.StartContext(ctx, remoteParameters)
+	return t.start(remoteParameters, t.handshakeDTLS)
 }
 
 // StartContext starts DTLS transport negotiation with the parameters of the remote DTLS
 // transport. If the context is canceled before the DTLS handshake is complete, the handshake
 // is interrupted and an error is returned.
 func (t *DTLSTransport) StartContext(ctx context.Context, remoteParameters DTLSParameters) error {
+	return t.start(remoteParameters, func(dtlsConn *dtls.Conn) error {
+		return dtlsConn.HandshakeContext(ctx)
+	})
+}
+
+func (t *DTLSTransport) start(remoteParameters DTLSParameters, handshake func(*dtls.Conn) error) error {
 	role, certificate, err := t.prepareStart(remoteParameters)
 	if err != nil {
 		return err
@@ -336,7 +333,7 @@ func (t *DTLSTransport) StartContext(ctx context.Context, remoteParameters DTLSP
 		return t.failStart(err)
 	}
 
-	if err = dtlsConn.HandshakeContext(ctx); err != nil {
+	if err = handshake(dtlsConn); err != nil {
 		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsConn.Close()
 

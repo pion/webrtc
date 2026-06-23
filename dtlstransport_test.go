@@ -216,11 +216,20 @@ func (c *failingPacketConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *failingPacketConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestDTLSTransport_Start_ErrICEConnectionNotStarted(t *testing.T) {
-	transport := &DTLSTransport{state: DTLSTransportStateNew}
+	api := NewAPI()
+	connectContextMakerCalled := false
+	api.settingEngine.dtls.connectContextMaker = func() (context.Context, func()) {
+		connectContextMakerCalled = true
+
+		return context.Background(), nil
+	}
+
+	transport := &DTLSTransport{api: api, state: DTLSTransportStateNew}
 
 	err := transport.Start(DTLSParameters{Role: DTLSRoleServer})
 	assert.ErrorIs(t, err, errICEConnectionNotStarted)
 	assert.Equal(t, DTLSTransportStateNew, transport.State())
+	assert.False(t, connectContextMakerCalled)
 }
 
 func TestDTLSTransport_Start_UsesConnectContextMaker(t *testing.T) {
@@ -263,6 +272,11 @@ func TestDTLSTransport_Start_UsesConnectContextMaker(t *testing.T) {
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
 	assert.NoError(t, err)
+	transport.OnStateChange(func(state DTLSTransportState) {
+		if state == DTLSTransportStateConnecting {
+			assert.False(t, connectContextMakerCalled)
+		}
+	})
 
 	err = transport.Start(DTLSParameters{Role: DTLSRoleServer})
 	assert.ErrorIs(t, err, context.Canceled)
