@@ -306,7 +306,9 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 	if t.api != nil && t.api.settingEngine.dtls.connectContextMaker != nil {
 		var cancel func()
 		ctx, cancel = t.api.settingEngine.dtls.connectContextMaker()
-		defer cancel()
+		if cancel != nil {
+			defer cancel()
+		}
 	}
 
 	return t.StartContext(ctx, remoteParameters)
