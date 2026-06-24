@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1642,6 +1643,25 @@ func TestICEGatherer_DisableActiveTCP(t *testing.T) { //nolint:cyclop
 			}
 		})
 	}
+}
+
+func TestICEGatherer_UseCandidateCheckPriority(t *testing.T) {
+	se := SettingEngine{}
+	se.SetICEUseCandidateCheckPriority(true)
+
+	gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, gatherer.Close())
+	}()
+
+	require.NoError(t, gatherer.createAgent())
+	agent := gatherer.getAgent()
+	require.NotNil(t, agent)
+
+	enabled := reflect.ValueOf(agent).Elem().FieldByName("enableUseCandidateCheckPriority")
+	require.True(t, enabled.IsValid())
+	assert.True(t, enabled.Bool())
 }
 
 func TestICEGatherer_HostAcceptanceMinWait(t *testing.T) {
