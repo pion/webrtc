@@ -282,13 +282,64 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
+// parseRidPayloadTypes parses the pt= parameter from a=rid parameters string
+// per RFC 8851 Section 4. The params string is the space-separated portion after
+// "<id> <direction>", e.g. "pt=96,97;max-width=1280".
+func parseRidPayloadTypes(params string) []uint8 {
+	var payloadTypes []uint8
+	for param := range strings.SplitSeq(params, ";") {
+		ptStr, ok := strings.CutPrefix(param, "pt=")
+		if !ok {
+			continue
+		}
+		for pt := range strings.SplitSeq(ptStr, ",") {
+			if ptVal, err := strconv.ParseUint(pt, 10, 8); err == nil {
+				payloadTypes = append(payloadTypes, uint8(ptVal)) //nolint:gosec
+			}
+		}
+	}
+
+	return payloadTypes
+}
+
+// buildRidPTParam maps offer payload types to answer payload types via semantic
+// codec matching per RFC 8851 Section 6.3, and returns the " pt=<types>" string
+// for the answer's a=rid line. Returns empty string if no types match.
+func buildRidPTParam(offerPTs []uint8, offerCodecs, answerCodecs []RTPCodecParameters) string {
+	if len(offerPTs) == 0 {
+		return ""
+	}
+
+	validPTs := []string{}
+	for _, pt := range offerPTs {
+		offerCodec := findCodecByPayload(offerCodecs, PayloadType(pt))
+		if offerCodec == nil {
+			continue
+		}
+		answerCodec, matchType := codecParametersFuzzySearch(*offerCodec, answerCodecs)
+		if matchType == codecMatchNone {
+			continue
+		}
+		validPTs = append(validPTs, strconv.FormatUint(uint64(answerCodec.PayloadType), 10))
+	}
+	if len(validPTs) == 0 {
+		return ""
+	}
+
+	return " pt=" + strings.Join(validPTs, ",")
+}
+
 func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 	rids := []*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids = append(rids, &simulcastRid{id: split[0], attrValue: attr.Value})
+			rid := &simulcastRid{id: split[0], attrValue: attr.Value}
+			if len(split) > 2 {
+				rid.payloadTypes = parseRidPayloadTypes(split[2])
+			}
+			rids = append(rids, rid)
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -634,7 +685,9 @@ func addTransceiverSDP(
 
 		for _, rid := range mediaSection.rids {
 			ridID := rid.id
-			media.WithValueAttribute(sdpAttributeRid, ridID+" recv")
+			ridAttr := ridID + " recv" + buildRidPTParam(rid.payloadTypes, mediaSection.offerCodecs, codecs)
+
+			media.WithValueAttribute(sdpAttributeRid, ridAttr)
 			if rid.paused && !ignoreRidPauseForRecv {
 				ridID = "~" + ridID
 			}
@@ -664,9 +717,10 @@ func addTransceiverSDP(
 }
 
 type simulcastRid struct {
-	id        string
-	attrValue string
-	paused    bool
+	id           string
+	attrValue    string
+	paused       bool
+	payloadTypes []uint8
 }
 
 type mediaSection struct {
@@ -676,6 +730,7 @@ type mediaSection struct {
 	sctpInit        []byte
 	matchExtensions map[string]int
 	rids            []*simulcastRid
+	offerCodecs     []RTPCodecParameters
 }
 
 func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
