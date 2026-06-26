@@ -145,6 +145,8 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       sctp.PartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	})
 
 	assert.Equal(t, SCTPTransportMetadata{
@@ -152,6 +154,8 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	}, metadata)
 }
 

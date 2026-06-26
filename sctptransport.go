@@ -36,6 +36,8 @@ func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMe
 		PartialReliabilityMode:       partialReliabilityMode,
 		ZeroChecksumSendingEnabled:   metadata.ZeroChecksumSendingEnabled,
 		ZeroChecksumReceivingEnabled: metadata.ZeroChecksumReceivingEnabled,
+		NumInboundStreams:            metadata.NumInboundStreams,
+		NumOutboundStreams:           metadata.NumOutboundStreams,
 	}
 }
 
@@ -444,10 +446,10 @@ func (r *SCTPTransport) updateMaxChannels() {
 
 	// If we have an association, use its stream limits
 	if assoc := r.association(); assoc != nil {
-		// The max channels is limited by the minimum of inbound and outbound streams
-		inbound := assoc.NumInboundStreams()
-		outbound := assoc.NumOutboundStreams()
-		val = min(val, inbound, outbound)
+		if metadata, ok := assoc.Metadata(); ok {
+			// The max channels is limited by the minimum of inbound and outbound streams.
+			val = min(val, metadata.NumInboundStreams, metadata.NumOutboundStreams)
+		}
 	}
 
 	r.maxChannels = &val
