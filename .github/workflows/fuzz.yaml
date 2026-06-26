@@ -15,13 +15,13 @@ name: Fuzz
 on:
   push:
     branches:
-      - master
+      - main
   schedule:
     - cron: "0 */8 * * *"
 
 jobs:
   fuzz:
-    uses: pion/.goassets/.github/workflows/fuzz.reusable.yml@master
+    uses: pion/.goassets/.github/workflows/fuzz.reusable.yml@main
     with:
       go-version: "1.25" # auto-update/latest-go-version
       fuzz-time: "60s"

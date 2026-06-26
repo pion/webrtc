@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -30,7 +31,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
@@ -358,6 +359,27 @@ func TestPeerConnection_EventHandlers_Go(t *testing.T) {
 	<-onTrackCalled
 	<-onICEConnectionStateChangeCalled
 	<-onDataChannelCalled
+	assert.NoError(t, pc.Close())
+}
+
+func TestPeerConnection_OnDataChannel_DefaultHandlerClosesChannel(t *testing.T) {
+	api := NewAPI()
+	pc, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	dc := &DataChannel{api: api}
+	dc.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc) })
+	assert.Equal(t, DataChannelStateClosing, dc.ReadyState())
+
+	pc.OnDataChannel(nil)
+	dc2 := &DataChannel{api: api}
+	dc2.setReadyState(DataChannelStateOpen)
+
+	assert.NotPanics(t, func() { pc.onDataChannelHandler(dc2) })
+	assert.Equal(t, DataChannelStateClosing, dc2.ReadyState())
+
 	assert.NoError(t, pc.Close())
 }
 
@@ -789,6 +811,19 @@ func TestPopulateLocalCandidates(t *testing.T) {
 	})
 }
 
+func configureMulticastDNS(s *SettingEngine) {
+	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	if runtime.GOOS != "darwin" {
+		return
+	}
+
+	s.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+	s.SetIncludeLoopbackCandidate(true)
+	s.SetIPFilter(func(ip net.IP) bool {
+		return ip.IsLoopback() && ip.To4() != nil
+	})
+}
+
 // Assert that two agents that only generate mDNS candidates can connect.
 func TestMulticastDNSCandidates(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -798,20 +833,20 @@ func TestMulticastDNSCandidates(t *testing.T) {
 	defer report()
 
 	s := SettingEngine{}
-	s.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&s)
 
 	pcOffer, pcAnswer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
-	assert.NoError(t, err)
-
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
 
 	onDataChannel, onDataChannelCancel := context.WithCancel(context.Background())
+	defer onDataChannelCancel()
 	pcAnswer.OnDataChannel(func(*DataChannel) {
 		onDataChannelCancel()
 	})
-	<-onDataChannel.Done()
 
-	closePairNow(t, pcOffer, pcAnswer)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+	<-onDataChannel.Done()
 }
 
 func TestMulticastDNSHostNameConnection(t *testing.T) {
@@ -828,11 +863,11 @@ func TestMulticastDNSHostNameConnection(t *testing.T) {
 	}
 
 	offerSettingEngine := SettingEngine{}
-	offerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&offerSettingEngine)
 	offerSettingEngine.SetMulticastDNSHostName(offerHostName)
 
 	answerSettingEngine := SettingEngine{}
-	answerSettingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryAndGather)
+	configureMulticastDNS(&answerSettingEngine)
 	answerSettingEngine.SetMulticastDNSHostName(answerHostName)
 
 	pcOffer, err := NewAPI(WithSettingEngine(offerSettingEngine)).NewPeerConnection(Configuration{})
@@ -2711,4 +2746,68 @@ func TestSctpSnap(t *testing.T) {
 	peerConnectionsConnected.Wait()
 
 	closePairNow(t, offer, answer)
+}
+
+func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.EnableSctpSnap(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offerPC, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPC, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	// Round 1: media only, no data channel, so this negotiation carries no
+	// sctp-init at all.
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
+	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	connected.Wait()
+
+	// Round 2: add a data channel and renegotiate.
+	dataChannel, err := offerPC.CreateDataChannel("snap", nil)
+	assert.NoError(t, err)
+	opened := make(chan struct{})
+	dataChannel.OnOpen(func() { close(opened) })
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+	// The offer introducing the data section must advertise sctp-init even though
+	// the previous remote description had no data section to copy it from.
+	assert.Contains(t, offer.SDP, "a=sctp-init:", "renegotiation offer adding a data channel must advertise sctp-init")
+
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
+	assert.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
+	answer, err := answerPC.CreateAnswer(nil)
+	assert.NoError(t, err)
+	// The answer responds with its own sctp-init, completing the SNAP exchange.
+	assert.Contains(t, answer.SDP, "a=sctp-init:", "answer to a SNAP offer must advertise sctp-init")
+
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
+	assert.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	// SNAP having engaged on both sides, the channel must come up end to end.
+	select {
+	case <-opened:
+	case <-time.After(time.Second * 10):
+		assert.Fail(t, "data channel added during renegotiation never opened")
+	}
+
+	closePairNow(t, offerPC, answerPC)
 }

@@ -402,24 +402,31 @@ func (pc *PeerConnection) Close() (err error) {
 
 	// Release any handlers as required by the syscall/js API.
 	if pc.onSignalingStateChangeHandler != nil {
+		pc.underlying.Set("onsignalingstatechange", js.Null())
 		pc.onSignalingStateChangeHandler.Release()
 	}
 	if pc.onDataChannelHandler != nil {
+		pc.underlying.Set("ondatachannel", js.Null())
 		pc.onDataChannelHandler.Release()
 	}
 	if pc.onNegotiationNeededHandler != nil {
+		pc.underlying.Set("onnegotiationneeded", js.Null())
 		pc.onNegotiationNeededHandler.Release()
 	}
 	if pc.onConnectionStateChangeHandler != nil {
+		pc.underlying.Set("onconnectionstatechange", js.Null())
 		pc.onConnectionStateChangeHandler.Release()
 	}
 	if pc.onICEConnectionStateChangeHandler != nil {
+		pc.underlying.Set("oniceconnectionstatechange", js.Null())
 		pc.onICEConnectionStateChangeHandler.Release()
 	}
 	if pc.onICECandidateHandler != nil {
+		pc.underlying.Set("onicecandidate", js.Null())
 		pc.onICECandidateHandler.Release()
 	}
 	if pc.onICEGatheringStateChangeHandler != nil {
+		pc.underlying.Set("onicegatheringstatechange", js.Null())
 		pc.onICEGatheringStateChangeHandler.Release()
 	}
 

@@ -20,6 +20,25 @@ import (
 
 const sctpMaxChannels = uint16(65535)
 
+func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMetadata {
+	partialReliabilityMode := SCTPTransportPartialReliabilityModeNone
+	switch metadata.PartialReliabilityMode {
+	case sctp.PartialReliabilityModeForwardTSN:
+		partialReliabilityMode = SCTPTransportPartialReliabilityModeForwardTSN
+	case sctp.PartialReliabilityModeIForwardTSN:
+		partialReliabilityMode = SCTPTransportPartialReliabilityModeIForwardTSN
+	case sctp.PartialReliabilityModeNone:
+		partialReliabilityMode = SCTPTransportPartialReliabilityModeNone
+	}
+
+	return SCTPTransportMetadata{
+		MessageInterleavingEnabled:   metadata.MessageInterleavingEnabled,
+		PartialReliabilityMode:       partialReliabilityMode,
+		ZeroChecksumSendingEnabled:   metadata.ZeroChecksumSendingEnabled,
+		ZeroChecksumReceivingEnabled: metadata.ZeroChecksumReceivingEnabled,
+	}
+}
+
 // SCTPTransport provides details about the SCTP transport.
 type SCTPTransport struct {
 	lock sync.RWMutex
@@ -454,6 +473,22 @@ func (r *SCTPTransport) State() SCTPTransportState {
 	return r.state
 }
 
+// Metadata returns negotiated SCTP association metadata. The ok return value is
+// false until the SCTP association has been established.
+func (r *SCTPTransport) Metadata() (SCTPTransportMetadata, bool) {
+	association := r.association()
+	if association == nil {
+		return SCTPTransportMetadata{}, false
+	}
+
+	metadata, ok := association.Metadata()
+	if !ok {
+		return SCTPTransportMetadata{}, false
+	}
+
+	return newSCTPTransportMetadata(metadata), true
+}
+
 // Stats reports the current statistics of the SCTPTransport.
 func (r *SCTPTransport) Stats() SCTPTransportStats {
 	stats := SCTPTransportStats{
@@ -470,6 +505,10 @@ func (r *SCTPTransport) Stats() SCTPTransportStats {
 		stats.CongestionWindow = association.CWND()
 		stats.ReceiverWindow = association.RWND()
 		stats.MTU = association.MTU()
+		if metadata, ok := association.Metadata(); ok {
+			transportMetadata := newSCTPTransportMetadata(metadata)
+			stats.Metadata = &transportMetadata
+		}
 	}
 
 	return stats

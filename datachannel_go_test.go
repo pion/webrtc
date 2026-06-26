@@ -22,6 +22,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDataChannel_EventHandlers(t *testing.T) {
@@ -62,6 +63,31 @@ func TestDataChannel_EventHandlers(t *testing.T) {
 	<-onDialCalled
 	<-onOpenCalled
 	<-onMessageCalled
+}
+
+func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
+	dc := &DataChannel{}
+	dc.setReadyState(DataChannelStateClosed)
+
+	called := atomic.Int32{}
+	done := make(chan struct{})
+
+	dc.OnClose(func() {
+		if called.Add(1) == 1 {
+			close(done)
+		}
+	})
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		assert.Fail(t, "OnClose did not fire immediately for closed DataChannel")
+	}
+
+	// Simulate additional close signaling and verify nonce prevents duplicate calls.
+	dc.onClose()
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int32(1), called.Load())
 }
 
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
@@ -508,6 +534,53 @@ func TestEOF(t *testing.T) { //nolint:cyclop
 	})
 }
 
+func TestDataChannel_BundleOnlyPortZero(t *testing.T) {
+	offerPC, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, offerPC.Close()) }()
+
+	answerPC, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, answerPC.Close()) }()
+
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	dataChannel, err := offerPC.CreateDataChannel(expectedLabel, nil)
+	require.NoError(t, err)
+	answerPC.OnDataChannel(func(*DataChannel) {})
+
+	offer, err := offerPC.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
+	require.NoError(t, offerPC.SetLocalDescription(offer))
+	<-offerGatheringComplete
+
+	const applicationMLine = "m=application 9 UDP/DTLS/SCTP webrtc-datachannel"
+	require.Contains(t, offerPC.LocalDescription().SDP, applicationMLine)
+	bundleOnlyOfferSDP := strings.Replace(
+		offerPC.LocalDescription().SDP,
+		applicationMLine,
+		"m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only",
+		1,
+	)
+	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{
+		Type: SDPTypeOffer,
+		SDP:  bundleOnlyOfferSDP,
+	}))
+
+	answer, err := answerPC.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
+	require.NoError(t, answerPC.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	require.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
+
+	require.Eventually(t, func() bool {
+		return dataChannel.ReadyState() == DataChannelStateOpen
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
 // Assert that a Session Description that doesn't follow
 // draft-ietf-mmusic-sctp-sdp is still accepted.
 func TestDataChannel_NonStandardSessionDescription(t *testing.T) {
@@ -612,6 +685,10 @@ func TestDataChannel_Dial(t *testing.T) {
 
 		offerPC, answerPC, err := newPair()
 		assert.NoError(t, err)
+
+		// Accept incoming data channels without closing them; without this the
+		// default handler would close the channel before the offer side opens it.
+		answerPC.OnDataChannel(func(_ *DataChannel) {})
 
 		d, err := offerPC.CreateDataChannel(expectedLabel, nil)
 		assert.NoError(t, err)
