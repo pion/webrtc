@@ -1124,6 +1124,13 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 			channels = uint16(val)
 		}
 
+		// RFC 4556 Section 6: For audio streams, the encoding parameters
+		// indicate the number of channels. This parameter is OPTIONAL and
+		// may be omitted if the number of channels is one.
+		if channels == 0 && strings.EqualFold(mediaDescr.MediaName.Media, "audio") {
+			channels = 1
+		}
+
 		feedback := []RTCPFeedback{}
 		for _, raw := range codec.RTCPFeedback {
 			split := strings.Split(raw, " ")
