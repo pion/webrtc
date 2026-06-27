@@ -216,11 +216,73 @@ func (c *failingPacketConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *failingPacketConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestDTLSTransport_Start_ErrICEConnectionNotStarted(t *testing.T) {
-	transport := &DTLSTransport{state: DTLSTransportStateNew}
+	api := NewAPI()
+	connectContextMakerCalled := false
+	api.settingEngine.dtls.connectContextMaker = func() (context.Context, func()) {
+		connectContextMakerCalled = true
+
+		return context.Background(), nil
+	}
+
+	transport := &DTLSTransport{api: api, state: DTLSTransportStateNew}
 
 	err := transport.Start(DTLSParameters{Role: DTLSRoleServer})
 	assert.ErrorIs(t, err, errICEConnectionNotStarted)
 	assert.Equal(t, DTLSTransportStateNew, transport.State())
+	assert.False(t, connectContextMakerCalled)
+}
+
+func TestDTLSTransport_Start_UsesConnectContextMaker(t *testing.T) {
+	lim := test.TimeOut(time.Second)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	loggerFactory := api.settingEngine.LoggerFactory
+
+	connectContextMakerCalled := false
+	cancelCalled := false
+	api.settingEngine.dtls.connectContextMaker = func() (context.Context, func()) {
+		connectContextMakerCalled = true
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		return ctx, func() {
+			cancelCalled = true
+		}
+	}
+
+	conn := &errConn{
+		localAddr:  &net.UDPAddr{IP: net.IPv4zero, Port: 1},
+		remoteAddr: &net.UDPAddr{IP: net.IPv4zero, Port: 2},
+		readErr:    io.EOF,
+		writeErr:   errTestWriteFailed,
+	}
+
+	iceTransport := NewICETransport(nil, loggerFactory)
+	iceTransport.mux = mux.NewMux(mux.Config{
+		Conn:          conn,
+		BufferSize:    1500,
+		LoggerFactory: loggerFactory,
+	})
+	defer func() { _ = iceTransport.mux.Close() }()
+
+	transport, err := api.NewDTLSTransport(iceTransport, nil)
+	assert.NoError(t, err)
+	transport.OnStateChange(func(state DTLSTransportState) {
+		if state == DTLSTransportStateConnecting {
+			assert.False(t, connectContextMakerCalled)
+		}
+	})
+
+	err = transport.Start(DTLSParameters{Role: DTLSRoleServer})
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, DTLSTransportStateFailed, transport.State())
+	assert.True(t, connectContextMakerCalled)
+	assert.True(t, cancelCalled)
 }
 
 func TestDTLSTransport_Start_ConnectErrorFailsTransport(t *testing.T) {

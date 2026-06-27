@@ -6,14 +6,123 @@
 package webrtc
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v4"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestICETransport_StartContextClosesOnCancel(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	api := NewAPI()
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	remoteGatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	params, err := remoteGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, remoteGatherer.Close())
+	}()
+
+	transport := api.NewICETransport(gatherer)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	controlling := ICERoleControlling
+	err = transport.StartContext(ctx, nil, params, &controlling)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, ICEGathererStateClosed, gatherer.State())
+	assert.Nil(t, gatherer.getAgent())
+}
+
+func TestICETransport_StartContextClearsCancelOnRoleError(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	api := NewAPI()
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, gatherer.Close())
+	}()
+
+	remoteGatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, remoteGatherer.Close())
+	}()
+
+	params, err := remoteGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	transport := api.NewICETransport(gatherer)
+	role := ICERoleUnknown
+	err = transport.StartContext(context.Background(), nil, params, &role)
+	assert.ErrorIs(t, err, errICERoleUnknown)
+	assert.Nil(t, transport.ctxCancel)
+	assert.NotEqual(t, ICEGathererStateClosed, gatherer.State())
+	assert.NotNil(t, gatherer.getAgent())
+}
+
+func TestICETransport_StartContextStopDoesNotReportCallerCancel(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	api := NewAPI()
+	gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+
+	remoteGatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, remoteGatherer.Close())
+	}()
+
+	params, err := remoteGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	transport := api.NewICETransport(gatherer)
+	controlling := ICERoleControlling
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- transport.StartContext(context.Background(), nil, params, &controlling)
+	}()
+
+	if !assert.Eventually(t, func() bool {
+		transport.lock.RLock()
+		defer transport.lock.RUnlock()
+
+		return transport.ctxCancel != nil
+	}, time.Second, time.Millisecond) {
+		return
+	}
+
+	assert.NoError(t, transport.Stop())
+
+	select {
+	case err = <-errCh:
+		assert.Error(t, err)
+		assert.NotErrorIs(t, err, context.Canceled)
+		assert.True(t,
+			errors.Is(err, ice.ErrCanceledByCaller) || errors.Is(err, ice.ErrClosed),
+			"expected ICE shutdown error, got %v",
+			err,
+		)
+	case <-time.After(time.Second):
+		assert.FailNow(t, "StartContext did not return after Stop")
+	}
+}
 
 func TestICETransport_OnConnectionStateChange(t *testing.T) {
 	report := test.CheckRoutines(t)
