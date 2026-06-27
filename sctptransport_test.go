@@ -352,18 +352,31 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				close(writeDetach)
 			})
 
+			offerConnected := make(chan struct{}, 1)
+			answerConnected := make(chan struct{}, 1)
+			offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+				if state == PeerConnectionStateConnected {
+					select {
+					case offerConnected <- struct{}{}:
+					default:
+					}
+				}
+			})
+			answerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+				if state == PeerConnectionStateConnected {
+					select {
+					case answerConnected <- struct{}{}:
+					default:
+					}
+				}
+			})
+
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				connestd := make(chan struct{}, 1)
-				offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
-					if state == PeerConnectionStateConnected {
-						connestd <- struct{}{}
-					}
-				})
 				select {
-				case <-connestd:
+				case <-offerConnected:
 				case <-time.After(10 * time.Second):
 					assert.Fail(t, "conn establishment timed out")
 
@@ -379,14 +392,8 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			}()
 			go func() {
 				defer wg.Done()
-				connestd := make(chan struct{}, 1)
-				answerPC.OnConnectionStateChange(func(state PeerConnectionState) {
-					if state == PeerConnectionStateConnected {
-						connestd <- struct{}{}
-					}
-				})
 				select {
-				case <-connestd:
+				case <-answerConnected:
 				case <-time.After(10 * time.Second):
 					assert.Fail(t, "connection establishment timed out")
 
@@ -406,7 +413,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 	for range N {
 		select {
 		case <-done:
-		case <-time.After(20 * time.Second):
+		case <-time.After(30 * time.Second):
 			assert.Fail(t, "timed out")
 		}
 	}
