@@ -5,6 +5,7 @@
 package oggwriter
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -29,6 +30,10 @@ const (
 	opusGranuleSampleRate              = 48000
 	maxOpusPacketSamples               = opusGranuleSampleRate * 120 / 1000
 	defaultChannelCount                = 2
+	channelMappingFamily0              = 0
+	channelMappingFamily1              = 1
+	channelMappingFamily2              = 2
+	channelMappingFamily255            = 255
 	idPageSignature                    = "OpusHead"
 	commentPageSignature               = "OpusTags"
 	defaultVendor                      = "pion"
@@ -48,7 +53,8 @@ var (
 	errTracksStarted        = errors.New("cannot add Ogg tracks after writing has started")
 	errPacketSSRCMismatch   = errors.New("RTP packet SSRC does not match Ogg track SSRC")
 	errInvalidOpusPacket    = errors.New("invalid Opus packet")
-	errInvalidChannelCount  = errors.New("invalid channel count for family 0")
+	errInvalidChannelCount  = errors.New("invalid channel count")
+	errInvalidChannelMap    = errors.New("invalid channel mapping")
 	errInvalidOpusTags      = errors.New("invalid OpusTags")
 )
 
@@ -58,18 +64,27 @@ type pageRewriter interface {
 }
 
 type writerConfig struct {
-	sampleRate   uint32
-	channelCount uint8
-	pageRewriter pageRewriter
-	opusTags     OpusTags
+	sampleRate     uint32
+	channelMapping channelMapping
+	pageRewriter   pageRewriter
+	opusTags       OpusTags
 }
 
 type trackConfig struct {
-	sampleRate   uint32
+	sampleRate        uint32
+	channelMapping    channelMapping
+	channelMappingSet bool
+	serial            uint32
+	serialSet         bool
+	opusTags          OpusTags
+}
+
+type channelMapping struct {
+	family       uint8
 	channelCount uint8
-	serial       uint32
-	serialSet    bool
-	opusTags     OpusTags
+	streamCount  uint8
+	coupledCount uint8
+	mapping      []byte
 }
 
 // WriterOption configures a multiplexed Ogg writer.
@@ -116,28 +131,58 @@ func (o sampleRateOption) applyTrackConfig(config *trackConfig) error {
 
 type (
 	channelCountOption uint16
+	channelMapOption   struct {
+		family       uint8
+		streamCount  uint8
+		coupledCount uint8
+		mapping      []byte
+	}
 	vendorOption       string
 	userCommentsOption []UserComment
 )
 
 func (o channelCountOption) applyWriterConfig(config *writerConfig) error {
-	channelCount, err := validateChannelCount(uint16(o))
+	mapping, err := defaultChannelMapping(uint16(o))
 	if err != nil {
 		return err
 	}
 
-	config.channelCount = channelCount
+	config.channelMapping = mapping
 
 	return nil
 }
 
 func (o channelCountOption) applyTrackConfig(config *trackConfig) error {
-	channelCount, err := validateChannelCount(uint16(o))
+	mapping, err := defaultChannelMapping(uint16(o))
 	if err != nil {
 		return err
 	}
 
-	config.channelCount = channelCount
+	config.channelMapping = mapping
+	config.channelMappingSet = true
+
+	return nil
+}
+
+func (o channelMapOption) applyWriterConfig(config *writerConfig) error {
+	mapping, err := validateChannelMapping(o.family, o.streamCount, o.coupledCount, o.mapping)
+	if err != nil {
+		return err
+	}
+
+	config.channelMapping = mapping
+
+	return nil
+}
+
+func (o channelMapOption) applyTrackConfig(config *trackConfig) error {
+	mapping, err := validateChannelMapping(o.family, o.streamCount, o.coupledCount, o.mapping)
+	if err != nil {
+		return err
+	}
+
+	config.channelMapping = mapping
+	config.channelMappingSet = true
 
 	return nil
 }
@@ -173,7 +218,7 @@ type UserComment struct {
 
 type oggTrack struct {
 	sampleRate              uint32
-	channelCount            uint8
+	channelMapping          channelMapping
 	preSkip                 uint16
 	serial                  uint32
 	opusTags                OpusTags
@@ -207,16 +252,16 @@ type OggWriter struct {
 // Writer is used to write multiple logical Opus streams into one OGG.
 // Tracks are added before writing starts, and each returned Track owns WriteRTP.
 type Writer struct {
-	mu            sync.Mutex
-	stream        io.Writer
-	pageRewriter  pageRewriter
-	sampleRate    uint32
-	channelCount  uint8
-	opusTags      OpusTags
-	checksumTable *[256]uint32
-	tracks        map[uint32]*Track
-	trackOrder    []*Track
-	started       bool
+	mu             sync.Mutex
+	stream         io.Writer
+	pageRewriter   pageRewriter
+	sampleRate     uint32
+	channelMapping channelMapping
+	opusTags       OpusTags
+	checksumTable  *[256]uint32
+	tracks         map[uint32]*Track
+	trackOrder     []*Track
+	started        bool
 }
 
 // Track writes RTP packets for a single logical Opus stream in a Writer.
@@ -242,8 +287,24 @@ func WithSampleRate(sampleRate uint32) WriterTrackOption {
 }
 
 // WithChannelCount sets the default channel count for a Writer or overrides it for a Track.
+// Mono and stereo are written with Opus channel mapping family 0.
+// For non-zero single-stream channel mapping families, use WithChannelMapping.
 func WithChannelCount(channelCount uint16) WriterTrackOption {
 	return channelCountOption(channelCount)
+}
+
+// WithChannelMapping sets an explicit Opus channel mapping family for a Writer or Track.
+// The channel count is derived from len(mapping). Only single-stream mappings are supported
+// because WriteRTP accepts one Opus packet per Ogg packet. Family 1 supports mono/stereo
+// Vorbis mappings, family 2 supports zero-order ambisonics, and family 255 supports
+// arbitrary single-stream mappings.
+func WithChannelMapping(family, streamCount, coupledCount uint8, mapping []byte) WriterTrackOption {
+	return channelMapOption{
+		family:       family,
+		streamCount:  streamCount,
+		coupledCount: coupledCount,
+		mapping:      append([]byte(nil), mapping...),
+	}
 }
 
 // WithVendor sets the OpusTags vendor string for a Writer or overrides it for a Track.
@@ -271,7 +332,8 @@ func WithSeekableOutput(output interface {
 
 // New builds a new single-track OGG Opus writer.
 func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	if _, err := validateChannelCount(channelCount); err != nil {
+	config, err := newTrackConfig(sampleRate, channelCount)
+	if err != nil {
 		return nil, err
 	}
 
@@ -280,7 +342,7 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, e
 		return nil, err
 	}
 
-	writer, err := newWith(file, file, sampleRate, channelCount)
+	writer, err := newWith(file, file, config)
 	if err != nil {
 		return nil, errors.Join(err, file.Close())
 	}
@@ -290,23 +352,28 @@ func New(fileName string, sampleRate uint32, channelCount uint16) (*OggWriter, e
 
 // NewWith initializes a new single-track OGG Opus writer with an io.Writer output.
 func NewWith(out io.Writer, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	return newWith(out, nil, sampleRate, channelCount)
-}
-
-func newWith(out io.Writer, fd *os.File, sampleRate uint32, channelCount uint16) (*OggWriter, error) {
-	if out == nil {
-		return nil, errFileNotOpened
-	}
-	validatedChannelCount, err := validateChannelCount(channelCount)
+	config, err := newTrackConfig(sampleRate, channelCount)
 	if err != nil {
 		return nil, err
 	}
 
+	return newWith(out, nil, config)
+}
+
+func newWith(out io.Writer, fd *os.File, config *trackConfig) (*OggWriter, error) {
+	if out == nil {
+		return nil, errFileNotOpened
+	}
+
+	serial := config.serial
+	if !config.serialSet {
+		serial = util.RandUint32()
+	}
 	writer := &OggWriter{
 		stream:        out,
 		fd:            fd,
 		checksumTable: generateChecksumTable(),
-		track:         newTrackState(sampleRate, validatedChannelCount, util.RandUint32(), defaultOpusTags()),
+		track:         newTrackState(config.sampleRate, config.channelMapping, serial, config.opusTags),
 	}
 
 	if err := writer.writeTrackHeaders(writer.track); err != nil {
@@ -324,10 +391,14 @@ func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
 		return nil, errOutputNotOpened
 	}
 
+	mapping, err := defaultChannelMapping(defaultChannelCount)
+	if err != nil {
+		return nil, err
+	}
 	config := &writerConfig{
-		sampleRate:   defaultSampleRate,
-		channelCount: defaultChannelCount,
-		opusTags:     defaultOpusTags(),
+		sampleRate:     defaultSampleRate,
+		channelMapping: mapping,
+		opusTags:       defaultOpusTags(),
 	}
 	for _, opt := range opts {
 		if err := opt.applyWriterConfig(config); err != nil {
@@ -339,13 +410,13 @@ func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
 	}
 
 	writer := &Writer{
-		stream:        out,
-		pageRewriter:  config.pageRewriter,
-		sampleRate:    config.sampleRate,
-		channelCount:  config.channelCount,
-		opusTags:      cloneOpusTags(config.opusTags),
-		checksumTable: generateChecksumTable(),
-		tracks:        map[uint32]*Track{},
+		stream:         out,
+		pageRewriter:   config.pageRewriter,
+		sampleRate:     config.sampleRate,
+		channelMapping: cloneChannelMapping(config.channelMapping),
+		opusTags:       cloneOpusTags(config.opusTags),
+		checksumTable:  generateChecksumTable(),
+		tracks:         map[uint32]*Track{},
 	}
 
 	return writer, nil
@@ -368,9 +439,10 @@ func (w *Writer) NewTrack(ssrc uint32, opts ...TrackOption) (*Track, error) {
 	}
 
 	config := &trackConfig{
-		sampleRate:   w.sampleRate,
-		channelCount: w.channelCount,
-		opusTags:     cloneOpusTags(w.opusTags),
+		sampleRate:        w.sampleRate,
+		channelMapping:    cloneChannelMapping(w.channelMapping),
+		channelMappingSet: true,
+		opusTags:          cloneOpusTags(w.opusTags),
 	}
 	for _, opt := range opts {
 		if err := opt.applyTrackConfig(config); err != nil {
@@ -391,7 +463,7 @@ func (w *Writer) NewTrack(ssrc uint32, opts ...TrackOption) (*Track, error) {
 	track := &Track{
 		parent: w,
 		ssrc:   ssrc,
-		track:  newTrackState(config.sampleRate, config.channelCount, serial, config.opusTags),
+		track:  newTrackState(config.sampleRate, config.channelMapping, serial, config.opusTags),
 	}
 	w.tracks[ssrc] = track
 	w.trackOrder = append(w.trackOrder, track)
@@ -498,23 +570,152 @@ func (w *Writer) Close() error {
 	return closeErr
 }
 
-func newTrackState(sampleRate uint32, channelCount uint8, serial uint32, opusTags OpusTags) *oggTrack {
+func newTrackConfig(sampleRate uint32, channelCount uint16) (*trackConfig, error) {
+	config := &trackConfig{
+		sampleRate: sampleRate,
+		opusTags:   defaultOpusTags(),
+	}
+	mapping, channelMappingErr := defaultChannelMapping(channelCount)
+	if channelMappingErr == nil {
+		config.channelMapping = mapping
+		config.channelMappingSet = true
+	}
+
+	if !config.channelMappingSet {
+		return nil, channelMappingErr
+	}
+	if err := validateOpusTags(config.opusTags); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+func newTrackState(sampleRate uint32, mapping channelMapping, serial uint32, opusTags OpusTags) *oggTrack {
 	return &oggTrack{
-		sampleRate:   sampleRate,
-		channelCount: channelCount,
-		preSkip:      defaultPreSkip,
-		serial:       serial,
-		opusTags:     cloneOpusTags(opusTags),
+		sampleRate:     sampleRate,
+		channelMapping: cloneChannelMapping(mapping),
+		preSkip:        defaultPreSkip,
+		serial:         serial,
+		opusTags:       cloneOpusTags(opusTags),
 	}
 }
 
-func validateChannelCount(channelCount uint16) (uint8, error) {
+func defaultChannelMapping(channelCount uint16) (channelMapping, error) {
 	switch channelCount {
-	case 1, 2:
-		return uint8(channelCount), nil
+	case 1:
+		return channelMapping{
+			family:       channelMappingFamily0,
+			channelCount: 1,
+			streamCount:  1,
+			coupledCount: 0,
+		}, nil
+	case 2:
+		return channelMapping{
+			family:       channelMappingFamily0,
+			channelCount: 2,
+			streamCount:  1,
+			coupledCount: 1,
+		}, nil
 	default:
-		return 0, errInvalidChannelCount
+		return channelMapping{}, errInvalidChannelCount
 	}
+}
+
+func validateChannelMapping(family, streamCount, coupledCount uint8, mapping []byte) (channelMapping, error) {
+	if err := validateChannelMappingFamily(family); err != nil {
+		return channelMapping{}, err
+	}
+	if err := validateChannelMappingLayout(streamCount, coupledCount, mapping); err != nil {
+		return channelMapping{}, err
+	}
+	if err := validateFamilySpecificChannelMapping(family, streamCount, coupledCount, mapping); err != nil {
+		return channelMapping{}, err
+	}
+
+	return channelMapping{
+		family:       family,
+		channelCount: uint8(len(mapping)), //nolint:gosec // validated <= MaxUint8.
+		streamCount:  streamCount,
+		coupledCount: coupledCount,
+		mapping:      append([]byte(nil), mapping...),
+	}, nil
+}
+
+func validateChannelMappingFamily(family uint8) error {
+	switch family {
+	case channelMappingFamily1, channelMappingFamily2, channelMappingFamily255:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported family %d", errInvalidChannelMap, family)
+	}
+}
+
+func validateChannelMappingLayout(streamCount, coupledCount uint8, mapping []byte) error {
+	if len(mapping) == 0 || len(mapping) > math.MaxUint8 {
+		return errInvalidChannelCount
+	}
+	if streamCount != 1 {
+		return fmt.Errorf("%w: stream count must be one", errInvalidChannelMap)
+	}
+	if coupledCount > streamCount {
+		return fmt.Errorf("%w: coupled count exceeds stream count", errInvalidChannelMap)
+	}
+
+	decodedChannels := int(streamCount) + int(coupledCount)
+	for _, channel := range mapping {
+		if channel != math.MaxUint8 && int(channel) >= decodedChannels {
+			return fmt.Errorf("%w: channel map entry is out of range", errInvalidChannelMap)
+		}
+	}
+
+	return nil
+}
+
+func validateFamilySpecificChannelMapping(
+	family uint8,
+	streamCount uint8,
+	coupledCount uint8,
+	mapping []byte,
+) error {
+	switch family {
+	case channelMappingFamily1:
+		return validateVorbisChannelMapping(streamCount, coupledCount, mapping)
+	case channelMappingFamily2:
+		if len(mapping) != 1 || streamCount != 1 || coupledCount != 0 || mapping[0] != 0 {
+			return fmt.Errorf("%w: invalid family 2 mapping", errInvalidChannelMap)
+		}
+	}
+
+	return nil
+}
+
+func validateVorbisChannelMapping(streamCount, coupledCount uint8, mapping []byte) error {
+	var wantStreams, wantCoupled uint8
+	var wantMapping []byte
+	switch len(mapping) {
+	case 1:
+		wantStreams = 1
+		wantCoupled = 0
+		wantMapping = []byte{0}
+	case 2:
+		wantStreams = 1
+		wantCoupled = 1
+		wantMapping = []byte{0, 1}
+	default:
+		return fmt.Errorf("%w: unsupported family 1 channel count", errInvalidChannelMap)
+	}
+	if streamCount != wantStreams || coupledCount != wantCoupled || !bytes.Equal(mapping, wantMapping) {
+		return fmt.Errorf("%w: invalid family 1 mapping", errInvalidChannelMap)
+	}
+
+	return nil
+}
+
+func cloneChannelMapping(mapping channelMapping) channelMapping {
+	mapping.mapping = append([]byte(nil), mapping.mapping...)
+
+	return mapping
 }
 
 func defaultOpusTags() OpusTags {
@@ -698,15 +899,26 @@ func writeTrackCommentHeader(track *oggTrack, writePageFunc func(*oggTrack, []by
 }
 
 func buildIDHeader(track *oggTrack) []byte {
-	oggIDHeader := make([]byte, 19)
+	channelMapping := track.channelMapping
+	headerLen := 19
+	if channelMapping.family != channelMappingFamily0 {
+		headerLen += 2 + int(channelMapping.channelCount)
+	}
+	oggIDHeader := make([]byte, headerLen)
 
 	copy(oggIDHeader[0:], idPageSignature)                         // Magic Signature 'OpusHead'
 	oggIDHeader[8] = 1                                             // Version
-	oggIDHeader[9] = track.channelCount                            // Channel count
+	oggIDHeader[9] = channelMapping.channelCount                   // Channel count
 	binary.LittleEndian.PutUint16(oggIDHeader[10:], track.preSkip) // pre-skip
 	binary.LittleEndian.PutUint32(oggIDHeader[12:], track.sampleRate)
 	binary.LittleEndian.PutUint16(oggIDHeader[16:], 0) // output gain
-	oggIDHeader[18] = 0                                // channel map 0 = one stream: mono or stereo
+	oggIDHeader[18] = channelMapping.family
+
+	if channelMapping.family != channelMappingFamily0 {
+		oggIDHeader[19] = channelMapping.streamCount
+		oggIDHeader[20] = channelMapping.coupledCount
+		copy(oggIDHeader[21:], channelMapping.mapping)
+	}
 
 	return oggIDHeader
 }

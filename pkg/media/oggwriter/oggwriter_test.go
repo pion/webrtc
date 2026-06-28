@@ -22,6 +22,9 @@ var (
 	errUnexpectedWriteAt = errors.New("unexpected write-at")
 	errRewriteFailed     = errors.New("rewrite failed")
 	errCloseFailed       = errors.New("close failed")
+
+	_ func(string, uint32, uint16) (*OggWriter, error)    = New
+	_ func(io.Writer, uint32, uint16) (*OggWriter, error) = NewWith
 )
 
 type oggWriterPacketTest struct {
@@ -222,6 +225,10 @@ func TestOggWriter_RejectsUnsupportedChannelCount(t *testing.T) {
 			channelCount: 3,
 		},
 		{
+			name:         "nine",
+			channelCount: 9,
+		},
+		{
 			name:         "wraps to zero",
 			channelCount: 256,
 		},
@@ -255,6 +262,229 @@ func TestOggWriter_RejectsUnsupportedChannelCount(t *testing.T) {
 
 			track, err := multiWriter.NewTrack(1111, WithChannelCount(tt.channelCount))
 			assert.ErrorIs(t, err, errInvalidChannelCount)
+			assert.Nil(t, track)
+		})
+	}
+}
+
+func TestOggWriter_ChannelMappingFamily0Defaults(t *testing.T) {
+	tests := []struct {
+		name          string
+		channels      uint16
+		mappingFamily uint8
+		streams       uint8
+		coupled       uint8
+		channelMap    []byte
+	}{
+		{name: "family-0-mono", channels: 1, mappingFamily: 0},
+		{name: "family-0-stereo", channels: 2, mappingFamily: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buffer := &bytes.Buffer{}
+
+			writer, err := NewWith(buffer, 48000, tt.channels)
+			assert.NoError(t, err)
+			assert.NotNil(t, writer)
+
+			header := firstOpusHeadForTest(t, buffer.Bytes())
+			assert.EqualValues(t, tt.channels, header.Channels)
+			assert.EqualValues(t, tt.mappingFamily, header.ChannelMap)
+			assert.EqualValues(t, tt.streams, header.StreamCount)
+			assert.EqualValues(t, tt.coupled, header.CoupledCount)
+			assert.Equal(t, string(tt.channelMap), header.ChannelMapping)
+		})
+	}
+}
+
+func TestOggWriter_ExplicitChannelMappings(t *testing.T) {
+	tests := []struct {
+		name          string
+		mappingFamily uint8
+		streams       uint8
+		coupled       uint8
+		channelMap    []byte
+	}{
+		{name: "family-1-mono", mappingFamily: 1, streams: 1, coupled: 0, channelMap: []byte{0}},
+		{name: "family-1-stereo", mappingFamily: 1, streams: 1, coupled: 1, channelMap: []byte{0, 1}},
+		{name: "family-2-zero-order", mappingFamily: 2, streams: 1, coupled: 0, channelMap: []byte{0}},
+		{name: "family-255", mappingFamily: 255, streams: 1, coupled: 1, channelMap: []byte{0, 255, 1}},
+		{
+			name:          "family-255-fewer-output-channels-than-decoded",
+			mappingFamily: 255,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buffer := &bytes.Buffer{}
+
+			writer, err := NewWriter(buffer)
+			assert.NoError(t, err)
+			assert.NotNil(t, writer)
+
+			track, err := writer.NewTrack(
+				1111,
+				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
+			)
+			assert.NoError(t, err)
+			assert.NotNil(t, track)
+			assert.NoError(t, track.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
+
+			header := firstOpusHeadForTest(t, buffer.Bytes())
+			assert.EqualValues(t, tt.mappingFamily, header.ChannelMap)
+			assert.EqualValues(t, len(tt.channelMap), header.Channels)
+			assert.EqualValues(t, tt.streams, header.StreamCount)
+			assert.EqualValues(t, tt.coupled, header.CoupledCount)
+			assert.Equal(t, string(tt.channelMap), header.ChannelMapping)
+		})
+	}
+}
+
+func TestOggWriter_ExplicitChannelMappingOverridesWriterDefaultChannelCount(t *testing.T) {
+	channelMap := []byte{0, 255, 1}
+	buffer := &bytes.Buffer{}
+
+	writer, err := NewWriter(buffer, WithChannelCount(1))
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track, err := writer.NewTrack(1111, WithChannelMapping(255, 1, 1, channelMap))
+	assert.NoError(t, err)
+	assert.NotNil(t, track)
+	assert.NoError(t, track.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
+
+	header := firstOpusHeadForTest(t, buffer.Bytes())
+	assert.EqualValues(t, 255, header.ChannelMap)
+	assert.EqualValues(t, len(channelMap), header.Channels)
+	assert.EqualValues(t, 1, header.StreamCount)
+	assert.EqualValues(t, 1, header.CoupledCount)
+	assert.Equal(t, string(channelMap), header.ChannelMapping)
+}
+
+func TestOggWriter_RejectsInvalidChannelMappings(t *testing.T) {
+	tests := []struct {
+		name          string
+		mappingFamily uint8
+		streams       uint8
+		coupled       uint8
+		channelMap    []byte
+		wantErr       error
+	}{
+		{
+			name:          "family-0",
+			mappingFamily: 0,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "family-3",
+			mappingFamily: 3,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "family-4",
+			mappingFamily: 4,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "empty mapping",
+			mappingFamily: 1,
+			streams:       1,
+			coupled:       1,
+			channelMap:    nil,
+			wantErr:       errInvalidChannelCount,
+		},
+		{
+			name:          "zero streams",
+			mappingFamily: 1,
+			streams:       0,
+			coupled:       0,
+			channelMap:    []byte{0},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "multiple streams",
+			mappingFamily: 255,
+			streams:       2,
+			coupled:       0,
+			channelMap:    []byte{0, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "too many coupled streams",
+			mappingFamily: 1,
+			streams:       1,
+			coupled:       2,
+			channelMap:    []byte{0, 1, 2},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "map entry out of range",
+			mappingFamily: 1,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 2},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "family-1 unsupported channel count",
+			mappingFamily: 1,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 1, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "family-1 non-vorbis mapping",
+			mappingFamily: 1,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{1, 0},
+			wantErr:       errInvalidChannelMap,
+		},
+		{
+			name:          "family-2 unsupported channel count",
+			mappingFamily: 2,
+			streams:       1,
+			coupled:       1,
+			channelMap:    []byte{0, 1},
+			wantErr:       errInvalidChannelMap,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"/writer-default", func(t *testing.T) {
+			writer, err := NewWriter(
+				&bytes.Buffer{},
+				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
+			)
+			assert.ErrorIs(t, err, tt.wantErr)
+			assert.Nil(t, writer)
+		})
+
+		t.Run(tt.name+"/track", func(t *testing.T) {
+			writer, err := NewWriter(&bytes.Buffer{})
+			assert.NoError(t, err)
+			assert.NotNil(t, writer)
+
+			track, err := writer.NewTrack(
+				1111,
+				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
+			)
+			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Nil(t, track)
 		})
 	}
@@ -325,11 +555,13 @@ func TestOggWriter_LargePayload(t *testing.T) {
 
 func TestOggWriter_BoundaryPayloadSplitsTerminatingLace(t *testing.T) {
 	payload := bytes.Repeat([]byte{0x45}, 65025)
-	track := newTrackState(48000, 2, 0x01020304, defaultOpusTags())
+	mapping, err := defaultChannelMapping(2)
+	assert.NoError(t, err)
+	track := newTrackState(48000, mapping, 0x01020304, defaultOpusTags())
 	track.pageIndex = 7
 	buffer := &bytes.Buffer{}
 
-	err := writePage(
+	err = writePage(
 		buffer,
 		nil,
 		generateChecksumTable(),
@@ -389,7 +621,9 @@ func TestOggWriter_CloseClosesFileAfterEOSRewriteFailure(t *testing.T) {
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) //nolint:gosec
 	assert.NoError(t, err)
 
-	writer, err := newWith(file, file, 48000, 2)
+	config, err := newTrackConfig(48000, 2)
+	assert.NoError(t, err)
+	writer, err := newWith(file, file, config)
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 
@@ -472,6 +706,16 @@ func opusRTPPacketForTest(t *testing.T, timestamp, ssrc uint32, payload []byte) 
 	assert.NoError(t, packet.SetExtension(0, []byte{0xFF, 0xFF, 0xFF, 0xFF}))
 
 	return packet
+}
+
+func firstOpusHeadForTest(t *testing.T, data []byte) *oggreader.OggHeader {
+	t.Helper()
+
+	_, header, err := oggreader.NewWith(bytes.NewReader(data))
+	assert.NoError(t, err)
+	assert.NotNil(t, header)
+
+	return header
 }
 
 func TestOggWriter_OpusPacketSampleCount(t *testing.T) {
