@@ -325,7 +325,7 @@ func TestOggWriter_LargePayload(t *testing.T) {
 
 func TestOggWriter_BoundaryPayloadSplitsTerminatingLace(t *testing.T) {
 	payload := bytes.Repeat([]byte{0x45}, 65025)
-	track := newTrackState(48000, 2, 0x01020304)
+	track := newTrackState(48000, 2, 0x01020304, defaultOpusTags())
 	track.pageIndex = 7
 	buffer := &bytes.Buffer{}
 
@@ -599,6 +599,38 @@ func audioGranulePositions(t *testing.T, data []byte) []uint64 {
 	return granules
 }
 
+func opusTagsBySerial(t *testing.T, data []byte) map[uint32]*oggreader.OpusTags {
+	t.Helper()
+
+	reader, err := oggreader.NewWithOptions(bytes.NewReader(data))
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+
+	tagsBySerial := map[uint32]*oggreader.OpusTags{}
+	for {
+		payload, pageHeader, parseErr := reader.ParseNextPage()
+		if errors.Is(parseErr, io.EOF) {
+			break
+		}
+		if !assert.NoError(t, parseErr) {
+			break
+		}
+
+		headerType, ok := pageHeader.HeaderType(payload)
+		if !ok || headerType != oggreader.HeaderOpusTags {
+			continue
+		}
+
+		opusTags, err := oggreader.ParseOpusTags(payload)
+		if !assert.NoError(t, err) {
+			continue
+		}
+		tagsBySerial[pageHeader.Serial] = opusTags
+	}
+
+	return tagsBySerial
+}
+
 func TestOggWriter_NewWriterRequiresOutput(t *testing.T) {
 	writer, err := NewWriter(nil)
 	assert.ErrorIs(t, err, errOutputNotOpened)
@@ -698,6 +730,134 @@ func TestOggWriter_NewWriter(t *testing.T) {
 		serial1: 1,
 		serial2: 2,
 	}, opusHeadChannelCounts)
+}
+
+func TestOggWriter_NewWriterWritesOpusTags(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	serial1 := uint32(0x01020304)
+	serial2 := uint32(0x05060708)
+
+	writer, err := NewWriter(
+		buffer,
+		WithVendor("pion-test-suite"),
+		WithUserComments(UserComment{Comment: "ENCODER", Value: "pion-oggwriter"}),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, writer)
+
+	track1, err := writer.NewTrack(
+		1111,
+		WithSerial(serial1),
+		WithUserComments(
+			UserComment{Comment: "ARTIST", Value: "Julia"},
+			UserComment{Comment: "TITLE", Value: "First Track"},
+		),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, track1)
+
+	track2, err := writer.NewTrack(
+		2222,
+		WithSerial(serial2),
+		WithVendor("track-two-vendor"),
+		WithUserComments(
+			UserComment{Comment: "ARTIST", Value: "Jade Bob"},
+			UserComment{Comment: "ALBUM", Value: "Fanta"},
+		),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, track2)
+
+	assert.NoError(t, track1.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
+	assert.NoError(t, track2.WriteRTP(validOpusPacketForTest(t, 2000, 2222)))
+
+	tagsBySerial := opusTagsBySerial(t, buffer.Bytes())
+	if !assert.Contains(t, tagsBySerial, serial1) || !assert.Contains(t, tagsBySerial, serial2) {
+		return
+	}
+
+	assert.Equal(t, "pion-test-suite", tagsBySerial[serial1].Vendor)
+	assert.Equal(t, []oggreader.UserComment{
+		{Comment: "ENCODER", Value: "pion-oggwriter"},
+		{Comment: "ARTIST", Value: "Julia"},
+		{Comment: "TITLE", Value: "First Track"},
+	}, tagsBySerial[serial1].UserComments)
+
+	assert.Equal(t, "track-two-vendor", tagsBySerial[serial2].Vendor)
+	assert.Equal(t, []oggreader.UserComment{
+		{Comment: "ENCODER", Value: "pion-oggwriter"},
+		{Comment: "ARTIST", Value: "Jade Bob"},
+		{Comment: "ALBUM", Value: "Fanta"},
+	}, tagsBySerial[serial2].UserComments)
+}
+
+func TestOggWriter_RejectsInvalidOpusTags(t *testing.T) {
+	tests := []struct {
+		name        string
+		option      WriterTrackOption
+		errContains string
+	}{
+		{
+			name:        "invalid vendor UTF-8",
+			option:      WithVendor(string([]byte{0xff})),
+			errContains: "vendor is not valid UTF-8",
+		},
+		{
+			name:        "empty user comment name",
+			option:      WithUserComments(UserComment{Comment: "", Value: "Alice"}),
+			errContains: "invalid user comment name",
+		},
+		{
+			name:        "user comment name with equals",
+			option:      WithUserComments(UserComment{Comment: "ART=IST", Value: "Alice"}),
+			errContains: "invalid user comment name",
+		},
+		{
+			name:        "invalid user comment value UTF-8",
+			option:      WithUserComments(UserComment{Comment: "ARTIST", Value: string([]byte{0xff})}),
+			errContains: "user comment value is not valid UTF-8",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"/writer", func(t *testing.T) {
+			writer, err := NewWriter(&bytes.Buffer{}, tt.option)
+			assert.ErrorIs(t, err, errInvalidOpusTags)
+			assert.ErrorContains(t, err, tt.errContains)
+			assert.Nil(t, writer)
+		})
+
+		t.Run(tt.name+"/track", func(t *testing.T) {
+			writer, err := NewWriter(&bytes.Buffer{})
+			assert.NoError(t, err)
+			assert.NotNil(t, writer)
+
+			track, err := writer.NewTrack(1111, tt.option)
+			assert.ErrorIs(t, err, errInvalidOpusTags)
+			assert.ErrorContains(t, err, tt.errContains)
+			assert.Nil(t, track)
+		})
+	}
+}
+
+func TestOggWriter_RejectsOpusTagsHeaderLongerThanMaxInt(t *testing.T) {
+	opusTags := OpusTags{
+		Vendor: "pion",
+		UserComments: []UserComment{
+			{Comment: "TITLE", Value: "A long enough title"},
+			{Comment: "ARTIST", Value: "Pion"},
+		},
+	}
+	headerLen := uint64(len(commentPageSignature) + 4 + len(opusTags.Vendor) + 4)
+	for _, comment := range opusTags.UserComments {
+		headerLen += 4 + uint64(len(comment.Comment)) + 1 + uint64(len(comment.Value))
+	}
+
+	assert.NoError(t, validateOpusTagsWithMaxHeaderLen(opusTags, headerLen))
+
+	err := validateOpusTagsWithMaxHeaderLen(opusTags, headerLen-1)
+	assert.ErrorIs(t, err, errInvalidOpusTags)
+	assert.ErrorContains(t, err, "header is too long")
 }
 
 func TestOggWriter_NewWriterAcceptsZeroSerial(t *testing.T) {

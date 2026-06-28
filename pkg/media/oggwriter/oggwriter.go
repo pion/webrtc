@@ -7,9 +7,12 @@ package oggwriter
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
@@ -28,10 +31,12 @@ const (
 	defaultChannelCount                = 2
 	idPageSignature                    = "OpusHead"
 	commentPageSignature               = "OpusTags"
+	defaultVendor                      = "pion"
 	pageHeaderSignature                = "OggS"
 	pageHeaderSize                     = 27
 	maxOggPageSegments                 = 255
 	noGranulePosition                  = ^uint64(0)
+	maxUint32Length                    = uint64(1<<32 - 1)
 )
 
 var (
@@ -44,6 +49,7 @@ var (
 	errPacketSSRCMismatch   = errors.New("RTP packet SSRC does not match Ogg track SSRC")
 	errInvalidOpusPacket    = errors.New("invalid Opus packet")
 	errInvalidChannelCount  = errors.New("invalid channel count for family 0")
+	errInvalidOpusTags      = errors.New("invalid OpusTags")
 )
 
 type pageRewriter interface {
@@ -55,6 +61,7 @@ type writerConfig struct {
 	sampleRate   uint32
 	channelCount uint8
 	pageRewriter pageRewriter
+	opusTags     OpusTags
 }
 
 type trackConfig struct {
@@ -62,6 +69,7 @@ type trackConfig struct {
 	channelCount uint8
 	serial       uint32
 	serialSet    bool
+	opusTags     OpusTags
 }
 
 // WriterOption configures a multiplexed Ogg writer.
@@ -106,7 +114,11 @@ func (o sampleRateOption) applyTrackConfig(config *trackConfig) error {
 	return nil
 }
 
-type channelCountOption uint16
+type (
+	channelCountOption uint16
+	vendorOption       string
+	userCommentsOption []UserComment
+)
 
 func (o channelCountOption) applyWriterConfig(config *writerConfig) error {
 	channelCount, err := validateChannelCount(uint16(o))
@@ -130,11 +142,41 @@ func (o channelCountOption) applyTrackConfig(config *trackConfig) error {
 	return nil
 }
 
+func (o vendorOption) applyWriterConfig(config *writerConfig) error {
+	return applyVendor(&config.opusTags, string(o))
+}
+
+func (o vendorOption) applyTrackConfig(config *trackConfig) error {
+	return applyVendor(&config.opusTags, string(o))
+}
+
+func (o userCommentsOption) applyWriterConfig(config *writerConfig) error {
+	return applyUserComments(&config.opusTags, []UserComment(o))
+}
+
+func (o userCommentsOption) applyTrackConfig(config *trackConfig) error {
+	return applyUserComments(&config.opusTags, []UserComment(o))
+}
+
+// OpusTags is the metadata for an OpusTags page.
+// https://datatracker.ietf.org/doc/html/rfc7845#section-5.2
+type OpusTags struct {
+	Vendor       string
+	UserComments []UserComment
+}
+
+// UserComment is a key-value pair of a Vorbis comment.
+type UserComment struct {
+	Comment string
+	Value   string
+}
+
 type oggTrack struct {
 	sampleRate              uint32
 	channelCount            uint8
 	preSkip                 uint16
 	serial                  uint32
+	opusTags                OpusTags
 	pageIndex               uint32
 	previousGranulePosition uint64
 	lastPayload             []byte
@@ -170,6 +212,7 @@ type Writer struct {
 	pageRewriter  pageRewriter
 	sampleRate    uint32
 	channelCount  uint8
+	opusTags      OpusTags
 	checksumTable *[256]uint32
 	tracks        map[uint32]*Track
 	trackOrder    []*Track
@@ -201,6 +244,16 @@ func WithSampleRate(sampleRate uint32) WriterTrackOption {
 // WithChannelCount sets the default channel count for a Writer or overrides it for a Track.
 func WithChannelCount(channelCount uint16) WriterTrackOption {
 	return channelCountOption(channelCount)
+}
+
+// WithVendor sets the OpusTags vendor string for a Writer or overrides it for a Track.
+func WithVendor(vendor string) WriterTrackOption {
+	return vendorOption(vendor)
+}
+
+// WithUserComments adds OpusTags user comments for a Writer or Track.
+func WithUserComments(comments ...UserComment) WriterTrackOption {
+	return userCommentsOption(cloneUserComments(comments))
 }
 
 // WithSeekableOutput enables close-time Ogg page rewrites for outputs that support Seek and WriteAt.
@@ -253,7 +306,7 @@ func newWith(out io.Writer, fd *os.File, sampleRate uint32, channelCount uint16)
 		stream:        out,
 		fd:            fd,
 		checksumTable: generateChecksumTable(),
-		track:         newTrackState(sampleRate, validatedChannelCount, util.RandUint32()),
+		track:         newTrackState(sampleRate, validatedChannelCount, util.RandUint32(), defaultOpusTags()),
 	}
 
 	if err := writer.writeTrackHeaders(writer.track); err != nil {
@@ -274,11 +327,15 @@ func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
 	config := &writerConfig{
 		sampleRate:   defaultSampleRate,
 		channelCount: defaultChannelCount,
+		opusTags:     defaultOpusTags(),
 	}
 	for _, opt := range opts {
 		if err := opt.applyWriterConfig(config); err != nil {
 			return nil, err
 		}
+	}
+	if err := validateOpusTags(config.opusTags); err != nil {
+		return nil, err
 	}
 
 	writer := &Writer{
@@ -286,6 +343,7 @@ func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
 		pageRewriter:  config.pageRewriter,
 		sampleRate:    config.sampleRate,
 		channelCount:  config.channelCount,
+		opusTags:      cloneOpusTags(config.opusTags),
 		checksumTable: generateChecksumTable(),
 		tracks:        map[uint32]*Track{},
 	}
@@ -312,11 +370,15 @@ func (w *Writer) NewTrack(ssrc uint32, opts ...TrackOption) (*Track, error) {
 	config := &trackConfig{
 		sampleRate:   w.sampleRate,
 		channelCount: w.channelCount,
+		opusTags:     cloneOpusTags(w.opusTags),
 	}
 	for _, opt := range opts {
 		if err := opt.applyTrackConfig(config); err != nil {
 			return nil, err
 		}
+	}
+	if err := validateOpusTags(config.opusTags); err != nil {
+		return nil, err
 	}
 
 	serial := config.serial
@@ -329,7 +391,7 @@ func (w *Writer) NewTrack(ssrc uint32, opts ...TrackOption) (*Track, error) {
 	track := &Track{
 		parent: w,
 		ssrc:   ssrc,
-		track:  newTrackState(config.sampleRate, config.channelCount, serial),
+		track:  newTrackState(config.sampleRate, config.channelCount, serial, config.opusTags),
 	}
 	w.tracks[ssrc] = track
 	w.trackOrder = append(w.trackOrder, track)
@@ -436,12 +498,13 @@ func (w *Writer) Close() error {
 	return closeErr
 }
 
-func newTrackState(sampleRate uint32, channelCount uint8, serial uint32) *oggTrack {
+func newTrackState(sampleRate uint32, channelCount uint8, serial uint32, opusTags OpusTags) *oggTrack {
 	return &oggTrack{
 		sampleRate:   sampleRate,
 		channelCount: channelCount,
 		preSkip:      defaultPreSkip,
 		serial:       serial,
+		opusTags:     cloneOpusTags(opusTags),
 	}
 }
 
@@ -452,6 +515,130 @@ func validateChannelCount(channelCount uint16) (uint8, error) {
 	default:
 		return 0, errInvalidChannelCount
 	}
+}
+
+func defaultOpusTags() OpusTags {
+	return OpusTags{Vendor: defaultVendor}
+}
+
+func cloneOpusTags(opusTags OpusTags) OpusTags {
+	opusTags.UserComments = cloneUserComments(opusTags.UserComments)
+
+	return opusTags
+}
+
+func cloneUserComments(comments []UserComment) []UserComment {
+	if len(comments) == 0 {
+		return nil
+	}
+
+	return append([]UserComment(nil), comments...)
+}
+
+func applyVendor(opusTags *OpusTags, vendor string) error {
+	if err := validateOpusTagString("vendor", vendor); err != nil {
+		return err
+	}
+
+	opusTags.Vendor = vendor
+
+	return nil
+}
+
+func applyUserComments(opusTags *OpusTags, comments []UserComment) error {
+	if err := validateUserComments(comments); err != nil {
+		return err
+	}
+
+	opusTags.UserComments = append(opusTags.UserComments, comments...)
+
+	return nil
+}
+
+func validateOpusTags(opusTags OpusTags) error {
+	return validateOpusTagsWithMaxHeaderLen(opusTags, uint64(math.MaxInt))
+}
+
+func validateOpusTagsWithMaxHeaderLen(opusTags OpusTags, maxHeaderLen uint64) error {
+	if err := validateOpusTagString("vendor", opusTags.Vendor); err != nil {
+		return err
+	}
+	if uint64(len(opusTags.UserComments)) > maxUint32Length {
+		return fmt.Errorf("%w: too many user comments", errInvalidOpusTags)
+	}
+
+	if err := validateUserComments(opusTags.UserComments); err != nil {
+		return err
+	}
+
+	return validateOpusTagsHeaderLen(opusTags, maxHeaderLen)
+}
+
+func validateOpusTagsHeaderLen(opusTags OpusTags, maxHeaderLen uint64) error {
+	headerLen := uint64(len(commentPageSignature)) + 4 + uint64(len(opusTags.Vendor)) + 4
+	if headerLen > maxHeaderLen {
+		return fmt.Errorf("%w: header is too long", errInvalidOpusTags)
+	}
+
+	for _, comment := range opusTags.UserComments {
+		userCommentLen := uint64(len(comment.Comment)) + 1 + uint64(len(comment.Value))
+		commentFieldLen := 4 + userCommentLen
+		if commentFieldLen > maxHeaderLen-headerLen {
+			return fmt.Errorf("%w: header is too long", errInvalidOpusTags)
+		}
+		headerLen += commentFieldLen
+	}
+
+	return nil
+}
+
+func validateUserComments(comments []UserComment) error {
+	for _, comment := range comments {
+		if err := validateUserComment(comment); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateUserComment(comment UserComment) error {
+	if !isValidCommentName(comment.Comment) {
+		return fmt.Errorf("%w: invalid user comment name", errInvalidOpusTags)
+	}
+	if err := validateOpusTagString("user comment value", comment.Value); err != nil {
+		return err
+	}
+	if uint64(len(comment.Comment))+1+uint64(len(comment.Value)) > maxUint32Length {
+		return fmt.Errorf("%w: user comment is too long", errInvalidOpusTags)
+	}
+
+	return nil
+}
+
+func validateOpusTagString(field, value string) error {
+	if !utf8.ValidString(value) {
+		return fmt.Errorf("%w: %s is not valid UTF-8", errInvalidOpusTags, field)
+	}
+	if uint64(len(value)) > maxUint32Length {
+		return fmt.Errorf("%w: %s is too long", errInvalidOpusTags, field)
+	}
+
+	return nil
+}
+
+func isValidCommentName(comment string) bool {
+	if comment == "" {
+		return false
+	}
+	for i := 0; i < len(comment); i++ {
+		b := comment[i]
+		if b < 0x20 || b > 0x7d || b == '=' {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (w *Writer) serialInUse(serial uint32) bool {
@@ -507,7 +694,7 @@ func writeTrackIDHeader(track *oggTrack, writePageFunc func(*oggTrack, []byte, u
 }
 
 func writeTrackCommentHeader(track *oggTrack, writePageFunc func(*oggTrack, []byte, uint8, uint64) error) error {
-	return writePageFunc(track, buildCommentHeader(), pageHeaderTypeContinuationOfStream, 0)
+	return writePageFunc(track, buildCommentHeader(track.opusTags), pageHeaderTypeContinuationOfStream, 0)
 }
 
 func buildIDHeader(track *oggTrack) []byte {
@@ -524,12 +711,41 @@ func buildIDHeader(track *oggTrack) []byte {
 	return oggIDHeader
 }
 
-func buildCommentHeader() []byte {
-	oggCommentHeader := make([]byte, 21)
-	copy(oggCommentHeader[0:], commentPageSignature)        // Magic Signature 'OpusTags'
-	binary.LittleEndian.PutUint32(oggCommentHeader[8:], 5)  // Vendor Length
-	copy(oggCommentHeader[12:], "pion")                     // Vendor name 'pion'
-	binary.LittleEndian.PutUint32(oggCommentHeader[17:], 0) // User Comment List Length
+func buildCommentHeader(opusTags OpusTags) []byte {
+	payloadLen := len(commentPageSignature) + 4 + len(opusTags.Vendor) + 4
+	for _, comment := range opusTags.UserComments {
+		payloadLen += 4 + len(comment.Comment) + 1 + len(comment.Value)
+	}
+
+	oggCommentHeader := make([]byte, payloadLen)
+	copy(oggCommentHeader[0:], commentPageSignature) // Magic Signature 'OpusTags'
+
+	pos := len(commentPageSignature)
+	binary.LittleEndian.PutUint32(
+		oggCommentHeader[pos:], uint32(len(opusTags.Vendor)), //nolint:gosec // validated to fit in uint32.
+	)
+	pos += 4
+	copy(oggCommentHeader[pos:], opusTags.Vendor)
+	pos += len(opusTags.Vendor)
+
+	binary.LittleEndian.PutUint32(
+		oggCommentHeader[pos:], uint32(len(opusTags.UserComments)), //nolint:gosec // validated to fit in uint32.
+	)
+	pos += 4
+
+	for _, comment := range opusTags.UserComments {
+		userCommentLen := len(comment.Comment) + 1 + len(comment.Value)
+		binary.LittleEndian.PutUint32(
+			oggCommentHeader[pos:], uint32(userCommentLen), //nolint:gosec // validated to fit in uint32.
+		)
+		pos += 4
+		copy(oggCommentHeader[pos:], comment.Comment)
+		pos += len(comment.Comment)
+		oggCommentHeader[pos] = '='
+		pos++
+		copy(oggCommentHeader[pos:], comment.Value)
+		pos += len(comment.Value)
+	}
 
 	return oggCommentHeader
 }
