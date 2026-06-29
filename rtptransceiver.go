@@ -100,6 +100,18 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 		return
 	}
 
+	simulcast := false
+	if len(getRids(media)) > 0 {
+		extensions, err := rtpExtensionsFromMediaDescription(media)
+		if err == nil {
+			for extension := range extensions {
+				if extension == sdp.SDESRepairRTPStreamIDURI {
+					simulcast = true
+				}
+			}
+		}
+	}
+
 	// make a copy as this slice is modified
 	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
 
@@ -168,6 +180,10 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 
 		mediaEngineRTX := findRTXPayloadType(mediaEnginePayloadType, leftCodecs)
 		if mediaEngineRTX == PayloadType(0) {
+			continue
+		}
+
+		if simulcast {
 			continue
 		}
 
