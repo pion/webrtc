@@ -1426,6 +1426,23 @@ func TestCodecsFromMediaDescription(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	})
+
+	t.Run("Audio codec without channel count defaults to 1", func(t *testing.T) {
+		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
+			MediaName: sdp.MediaName{
+				Media:   "audio",
+				Formats: []string{"9"},
+			},
+			Attributes: []sdp.Attribute{
+				{Key: "rtpmap", Value: "9 G722/8000"},
+			},
+		})
+
+		assert.NoError(t, err)
+		require.Len(t, codecs, 1)
+		assert.Equal(t, uint16(1), codecs[0].Channels)
+		assert.Equal(t, MimeTypeG722, codecs[0].MimeType)
+	})
 }
 
 func TestRtpExtensionsFromMediaDescription(t *testing.T) {
