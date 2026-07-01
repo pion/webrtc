@@ -1,6 +1,6 @@
 module github.com/pion/webrtc/v4
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/pion/datachannel v1.6.2
@@ -19,7 +19,7 @@ require (
 	github.com/pion/turn/v5 v5.0.10
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.56.0
 )
 
 require (
@@ -30,8 +30,8 @@ require (
 	github.com/pion/mdns/v2 v2.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
