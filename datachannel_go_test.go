@@ -90,6 +90,78 @@ func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
 	assert.Equal(t, int32(1), called.Load())
 }
 
+func TestDataChannelSetWriteDeadline(t *testing.T) {
+	for _, name := range []string{"Send", "SendText"} {
+		t.Run(name, func(t *testing.T) {
+			defer test.TimeOut(30 * time.Second).Stop()
+			defer test.CheckRoutines(t)()
+
+			settings := SettingEngine{}
+			settings.EnableDataChannelBlockWrite(true)
+			settings.SetSCTPMaxReceiveBufferSize(1500)
+			api := NewAPI(WithSettingEngine(settings))
+			offerPC, answerPC, err := api.newPair(Configuration{})
+			require.NoError(t, err)
+			defer closePairNow(t, offerPC, answerPC)
+
+			releaseMessages := make(chan struct{})
+			release := sync.OnceFunc(func() { close(releaseMessages) })
+			defer release()
+			received := make(chan DataChannelMessage, 1)
+			answerPC.OnDataChannel(func(answerDC *DataChannel) {
+				if answerDC.Label() == expectedLabel {
+					answerDC.OnMessage(func(message DataChannelMessage) {
+						<-releaseMessages
+						if string(message.Data) == "resumed" {
+							received <- message
+						}
+					})
+				}
+			})
+
+			dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+			require.NoError(t, err)
+			send := dc.Send
+			if name == "SendText" {
+				send = func(payload []byte) error { return dc.SendText(string(payload)) }
+			}
+			sendUntilError := func() error {
+				payload := make([]byte, 1000)
+				for {
+					if sendErr := send(payload); sendErr != nil {
+						return sendErr
+					}
+				}
+			}
+
+			require.NoError(t, dc.SetWriteDeadline(time.Now().Add(-time.Second)))
+			opened := make(chan struct{})
+			dc.OnOpen(func() { close(opened) })
+			require.NoError(t, signalPair(offerPC, answerPC))
+			<-opened
+			require.ErrorIs(t, sendUntilError(), context.DeadlineExceeded)
+
+			require.NoError(t, dc.SetWriteDeadline(time.Time{}))
+			pending := make(chan error, 1)
+			go func() { pending <- sendUntilError() }()
+			require.Eventually(t, func() bool { return dc.BufferedAmount() >= 3000 },
+				10*time.Second, time.Millisecond)
+			select {
+			case err = <-pending:
+				require.FailNow(t, "send returned before setting the new deadline", "%v", err)
+			default:
+			}
+			require.NoError(t, dc.SetWriteDeadline(time.Now().Add(-time.Second)))
+			require.ErrorIs(t, <-pending, context.DeadlineExceeded)
+
+			require.NoError(t, dc.SetWriteDeadline(time.Time{}))
+			release()
+			require.NoError(t, send([]byte("resumed")))
+			assert.Equal(t, name == "SendText", (<-received).IsString)
+		})
+	}
+}
+
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
