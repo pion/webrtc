@@ -104,6 +104,7 @@ type SettingEngine struct {
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
+	iceUDPMuxSrflx                            ice.UniversalUDPMux
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
 	iceUseCandidateCheckPriority              bool
@@ -496,6 +497,15 @@ func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
 // UDPMux should be started prior to creating PeerConnections.
 func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
 	e.iceUDPMux = udpMux
+}
+
+// SetICEUDPMuxSrflx allows ICE traffic from server reflexive candidates to be
+// multiplexed onto a single UDP port. This enables STUN binding requests, used
+// to gather server reflexive candidates, to share the same port as host
+// candidates instead of allocating an additional port per PeerConnection.
+// The mux should be started prior to creating PeerConnections.
+func (e *SettingEngine) SetICEUDPMuxSrflx(udpMuxSrflx ice.UniversalUDPMux) {
+	e.iceUDPMuxSrflx = udpMuxSrflx
 }
 
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
