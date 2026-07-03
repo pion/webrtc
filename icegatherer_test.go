@@ -73,6 +73,43 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	assert.NoError(t, gatherer.Close())
 }
 
+func TestICEGatherer_UDPMuxSrflx(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	listenConfig := net.ListenConfig{}
+	stunConn, err := listenConfig.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	server, err := turn.NewServer(turn.ServerConfig{
+		PacketConnConfigs: []turn.PacketConnConfig{{PacketConn: stunConn}},
+	})
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, server.Close()) }()
+
+	muxConn, err := listenConfig.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	mux := NewICEUniversalUDPMux(nil, muxConn, 0)
+	defer func() { assert.NoError(t, mux.Close()) }()
+
+	se := SettingEngine{}
+	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+	se.SetIncludeLoopbackCandidate(true)
+	se.SetICEUDPMux(mux)
+	se.SetICEUDPMuxSrflx(mux)
+
+	for range 2 {
+		candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{
+			ICEServers: []ICEServer{{URLs: []string{"stun:" + stunConn.LocalAddr().String()}}},
+		})
+		var types []ICECandidateType
+		for _, candidate := range candidates {
+			types = append(types, candidate.Typ)
+			assert.Equal(t, muxConn.LocalAddr().String(), fmt.Sprintf("%s:%d", candidate.Address, candidate.Port))
+		}
+		assert.ElementsMatch(t, []ICECandidateType{ICECandidateTypeHost, ICECandidateTypeSrflx}, types)
+	}
+}
+
 func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
