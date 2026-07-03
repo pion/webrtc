@@ -90,6 +90,38 @@ func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
 	assert.Equal(t, int32(1), called.Load())
 }
 
+func TestDataChannelSetWriteDeadline(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, dc.SetWriteDeadline(time.Now().Add(time.Second)))
+
+	opened := make(chan struct{})
+	dc.OnOpen(func() {
+		close(opened)
+	})
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	select {
+	case <-opened:
+	case <-time.After(time.Second * 10):
+		assert.FailNow(t, "data channel did not open")
+	}
+
+	assert.NoError(t, dc.SetWriteDeadline(time.Time{}))
+}
+
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
