@@ -244,7 +244,7 @@ func (g *ICEGatherer) sanitizedMDNSMode() ice.MulticastDNSMode {
 }
 
 func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.AgentOption {
-	options := []ice.AgentOption{
+	return []ice.AgentOption{
 		ice.WithICELite(g.api.settingEngine.candidates.ICELite),
 		ice.WithUrls(g.validatedServers),
 		ice.WithPortRange(g.api.settingEngine.ephemeralUDP.PortMin, g.api.settingEngine.ephemeralUDP.PortMax),
@@ -259,12 +259,6 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
 		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
 	}
-
-	if g.api.settingEngine.iceUseCandidateCheckPriority {
-		options = append(options, ice.WithEnableUseCandidateCheckPriority())
-	}
-
-	return options
 }
 
 func (g *ICEGatherer) credentialOptions() []ice.AgentOption {
@@ -336,7 +330,7 @@ func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {
 }
 
 func (g *ICEGatherer) miscOptions() []ice.AgentOption {
-	opts := make([]ice.AgentOption, 0, 4)
+	opts := make([]ice.AgentOption, 0, 5)
 
 	if g.api.settingEngine.candidates.MulticastDNSHostName != "" {
 		opts = append(opts, ice.WithMulticastDNSHostName(g.api.settingEngine.candidates.MulticastDNSHostName))
@@ -352,6 +346,10 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 
 	if g.api.settingEngine.iceMaxBindingRequests != nil {
 		opts = append(opts, ice.WithMaxBindingRequests(*g.api.settingEngine.iceMaxBindingRequests))
+	}
+
+	if g.api.settingEngine.iceUseCandidateCheckPriority {
+		opts = append(opts, ice.WithEnableUseCandidateCheckPriority())
 	}
 
 	return opts
