@@ -219,8 +219,8 @@ func (e *SettingEngine) DetachDataChannels() {
 // EnableDataChannelBlockWrite allows data channels to block on write.
 // Blocking writes may be interrupted with DataChannel.SetWriteDeadline
 // or the SetWriteDeadline method on a detached data channel.
-func (e *SettingEngine) EnableDataChannelBlockWrite(nonblockWrite bool) {
-	e.dataChannelBlockWrite = nonblockWrite
+func (e *SettingEngine) EnableDataChannelBlockWrite(blockWrite bool) {
+	e.dataChannelBlockWrite = blockWrite
 }
 
 // SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles

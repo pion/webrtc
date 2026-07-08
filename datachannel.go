@@ -345,15 +345,17 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 
 		return
 	}
-	d.dataChannel = dc
 	bufferedAmountLowThreshold := d.bufferedAmountLowThreshold
 	onBufferedAmountLow := d.onBufferedAmountLow
 	writeDeadline := d.writeDeadline
-	d.mu.Unlock()
+	var writeDeadlineErr error
 	if !writeDeadline.IsZero() {
-		if err := dc.SetWriteDeadline(writeDeadline); err != nil {
-			d.onError(err)
-		}
+		writeDeadlineErr = dc.SetWriteDeadline(writeDeadline)
+	}
+	d.dataChannel = dc
+	d.mu.Unlock()
+	if writeDeadlineErr != nil {
+		d.onError(writeDeadlineErr)
 	}
 	d.setReadyState(DataChannelStateOpen)
 
@@ -474,7 +476,8 @@ func (d *DataChannel) SendText(s string) error {
 }
 
 // SetWriteDeadline sets the deadline for future Send and SendText calls.
-// A zero time value disables the deadline.
+// A zero time value disables the deadline. Deadlines are only enforced when
+// SettingEngine.EnableDataChannelBlockWrite(true) is configured.
 func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
 	d.mu.Lock()
 	d.writeDeadline = deadline
