@@ -398,6 +398,17 @@ func TestSetSCTPRTOMax(t *testing.T) {
 	assert.Equal(t, expSize, s.sctp.rtoMax)
 }
 
+func TestSetICEUseCandidateCheckPriority(t *testing.T) {
+	settingEngine := SettingEngine{}
+	assert.False(t, settingEngine.iceUseCandidateCheckPriority)
+
+	settingEngine.SetICEUseCandidateCheckPriority(true)
+	assert.True(t, settingEngine.iceUseCandidateCheckPriority)
+
+	settingEngine.SetICEUseCandidateCheckPriority(false)
+	assert.False(t, settingEngine.iceUseCandidateCheckPriority)
+}
+
 func TestSetICEBindingRequestHandler(t *testing.T) {
 	seenICEControlled, seenICEControlledCancel := context.WithCancel(context.Background())
 	seenICEControlling, seenICEControllingCancel := context.WithCancel(context.Background())

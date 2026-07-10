@@ -330,7 +330,7 @@ func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {
 }
 
 func (g *ICEGatherer) miscOptions() []ice.AgentOption {
-	opts := make([]ice.AgentOption, 0, 4)
+	opts := make([]ice.AgentOption, 0, 5)
 
 	if g.api.settingEngine.candidates.MulticastDNSHostName != "" {
 		opts = append(opts, ice.WithMulticastDNSHostName(g.api.settingEngine.candidates.MulticastDNSHostName))
@@ -346,6 +346,10 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 
 	if g.api.settingEngine.iceMaxBindingRequests != nil {
 		opts = append(opts, ice.WithMaxBindingRequests(*g.api.settingEngine.iceMaxBindingRequests))
+	}
+
+	if g.api.settingEngine.iceUseCandidateCheckPriority {
+		opts = append(opts, ice.WithEnableUseCandidateCheckPriority())
 	}
 
 	return opts
