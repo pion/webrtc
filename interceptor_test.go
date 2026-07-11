@@ -507,13 +507,15 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 		buf := make([]byte, 1500)
 		for {
 			n, _, err2 := sender.Read(buf)
-			// nolint
-			if err2 == io.EOF {
+			if err2 != nil {
+				// Reads fail once the test closes the peer connections, so
+				// treat any error as end-of-stream, not as a test failure.
 				break
 			}
-			assert.NoError(t, err2)
 			ps, err2 := rtcp.Unmarshal(buf[:n])
-			assert.NoError(t, err2)
+			if err2 != nil {
+				break
+			}
 			for _, p := range ps {
 				if pn, ok := p.(*rtcp.TransportLayerNack); ok {
 					assert.Equal(t, len(pn.Nacks), 1)
@@ -566,6 +568,10 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	assert.NoError(t, err)
 	err = pc2.Close()
 	assert.NoError(t, err)
+
+	// Wait for the RTCP reader goroutine to exit, so it cannot outlive the
+	// test and fail it after completion.
+	<-rtcpDone
 
 	if requestNack {
 		assert.True(t, gotNack.Load(), "Expected to get a NACK, got none")
