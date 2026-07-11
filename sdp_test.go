@@ -1399,94 +1399,35 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 }
 
 func TestGetRIDs(t *testing.T) {
-	mediaDescr := []*sdp.MediaDescription{
-		{
-			MediaName: sdp.MediaName{
-				Media: "video",
-			},
-			Attributes: []sdp.Attribute{
-				{Key: "sendonly"},
+	for _, tc := range []struct{ simulcast, order, paused string }{
+		{"", "f q h u v x", ""},                     // No simulcast list preserves RID declaration order.
+		{"send h;", "h f q u v x", ""},              // A trailing separator leaves unlisted RIDs in their original order.
+		{"send h;;~f", "h f q u v x", "f"},          // An empty stream entry does not hide a later paused RID.
+		{"send ", "f q h u v x", ""},                // An empty list after the direction preserves declaration order.
+		{"send", "f q h u v x", ""},                 // A direction without a list is safe to parse.
+		{"recv ~x", "x f q h u v", "x"},             // A recv-only list still controls ordering and pause state.
+		{"send h;~f;q", "h f q u v x", "f"},         // Send order overrides declaration order and preserves pause state.
+		{"send h,~f;q", "h f q u v x", "f"},         // Comma-separated alternatives are ordered and can be paused.
+		{"recv x send h;~f;q", "h f q u v x", "f"},  // Prefer send even when recv appears first.
+		{"send h;~f;q recv ~x", "h f q u v x", "f"}, // A later recv list cannot override send ordering or pause state.
+		{"send h;~f;h;q;~f", "h f q u v x", "f"},    // Repeated RIDs keep their first position without duplicating entries.
+	} {
+		t.Run(tc.simulcast, func(t *testing.T) {
+			media := &sdp.MediaDescription{Attributes: []sdp.Attribute{
 				{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
-			},
-		},
-	}
-
-	rids := getRids(mediaDescr[0])
-
-	assert.NotEmpty(t, rids, "Rid mapping should be present")
-	found := false
-	for _, rid := range rids {
-		if rid.id == "f" {
-			found = true
-
-			break
-		}
-	}
-	if !found {
-		assert.Fail(t, "rid values should contain 'f'")
-	}
-}
-
-// TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
-// a=simulcast: attribute contains empty tokens (trailing ";", ";;", or a
-// direction-only value with no rid list).
-func TestGetRIDs_EmptySimulcastTokens(t *testing.T) {
-	cases := []struct {
-		name          string
-		simulcastVal  string
-		ridAttrs      []string
-		wantPausedIDs []string
-	}{
-		{
-			name:         "trailing semicolon",
-			simulcastVal: "send 1;",
-			ridAttrs:     []string{"1 send", "2 send"},
-		},
-		{
-			name:          "double semicolon",
-			simulcastVal:  "send 1;;~2",
-			ridAttrs:      []string{"1 send", "2 send"},
-			wantPausedIDs: []string{"2"},
-		},
-		{
-			name:         "empty rid list after direction",
-			simulcastVal: "send ",
-			ridAttrs:     []string{"1 send"},
-		},
-		{
-			name:         "direction only no space",
-			simulcastVal: "send",
-			ridAttrs:     []string{"1 send"},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			attrs := []sdp.Attribute{
-				{Key: sdpAttributeSimulcast, Value: tc.simulcastVal},
-			}
-			for _, v := range tc.ridAttrs {
-				attrs = append(attrs, sdp.Attribute{Key: sdpAttributeRid, Value: v})
-			}
-			media := &sdp.MediaDescription{
-				MediaName:  sdp.MediaName{Media: "video"},
-				Attributes: attrs,
-			}
-
-			// Must not panic.
+				{Key: sdpAttributeRid, Value: "q send"},
+				{Key: sdpAttributeRid, Value: "h send"},
+				{Key: sdpAttributeRid, Value: "u send"},
+				{Key: sdpAttributeRid, Value: "v send"},
+				{Key: sdpAttributeRid, Value: "x recv"},
+				{Key: sdpAttributeSimulcast, Value: tc.simulcast},
+			}}
 			rids := getRids(media)
-
-			for _, pausedID := range tc.wantPausedIDs {
-				found := false
-				for _, rid := range rids {
-					if rid.id == pausedID {
-						assert.True(t, rid.paused, "rid %q should be paused", pausedID)
-						found = true
-
-						break
-					}
-				}
-				assert.True(t, found, "rid %q not found in result", pausedID)
+			want := strings.Fields(tc.order)
+			require.Len(t, rids, len(want))
+			for i, rid := range rids {
+				assert.Equal(t, want[i], rid.id)
+				assert.Equal(t, tc.paused == rid.id, rid.paused, "rid %q", rid.id)
 			}
 		})
 	}

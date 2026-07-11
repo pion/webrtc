@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -230,7 +231,7 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
+func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	rids := []*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
@@ -241,25 +242,40 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 			simulcastAttr = attr.Value
 		}
 	}
-	// process paused stream like "a=simulcast:send 1;~2;~3"
-	if simulcastAttr != "" {
-		if space := strings.Index(simulcastAttr, " "); space > 0 {
-			simulcastAttr = simulcastAttr[space+1:]
+	// Prefer the send list when both directions are present (RFC 8853).
+	fields := strings.Fields(simulcastAttr)
+	simulcastAttr = ""
+	for i := 0; i+1 < len(fields); i += 2 {
+		if fields[i] == "send" || (fields[i] == "recv" && simulcastAttr == "") {
+			simulcastAttr = fields[i+1]
 		}
-		ridStates := strings.SplitSeq(simulcastAttr, ";")
-		for ridState := range ridStates {
-			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
+	}
+	simulcastOrder := map[string]int{}
+	for _, scID := range strings.FieldsFunc(simulcastAttr, func(r rune) bool { return r == ';' || r == ',' }) {
+		ridID, paused := strings.CutPrefix(scID, "~")
+		if paused {
+			for _, rid := range rids {
+				if rid.id == ridID {
+					rid.paused = true
 
-						break
-					}
+					break
 				}
 			}
 		}
+		if _, ok := simulcastOrder[ridID]; !ok {
+			simulcastOrder[ridID] = len(simulcastOrder)
+		}
 	}
+	orderOf := func(id string) int {
+		if idx, ok := simulcastOrder[id]; ok {
+			return idx
+		}
+
+		return len(simulcastOrder)
+	}
+	slices.SortStableFunc(rids, func(a, b *simulcastRid) int {
+		return cmp.Compare(orderOf(a.id), orderOf(b.id))
+	})
 
 	return rids
 }
