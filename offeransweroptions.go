@@ -28,6 +28,9 @@ type OfferOptions struct {
 
 	// ICERestart forces the underlying ice gathering process to be restarted.
 	// When this value is true, the generated description will have ICE
-	// credentials that are different from the current credentials
+	// credentials that are different from the current credentials.
+	//
+	// The restart takes effect when SetLocalDescription applies the offer, not when
+	// CreateOffer creates it, so an unused restart offer leaves the live connection intact.
 	ICERestart bool
 }

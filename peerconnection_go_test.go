@@ -913,6 +913,192 @@ func TestMulticastDNSHostNameConnection(t *testing.T) {
 	}
 }
 
+// Assert that CreateOffer(ICERestart) alone does not touch the live ICE transport.
+func TestPeerConnection_CreateOffer_ICERestart_DoesNotMutateLiveTransport(t *testing.T) {
+	defer test.TimeOut(time.Second * 10).Stop()
+	defer test.CheckRoutines(t)()
+
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+
+	offer1, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pc.SetLocalDescription(offer1))
+
+	before, err := pc.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	_, err = pc.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+
+	after, err := pc.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	assert.Equal(t, before.UsernameFragment, after.UsernameFragment)
+	assert.Equal(t, before.Password, after.Password)
+}
+
+// Assert that a CreateOffer(ICERestart) racing a concurrent CreateOffer(nil) always proposes
+// new credentials: pc.mu serializes the two calls so neither clobbers the other's pending
+// restart. Such a clobber is a logical race -race can't catch, hence the stress loop.
+func TestPeerConnection_CreateOffer_ICERestart_ConcurrentWithPlainOffer(t *testing.T) {
+	defer test.TimeOut(time.Second * 30).Stop()
+	defer test.CheckRoutines(t)()
+
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	_, err = pc.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+	offer1, err := pc.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pc.SetLocalDescription(offer1))
+
+	live, err := pc.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	// Fire all iterations without a barrier between them so restart and plain
+	// offer calls stay under sustained concurrent pressure.
+	const iterations = 200
+	proposedUfrags := make([]string, iterations)
+	var wg sync.WaitGroup
+	wg.Add(iterations * 2)
+	for i := range iterations {
+		go func() {
+			defer wg.Done()
+			restartOffer, err := pc.CreateOffer(&OfferOptions{ICERestart: true})
+			assert.NoError(t, err)
+			proposed, err := extractICEDetails(restartOffer.parsed, pc.log)
+			assert.NoError(t, err)
+			proposedUfrags[i] = proposed.Ufrag
+		}()
+		go func() {
+			defer wg.Done()
+			_, err := pc.CreateOffer(nil)
+			assert.NoError(t, err)
+		}()
+	}
+	wg.Wait()
+
+	for i, ufrag := range proposedUfrags {
+		assert.NotEqualf(t, live.UsernameFragment, ufrag, "iteration %d", i)
+	}
+}
+
+// Assert that credentials CreateOffer(ICERestart) proposes apply to the transport only once committed.
+func TestPeerConnection_SetLocalDescription_AppliesPendingICERestart(t *testing.T) {
+	defer test.TimeOut(time.Second * 10).Stop()
+	defer test.CheckRoutines(t)()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pcOffer.Close()) }()
+	defer func() { assert.NoError(t, pcAnswer.Close()) }()
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	before, err := pcOffer.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	offer2, err := pcOffer.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+	proposed, err := extractICEDetails(offer2.parsed, pcOffer.log)
+	assert.NoError(t, err)
+	assert.NotEqual(t, before.UsernameFragment, proposed.Ufrag)
+
+	stillBefore, err := pcOffer.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	assert.Equal(t, before.UsernameFragment, stillBefore.UsernameFragment)
+
+	assert.NoError(t, pcOffer.SetLocalDescription(offer2))
+
+	after, err := pcOffer.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	assert.Equal(t, proposed.Ufrag, after.UsernameFragment)
+}
+
+// Assert that a GatheringCompletePromise created after CreateOffer(ICERestart) but before
+// SetLocalDescription resolves against the new gathering cycle, not the previous one's Complete state.
+func TestPeerConnection_ICERestart_GatheringCompletePromiseAwaitsNewCycle(t *testing.T) {
+	defer test.TimeOut(time.Second * 30).Stop()
+	defer test.CheckRoutines(t)()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pcOffer.Close()) }()
+	defer func() { assert.NoError(t, pcAnswer.Close()) }()
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	offer2, err := pcOffer.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+	gatherComplete := GatheringCompletePromise(pcOffer)
+
+	select {
+	case <-gatherComplete:
+		assert.Fail(t, "promise resolved against the stale gathering cycle before SetLocalDescription")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	assert.NoError(t, pcOffer.SetLocalDescription(offer2))
+	<-gatherComplete
+}
+
+// Assert that a CreateOffer(ICERestart) superseded by a plain CreateOffer leaves the live
+// transport untouched: applying the plain offer must not restart with the abandoned credentials.
+func TestPeerConnection_CreateOffer_ICERestart_SupersededByPlainOffer_LeavesTransportIntact(t *testing.T) {
+	defer test.TimeOut(time.Second * 10).Stop()
+	defer test.CheckRoutines(t)()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pcOffer.Close()) }()
+	defer func() { assert.NoError(t, pcAnswer.Close()) }()
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	before, err := pcOffer.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+
+	restartOffer, err := pcOffer.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+	proposed, err := extractICEDetails(restartOffer.parsed, pcOffer.log)
+	assert.NoError(t, err)
+	assert.NotEqual(t, before.UsernameFragment, proposed.Ufrag)
+
+	plainOffer, err := pcOffer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, pcOffer.SetLocalDescription(plainOffer))
+
+	after, err := pcOffer.iceGatherer.GetLocalParameters()
+	assert.NoError(t, err)
+	assert.Equal(t, before.UsernameFragment, after.UsernameFragment)
+}
+
+// Assert that generateICECredentials returns distinct values clearing the ICE minimums.
+func TestGenerateICECredentials(t *testing.T) {
+	first, err := generateICECredentials()
+	assert.NoError(t, err)
+	// Must clear the ICE credential minimums (RFC 8445 section 5.3).
+	assert.GreaterOrEqual(t, len(first.ufrag), 4)
+	assert.GreaterOrEqual(t, len(first.pwd), 22)
+
+	second, err := generateICECredentials()
+	assert.NoError(t, err)
+	assert.NotEqual(t, first.ufrag, second.ufrag)
+	assert.NotEqual(t, first.pwd, second.pwd)
+}
+
 func TestICERestart(t *testing.T) {
 	extractCandidates := func(sdp string) (candidates []string) {
 		sc := bufio.NewScanner(strings.NewReader(sdp))

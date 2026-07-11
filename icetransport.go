@@ -208,6 +208,12 @@ func (t *ICETransport) StartContext(
 // restart is not exposed currently because ORTC has users create a whole new ICETransport
 // so for now lets keep it private so we don't cause ORTC users to depend on non-standard APIs.
 func (t *ICETransport) restart() error {
+	return t.restartWithCredentials("", "") // "" means use the SettingEngine defaults
+}
+
+// restartWithCredentials restarts the live ICE transport with ufrag/pwd,
+// or the SettingEngine default for whichever is empty.
+func (t *ICETransport) restartWithCredentials(ufrag, pwd string) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -216,10 +222,14 @@ func (t *ICETransport) restart() error {
 		return fmt.Errorf("%w: unable to restart ICETransport", errICEAgentNotExist)
 	}
 
-	if err := agent.Restart(
-		t.gatherer.api.settingEngine.candidates.UsernameFragment,
-		t.gatherer.api.settingEngine.candidates.Password,
-	); err != nil {
+	if ufrag == "" {
+		ufrag = t.gatherer.api.settingEngine.candidates.UsernameFragment
+	}
+	if pwd == "" {
+		pwd = t.gatherer.api.settingEngine.candidates.Password
+	}
+
+	if err := agent.Restart(ufrag, pwd); err != nil {
 		return err
 	}
 

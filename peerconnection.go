@@ -73,8 +73,9 @@ type PeerConnection struct {
 	// should be defined (see JSEP 3.4.1).
 	greaterMid int
 
-	rtpTransceivers        []*RTPTransceiver
-	nonMediaBandwidthProbe atomic.Value // RTPReceiver
+	rtpTransceivers              []*RTPTransceiver
+	nonMediaBandwidthProbe       atomic.Value // RTPReceiver
+	pendingICERestartCredentials atomic.Value // *iceCredentials
 
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler atomic.Value // func(ICEConnectionState)
@@ -662,6 +663,75 @@ func (pc *PeerConnection) ID() string {
 	return pc.id
 }
 
+// prepareICERestartForOffer stores or clears the credentials this offer will
+// propose for an ICE restart.
+func (pc *PeerConnection) prepareICERestartForOffer(options *OfferOptions) error {
+	if options == nil || !options.ICERestart {
+		pc.pendingICERestartCredentials.Store((*iceCredentials)(nil))
+
+		return nil
+	}
+
+	credentials, err := generateICECredentials()
+	if err != nil {
+		return err
+	}
+	pc.pendingICERestartCredentials.Store(&credentials)
+
+	return nil
+}
+
+// effectiveLocalICEParameters returns the ICE credentials CreateOffer proposes:
+// the pending restart's if one is staged, otherwise the live transport's.
+func (pc *PeerConnection) effectiveLocalICEParameters() (ICEParameters, error) {
+	if pending, ok := pc.pendingICERestartCredentials.Load().(*iceCredentials); ok && pending != nil {
+		// a=ice-lite is emitted from the SettingEngine in populateSDP, so it is not
+		// carried on this ICEParameters value.
+		return ICEParameters{UsernameFragment: pending.ufrag, Password: pending.pwd}, nil
+	}
+
+	return pc.iceGatherer.GetLocalParameters()
+}
+
+// effectiveLocalCandidates returns CreateOffer's local candidates, or none while a restart is
+// pending: the live candidates predate the restart and belong to the old ufrag, not the new one.
+func (pc *PeerConnection) effectiveLocalCandidates() ([]ICECandidate, error) {
+	if pending, ok := pc.pendingICERestartCredentials.Load().(*iceCredentials); ok && pending != nil {
+		return nil, nil
+	}
+
+	return pc.iceGatherer.GetLocalCandidates()
+}
+
+// applyPendingICERestart restarts the ICE transport with the pending restart credentials
+// when SetLocalDescription commits the offer, matching what the peer already received.
+func (pc *PeerConnection) applyPendingICERestart(desc *SessionDescription) error {
+	// Loaded outside pc.mu; safe because JSEP requires the application to serialize
+	// SetLocalDescription with CreateOffer, so pending cannot change under us.
+	pending, ok := pc.pendingICERestartCredentials.Load().(*iceCredentials)
+	if !ok || pending == nil {
+		return nil
+	}
+	// ice-ufrag lives on the media sections, so read it via extractICEDetails.
+	details, err := extractICEDetails(desc.parsed, pc.log)
+	if err != nil {
+		return err
+	}
+	if details.Ufrag != pending.ufrag {
+		// The applied offer isn't the one that staged this restart (normally unreachable).
+		pc.log.Warnf("ice restart skipped: offer ufrag %q != pending %q", details.Ufrag, pending.ufrag)
+
+		return nil
+	}
+
+	if err := pc.iceTransport.restartWithCredentials(pending.ufrag, pending.pwd); err != nil {
+		return err
+	}
+	pc.pendingICERestartCredentials.Store((*iceCredentials)(nil))
+
+	return nil
+}
+
 // hasLocalDescriptionChanged returns whether local media (rtpTransceivers) has changed
 // caller of this method should hold `pc.mu` lock.
 func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) bool {
@@ -692,17 +762,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	if options != nil && options.ICERestart {
-		if err := pc.iceTransport.restart(); err != nil {
-			return SessionDescription{}, err
-		}
-	}
-
-	var (
-		descr *sdp.SessionDescription
-		offer SessionDescription
-		err   error
-	)
+	var descr *sdp.SessionDescription
+	var offer SessionDescription
 
 	// This may be necessary to recompute if, for example, createOffer was called when only an
 	// audio RTCRtpTransceiver was added to connection, but while performing the in-parallel
@@ -711,6 +772,30 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	count := 0
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
+
+	// Under pc.mu so a concurrent CreateOffer can't interleave and clobber
+	// pendingICERestartCredentials between preparing it here and reading it below.
+	prevPending, _ := pc.pendingICERestartCredentials.Load().(*iceCredentials)
+	if err := pc.prepareICERestartForOffer(options); err != nil {
+		return SessionDescription{}, err
+	}
+	// prepareICERestartForOffer stages pending before the SDP is built from it;
+	// roll back if offer generation fails so pending never diverges from lastOffer.
+	offerCommitted := false
+	defer func() {
+		if !offerCommitted {
+			pc.pendingICERestartCredentials.Store(prevPending)
+		}
+	}()
+
+	iceParams, err := pc.effectiveLocalICEParameters()
+	if err != nil {
+		return SessionDescription{}, err
+	}
+	candidates, err := pc.effectiveLocalCandidates()
+	if err != nil {
+		return SessionDescription{}, err
+	}
 	for {
 		// We cache current transceivers to ensure they aren't
 		// mutated during offer generation. We later check if they have
@@ -763,7 +848,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 
 		if pc.currentRemoteDescription == nil {
-			descr, err = pc.generateUnmatchedSDP(currentTransceivers, useIdentity)
+			descr, err = pc.generateUnmatchedSDP(currentTransceivers, useIdentity, iceParams, candidates)
 		} else {
 			descr, err = pc.generateMatchedSDP(
 				currentTransceivers,
@@ -771,6 +856,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 				true, /*includeUnmatched */
 				connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
 				false,
+				iceParams,
+				candidates,
 			)
 		}
 
@@ -809,6 +896,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 
 	pc.lastOffer = offer.SDP
+	offerCommitted = true
 
 	return offer, nil
 }
@@ -947,12 +1035,25 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
+	// An answer never proposes its own ICE restart, so unlike CreateOffer it
+	// always uses the live transport's current credentials/candidates directly.
+	iceParams, err := pc.iceGatherer.GetLocalParameters()
+	if err != nil {
+		return SessionDescription{}, err
+	}
+	candidates, err := pc.iceGatherer.GetLocalCandidates()
+	if err != nil {
+		return SessionDescription{}, err
+	}
+
 	descr, err := pc.generateMatchedSDP(
 		pc.rtpTransceivers,
 		useIdentity,
 		false, /*includeUnmatched */
 		connectionRole,
 		pc.api.settingEngine.ignoreRidPauseForRecv,
+		iceParams,
+		candidates,
 	)
 	if err != nil {
 		return SessionDescription{}, err
@@ -1131,6 +1232,12 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	}
 	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
 		return err
+	}
+
+	if desc.Type == SDPTypeOffer {
+		if err := pc.applyPendingICERestart(&desc); err != nil {
+			return err
+		}
 	}
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
@@ -2857,22 +2964,14 @@ func (pc *PeerConnection) startRTP(
 func (pc *PeerConnection) generateUnmatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity bool,
+	iceParams ICEParameters,
+	candidates []ICECandidate,
 ) (*sdp.SessionDescription, error) {
 	desc, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
 	}
 	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS *"})
-
-	iceParams, err := pc.iceGatherer.GetLocalParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	candidates, err := pc.iceGatherer.GetLocalCandidates()
-	if err != nil {
-		return nil, err
-	}
 
 	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
 	mediaSections := []mediaSection{}
@@ -2961,22 +3060,14 @@ func (pc *PeerConnection) generateMatchedSDP(
 	useIdentity, includeUnmatched bool,
 	connectionRole sdp.ConnectionRole,
 	ignoreRidPauseForRecv bool,
+	iceParams ICEParameters,
+	candidates []ICECandidate,
 ) (*sdp.SessionDescription, error) {
 	desc, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
 		return nil, err
 	}
 	desc.Attributes = append(desc.Attributes, sdp.Attribute{Key: sdp.AttrKeyMsidSemantic, Value: "WMS *"})
-
-	iceParams, err := pc.iceGatherer.GetLocalParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	candidates, err := pc.iceGatherer.GetLocalCandidates()
-	if err != nil {
-		return nil, err
-	}
 
 	var transceiver *RTPTransceiver
 	remoteDescription := pc.currentRemoteDescription
