@@ -180,7 +180,7 @@ func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint3
 	opts := []sctp.ClientOption{
 		sctp.WithNetConn(netConn),
 		sctp.WithLoggerFactory(r.api.settingEngine.LoggerFactory),
-		sctp.WithMTU(outboundMTU),
+		sctp.WithMTU(sctpOutboundMTU),
 		sctp.WithMaxMessageSize(maxMessageSize),
 	}
 
