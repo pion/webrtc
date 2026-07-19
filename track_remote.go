@@ -10,6 +10,7 @@ import (
 	"io"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/interceptor"
@@ -23,7 +24,8 @@ type peekedPacket struct {
 
 // TrackRemote represents a single inbound source of media.
 type TrackRemote struct {
-	mu sync.RWMutex
+	mu                  sync.RWMutex
+	repairReadRequested atomic.Bool
 
 	id       string
 	streamID string
@@ -120,6 +122,14 @@ func (t *TrackRemote) Codec() RTPCodecParameters {
 
 // Read reads data from the track.
 func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, err error) {
+	if t.repairReadRequested.CompareAndSwap(false, true) {
+		t.receiver.requestRepairStreamReader(t)
+	}
+
+	return t.read(b)
+}
+
+func (t *TrackRemote) read(b []byte) (n int, attributes interceptor.Attributes, err error) {
 	t.mu.RLock()
 	receiver := t.receiver
 	var peekedPkt *peekedPacket
@@ -201,8 +211,9 @@ func (t *TrackRemote) ReadRTP() (*rtp.Packet, interceptor.Attributes, error) {
 }
 
 // peek is like Read, but it doesn't discard the packet read.
-func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error) {
-	n, a, err = t.Read(b)
+func (t *TrackRemote) peek(b []byte) (n int, err error) {
+	var attr interceptor.Attributes
+	n, attr, err = t.read(b)
 	if err != nil {
 		return
 	}
@@ -213,7 +224,7 @@ func (t *TrackRemote) peek(b []byte) (n int, a interceptor.Attributes, err error
 	// that case.
 	data := make([]byte, n)
 	n = copy(data, b[:n])
-	t.peekedPackets = append(t.peekedPackets, &peekedPacket{payload: data, attributes: a})
+	t.peekedPackets = append(t.peekedPackets, &peekedPacket{payload: data, attributes: attr})
 	t.mu.Unlock()
 
 	return

@@ -1967,6 +1967,189 @@ func (s *simulcastTestTrackLocal) WriteRTP(pkt *rtp.Packet) error {
 	return util.FlattenErrs(writeErrs)
 }
 
+func TestPeerConnection_RIDRepairReaderStartsForPrimaryWrapper(t *testing.T) { //nolint:cyclop
+	for _, primaryFirst := range []bool{true, false} {
+		name := "RTX first"
+		if primaryFirst {
+			name = "primary first"
+		}
+		t.Run(name, func(t *testing.T) {
+			lim := test.TimeOut(time.Second * 30)
+			defer lim.Stop()
+
+			report := test.CheckRoutines(t)
+			defer report()
+
+			mediaEngine := &MediaEngine{}
+			require.NoError(t, mediaEngine.RegisterDefaultCodecs())
+			require.NoError(t, ConfigureSimulcastExtensionHeaders(mediaEngine))
+			ir := &interceptor.Registry{}
+			require.NoError(t, ConfigureNack(mediaEngine, ir))
+			api := NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(ir))
+			pcOffer, pcAnswer, err := api.newPair(Configuration{})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			const rid = "a"
+			primaryTrack, err := NewTrackLocalStaticRTP(
+				RTPCodecCapability{MimeType: MimeTypeVP8},
+				"video",
+				"pion",
+				WithRTPStreamID(rid),
+			)
+			require.NoError(t, err)
+			secondTrack, err := NewTrackLocalStaticRTP(
+				RTPCodecCapability{MimeType: MimeTypeVP8},
+				"video",
+				"pion",
+				WithRTPStreamID("b"),
+			)
+			require.NoError(t, err)
+			writer := &simulcastTestTrackLocal{primaryTrack}
+			sender, err := pcOffer.AddTrack(writer)
+			require.NoError(t, err)
+			require.NoError(t, sender.AddEncoding(&simulcastTestTrackLocal{secondTrack}))
+
+			// Do not read the TrackRemote: eager startup must come only from the interceptor wrapper.
+			pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {})
+
+			connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+			require.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(raw string) string {
+				lines := strings.Split(raw, "\r\n")
+				filtered := lines[:0]
+				for _, line := range lines {
+					if strings.HasPrefix(line, "a=ssrc") || strings.HasPrefix(line, "a=rtcp-fb:97") {
+						continue
+					}
+					filtered = append(filtered, line)
+				}
+
+				return strings.Join(filtered, "\r\n")
+			}))
+			connected.Wait()
+
+			parameters := sender.GetParameters()
+			var midID, ridID, rsidID uint8
+			for _, extension := range parameters.HeaderExtensions {
+				switch extension.URI {
+				case sdp.SDESMidURI:
+					midID = uint8(extension.ID) //nolint:gosec // G115
+				case sdp.SDESRTPStreamIDURI:
+					ridID = uint8(extension.ID) //nolint:gosec // G115
+				case sdp.SDESRepairRTPStreamIDURI:
+					rsidID = uint8(extension.ID) //nolint:gosec // G115
+				}
+			}
+			require.NotZero(t, midID)
+			require.NotZero(t, ridID)
+			require.NotZero(t, rsidID)
+			mid := sender.rtpTransceiver.Mid()
+			require.NotEmpty(t, mid)
+
+			receivers := pcAnswer.GetReceivers()
+			require.Len(t, receivers, 1)
+			receiver := receivers[0]
+			type repairState struct {
+				found, primaryBound, repairBound bool
+				startImmediately, readerStarted  bool
+				readRequested                    bool
+			}
+			snapshot := func() repairState {
+				receiver.mu.RLock()
+				defer receiver.mu.RUnlock()
+				for i := range receiver.tracks {
+					if receiver.tracks[i].track.RID() != rid {
+						continue
+					}
+
+					return repairState{
+						found:            true,
+						primaryBound:     receiver.tracks[i].streamInfo != nil,
+						repairBound:      receiver.tracks[i].repairStreamInfo != nil,
+						startImmediately: receiver.tracks[i].startRepairReaderImmediately,
+						readerStarted:    receiver.tracks[i].repairReaderStarted,
+						readRequested:    receiver.tracks[i].track.repairReadRequested.Load(),
+					}
+				}
+
+				return repairState{}
+			}
+
+			var sequenceNumber uint16
+			send := func(repair bool) error {
+				sequenceNumber++
+				header := rtp.Header{
+					Version:        2,
+					SequenceNumber: sequenceNumber,
+					PayloadType:    96,
+					SSRC:           1111,
+				}
+				payload := []byte{0xAA}
+				if repair {
+					header.PayloadType = 97
+					header.SSRC = 2222
+					payload = []byte{0, 1, 0xAA}
+				}
+				if err := header.SetExtension(midID, []byte(mid)); err != nil {
+					return err
+				}
+				if repair {
+					if err := header.SetExtension(rsidID, []byte(rid)); err != nil {
+						return err
+					}
+				} else if err := header.SetExtension(ridID, []byte(rid)); err != nil {
+					return err
+				}
+
+				return writer.WriteRTP(&rtp.Packet{Header: header, Payload: payload})
+			}
+			sendUntil := func(repair bool, ready func(repairState) bool) {
+				t.Helper()
+				deadline := time.Now().Add(5 * time.Second)
+				for {
+					state := snapshot()
+					if ready(state) {
+						return
+					}
+					if time.Now().After(deadline) {
+						require.FailNow(t, "timed out waiting for RID/RSID binding", "%+v", state)
+					}
+					require.NoError(t, send(repair))
+					time.Sleep(20 * time.Millisecond)
+				}
+			}
+
+			firstIsRepair := !primaryFirst
+			sendUntil(firstIsRepair, func(state repairState) bool {
+				if primaryFirst {
+					return state.primaryBound
+				}
+
+				return state.repairBound
+			})
+			firstState := snapshot()
+			require.True(t, firstState.found)
+			assert.False(t, firstState.readerStarted)
+			assert.False(t, firstState.readRequested)
+			if primaryFirst {
+				assert.True(t, firstState.startImmediately)
+				assert.False(t, firstState.repairBound)
+			} else {
+				assert.False(t, firstState.startImmediately)
+				assert.False(t, firstState.primaryBound)
+			}
+
+			sendUntil(primaryFirst, func(state repairState) bool {
+				return state.primaryBound && state.repairBound && state.readerStarted
+			})
+			finalState := snapshot()
+			assert.True(t, finalState.startImmediately)
+			assert.True(t, finalState.readerStarted)
+			assert.False(t, finalState.readRequested)
+		})
+	}
+}
+
 func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
