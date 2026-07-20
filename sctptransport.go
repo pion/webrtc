@@ -198,7 +198,7 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 		opts = append(opts, sctp.WithEnableZeroChecksum(true))
 	}
 
-	if r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite {
+	if r.api.settingEngine.dataChannelBlockWrite {
 		opts = append(opts, sctp.WithBlockWrite(true))
 	}
 

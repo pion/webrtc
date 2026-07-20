@@ -90,6 +90,76 @@ func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
 	assert.Equal(t, int32(1), called.Load())
 }
 
+func TestDataChannelSetWriteDeadline(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.EnableDataChannelBlockWrite(true)
+	s.SetSCTPMaxReceiveBufferSize(1500)
+
+	api := NewAPI(WithSettingEngine(s))
+	offerPC, answerPC, err := api.newPair(Configuration{})
+	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	releaseMessages := make(chan struct{})
+	defer close(releaseMessages)
+
+	answerPC.OnDataChannel(func(answerDC *DataChannel) {
+		if answerDC.Label() != expectedLabel {
+			return
+		}
+
+		answerDC.OnMessage(func(DataChannelMessage) {
+			<-releaseMessages
+		})
+	})
+
+	dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+	assert.NoError(t, err)
+
+	assert.NoError(t, dc.SetWriteDeadline(time.Now().Add(500*time.Millisecond)))
+
+	opened := make(chan struct{})
+	dc.OnOpen(func() {
+		close(opened)
+	})
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
+
+	select {
+	case <-opened:
+	case <-time.After(time.Second * 10):
+		assert.FailNow(t, "data channel did not open")
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 1000)
+		for {
+			sendErr := dc.Send(buf)
+			if sendErr != nil {
+				errCh <- sendErr
+
+				return
+			}
+		}
+	}()
+
+	select {
+	case err = <-errCh:
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second * 10):
+		assert.FailNow(t, "data channel send did not observe write deadline")
+	}
+
+	assert.NoError(t, dc.SetWriteDeadline(time.Time{}))
+}
+
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
