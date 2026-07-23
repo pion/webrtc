@@ -28,8 +28,7 @@ func GatheringCompletePromise(pc *PeerConnection) (gatherComplete <-chan struct{
 	pc.setGatherCompleteHandler(func() { done() })
 	// While a restart is pending, the current Complete belongs to the previous cycle, so let the
 	// handler resolve once SetLocalDescription starts the new one instead of resolving now.
-	pending, _ := pc.pendingICERestartCredentials.Load().(*iceCredentials)
-	if pending == nil && pc.ICEGatheringState() == ICEGatheringStateComplete {
+	if !pc.hasPendingICERestart() && pc.ICEGatheringState() == ICEGatheringStateComplete {
 		done()
 	}
 

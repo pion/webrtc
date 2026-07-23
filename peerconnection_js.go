@@ -505,6 +505,11 @@ func (pc *PeerConnection) ConnectionState() PeerConnectionState {
 	return newPeerConnectionState(rawState)
 }
 
+// hasPendingICERestart is always false in the WASM build; the browser performs the ICE restart.
+func (pc *PeerConnection) hasPendingICERestart() bool {
+	return false
+}
+
 func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
 	pc.onGatherCompleteHandler = handler
 

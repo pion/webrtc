@@ -681,6 +681,13 @@ func (pc *PeerConnection) prepareICERestartForOffer(options *OfferOptions) error
 	return nil
 }
 
+// hasPendingICERestart reports whether a restart's credentials are staged but not yet applied.
+func (pc *PeerConnection) hasPendingICERestart() bool {
+	pending, _ := pc.pendingICERestartCredentials.Load().(*iceCredentials)
+
+	return pending != nil
+}
+
 // effectiveLocalICEParameters returns the ICE credentials CreateOffer proposes:
 // the pending restart's if one is staged, otherwise the live transport's.
 func (pc *PeerConnection) effectiveLocalICEParameters() (ICEParameters, error) {
