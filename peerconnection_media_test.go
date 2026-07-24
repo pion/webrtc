@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -2750,4 +2751,76 @@ func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cycl
 	<-ctx.Done()
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, pcOffer, pcAnswer)
+}
+
+// BenchmarkPeerConnection_Media_WriteRead measures a WriteRTP on a local track through the
+// interceptor chain, SRTP and the loopback network, to a Read on the remote track.
+// An empty interceptor registry is used so allocations of the default interceptors
+// don't dominate the measurement. Note that b.ReportAllocs counts allocations across
+// all goroutines, so the write and read paths (of both peers) are measured together.
+func BenchmarkPeerConnection_Media_WriteRead(b *testing.B) {
+	mediaEngine := &MediaEngine{}
+	require.NoError(b, mediaEngine.RegisterDefaultCodecs())
+
+	offerPC, answerPC, err := NewAPI(
+		WithMediaEngine(mediaEngine),
+		WithInterceptorRegistry(&interceptor.Registry{}),
+	).newPair(Configuration{})
+	require.NoError(b, err)
+	defer closePairNow(b, offerPC, answerPC)
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	require.NoError(b, err)
+
+	_, err = offerPC.AddTrack(track)
+	require.NoError(b, err)
+
+	remoteTrackChan := make(chan *TrackRemote, 1)
+	answerPC.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		remoteTrackChan <- remote
+	})
+
+	require.NoError(b, signalPair(offerPC, answerPC))
+
+	packet := &rtp.Packet{
+		Header:  rtp.Header{Version: 2},
+		Payload: make([]byte, 1000),
+	}
+	writePacket := func() {
+		packet.SequenceNumber++
+		packet.Timestamp += 3000
+		require.NoError(b, track.WriteRTP(packet))
+	}
+
+	// Packets are dropped until the connection is up, so write until OnTrack fires.
+	var remoteTrack *TrackRemote
+	for remoteTrack == nil {
+		writePacket()
+		select {
+		case remoteTrack = <-remoteTrackChan:
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	// Drain packets queued while waiting for OnTrack.
+	readBuf := make([]byte, receiveMTU)
+	for {
+		require.NoError(b, remoteTrack.SetReadDeadline(time.Now().Add(50*time.Millisecond)))
+		if _, _, err = remoteTrack.Read(readBuf); err != nil {
+			break
+		}
+	}
+	require.NoError(b, remoteTrack.SetReadDeadline(time.Now().Add(time.Minute)))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		writePacket()
+		if _, _, err = remoteTrack.Read(readBuf); err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.StopTimer()
 }

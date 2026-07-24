@@ -308,7 +308,7 @@ type interceptorToTrackLocalWriter struct{ interceptor atomic.Value } // interce
 // WriteRTP writes an RTP packet using the underlying interceptor.RTPWriter.
 func (i *interceptorToTrackLocalWriter) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
 	if writer, ok := i.interceptor.Load().(interceptor.RTPWriter); ok && writer != nil {
-		return writer.Write(header, payload, interceptor.Attributes{})
+		return writer.Write(header, payload, nil)
 	}
 
 	return 0, nil
