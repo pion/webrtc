@@ -111,6 +111,10 @@ linters:
         - name: use-any
           severity: warning
           disabled: false
+        # Keep package documentation consistent and avoid duplicate package comments.
+        - name: package-comments
+          severity: warning
+          disabled: false
     misspell:
       locale: US
     varnamelen:
