@@ -121,10 +121,14 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 //
 //nolint:cyclop
 func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
-	if r.isStarted {
+	r.lock.Lock()
+	if r.isStarted || r.state == SCTPTransportStateClosed {
+		r.lock.Unlock()
+
 		return nil
 	}
 	r.isStarted = true
+	r.lock.Unlock()
 
 	maxMessageSize := capabilities.MaxMessageSize
 	if maxMessageSize == 0 {
@@ -149,6 +153,12 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	}
 
 	r.lock.Lock()
+	if r.state == SCTPTransportStateClosed {
+		r.lock.Unlock()
+		sctpAssociation.Abort("")
+
+		return nil
+	}
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
 	dataChannels := append([]*DataChannel{}, r.dataChannels...)
@@ -228,6 +238,9 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
+	r.state = SCTPTransportStateClosed
+
 	if r.sctpAssociation == nil {
 		return nil
 	}
@@ -235,7 +248,6 @@ func (r *SCTPTransport) Stop() error {
 	r.sctpAssociation.Abort("")
 
 	r.sctpAssociation = nil
-	r.state = SCTPTransportStateClosed
 
 	return nil
 }
