@@ -68,8 +68,10 @@ type SCTPTransport struct {
 	onDataChannelOpenedHandler func(*DataChannel)
 
 	// DataChannels
-	dataChannels          []*DataChannel
-	dataChannelIDsUsed    map[uint16]struct{}
+	dataChannels []*DataChannel
+	// Count reservations because a reused stream can arrive before the old
+	// generation's reset-complete callback runs on this association.
+	dataChannelIDsUsed    map[uint16]uint32
 	dataChannelsOpened    uint32
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
@@ -89,7 +91,7 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 		state:              SCTPTransportStateConnecting,
 		api:                api,
 		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed: make(map[uint16]struct{}),
+		dataChannelIDsUsed: make(map[uint16]uint32),
 	}
 
 	res.updateMaxChannels()
@@ -412,7 +414,7 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
 	if dc.ID() != nil {
-		r.dataChannelIDsUsed[*dc.ID()] = struct{}{}
+		r.dataChannelIDsUsed[*dc.ID()]++
 	} else {
 		// This cannot happen, the constructor for this datachannel in the caller
 		// takes a pointer to the id.
@@ -458,7 +460,11 @@ func maxChannelsForAssociation(association *sctp.Association) *uint16 {
 
 func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
 	r.lock.Lock()
-	delete(r.dataChannelIDsUsed, streamID)
+	if r.dataChannelIDsUsed[streamID] > 1 {
+		r.dataChannelIDsUsed[streamID]--
+	} else {
+		delete(r.dataChannelIDsUsed, streamID)
+	}
 	r.lock.Unlock()
 }
 
@@ -546,7 +552,7 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 			continue
 		}
 		*idOut = &id
-		r.dataChannelIDsUsed[id] = struct{}{}
+		r.dataChannelIDsUsed[id] = 1
 
 		return nil
 	}

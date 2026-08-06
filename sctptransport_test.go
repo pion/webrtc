@@ -23,13 +23,13 @@ func TestGenerateDataChannelID(t *testing.T) {
 	sctpTransportWithChannels := func(ids []uint16) *SCTPTransport {
 		ret := &SCTPTransport{
 			dataChannels:       []*DataChannel{},
-			dataChannelIDsUsed: make(map[uint16]struct{}),
+			dataChannelIDsUsed: make(map[uint16]uint32),
 		}
 
 		for i := range ids {
 			id := ids[i]
 			ret.dataChannels = append(ret.dataChannels, &DataChannel{id: &id})
-			ret.dataChannelIDsUsed[id] = struct{}{}
+			ret.dataChannelIDsUsed[id] = 1
 		}
 
 		return ret
@@ -76,7 +76,7 @@ func TestGenerateDataChannelIDRespectsNegotiatedLimitAndParity(t *testing.T) {
 			maxChannels := uint16(4)
 			transport := &SCTPTransport{
 				maxChannels:        &maxChannels,
-				dataChannelIDsUsed: make(map[uint16]struct{}),
+				dataChannelIDsUsed: make(map[uint16]uint32),
 			}
 
 			for _, expected := range testCase.expected {
@@ -96,7 +96,7 @@ func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
 	maxChannels := uint16(2)
 	transport := &SCTPTransport{
 		maxChannels:        &maxChannels,
-		dataChannelIDsUsed: make(map[uint16]struct{}),
+		dataChannelIDsUsed: make(map[uint16]uint32),
 	}
 
 	first := new(uint16)
@@ -110,6 +110,25 @@ func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
 	reused := new(uint16)
 	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reused))
 	require.Equal(t, *first, *reused)
+}
+
+func TestReleaseDataChannelIDKeepsOverlappingGenerationReserved(t *testing.T) {
+	const streamID = uint16(0)
+	maxChannels := uint16(2)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: map[uint16]uint32{streamID: 2},
+	}
+
+	transport.releaseDataChannelID(streamID)
+	require.Equal(t, uint32(1), transport.dataChannelIDsUsed[streamID])
+	blocked := new(uint16)
+	require.ErrorIs(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &blocked), ErrMaxDataChannelID)
+
+	transport.releaseDataChannelID(streamID)
+	reused := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reused))
+	require.Equal(t, streamID, *reused)
 }
 
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
