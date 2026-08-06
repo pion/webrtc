@@ -1,5 +1,5 @@
-github.com/GizClaw/pion-sctp v0.0.0-20260806143535-4889afb0bdcb h1:qnnCWZ8opOAA4tPF7e5EAQ4unr8zvsrkZN+DC7Rq3IY=
-github.com/GizClaw/pion-sctp v0.0.0-20260806143535-4889afb0bdcb/go.mod h1:UeyX8aRca892UhRetke5BTkhvISxX/wiBdLl+njo1Lo=
+github.com/GizClaw/pion-sctp v0.0.0-20260806150545-1314565dcbc5 h1:s+8wtkBW4dwotUFT9gzkA/Ct7nqjk8N6r53+LtvREyM=
+github.com/GizClaw/pion-sctp v0.0.0-20260806150545-1314565dcbc5/go.mod h1:UeyX8aRca892UhRetke5BTkhvISxX/wiBdLl+njo1Lo=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
