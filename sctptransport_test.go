@@ -63,6 +63,55 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
+func TestGenerateDataChannelIDRespectsNegotiatedLimitAndParity(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		role     DTLSRole
+		expected []uint16
+	}{
+		{name: "client", role: DTLSRoleClient, expected: []uint16{0, 2}},
+		{name: "server", role: DTLSRoleServer, expected: []uint16{1, 3}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			maxChannels := uint16(4)
+			transport := &SCTPTransport{
+				maxChannels:        &maxChannels,
+				dataChannelIDsUsed: make(map[uint16]struct{}),
+			}
+
+			for _, expected := range testCase.expected {
+				id := new(uint16)
+				require.NoError(t, transport.generateAndSetDataChannelID(testCase.role, &id))
+				require.Equal(t, expected, *id)
+			}
+
+			id := new(uint16)
+			err := transport.generateAndSetDataChannelID(testCase.role, &id)
+			require.ErrorIs(t, err, ErrMaxDataChannelID)
+		})
+	}
+}
+
+func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
+	maxChannels := uint16(2)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: make(map[uint16]struct{}),
+	}
+
+	first := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &first))
+	require.Equal(t, uint16(0), *first)
+
+	exhausted := new(uint16)
+	require.ErrorIs(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &exhausted), ErrMaxDataChannelID)
+
+	transport.releaseDataChannelID(*first)
+	reused := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reused))
+	require.Equal(t, *first, *reused)
+}
+
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
 	metadata, ok := (&SCTPTransport{}).Metadata()
 	assert.False(t, ok)
@@ -75,6 +124,8 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       sctp.PartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	})
 
 	assert.Equal(t, SCTPTransportMetadata{
@@ -82,7 +133,80 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	}, metadata)
+}
+
+func TestSCTPTransportReusesDataChannelIDAfterResetCompletion(t *testing.T) {
+	offerPC, answerPC, wan := createVNetPair(t, nil)
+	defer func() {
+		require.NoError(t, wan.Stop())
+		closePairNow(t, offerPC, answerPC)
+	}()
+
+	accepted := make(chan *DataChannel, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		accepted <- dataChannel
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() { close(firstOpened) })
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	select {
+	case <-firstOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first DataChannel to open")
+	}
+	firstRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, first.ID())
+	require.NotNil(t, firstRemote.ID())
+	firstID := *first.ID()
+	require.Equal(t, firstID, *firstRemote.ID())
+
+	require.NoError(t, first.Close())
+	require.Eventually(t, func() bool {
+		return !dataChannelIDInUse(offerPC.SCTP(), firstID) && !dataChannelIDInUse(answerPC.SCTP(), firstID)
+	}, 5*time.Second, time.Millisecond)
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	require.NotNil(t, second.ID())
+	require.Equal(t, firstID, *second.ID())
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() { close(secondOpened) })
+
+	select {
+	case <-secondOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for reused DataChannel to open")
+	}
+	secondRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, secondRemote.ID())
+	require.Equal(t, firstID, *secondRemote.ID())
+}
+
+func dataChannelIDInUse(transport *SCTPTransport, id uint16) bool {
+	transport.lock.RLock()
+	defer transport.lock.RUnlock()
+	_, ok := transport.dataChannelIDsUsed[id]
+
+	return ok
+}
+
+func waitForAcceptedDataChannel(t *testing.T, accepted <-chan *DataChannel) *DataChannel {
+	t.Helper()
+	select {
+	case dataChannel := <-accepted:
+		return dataChannel
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for remote DataChannel")
+
+		return nil
+	}
 }
 
 func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {

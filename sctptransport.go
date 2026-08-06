@@ -36,6 +36,8 @@ func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMe
 		PartialReliabilityMode:       partialReliabilityMode,
 		ZeroChecksumSendingEnabled:   metadata.ZeroChecksumSendingEnabled,
 		ZeroChecksumReceivingEnabled: metadata.ZeroChecksumReceivingEnabled,
+		NumInboundStreams:            metadata.NumInboundStreams,
+		NumOutboundStreams:           metadata.NumOutboundStreams,
 	}
 }
 
@@ -147,10 +149,12 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if err != nil {
 		return err
 	}
+	sctpAssociation.OnStreamResetComplete(r.releaseDataChannelID)
 
 	r.lock.Lock()
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
+	r.maxChannels = maxChannelsForAssociation(sctpAssociation)
 	dataChannels := append([]*DataChannel{}, r.dataChannels...)
 	r.lock.Unlock()
 
@@ -227,15 +231,18 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 // Stop stops the SCTPTransport.
 func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
-	defer r.lock.Unlock()
-	if r.sctpAssociation == nil {
+	association := r.sctpAssociation
+	if association == nil {
+		r.lock.Unlock()
+
 		return nil
 	}
-
-	r.sctpAssociation.Abort("")
-
 	r.sctpAssociation = nil
 	r.state = SCTPTransportStateClosed
+	r.lock.Unlock()
+
+	association.OnStreamResetComplete(nil)
+	association.Abort("")
 
 	return nil
 }
@@ -432,14 +439,33 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 }
 
 func (r *SCTPTransport) updateMaxChannels() {
-	val := sctpMaxChannels
-	r.maxChannels = &val
+	maxChannels := maxChannelsForAssociation(r.association())
+	r.lock.Lock()
+	r.maxChannels = maxChannels
+	r.lock.Unlock()
+}
+
+func maxChannelsForAssociation(association *sctp.Association) *uint16 {
+	maxChannels := sctpMaxChannels
+	if association != nil {
+		if metadata, ok := association.Metadata(); ok {
+			maxChannels = min(maxChannels, metadata.NumInboundStreams, metadata.NumOutboundStreams)
+		}
+	}
+
+	return &maxChannels
+}
+
+func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
+	r.lock.Lock()
+	delete(r.dataChannelIDsUsed, streamID)
+	r.lock.Unlock()
 }
 
 // MaxChannels is the maximum number of RTCDataChannels that can be open simultaneously.
 func (r *SCTPTransport) MaxChannels() uint16 {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	if r.maxChannels == nil {
 		return sctpMaxChannels
@@ -504,17 +530,18 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 }
 
 func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
-	var id uint16
+	var firstID uint32
 	if dtlsRole != DTLSRoleClient {
-		id++
+		firstID++
 	}
 
-	maxVal := r.MaxChannels()
+	maxVal := uint32(r.MaxChannels())
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	for ; id < maxVal-1; id += 2 {
+	for candidate := firstID; candidate < maxVal; candidate += 2 {
+		id := uint16(candidate)
 		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
