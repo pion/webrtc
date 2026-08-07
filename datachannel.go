@@ -183,10 +183,10 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 
 		return err
 	}
-	d.sctpTransport.registerLocalDataChannelStream(stream)
+	generation := d.sctpTransport.registerLocalDataChannelGeneration(*d.id)
 	dc, err := datachannel.Client(stream, cfg)
 	if err != nil {
-		d.sctpTransport.unregisterLocalDataChannelStream(stream)
+		d.sctpTransport.unregisterLocalDataChannelGeneration(*d.id, generation)
 		d.mu.Unlock()
 
 		return err

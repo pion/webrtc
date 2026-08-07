@@ -74,11 +74,13 @@ type SCTPTransport struct {
 	dataChannelIDsUsed map[uint16]uint32
 	// Detach removes DataChannels from dataChannels before their ACK can arrive.
 	// Keep each locally opened stream generation classified independently from
-	// that garbage-collection list until its reset completes.
-	localDataChannelStreams map[uint16][]*sctp.Stream
-	dataChannelsOpened      uint32
-	dataChannelsRequested   uint32
-	dataChannelsAccepted    uint32
+	// that garbage-collection list until its reset completes. SCTP may recreate
+	// the Go Stream object for the same ID while completing a reset, so identity
+	// here must be the ordered generation, not a Stream pointer.
+	localDataChannelGenerations map[uint16][]*localDataChannelGeneration
+	dataChannelsOpened          uint32
+	dataChannelsRequested       uint32
+	dataChannelsAccepted        uint32
 
 	localSctpInit []byte
 
@@ -91,12 +93,12 @@ type SCTPTransport struct {
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
-		dtlsTransport:           dtls,
-		state:                   SCTPTransportStateConnecting,
-		api:                     api,
-		log:                     api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed:      make(map[uint16]uint32),
-		localDataChannelStreams: make(map[uint16][]*sctp.Stream),
+		dtlsTransport:               dtls,
+		state:                       SCTPTransportStateConnecting,
+		api:                         api,
+		log:                         api.settingEngine.LoggerFactory.NewLogger("ortc"),
+		dataChannelIDsUsed:          make(map[uint16]uint32),
+		localDataChannelGenerations: make(map[uint16][]*localDataChannelGeneration),
 	}
 
 	res.updateMaxChannels()
@@ -371,7 +373,7 @@ func (r *SCTPTransport) acceptDataChannel(
 	}
 
 	stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
-	if r.isLocalDataChannelStream(stream) {
+	if r.acceptLocalDataChannelGeneration(stream.StreamIdentifier()) {
 		return nil, true, nil
 	}
 
@@ -385,22 +387,30 @@ func (r *SCTPTransport) acceptDataChannel(
 	return dc, false, nil
 }
 
-func (r *SCTPTransport) registerLocalDataChannelStream(stream *sctp.Stream) {
-	r.lock.Lock()
-	if r.localDataChannelStreams == nil {
-		r.localDataChannelStreams = make(map[uint16][]*sctp.Stream)
-	}
-	streamID := stream.StreamIdentifier()
-	r.localDataChannelStreams[streamID] = append(r.localDataChannelStreams[streamID], stream)
-	r.lock.Unlock()
+type localDataChannelGeneration struct {
+	accepted bool
 }
 
-func (r *SCTPTransport) isLocalDataChannelStream(stream *sctp.Stream) bool {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+func (r *SCTPTransport) registerLocalDataChannelGeneration(streamID uint16) *localDataChannelGeneration {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.localDataChannelGenerations == nil {
+		r.localDataChannelGenerations = make(map[uint16][]*localDataChannelGeneration)
+	}
+	generation := &localDataChannelGeneration{}
+	r.localDataChannelGenerations[streamID] = append(r.localDataChannelGenerations[streamID], generation)
 
-	for _, localStream := range r.localDataChannelStreams[stream.StreamIdentifier()] {
-		if localStream == stream {
+	return generation
+}
+
+func (r *SCTPTransport) acceptLocalDataChannelGeneration(streamID uint16) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for _, generation := range r.localDataChannelGenerations[streamID] {
+		if !generation.accepted {
+			generation.accepted = true
+
 			return true
 		}
 	}
@@ -408,21 +418,23 @@ func (r *SCTPTransport) isLocalDataChannelStream(stream *sctp.Stream) bool {
 	return false
 }
 
-func (r *SCTPTransport) unregisterLocalDataChannelStream(stream *sctp.Stream) {
+func (r *SCTPTransport) unregisterLocalDataChannelGeneration(
+	streamID uint16,
+	generation *localDataChannelGeneration,
+) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	streamID := stream.StreamIdentifier()
-	localStreams := r.localDataChannelStreams[streamID]
-	for i := range localStreams {
-		if localStreams[i] != stream {
+	generations := r.localDataChannelGenerations[streamID]
+	for i := range generations {
+		if generations[i] != generation {
 			continue
 		}
-		localStreams = append(localStreams[:i], localStreams[i+1:]...)
-		if len(localStreams) == 0 {
-			delete(r.localDataChannelStreams, streamID)
+		generations = append(generations[:i], generations[i+1:]...)
+		if len(generations) == 0 {
+			delete(r.localDataChannelGenerations, streamID)
 		} else {
-			r.localDataChannelStreams[streamID] = localStreams
+			r.localDataChannelGenerations[streamID] = generations
 		}
 
 		return
@@ -530,10 +542,10 @@ func maxChannelsForAssociation(association *sctp.Association) *uint16 {
 
 func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
 	r.lock.Lock()
-	if localStreams := r.localDataChannelStreams[streamID]; len(localStreams) <= 1 {
-		delete(r.localDataChannelStreams, streamID)
+	if generations := r.localDataChannelGenerations[streamID]; len(generations) <= 1 {
+		delete(r.localDataChannelGenerations, streamID)
 	} else {
-		r.localDataChannelStreams[streamID] = localStreams[1:]
+		r.localDataChannelGenerations[streamID] = generations[1:]
 	}
 	if r.dataChannelIDsUsed[streamID] > 1 {
 		r.dataChannelIDsUsed[streamID]--

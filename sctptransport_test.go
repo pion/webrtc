@@ -131,6 +131,22 @@ func TestReleaseDataChannelIDKeepsOverlappingGenerationReserved(t *testing.T) {
 	require.Equal(t, streamID, *reused)
 }
 
+func TestLocalDataChannelGenerationSurvivesDelayedReset(t *testing.T) {
+	const streamID = uint16(0)
+	transport := &SCTPTransport{
+		dataChannelIDsUsed:          map[uint16]uint32{streamID: 2},
+		localDataChannelGenerations: make(map[uint16][]*localDataChannelGeneration),
+	}
+
+	transport.registerLocalDataChannelGeneration(streamID)
+	require.True(t, transport.acceptLocalDataChannelGeneration(streamID))
+	transport.registerLocalDataChannelGeneration(streamID)
+
+	transport.releaseDataChannelID(streamID)
+	require.True(t, transport.acceptLocalDataChannelGeneration(streamID))
+	require.False(t, transport.acceptLocalDataChannelGeneration(streamID))
+}
+
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
 	metadata, ok := (&SCTPTransport{}).Metadata()
 	assert.False(t, ok)
