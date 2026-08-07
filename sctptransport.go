@@ -172,6 +172,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		if d.ReadyState() == DataChannelStateConnecting {
 			err := d.open(r)
 			if err != nil {
+				r.discardFailedDataChannel(d)
 				r.log.Warnf("failed to open data channel: %s", err)
 
 				continue
@@ -547,12 +548,37 @@ func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
 	} else {
 		r.localDataChannelGenerations[streamID] = generations[1:]
 	}
+	r.releaseDataChannelReservationLocked(streamID)
+	r.lock.Unlock()
+}
+
+func (r *SCTPTransport) discardFailedDataChannel(dataChannel *DataChannel) {
+	streamID := dataChannel.ID()
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for i, existing := range r.dataChannels {
+		if existing != dataChannel {
+			continue
+		}
+		copy(r.dataChannels[i:], r.dataChannels[i+1:])
+		r.dataChannels[len(r.dataChannels)-1] = nil
+		r.dataChannels = r.dataChannels[:len(r.dataChannels)-1]
+
+		break
+	}
+	if streamID != nil {
+		r.releaseDataChannelReservationLocked(*streamID)
+	}
+}
+
+// The caller should hold the SCTPTransport lock.
+func (r *SCTPTransport) releaseDataChannelReservationLocked(streamID uint16) {
 	if r.dataChannelIDsUsed[streamID] > 1 {
 		r.dataChannelIDsUsed[streamID]--
 	} else {
 		delete(r.dataChannelIDsUsed, streamID)
 	}
-	r.lock.Unlock()
 }
 
 // MaxChannels is the maximum number of RTCDataChannels that can be open simultaneously.

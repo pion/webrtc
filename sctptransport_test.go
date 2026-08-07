@@ -112,6 +112,40 @@ func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
 	require.Equal(t, *first, *reused)
 }
 
+func TestSCTPTransportRejectsExplicitDataChannelIDOutsideNegotiatedLimit(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	_, err = offerPC.CreateDataChannel("initial", nil)
+	require.NoError(t, err)
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	require.Eventually(t, func() bool {
+		return offerPC.SCTP().State() == SCTPTransportStateConnected
+	}, 5*time.Second, time.Millisecond)
+
+	const negotiatedLimit = uint16(4)
+	limit := negotiatedLimit
+	offerPC.SCTP().lock.Lock()
+	offerPC.SCTP().maxChannels = &limit
+	dataChannelsBeforeFailure := len(offerPC.SCTP().dataChannels)
+	offerPC.SCTP().lock.Unlock()
+
+	invalidID := negotiatedLimit
+	_, err = offerPC.CreateDataChannel("out-of-range", &DataChannelInit{ID: &invalidID})
+	require.ErrorIs(t, err, ErrMaxDataChannelID)
+	require.False(t, dataChannelIDInUse(offerPC.SCTP(), invalidID))
+	offerPC.SCTP().lock.RLock()
+	dataChannelsAfterFailure := len(offerPC.SCTP().dataChannels)
+	offerPC.SCTP().lock.RUnlock()
+	require.Equal(t, dataChannelsBeforeFailure, dataChannelsAfterFailure)
+
+	validID := negotiatedLimit - 2
+	valid, err := offerPC.CreateDataChannel("in-range", &DataChannelInit{ID: &validID})
+	require.NoError(t, err)
+	require.Equal(t, validID, *valid.ID())
+}
+
 func TestReleaseDataChannelIDKeepsOverlappingGenerationReserved(t *testing.T) {
 	const streamID = uint16(0)
 	maxChannels := uint16(2)

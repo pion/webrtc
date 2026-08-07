@@ -177,6 +177,11 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		d.mu.Lock()
 		d.id = dcID
 	}
+	if *d.id >= sctpTransport.MaxChannels() {
+		d.mu.Unlock()
+
+		return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	}
 	stream, err := association.OpenStream(*d.id, sctp.PayloadTypeWebRTCBinary)
 	if err != nil {
 		d.mu.Unlock()
