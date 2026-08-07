@@ -112,6 +112,71 @@ func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
 	require.Equal(t, *first, *reused)
 }
 
+func TestGenerateDataChannelIDRotatesBeforeReuse(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		role     DTLSRole
+		expected []uint16
+	}{
+		{name: "client", role: DTLSRoleClient, expected: []uint16{0, 2, 4, 0}},
+		{name: "server", role: DTLSRoleServer, expected: []uint16{1, 3, 5, 1}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			maxChannels := uint16(6)
+			transport := &SCTPTransport{
+				maxChannels:        &maxChannels,
+				dataChannelIDsUsed: make(map[uint16]uint32),
+			}
+
+			for _, expected := range testCase.expected {
+				id := new(uint16)
+				require.NoError(t, transport.generateAndSetDataChannelID(testCase.role, &id))
+				require.Equal(t, expected, *id)
+				transport.releaseDataChannelID(*id)
+			}
+		})
+	}
+}
+
+func TestGenerateDataChannelIDRotationSkipsReservedID(t *testing.T) {
+	maxChannels := uint16(6)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: map[uint16]uint32{2: 1},
+		nextDataChannelID:  2,
+	}
+
+	id := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &id))
+	require.Equal(t, uint16(4), *id)
+	transport.releaseDataChannelID(*id)
+
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &id))
+	require.Equal(t, uint16(0), *id)
+}
+
+func TestGenerateDataChannelIDRejectsEmptyRoleParity(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		role        DTLSRole
+		maxChannels uint16
+	}{
+		{name: "empty association", role: DTLSRoleClient, maxChannels: 0},
+		{name: "server parity unavailable", role: DTLSRoleServer, maxChannels: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			transport := &SCTPTransport{
+				maxChannels:        &testCase.maxChannels,
+				dataChannelIDsUsed: make(map[uint16]uint32),
+			}
+
+			id := new(uint16)
+			err := transport.generateAndSetDataChannelID(testCase.role, &id)
+			require.ErrorIs(t, err, ErrMaxDataChannelID)
+		})
+	}
+}
+
 func TestSCTPTransportRejectsExplicitDataChannelIDOutsideNegotiatedLimit(t *testing.T) {
 	offerPC, answerPC, err := newPair()
 	require.NoError(t, err)
@@ -235,6 +300,13 @@ func TestSCTPTransportReusesDataChannelIDAfterResetCompletion(t *testing.T) {
 	require.NotNil(t, firstRemote.ID())
 	firstID := *first.ID()
 	require.Equal(t, firstID, *firstRemote.ID())
+	// Constrain the allocator to this single local-parity ID so the test still
+	// proves reuse after reset completion. Wider negotiated ranges are covered
+	// separately and intentionally rotate before returning to firstID.
+	maxChannels := firstID + 1
+	offerPC.SCTP().lock.Lock()
+	offerPC.SCTP().maxChannels = &maxChannels
+	offerPC.SCTP().lock.Unlock()
 
 	require.NoError(t, first.Close())
 	require.Eventually(t, func() bool {

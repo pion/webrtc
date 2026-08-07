@@ -72,6 +72,12 @@ type SCTPTransport struct {
 	// Count reservations because a reused stream can arrive before the old
 	// generation's reset-complete callback runs on this association.
 	dataChannelIDsUsed map[uint16]uint32
+	// Advance allocations within the negotiated DTLS-role parity instead of
+	// immediately selecting the lowest released ID again. Reset completion is
+	// still the reuse boundary, while spreading successive short-lived channels
+	// across the available stream space avoids coupling every new generation to
+	// the immediately preceding reset exchange.
+	nextDataChannelID uint16
 	// Detach removes DataChannels from dataChannels before their ACK can arrive.
 	// Keep each locally opened stream generation classified independently from
 	// that garbage-collection list until its reset completes. SCTP may recreate
@@ -659,13 +665,27 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	for candidate := firstID; candidate < maxVal; candidate += 2 {
+	if maxVal <= firstID {
+		return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	}
+	start := uint32(r.nextDataChannelID)
+	if start < firstID || start >= maxVal || start%2 != firstID {
+		start = firstID
+	}
+	candidateCount := (maxVal - firstID + 1) / 2
+	for range candidateCount {
+		candidate := start
+		start += 2
+		if start >= maxVal {
+			start = firstID
+		}
 		id := uint16(candidate)
 		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
 		*idOut = &id
 		r.dataChannelIDsUsed[id] = 1
+		r.nextDataChannelID = uint16(start)
 
 		return nil
 	}
