@@ -470,6 +470,14 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			wantExtra: 1,
 		},
 		{
+			name: "NumStreams",
+			configure: func(se *SettingEngine) {
+				se.sctp.numInboundStreams = 7
+				se.sctp.numOutboundStreams = 9
+			},
+			wantExtra: 1,
+		},
+		{
 			name: "EnableZeroChecksum",
 			configure: func(se *SettingEngine) {
 				se.sctp.enableZeroChecksum = true
@@ -523,6 +531,8 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			name: "AllOptional",
 			configure: func(se *SettingEngine) {
 				se.sctp.maxReceiveBufferSize = 1024
+				se.sctp.numInboundStreams = 7
+				se.sctp.numOutboundStreams = 9
 				se.sctp.enableZeroChecksum = true
 				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
@@ -532,7 +542,7 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 				se.sctp.fastRtxWnd = 22
 				se.sctp.cwndCAStep = 33
 			},
-			wantExtra: 8,
+			wantExtra: 9,
 		},
 	}
 

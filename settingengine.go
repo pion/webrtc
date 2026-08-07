@@ -86,6 +86,8 @@ type SettingEngine struct {
 	}
 	sctp struct {
 		maxReceiveBufferSize uint32
+		numInboundStreams    uint16
+		numOutboundStreams   uint16
 		enableZeroChecksum   bool
 		rtoMax               time.Duration
 		handshakeRTOMax      time.Duration
@@ -609,6 +611,13 @@ func (e *SettingEngine) SetDTLSKeyLogWriter(writer io.Writer) {
 // Leave this 0 for the default maxReceiveBufferSize.
 func (e *SettingEngine) SetSCTPMaxReceiveBufferSize(maxReceiveBufferSize uint32) {
 	e.sctp.maxReceiveBufferSize = maxReceiveBufferSize
+}
+
+// SetSCTPNumStreams sets the maximum inbound and outbound stream counts to
+// negotiate. A zero value retains SCTP's default maximum for that direction.
+func (e *SettingEngine) SetSCTPNumStreams(numInbound, numOutbound uint16) {
+	e.sctp.numInboundStreams = numInbound
+	e.sctp.numOutboundStreams = numOutbound
 }
 
 // EnableSCTPZeroChecksum controls the zero checksum feature in SCTP.

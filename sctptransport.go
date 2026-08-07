@@ -208,10 +208,17 @@ func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint3
 }
 
 func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
-	opts := make([]sctp.ClientOption, 0, 8)
+	opts := make([]sctp.ClientOption, 0, 9)
 
 	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
 		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
+	}
+
+	if r.api.settingEngine.sctp.numInboundStreams != 0 || r.api.settingEngine.sctp.numOutboundStreams != 0 {
+		opts = append(opts, sctp.WithNumStreams(
+			r.api.settingEngine.sctp.numInboundStreams,
+			r.api.settingEngine.sctp.numOutboundStreams,
+		))
 	}
 
 	if r.api.settingEngine.sctp.enableZeroChecksum {
@@ -722,6 +729,8 @@ func (r *SCTPTransport) GetSctpInit() []byte {
 		var err error
 		r.localSctpInit, err = sctp.GenerateOutOfBandToken(sctp.Config{
 			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
+			NumInboundStreams:    r.api.settingEngine.sctp.numInboundStreams,
+			NumOutboundStreams:   r.api.settingEngine.sctp.numOutboundStreams,
 			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		})
 		if err != nil {
