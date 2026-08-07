@@ -88,6 +88,7 @@ type SettingEngine struct {
 		maxReceiveBufferSize uint32
 		enableZeroChecksum   bool
 		rtoMax               time.Duration
+		handshakeRTOMax      time.Duration
 		maxMessageSize       uint32
 		minCwnd              uint32
 		fastRtxWnd           uint32
@@ -673,6 +674,13 @@ func (e *SettingEngine) SetDTLSSupportedProtocols(protocols ...string) {
 // Leave this 0 for the default timeout.
 func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 	e.sctp.rtoMax = rtoMax
+}
+
+// SetSCTPHandshakeRTOMax sets the maximum retransmission timeout for SCTP
+// T1-init and T1-cookie without changing the established association's DATA,
+// reconfiguration, or shutdown timers. Leave this 0 to inherit SCTP RTO max.
+func (e *SettingEngine) SetSCTPHandshakeRTOMax(rtoMax time.Duration) {
+	e.sctp.handshakeRTOMax = rtoMax
 }
 
 // SetSCTPMinCwnd sets the minimum congestion window size. The congestion window
