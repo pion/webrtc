@@ -208,6 +208,49 @@ func TestSCTPTransportReusesDataChannelIDAfterResetCompletion(t *testing.T) {
 	require.Equal(t, firstID, *secondRemote.ID())
 }
 
+func TestSCTPTransportAcceptsLocalDataChannelCreatedAfterStart(t *testing.T) {
+	offerPC, answerPC, wan := createVNetPair(t, nil)
+	defer func() {
+		require.NoError(t, wan.Stop())
+		closePairNow(t, offerPC, answerPC)
+	}()
+
+	accepted := make(chan *DataChannel, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		accepted <- dataChannel
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() { close(firstOpened) })
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	select {
+	case <-firstOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first DataChannel to open")
+	}
+	waitForAcceptedDataChannel(t, accepted)
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	require.NotNil(t, first.ID())
+	require.NotNil(t, second.ID())
+	require.NotEqual(t, *first.ID(), *second.ID())
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() { close(secondOpened) })
+
+	select {
+	case <-secondOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for DataChannel created after SCTP start to open")
+	}
+	secondRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, secondRemote.ID())
+	require.Equal(t, *second.ID(), *secondRemote.ID())
+}
+
 func dataChannelIDInUse(transport *SCTPTransport, id uint16) bool {
 	transport.lock.RLock()
 	defer transport.lock.RUnlock()

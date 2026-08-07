@@ -39,6 +39,7 @@ type DataChannel struct {
 	detachCalled               bool
 	readLoopActive             chan struct{}
 	isGracefulClosed           bool
+	isRemote                   bool
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -335,6 +336,7 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
+	d.isRemote = isRemote
 	if d.isGracefulClosed { // The channel was closed during the connecting state
 		d.mu.Unlock()
 		if err := dc.Close(); err != nil {

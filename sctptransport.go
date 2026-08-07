@@ -177,7 +177,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	r.dataChannelsOpened += openedDCCount
 	r.lock.Unlock()
 
-	go r.acceptDataChannels(sctpAssociation, dataChannels)
+	go r.acceptDataChannels(sctpAssociation)
 
 	return nil
 }
@@ -252,18 +252,7 @@ func (r *SCTPTransport) Stop() error {
 //nolint:cyclop
 func (r *SCTPTransport) acceptDataChannels(
 	assoc *sctp.Association,
-	existingDataChannels []*DataChannel,
 ) {
-	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
-	for _, dc := range existingDataChannels {
-		dc.mu.Lock()
-		isNil := dc.dataChannel == nil
-		dc.mu.Unlock()
-		if isNil {
-			continue
-		}
-		dataChannels = append(dataChannels, dc.dataChannel)
-	}
 ACCEPT:
 	for {
 		// check if the association has been stopped before calling accept.
@@ -277,9 +266,7 @@ ACCEPT:
 			return
 		}
 
-		dc, err := datachannel.Accept(assoc, &datachannel.Config{
-			LoggerFactory: r.api.settingEngine.LoggerFactory,
-		}, dataChannels...)
+		dc, existing, err := r.acceptDataChannel(assoc)
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				r.log.Errorf("Failed to accept data channel: %v", err)
@@ -291,10 +278,8 @@ ACCEPT:
 
 			return
 		}
-		for _, ch := range dataChannels {
-			if ch.StreamIdentifier() == dc.StreamIdentifier() {
-				continue ACCEPT
-			}
+		if existing {
+			continue ACCEPT
 		}
 
 		var (
@@ -357,6 +342,46 @@ ACCEPT:
 			handler(rtcDC)
 		}
 	}
+}
+
+// acceptDataChannel classifies an accepted SCTP stream against the live local
+// DataChannel registry. A startup snapshot is insufficient because applications
+// may create local DataChannels after the SCTP association has started; the
+// first inbound packet on those streams is a DataChannelAck, not a new Open.
+func (r *SCTPTransport) acceptDataChannel(
+	assoc *sctp.Association,
+) (*datachannel.DataChannel, bool, error) {
+	stream, err := assoc.AcceptStream()
+	if err != nil {
+		return nil, false, err
+	}
+
+	stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
+	streamID := stream.StreamIdentifier()
+
+	r.lock.RLock()
+	for i := len(r.dataChannels) - 1; i >= 0; i-- {
+		dc := r.dataChannels[i]
+		dc.mu.RLock()
+		isLocalMatch := !dc.isRemote && dc.id != nil && *dc.id == streamID &&
+			dc.ReadyState() != DataChannelStateClosed
+		dc.mu.RUnlock()
+		if isLocalMatch {
+			r.lock.RUnlock()
+
+			return nil, true, nil
+		}
+	}
+	r.lock.RUnlock()
+
+	dc, err := datachannel.Server(stream, &datachannel.Config{
+		LoggerFactory: r.api.settingEngine.LoggerFactory,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	return dc, false, nil
 }
 
 // OnError sets an event handler which is invoked when the SCTP Association errors.
