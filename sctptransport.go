@@ -71,10 +71,14 @@ type SCTPTransport struct {
 	dataChannels []*DataChannel
 	// Count reservations because a reused stream can arrive before the old
 	// generation's reset-complete callback runs on this association.
-	dataChannelIDsUsed    map[uint16]uint32
-	dataChannelsOpened    uint32
-	dataChannelsRequested uint32
-	dataChannelsAccepted  uint32
+	dataChannelIDsUsed map[uint16]uint32
+	// Detach removes DataChannels from dataChannels before their ACK can arrive.
+	// Keep each locally opened stream generation classified independently from
+	// that garbage-collection list until its reset completes.
+	localDataChannelStreams map[uint16][]*sctp.Stream
+	dataChannelsOpened      uint32
+	dataChannelsRequested   uint32
+	dataChannelsAccepted    uint32
 
 	localSctpInit []byte
 
@@ -87,11 +91,12 @@ type SCTPTransport struct {
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
-		dtlsTransport:      dtls,
-		state:              SCTPTransportStateConnecting,
-		api:                api,
-		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed: make(map[uint16]uint32),
+		dtlsTransport:           dtls,
+		state:                   SCTPTransportStateConnecting,
+		api:                     api,
+		log:                     api.settingEngine.LoggerFactory.NewLogger("ortc"),
+		dataChannelIDsUsed:      make(map[uint16]uint32),
+		localDataChannelStreams: make(map[uint16][]*sctp.Stream),
 	}
 
 	res.updateMaxChannels()
@@ -366,22 +371,9 @@ func (r *SCTPTransport) acceptDataChannel(
 	}
 
 	stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
-	streamID := stream.StreamIdentifier()
-
-	r.lock.RLock()
-	for i := len(r.dataChannels) - 1; i >= 0; i-- {
-		dc := r.dataChannels[i]
-		dc.mu.RLock()
-		isLocalMatch := !dc.isRemote && dc.id != nil && *dc.id == streamID &&
-			dc.ReadyState() != DataChannelStateClosed
-		dc.mu.RUnlock()
-		if isLocalMatch {
-			r.lock.RUnlock()
-
-			return nil, true, nil
-		}
+	if r.isLocalDataChannelStream(stream) {
+		return nil, true, nil
 	}
-	r.lock.RUnlock()
 
 	dc, err := datachannel.Server(stream, &datachannel.Config{
 		LoggerFactory: r.api.settingEngine.LoggerFactory,
@@ -391,6 +383,50 @@ func (r *SCTPTransport) acceptDataChannel(
 	}
 
 	return dc, false, nil
+}
+
+func (r *SCTPTransport) registerLocalDataChannelStream(stream *sctp.Stream) {
+	r.lock.Lock()
+	if r.localDataChannelStreams == nil {
+		r.localDataChannelStreams = make(map[uint16][]*sctp.Stream)
+	}
+	streamID := stream.StreamIdentifier()
+	r.localDataChannelStreams[streamID] = append(r.localDataChannelStreams[streamID], stream)
+	r.lock.Unlock()
+}
+
+func (r *SCTPTransport) isLocalDataChannelStream(stream *sctp.Stream) bool {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	for _, localStream := range r.localDataChannelStreams[stream.StreamIdentifier()] {
+		if localStream == stream {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *SCTPTransport) unregisterLocalDataChannelStream(stream *sctp.Stream) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	streamID := stream.StreamIdentifier()
+	localStreams := r.localDataChannelStreams[streamID]
+	for i := range localStreams {
+		if localStreams[i] != stream {
+			continue
+		}
+		localStreams = append(localStreams[:i], localStreams[i+1:]...)
+		if len(localStreams) == 0 {
+			delete(r.localDataChannelStreams, streamID)
+		} else {
+			r.localDataChannelStreams[streamID] = localStreams
+		}
+
+		return
+	}
 }
 
 // OnError sets an event handler which is invoked when the SCTP Association errors.
@@ -494,6 +530,11 @@ func maxChannelsForAssociation(association *sctp.Association) *uint16 {
 
 func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
 	r.lock.Lock()
+	if localStreams := r.localDataChannelStreams[streamID]; len(localStreams) <= 1 {
+		delete(r.localDataChannelStreams, streamID)
+	} else {
+		r.localDataChannelStreams[streamID] = localStreams[1:]
+	}
 	if r.dataChannelIDsUsed[streamID] > 1 {
 		r.dataChannelIDsUsed[streamID]--
 	} else {

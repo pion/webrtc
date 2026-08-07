@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
+	"github.com/pion/sctp"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
@@ -39,7 +40,6 @@ type DataChannel struct {
 	detachCalled               bool
 	readLoopActive             chan struct{}
 	isGracefulClosed           bool
-	isRemote                   bool
 
 	// The binaryType represents attribute MUST, on getting, return the value to
 	// which it was last set. On setting, if the new value is either the string
@@ -177,8 +177,16 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		d.mu.Lock()
 		d.id = dcID
 	}
-	dc, err := datachannel.Dial(association, *d.id, cfg)
+	stream, err := association.OpenStream(*d.id, sctp.PayloadTypeWebRTCBinary)
 	if err != nil {
+		d.mu.Unlock()
+
+		return err
+	}
+	d.sctpTransport.registerLocalDataChannelStream(stream)
+	dc, err := datachannel.Client(stream, cfg)
+	if err != nil {
+		d.sctpTransport.unregisterLocalDataChannelStream(stream)
 		d.mu.Unlock()
 
 		return err
@@ -336,7 +344,6 @@ func (d *DataChannel) onMessage(msg DataChannelMessage) {
 
 func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlreadyNegotiated bool) {
 	d.mu.Lock()
-	d.isRemote = isRemote
 	if d.isGracefulClosed { // The channel was closed during the connecting state
 		d.mu.Unlock()
 		if err := dc.Close(); err != nil {

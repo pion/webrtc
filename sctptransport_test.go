@@ -251,6 +251,59 @@ func TestSCTPTransportAcceptsLocalDataChannelCreatedAfterStart(t *testing.T) {
 	require.Equal(t, *second.ID(), *secondRemote.ID())
 }
 
+func TestSCTPTransportAcceptsDetachedLocalDataChannelCreatedAfterStart(t *testing.T) {
+	settingEngine := SettingEngine{}
+	settingEngine.DetachDataChannels()
+	offerPC, answerPC, err := NewAPI(WithSettingEngine(settingEngine)).newPair(Configuration{})
+	require.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	remoteOpened := make(chan struct{}, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		dataChannel.OnOpen(func() {
+			_, detachErr := dataChannel.Detach()
+			require.NoError(t, detachErr)
+			remoteOpened <- struct{}{}
+		})
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() {
+		_, detachErr := first.Detach()
+		require.NoError(t, detachErr)
+		close(firstOpened)
+	})
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	waitForSignal(t, firstOpened, "first detached local DataChannel")
+	waitForSignal(t, remoteOpened, "first detached remote DataChannel")
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() {
+		_, detachErr := second.Detach()
+		require.NoError(t, detachErr)
+		close(secondOpened)
+	})
+
+	waitForSignal(t, secondOpened, "second detached local DataChannel")
+	waitForSignal(t, remoteOpened, "second detached remote DataChannel")
+	require.Equal(t, SCTPTransportStateConnected, offerPC.SCTP().State())
+	require.Equal(t, SCTPTransportStateConnected, answerPC.SCTP().State())
+}
+
+func waitForSignal(t *testing.T, signal <-chan struct{}, description string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", description)
+	}
+}
+
 func dataChannelIDInUse(transport *SCTPTransport, id uint16) bool {
 	transport.lock.RLock()
 	defer transport.lock.RUnlock()
