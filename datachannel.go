@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
+	"github.com/pion/sctp"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
@@ -176,8 +177,21 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		d.mu.Lock()
 		d.id = dcID
 	}
-	dc, err := datachannel.Dial(association, *d.id, cfg)
+	if *d.id >= sctpTransport.MaxChannels() {
+		d.mu.Unlock()
+
+		return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	}
+	stream, err := association.OpenStream(*d.id, sctp.PayloadTypeWebRTCBinary)
 	if err != nil {
+		d.mu.Unlock()
+
+		return err
+	}
+	generation := d.sctpTransport.registerLocalDataChannelGeneration(*d.id)
+	dc, err := datachannel.Client(stream, cfg)
+	if err != nil {
+		d.sctpTransport.unregisterLocalDataChannelGeneration(*d.id, generation)
 		d.mu.Unlock()
 
 		return err

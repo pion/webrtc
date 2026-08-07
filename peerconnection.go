@@ -2450,7 +2450,7 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	pc.sctpTransport.lock.Lock()
 	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, dataChannel)
 	if dataChannel.ID() != nil {
-		pc.sctpTransport.dataChannelIDsUsed[*dataChannel.ID()] = struct{}{}
+		pc.sctpTransport.dataChannelIDsUsed[*dataChannel.ID()]++
 	}
 	pc.sctpTransport.dataChannelsRequested++
 	pc.sctpTransport.lock.Unlock()
@@ -2458,6 +2458,8 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	// If SCTP already connected open all the channels
 	if pc.sctpTransport.State() == SCTPTransportStateConnected {
 		if err = dataChannel.open(pc.sctpTransport); err != nil {
+			pc.sctpTransport.discardFailedDataChannel(dataChannel)
+
 			return nil, err
 		}
 	}
