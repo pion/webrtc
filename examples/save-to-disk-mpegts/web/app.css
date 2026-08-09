@@ -1,0 +1,17 @@
+/*
+    SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+    SPDX-License-Identifier: MIT
+*/
+body {
+    font-family: sans-serif;
+    margin: 2rem;
+}
+
+video {
+    display: block;
+    max-width: 100%;
+}
+
+#logs {
+    font-family: monospace;
+}

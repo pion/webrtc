@@ -1,25 +1,38 @@
 # save-to-disk-mpegts
 
-This example records an H.264 WebRTC video track into an MPEG-TS file using the writer from `pion/format`.
+save-to-disk-mpegts demonstrates how to record an H.264 WebRTC video track into an MPEG-TS file using `pion/format`.
 
-## Run
+The MPEG-TS package currently supports video only, so this example does not request or record audio.
 
-1. Start the local examples server from the `examples` directory:
+## Instructions
 
-   ```sh
-   go run examples.go --address localhost:8080
-   ```
+### Run the example
 
-2. Open <http://localhost:8080/example/js/save-to-disk-mpegts/>.
-3. Copy the browser Session Description.
-4. In another terminal, run the program from its example directory:
+From this directory, run:
 
-   ```sh
-   cd /Users/gokuljs/work-docs/webrtc/examples/save-to-disk-mpegts
-   echo "$BROWSER_SDP" | go run .
-   ```
+```sh
+go run .
+```
 
-5. Paste the Session Description printed by the Go program into the browser page and start the session.
-6. Record for a few seconds, then close the browser tab.
+To select a different output file or listen address:
 
-The example writes `output.ts` inside `examples/save-to-disk-mpegts`. To test the complete round trip, copy that file to `examples/play-from-disk-mpegts/output.ts` and run the playback example.
+```sh
+go run . -output recording.ts -addr localhost:8081
+```
+
+### Record video
+
+Open <http://localhost:8080>, allow camera access, and click **Start recording**. Record for 10–15 seconds, then click **Stop recording**.
+
+The example writes `output.ts` in this directory. The Stop button waits for the MPEG-TS writer to finish; confirm that the page says `Recording saved` and the terminal says `Finished writing output.ts`.
+
+### Test the recording
+
+Run the playback example with the recorded file:
+
+```sh
+cd ../play-from-disk-mpegts
+go run . -input ../save-to-disk-mpegts/output.ts -addr localhost:8081
+```
+
+Then open <http://localhost:8081> and click **Start playback**.
