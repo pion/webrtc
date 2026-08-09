@@ -1,8 +1,0 @@
----
-# SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
-# SPDX-License-Identifier: MIT
-
-name: play-from-disk-mpegts
-description: Send H.264 or H.265 video from an MPEG-TS file to a browser.
-authors:
-  - The Pion community

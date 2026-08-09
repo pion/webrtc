@@ -1,32 +1,41 @@
 # play-from-disk-mpegts
 
-This example reads H.264 or H.265 access units from an MPEG-TS file using `pion/format` and sends them to a browser over WebRTC.
+play-from-disk-mpegts demonstrates how to read H.264 or H.265 video from an MPEG-TS file and send it to a browser using Pion WebRTC.
 
-## Video location
+The MPEG-TS package currently supports video only. Audio streams in the input are not sent.
 
-Place the video inside this example directory with the exact name `output.ts`:
+## Instructions
 
-```text
-/Users/gokuljs/work-docs/webrtc/examples/play-from-disk-mpegts/output.ts
+### Create an MPEG-TS file
+
+Place a WebRTC-compatible H.264 file named `output.ts` in this directory. You can create one with FFmpeg:
+
+```sh
+ffmpeg -i "$INPUT_FILE" -map 0:v:0 -vf 'scale=1280:-2' \
+  -c:v libx264 -preset veryfast -crf 23 \
+  -profile:v baseline -level:v 3.1 -pix_fmt yuv420p \
+  -bf 0 -g 48 -keyint_min 48 -sc_threshold 0 \
+  -an -f mpegts output.ts
 ```
 
-## Run
+H.265 files can also be read, but H.265 WebRTC support varies between browsers.
 
-1. Start the local examples server from the `examples` directory:
+### Run the example
 
-   ```sh
-   go run examples.go --address localhost:8080
-   ```
+From this directory, run:
 
-2. Open <http://localhost:8080/example/js/play-from-disk-mpegts/>.
-3. Copy the browser Session Description.
-4. In another terminal, run the program from its example directory:
+```sh
+go run .
+```
 
-   ```sh
-   cd /Users/gokuljs/work-docs/webrtc/examples/play-from-disk-mpegts
-   echo "$BROWSER_SDP" | go run .
-   ```
+To use a different MPEG-TS file or listen address:
 
-5. Paste the Session Description printed by the Go program into the browser page and start the session.
+```sh
+go run . -input video.ts -addr localhost:8081
+```
 
-The example discovers whether the first supported video track is H.264 or H.265. Browser support for H.265 varies; H.264 is the recommended format for this test.
+### Open the browser page
+
+Open <http://localhost:8080> and click **Start playback**.
+
+The Go process serves the page and handles WebRTC signaling. No separate examples server or manual Session Description exchange is required.

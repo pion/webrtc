@@ -1,0 +1,27 @@
+<!--
+SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+SPDX-License-Identifier: MIT
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Play MPEG-TS from Disk</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <h1>Play MPEG-TS from Disk</h1>
+  <p>Send H.264 or H.265 video from an MPEG-TS file to this browser over WebRTC.</p>
+
+  <button id="startButton" onclick="startSession()">Start playback</button>
+
+  <h2>Video</h2>
+  <video id="remoteVideo" controls autoplay playsinline></video>
+
+  <h2>Logs</h2>
+  <div id="logs"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
