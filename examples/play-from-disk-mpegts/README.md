@@ -4,22 +4,29 @@ This example reads H.264 or H.265 access units from an MPEG-TS file using `pion/
 
 ## Video location
 
-Place the video at `output.ts` in the directory from which you run the example. When running from the repository root, that means:
+Place the video inside this example directory with the exact name `output.ts`:
 
 ```text
-/Users/gokuljs/work-docs/webrtc/output.ts
+/Users/gokuljs/work-docs/webrtc/examples/play-from-disk-mpegts/output.ts
 ```
 
 ## Run
 
-1. Open the existing [play-from-disk browser page](https://jsfiddle.net/8kup9mvn/).
-2. Copy the browser Session Description.
-3. From the repository root, run:
+1. Start the local examples server from the `examples` directory:
 
    ```sh
-   echo "$BROWSER_SDP" | go run ./examples/play-from-disk-mpegts
+   go run examples.go --address localhost:8080
    ```
 
-4. Paste the Session Description printed by the Go program into the browser page and start the session.
+2. Open <http://localhost:8080/example/js/play-from-disk-mpegts/>.
+3. Copy the browser Session Description.
+4. In another terminal, run the program from its example directory:
+
+   ```sh
+   cd /Users/gokuljs/work-docs/webrtc/examples/play-from-disk-mpegts
+   echo "$BROWSER_SDP" | go run .
+   ```
+
+5. Paste the Session Description printed by the Go program into the browser page and start the session.
 
 The example discovers whether the first supported video track is H.264 or H.265. Browser support for H.265 varies; H.264 is the recommended format for this test.

@@ -48,6 +48,12 @@
 		"type": "browser"
 	},
 	{
+		"title": "Play MPEG-TS from Disk",
+		"link": "play-from-disk-mpegts",
+		"description": "Read H.264 or H.265 video from an MPEG-TS file and send it to a browser.",
+		"type": "browser"
+	},
+	{
 		"title": "Play from Disk Renegotiation",
 		"link": "play-from-disk",
 		"description": "The play-from-disk-renegotiation example is an extension of the play-from-disk example, but demonstrates how you can add/remove video tracks from an already negotiated PeerConnection.",
@@ -69,6 +75,12 @@
 		"title": "Save to Disk",
 		"link": "save-to-disk",
 		"description": "The save-to-disk example shows how to record your webcam and save the footage to disk on the server side.",
+		"type": "browser"
+	},
+	{
+		"title": "Save MPEG-TS to Disk",
+		"link": "save-to-disk-mpegts",
+		"description": "Record an H.264 browser video track into an MPEG-TS file.",
 		"type": "browser"
 	},
 	{

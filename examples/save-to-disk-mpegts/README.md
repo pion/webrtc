@@ -4,15 +4,22 @@ This example records an H.264 WebRTC video track into an MPEG-TS file using the 
 
 ## Run
 
-1. Open the existing [save-to-disk browser page](https://jsfiddle.net/2nwt1vjq/).
-2. Copy the browser Session Description.
-3. From the repository root, run:
+1. Start the local examples server from the `examples` directory:
 
    ```sh
-   echo "$BROWSER_SDP" | go run ./examples/save-to-disk-mpegts
+   go run examples.go --address localhost:8080
    ```
 
-4. Paste the Session Description printed by the Go program into the browser page and start the session.
-5. Record for a few seconds, then close the browser tab.
+2. Open <http://localhost:8080/example/js/save-to-disk-mpegts/>.
+3. Copy the browser Session Description.
+4. In another terminal, run the program from its example directory:
 
-The example writes `output.ts` in the directory from which you run the command. Use that file with `play-from-disk-mpegts` to test the complete writer/reader round trip.
+   ```sh
+   cd /Users/gokuljs/work-docs/webrtc/examples/save-to-disk-mpegts
+   echo "$BROWSER_SDP" | go run .
+   ```
+
+5. Paste the Session Description printed by the Go program into the browser page and start the session.
+6. Record for a few seconds, then close the browser tab.
+
+The example writes `output.ts` inside `examples/save-to-disk-mpegts`. To test the complete round trip, copy that file to `examples/play-from-disk-mpegts/output.ts` and run the playback example.

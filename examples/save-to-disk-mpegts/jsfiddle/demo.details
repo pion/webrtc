@@ -1,0 +1,8 @@
+---
+# SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: save-to-disk-mpegts
+description: Record browser H.264 video in an MPEG-TS container.
+authors:
+  - The Pion community

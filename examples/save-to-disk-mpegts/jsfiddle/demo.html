@@ -1,0 +1,17 @@
+<!--
+	SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+	SPDX-License-Identifier: MIT
+-->
+Browser Session Description<br />
+<textarea id="localSessionDescription" readonly="true"></textarea><br />
+<button onclick="window.copySessionDescription()">Copy browser Session Description</button><br /><br />
+
+Go Session Description<br />
+<textarea id="remoteSessionDescription"></textarea><br />
+<button onclick="window.startSession()">Start recording</button><br /><br />
+
+Camera preview<br />
+<video id="preview" width="320" height="240" autoplay muted></video><br /><br />
+
+Logs<br />
+<div id="logs"></div>
