@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/pion/datachannel v1.6.2
 	github.com/pion/dtls/v3 v3.1.5
+	github.com/pion/format v0.0.0
 	github.com/pion/ice/v4 v4.4.0
 	github.com/pion/interceptor v0.1.47
 	github.com/pion/logging v0.2.4
@@ -21,6 +22,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.50.0
 )
+
+// Remove this replacement after pion/format#3 is merged and released.
+replace github.com/pion/format => github.com/gokuljs/format v0.0.0-20260809145305-29cf6d18b3e9
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
