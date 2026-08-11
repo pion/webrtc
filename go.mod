@@ -24,7 +24,7 @@ require (
 )
 
 // Remove this replacement after pion/format#3 is merged and released.
-replace github.com/pion/format => github.com/gokuljs/format v0.0.0-20260809145305-29cf6d18b3e9
+replace github.com/pion/format => github.com/gokuljs/format v0.0.0-20260811151039-fe368c34969e
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
