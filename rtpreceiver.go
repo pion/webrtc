@@ -800,6 +800,21 @@ func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) e
 	return fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 }
 
+// SetReadDeadlineSimulcastSSRC sets the max amount of time the RTCP stream for a given SSRC will block before
+// returning. 0 is forever.
+func (r *RTPReceiver) SetReadDeadlineSimulcastSSRC(deadline time.Time, ssrc SSRC) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, t := range r.tracks {
+		if t.track != nil && t.track.ssrc == ssrc {
+			return t.rtcpReadStream.SetReadDeadline(deadline)
+		}
+	}
+
+	return fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+}
+
 // setRTPReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
 // This should be fired by calling SetReadDeadline on the TrackRemote.
 func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote) error {
