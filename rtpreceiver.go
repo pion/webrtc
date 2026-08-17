@@ -678,11 +678,15 @@ func (r *RTPReceiver) receiveForRtxInternal(
 		track = &r.tracks[0]
 	} else {
 		for i := range r.tracks {
-			if r.tracks[i].track.RID() == rsid {
+			if rsid != "" && r.tracks[i].track.RID() == rsid {
 				track = &r.tracks[i]
 				if track.track.RtxSSRC() == 0 {
 					track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
 				}
+
+				break
+			} else if rsid == "" && r.tracks[i].track.RtxSSRC() == ssrc {
+				track = &r.tracks[i]
 
 				break
 			}
