@@ -134,9 +134,14 @@ func trackDetailsFromSDP(
 							SSRC(rtxRepairFlow),
 						) // Remove if rtx was added as track before
 						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = []*SSRC{&repairSsrc}
+							for j, ssrc := range tracksInMediaSection[i].ssrcs {
+								if ssrc == SSRC(baseSsrc) {
+									if tracksInMediaSection[i].rtxSsrc == nil {
+										tracksInMediaSection[i].rtxSsrc = make([]*SSRC, len(tracksInMediaSection[i].ssrcs))
+									}
+									repairSsrc := SSRC(rtxRepairFlow)
+									tracksInMediaSection[i].rtxSsrc[j] = &repairSsrc
+								}
 							}
 						}
 					}
@@ -162,12 +167,72 @@ func trackDetailsFromSDP(
 							SSRC(fecRepairFlow),
 						) // Remove if fec was added as track before
 						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = []*SSRC{&repairSsrc}
+							for j, ssrc := range tracksInMediaSection[i].ssrcs {
+								if ssrc == SSRC(baseSsrc) {
+									if tracksInMediaSection[i].fecSsrc == nil {
+										tracksInMediaSection[i].fecSsrc = make([]*SSRC, len(tracksInMediaSection[i].ssrcs))
+									}
+									repairSsrc := SSRC(fecRepairFlow)
+									tracksInMediaSection[i].fecSsrc[j] = &repairSsrc
+								}
 							}
 						}
 					}
+				} else if split[0] == ssrcGroupSimulcast {
+					// Format is a=ssrc-group:SIM aaaaa bbbbb ccccc meaning there is a simulcast
+					// track consisting of SSRCS aaaaa, bbbbb and ccccc.
+					var ssrcs []SSRC
+					for _, v := range split[1:] {
+						ssrc, err := strconv.ParseUint(v, 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+
+							continue
+						}
+
+						ssrcs = append(ssrcs, SSRC(ssrc))
+					}
+
+					if len(ssrcs) == 0 {
+						log.Warn("Empty SIM ssrc-group")
+
+						continue
+					}
+
+					simulcastTrack := trackDetails{
+						mid:      midValue,
+						kind:     codecType,
+						streamID: streamID,
+						id:       trackID,
+						ssrcs:    ssrcs,
+					}
+					if len(rtxRepairFlows) > 0 {
+						simulcastTrack.rtxSsrc = make([]*SSRC, len(ssrcs))
+						for rtx, base := range rtxRepairFlows {
+							baseSsrc := SSRC(base) //nolint:gosec // G115
+							if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+								repairSsrc := SSRC(rtx) //nolint:gosec // G115
+								simulcastTrack.rtxSsrc[pos] = &repairSsrc
+							}
+						}
+					}
+					if len(fecRepairFlows) > 0 {
+						simulcastTrack.fecSsrc = make([]*SSRC, len(ssrcs))
+						for fec, base := range fecRepairFlows {
+							baseSsrc := SSRC(base) //nolint:gosec // G115
+							if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+								fecSsrc := SSRC(fec) //nolint:gosec // G115
+								simulcastTrack.fecSsrc[pos] = &fecSsrc
+							}
+						}
+					}
+
+					// Simulcast track will replace previously parsed SSRC tracks.
+					tracksInMediaSection = slices.DeleteFunc(tracksInMediaSection, func(t trackDetails) bool {
+						return len(t.ssrcs) == 1 && slices.Contains(ssrcs, t.ssrcs[0])
+					})
+
+					tracksInMediaSection = append(tracksInMediaSection, simulcastTrack)
 				}
 
 			// Handle `a=msid:<stream_id> <track_label>` for Unified plan. The first value is the same as MediaStream.id
@@ -216,7 +281,9 @@ func trackDetailsFromSDP(
 				trackDetails.kind = codecType
 				trackDetails.streamID = streamID
 				trackDetails.id = trackID
-				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+				if trackDetails.ssrcs == nil {
+					trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+				}
 
 				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
@@ -247,36 +314,6 @@ func trackDetailsFromSDP(
 			}
 			for _, rid := range rids {
 				simulcastTrack.rids = append(simulcastTrack.rids, rid.id)
-			}
-
-			tracksInMediaSection = []trackDetails{simulcastTrack}
-		} else if ssrcs := getSimulcastSSRCs(log, media); len(ssrcs) != 0 && trackID != "" && streamID != "" {
-			simulcastTrack := trackDetails{
-				mid:      midValue,
-				kind:     codecType,
-				streamID: streamID,
-				id:       trackID,
-				ssrcs:    ssrcs,
-			}
-			if len(rtxRepairFlows) > 0 {
-				simulcastTrack.rtxSsrc = make([]*SSRC, len(ssrcs))
-				for rtx, base := range rtxRepairFlows {
-					baseSsrc := SSRC(base) //nolint:gosec // G115
-					if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
-						repairSsrc := SSRC(rtx) //nolint:gosec // G115
-						simulcastTrack.rtxSsrc[pos] = &repairSsrc
-					}
-				}
-			}
-			if len(fecRepairFlows) > 0 {
-				simulcastTrack.fecSsrc = make([]*SSRC, len(ssrcs))
-				for fec, base := range fecRepairFlows {
-					baseSsrc := SSRC(base) //nolint:gosec // G115
-					if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
-						fecSsrc := SSRC(fec) //nolint:gosec // G115
-						simulcastTrack.fecSsrc[pos] = &fecSsrc
-					}
-				}
 			}
 
 			tracksInMediaSection = []trackDetails{simulcastTrack}
@@ -344,29 +381,6 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 	}
 
 	return rids
-}
-
-func getSimulcastSSRCs(log logging.LeveledLogger, media *sdp.MediaDescription) []SSRC {
-	var ssrcs []SSRC
-	for _, attr := range media.Attributes {
-		if attr.Key == sdp.AttrKeySSRCGroup {
-			split := strings.Split(attr.Value, " ")
-			if split[0] == ssrcGroupSimulcast {
-				for _, v := range split[1:] {
-					ssrc, err := strconv.ParseUint(v, 10, 32)
-					if err != nil {
-						log.Warnf("Failed to parse SSRC: %v", err)
-
-						continue
-					}
-
-					ssrcs = append(ssrcs, SSRC(ssrc))
-				}
-			}
-		}
-	}
-
-	return ssrcs
 }
 
 func addCandidatesToMediaDescriptions(
