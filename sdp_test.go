@@ -701,6 +701,23 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						{Key: "mid", Value: "0"},
 						{Key: "sendrecv"},
 						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+						{Key: "ssrc-group", Value: "SIM 6000 7000 8000"},
+						{Key: "ssrc", Value: "6000 msid:video_trk2_label video_trk2_guid"},
+						{Key: "ssrc", Value: "7000 msid:video_trk2_label video_trk2_guid"},
+						{Key: "ssrc", Value: "8000 msid:video_trk2_label video_trk2_guid"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
 						{Key: "ssrc", Value: "3100 msid:video_trk_label video_trk_guid"},
 						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
 						{Key: "ssrc", Value: "4100 msid:video_trk_label video_trk_guid"},
@@ -735,19 +752,30 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		}
 
 		tracks := trackDetailsFromSDP(log, descr)
-		assert.Equal(t, 4, len(tracks))
+		assert.Equal(t, 7, len(tracks))
 		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[0].ssrcs)
-		assert.Equal(t, []SSRC{3000, 5000}, tracks[1].ssrcs)
-		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[2].ssrcs)
-		if assert.Len(t, tracks[2].rtxSsrc, 3) {
-			assert.Equal(t, SSRC(3100), *tracks[2].rtxSsrc[0])
-			assert.Equal(t, SSRC(4100), *tracks[2].rtxSsrc[1])
-			assert.Equal(t, SSRC(5100), *tracks[2].rtxSsrc[2])
+		assert.Equal(t, "video_trk_label", tracks[0].streamID)
+		assert.Equal(t, []SSRC{4000}, tracks[1].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[1].streamID)
+		assert.Equal(t, []SSRC{3000, 5000}, tracks[2].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[2].streamID)
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[3].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[3].streamID)
+		assert.Equal(t, []SSRC{6000, 7000, 8000}, tracks[4].ssrcs)
+		assert.Equal(t, "video_trk2_label", tracks[4].streamID)
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[5].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[5].streamID)
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[6].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[6].streamID)
+		if assert.Len(t, tracks[5].rtxSsrc, 3) {
+			assert.Equal(t, SSRC(3100), *tracks[5].rtxSsrc[0])
+			assert.Equal(t, SSRC(4100), *tracks[5].rtxSsrc[1])
+			assert.Equal(t, SSRC(5100), *tracks[5].rtxSsrc[2])
 		}
-		if assert.Len(t, tracks[3].fecSsrc, 3) {
-			assert.Equal(t, SSRC(3100), *tracks[3].fecSsrc[0])
-			assert.Equal(t, SSRC(4100), *tracks[3].fecSsrc[1])
-			assert.Equal(t, SSRC(5100), *tracks[3].fecSsrc[2])
+		if assert.Len(t, tracks[6].fecSsrc, 3) {
+			assert.Equal(t, SSRC(3100), *tracks[6].fecSsrc[0])
+			assert.Equal(t, SSRC(4100), *tracks[6].fecSsrc[1])
+			assert.Equal(t, SSRC(5100), *tracks[6].fecSsrc[2])
 		}
 	})
 }
