@@ -1306,6 +1306,66 @@ func TestGetRIDs(t *testing.T) {
 	}
 }
 
+// TestGetRIDsOrderFollowsSimulcast verifies that getRids orders the simulcast
+// streams by the a=simulcast attribute, not by the order of the a=rid lines.
+// RFC 8853 §5.2: the a=simulcast send list "suggests a proposed order of
+// preference, in decreasing order"; the order of the a=rid lines is not
+// significant. Here the a=rid lines are listed in the opposite order to
+// a=simulcast:send, so the result must follow the attribute (f, h, q).
+func TestGetRIDsOrderFollowsSimulcast(t *testing.T) {
+	media := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+		},
+		Attributes: []sdp.Attribute{
+			{Key: sdpAttributeRid, Value: "q send"},
+			{Key: sdpAttributeRid, Value: "h send"},
+			{Key: sdpAttributeRid, Value: "f send"},
+			{Key: sdpAttributeSimulcast, Value: "send f;h;q"},
+		},
+	}
+
+	got := make([]string, 0, 3)
+	for _, rid := range getRids(media) {
+		got = append(got, rid.id)
+	}
+
+	assert.Equal(t, []string{"f", "h", "q"}, got)
+}
+
+// TestGetRIDsOrderAlternativeRIDs verifies that getRids parses the a=simulcast
+// send list as a ";"-separated list of streams whose members are ","-separated
+// alternative rids (RFC 8853 §5.1). A value like "send f,h;q" must order the
+// rids f, h, q — and still detect a "~" paused alternative — rather than
+// treating "f,h" as a single opaque token.
+func TestGetRIDsOrderAlternativeRIDs(t *testing.T) {
+	media := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+		},
+		Attributes: []sdp.Attribute{
+			{Key: sdpAttributeRid, Value: "q send"},
+			{Key: sdpAttributeRid, Value: "h send"},
+			{Key: sdpAttributeRid, Value: "f send"},
+			{Key: sdpAttributeSimulcast, Value: "send f,~h;q"},
+		},
+	}
+
+	rids := getRids(media)
+
+	got := make([]string, 0, len(rids))
+	paused := map[string]bool{}
+	for _, rid := range rids {
+		got = append(got, rid.id)
+		paused[rid.id] = rid.paused
+	}
+
+	assert.Equal(t, []string{"f", "h", "q"}, got)
+	assert.True(t, paused["h"], "alternative rid h should be paused")
+	assert.False(t, paused["f"], "rid f should not be paused")
+	assert.False(t, paused["q"], "rid q should not be paused")
+}
+
 // TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
 // a=simulcast: attribute contains empty tokens (trailing ";", ";;", or a
 // direction-only value with no rid list).
