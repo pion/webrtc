@@ -272,6 +272,25 @@ func TestSettingEngine_SetICETCP(t *testing.T) {
 	assert.Equal(t, tcpMux, settingEngine.iceTCPMux)
 }
 
+func TestSettingEngine_SetICEUDPMuxSrflx(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	udpConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	assert.NoError(t, err)
+
+	udpMux := NewICEUniversalUDPMux(nil, udpConn, 0)
+
+	defer func() {
+		_ = udpMux.Close()
+	}()
+
+	settingEngine := SettingEngine{}
+	settingEngine.SetICEUDPMuxSrflx(udpMux)
+
+	assert.Equal(t, udpMux, settingEngine.iceUDPMuxSrflx)
+}
+
 func TestSettingEngine_SetDisableMediaEngineCopy(t *testing.T) {
 	t.Run("Copy", func(t *testing.T) {
 		mediaEngine := &MediaEngine{}
