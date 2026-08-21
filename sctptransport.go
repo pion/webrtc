@@ -36,6 +36,8 @@ func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMe
 		PartialReliabilityMode:       partialReliabilityMode,
 		ZeroChecksumSendingEnabled:   metadata.ZeroChecksumSendingEnabled,
 		ZeroChecksumReceivingEnabled: metadata.ZeroChecksumReceivingEnabled,
+		NumInboundStreams:            metadata.NumInboundStreams,
+		NumOutboundStreams:           metadata.NumOutboundStreams,
 	}
 }
 
@@ -148,11 +150,19 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		return err
 	}
 
+	sctpAssociation.OnStreamResetComplete(func(streamID uint16) {
+		r.lock.Lock()
+		defer r.lock.Unlock()
+		delete(r.dataChannelIDsUsed, streamID)
+	})
+
 	r.lock.Lock()
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
 	dataChannels := append([]*DataChannel{}, r.dataChannels...)
 	r.lock.Unlock()
+
+	r.updateMaxChannels()
 
 	var openedDCCount uint32
 	for _, d := range dataChannels {
@@ -433,6 +443,15 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 
 func (r *SCTPTransport) updateMaxChannels() {
 	val := sctpMaxChannels
+
+	// If we have an association, use its stream limits
+	if assoc := r.association(); assoc != nil {
+		if metadata, ok := assoc.Metadata(); ok {
+			// The max channels is limited by the minimum of inbound and outbound streams.
+			val = min(val, metadata.NumInboundStreams, metadata.NumOutboundStreams)
+		}
+	}
+
 	r.maxChannels = &val
 }
 
