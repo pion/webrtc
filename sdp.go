@@ -29,8 +29,8 @@ type trackDetails struct {
 	streamID string
 	id       string
 	ssrcs    []SSRC
-	rtxSsrc  *SSRC
-	fecSsrc  *SSRC
+	rtxSsrc  []*SSRC
+	fecSsrc  []*SSRC
 	rids     []string
 }
 
@@ -134,9 +134,14 @@ func trackDetailsFromSDP(
 							SSRC(rtxRepairFlow),
 						) // Remove if rtx was added as track before
 						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = &repairSsrc
+							for j, ssrc := range tracksInMediaSection[i].ssrcs {
+								if ssrc == SSRC(baseSsrc) {
+									if tracksInMediaSection[i].rtxSsrc == nil {
+										tracksInMediaSection[i].rtxSsrc = make([]*SSRC, len(tracksInMediaSection[i].ssrcs))
+									}
+									repairSsrc := SSRC(rtxRepairFlow)
+									tracksInMediaSection[i].rtxSsrc[j] = &repairSsrc
+								}
 							}
 						}
 					}
@@ -162,12 +167,72 @@ func trackDetailsFromSDP(
 							SSRC(fecRepairFlow),
 						) // Remove if fec was added as track before
 						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = &repairSsrc
+							for j, ssrc := range tracksInMediaSection[i].ssrcs {
+								if ssrc == SSRC(baseSsrc) {
+									if tracksInMediaSection[i].fecSsrc == nil {
+										tracksInMediaSection[i].fecSsrc = make([]*SSRC, len(tracksInMediaSection[i].ssrcs))
+									}
+									repairSsrc := SSRC(fecRepairFlow)
+									tracksInMediaSection[i].fecSsrc[j] = &repairSsrc
+								}
 							}
 						}
 					}
+				} else if split[0] == ssrcGroupSimulcast {
+					// Format is a=ssrc-group:SIM aaaaa bbbbb ccccc meaning there is a simulcast
+					// track consisting of SSRCS aaaaa, bbbbb and ccccc.
+					var ssrcs []SSRC
+					for _, v := range split[1:] {
+						ssrc, err := strconv.ParseUint(v, 10, 32)
+						if err != nil {
+							log.Warnf("Failed to parse SSRC: %v", err)
+
+							continue
+						}
+
+						ssrcs = append(ssrcs, SSRC(ssrc))
+					}
+
+					if len(ssrcs) == 0 {
+						log.Warn("Empty SIM ssrc-group")
+
+						continue
+					}
+
+					simulcastTrack := trackDetails{
+						mid:      midValue,
+						kind:     codecType,
+						streamID: streamID,
+						id:       trackID,
+						ssrcs:    ssrcs,
+					}
+					if len(rtxRepairFlows) > 0 {
+						simulcastTrack.rtxSsrc = make([]*SSRC, len(ssrcs))
+						for rtx, base := range rtxRepairFlows {
+							baseSsrc := SSRC(base) //nolint:gosec // G115
+							if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+								repairSsrc := SSRC(rtx) //nolint:gosec // G115
+								simulcastTrack.rtxSsrc[pos] = &repairSsrc
+							}
+						}
+					}
+					if len(fecRepairFlows) > 0 {
+						simulcastTrack.fecSsrc = make([]*SSRC, len(ssrcs))
+						for fec, base := range fecRepairFlows {
+							baseSsrc := SSRC(base) //nolint:gosec // G115
+							if pos := slices.Index(ssrcs, baseSsrc); pos != -1 {
+								fecSsrc := SSRC(fec) //nolint:gosec // G115
+								simulcastTrack.fecSsrc[pos] = &fecSsrc
+							}
+						}
+					}
+
+					// Simulcast track will replace previously parsed SSRC tracks.
+					tracksInMediaSection = slices.DeleteFunc(tracksInMediaSection, func(t trackDetails) bool {
+						return len(t.ssrcs) == 1 && slices.Contains(ssrcs, t.ssrcs[0])
+					})
+
+					tracksInMediaSection = append(tracksInMediaSection, simulcastTrack)
 				}
 
 			// Handle `a=msid:<stream_id> <track_label>` for Unified plan. The first value is the same as MediaStream.id
@@ -216,18 +281,20 @@ func trackDetailsFromSDP(
 				trackDetails.kind = codecType
 				trackDetails.streamID = streamID
 				trackDetails.id = trackID
-				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+				if trackDetails.ssrcs == nil {
+					trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+				}
 
 				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
 						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
+						trackDetails.rtxSsrc = []*SSRC{&repairSsrc}
 					}
 				}
 				for r, baseSsrc := range fecRepairFlows {
 					if baseSsrc == ssrc {
 						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
+						trackDetails.fecSsrc = []*SSRC{&fecSsrc}
 					}
 				}
 
@@ -270,12 +337,12 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 			encodings[i].SSRC = trackDetails.ssrcs[i]
 		}
 
-		if trackDetails.rtxSsrc != nil {
-			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc
+		if len(trackDetails.rtxSsrc) > i && trackDetails.rtxSsrc[i] != nil {
+			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc[i]
 		}
 
-		if trackDetails.fecSsrc != nil {
-			encodings[i].FEC.SSRC = *trackDetails.fecSsrc
+		if len(trackDetails.fecSsrc) > i && trackDetails.fecSsrc[i] != nil {
+			encodings[i].FEC.SSRC = *trackDetails.fecSsrc[i]
 		}
 	}
 
