@@ -8,6 +8,7 @@
 package webrtc
 
 import (
+	"sync"
 	"syscall/js"
 
 	"github.com/pion/ice/v4"
@@ -30,12 +31,66 @@ type PeerConnection struct {
 	onICEConnectionStateChangeHandler *js.Func
 	onICECandidateHandler             *js.Func
 	onICEGatheringStateChangeHandler  *js.Func
+	iceCandidateDispatcher            *iceCandidateDispatcher
 
 	// Used by GatheringCompletePromise
 	onGatherCompleteHandler func()
 
 	// A reference to the associated API state used by this connection
 	api *API
+}
+
+// iceCandidateEvent binds a browser event to the callback active at delivery.
+type iceCandidateEvent struct {
+	candidate *ICECandidate
+	callback  func(*ICECandidate)
+}
+
+// iceCandidateDispatcher serializes accepted events across callback replacements.
+type iceCandidateDispatcher struct {
+	mtx sync.Mutex
+
+	events  []iceCandidateEvent
+	running bool
+	stopped bool
+}
+
+func (d *iceCandidateDispatcher) enqueue(event iceCandidateEvent) {
+	d.mtx.Lock()
+	defer d.mtx.Unlock()
+	if d.stopped {
+		return
+	}
+
+	d.events = append(d.events, event)
+	if !d.running {
+		d.running = true
+		go d.run()
+	}
+}
+
+func (d *iceCandidateDispatcher) run() {
+	for {
+		d.mtx.Lock()
+		if d.stopped || len(d.events) == 0 {
+			d.running = false
+			d.mtx.Unlock()
+			return
+		}
+
+		event := d.events[0]
+		d.events[0] = iceCandidateEvent{}
+		d.events = d.events[1:]
+		d.mtx.Unlock()
+		event.callback(event.candidate)
+	}
+}
+
+func (d *iceCandidateDispatcher) stop() {
+	d.mtx.Lock()
+	d.stopped = true
+	d.events = nil
+	d.mtx.Unlock()
 }
 
 // NewPeerConnection creates a peerconnection.
@@ -331,21 +386,31 @@ func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 // OnICECandidate sets an event handler which is invoked when a new ICE
 // candidate is found.
 func (pc *PeerConnection) OnICECandidate(f func(candidate *ICECandidate)) {
+	// Detaching the old JavaScript function prevents new events without
+	// discarding events it already placed in the dispatcher.
 	if pc.onICECandidateHandler != nil {
-		oldHandler := pc.onICECandidateHandler
-		defer oldHandler.Release()
+		pc.underlying.Set("onicecandidate", js.Null())
+		pc.onICECandidateHandler.Release()
 	}
-	onICECandidateHandler := js.FuncOf(func(this js.Value, args []js.Value) any {
-		candidate := valueToICECandidate(args[0].Get("candidate"))
-		if candidate == nil && pc.onGatherCompleteHandler != nil {
-			go pc.onGatherCompleteHandler()
-		}
+	if pc.iceCandidateDispatcher == nil {
+		pc.iceCandidateDispatcher = &iceCandidateDispatcher{}
+	}
 
-		go f(candidate)
+	callback := func(candidate *ICECandidate) {
+		if candidate == nil && pc.onGatherCompleteHandler != nil {
+			pc.onGatherCompleteHandler()
+		}
+		f(candidate)
+	}
+	handler := js.FuncOf(func(this js.Value, args []js.Value) any {
+		pc.iceCandidateDispatcher.enqueue(iceCandidateEvent{
+			candidate: valueToICECandidate(args[0].Get("candidate")),
+			callback:  callback,
+		})
 		return js.Undefined()
 	})
-	pc.onICECandidateHandler = &onICECandidateHandler
-	pc.underlying.Set("onicecandidate", onICECandidateHandler)
+	pc.onICECandidateHandler = &handler
+	pc.underlying.Set("onicecandidate", handler)
 }
 
 // OnICEGatheringStateChange sets an event handler which is invoked when the
@@ -424,6 +489,9 @@ func (pc *PeerConnection) Close() (err error) {
 	if pc.onICECandidateHandler != nil {
 		pc.underlying.Set("onicecandidate", js.Null())
 		pc.onICECandidateHandler.Release()
+	}
+	if pc.iceCandidateDispatcher != nil {
+		pc.iceCandidateDispatcher.stop()
 	}
 	if pc.onICEGatheringStateChangeHandler != nil {
 		pc.underlying.Set("onicegatheringstatechange", js.Null())
@@ -684,14 +752,18 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 	if val.IsNull() || val.IsUndefined() {
 		return nil
 	}
-	if val.Get("protocol").IsUndefined() && !val.Get("candidate").IsUndefined() {
-		// Missing some fields, assume it's Firefox and parse SDP candidate.
-		c, err := ice.UnmarshalCandidate(val.Get("candidate").String())
+	sdpMid := valueToStringOrZero(val.Get("sdpMid"))
+	sdpMLineIndex := valueToUint16OrZero(val.Get("sdpMLineIndex"))
+	candidateStr := valueToStringOrZero(val.Get("candidate"))
+	if candidateStr != "" {
+		// The SDP candidate string is authoritative; rebuilding from typed
+		// browser fields can lose fields Chromium still needs on WASM.
+		c, err := ice.UnmarshalCandidate(candidateStr)
 		if err != nil {
 			return nil
 		}
 
-		iceCandidate, err := newICECandidateFromICE(c, "", 0)
+		iceCandidate, err := newICECandidateFromICE(c, sdpMid, sdpMLineIndex)
 		if err != nil {
 			return nil
 		}
@@ -710,6 +782,8 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 		Component:      stringToComponentIDOrZero(val.Get("component").String()),
 		RelatedAddress: val.Get("relatedAddress").String(),
 		RelatedPort:    valueToUint16OrZero(val.Get("relatedPort")),
+		SDPMid:         sdpMid,
+		SDPMLineIndex:  sdpMLineIndex,
 	}
 }
 

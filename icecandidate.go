@@ -233,11 +233,13 @@ func (c ICECandidate) ToJSON() ICECandidateInit {
 
 	candidate, err := c.ToICE()
 	if err == nil {
-		candidateStr = candidate.Marshal()
+		if marshaled := candidate.Marshal(); marshaled != "" {
+			candidateStr = fmt.Sprintf("candidate:%s", marshaled)
+		}
 	}
 
 	return ICECandidateInit{
-		Candidate:     fmt.Sprintf("candidate:%s", candidateStr),
+		Candidate:     candidateStr,
 		SDPMid:        &c.SDPMid,
 		SDPMLineIndex: &c.SDPMLineIndex,
 	}

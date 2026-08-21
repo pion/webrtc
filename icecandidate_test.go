@@ -225,6 +225,7 @@ func TestICECandidateZeroSDPid(t *testing.T) {
 
 	assert.Equal(t, candidate.SDPMid, "")
 	assert.Equal(t, candidate.SDPMLineIndex, uint16(0))
+	assert.Empty(t, candidate.ToJSON().Candidate)
 }
 
 func TestICECandidateString(t *testing.T) {
