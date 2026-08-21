@@ -517,10 +517,18 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 		clientAuth = *t.api.settingEngine.dtls.clientAuth
 	}
 
+	// The HelloVerifyRequest cookie exchange only validates the remote
+	// address, which the ICE connectivity checks have already done, so it
+	// is skipped unless explicitly requested via the SettingEngine.
+	skipHelloVerify := true
+	if skip := t.api.settingEngine.dtls.insecureSkipHelloVerify; skip != nil {
+		skipHelloVerify = *skip
+	}
+
 	serverOpts = append(serverOpts,
 		dtls.WithClientAuth(clientAuth),
 		dtls.WithClientCAs(t.api.settingEngine.dtls.clientCAs),
-		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify),
+		dtls.WithInsecureSkipVerifyHello(skipHelloVerify),
 	)
 
 	if t.api.settingEngine.dtls.serverHelloMessageHook != nil {
