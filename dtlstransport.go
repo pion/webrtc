@@ -542,10 +542,14 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 		clientAuth = *t.api.settingEngine.dtls.clientAuth
 	}
 
+	// SPED does not need the HelloVerifyRequest cookie exchange, the
+	// remote address is already validated by ICE connectivity checks.
+	skipHelloVerify := t.api.settingEngine.dtls.insecureSkipHelloVerify || t.api.settingEngine.enableSped
+
 	serverOpts = append(serverOpts,
 		dtls.WithClientAuth(clientAuth),
 		dtls.WithClientCAs(t.api.settingEngine.dtls.clientCAs),
-		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify),
+		dtls.WithInsecureSkipVerifyHello(skipHelloVerify),
 	)
 
 	if t.api.settingEngine.dtls.serverHelloMessageHook != nil {
