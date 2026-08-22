@@ -91,7 +91,7 @@ func (t *TrackRemote) Kind() RTPCodecType {
 	return t.kind
 }
 
-// StreamID is the group this track belongs too. This must be unique.
+// StreamID is the group this track belongs to. This must be unique.
 func (t *TrackRemote) StreamID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
