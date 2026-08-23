@@ -131,6 +131,11 @@ func Parse(mimeType string, clockRate uint32, channels uint16, line string) FMTP
 			parameters: parameters,
 		}
 
+	case strings.EqualFold(mimeType, "video/h265"):
+		fmtp = &h265FMTP{
+			parameters: parameters,
+		}
+
 	case strings.EqualFold(mimeType, "video/vp9"):
 		fmtp = &vp9FMTP{
 			parameters: parameters,

@@ -1797,14 +1797,13 @@ a=fmtp:49 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST
 		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 94, codecsOfTr2[0].PayloadType)
+		assert.EqualValues(t, 49, codecsOfTr2[0].PayloadType)
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
-		// as H.265 (49) is a partial match, it gets pushed to the end
+		assert.EqualValues(t, 94, codecsOfTr2[1].PayloadType)
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[2], codecs)
-		assert.Equal(t, codecMatchPartial, matchType)
-		assert.EqualValues(t, 49, codecsOfTr2[2].PayloadType)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[2].PayloadType)
 
 		assert.NoError(t, pc.Close())
 	})
