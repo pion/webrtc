@@ -360,6 +360,16 @@ func (t *DTLSTransport) start(remoteParameters DTLSParameters, handshake func(*d
 		return t.failStart(err)
 	}
 
+	// Tell the piggybacking controller that the local handshake finished so it
+	// can run the SPED closing handshake.
+	if t.api.settingEngine.enableSped {
+		if connState, ok := dtlsConn.ConnectionState(); ok {
+			t.iceTransport.SetDtlsHandshakeComplete(
+				connState.Role() == dtls.RoleClient, connState.NegotiatedVersion(),
+			)
+		}
+	}
+
 	if err = t.completeStart(dtlsConn); err != nil {
 		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsConn.Close()

@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pion/dtls/v3/pkg/protocol"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4/internal/mux"
@@ -519,6 +520,21 @@ func (t *ICETransport) Piggyback(packet []byte, end bool) bool {
 	}
 
 	return agent.Piggyback(packet, end)
+}
+
+// SetDtlsHandshakeComplete signals the piggybacking controller that the local
+// DTLS handshake finished, which lets it run the SPED closing handshake.
+func (t *ICETransport) SetDtlsHandshakeComplete(isClient bool, version protocol.Version) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	agent := t.gatherer.getAgent()
+	if agent == nil {
+		t.log.Warnf("%w: unable to signal DTLS handshake completion", errICEAgentNotExist)
+
+		return
+	}
+	agent.SetDtlsHandshakeComplete(isClient, version)
 }
 
 func (t *ICETransport) ReportDtlsPacket(packet []byte) {
