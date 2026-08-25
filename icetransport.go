@@ -224,7 +224,11 @@ func (t *ICETransport) StartContext(
 func (t *ICETransport) SetDtlsCallback(cb func(packet []byte, rAddr net.Addr)) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	if agent := t.gatherer.getAgent(); agent != nil {
+	var agent *ice.Agent
+	if t.gatherer != nil {
+		agent = t.gatherer.getAgent()
+	}
+	if agent != nil {
 		agent.SetDtlsCallback(cb)
 	} else {
 		t.dtlsCallback = cb

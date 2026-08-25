@@ -97,6 +97,21 @@ func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certifi
 		log:          api.settingEngine.LoggerFactory.NewLogger("DTLSTransport"),
 	}
 
+	// Configure ICE for SPED.
+	if api.settingEngine.enableSped {
+		transport.SetDtlsCallback(func(packet []byte, rAddr net.Addr) {
+			trans.lock.RLock()
+			conn := trans.conn
+			trans.lock.RUnlock()
+			if conn == nil {
+				trans.log.Warnf("Dropping %d piggybacked bytes, DTLS not started yet", len(packet))
+
+				return
+			}
+			conn.InjectInboundPacket(packet, rAddr)
+		})
+	}
+
 	if len(certificates) > 0 {
 		now := time.Now()
 		for _, x509Cert := range certificates {
@@ -345,12 +360,9 @@ func (t *DTLSTransport) start(remoteParameters DTLSParameters, handshake func(*d
 		return t.failStart(err)
 	}
 
-	// Configure ICE for SPED after we created the DTLS transport.
-	if t.api.settingEngine.enableSped {
-		t.iceTransport.SetDtlsCallback(func(packet []byte, rAddr net.Addr) {
-			dtlsConn.InjectInboundPacket(packet, rAddr)
-		})
-	}
+	t.lock.Lock()
+	t.conn = dtlsConn
+	t.lock.Unlock()
 
 	// This awaits the DTLS handshake.
 	if err = handshake(dtlsConn); err != nil {
@@ -621,7 +633,6 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	}
 
 	t.srtpProtectionProfile = srtpProtectionProfile
-	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 	if t.api.settingEngine.enableSped {
 		t.iceTransport.Piggyback(nil, true)
