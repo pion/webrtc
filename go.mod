@@ -10,6 +10,8 @@ replace github.com/pion/stun/v3 => /home/fippo/pion/stun
 
 replace github.com/pion/ice/v4 => /home/fippo/pion/ice
 
+replace github.com/pion/sdp/v3 => /home/fippo/pion/sdp
+
 require (
 	github.com/pion/datachannel v1.6.2
 	github.com/pion/dtls/v3 v3.1.5

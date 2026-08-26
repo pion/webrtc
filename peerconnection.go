@@ -781,6 +781,9 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		if options != nil && options.ICETricklingSupported {
 			descr.WithICETrickleAdvertised()
 		}
+		if pc.api.settingEngine.enableSped {
+			descr.WithICESped()
+		}
 		if pc.api.settingEngine.renomination.enabled {
 			descr.WithICERenomination()
 		}
@@ -960,6 +963,9 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 	if options != nil && options.ICETricklingSupported {
 		descr.WithICETrickleAdvertised()
+	}
+	if pc.api.settingEngine.enableSped {
+		descr.WithICESped()
 	}
 	if pc.api.settingEngine.renomination.enabled {
 		descr.WithICERenomination()
