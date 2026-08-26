@@ -45,15 +45,6 @@
     }
     channel.onmessage = e => log(`📩 Server: ${e.data}`);
 
-    pc.onicecandidate = event => {
-      if(event.candidate){
-        fetch("/candidate", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(event.candidate),
-        });
-      }
-    };
     pc.ondatachannel = event => {
         log("Server opened a channel", event.channel.name)
         event.channel.onmessage = (ev) => {
@@ -66,6 +57,8 @@
       document.getElementById("dtlsRole").disabled = true;
       try {
         await pc.setLocalDescription();
+        // The offer carries no candidates, the peer learns our address from
+        // the connectivity checks we send.
         const offer = pc.localDescription;
         if (offer.sdp.indexOf("\na=sctp-init:") !== -1) {
           log("✅ sctp-init found in offer, SNAP is supported");
