@@ -1,0 +1,28 @@
+<!--
+SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+SPDX-License-Identifier: MIT
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Save MPEG-TS to Disk</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <h1>Save MPEG-TS to Disk</h1>
+  <p>Record H.264 video from your camera into an MPEG-TS file using Pion WebRTC.</p>
+
+  <button id="startButton" onclick="startSession()">Start recording</button>
+  <button id="stopButton" onclick="stopSession()" disabled>Stop recording</button>
+
+  <h2>Camera preview</h2>
+  <video id="preview" autoplay muted playsinline></video>
+
+  <h2>Logs</h2>
+  <div id="logs"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
