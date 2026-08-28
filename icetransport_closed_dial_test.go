@@ -59,19 +59,36 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	paramsB, err := gathererB.GetLocalParameters()
 	require.NoError(t, err)
 
-	// Exchange candidates gathered on each side.
+	// Exchange candidates gathered on each side. Candidate callbacks must
+	// not fire while the transport lock is held below, since adding a
+	// remote candidate takes the transport read lock and would be
+	// blocked. Wait for gathering to finish before holding the lock.
+	var (
+		onceA       sync.Once
+		onceB       sync.Once
+		gatherDoneA = make(chan struct{})
+		gatherDoneB = make(chan struct{})
+	)
 	gathererA.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
 			_ = transportB.AddRemoteCandidate(c)
+
+			return
 		}
+		onceA.Do(func() { close(gatherDoneA) })
 	})
 	gathererB.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
 			_ = transportA.AddRemoteCandidate(c)
+
+			return
 		}
+		onceB.Do(func() { close(gatherDoneB) })
 	})
 	require.NoError(t, gathererA.Gather())
 	require.NoError(t, gathererB.Gather())
+	awaitGatheringComplete(t, gatherDoneA, "gathererA")
+	awaitGatheringComplete(t, gatherDoneB, "gathererB")
 
 	// Start the remote (controlled) side.
 	controlled := ICERoleControlled
@@ -145,6 +162,17 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return runtime.NumGoroutine() <= baseline
 	}, 5*time.Second, 20*time.Millisecond)
+}
+
+// awaitGatheringComplete waits for the gathering-done signal.
+func awaitGatheringComplete(t *testing.T, done <-chan struct{}, name string) {
+	t.Helper()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		assert.FailNow(t, name+" gathering did not complete")
+	}
 }
 
 // awaitConnected registers a one-shot handler on the transport that
