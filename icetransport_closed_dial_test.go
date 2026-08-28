@@ -135,21 +135,21 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 		return true
 	}, 5*time.Second, time.Millisecond)
 
-	// Wait until the connection is established. The state change callback
-	// fires after the connected signal, so once it fires the Dial goroutine
-	// is blocked trying to reacquire the transport lock (still held here).
-	connectedCh := awaitConnected(t, transportA)
-	select {
-	case <-connectedCh:
-	case <-time.After(10 * time.Second):
-		transportA.lock.Unlock()
-		dumpAgentState(t, "A", gathererA)
-		dumpAgentState(t, "B", gathererB)
-		assert.FailNow(t, "ICE connection was not established")
-	}
+	// Wait until the connection is established: once the agent has a
+	// selected pair the Dial goroutine is blocked trying to reacquire the
+	// transport lock (still held here). Polling the agent's selected pair
+	// is robust against the transport state being overwritten by
+	// setState(Closed) below, unlike observing the Connected state event,
+	// which can be missed entirely on slow CI schedulers.
+	agent := gathererA.getAgent()
+	require.NotNil(t, agent)
+	require.Eventually(t, func() bool {
+		pair, err := agent.GetSelectedCandidatePair()
 
-	// The internal state callback has overwritten the state with Connected.
-	// Force it back to Closed before releasing the lock, so the Dial
+		return err == nil && pair != nil
+	}, 10*time.Second, 10*time.Millisecond)
+
+	// Force the state to Closed before releasing the lock, so the Dial
 	// goroutine deterministically observes the Closed state.
 	transportA.setState(ICETransportStateClosed)
 	transportA.lock.Unlock()
@@ -170,29 +170,6 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond)
 }
 
-// dumpAgentState logs the gatherer's candidate state for debugging CI
-// failures in restricted environments.
-func dumpAgentState(t *testing.T, name string, g *ICEGatherer) {
-	t.Helper()
-
-	agent := g.getAgent()
-	if agent == nil {
-		t.Logf("%s: no agent", name)
-
-		return
-	}
-
-	local, errL := agent.GetLocalCandidates()
-	remote, errR := agent.GetRemoteCandidates()
-	t.Logf("%s: local=%d (err=%v) remote=%d (err=%v)", name, len(local), errL, len(remote), errR)
-	for _, c := range local {
-		t.Logf("%s: local candidate: %v", name, c)
-	}
-	for _, c := range remote {
-		t.Logf("%s: remote candidate: %v", name, c)
-	}
-}
-
 // awaitGatheringComplete waits for the gathering-done signal.
 func awaitGatheringComplete(t *testing.T, done <-chan struct{}, name string) {
 	t.Helper()
@@ -202,24 +179,6 @@ func awaitGatheringComplete(t *testing.T, done <-chan struct{}, name string) {
 	case <-time.After(10 * time.Second):
 		assert.FailNow(t, name+" gathering did not complete")
 	}
-}
-
-// awaitConnected registers a one-shot handler on the transport that
-// signals when the transport reaches the Connected state.
-func awaitConnected(t *testing.T, transport *ICETransport) <-chan struct{} {
-	t.Helper()
-
-	var (
-		once sync.Once
-		ch   = make(chan struct{})
-	)
-	transport.OnConnectionStateChange(func(s ICETransportState) {
-		if s == ICETransportStateConnected {
-			once.Do(func() { close(ch) })
-		}
-	})
-
-	return ch
 }
 
 // receiveWithTimeout waits for a value on ch, failing the test if the
