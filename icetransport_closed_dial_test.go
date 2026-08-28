@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v4"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,13 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
-	api := NewAPI()
+	// Disable mDNS so that the test also works in restricted CI
+	// environments (e.g. i386 containers) where multicast binding fails
+	// and host candidates would otherwise never be reachable.
+	settingEngine := SettingEngine{}
+	settingEngine.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+	api := NewAPI(WithSettingEngine(settingEngine))
+
 	gathererA, err := api.NewICEGatherer(ICEGatherOptions{})
 	require.NoError(t, err)
 	gathererB, err := api.NewICEGatherer(ICEGatherOptions{})
