@@ -71,7 +71,9 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	)
 	gathererA.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
-			_ = transportB.AddRemoteCandidate(c)
+			if err := transportB.AddRemoteCandidate(c); err != nil {
+				t.Logf("B AddRemoteCandidate(%s) failed: %v", c, err)
+			}
 
 			return
 		}
@@ -79,7 +81,9 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	})
 	gathererB.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
-			_ = transportA.AddRemoteCandidate(c)
+			if err := transportA.AddRemoteCandidate(c); err != nil {
+				t.Logf("A AddRemoteCandidate(%s) failed: %v", c, err)
+			}
 
 			return
 		}
@@ -139,6 +143,8 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	case <-connectedCh:
 	case <-time.After(10 * time.Second):
 		transportA.lock.Unlock()
+		dumpAgentState(t, "A", gathererA)
+		dumpAgentState(t, "B", gathererB)
 		assert.FailNow(t, "ICE connection was not established")
 	}
 
@@ -162,6 +168,29 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return runtime.NumGoroutine() <= baseline
 	}, 5*time.Second, 20*time.Millisecond)
+}
+
+// dumpAgentState logs the gatherer's candidate state for debugging CI
+// failures in restricted environments.
+func dumpAgentState(t *testing.T, name string, g *ICEGatherer) {
+	t.Helper()
+
+	agent := g.getAgent()
+	if agent == nil {
+		t.Logf("%s: no agent", name)
+
+		return
+	}
+
+	local, errL := agent.GetLocalCandidates()
+	remote, errR := agent.GetRemoteCandidates()
+	t.Logf("%s: local=%d (err=%v) remote=%d (err=%v)", name, len(local), errL, len(remote), errR)
+	for _, c := range local {
+		t.Logf("%s: local candidate: %v", name, c)
+	}
+	for _, c := range remote {
+		t.Logf("%s: remote candidate: %v", name, c)
+	}
 }
 
 // awaitGatheringComplete waits for the gathering-done signal.
