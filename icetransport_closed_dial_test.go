@@ -23,9 +23,17 @@ import (
 // releasing the connection established by a successful Dial/Accept.
 //
 // It deterministically drives StartContext into the "transport closed while
-// Dial was in flight" branch by holding the transport lock while the ICE
-// connection is established, so the Dial goroutine cannot observe any state
-// other than Closed.
+// Dial was in flight" branch:
+//
+//  1. Candidates are gathered but withheld, so the Dial cannot complete.
+//  2. The transport is marked Closed while StartContext is inside Dial.
+//  3. While holding the transport lock, candidates are injected directly
+//     into the agents (bypassing the transport lock), so the connection is
+//     established while the transport is closed and the Dial goroutine is
+//     blocked trying to reacquire the transport lock.
+//  4. The Connected state change is fully dispatched before the state is
+//     forced back to Closed and the lock released, so the Dial goroutine
+//     deterministically observes ICETransportStateClosed.
 //
 // Run with -race.
 func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
@@ -59,21 +67,19 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	paramsB, err := gathererB.GetLocalParameters()
 	require.NoError(t, err)
 
-	// Exchange candidates gathered on each side. Candidate callbacks must
-	// not fire while the transport lock is held below, since adding a
-	// remote candidate takes the transport read lock and would be
-	// blocked. Wait for gathering to finish before holding the lock.
+	// Collect candidates without exchanging them, and signal when
+	// gathering completes.
 	var (
 		onceA       sync.Once
 		onceB       sync.Once
+		candidatesA []*ICECandidate
+		candidatesB []*ICECandidate
 		gatherDoneA = make(chan struct{})
 		gatherDoneB = make(chan struct{})
 	)
 	gathererA.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
-			if err := transportB.AddRemoteCandidate(c); err != nil {
-				t.Logf("B AddRemoteCandidate(%s) failed: %v", c, err)
-			}
+			candidatesA = append(candidatesA, c)
 
 			return
 		}
@@ -81,9 +87,7 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	})
 	gathererB.OnLocalCandidate(func(c *ICECandidate) {
 		if c != nil {
-			if err := transportA.AddRemoteCandidate(c); err != nil {
-				t.Logf("A AddRemoteCandidate(%s) failed: %v", c, err)
-			}
+			candidatesB = append(candidatesB, c)
 
 			return
 		}
@@ -93,6 +97,21 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.NoError(t, gathererB.Gather())
 	awaitGatheringComplete(t, gatherDoneA, "gathererA")
 	awaitGatheringComplete(t, gatherDoneB, "gathererB")
+
+	// Register the Connected handler before starting StartContext so the
+	// event cannot be missed no matter how quickly the connection is
+	// established. The internal handler sets the transport state before
+	// invoking user handlers, so once this channel fires no pending
+	// Connected state write can overwrite setState(Closed) below.
+	var (
+		connectedOnce sync.Once
+		connectedCh   = make(chan struct{})
+	)
+	transportA.OnConnectionStateChange(func(s ICETransportState) {
+		if s == ICETransportStateConnected {
+			connectedOnce.Do(func() { close(connectedCh) })
+		}
+	})
 
 	// Start the remote (controlled) side.
 	controlled := ICERoleControlled
@@ -117,7 +136,8 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 
 	// Wait until StartContext has passed its entry checks and released the
 	// lock to run the ICE Dial, then grab the lock and mark the transport
-	// closed underneath it. The lock is intentionally kept held.
+	// closed underneath it. The Dial cannot complete yet because no remote
+	// candidates have been injected, so this is race-free.
 	require.Eventually(t, func() bool {
 		if !transportA.lock.TryLock() {
 			return false
@@ -135,24 +155,30 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 		return true
 	}, 5*time.Second, time.Millisecond)
 
-	// Wait until the connection is established: once the agent has a
-	// selected pair the Dial goroutine is blocked trying to reacquire the
-	// transport lock (still held here). Polling the agent's selected pair
-	// is robust against the transport state being overwritten by
-	// setState(Closed) below, unlike observing the Connected state event,
-	// which can be missed entirely on slow CI schedulers.
-	agent := gathererA.getAgent()
-	require.NotNil(t, agent)
-	require.Eventually(t, func() bool {
-		pair, err := agent.GetSelectedCandidatePair()
+	// The transport lock is still held and StartContext is inside Dial.
+	// Inject the candidates directly into the agents, bypassing the
+	// transport lock, so the connection is established while the transport
+	// is closed. The Dial goroutine is then blocked trying to reacquire
+	// the transport lock.
+	agentA := gathererA.getAgent()
+	agentB := gathererB.getAgent()
+	require.NotNil(t, agentA)
+	require.NotNil(t, agentB)
+	for _, c := range candidatesB {
+		iceCandidate, err := c.ToICE()
+		require.NoError(t, err)
+		require.NoError(t, agentA.AddRemoteCandidate(iceCandidate))
+	}
+	for _, c := range candidatesA {
+		iceCandidate, err := c.ToICE()
+		require.NoError(t, err)
+		require.NoError(t, agentB.AddRemoteCandidate(iceCandidate))
+	}
 
-		return err == nil && pair != nil
-	}, 10*time.Second, 10*time.Millisecond)
-
-	// Force the state to Closed before releasing the lock, so the Dial
-	// goroutine deterministically observes the Closed state.
-	transportA.setState(ICETransportStateClosed)
-	transportA.lock.Unlock()
+	// Wait for the Connected state change to be fully dispatched, then
+	// force the state back to Closed and release the lock, so the Dial
+	// goroutine deterministically observes ICETransportStateClosed.
+	completeClosedUnderLock(t, transportA, connectedCh)
 
 	require.ErrorIs(t, receiveWithTimeout(t, errChA, 10*time.Second, "StartContext did not return"), errICETransportClosed)
 
@@ -168,6 +194,23 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return runtime.NumGoroutine() <= baseline
 	}, 5*time.Second, 20*time.Millisecond)
+}
+
+// completeClosedUnderLock waits for the Connected state change to be
+// fully dispatched, then forces the transport state back to Closed and
+// releases the transport lock. The caller must hold the lock.
+func completeClosedUnderLock(t *testing.T, transport *ICETransport, connectedCh <-chan struct{}) {
+	t.Helper()
+
+	select {
+	case <-connectedCh:
+	case <-time.After(10 * time.Second):
+		transport.lock.Unlock()
+		assert.FailNow(t, "ICE connection state change was not dispatched")
+	}
+
+	transport.setState(ICETransportStateClosed)
+	transport.lock.Unlock()
 }
 
 // awaitGatheringComplete waits for the gathering-done signal.
