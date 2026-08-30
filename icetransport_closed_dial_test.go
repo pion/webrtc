@@ -22,8 +22,46 @@ import (
 // ICETransport.StartContext returning errICETransportClosed without
 // releasing the connection established by a successful Dial/Accept.
 //
-// It deterministically drives StartContext into the "transport closed while
-// Dial was in flight" branch:
+// Run with -race.
+func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	err := runClosedDuringDial(t, nil)
+	require.ErrorIs(t, err, errICETransportClosed)
+}
+
+// TestICETransport_StartContextClosedDuringDialGathererCallbackReentry is a
+// regression test for the transport deadlocking when the gatherer is closed
+// while the transport lock is held: the gatherer's OnStateChange callback
+// runs synchronously, and if it re-enters the transport it must not block
+// forever on the transport lock.
+//
+// Run with -race.
+func TestICETransport_StartContextClosedDuringDialGathererCallbackReentry(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	err := runClosedDuringDial(t, func(transportA *ICETransport, gathererA *ICEGatherer) {
+		gathererA.OnStateChange(func(s ICEGathererState) {
+			if s == ICEGathererStateClosed {
+				// Re-enter the transport from the gatherer callback.
+				// This must not deadlock on the transport lock.
+				_ = transportA.Start(nil, ICEParameters{}, nil) //nolint:errcheck
+			}
+		})
+	})
+	require.ErrorIs(t, err, errICETransportClosed)
+}
+
+// runClosedDuringDial deterministically drives StartContext into the
+// "transport closed while Dial was in flight" branch:
 //
 //  1. Candidates are gathered but withheld, so the Dial cannot complete.
 //  2. The transport is marked Closed while StartContext is inside Dial.
@@ -35,13 +73,14 @@ import (
 //     forced back to Closed and the lock released, so the Dial goroutine
 //     deterministically observes ICETransportStateClosed.
 //
-// Run with -race.
-func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
-	report := test.CheckRoutines(t)
-	defer report()
-
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
+// If hook is non-nil it is invoked with transportA and gathererA before
+// the connection is established, so callers can register extra callbacks.
+// It returns the error produced by the local StartContext.
+func runClosedDuringDial(
+	t *testing.T,
+	hook func(transportA *ICETransport, gathererA *ICEGatherer),
+) error {
+	t.Helper()
 
 	// Disable mDNS so that the test also works in restricted CI
 	// environments (e.g. i386 containers) where multicast binding fails
@@ -97,6 +136,10 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.NoError(t, gathererB.Gather())
 	awaitGatheringComplete(t, gatherDoneA, "gathererA")
 	awaitGatheringComplete(t, gatherDoneB, "gathererB")
+
+	if hook != nil {
+		hook(transportA, gathererA)
+	}
 
 	// Register the Connected handler before starting StartContext so the
 	// event cannot be missed no matter how quickly the connection is
@@ -164,23 +207,16 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	agentB := gathererB.getAgent()
 	require.NotNil(t, agentA)
 	require.NotNil(t, agentB)
-	for _, c := range candidatesB {
-		iceCandidate, err := c.ToICE()
-		require.NoError(t, err)
-		require.NoError(t, agentA.AddRemoteCandidate(iceCandidate))
-	}
-	for _, c := range candidatesA {
-		iceCandidate, err := c.ToICE()
-		require.NoError(t, err)
-		require.NoError(t, agentB.AddRemoteCandidate(iceCandidate))
-	}
+	injectCandidates(t, agentA, candidatesB)
+	injectCandidates(t, agentB, candidatesA)
 
 	// Wait for the Connected state change to be fully dispatched, then
 	// force the state back to Closed and release the lock, so the Dial
 	// goroutine deterministically observes ICETransportStateClosed.
 	completeClosedUnderLock(t, transportA, connectedCh)
 
-	require.ErrorIs(t, receiveWithTimeout(t, errChA, 10*time.Second, "StartContext did not return"), errICETransportClosed)
+	err = receiveWithTimeout(t, errChA, 10*time.Second, "StartContext did not return")
+	require.ErrorIs(t, err, errICETransportClosed)
 
 	// The cancel function must be released, mirroring the error path.
 	require.Nil(t, transportA.ctxCancel)
@@ -194,6 +230,19 @@ func TestICETransport_StartContextClosedDuringDial(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return runtime.NumGoroutine() <= baseline
 	}, 5*time.Second, 20*time.Millisecond)
+
+	return err
+}
+
+// injectCandidates converts and adds the candidates to the agent.
+func injectCandidates(t *testing.T, agent *ice.Agent, candidates []*ICECandidate) {
+	t.Helper()
+
+	for _, c := range candidates {
+		iceCandidate, err := c.ToICE()
+		require.NoError(t, err)
+		require.NoError(t, agent.AddRemoteCandidate(iceCandidate))
+	}
 }
 
 // completeClosedUnderLock waits for the Connected state change to be
