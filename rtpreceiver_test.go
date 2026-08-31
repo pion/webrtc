@@ -983,3 +983,56 @@ func TestRTPReceiver_CollectStats_RID(t *testing.T) {
 
 	assert.Equal(t, rid, inbound.Rid)
 }
+
+func TestRTPReceiverRepairReaderMalformedPacketNoPanic(t *testing.T) {
+	receiver, track := newRepairReaderPolicyTestReceiver(t, false, 2222, nil)
+
+	var reads atomic.Int32
+	repairReader := interceptor.RTPReaderFunc(
+		func(b []byte, attributes interceptor.Attributes) (int, interceptor.Attributes, error) {
+			switch reads.Add(1) {
+			case 1:
+				// Zero-length read whose buffer holds garbage (as if recycled
+				// from a prior packet). Without an i == 0 guard the padding
+				// length read b[i-1] is b[-1] -> panic.
+				b[0] = 0xA0 // padding + extension bits set
+
+				return 0, attributes, nil
+			case 2:
+				// Truncated packet: extension bit set (0x90) but only 12 bytes,
+				// shorter than the fixed header + extension header. Without a
+				// length guard the extension length field is parsed from bytes
+				// beyond the packet.
+				return copy(b, []byte{
+					0x90, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x04, 0x57,
+				}), attributes, nil
+			case 3:
+				// Valid RTX packet: OSN 0x04D2 -> sequence number 1234, payload 0xA1.
+				return copy(b, []byte{
+					0x80, 97, 0x13, 0x88, 0, 0, 0, 0, 0, 0, 0x08, 0xAE,
+					0x04, 0xD2, 0xA1,
+				}), attributes, nil
+			default:
+				// Stop the repair reader once the valid packet was forwarded.
+				return 0, attributes, io.EOF
+			}
+		},
+	)
+	require.NoError(t, receiver.receiveForRtx(
+		2222, "", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, true, nil, nil,
+	))
+
+	// The malformed packets must be skipped and the valid packet still forwarded.
+	require.Eventually(t, func() bool {
+		receiver.mu.RLock()
+		defer receiver.mu.RUnlock()
+
+		return len(receiver.tracks[0].repairStreamChannel) == 1
+	}, time.Second, time.Millisecond)
+
+	packet, _, err := track.ReadRTP()
+	require.NoError(t, err)
+	require.NotNil(t, packet)
+	assert.Equal(t, uint16(1234), packet.SequenceNumber)
+	assert.Equal(t, []byte{0xA1}, packet.Payload)
+}
