@@ -100,6 +100,117 @@ func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
 	closePairNow(t, sender, receiver)
 }
 
+// Test_RTPSender_ReplaceTrack_ResumesFlowAfterRepeatedMuteUnmute reproduces
+// https://github.com/pion/webrtc/issues/2623: repeatedly muting a sender via
+// ReplaceTrack(nil) and resuming it with a freshly-constructed track (as a
+// typical mute/unmute implementation using getUserMedia-style tracks would)
+// must keep RTP flowing to the remote peer. Before the fix, a fresh track's
+// unrelated starting RTP sequence number could desync SRTP's rollover-count
+// tracking on the receiver, causing it to silently drop every subsequent
+// packet as a replay.
+func Test_RTPSender_ReplaceTrack_ResumesFlowAfterRepeatedMuteUnmute(t *testing.T) { //nolint:cyclop
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, err := NewAPI().newPair(Configuration{})
+	assert.NoError(t, err)
+
+	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	var lastSeenCycle atomic.Uint32
+	var currentCycle atomic.Uint32
+	var currentTrack atomic.Pointer[TrackLocalStaticSample]
+	currentTrack.Store(trackA)
+
+	receiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		for {
+			pkt, _, err := track.ReadRTP()
+			if err != nil {
+				assert.True(t, errors.Is(err, io.EOF))
+
+				return
+			}
+			if len(pkt.Payload) > 0 {
+				lastSeenCycle.Store(uint32(pkt.Payload[len(pkt.Payload)-1]))
+			}
+		}
+	})
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	// Continuous background writer, simulating an audio/video pipeline that
+	// keeps producing samples independent of application-level mute state.
+	writerDone := make(chan struct{})
+	defer func() { <-writerDone }()
+
+	stopWriter := make(chan struct{})
+	defer close(stopWriter)
+
+	go func() {
+		defer close(writerDone)
+
+		ticker := time.NewTicker(time.Millisecond * 10)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopWriter:
+				return
+			case <-ticker.C:
+				tr := currentTrack.Load()
+				if tr == nil {
+					continue
+				}
+				cycle := byte(currentCycle.Load()) //nolint:gosec // G115: bounded by the small cycles const below
+				sample := media.Sample{Data: []byte{cycle}, Duration: time.Millisecond * 10}
+				_ = tr.WriteSample(sample)
+			}
+		}
+	}()
+
+	const cycles = 15
+	for cycle := 1; cycle <= cycles; cycle++ {
+		currentCycle.Store(uint32(cycle))
+
+		// Mute.
+		assert.NoError(t, rtpSender.ReplaceTrack(nil))
+		currentTrack.Store(nil)
+		time.Sleep(time.Millisecond * 20)
+
+		// Unmute with a brand-new track object, mirroring a caller that
+		// creates a fresh local track on every unmute.
+		newTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+		assert.NoError(t, err)
+		assert.NoError(t, rtpSender.ReplaceTrack(newTrack))
+		currentTrack.Store(newTrack)
+
+		deadline := time.Now().Add(time.Second * 2)
+		resumed := false
+		for time.Now().Before(deadline) {
+			if lastSeenCycle.Load() == uint32(cycle) {
+				resumed = true
+
+				break
+			}
+			time.Sleep(time.Millisecond * 20)
+		}
+
+		msg := "RTP flow did not resume on cycle %d/%d after ReplaceTrack(nil)->ReplaceTrack(newTrack)"
+		assert.Truef(t, resumed, msg, cycle, cycles)
+		if !resumed {
+			break
+		}
+	}
+
+	closePairNow(t, sender, receiver)
+}
+
 func Test_RTPSender_GetParameters(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
