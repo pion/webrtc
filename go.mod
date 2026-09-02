@@ -2,10 +2,15 @@ module github.com/pion/webrtc/v4
 
 go 1.24.0
 
+replace (
+	github.com/pion/dtls/v3 => github.com/pion/dtls/v3 v3.1.3-0.20260902001837-a2624993668b
+	github.com/pion/stun/v3 => github.com/pion/stun/v3 v3.1.8-0.20260902140557-0f487f2ad4fe
+)
+
 require (
 	github.com/pion/datachannel v1.6.2
 	github.com/pion/dtls/v3 v3.1.8
-	github.com/pion/ice/v4 v4.4.1
+	github.com/pion/ice/v4 v4.4.2-0.20260902141520-0a12a1637d28
 	github.com/pion/interceptor v0.1.47
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
@@ -14,7 +19,7 @@ require (
 	github.com/pion/sctp v1.11.1
 	github.com/pion/sdp/v3 v3.0.19
 	github.com/pion/srtp/v3 v3.0.13
-	github.com/pion/stun/v3 v3.1.7
+	github.com/pion/stun/v3 v3.1.8-0.20260902140557-0f487f2ad4fe
 	github.com/pion/transport/v4 v4.1.0
 	github.com/pion/turn/v5 v5.1.0
 	github.com/sclevine/agouti v3.0.0+incompatible

@@ -15,6 +15,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/dtls/v3"
+	dtlsCipherSuite "github.com/pion/dtls/v3/pkg/crypto/ciphersuite"
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
@@ -724,11 +725,14 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	se.SetDTLSClientCAs(clientCAs)
 	se.SetDTLSRootCAs(rootCAs)
 	se.SetDTLSKeyLogWriter(&keyBuf)
-	se.SetDTLSCipherSuites(dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+	se.SetDTLSCipherSuites(
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	)
 	se.SetDTLSSupportedProtocols("webrtc")
 
 	called := false
-	se.SetDTLSCustomerCipherSuites(func() []dtls.CipherSuite {
+	se.SetDTLSCustomerCipherSuites(func() []dtlsCipherSuite.Suite {
 		called = true
 
 		return nil
@@ -743,9 +747,9 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	assert.Equal(t, rootCAs, se.dtls.rootCAs)
 	_, _ = se.dtls.keyLogWriter.Write([]byte("test"))
 	assert.NotZero(t, keyBuf.Len())
-	assert.Equal(t, []dtls.CipherSuiteID{
-		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
-		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	assert.Equal(t, []dtlsCipherSuite.ID{
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	}, se.dtls.cipherSuites)
 	_ = se.dtls.customCipherSuites()
 	assert.Equal(t, []string{"webrtc"}, se.dtls.supportedProtocols)
