@@ -635,7 +635,6 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	t.srtpProtectionProfile = srtpProtectionProfile
 	t.onStateChange(DTLSTransportStateConnected)
 	if t.api.settingEngine.enableSped {
-		t.iceTransport.Piggyback(nil, nil)
 		t.iceTransport.SetDtlsCallback(nil)
 	}
 
