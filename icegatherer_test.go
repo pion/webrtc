@@ -1358,9 +1358,9 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	const (
 		offerUfrag  = "offerufrag123"
-		offerPwd    = "offerpassword123456"
+		offerPwd    = "offerpassword123456789"
 		answerUfrag = "answerufrag123"
-		answerPwd   = "answerpassword123456"
+		answerPwd   = "answerpassword12345678"
 	)
 
 	pcOffer, err := NewAPI(WithSettingEngine(buildSE(offerNet, offerUfrag, offerPwd))).NewPeerConnection(Configuration{})
