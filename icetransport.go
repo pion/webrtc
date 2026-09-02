@@ -511,8 +511,8 @@ func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
 	return agent.SetRemoteCredentials(newUfrag, newPwd)
 }
 
-// Piggyback forwards a raw packet to the ICE Agent.
-func (t *ICETransport) Piggyback(packet []byte, end bool) bool {
+// Piggyback forwards the raw datagrams of a DTLS flight to the ICE Agent.
+func (t *ICETransport) Piggyback(datagrams [][]byte, rAddr net.Addr) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -523,7 +523,7 @@ func (t *ICETransport) Piggyback(packet []byte, end bool) bool {
 		return false
 	}
 
-	return agent.Piggyback(packet, end)
+	return agent.Piggyback(datagrams, rAddr)
 }
 
 // SetDtlsHandshakeComplete signals the piggybacking controller that the local

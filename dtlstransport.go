@@ -449,9 +449,9 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 	if t.api.settingEngine.enableSped {
 		sharedOpts = append(
 			sharedOpts,
-			dtls.WithOutboundHandshakePacketInterceptor(func(packet []byte, end bool) bool {
-				// Forward the packet to the ICE transport for piggybacking.
-				return t.iceTransport.Piggyback(packet, end)
+			dtls.WithOutboundHandshakePacketInterceptor(func(datagrams [][]byte, rAddr net.Addr) bool {
+				// Forward the flight to the ICE transport for piggybacking.
+				return t.iceTransport.Piggyback(datagrams, rAddr)
 			}),
 			dtls.WithInboundHandshakePacketNotifier(func(packet []byte) {
 				t.iceTransport.ReportDtlsPacket(packet)
@@ -635,7 +635,7 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	t.srtpProtectionProfile = srtpProtectionProfile
 	t.onStateChange(DTLSTransportStateConnected)
 	if t.api.settingEngine.enableSped {
-		t.iceTransport.Piggyback(nil, true)
+		t.iceTransport.Piggyback(nil, nil)
 		t.iceTransport.SetDtlsCallback(nil)
 	}
 
