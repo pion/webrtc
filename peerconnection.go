@@ -1372,6 +1372,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		pc.startTransports(
 			iceRole,
 			dtlsRoleFromSDP(desc.parsed),
+			remoteIsLite,
 			iceDetails.Ufrag,
 			iceDetails.Password,
 			fingerprint,
@@ -2796,6 +2797,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 func (pc *PeerConnection) startTransports(
 	iceRole ICERole,
 	dtlsRole DTLSRole,
+	remoteIsLite bool,
 	remoteUfrag, remotePwd, fingerprint, fingerprintHash string,
 ) {
 	// Start the ice transport
@@ -2804,7 +2806,7 @@ func (pc *PeerConnection) startTransports(
 		ICEParameters{
 			UsernameFragment: remoteUfrag,
 			Password:         remotePwd,
-			ICELite:          false,
+			ICELite:          remoteIsLite,
 		},
 		&iceRole,
 	)

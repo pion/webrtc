@@ -158,6 +158,9 @@ func (t *ICETransport) StartContext(
 	}); err != nil {
 		return err
 	}
+	if err := agent.SetRemoteICELite(params.ICELite); err != nil {
+		return err
+	}
 
 	if role == nil {
 		controlled := ICERoleControlled
