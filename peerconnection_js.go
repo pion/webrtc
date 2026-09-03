@@ -8,7 +8,7 @@
 package webrtc
 
 import (
-	"sync"
+	"strings"
 	"syscall/js"
 
 	"github.com/pion/ice/v4"
@@ -38,59 +38,6 @@ type PeerConnection struct {
 
 	// A reference to the associated API state used by this connection
 	api *API
-}
-
-// iceCandidateEvent binds a browser event to the callback active at delivery.
-type iceCandidateEvent struct {
-	candidate *ICECandidate
-	callback  func(*ICECandidate)
-}
-
-// iceCandidateDispatcher serializes accepted events across callback replacements.
-type iceCandidateDispatcher struct {
-	mtx sync.Mutex
-
-	events  []iceCandidateEvent
-	running bool
-	stopped bool
-}
-
-func (d *iceCandidateDispatcher) enqueue(event iceCandidateEvent) {
-	d.mtx.Lock()
-	defer d.mtx.Unlock()
-	if d.stopped {
-		return
-	}
-
-	d.events = append(d.events, event)
-	if !d.running {
-		d.running = true
-		go d.run()
-	}
-}
-
-func (d *iceCandidateDispatcher) run() {
-	for {
-		d.mtx.Lock()
-		if d.stopped || len(d.events) == 0 {
-			d.running = false
-			d.mtx.Unlock()
-			return
-		}
-
-		event := d.events[0]
-		d.events[0] = iceCandidateEvent{}
-		d.events = d.events[1:]
-		d.mtx.Unlock()
-		event.callback(event.candidate)
-	}
-}
-
-func (d *iceCandidateDispatcher) stop() {
-	d.mtx.Lock()
-	d.stopped = true
-	d.events = nil
-	d.mtx.Unlock()
 }
 
 // NewPeerConnection creates a peerconnection.
@@ -386,27 +333,76 @@ func (pc *PeerConnection) ICEConnectionState() ICEConnectionState {
 // OnICECandidate sets an event handler which is invoked when a new ICE
 // candidate is found.
 func (pc *PeerConnection) OnICECandidate(f func(candidate *ICECandidate)) {
+	if f == nil {
+		pc.OnICECandidateEvent(nil)
+
+		return
+	}
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
+		f(event.Candidate)
+	})
+}
+
+// OnICECandidateEvent sets a handler for local ICE candidate events. Events
+// accepted from the browser are serialized in FIFO order and retain the handler
+// active at acceptance. Setting f to nil disables only future acceptance; it
+// does not discard queued events.
+func (pc *PeerConnection) OnICECandidateEvent(f func(ICECandidateEvent)) {
 	// Detaching the old JavaScript function prevents new events without
 	// discarding events it already placed in the dispatcher.
 	if pc.onICECandidateHandler != nil {
 		pc.underlying.Set("onicecandidate", js.Null())
 		pc.onICECandidateHandler.Release()
+		pc.onICECandidateHandler = nil
+	}
+	if f == nil {
+		return
 	}
 	if pc.iceCandidateDispatcher == nil {
 		pc.iceCandidateDispatcher = &iceCandidateDispatcher{}
 	}
 
-	callback := func(candidate *ICECandidate) {
-		if candidate == nil && pc.onGatherCompleteHandler != nil {
+	callback := func(event ICECandidateEvent) {
+		if event.Candidate == nil && pc.onGatherCompleteHandler != nil {
 			pc.onGatherCompleteHandler()
 		}
-		f(candidate)
+		f(event)
 	}
+	usernameFragment := ""
+	haveCandidate := false
+	haveExactCandidateIdentity := false
 	handler := js.FuncOf(func(this js.Value, args []js.Value) any {
-		pc.iceCandidateDispatcher.enqueue(iceCandidateEvent{
-			candidate: valueToICECandidate(args[0].Get("candidate")),
-			callback:  callback,
-		})
+		candidateValue := args[0].Get("candidate")
+		candidate := valueToICECandidate(candidateValue)
+		eventUsernameFragment := ""
+		if candidate != nil {
+			eventUsernameFragment = candidate.UsernameFragment()
+			if eventUsernameFragment == "" {
+				eventUsernameFragment = pc.localICEUsernameFragment(candidateValue)
+				candidate.usernameFragment = eventUsernameFragment
+			}
+
+			if !haveCandidate {
+				usernameFragment = eventUsernameFragment
+				haveExactCandidateIdentity = eventUsernameFragment != ""
+			} else if eventUsernameFragment == "" || eventUsernameFragment != usernameFragment {
+				haveExactCandidateIdentity = false
+			}
+			haveCandidate = true
+		} else if exactUsernameFragment, haveLocalDescription := pc.globalICEUsernameFragment(); haveLocalDescription {
+			eventUsernameFragment = exactUsernameFragment
+		} else if haveExactCandidateIdentity {
+			eventUsernameFragment = usernameFragment
+		}
+		pc.iceCandidateDispatcher.enqueue(ICECandidateEvent{
+			Candidate:        candidate,
+			UsernameFragment: eventUsernameFragment,
+		}, callback)
+		if candidate == nil {
+			usernameFragment = ""
+			haveCandidate = false
+			haveExactCandidateIdentity = false
+		}
 		return js.Undefined()
 	})
 	pc.onICECandidateHandler = &handler
@@ -455,7 +451,8 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) (err error) {
 	return nil
 }
 
-// Close ends the PeerConnection
+// Close ends the PeerConnection and discards ICECandidateEvent callbacks
+// still queued.
 func (pc *PeerConnection) Close() (err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -748,12 +745,199 @@ func valueToICEServer(iceServerValue js.Value) ICEServer {
 	return s
 }
 
+const (
+	maxLocalDescriptionBytes = 1 << 20
+	maxLocalDescriptionLines = 4096
+	maxLocalMediaSections    = 256
+)
+
+type localICECredentials struct {
+	sessionUsernameFragment string
+	media                   []localICEMediaCredentials
+}
+
+type localICEMediaCredentials struct {
+	mid                 string
+	usernameFragment    string
+	hasUsernameFragment bool
+}
+
+func (pc *PeerConnection) localICEUsernameFragment(candidateValue js.Value) string {
+	credentials, haveLocalDescription := pc.localICECredentials()
+	if !haveLocalDescription {
+		return ""
+	}
+
+	midValue := candidateValue.Get("sdpMid")
+	indexValue := candidateValue.Get("sdpMLineIndex")
+	haveMid := !midValue.IsNull() && !midValue.IsUndefined()
+	haveIndex := !indexValue.IsNull() && !indexValue.IsUndefined()
+	if !haveMid && !haveIndex {
+		return credentials.globalUsernameFragment()
+	}
+
+	mediaIndex := -1
+	if haveMid {
+		if midValue.Type() != js.TypeString || midValue.String() == "" {
+			return ""
+		}
+		for i := range credentials.media {
+			if credentials.media[i].mid != midValue.String() {
+				continue
+			}
+			if mediaIndex != -1 {
+				return ""
+			}
+			mediaIndex = i
+		}
+		if mediaIndex == -1 {
+			return ""
+		}
+	}
+	if haveIndex {
+		if indexValue.Type() != js.TypeNumber {
+			return ""
+		}
+		index := indexValue.Int()
+		if indexValue.Float() != float64(index) || index < 0 || index >= len(credentials.media) ||
+			(mediaIndex != -1 && mediaIndex != index) {
+			return ""
+		}
+		mediaIndex = index
+	}
+
+	return credentials.media[mediaIndex].usernameFragment
+}
+
+// globalICEUsernameFragment returns a username fragment only when every local
+// media section uses that exact fragment. The boolean reports whether a local
+// description was available, including malformed or ambiguous descriptions.
+func (pc *PeerConnection) globalICEUsernameFragment() (string, bool) {
+	credentials, haveLocalDescription := pc.localICECredentials()
+	if !haveLocalDescription {
+		return "", false
+	}
+
+	return credentials.globalUsernameFragment(), true
+}
+
+func (pc *PeerConnection) localICECredentials() (localICECredentials, bool) {
+	localDescription := pc.underlying.Get("localDescription")
+	if localDescription.Type() != js.TypeObject {
+		return localICECredentials{}, false
+	}
+
+	credentials, ok := parseLocalICECredentials(valueToStringOrZero(localDescription.Get("sdp")))
+	if !ok {
+		return localICECredentials{}, true
+	}
+
+	return credentials, true
+}
+
+func (c localICECredentials) globalUsernameFragment() string {
+	if len(c.media) == 0 {
+		return c.sessionUsernameFragment
+	}
+
+	usernameFragment := c.media[0].usernameFragment
+	if usernameFragment == "" {
+		return ""
+	}
+	for i := 1; i < len(c.media); i++ {
+		if c.media[i].usernameFragment != usernameFragment {
+			return ""
+		}
+	}
+
+	return usernameFragment
+}
+
+func parseLocalICECredentials(raw string) (localICECredentials, bool) {
+	if len(raw) == 0 || len(raw) > maxLocalDescriptionBytes {
+		return localICECredentials{}, false
+	}
+
+	credentials := localICECredentials{}
+	mediaIndex := -1
+	lineCount := 0
+	for line := range strings.SplitSeq(raw, "\n") {
+		lineCount++
+		if lineCount > maxLocalDescriptionLines {
+			return localICECredentials{}, false
+		}
+		line = strings.TrimSuffix(line, "\r")
+		if line == "" {
+			continue
+		}
+		if len(line) < 2 || line[1] != '=' {
+			return localICECredentials{}, false
+		}
+
+		switch {
+		case strings.HasPrefix(line, "m="):
+			if len(credentials.media) == maxLocalMediaSections || len(line) == 2 {
+				return localICECredentials{}, false
+			}
+			credentials.media = append(credentials.media, localICEMediaCredentials{
+				usernameFragment: credentials.sessionUsernameFragment,
+			})
+			mediaIndex = len(credentials.media) - 1
+		case strings.HasPrefix(line, "a=mid:"):
+			mid := strings.TrimPrefix(line, "a=mid:")
+			if mediaIndex == -1 || !validSDPToken(mid) || credentials.media[mediaIndex].mid != "" {
+				return localICECredentials{}, false
+			}
+			credentials.media[mediaIndex].mid = mid
+		case strings.HasPrefix(line, "a=ice-ufrag:"):
+			usernameFragment := strings.TrimPrefix(line, "a=ice-ufrag:")
+			if !validICEUsernameFragment(usernameFragment) {
+				return localICECredentials{}, false
+			}
+			if mediaIndex == -1 {
+				if credentials.sessionUsernameFragment != "" {
+					return localICECredentials{}, false
+				}
+				credentials.sessionUsernameFragment = usernameFragment
+				continue
+			}
+			// A media-level credential overrides the inherited session value, but
+			// a second attribute in the same section is malformed.
+			if credentials.media[mediaIndex].hasUsernameFragment {
+				return localICECredentials{}, false
+			}
+			credentials.media[mediaIndex].usernameFragment = usernameFragment
+			credentials.media[mediaIndex].hasUsernameFragment = true
+		}
+	}
+
+	return credentials, true
+}
+
+func validICEUsernameFragment(usernameFragment string) bool {
+	return validSDPToken(usernameFragment)
+}
+
+func validSDPToken(token string) bool {
+	if len(token) == 0 || len(token) > 256 {
+		return false
+	}
+	for _, character := range token {
+		if character <= ' ' || character > '~' {
+			return false
+		}
+	}
+
+	return true
+}
+
 func valueToICECandidate(val js.Value) *ICECandidate {
 	if val.IsNull() || val.IsUndefined() {
 		return nil
 	}
 	sdpMid := valueToStringOrZero(val.Get("sdpMid"))
 	sdpMLineIndex := valueToUint16OrZero(val.Get("sdpMLineIndex"))
+	usernameFragment := valueToStringOrZero(val.Get("usernameFragment"))
 	candidateStr := valueToStringOrZero(val.Get("candidate"))
 	if candidateStr != "" {
 		// The SDP candidate string is authoritative; rebuilding from typed
@@ -768,22 +952,24 @@ func valueToICECandidate(val js.Value) *ICECandidate {
 			return nil
 		}
 
+		iceCandidate.usernameFragment = usernameFragment
 		return &iceCandidate
 	}
 	protocol, _ := NewICEProtocol(val.Get("protocol").String())
 	candidateType, _ := NewICECandidateType(val.Get("type").String())
 	return &ICECandidate{
-		Foundation:     val.Get("foundation").String(),
-		Priority:       valueToUint32OrZero(val.Get("priority")),
-		Address:        val.Get("address").String(),
-		Protocol:       protocol,
-		Port:           valueToUint16OrZero(val.Get("port")),
-		Typ:            candidateType,
-		Component:      stringToComponentIDOrZero(val.Get("component").String()),
-		RelatedAddress: val.Get("relatedAddress").String(),
-		RelatedPort:    valueToUint16OrZero(val.Get("relatedPort")),
-		SDPMid:         sdpMid,
-		SDPMLineIndex:  sdpMLineIndex,
+		usernameFragment: usernameFragment,
+		Foundation:       val.Get("foundation").String(),
+		Priority:         valueToUint32OrZero(val.Get("priority")),
+		Address:          val.Get("address").String(),
+		Protocol:         protocol,
+		Port:             valueToUint16OrZero(val.Get("port")),
+		Typ:              candidateType,
+		Component:        stringToComponentIDOrZero(val.Get("component").String()),
+		RelatedAddress:   val.Get("relatedAddress").String(),
+		RelatedPort:      valueToUint16OrZero(val.Get("relatedPort")),
+		SDPMid:           sdpMid,
+		SDPMLineIndex:    sdpMLineIndex,
 	}
 }
 

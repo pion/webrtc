@@ -205,18 +205,20 @@ func TestNewIdentifiedICECandidatesFromICE(t *testing.T) {
 
 func TestICECandidate_ToJSON(t *testing.T) {
 	candidate := ICECandidate{
-		Foundation: "foundation",
-		Priority:   128,
-		Address:    "1.0.0.1",
-		Protocol:   ICEProtocolUDP,
-		Port:       1234,
-		Typ:        ICECandidateTypeHost,
-		Component:  1,
+		usernameFragment: "gathering-1",
+		Foundation:       "foundation",
+		Priority:         128,
+		Address:          "1.0.0.1",
+		Protocol:         ICEProtocolUDP,
+		Port:             1234,
+		Typ:              ICECandidateTypeHost,
+		Component:        1,
 	}
 
 	candidateInit := candidate.ToJSON()
 
 	assert.Equal(t, uint16(0), *candidateInit.SDPMLineIndex)
+	assert.Equal(t, "gathering-1", *candidateInit.UsernameFragment)
 	assert.Equal(t, "candidate:foundation 1 udp 128 1.0.0.1 1234 typ host", candidateInit.Candidate)
 }
 

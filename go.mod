@@ -35,3 +35,5 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/pion/ice/v4 => github.com/aperturerobotics/pion-ice/v4 v4.0.0-20260812163703-6ad0c439f02a

@@ -66,6 +66,239 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	assert.NoError(t, gatherer.Close())
 }
 
+func TestICEGathererCandidateEventsPreserveOrderAndGeneration(t *testing.T) {
+	se := SettingEngine{}
+	se.SetICECredentials("generation-one", "generation-one-password")
+	gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, gatherer.Close()) }()
+
+	firstCandidate := make(chan struct{})
+	releaseCandidate := make(chan struct{})
+	firstEvents := make(chan ICECandidateEvent, 8)
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) {
+		firstEvents <- event
+		if event.Candidate != nil {
+			select {
+			case <-firstCandidate:
+			default:
+				close(firstCandidate)
+				<-releaseCandidate
+			}
+		}
+	})
+	require.NoError(t, gatherer.Gather())
+	<-firstCandidate
+	select {
+	case event := <-firstEvents:
+		require.NotNil(t, event.Candidate)
+		assert.Equal(t, "generation-one", event.UsernameFragment)
+		assert.Equal(t, "generation-one", event.Candidate.UsernameFragment())
+		assert.Equal(t, "generation-one", *event.Candidate.ToJSON().UsernameFragment)
+	case <-time.After(5 * time.Second):
+		t.Fatal("first candidate was not delivered")
+	}
+	select {
+	case event := <-firstEvents:
+		t.Fatalf("event overtook blocked candidate: %+v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseCandidate)
+
+	for {
+		event := <-firstEvents
+		assert.Equal(t, "generation-one", event.UsernameFragment)
+		if event.Candidate == nil {
+			break
+		}
+	}
+
+	agent := gatherer.getAgent()
+	require.NotNil(t, agent)
+	require.NoError(t, agent.Restart("generation-two", "generation-two-password"))
+	secondEvents := make(chan ICECandidateEvent, 8)
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) { secondEvents <- event })
+	require.NoError(t, gatherer.Gather())
+	for {
+		event := <-secondEvents
+		assert.Equal(t, "generation-two", event.UsernameFragment)
+		if event.Candidate == nil {
+			break
+		}
+		assert.Equal(t, "generation-two", event.Candidate.UsernameFragment())
+	}
+}
+
+func TestICEGathererLateSourceEventsKeepGeneration(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	candidate, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network: "udp", Address: "192.0.2.1", Port: 3478, Component: 1,
+	})
+	require.NoError(t, err)
+
+	events := make(chan ICECandidateEvent, 2)
+	oldCalled := false
+	gatherer.OnLocalCandidateEvent(func(ICECandidateEvent) { oldCalled = true })
+	oldHandler := gatherer.onLocalCandidateHandler.Load()
+	oldSource := func(candidate ice.Candidate) {
+		gatherer.onCandidate("old-generation", oldHandler, candidate)
+	}
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) { events <- event })
+	oldSource(candidate)
+	oldSource(nil)
+
+	candidateEvent := <-events
+	require.NotNil(t, candidateEvent.Candidate)
+	assert.Equal(t, "old-generation", candidateEvent.UsernameFragment)
+	assert.Equal(t, "old-generation", candidateEvent.Candidate.UsernameFragment())
+	endEvent := <-events
+	assert.False(t, oldCalled)
+	assert.Nil(t, endEvent.Candidate)
+	assert.Equal(t, "old-generation", endEvent.UsernameFragment)
+}
+
+func TestICEGathererPooledAndLiveEventsShareDeliveryOrder(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{ICECandidatePoolSize: 1})
+	require.NoError(t, err)
+
+	candidate, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network: "udp", Address: "192.0.2.1", Port: 3478, Component: 1,
+	})
+	require.NoError(t, err)
+
+	events := make(chan string, 8)
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) {
+		if event.Candidate != nil {
+			events <- "old-candidate-start"
+			close(firstStarted)
+			<-releaseFirst
+			events <- "old-candidate-complete"
+			return
+		}
+		events <- "old-eoc:" + event.UsernameFragment
+	})
+
+	gatherer.onCandidate("pooled", gatherer.onLocalCandidateHandler.Load(), candidate)
+	gatherer.onCandidate("pooled", gatherer.onLocalCandidateHandler.Load(), nil)
+	go gatherer.flushCandidates()
+	<-firstStarted
+	assert.Equal(t, "old-candidate-start", <-events)
+
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) {
+		events <- "new:" + event.UsernameFragment
+	})
+	gatherer.onCandidate("live", gatherer.onLocalCandidateHandler.Load(), candidate)
+	select {
+	case event := <-events:
+		t.Fatalf("live event overtook pooled delivery: %s", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(releaseFirst)
+	assert.Equal(t, "old-candidate-complete", <-events)
+	assert.Equal(t, "old-eoc:pooled", <-events)
+	assert.Equal(t, "new:live", <-events)
+}
+
+func TestICEGathererAcceptedEventsRetainCallbackAcrossReplacement(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	candidate, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network: "udp", Address: "192.0.2.1", Port: 3478, Component: 1,
+	})
+	require.NoError(t, err)
+
+	events := make(chan string, 4)
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	calls := 0
+	gatherer.OnLocalCandidateEvent(func(ICECandidateEvent) {
+		calls++
+		if calls == 1 {
+			events <- "old-start"
+			close(firstStarted)
+			<-releaseFirst
+			return
+		}
+		events <- "old-queued"
+	})
+	go gatherer.onCandidate("old", gatherer.onLocalCandidateHandler.Load(), candidate)
+	<-firstStarted
+	gatherer.onCandidate("old", gatherer.onLocalCandidateHandler.Load(), candidate)
+	gatherer.OnLocalCandidateEvent(func(ICECandidateEvent) { events <- "new" })
+	gatherer.onCandidate("new", gatherer.onLocalCandidateHandler.Load(), candidate)
+	close(releaseFirst)
+
+	assert.Equal(t, "old-start", <-events)
+	assert.Equal(t, "old-queued", <-events)
+	assert.Equal(t, "new", <-events)
+}
+
+func TestICEGathererReentrantCloseDropsQueuedEvents(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	closed := make(chan struct{})
+	unexpected := make(chan struct{}, 1)
+	gatherer.candidateEvents.events = []queuedICECandidateEvent{
+		{callback: func(ICECandidateEvent) {
+			assert.NoError(t, gatherer.Close())
+			close(closed)
+		}},
+		{callback: func(ICECandidateEvent) { unexpected <- struct{}{} }},
+	}
+	gatherer.candidateEvents.running = true
+	go gatherer.candidateEvents.run()
+	<-closed
+	select {
+	case <-unexpected:
+		t.Fatal("queued callback ran after reentrant Close")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestICEGathererCandidateCallbackCanReplaceHandler(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	candidate, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network: "udp", Address: "192.0.2.1", Port: 3478, Component: 1,
+	})
+	require.NoError(t, err)
+
+	events := make(chan string, 2)
+	gatherer.OnLocalCandidateEvent(func(event ICECandidateEvent) {
+		gatherer.OnLocalCandidateEvent(func(ICECandidateEvent) { events <- "replacement" })
+		events <- "original"
+	})
+	gatherer.onCandidate("original", gatherer.onLocalCandidateHandler.Load(), candidate)
+	assert.Equal(t, "original", <-events)
+	gatherer.onCandidate("replacement", gatherer.onLocalCandidateHandler.Load(), candidate)
+	assert.Equal(t, "replacement", <-events)
+}
+
+func TestICEGathererNilCandidateHandlers(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+
+	candidate, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
+		Network: "udp", Address: "192.0.2.1", Port: 3478, Component: 1,
+	})
+	require.NoError(t, err)
+
+	gatherer.OnLocalCandidate(nil)
+	gatherer.onCandidate("legacy-nil", gatherer.onLocalCandidateHandler.Load(), candidate)
+	gatherer.onCandidate("legacy-nil", gatherer.onLocalCandidateHandler.Load(), nil)
+	gatherer.OnLocalCandidateEvent(nil)
+	gatherer.onCandidate("event-nil", gatherer.onLocalCandidateHandler.Load(), candidate)
+	gatherer.onCandidate("event-nil", gatherer.onLocalCandidateHandler.Load(), nil)
+}
+
 func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)

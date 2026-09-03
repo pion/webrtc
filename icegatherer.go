@@ -31,8 +31,9 @@ type ICEGatherer struct {
 
 	agent *ice.Agent
 
-	onLocalCandidateHandler atomic.Value // func(candidate *ICECandidate)
+	onLocalCandidateHandler atomic.Pointer[iceCandidateEventHandler]
 	onStateChangeHandler    atomic.Value // func(state ICEGathererState)
+	candidateEvents         iceCandidateDispatcher
 
 	// Used for GatheringCompletePromise
 	onGatheringCompleteHandler atomic.Value // func()
@@ -46,8 +47,17 @@ type ICEGatherer struct {
 
 	// Used for ICE candidate pooling
 	candidatePoolLock    sync.Mutex
-	candidatePool        []ice.Candidate
+	candidatePool        []iceCandidateSourceEvent
 	iceCandidatePoolSize uint8
+}
+
+type iceCandidateEventHandler struct {
+	callback func(ICECandidateEvent)
+}
+
+type iceCandidateSourceEvent struct {
+	candidate        ice.Candidate
+	usernameFragment string
 }
 
 // ICEAddressRewriteMode controls whether a rule replaces or appends candidates.
@@ -115,7 +125,7 @@ func (api *API) NewICEGatherer(opts ICEGatherOptions) (*ICEGatherer, error) {
 		log:                  api.settingEngine.LoggerFactory.NewLogger("ice"),
 		sdpMid:               atomic.Value{},
 		sdpMLineIndex:        atomic.Uint32{},
-		candidatePool:        make([]ice.Candidate, 0, opts.ICECandidatePoolSize),
+		candidatePool:        make([]iceCandidateSourceEvent, 0, opts.ICECandidatePoolSize),
 		iceCandidatePoolSize: opts.ICECandidatePoolSize,
 	}, nil
 }
@@ -425,63 +435,95 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 	}
 
 	g.setState(ICEGathererStateGathering)
-	if err := agent.OnCandidate(func(candidate ice.Candidate) {
-		onLocalCandidateHandler := func(*ICECandidate) {}
-		if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
-			onLocalCandidateHandler = handler
-		}
-
-		onGatheringCompleteHandler := func() {}
-		if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
-			onGatheringCompleteHandler = handler
-		}
-
-		sdpMid := ""
-
-		if mid, ok := g.sdpMid.Load().(string); ok {
-			sdpMid = mid
-		}
-
-		sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
-
-		if candidate != nil {
-			g.candidatePoolLock.Lock()
-			if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
-				g.candidatePool = append(g.candidatePool, candidate)
-				g.candidatePoolLock.Unlock()
-
-				return
-			}
-			g.candidatePoolLock.Unlock()
-
-			c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
-			if err != nil {
-				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
-
-				return
-			}
-			onLocalCandidateHandler(&c)
-		} else {
-			g.setState(ICEGathererStateComplete)
-			onGatheringCompleteHandler()
-
-			// If gathering completes before flushing (i.e., before SetLocalDescription), avoid triggering nil.
-			// Users expect valid candidates to be emitted before the nil completion signal.
-			g.candidatePoolLock.Lock()
-			if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
-				g.candidatePoolLock.Unlock()
-
-				return
-			}
-			g.candidatePoolLock.Unlock()
-
-			onLocalCandidateHandler(nil)
-		}
-	}); err != nil {
+	g.candidatePoolLock.Lock()
+	err := g.setCandidateSourceHandler(agent, g.onLocalCandidateHandler.Load())
+	g.candidatePoolLock.Unlock()
+	if err != nil {
 		return err
 	}
 
 	return agent.GatherCandidates()
+}
+
+func (g *ICEGatherer) setCandidateSourceHandler(agent *ice.Agent, handler *iceCandidateEventHandler) error {
+	usernameFragment, _, err := agent.GetLocalUserCredentials()
+	if err != nil {
+		usernameFragment = ""
+	}
+
+	return agent.OnCandidate(func(candidate ice.Candidate) {
+		g.onCandidate(usernameFragment, handler, candidate)
+	})
+}
+
+func (g *ICEGatherer) onCandidate(
+	usernameFragment string,
+	handler *iceCandidateEventHandler,
+	candidate ice.Candidate,
+) {
+	if candidate == nil {
+		g.setState(ICEGathererStateComplete)
+		if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
+			handler()
+		}
+	}
+
+	source := iceCandidateSourceEvent{
+		candidate:        candidate,
+		usernameFragment: usernameFragment,
+	}
+
+	// candidatePoolLock orders the transition from pooled events to live events.
+	// Enqueuing the complete pool while holding it prevents a concurrent live
+	// candidate from overtaking the pool's candidates or end marker.
+	g.candidatePoolLock.Lock()
+	if g.iceCandidatePoolSize > 0 && g.candidatePool != nil {
+		g.candidatePool = append(g.candidatePool, source)
+		g.candidatePoolLock.Unlock()
+
+		return
+	}
+	shouldRun := g.acceptCandidateSourceEvents(
+		[]iceCandidateSourceEvent{source},
+		handler,
+	)
+	g.candidatePoolLock.Unlock()
+	if shouldRun {
+		g.candidateEvents.run()
+	}
+}
+
+func (g *ICEGatherer) acceptCandidateSourceEvents(
+	sources []iceCandidateSourceEvent,
+	handler *iceCandidateEventHandler,
+) bool {
+	if handler == nil {
+		return false
+	}
+
+	events := make([]queuedICECandidateEvent, 0, len(sources))
+	for _, source := range sources {
+		event := ICECandidateEvent{UsernameFragment: source.usernameFragment}
+		if source.candidate != nil {
+			sdpMid := ""
+			if mid, ok := g.sdpMid.Load().(string); ok {
+				sdpMid = mid
+			}
+			sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
+
+			candidate, err := newICECandidateFromICE(source.candidate, sdpMid, sdpMLineIndex)
+			if err != nil {
+				g.log.Warnf("Failed to convert ice.Candidate: %s", err)
+
+				continue
+			}
+			candidate.usernameFragment = source.usernameFragment
+			event.Candidate = &candidate
+		}
+		events = append(events, queuedICECandidateEvent{event: event, callback: handler.callback})
+	}
+
+	return g.candidateEvents.accept(events)
 }
 
 // set media stream identification tag and media description index for this gatherer.
@@ -492,45 +534,18 @@ func (g *ICEGatherer) setMediaStreamIdentification(mid string, mLineIndex uint16
 
 func (g *ICEGatherer) flushCandidates() {
 	g.candidatePoolLock.Lock()
-
-	candidates := g.candidatePool
+	sources := g.candidatePool
 	g.candidatePool = nil
 	g.iceCandidatePoolSize = 0
-
+	shouldRun := g.acceptCandidateSourceEvents(sources, g.onLocalCandidateHandler.Load())
 	g.candidatePoolLock.Unlock()
-
-	onLocalCandidateHandler := func(*ICECandidate) {}
-	if handler, ok := g.onLocalCandidateHandler.Load().(func(candidate *ICECandidate)); ok && handler != nil {
-		onLocalCandidateHandler = handler
-	}
-
-	sdpMid := ""
-	if mid, ok := g.sdpMid.Load().(string); ok {
-		sdpMid = mid
-	}
-
-	sdpMLineIndex := uint16(g.sdpMLineIndex.Load()) //nolint:gosec // G115
-
-	currentState := g.State()
-
-	for _, candidate := range candidates {
-		c, err := newICECandidateFromICE(candidate, sdpMid, sdpMLineIndex)
-		if err != nil {
-			g.log.Warnf("Failed to convert pooled ice.Candidate: %s", err)
-
-			continue
-		}
-		onLocalCandidateHandler(&c)
-	}
-
-	// If this is true, gathering completed before flushing,
-	// so trigger nil to notify the user that all candidates have been gathered.
-	if currentState == ICEGathererStateComplete {
-		onLocalCandidateHandler(nil)
+	if shouldRun {
+		g.candidateEvents.run()
 	}
 }
 
-// Close prunes all local candidates, and closes the ports.
+// Close prunes all local candidates, closes the ports, and discards
+// ICECandidateEvent callbacks still queued.
 func (g *ICEGatherer) Close() error {
 	return g.close(false /* shouldGracefullyClose */)
 }
@@ -543,6 +558,7 @@ func (g *ICEGatherer) GracefulClose() error {
 }
 
 func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
+	g.candidateEvents.stop()
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -623,10 +639,38 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 	return newICECandidatesFromICE(iceCandidates, sdpMid, sdpMLineIndex)
 }
 
-// OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available
+// OnLocalCandidate sets an event handler which fires when a new local ICE candidate is available.
 // Take note that the handler will be called with a nil pointer when gathering is finished.
 func (g *ICEGatherer) OnLocalCandidate(f func(*ICECandidate)) {
-	g.onLocalCandidateHandler.Store(f)
+	if f == nil {
+		g.OnLocalCandidateEvent(nil)
+
+		return
+	}
+	g.OnLocalCandidateEvent(func(event ICECandidateEvent) {
+		f(event.Candidate)
+	})
+}
+
+// OnLocalCandidateEvent sets a handler for local ICE candidate events. Events
+// accepted by the gatherer are serialized in FIFO order and retain the handler
+// active at acceptance. Setting f to nil disables only future acceptance; it
+// does not discard queued events. Each event carries the exact ICE username
+// fragment captured for its gathering when available.
+func (g *ICEGatherer) OnLocalCandidateEvent(f func(ICECandidateEvent)) {
+	var handler *iceCandidateEventHandler
+	if f != nil {
+		handler = &iceCandidateEventHandler{callback: f}
+	}
+
+	g.candidatePoolLock.Lock()
+	g.onLocalCandidateHandler.Store(handler)
+	if agent := g.getAgent(); agent != nil {
+		if err := g.setCandidateSourceHandler(agent, handler); err != nil {
+			g.log.Warnf("Failed to set ICE candidate handler: %s", err)
+		}
+	}
+	g.candidatePoolLock.Unlock()
 }
 
 // OnStateChange fires any time the ICEGatherer changes.

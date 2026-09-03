@@ -84,15 +84,18 @@ func TestValueToICECandidateFromNativeBrowserCandidate(t *testing.T) {
 	}
 
 	native := constructor.New(js.ValueOf(map[string]any{
-		"candidate":     "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
-		"sdpMid":        "audio",
-		"sdpMLineIndex": 2,
+		"candidate":        "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+		"sdpMid":           "audio",
+		"sdpMLineIndex":    2,
+		"usernameFragment": "browser-ufrag",
 	}))
 	candidate := valueToICECandidate(native)
 	if assert.NotNil(t, candidate) {
 		assert.Equal(t, native.Get("candidate").String(), candidate.ToJSON().Candidate)
 		assert.Equal(t, "audio", candidate.SDPMid)
 		assert.Equal(t, uint16(2), candidate.SDPMLineIndex)
+		assert.Equal(t, "browser-ufrag", candidate.UsernameFragment())
+		assert.Equal(t, "browser-ufrag", *candidate.ToJSON().UsernameFragment)
 	}
 }
 
@@ -105,13 +108,13 @@ func TestOnICECandidatePreservesBrowserEventOrder(t *testing.T) {
 	pc := &PeerConnection{underlying: js.ValueOf(map[string]any{"close": closeFunc})}
 	events := make(chan string, 3)
 	releaseCandidate := make(chan struct{})
-	pc.OnICECandidate(func(candidate *ICECandidate) {
-		if candidate == nil {
-			events <- "gathering-complete"
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
+		if event.Candidate == nil {
+			events <- "gathering-complete:" + event.UsernameFragment
 			return
 		}
 
-		events <- "candidate-start"
+		events <- "candidate-start:" + event.UsernameFragment
 		<-releaseCandidate
 		events <- "candidate-complete"
 	})
@@ -122,10 +125,11 @@ func TestOnICECandidatePreservesBrowserEventOrder(t *testing.T) {
 	handler := pc.underlying.Get("onicecandidate")
 	handler.Invoke(js.ValueOf(map[string]any{
 		"candidate": map[string]any{
-			"candidate": "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+			"candidate":        "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+			"usernameFragment": "gathering-1",
 		},
 	}))
-	assert.Equal(t, "candidate-start", <-events)
+	assert.Equal(t, "candidate-start:gathering-1", <-events)
 
 	// The browser delivers the end marker after its candidates. The adapter
 	// must not begin that callback while the preceding candidate is in flight.
@@ -138,66 +142,64 @@ func TestOnICECandidatePreservesBrowserEventOrder(t *testing.T) {
 
 	close(releaseCandidate)
 	assert.Equal(t, "candidate-complete", <-events)
-	assert.Equal(t, "gathering-complete", <-events)
+	assert.Equal(t, "gathering-complete:gathering-1", <-events)
 }
 
 func TestOnICECandidateReplacementDrainsAcceptedEvents(t *testing.T) {
-	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any {
-		return nil
-	})
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
 	defer closeFunc.Release()
 
 	pc := &PeerConnection{underlying: js.ValueOf(map[string]any{"close": closeFunc})}
-	events := make(chan string, 5)
+	events := make(chan string, 6)
 	firstStarted := make(chan struct{})
-	allowReplacement := make(chan struct{})
-	replaced := make(chan struct{})
+	releaseFirst := make(chan struct{})
 	oldCalls := 0
-	pc.OnICECandidate(func(candidate *ICECandidate) {
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
 		oldCalls++
-		if oldCalls != 1 {
-			events <- "old-candidate-2"
+		if oldCalls == 1 {
+			events <- "old-start:" + event.UsernameFragment
+			close(firstStarted)
+			<-releaseFirst
+			events <- "old-complete:" + event.UsernameFragment
 			return
 		}
-
-		events <- "old-candidate-1-start"
-		close(firstStarted)
-		<-allowReplacement
-		pc.OnICECandidate(func(candidate *ICECandidate) {
-			if candidate == nil {
-				events <- "new-gathering-complete"
-				return
-			}
-			events <- "new-candidate"
-		})
-		close(replaced)
-		events <- "old-candidate-1-complete"
+		if event.Candidate == nil {
+			events <- "old-eoc:" + event.UsernameFragment
+			return
+		}
+		events <- "old-late:" + event.UsernameFragment
 	})
-	defer func() {
-		assert.NoError(t, pc.Close())
-	}()
+	defer func() { assert.NoError(t, pc.Close()) }()
 
-	candidateEvent := js.ValueOf(map[string]any{
-		"candidate": map[string]any{
-			"candidate": "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
-		},
-	})
+	oldCandidate := js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate": "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host", "usernameFragment": "old",
+	}})
 	oldHandler := pc.underlying.Get("onicecandidate")
-	oldHandler.Invoke(candidateEvent)
+	oldHandler.Invoke(oldCandidate)
 	<-firstStarted
-	assert.Equal(t, "old-candidate-1-start", <-events)
+	oldHandler.Invoke(oldCandidate)
+	oldHandler.Invoke(js.ValueOf(map[string]any{"candidate": nil}))
 
-	oldHandler.Invoke(candidateEvent)
-	close(allowReplacement)
-	<-replaced
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
+		if event.Candidate == nil {
+			events <- "new-eoc:" + event.UsernameFragment
+			return
+		}
+		events <- "new:" + event.UsernameFragment
+	})
 	newHandler := pc.underlying.Get("onicecandidate")
-	newHandler.Invoke(candidateEvent)
+	newHandler.Invoke(js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate": "candidate:2 1 udp 2130706431 192.0.2.2 3478 typ host", "usernameFragment": "new",
+	}}))
 	newHandler.Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+	close(releaseFirst)
 
-	assert.Equal(t, "old-candidate-1-complete", <-events)
-	assert.Equal(t, "old-candidate-2", <-events)
-	assert.Equal(t, "new-candidate", <-events)
-	assert.Equal(t, "new-gathering-complete", <-events)
+	assert.Equal(t, "old-start:old", <-events)
+	assert.Equal(t, "old-complete:old", <-events)
+	assert.Equal(t, "old-late:old", <-events)
+	assert.Equal(t, "old-eoc:old", <-events)
+	assert.Equal(t, "new:new", <-events)
+	assert.Equal(t, "new-eoc:new", <-events)
 }
 
 func TestCloseDropsQueuedICECandidateCallbacks(t *testing.T) {
@@ -238,6 +240,259 @@ func TestCloseDropsQueuedICECandidateCallbacks(t *testing.T) {
 		t.Fatal("queued candidate callback ran after Close")
 	case <-time.After(50 * time.Millisecond):
 	}
+}
+
+func TestOnICECandidateZeroCandidateRestartUsesLocalDescriptionGeneration(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	underlying := js.ValueOf(map[string]any{
+		"close": closeFunc,
+		"localDescription": map[string]any{
+			"sdp": "v=0\r\na=ice-ufrag:first-generation\r\n",
+		},
+	})
+	pc := &PeerConnection{underlying: underlying}
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	events := make(chan string, 2)
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) { events <- event.UsernameFragment })
+	pc.underlying.Get("onicecandidate").Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+	assert.Equal(t, "first-generation", <-events)
+
+	underlying.Set("localDescription", map[string]any{
+		"sdp": "v=0\r\na=ice-ufrag:second-generation\r\n",
+	})
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) { events <- event.UsernameFragment })
+	pc.underlying.Get("onicecandidate").Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+	assert.Equal(t, "second-generation", <-events)
+}
+
+func TestOnICECandidateEmptyIdentityDoesNotInheritPriorGeneration(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	underlying := js.ValueOf(map[string]any{
+		"close": closeFunc,
+		"localDescription": map[string]any{
+			"sdp": "v=0\r\na=ice-ufrag:known-generation\r\n",
+		},
+	})
+	pc := &PeerConnection{underlying: underlying}
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	events := make(chan ICECandidateEvent, 4)
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) { events <- event })
+	handler := pc.underlying.Get("onicecandidate")
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate":        "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+		"usernameFragment": "known-generation",
+	}}))
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+	assert.Equal(t, "known-generation", (<-events).UsernameFragment)
+	assert.Equal(t, "known-generation", (<-events).UsernameFragment)
+
+	underlying.Set("localDescription", js.Null())
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate":        "candidate:2 1 udp 2130706431 192.0.2.2 3478 typ host",
+		"usernameFragment": "",
+	}}))
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+
+	candidateEvent := <-events
+	if assert.NotNil(t, candidateEvent.Candidate) {
+		assert.Empty(t, candidateEvent.Candidate.UsernameFragment())
+	}
+	assert.Empty(t, candidateEvent.UsernameFragment)
+	endEvent := <-events
+	assert.Nil(t, endEvent.Candidate)
+	assert.Empty(t, endEvent.UsernameFragment)
+}
+
+func TestOnICECandidateUsesSelectedMediaUsernameFragment(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	pc := &PeerConnection{underlying: js.ValueOf(map[string]any{
+		"close": closeFunc,
+		"localDescription": map[string]any{"sdp": "v=0\r\n" +
+			"a=ice-ufrag:session-generation\r\n" +
+			"m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+			"a=mid:audio\r\n" +
+			"a=ice-ufrag:audio-generation\r\n" +
+			"m=video 9 UDP/TLS/RTP/SAVPF 96\r\n" +
+			"a=mid:video\r\n" +
+			"a=ice-ufrag:video-generation\r\n"},
+	})}
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	events := make(chan ICECandidateEvent, 2)
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) { events <- event })
+	handler := pc.underlying.Get("onicecandidate")
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate":     "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+		"sdpMid":        "video",
+		"sdpMLineIndex": 1,
+	}}))
+	handler.Invoke(js.ValueOf(map[string]any{"candidate": nil}))
+
+	candidateEvent := <-events
+	if assert.NotNil(t, candidateEvent.Candidate) {
+		assert.Equal(t, "video-generation", candidateEvent.Candidate.UsernameFragment())
+		assert.Equal(t, "video-generation", *candidateEvent.Candidate.ToJSON().UsernameFragment)
+	}
+	assert.Equal(t, "video-generation", candidateEvent.UsernameFragment)
+
+	endEvent := <-events
+	assert.Nil(t, endEvent.Candidate)
+	assert.Empty(t, endEvent.UsernameFragment, "global end marker cannot select one of multiple ICE transports")
+}
+
+func TestLocalICEUsernameFragmentSelection(t *testing.T) {
+	const distinctMedia = "v=0\r\n" +
+		"a=ice-ufrag:session-generation\r\n" +
+		"m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+		"a=mid:audio\r\n" +
+		"a=ice-ufrag:audio-generation\r\n" +
+		"m=video 9 UDP/TLS/RTP/SAVPF 96\r\n" +
+		"a=mid:video\r\n" +
+		"a=ice-ufrag:video-generation\r\n"
+
+	testCases := []struct {
+		name      string
+		sdp       string
+		candidate map[string]any
+		expect    string
+	}{
+		{
+			name: "session credential inherited",
+			sdp: "v=0\r\na=ice-ufrag:session-generation\r\n" +
+				"m=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=mid:audio\r\n",
+			candidate: map[string]any{"sdpMid": "audio", "sdpMLineIndex": 0},
+			expect:    "session-generation",
+		},
+		{
+			name:      "media index selects override",
+			sdp:       distinctMedia,
+			candidate: map[string]any{"sdpMLineIndex": 1},
+			expect:    "video-generation",
+		},
+		{
+			name:      "selectors absent in multi transport description",
+			sdp:       distinctMedia,
+			candidate: map[string]any{},
+		},
+		{
+			name: "candidate mid absent from description",
+			sdp: "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+				"a=ice-ufrag:audio-generation\r\n",
+			candidate: map[string]any{"sdpMid": "audio", "sdpMLineIndex": 0},
+		},
+		{
+			name: "malformed mid is rejected",
+			sdp: "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+				"a=mid:bad mid\r\na=ice-ufrag:audio-generation\r\n",
+			candidate: map[string]any{"sdpMid": "bad mid", "sdpMLineIndex": 0},
+		},
+		{
+			name: "duplicate mid is ambiguous",
+			sdp: "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+				"a=mid:duplicate\r\na=ice-ufrag:first\r\n" +
+				"m=video 9 UDP/TLS/RTP/SAVPF 96\r\n" +
+				"a=mid:duplicate\r\na=ice-ufrag:second\r\n",
+			candidate: map[string]any{"sdpMid": "duplicate", "sdpMLineIndex": 1},
+		},
+		{
+			name:      "mid and index disagree",
+			sdp:       distinctMedia,
+			candidate: map[string]any{"sdpMid": "audio", "sdpMLineIndex": 1},
+		},
+		{
+			name:      "malformed SDP",
+			sdp:       "v=0\r\nnot-an-sdp-line\r\na=ice-ufrag:first\r\n",
+			candidate: map[string]any{},
+		},
+		{
+			name: "duplicate media credential",
+			sdp: "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=mid:audio\r\n" +
+				"a=ice-ufrag:first\r\na=ice-ufrag:second\r\n",
+			candidate: map[string]any{"sdpMid": "audio", "sdpMLineIndex": 0},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pc := &PeerConnection{underlying: js.ValueOf(map[string]any{
+				"localDescription": map[string]any{"sdp": testCase.sdp},
+			})}
+			assert.Equal(t, testCase.expect, pc.localICEUsernameFragment(js.ValueOf(testCase.candidate)))
+		})
+	}
+}
+
+func TestOnICECandidateReentrantReplacementRetainsAcceptedCallback(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	pc := &PeerConnection{underlying: js.ValueOf(map[string]any{"close": closeFunc})}
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	events := make(chan string, 4)
+	calls := 0
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
+		calls++
+		events <- "old"
+		if calls == 1 {
+			pc.OnICECandidateEvent(func(ICECandidateEvent) { events <- "new" })
+		}
+	})
+	candidate := js.ValueOf(map[string]any{"candidate": map[string]any{
+		"candidate": "candidate:1 1 udp 2130706431 192.0.2.1 3478 typ host",
+	}})
+	pc.underlying.Get("onicecandidate").Invoke(candidate)
+	assert.Equal(t, "old", <-events)
+
+	pc.underlying.Get("onicecandidate").Invoke(candidate)
+	assert.Equal(t, "new", <-events)
+}
+
+func TestOnICECandidateReentrantCloseDropsQueuedCallbacks(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	dispatcher := &iceCandidateDispatcher{running: true}
+	pc := &PeerConnection{
+		underlying:             js.ValueOf(map[string]any{"close": closeFunc}),
+		iceCandidateDispatcher: dispatcher,
+	}
+	closed := make(chan struct{})
+	unexpected := make(chan struct{}, 1)
+	dispatcher.events = []queuedICECandidateEvent{
+		{callback: func(ICECandidateEvent) {
+			assert.NoError(t, pc.Close())
+			close(closed)
+		}},
+		{callback: func(ICECandidateEvent) { unexpected <- struct{}{} }},
+	}
+	go dispatcher.run()
+	<-closed
+	select {
+	case <-unexpected:
+		t.Fatal("queued callback ran after reentrant Close")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestOnICECandidateNilHandlers(t *testing.T) {
+	closeFunc := js.FuncOf(func(this js.Value, args []js.Value) any { return nil })
+	defer closeFunc.Release()
+
+	pc := &PeerConnection{underlying: js.ValueOf(map[string]any{"close": closeFunc})}
+	defer func() { assert.NoError(t, pc.Close()) }()
+	pc.OnICECandidate(nil)
+	assert.Equal(t, js.TypeUndefined, pc.underlying.Get("onicecandidate").Type())
+	pc.OnICECandidateEvent(nil)
+	assert.Equal(t, js.TypeUndefined, pc.underlying.Get("onicecandidate").Type())
 }
 
 func TestValueToICEServer(t *testing.T) {

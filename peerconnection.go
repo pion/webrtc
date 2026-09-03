@@ -477,7 +477,22 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit,cycl
 // Take note that the handler will be called with a nil pointer when
 // gathering is finished.
 func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
-	pc.iceGatherer.OnLocalCandidate(f)
+	if f == nil {
+		pc.OnICECandidateEvent(nil)
+
+		return
+	}
+	pc.OnICECandidateEvent(func(event ICECandidateEvent) {
+		f(event.Candidate)
+	})
+}
+
+// OnICECandidateEvent sets a handler for local ICE candidate events. Events
+// accepted by the PeerConnection are serialized in FIFO order and retain the
+// handler active at acceptance. Setting f to nil disables only future
+// acceptance; it does not discard queued events.
+func (pc *PeerConnection) OnICECandidateEvent(f func(ICECandidateEvent)) {
+	pc.iceGatherer.OnLocalCandidateEvent(f)
 }
 
 // OnICEGatheringStateChange sets an event handler which is invoked when the
@@ -2486,7 +2501,8 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
-// Close ends the PeerConnection.
+// Close ends the PeerConnection and discards ICECandidateEvent callbacks
+// still queued.
 func (pc *PeerConnection) Close() error {
 	return pc.close(false /* shouldGracefullyClose */)
 }

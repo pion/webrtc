@@ -12,20 +12,21 @@ import (
 
 // ICECandidate represents a ice candidate.
 type ICECandidate struct {
-	statsID        string
-	Foundation     string           `json:"foundation"`
-	Priority       uint32           `json:"priority"`
-	Address        string           `json:"address"`
-	Protocol       ICEProtocol      `json:"protocol"`
-	Port           uint16           `json:"port"`
-	Typ            ICECandidateType `json:"type"`
-	Component      uint16           `json:"component"`
-	RelatedAddress string           `json:"relatedAddress"`
-	RelatedPort    uint16           `json:"relatedPort"`
-	TCPType        string           `json:"tcpType"`
-	SDPMid         string           `json:"sdpMid"`
-	SDPMLineIndex  uint16           `json:"sdpMLineIndex"`
-	extensions     string
+	statsID          string
+	usernameFragment string
+	Foundation       string           `json:"foundation"`
+	Priority         uint32           `json:"priority"`
+	Address          string           `json:"address"`
+	Protocol         ICEProtocol      `json:"protocol"`
+	Port             uint16           `json:"port"`
+	Typ              ICECandidateType `json:"type"`
+	Component        uint16           `json:"component"`
+	RelatedAddress   string           `json:"relatedAddress"`
+	RelatedPort      uint16           `json:"relatedPort"`
+	TCPType          string           `json:"tcpType"`
+	SDPMid           string           `json:"sdpMid"`
+	SDPMLineIndex    uint16           `json:"sdpMLineIndex"`
+	extensions       string
 }
 
 // Conversion for package ice.
@@ -226,6 +227,14 @@ func (c ICECandidate) String() string {
 	return ic.String()
 }
 
+// UsernameFragment returns the ICE username fragment associated with c when
+// the browser or local gathering callback supplied it. It is empty when that
+// identity is unavailable. Conversions from standalone ICE candidates cannot
+// reconstruct the gathering that produced them.
+func (c ICECandidate) UsernameFragment() string {
+	return c.usernameFragment
+}
+
 // ToJSON returns an ICECandidateInit
 // as indicated by the spec https://w3c.github.io/webrtc-pc/#dom-rtcicecandidate-tojson
 func (c ICECandidate) ToJSON() ICECandidateInit {
@@ -238,9 +247,15 @@ func (c ICECandidate) ToJSON() ICECandidateInit {
 		}
 	}
 
+	var usernameFragment *string
+	if c.usernameFragment != "" {
+		usernameFragment = &c.usernameFragment
+	}
+
 	return ICECandidateInit{
-		Candidate:     candidateStr,
-		SDPMid:        &c.SDPMid,
-		SDPMLineIndex: &c.SDPMLineIndex,
+		Candidate:        candidateStr,
+		SDPMid:           &c.SDPMid,
+		SDPMLineIndex:    &c.SDPMLineIndex,
+		UsernameFragment: usernameFragment,
 	}
 }
