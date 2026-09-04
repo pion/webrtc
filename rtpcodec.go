@@ -4,7 +4,6 @@
 package webrtc
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -144,11 +143,32 @@ func codecParametersFuzzySearch(
 	return RTPCodecParameters{}, codecMatchNone
 }
 
+// Given an RTX CodecParameters, return the payload type of the codec it
+// repairs, taken from the apt parameter defined by RFC 4588.
+func rtxAssociatedPayloadType(codec RTPCodecParameters) (PayloadType, bool) {
+	if !strings.EqualFold(codec.MimeType, MimeTypeRTX) {
+		return 0, false
+	}
+
+	parsed := fmtp.Parse(codec.MimeType, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
+
+	aptPayload, ok := parsed.Parameter("apt")
+	if !ok {
+		return 0, false
+	}
+
+	payloadType, err := strconv.Atoi(aptPayload)
+	if err != nil || payloadType < 0 || payloadType > 255 {
+		return 0, false
+	}
+
+	return PayloadType(payloadType), true
+}
+
 // Given a CodecParameters find the RTX CodecParameters if one exists.
 func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
-	aptStr := fmt.Sprintf("apt=%d", needle)
 	for _, c := range haystack {
-		if aptStr == c.SDPFmtpLine {
+		if associated, ok := rtxAssociatedPayloadType(c); ok && associated == needle {
 			return c.PayloadType
 		}
 	}
@@ -166,19 +186,14 @@ func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCod
 	}
 
 	isRTX = true
-	parsed := fmtp.Parse(needle.MimeType, needle.ClockRate, needle.Channels, needle.SDPFmtpLine)
-	aptPayload, ok := parsed.Parameter("apt")
+
+	primaryPayloadType, ok := rtxAssociatedPayloadType(needle)
 	if !ok {
 		return
 	}
 
-	primaryPayloadType, err := strconv.Atoi(aptPayload)
-	if err != nil || primaryPayloadType < 0 || primaryPayloadType > 255 {
-		return
-	}
-
 	for _, c := range haystack {
-		if c.PayloadType == PayloadType(primaryPayloadType) {
+		if c.PayloadType == primaryPayloadType {
 			primaryExists = true
 
 			return
