@@ -1172,7 +1172,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := "audio"
 		offerSdp, err := populateSDP(
 			d,
 			false,
@@ -1186,7 +1185,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEParameters{},
 			mediaSections,
 			ICEGatheringStateComplete,
-			&matchedBundle,
+			&remoteBundleGroup{mids: "audio", present: true},
 			se.getSCTPMaxMessageSize(),
 			false,
 		)
@@ -1215,7 +1214,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := ""
 		offerSdp, err := populateSDP(
 			d,
 			false,
@@ -1229,11 +1227,56 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEParameters{},
 			mediaSections,
 			ICEGatheringStateComplete,
-			&matchedBundle,
+			&remoteBundleGroup{present: true},
 			se.getSCTPMaxMessageSize(),
 			false,
 		)
 		assert.Nil(t, err)
+
+		_, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
+		assert.False(t, ok)
+	})
+	t.Run("remote without bundle group", func(t *testing.T) {
+		se := SettingEngine{}
+
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tra := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tra.setDirection(RTPTransceiverDirectionRecvonly)
+		trb := &RTPTransceiver{kind: RTPCodecTypeAudio, api: api, codecs: me.audioCodecs}
+		trb.setDirection(RTPTransceiverDirectionRecvonly)
+		mediaSections := []mediaSection{
+			{id: "video", transceivers: []*RTPTransceiver{tra}},
+			{id: "audio", transceivers: []*RTPTransceiver{trb}},
+		}
+
+		d := &sdp.SessionDescription{}
+
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			&remoteBundleGroup{},
+			se.getSCTPMaxMessageSize(),
+			false,
+		)
+		assert.Nil(t, err)
+
+		// only one transport is available, so the first media section is
+		// kept and the others are rejected.
+		assert.NotEqual(t, 0, offerSdp.MediaDescriptions[0].MediaName.Port.Value)
+		assert.Equal(t, 0, offerSdp.MediaDescriptions[1].MediaName.Port.Value)
 
 		_, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
 		assert.False(t, ok)

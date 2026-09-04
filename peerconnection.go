@@ -3091,7 +3091,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 	pc.sctpTransport.lock.Lock()
 	defer pc.sctpTransport.lock.Unlock()
 
-	var bundleGroup *string
+	var bundleGroup *remoteBundleGroup
 	// If we are offering also include unmatched local transceivers
 	if includeUnmatched { //nolint:nestif
 		if !detectedPlanB {
@@ -3119,9 +3119,22 @@ func (pc *PeerConnection) generateMatchedSDP(
 			}
 		}
 	} else if remoteDescription != nil {
-		groupValue, _ := remoteDescription.parsed.Attribute(sdp.AttrKeyGroup)
-		groupValue = strings.TrimLeft(groupValue, "BUNDLE")
-		bundleGroup = &groupValue
+		bundleGroup = &remoteBundleGroup{}
+
+		// a description can carry several groups with different semantics
+		// (RFC 5888), so look for the BUNDLE one instead of taking the first.
+		for _, attribute := range remoteDescription.parsed.Attributes {
+			if attribute.Key != sdp.AttrKeyGroup {
+				continue
+			}
+
+			if semantics, mids, _ := strings.Cut(attribute.Value, " "); semantics == "BUNDLE" {
+				bundleGroup.mids = mids
+				bundleGroup.present = true
+
+				break
+			}
+		}
 	}
 
 	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
