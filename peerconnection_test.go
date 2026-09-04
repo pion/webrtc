@@ -968,3 +968,77 @@ func TestICETrickleCapabilityString(t *testing.T) {
 		assert.Equal(t, tt.expected, tt.value.String())
 	}
 }
+
+func TestPeerConnection_AnswerNonBundledOffer(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	const offerHead = "v=0\r\n" +
+		"o=- 0 0 IN IP4 127.0.0.1\r\n" +
+		"s=-\r\n" +
+		"t=0 0\r\n"
+
+	const audioSection = "m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n" +
+		"c=IN IP4 0.0.0.0\r\n" +
+		"a=ice-ufrag:abcd\r\n" +
+		"a=ice-pwd:abcdefghijklmnopqrstuvwx\r\n" +
+		"a=fingerprint:sha-256 " +
+		"11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:" +
+		"11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00\r\n" +
+		"a=setup:actpass\r\n" +
+		"a=mid:0\r\n" +
+		"a=sendonly\r\n" +
+		"a=rtcp-mux\r\n" +
+		"a=rtpmap:111 opus/48000/2\r\n"
+
+	t.Run("without a bundle group", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  offerHead + audioSection,
+		}))
+
+		answer, err := pc.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		parsed, err := answer.Unmarshal()
+		assert.NoError(t, err)
+		assert.Len(t, parsed.MediaDescriptions, 1)
+
+		// the media section must not be rejected...
+		assert.NotEqual(t, 0, parsed.MediaDescriptions[0].MediaName.Port.Value)
+
+		// ...and the answer must not carry a group the offer did not have.
+		_, ok := parsed.Attribute(sdp.AttrKeyGroup)
+		assert.False(t, ok)
+
+		assert.NoError(t, pc.Close())
+	})
+
+	t.Run("with a non-bundle group", func(t *testing.T) {
+		pc, err := NewPeerConnection(Configuration{})
+		assert.NoError(t, err)
+
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
+			Type: SDPTypeOffer,
+			SDP:  offerHead + "a=group:LS 0\r\n" + audioSection,
+		}))
+
+		answer, err := pc.CreateAnswer(nil)
+		assert.NoError(t, err)
+
+		parsed, err := answer.Unmarshal()
+		assert.NoError(t, err)
+
+		// an LS group is not a BUNDLE group.
+		_, ok := parsed.Attribute(sdp.AttrKeyGroup)
+		assert.False(t, ok)
+
+		assert.NoError(t, pc.Close())
+	})
+}
