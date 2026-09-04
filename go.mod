@@ -14,7 +14,8 @@ require (
 	github.com/pion/sctp v1.11.1
 	github.com/pion/sdp/v3 v3.0.19
 	github.com/pion/srtp/v3 v3.0.13
-	github.com/pion/stun/v3 v3.1.7
+	github.com/pion/stun/v3 v3.1.6
+	github.com/pion/stun/v4 v4.0.0
 	github.com/pion/transport/v4 v4.1.0
 	github.com/pion/turn/v5 v5.1.0
 	github.com/sclevine/agouti v3.0.0+incompatible
@@ -27,7 +28,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/mdns/v2 v2.1.0 // indirect
-	github.com/pion/stun/v4 v4.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
