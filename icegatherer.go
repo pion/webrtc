@@ -14,7 +14,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v3"
+	"github.com/pion/stun/v4"
 )
 
 // ICEGatherer gathers local host, server reflexive and relay
