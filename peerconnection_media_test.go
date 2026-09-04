@@ -2833,7 +2833,9 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 	})
 
 	// Signal pair first to negotiate codecs
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sdp string) string {
+		return strings.ReplaceAll(sdp, "apt=96\r\n", "rtx-time=3000;apt=96\r\n")
+	}))
 
 	// Get the negotiated payload type for the media codec
 	mediaPayloadType := uint8(rtpSender.GetParameters().Codecs[0].PayloadType)
