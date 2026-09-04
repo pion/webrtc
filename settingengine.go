@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v3"
+	dtlsCipherSuite "github.com/pion/dtls/v3/pkg/crypto/ciphersuite"
 	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v3"
+	"github.com/pion/stun/v4"
 	"github.com/pion/transport/v4"
 	"github.com/pion/transport/v4/packetio"
 	"golang.org/x/net/proxy"
@@ -77,8 +78,8 @@ type SettingEngine struct {
 		clientCAs                     *x509.CertPool
 		rootCAs                       *x509.CertPool
 		keyLogWriter                  io.Writer
-		cipherSuites                  []dtls.CipherSuiteID
-		customCipherSuites            func() []dtls.CipherSuite
+		cipherSuites                  []dtlsCipherSuite.ID
+		customCipherSuites            func() []dtlsCipherSuite.Suite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
 		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
@@ -631,13 +632,13 @@ func (e *SettingEngine) SetSCTPMaxMessageSize(maxMessageSize uint32) {
 // SetDTLSCipherSuites allows the user to specify a list of DTLS CipherSuites.
 // This allow to control which ciphers implemented by pion/dtls are used during the DTLS handshake.
 // It can be used for DTLS connection hardening.
-func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtls.CipherSuiteID) {
+func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtlsCipherSuite.ID) {
 	e.dtls.cipherSuites = cipherSuites
 }
 
 // SetDTLSCustomerCipherSuites allows the user to specify a list of custom DTLS CipherSuites.
 // It allows to use custom/private DTLS CipherSuites in addition to the ones implemented by pion/dtls.
-func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
+func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtlsCipherSuite.Suite) {
 	e.dtls.customCipherSuites = customCipherSuites
 }
 

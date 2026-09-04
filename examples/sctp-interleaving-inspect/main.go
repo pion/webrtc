@@ -223,7 +223,7 @@ func runStack(
 	events.publish(sessionID, logEvent("ice", "connected: "+iceConn.RemoteAddr().String()))
 
 	packetConn := &connectedPacketConn{Conn: iceConn, remote: iceConn.RemoteAddr()}
-	dtlsConn, err := dtls.ServerWithOptions(
+	dtlsConn, err := dtls.Server(
 		packetConn,
 		packetConn.remote,
 		dtls.WithCertificates(cert),
