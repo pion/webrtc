@@ -1650,3 +1650,287 @@ func TestSctpInit(t *testing.T) {
 		assert.ErrorAs(t, err, &corruptInputError)
 	})
 }
+
+func TestGetRidsWithPayloadType(t *testing.T) {
+	t.Run("empty media description returns empty slice", func(t *testing.T) {
+		media := &sdp.MediaDescription{}
+		rids := getRids(media)
+		require.Empty(t, rids)
+	})
+
+	t.Run("rid without payload type", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Len(t, rids[0].payloadTypes, 0)
+	})
+
+	t.Run("rid with valid payload type", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Len(t, rids[0].payloadTypes, 1)
+		require.Equal(t, uint8(96), rids[0].payloadTypes[0])
+	})
+
+	t.Run("rid with invalid payload type", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=invalid"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Len(t, rids[0].payloadTypes, 0)
+	})
+
+	t.Run("multiple rids with payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96"},
+				{Key: sdpAttributeRid, Value: "low send pt=97"},
+				{Key: sdpAttributeRid, Value: "medium send pt=98"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 3)
+		require.Equal(t, uint8(96), rids[0].payloadTypes[0])
+		require.Equal(t, uint8(97), rids[1].payloadTypes[0])
+		require.Equal(t, uint8(98), rids[2].payloadTypes[0])
+	})
+
+	t.Run("rid with multiple parameters", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96;max-width=1280;max-height=720"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Equal(t, uint8(96), rids[0].payloadTypes[0])
+	})
+
+	t.Run("simulcast with paused streams", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96"},
+				{Key: sdpAttributeRid, Value: "low send pt=97"},
+				{Key: sdpAttributeSimulcast, Value: "send high;~low"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 2)
+		require.Equal(t, uint8(96), rids[0].payloadTypes[0])
+		require.Equal(t, uint8(97), rids[1].payloadTypes[0])
+		require.False(t, rids[0].paused)
+		require.True(t, rids[1].paused)
+	})
+
+	t.Run("rid with multiple valid payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96,98"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Equal(t, []uint8{96, 98}, rids[0].payloadTypes)
+	})
+
+	t.Run("rid with mixed valid and invalid payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96,invalid,98"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Equal(t, []uint8{96, 98}, rids[0].payloadTypes)
+	})
+
+	t.Run("multiple rids with multiple payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96,98"},
+				{Key: sdpAttributeRid, Value: "low send pt=97"},
+				{Key: sdpAttributeRid, Value: "medium send pt=98,99"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 3)
+		require.Equal(t, []uint8{96, 98}, rids[0].payloadTypes)
+		require.Equal(t, []uint8{97}, rids[1].payloadTypes)
+		require.Equal(t, []uint8{98, 99}, rids[2].payloadTypes)
+	})
+
+	t.Run("rid with multiple parameters and multiple payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96,98;max-width=1280;max-height=720"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 1)
+		require.Equal(t, "high", rids[0].id)
+		require.Equal(t, []uint8{96, 98}, rids[0].payloadTypes)
+	})
+
+	t.Run("simulcast with paused streams and multiple payload types", func(t *testing.T) {
+		media := &sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdpAttributeRid, Value: "high send pt=96,98"},
+				{Key: sdpAttributeRid, Value: "low send pt=97,99"},
+				{Key: sdpAttributeSimulcast, Value: "send high;~low"},
+			},
+		}
+		rids := getRids(media)
+		require.Len(t, rids, 2)
+		require.Equal(t, []uint8{96, 98}, rids[0].payloadTypes)
+		require.Equal(t, []uint8{97, 99}, rids[1].payloadTypes)
+		require.False(t, rids[0].paused)
+		require.True(t, rids[1].paused)
+	})
+}
+
+func TestPopulateSDP_RidWithPayloadTypes(t *testing.T) {
+	t.Run("rid with multiple payload types", func(t *testing.T) {
+		se := SettingEngine{}
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+
+		rids := []*simulcastRid{
+			{id: "high", attrValue: "high recv pt=96,98,100", payloadTypes: []uint8{96, 98, 100}},
+			{id: "medium", attrValue: "medium recv pt=96,98", payloadTypes: []uint8{96, 98}},
+			{id: "low", attrValue: "low recv pt=100", payloadTypes: []uint8{100}, paused: true},
+		}
+
+		mediaSections := []mediaSection{{
+			id: "video", transceivers: []*RTPTransceiver{tr}, rids: rids, offerCodecs: me.videoCodecs,
+		}}
+
+		d := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections,
+			ICEGatheringStateComplete, nil, 0, false,
+		)
+		assert.Nil(t, err)
+
+		var videoDesc *sdp.MediaDescription
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media == "video" {
+				videoDesc = desc
+
+				break
+			}
+		}
+		require.NotNil(t, videoDesc, "Video media description should exist")
+
+		parsedRids := getRids(videoDesc)
+		require.Len(t, parsedRids, 3)
+
+		require.Equal(t, "high", parsedRids[0].id)
+		require.False(t, parsedRids[0].paused)
+		require.ElementsMatch(t, []uint8{96, 98, 100}, parsedRids[0].payloadTypes)
+
+		require.Equal(t, "medium", parsedRids[1].id)
+		require.False(t, parsedRids[1].paused)
+		require.ElementsMatch(t, []uint8{96, 98}, parsedRids[1].payloadTypes)
+
+		require.Equal(t, "low", parsedRids[2].id)
+		require.True(t, parsedRids[2].paused)
+		require.ElementsMatch(t, []uint8{100}, parsedRids[2].payloadTypes)
+
+		var simulcastAttr string
+		for _, attr := range videoDesc.Attributes {
+			if attr.Key == sdpAttributeSimulcast {
+				simulcastAttr = attr.Value
+
+				break
+			}
+		}
+		assert.Contains(t, simulcastAttr, "recv high;medium;~low")
+	})
+
+	t.Run("rid with missing payload types filtered", func(t *testing.T) {
+		se := SettingEngine{}
+		me := &MediaEngine{}
+		assert.NoError(t, me.RegisterDefaultCodecs())
+		api := NewAPI(WithMediaEngine(me))
+
+		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
+		tr.setDirection(RTPTransceiverDirectionRecvonly)
+
+		rids := []*simulcastRid{
+			{id: "high", attrValue: "high recv pt=96,98,200", payloadTypes: []uint8{96, 98, 200}},
+			{id: "medium", attrValue: "medium recv pt=96,98", payloadTypes: []uint8{96, 98}},
+			{id: "low", attrValue: "low recv pt=200", payloadTypes: []uint8{200}, paused: true},
+		}
+
+		mediaSections := []mediaSection{{
+			id: "video", transceivers: []*RTPTransceiver{tr}, rids: rids, offerCodecs: me.videoCodecs,
+		}}
+
+		d := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(d, false, []DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections,
+			ICEGatheringStateComplete, nil, 0, false,
+		)
+		assert.Nil(t, err)
+
+		var videoDesc *sdp.MediaDescription
+		for _, desc := range offerSdp.MediaDescriptions {
+			if desc.MediaName.Media == "video" {
+				videoDesc = desc
+
+				break
+			}
+		}
+		require.NotNil(t, videoDesc, "Video media description should exist")
+
+		parsedRids := getRids(videoDesc)
+		require.Len(t, parsedRids, 3)
+
+		// PT 200 should be filtered out
+		require.Equal(t, "high", parsedRids[0].id)
+		require.ElementsMatch(t, []uint8{96, 98}, parsedRids[0].payloadTypes)
+
+		require.Equal(t, "medium", parsedRids[1].id)
+		require.ElementsMatch(t, []uint8{96, 98}, parsedRids[1].payloadTypes)
+
+		// PT 200 not available, so no PT in output
+		require.Equal(t, "low", parsedRids[2].id)
+		require.Empty(t, parsedRids[2].payloadTypes)
+
+		var simulcastAttr string
+		for _, attr := range videoDesc.Attributes {
+			if attr.Key == sdpAttributeSimulcast {
+				simulcastAttr = attr.Value
+
+				break
+			}
+		}
+		assert.Contains(t, simulcastAttr, "recv high;medium;~low")
+	})
+}
