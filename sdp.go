@@ -6,9 +6,11 @@
 package webrtc
 
 import (
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -282,7 +284,7 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
+func getRids(media *sdp.MediaDescription) []*simulcastRid {
 	rids := []*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
@@ -293,27 +295,57 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 			simulcastAttr = attr.Value
 		}
 	}
-	// process paused stream like "a=simulcast:send 1;~2;~3"
 	if simulcastAttr != "" {
-		if space := strings.Index(simulcastAttr, " "); space > 0 {
-			simulcastAttr = simulcastAttr[space+1:]
-		}
-		ridStates := strings.SplitSeq(simulcastAttr, ";")
-		for ridState := range ridStates {
-			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
-
-						break
-					}
-				}
-			}
-		}
+		orderRidsBySimulcast(rids, simulcastAttr)
 	}
 
 	return rids
+}
+
+// orderRidsBySimulcast marks the paused rids and reorders rids in place to
+// follow the a=simulcast send list. RFC 8853 §5.2: the send list "suggests a
+// proposed order of preference, in decreasing order"; the a=rid line order is
+// not significant. §5.1: the send list is a ";"-separated list of simulcast
+// streams, each a ","-separated list of alternative rids, and a leading "~"
+// marks a paused rid (e.g. "send f,~h;q"). The sort is stable, so any rid not
+// named in the attribute keeps its a=rid declaration order at the end.
+func orderRidsBySimulcast(rids []*simulcastRid, simulcastAttr string) {
+	if space := strings.Index(simulcastAttr, " "); space > 0 {
+		simulcastAttr = simulcastAttr[space+1:]
+	}
+	simulcastOrder := map[string]int{}
+	for stream := range strings.SplitSeq(simulcastAttr, ";") {
+		for scID := range strings.SplitSeq(stream, ",") {
+			ridID, paused := strings.CutPrefix(scID, "~")
+			if paused {
+				markRidPaused(rids, ridID)
+			}
+			if _, ok := simulcastOrder[ridID]; !ok {
+				simulcastOrder[ridID] = len(simulcastOrder)
+			}
+		}
+	}
+	orderOf := func(id string) int {
+		if idx, ok := simulcastOrder[id]; ok {
+			return idx
+		}
+
+		return math.MaxInt
+	}
+	slices.SortStableFunc(rids, func(a, b *simulcastRid) int {
+		return cmp.Compare(orderOf(a.id), orderOf(b.id))
+	})
+}
+
+// markRidPaused flags the rid with the given id as paused, if present.
+func markRidPaused(rids []*simulcastRid, ridID string) {
+	for _, rid := range rids {
+		if rid.id == ridID {
+			rid.paused = true
+
+			return
+		}
+	}
 }
 
 func addCandidatesToMediaDescriptions(
