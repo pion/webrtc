@@ -23,13 +23,13 @@ func TestGenerateDataChannelID(t *testing.T) {
 	sctpTransportWithChannels := func(ids []uint16) *SCTPTransport {
 		ret := &SCTPTransport{
 			dataChannels:       []*DataChannel{},
-			dataChannelIDsUsed: make(map[uint16]struct{}),
+			dataChannelIDsUsed: make(map[uint16]uint32),
 		}
 
 		for i := range ids {
 			id := ids[i]
 			ret.dataChannels = append(ret.dataChannels, &DataChannel{id: &id})
-			ret.dataChannelIDsUsed[id] = struct{}{}
+			ret.dataChannelIDsUsed[id] = 1
 		}
 
 		return ret
@@ -63,6 +63,189 @@ func TestGenerateDataChannelID(t *testing.T) {
 	}
 }
 
+func TestGenerateDataChannelIDRespectsNegotiatedLimitAndParity(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		role     DTLSRole
+		expected []uint16
+	}{
+		{name: "client", role: DTLSRoleClient, expected: []uint16{0, 2}},
+		{name: "server", role: DTLSRoleServer, expected: []uint16{1, 3}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			maxChannels := uint16(4)
+			transport := &SCTPTransport{
+				maxChannels:        &maxChannels,
+				dataChannelIDsUsed: make(map[uint16]uint32),
+			}
+
+			for _, expected := range testCase.expected {
+				id := new(uint16)
+				require.NoError(t, transport.generateAndSetDataChannelID(testCase.role, &id))
+				require.Equal(t, expected, *id)
+			}
+
+			id := new(uint16)
+			err := transport.generateAndSetDataChannelID(testCase.role, &id)
+			require.ErrorIs(t, err, ErrMaxDataChannelID)
+		})
+	}
+}
+
+func TestGenerateDataChannelIDReusesReleasedID(t *testing.T) {
+	maxChannels := uint16(2)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: make(map[uint16]uint32),
+	}
+
+	first := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &first))
+	require.Equal(t, uint16(0), *first)
+
+	exhausted := new(uint16)
+	require.ErrorIs(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &exhausted), ErrMaxDataChannelID)
+
+	transport.releaseDataChannelID(*first)
+	reused := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reused))
+	require.Equal(t, *first, *reused)
+}
+
+func TestGenerateDataChannelIDRotatesBeforeReuse(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		role     DTLSRole
+		expected []uint16
+	}{
+		{name: "client", role: DTLSRoleClient, expected: []uint16{0, 2, 4, 0}},
+		{name: "server", role: DTLSRoleServer, expected: []uint16{1, 3, 5, 1}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			maxChannels := uint16(6)
+			transport := &SCTPTransport{
+				maxChannels:        &maxChannels,
+				dataChannelIDsUsed: make(map[uint16]uint32),
+			}
+
+			for _, expected := range testCase.expected {
+				id := new(uint16)
+				require.NoError(t, transport.generateAndSetDataChannelID(testCase.role, &id))
+				require.Equal(t, expected, *id)
+				transport.releaseDataChannelID(*id)
+			}
+		})
+	}
+}
+
+func TestGenerateDataChannelIDRotationSkipsReservedID(t *testing.T) {
+	maxChannels := uint16(6)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: map[uint16]uint32{2: 1},
+		nextDataChannelID:  2,
+	}
+
+	id := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &id))
+	require.Equal(t, uint16(4), *id)
+	transport.releaseDataChannelID(*id)
+
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &id))
+	require.Equal(t, uint16(0), *id)
+}
+
+func TestGenerateDataChannelIDRejectsEmptyRoleParity(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		role        DTLSRole
+		maxChannels uint16
+	}{
+		{name: "empty association", role: DTLSRoleClient, maxChannels: 0},
+		{name: "server parity unavailable", role: DTLSRoleServer, maxChannels: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			transport := &SCTPTransport{
+				maxChannels:        &testCase.maxChannels,
+				dataChannelIDsUsed: make(map[uint16]uint32),
+			}
+
+			id := new(uint16)
+			err := transport.generateAndSetDataChannelID(testCase.role, &id)
+			require.ErrorIs(t, err, ErrMaxDataChannelID)
+		})
+	}
+}
+
+func TestSCTPTransportRejectsExplicitDataChannelIDOutsideNegotiatedLimit(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	_, err = offerPC.CreateDataChannel("initial", nil)
+	require.NoError(t, err)
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	require.Eventually(t, func() bool {
+		return offerPC.SCTP().State() == SCTPTransportStateConnected
+	}, 5*time.Second, time.Millisecond)
+
+	const negotiatedLimit = uint16(4)
+	limit := negotiatedLimit
+	offerPC.SCTP().lock.Lock()
+	offerPC.SCTP().maxChannels = &limit
+	dataChannelsBeforeFailure := len(offerPC.SCTP().dataChannels)
+	offerPC.SCTP().lock.Unlock()
+
+	invalidID := negotiatedLimit
+	_, err = offerPC.CreateDataChannel("out-of-range", &DataChannelInit{ID: &invalidID})
+	require.ErrorIs(t, err, ErrMaxDataChannelID)
+	require.False(t, dataChannelIDInUse(offerPC.SCTP(), invalidID))
+	offerPC.SCTP().lock.RLock()
+	dataChannelsAfterFailure := len(offerPC.SCTP().dataChannels)
+	offerPC.SCTP().lock.RUnlock()
+	require.Equal(t, dataChannelsBeforeFailure, dataChannelsAfterFailure)
+
+	validID := negotiatedLimit - 2
+	valid, err := offerPC.CreateDataChannel("in-range", &DataChannelInit{ID: &validID})
+	require.NoError(t, err)
+	require.Equal(t, validID, *valid.ID())
+}
+
+func TestReleaseDataChannelIDKeepsOverlappingGenerationReserved(t *testing.T) {
+	const streamID = uint16(0)
+	maxChannels := uint16(2)
+	transport := &SCTPTransport{
+		maxChannels:        &maxChannels,
+		dataChannelIDsUsed: map[uint16]uint32{streamID: 2},
+	}
+
+	transport.releaseDataChannelID(streamID)
+	require.Equal(t, uint32(1), transport.dataChannelIDsUsed[streamID])
+	blocked := new(uint16)
+	require.ErrorIs(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &blocked), ErrMaxDataChannelID)
+
+	transport.releaseDataChannelID(streamID)
+	reused := new(uint16)
+	require.NoError(t, transport.generateAndSetDataChannelID(DTLSRoleClient, &reused))
+	require.Equal(t, streamID, *reused)
+}
+
+func TestLocalDataChannelGenerationSurvivesDelayedReset(t *testing.T) {
+	const streamID = uint16(0)
+	transport := &SCTPTransport{
+		dataChannelIDsUsed:          map[uint16]uint32{streamID: 2},
+		localDataChannelGenerations: make(map[uint16][]*localDataChannelGeneration),
+	}
+
+	transport.registerLocalDataChannelGeneration(streamID)
+	require.True(t, transport.acceptLocalDataChannelGeneration(streamID))
+	transport.registerLocalDataChannelGeneration(streamID)
+
+	transport.releaseDataChannelID(streamID)
+	require.True(t, transport.acceptLocalDataChannelGeneration(streamID))
+	require.False(t, transport.acceptLocalDataChannelGeneration(streamID))
+}
+
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
 	metadata, ok := (&SCTPTransport{}).Metadata()
 	assert.False(t, ok)
@@ -75,6 +258,8 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       sctp.PartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	})
 
 	assert.Equal(t, SCTPTransportMetadata{
@@ -82,7 +267,183 @@ func TestNewSCTPTransportMetadata(t *testing.T) {
 		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
 		ZeroChecksumSendingEnabled:   true,
 		ZeroChecksumReceivingEnabled: true,
+		NumInboundStreams:            10,
+		NumOutboundStreams:           20,
 	}, metadata)
+}
+
+func TestSCTPTransportReusesDataChannelIDAfterResetCompletion(t *testing.T) {
+	offerPC, answerPC, wan := createVNetPair(t, nil)
+	defer func() {
+		require.NoError(t, wan.Stop())
+		closePairNow(t, offerPC, answerPC)
+	}()
+
+	accepted := make(chan *DataChannel, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		accepted <- dataChannel
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() { close(firstOpened) })
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	select {
+	case <-firstOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first DataChannel to open")
+	}
+	firstRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, first.ID())
+	require.NotNil(t, firstRemote.ID())
+	firstID := *first.ID()
+	require.Equal(t, firstID, *firstRemote.ID())
+	// Constrain the allocator to this single local-parity ID so the test still
+	// proves reuse after reset completion. Wider negotiated ranges are covered
+	// separately and intentionally rotate before returning to firstID.
+	maxChannels := firstID + 1
+	offerPC.SCTP().lock.Lock()
+	offerPC.SCTP().maxChannels = &maxChannels
+	offerPC.SCTP().lock.Unlock()
+
+	require.NoError(t, first.Close())
+	require.Eventually(t, func() bool {
+		return !dataChannelIDInUse(offerPC.SCTP(), firstID) && !dataChannelIDInUse(answerPC.SCTP(), firstID)
+	}, 5*time.Second, time.Millisecond)
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	require.NotNil(t, second.ID())
+	require.Equal(t, firstID, *second.ID())
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() { close(secondOpened) })
+
+	select {
+	case <-secondOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for reused DataChannel to open")
+	}
+	secondRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, secondRemote.ID())
+	require.Equal(t, firstID, *secondRemote.ID())
+}
+
+func TestSCTPTransportAcceptsLocalDataChannelCreatedAfterStart(t *testing.T) {
+	offerPC, answerPC, wan := createVNetPair(t, nil)
+	defer func() {
+		require.NoError(t, wan.Stop())
+		closePairNow(t, offerPC, answerPC)
+	}()
+
+	accepted := make(chan *DataChannel, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		accepted <- dataChannel
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() { close(firstOpened) })
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	select {
+	case <-firstOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for first DataChannel to open")
+	}
+	waitForAcceptedDataChannel(t, accepted)
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	require.NotNil(t, first.ID())
+	require.NotNil(t, second.ID())
+	require.NotEqual(t, *first.ID(), *second.ID())
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() { close(secondOpened) })
+
+	select {
+	case <-secondOpened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for DataChannel created after SCTP start to open")
+	}
+	secondRemote := waitForAcceptedDataChannel(t, accepted)
+	require.NotNil(t, secondRemote.ID())
+	require.Equal(t, *second.ID(), *secondRemote.ID())
+}
+
+func TestSCTPTransportAcceptsDetachedLocalDataChannelCreatedAfterStart(t *testing.T) {
+	settingEngine := SettingEngine{}
+	settingEngine.DetachDataChannels()
+	offerPC, answerPC, err := NewAPI(WithSettingEngine(settingEngine)).newPair(Configuration{})
+	require.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	remoteOpened := make(chan struct{}, 2)
+	answerPC.OnDataChannel(func(dataChannel *DataChannel) {
+		dataChannel.OnOpen(func() {
+			_, detachErr := dataChannel.Detach()
+			require.NoError(t, detachErr)
+			remoteOpened <- struct{}{}
+		})
+	})
+
+	first, err := offerPC.CreateDataChannel("first", nil)
+	require.NoError(t, err)
+	firstOpened := make(chan struct{})
+	first.OnOpen(func() {
+		_, detachErr := first.Detach()
+		require.NoError(t, detachErr)
+		close(firstOpened)
+	})
+	require.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+
+	waitForSignal(t, firstOpened, "first detached local DataChannel")
+	waitForSignal(t, remoteOpened, "first detached remote DataChannel")
+
+	second, err := offerPC.CreateDataChannel("second", nil)
+	require.NoError(t, err)
+	secondOpened := make(chan struct{})
+	second.OnOpen(func() {
+		_, detachErr := second.Detach()
+		require.NoError(t, detachErr)
+		close(secondOpened)
+	})
+
+	waitForSignal(t, secondOpened, "second detached local DataChannel")
+	waitForSignal(t, remoteOpened, "second detached remote DataChannel")
+	require.Equal(t, SCTPTransportStateConnected, offerPC.SCTP().State())
+	require.Equal(t, SCTPTransportStateConnected, answerPC.SCTP().State())
+}
+
+func waitForSignal(t *testing.T, signal <-chan struct{}, description string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", description)
+	}
+}
+
+func dataChannelIDInUse(transport *SCTPTransport, id uint16) bool {
+	transport.lock.RLock()
+	defer transport.lock.RUnlock()
+	_, ok := transport.dataChannelIDsUsed[id]
+
+	return ok
+}
+
+func waitForAcceptedDataChannel(t *testing.T, accepted <-chan *DataChannel) *DataChannel {
+	t.Helper()
+	select {
+	case dataChannel := <-accepted:
+		return dataChannel
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for remote DataChannel")
+
+		return nil
+	}
 }
 
 func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
@@ -109,6 +470,14 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			wantExtra: 1,
 		},
 		{
+			name: "NumStreams",
+			configure: func(se *SettingEngine) {
+				se.sctp.numInboundStreams = 7
+				se.sctp.numOutboundStreams = 9
+			},
+			wantExtra: 1,
+		},
+		{
 			name: "EnableZeroChecksum",
 			configure: func(se *SettingEngine) {
 				se.sctp.enableZeroChecksum = true
@@ -127,6 +496,13 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			name: "RTOMax",
 			configure: func(se *SettingEngine) {
 				se.sctp.rtoMax = time.Second
+			},
+			wantExtra: 1,
+		},
+		{
+			name: "HandshakeRTOMax",
+			configure: func(se *SettingEngine) {
+				se.sctp.handshakeRTOMax = 150 * time.Millisecond
 			},
 			wantExtra: 1,
 		},
@@ -155,15 +531,18 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			name: "AllOptional",
 			configure: func(se *SettingEngine) {
 				se.sctp.maxReceiveBufferSize = 1024
+				se.sctp.numInboundStreams = 7
+				se.sctp.numOutboundStreams = 9
 				se.sctp.enableZeroChecksum = true
 				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 				se.sctp.rtoMax = time.Second
+				se.sctp.handshakeRTOMax = 150 * time.Millisecond
 				se.sctp.minCwnd = 11
 				se.sctp.fastRtxWnd = 22
 				se.sctp.cwndCAStep = 33
 			},
-			wantExtra: 7,
+			wantExtra: 9,
 		},
 	}
 

@@ -36,6 +36,8 @@ func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMe
 		PartialReliabilityMode:       partialReliabilityMode,
 		ZeroChecksumSendingEnabled:   metadata.ZeroChecksumSendingEnabled,
 		ZeroChecksumReceivingEnabled: metadata.ZeroChecksumReceivingEnabled,
+		NumInboundStreams:            metadata.NumInboundStreams,
+		NumOutboundStreams:           metadata.NumOutboundStreams,
 	}
 }
 
@@ -66,11 +68,25 @@ type SCTPTransport struct {
 	onDataChannelOpenedHandler func(*DataChannel)
 
 	// DataChannels
-	dataChannels          []*DataChannel
-	dataChannelIDsUsed    map[uint16]struct{}
-	dataChannelsOpened    uint32
-	dataChannelsRequested uint32
-	dataChannelsAccepted  uint32
+	dataChannels []*DataChannel
+	// Count reservations because a reused stream can arrive before the old
+	// generation's reset-complete callback runs on this association.
+	dataChannelIDsUsed map[uint16]uint32
+	// Advance allocations within the negotiated DTLS-role parity instead of
+	// immediately selecting the lowest released ID again. Reset completion is
+	// still the reuse boundary, while spreading successive short-lived channels
+	// across the available stream space avoids coupling every new generation to
+	// the immediately preceding reset exchange.
+	nextDataChannelID uint16
+	// Detach removes DataChannels from dataChannels before their ACK can arrive.
+	// Keep each locally opened stream generation classified independently from
+	// that garbage-collection list until its reset completes. SCTP may recreate
+	// the Go Stream object for the same ID while completing a reset, so identity
+	// here must be the ordered generation, not a Stream pointer.
+	localDataChannelGenerations map[uint16][]*localDataChannelGeneration
+	dataChannelsOpened          uint32
+	dataChannelsRequested       uint32
+	dataChannelsAccepted        uint32
 
 	localSctpInit []byte
 
@@ -83,11 +99,12 @@ type SCTPTransport struct {
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 	res := &SCTPTransport{
-		dtlsTransport:      dtls,
-		state:              SCTPTransportStateConnecting,
-		api:                api,
-		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed: make(map[uint16]struct{}),
+		dtlsTransport:               dtls,
+		state:                       SCTPTransportStateConnecting,
+		api:                         api,
+		log:                         api.settingEngine.LoggerFactory.NewLogger("ortc"),
+		dataChannelIDsUsed:          make(map[uint16]uint32),
+		localDataChannelGenerations: make(map[uint16][]*localDataChannelGeneration),
 	}
 
 	res.updateMaxChannels()
@@ -147,10 +164,12 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	if err != nil {
 		return err
 	}
+	sctpAssociation.OnStreamResetComplete(r.releaseDataChannelID)
 
 	r.lock.Lock()
 	r.sctpAssociation = sctpAssociation
 	r.state = SCTPTransportStateConnected
+	r.maxChannels = maxChannelsForAssociation(sctpAssociation)
 	dataChannels := append([]*DataChannel{}, r.dataChannels...)
 	r.lock.Unlock()
 
@@ -159,6 +178,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 		if d.ReadyState() == DataChannelStateConnecting {
 			err := d.open(r)
 			if err != nil {
+				r.discardFailedDataChannel(d)
 				r.log.Warnf("failed to open data channel: %s", err)
 
 				continue
@@ -171,7 +191,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 	r.dataChannelsOpened += openedDCCount
 	r.lock.Unlock()
 
-	go r.acceptDataChannels(sctpAssociation, dataChannels)
+	go r.acceptDataChannels(sctpAssociation)
 
 	return nil
 }
@@ -188,10 +208,17 @@ func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint3
 }
 
 func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
-	opts := make([]sctp.ClientOption, 0, 7)
+	opts := make([]sctp.ClientOption, 0, 9)
 
 	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
 		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
+	}
+
+	if r.api.settingEngine.sctp.numInboundStreams != 0 || r.api.settingEngine.sctp.numOutboundStreams != 0 {
+		opts = append(opts, sctp.WithNumStreams(
+			r.api.settingEngine.sctp.numInboundStreams,
+			r.api.settingEngine.sctp.numOutboundStreams,
+		))
 	}
 
 	if r.api.settingEngine.sctp.enableZeroChecksum {
@@ -206,6 +233,15 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 		opts = append(
 			opts,
 			sctp.WithRTOMax(float64(r.api.settingEngine.sctp.rtoMax)/float64(time.Millisecond)),
+		)
+	}
+
+	if r.api.settingEngine.sctp.handshakeRTOMax > 0 {
+		opts = append(
+			opts,
+			sctp.WithHandshakeRTOMax(
+				float64(r.api.settingEngine.sctp.handshakeRTOMax)/float64(time.Millisecond),
+			),
 		)
 	}
 
@@ -227,15 +263,18 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 // Stop stops the SCTPTransport.
 func (r *SCTPTransport) Stop() error {
 	r.lock.Lock()
-	defer r.lock.Unlock()
-	if r.sctpAssociation == nil {
+	association := r.sctpAssociation
+	if association == nil {
+		r.lock.Unlock()
+
 		return nil
 	}
-
-	r.sctpAssociation.Abort("")
-
 	r.sctpAssociation = nil
 	r.state = SCTPTransportStateClosed
+	r.lock.Unlock()
+
+	association.OnStreamResetComplete(nil)
+	association.Abort("")
 
 	return nil
 }
@@ -243,18 +282,7 @@ func (r *SCTPTransport) Stop() error {
 //nolint:cyclop
 func (r *SCTPTransport) acceptDataChannels(
 	assoc *sctp.Association,
-	existingDataChannels []*DataChannel,
 ) {
-	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
-	for _, dc := range existingDataChannels {
-		dc.mu.Lock()
-		isNil := dc.dataChannel == nil
-		dc.mu.Unlock()
-		if isNil {
-			continue
-		}
-		dataChannels = append(dataChannels, dc.dataChannel)
-	}
 ACCEPT:
 	for {
 		// check if the association has been stopped before calling accept.
@@ -268,9 +296,7 @@ ACCEPT:
 			return
 		}
 
-		dc, err := datachannel.Accept(assoc, &datachannel.Config{
-			LoggerFactory: r.api.settingEngine.LoggerFactory,
-		}, dataChannels...)
+		dc, existing, err := r.acceptDataChannel(assoc)
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				r.log.Errorf("Failed to accept data channel: %v", err)
@@ -282,10 +308,8 @@ ACCEPT:
 
 			return
 		}
-		for _, ch := range dataChannels {
-			if ch.StreamIdentifier() == dc.StreamIdentifier() {
-				continue ACCEPT
-			}
+		if existing {
+			continue ACCEPT
 		}
 
 		var (
@@ -350,6 +374,87 @@ ACCEPT:
 	}
 }
 
+// acceptDataChannel classifies an accepted SCTP stream against the live local
+// DataChannel registry. A startup snapshot is insufficient because applications
+// may create local DataChannels after the SCTP association has started; the
+// first inbound packet on those streams is a DataChannelAck, not a new Open.
+func (r *SCTPTransport) acceptDataChannel(
+	assoc *sctp.Association,
+) (*datachannel.DataChannel, bool, error) {
+	stream, err := assoc.AcceptStream()
+	if err != nil {
+		return nil, false, err
+	}
+
+	stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
+	if r.acceptLocalDataChannelGeneration(stream.StreamIdentifier()) {
+		return nil, true, nil
+	}
+
+	dc, err := datachannel.Server(stream, &datachannel.Config{
+		LoggerFactory: r.api.settingEngine.LoggerFactory,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	return dc, false, nil
+}
+
+type localDataChannelGeneration struct {
+	accepted bool
+}
+
+func (r *SCTPTransport) registerLocalDataChannelGeneration(streamID uint16) *localDataChannelGeneration {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.localDataChannelGenerations == nil {
+		r.localDataChannelGenerations = make(map[uint16][]*localDataChannelGeneration)
+	}
+	generation := &localDataChannelGeneration{}
+	r.localDataChannelGenerations[streamID] = append(r.localDataChannelGenerations[streamID], generation)
+
+	return generation
+}
+
+func (r *SCTPTransport) acceptLocalDataChannelGeneration(streamID uint16) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for _, generation := range r.localDataChannelGenerations[streamID] {
+		if !generation.accepted {
+			generation.accepted = true
+
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *SCTPTransport) unregisterLocalDataChannelGeneration(
+	streamID uint16,
+	generation *localDataChannelGeneration,
+) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	generations := r.localDataChannelGenerations[streamID]
+	for i := range generations {
+		if generations[i] != generation {
+			continue
+		}
+		generations = append(generations[:i], generations[i+1:]...)
+		if len(generations) == 0 {
+			delete(r.localDataChannelGenerations, streamID)
+		} else {
+			r.localDataChannelGenerations[streamID] = generations
+		}
+
+		return
+	}
+}
+
 // OnError sets an event handler which is invoked when the SCTP Association errors.
 func (r *SCTPTransport) OnError(f func(err error)) {
 	r.lock.Lock()
@@ -405,7 +510,7 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
 	if dc.ID() != nil {
-		r.dataChannelIDsUsed[*dc.ID()] = struct{}{}
+		r.dataChannelIDsUsed[*dc.ID()]++
 	} else {
 		// This cannot happen, the constructor for this datachannel in the caller
 		// takes a pointer to the id.
@@ -432,14 +537,67 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 }
 
 func (r *SCTPTransport) updateMaxChannels() {
-	val := sctpMaxChannels
-	r.maxChannels = &val
+	maxChannels := maxChannelsForAssociation(r.association())
+	r.lock.Lock()
+	r.maxChannels = maxChannels
+	r.lock.Unlock()
+}
+
+func maxChannelsForAssociation(association *sctp.Association) *uint16 {
+	maxChannels := sctpMaxChannels
+	if association != nil {
+		if metadata, ok := association.Metadata(); ok {
+			maxChannels = min(maxChannels, metadata.NumInboundStreams, metadata.NumOutboundStreams)
+		}
+	}
+
+	return &maxChannels
+}
+
+func (r *SCTPTransport) releaseDataChannelID(streamID uint16) {
+	r.lock.Lock()
+	if generations := r.localDataChannelGenerations[streamID]; len(generations) <= 1 {
+		delete(r.localDataChannelGenerations, streamID)
+	} else {
+		r.localDataChannelGenerations[streamID] = generations[1:]
+	}
+	r.releaseDataChannelReservationLocked(streamID)
+	r.lock.Unlock()
+}
+
+func (r *SCTPTransport) discardFailedDataChannel(dataChannel *DataChannel) {
+	streamID := dataChannel.ID()
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for i, existing := range r.dataChannels {
+		if existing != dataChannel {
+			continue
+		}
+		copy(r.dataChannels[i:], r.dataChannels[i+1:])
+		r.dataChannels[len(r.dataChannels)-1] = nil
+		r.dataChannels = r.dataChannels[:len(r.dataChannels)-1]
+
+		break
+	}
+	if streamID != nil {
+		r.releaseDataChannelReservationLocked(*streamID)
+	}
+}
+
+// The caller should hold the SCTPTransport lock.
+func (r *SCTPTransport) releaseDataChannelReservationLocked(streamID uint16) {
+	if r.dataChannelIDsUsed[streamID] > 1 {
+		r.dataChannelIDsUsed[streamID]--
+	} else {
+		delete(r.dataChannelIDsUsed, streamID)
+	}
 }
 
 // MaxChannels is the maximum number of RTCDataChannels that can be open simultaneously.
 func (r *SCTPTransport) MaxChannels() uint16 {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	if r.maxChannels == nil {
 		return sctpMaxChannels
@@ -504,22 +662,37 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 }
 
 func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
-	var id uint16
+	var firstID uint32
 	if dtlsRole != DTLSRoleClient {
-		id++
+		firstID++
 	}
 
-	maxVal := r.MaxChannels()
+	maxVal := uint32(r.MaxChannels())
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	for ; id < maxVal-1; id += 2 {
+	if maxVal <= firstID {
+		return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	}
+	start := uint32(r.nextDataChannelID)
+	if start < firstID || start >= maxVal || start%2 != firstID {
+		start = firstID
+	}
+	candidateCount := (maxVal - firstID + 1) / 2
+	for range candidateCount {
+		candidate := start
+		start += 2
+		if start >= maxVal {
+			start = firstID
+		}
+		id := uint16(candidate)
 		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
 		*idOut = &id
-		r.dataChannelIDsUsed[id] = struct{}{}
+		r.dataChannelIDsUsed[id] = 1
+		r.nextDataChannelID = uint16(start)
 
 		return nil
 	}
@@ -556,6 +729,8 @@ func (r *SCTPTransport) GetSctpInit() []byte {
 		var err error
 		r.localSctpInit, err = sctp.GenerateOutOfBandToken(sctp.Config{
 			MaxReceiveBufferSize: r.api.settingEngine.sctp.maxReceiveBufferSize,
+			NumInboundStreams:    r.api.settingEngine.sctp.numInboundStreams,
+			NumOutboundStreams:   r.api.settingEngine.sctp.numOutboundStreams,
 			EnableZeroChecksum:   r.api.settingEngine.sctp.enableZeroChecksum,
 		})
 		if err != nil {
