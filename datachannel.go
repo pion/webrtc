@@ -60,6 +60,7 @@ type DataChannel struct {
 
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
+	writeDeadline time.Time
 
 	// A reference to the associated api object used by this datachannel
 	api *API
@@ -344,10 +345,18 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 
 		return
 	}
-	d.dataChannel = dc
 	bufferedAmountLowThreshold := d.bufferedAmountLowThreshold
 	onBufferedAmountLow := d.onBufferedAmountLow
+	writeDeadline := d.writeDeadline
+	var writeDeadlineErr error
+	if !writeDeadline.IsZero() {
+		writeDeadlineErr = dc.SetWriteDeadline(writeDeadline)
+	}
+	d.dataChannel = dc
 	d.mu.Unlock()
+	if writeDeadlineErr != nil {
+		d.onError(writeDeadlineErr)
+	}
 	d.setReadyState(DataChannelStateOpen)
 
 	// Fire the OnOpen handler immediately not using pion/datachannel
@@ -464,6 +473,26 @@ func (d *DataChannel) SendText(s string) error {
 	_, err = d.dataChannel.WriteDataChannel([]byte(s), true)
 
 	return err
+}
+
+// SetWriteDeadline sets the deadline for future Send and SendText calls.
+// A zero time value disables the deadline. Deadlines are only enforced when
+// SettingEngine.EnableDataChannelBlockWrite(true) is configured.
+func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
+	d.mu.Lock()
+	d.writeDeadline = deadline
+	dataChannel := d.dataChannel
+	d.mu.Unlock()
+
+	if dataChannel == nil {
+		if d.ReadyState() == DataChannelStateClosed {
+			return io.ErrClosedPipe
+		}
+
+		return nil
+	}
+
+	return dataChannel.SetWriteDeadline(deadline)
 }
 
 func (d *DataChannel) ensureOpen() error {
