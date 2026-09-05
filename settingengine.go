@@ -67,7 +67,7 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		insecureSkipHelloVerify       bool
+		insecureSkipHelloVerify       *bool
 		disableInsecureSkipVerify     bool
 		retransmissionInterval        time.Duration
 		ellipticCurves                []dtlsElliptic.Curve
@@ -549,11 +549,14 @@ func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 }
 
 // SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
-// If true and when acting as DTLS server, will allow client to skip hello verify phase and
-// receive ServerHello after initial ClientHello. This will mean faster connect times,
-// but will have lower DoS attack resistance.
+//
+// Deprecated: the HelloVerifyRequest cookie exchange only validates the
+// remote address, which the ICE connectivity checks have already done, so it
+// is skipped by default. This setter is retained for backward compatibility;
+// pass false to restore the cookie exchange when acting as DTLS server. It
+// will be removed in v5.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
-	e.dtls.insecureSkipHelloVerify = skip
+	e.dtls.insecureSkipHelloVerify = &skip
 }
 
 // SetDTLSDisableInsecureSkipVerify sets the disable skip insecure verify flag for DTLS.

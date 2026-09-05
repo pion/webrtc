@@ -734,7 +734,11 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 		return nil
 	})
 
-	assert.True(t, se.dtls.insecureSkipHelloVerify)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(false)
+	assert.False(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(true)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
 	assert.True(t, se.dtls.disableInsecureSkipVerify)
 	assert.Equal(t, dtls.RequireExtendedMasterSecret, se.dtls.extendedMasterSecret)
 	assert.NotNil(t, se.dtls.clientAuth)
