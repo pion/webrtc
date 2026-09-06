@@ -3083,7 +3083,7 @@ func TestPeerConnection_RTXWithExtraFmtpParameters(t *testing.T) {
 	// from the whole line.
 	for _, fmtpLine := range []string{"apt=96", "apt=96;rtx-time=3000", "rtx-time=3000;apt=96"} {
 		pc, err := NewPeerConnection(Configuration{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		offer := "v=0\r\n" +
 			"o=- 0 0 IN IP4 127.0.0.1\r\n" +
