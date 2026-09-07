@@ -18,7 +18,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v3"
+	"github.com/pion/stun/v4"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/turn/v5"
@@ -1358,9 +1358,9 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	const (
 		offerUfrag  = "offerufrag123"
-		offerPwd    = "offerpassword123456"
+		offerPwd    = "offerpassword123456789"
 		answerUfrag = "answerufrag123"
-		answerPwd   = "answerpassword123456"
+		answerPwd   = "answerpassword12345678"
 	)
 
 	pcOffer, err := NewAPI(WithSettingEngine(buildSE(offerNet, offerUfrag, offerPwd))).NewPeerConnection(Configuration{})

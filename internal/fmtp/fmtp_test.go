@@ -105,6 +105,18 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			"h265",
+			"video/h265",
+			90000,
+			0,
+			"key-name=value",
+			&h265FMTP{
+				parameters: map[string]string{
+					"key-name": "value",
+				},
+			},
+		},
+		{
 			"vp9",
 			"video/vp9",
 			90000,
@@ -140,6 +152,9 @@ func TestParse(t *testing.T) {
 
 func TestMatch(t *testing.T) { //nolint:maintidx
 	consistString := map[bool]string{true: "consist", false: "inconsist"}
+	parseH265 := func(line string) FMTP {
+		return Parse("video/h265", 90000, 0, line)
+	}
 
 	for _, ca := range []struct {
 		name    string
@@ -430,6 +445,42 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 					"profile-level-id":   "41e029",
 				},
 			},
+			false,
+		},
+		{
+			"h265 downgraded level",
+			parseH265("level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST"),
+			parseH265("level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST"),
+			true,
+		},
+		{
+			"h265 inferred defaults and ignored sprop parameter",
+			parseH265(""),
+			parseH265("profile-id=1;tier-flag=0;tx-mode=srst;sprop-vps=ignored"),
+			true,
+		},
+		{
+			"h265 inconsistent different kind",
+			parseH265(""),
+			&genericFMTP{},
+			false,
+		},
+		{
+			"h265 inconsistent different profile",
+			parseH265("profile-id=1"),
+			parseH265("profile-id=2"),
+			false,
+		},
+		{
+			"h265 inconsistent different tier",
+			parseH265("tier-flag=0"),
+			parseH265("tier-flag=1"),
+			false,
+		},
+		{
+			"h265 inconsistent different transmission mode",
+			parseH265("tx-mode=SRST"),
+			parseH265("tx-mode=MRST"),
 			false,
 		},
 		{

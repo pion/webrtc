@@ -212,6 +212,11 @@ func (i *IVFWriter) writeVP8(packet *rtp.Packet, timestamp uint64) error {
 		return err
 	}
 
+	// a payload that carries only the VP8 descriptor has nothing to write.
+	if len(vp8Packet.Payload) == 0 {
+		return nil
+	}
+
 	isKeyFrame := (vp8Packet.Payload[0] & 0x01) == 0
 	switch {
 	case !i.seenKeyFrame && !isKeyFrame:

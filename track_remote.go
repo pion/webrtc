@@ -91,7 +91,7 @@ func (t *TrackRemote) Kind() RTPCodecType {
 	return t.kind
 }
 
-// StreamID is the group this track belongs too. This must be unique.
+// StreamID is the group this track belongs to. This must be unique.
 func (t *TrackRemote) StreamID() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -130,14 +130,14 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 }
 
 func (t *TrackRemote) read(b []byte) (n int, attributes interceptor.Attributes, err error) {
-	t.mu.RLock()
+	t.mu.Lock()
 	receiver := t.receiver
 	var peekedPkt *peekedPacket
 	if len(t.peekedPackets) != 0 {
 		peekedPkt = t.peekedPackets[0]
 		t.peekedPackets = t.peekedPackets[1:]
 	}
-	t.mu.RUnlock()
+	t.mu.Unlock()
 
 	if receiver.haveClosed() {
 		return 0, nil, io.EOF
