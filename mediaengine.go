@@ -483,6 +483,70 @@ func (m *MediaEngine) matchRemoteCodec(
 		remoteCodec.RTPCodecCapability.Channels,
 		remoteCodec.RTPCodecCapability.SDPFmtpLine)
 
+	if strings.EqualFold(remoteCodec.MimeType, MimeTypeRED) {
+		payloadTypes, ok := parseREDFmtp(remoteCodec.SDPFmtpLine)
+		if !ok {
+			return RTPCodecParameters{}, codecMatchNone, nil
+		}
+
+		remoteOpusPayloadType := payloadTypes[0]
+		for _, payloadType := range payloadTypes[1:] {
+			if payloadType != remoteOpusPayloadType {
+				return RTPCodecParameters{}, codecMatchNone, nil
+			}
+		}
+
+		opusMatch := codecMatchNone
+		var remoteOpusCodec RTPCodecParameters
+		for _, codec := range exactMatches {
+			if codec.PayloadType == remoteOpusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+				opusMatch = codecMatchExact
+				remoteOpusCodec = codec
+
+				break
+			}
+		}
+		if opusMatch == codecMatchNone {
+			for _, codec := range partialMatches {
+				if codec.PayloadType == remoteOpusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+					opusMatch = codecMatchPartial
+					remoteOpusCodec = codec
+
+					break
+				}
+			}
+		}
+		if opusMatch == codecMatchNone {
+			return RTPCodecParameters{}, codecMatchNone, nil
+		}
+
+		localOpusCodec, localOpusMatch := codecParametersFuzzySearch(remoteOpusCodec, codecs)
+		if localOpusMatch != opusMatch || !strings.EqualFold(localOpusCodec.MimeType, MimeTypeOpus) {
+			return RTPCodecParameters{}, codecMatchNone, nil
+		}
+
+		localREDPayloadType := findREDPayloadType(localOpusCodec.PayloadType, codecs)
+		if localREDPayloadType == PayloadType(0) {
+			return RTPCodecParameters{}, codecMatchNone, nil
+		}
+		var localREDCodec RTPCodecParameters
+		for _, codec := range codecs {
+			if codec.PayloadType == localREDPayloadType {
+				localREDCodec = codec
+
+				break
+			}
+		}
+		toMatchCodec := remoteCodec
+		toMatchCodec.SDPFmtpLine = localREDCodec.SDPFmtpLine
+		localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
+		if matchType == codecMatchExact && opusMatch == codecMatchPartial {
+			matchType = codecMatchPartial
+		}
+
+		return localCodec, matchType, nil
+	}
+
 	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt { //nolint:nestif
 		payloadType, err := strconv.ParseUint(apt, 10, 8)
 		if err != nil {
@@ -538,6 +602,21 @@ func (m *MediaEngine) matchRemoteCodec(
 	localCodec, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
 
 	return localCodec, matchType, nil
+}
+
+func codecsInRemoteOrder(remoteCodecs, matchedCodecs []RTPCodecParameters) []RTPCodecParameters {
+	ordered := make([]RTPCodecParameters, 0, len(matchedCodecs))
+	for _, remoteCodec := range remoteCodecs {
+		for _, matchedCodec := range matchedCodecs {
+			if remoteCodec.PayloadType == matchedCodec.PayloadType {
+				ordered = append(ordered, matchedCodec)
+
+				break
+			}
+		}
+	}
+
+	return ordered
 }
 
 // Update header extensions from a remote media section.
@@ -701,9 +780,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		// use exact matches when they exist, otherwise fall back to partial
 		switch {
 		case len(exactMatches) > 0:
-			err = m.pushCodecs(exactMatches, typ)
+			err = m.pushCodecs(codecsInRemoteOrder(codecs, exactMatches), typ)
 		case len(partialMatches) > 0:
-			err = m.pushCodecs(partialMatches, typ)
+			err = m.pushCodecs(codecsInRemoteOrder(codecs, partialMatches), typ)
 		default:
 			// no match, not negotiated
 			continue

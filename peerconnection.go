@@ -2687,7 +2687,18 @@ func (pc *PeerConnection) AddTransceiverFromKind(
 		if len(codecs) == 0 {
 			return nil, ErrNoCodecsAvailable
 		}
-		track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+		var mediaCodec *RTPCodecParameters
+		for i := range codecs {
+			if !strings.EqualFold(codecs[i].MimeType, MimeTypeRED) {
+				mediaCodec = &codecs[i]
+
+				break
+			}
+		}
+		if mediaCodec == nil {
+			return nil, ErrNoCodecsAvailable
+		}
+		track, err := NewTrackLocalStaticSample(mediaCodec.RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
 		if err != nil {
 			return nil, err
 		}
