@@ -9,6 +9,82 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestParseREDFmtp(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		expected []PayloadType
+		valid    bool
+	}{
+		{name: "two entries", line: "96/96", expected: []PayloadType{96, 96}, valid: true},
+		{name: "more than two entries", line: "96/96/96", expected: []PayloadType{96, 96, 96}, valid: true},
+		{name: "payload type zero", line: "0/0", expected: []PayloadType{0, 0}, valid: true},
+		{name: "one entry", line: "96"},
+		{name: "empty", line: ""},
+		{name: "empty entry", line: "96/"},
+		{name: "whitespace", line: "96 /96"},
+		{name: "sign", line: "+96/+96"},
+		{name: "non decimal", line: "0x60/0x60"},
+		{name: "out of range", line: "128/128"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, valid := parseREDFmtp(test.line)
+			assert.Equal(t, test.valid, valid)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestREDCodecAssociation(t *testing.T) {
+	opus := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		PayloadType:        96,
+	}
+	red := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, ClockRate: 48000, Channels: 2, SDPFmtpLine: "96/96"},
+		PayloadType:        97,
+	}
+
+	isRED, primary, attached := primaryPayloadTypeForRED(red, []RTPCodecParameters{red, opus})
+	assert.True(t, isRED)
+	assert.Equal(t, PayloadType(96), primary)
+	assert.True(t, attached)
+	assert.Equal(t, PayloadType(97), findREDPayloadType(opus.PayloadType, []RTPCodecParameters{red, opus}))
+
+	for _, codec := range []RTPCodecParameters{
+		{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, SDPFmtpLine: "96"}, PayloadType: 97},
+		{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, SDPFmtpLine: "96/98"}, PayloadType: 97},
+		{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, SDPFmtpLine: "98/98"}, PayloadType: 97},
+	} {
+		assert.Equal(t, PayloadType(0), findREDPayloadType(opus.PayloadType, []RTPCodecParameters{codec, opus}))
+	}
+
+	nonOpus := opus
+	nonOpus.MimeType = MimeTypePCMU
+	assert.Equal(t, PayloadType(0), findREDPayloadType(opus.PayloadType, []RTPCodecParameters{red, nonOpus}))
+}
+
+func TestFilterUnattachedRED(t *testing.T) {
+	opus := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus},
+		PayloadType:        96,
+	}
+	attachedRED := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, SDPFmtpLine: "96/96"},
+		PayloadType:        97,
+	}
+	unattachedRED := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRED, SDPFmtpLine: "98/98"},
+		PayloadType:        99,
+	}
+
+	assert.Equal(t, []RTPCodecParameters{attachedRED, opus}, filterUnattachedRED(
+		[]RTPCodecParameters{attachedRED, opus, unattachedRED},
+	))
+}
+
 func TestFindPrimaryPayloadTypeForRTX(t *testing.T) {
 	for _, test := range []struct {
 		Name                string
