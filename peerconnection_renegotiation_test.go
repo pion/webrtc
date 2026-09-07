@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -1424,4 +1425,205 @@ func TestNegotiationNotNeededAfterReplaceTrackNil(t *testing.T) {
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
+}
+
+// renegotiationExtmapOfferHeader is the session level part of a Chrome-like offer.
+const renegotiationExtmapOfferHeader = `v=0
+o=- 4596489990601351948 %d IN IP4 127.0.0.1
+s=-
+t=0 0
+a=group:BUNDLE %s
+a=extmap-allow-mixed
+a=msid-semantic: WMS
+`
+
+// renegotiationExtmapDataSection is the data channel media section (mid 0).
+const renegotiationExtmapDataSection = `m=application 9 UDP/DTLS/SCTP webrtc-datachannel
+c=IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:0
+a=sctp-port:5000
+`
+
+// renegotiationExtmapVideoSection is a video media section template, formatted with the mid and the extmap lines.
+const renegotiationExtmapVideoSection = `m=video 9 UDP/TLS/RTP/SAVPF 96 97
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:%s
+%sa=sendonly
+a=msid:- video-track
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:96 VP8/90000
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 transport-cc
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+a=ssrc:1111 cname:pion
+`
+
+// renegotiationExtmapRejectedVideoSection is the old video section rejected (port 0) after its transceiver was stopped.
+const renegotiationExtmapRejectedVideoSection = `m=video 0 UDP/TLS/RTP/SAVPF 96 97
+c=IN IP4 0.0.0.0
+a=inactive
+a=mid:1
+a=rtpmap:96 VP8/90000
+a=rtpmap:97 rtx/90000
+a=fmtp:97 apt=96
+`
+
+// renegotiationExtmapAudioSection is the audio media section (mid 2).
+const renegotiationExtmapAudioSection = `m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=rtcp:9 IN IP4 0.0.0.0
+a=ice-ufrag:1/MvHwjAyVf27aLu
+a=ice-pwd:3dBU7cFOBl120v33cynDvN1E
+a=fingerprint:sha-256 75:74:5A:A6:A4:E5:52:F4:A7:67:4C:01:C7:EE:91:3F:21:3D:A2:E3:53:7B:6F:30:86:F2:30:AA:65:FB:04:24
+a=setup:actpass
+a=mid:2
+a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
+a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=sendonly
+a=msid:- audio-track
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 transport-cc
+a=fmtp:111 minptime=10;useinbandfec=1
+a=ssrc:2222 cname:pion
+`
+
+// extmaps of the old video section (mid 1): 4 is transport-cc, 9 is sdes:mid.
+const renegotiationExtmapOldVideoExtmaps = `a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+a=extmap:4 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:9 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id
+`
+
+// extmaps of the new video section (mid 3): 3 is transport-cc and 4 is now sdes:mid, conflicting with mid 1.
+const renegotiationExtmapNewVideoExtmaps = `a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id
+`
+
+// renegotiationExtmapOffers builds the four Chrome-like offers of the pion/webrtc#3417 repro:
+// 1. publish video (mid 1)
+// 2. unpublish video (mid 1 is rejected, port 0)
+// 3. publish audio (mid 2)
+// 4. publish video again (mid 3) with extmap IDs assigned differently than in mid 1.
+func renegotiationExtmapOffers() []string {
+	return []string{
+		fmt.Sprintf(renegotiationExtmapOfferHeader, 2, "0 1") +
+			renegotiationExtmapDataSection +
+			fmt.Sprintf(renegotiationExtmapVideoSection, "1", renegotiationExtmapOldVideoExtmaps),
+		fmt.Sprintf(renegotiationExtmapOfferHeader, 3, "0") +
+			renegotiationExtmapDataSection +
+			renegotiationExtmapRejectedVideoSection,
+		fmt.Sprintf(renegotiationExtmapOfferHeader, 4, "0 2") +
+			renegotiationExtmapDataSection +
+			renegotiationExtmapRejectedVideoSection +
+			renegotiationExtmapAudioSection,
+		fmt.Sprintf(renegotiationExtmapOfferHeader, 5, "0 2 3") +
+			renegotiationExtmapDataSection +
+			renegotiationExtmapRejectedVideoSection +
+			renegotiationExtmapAudioSection +
+			fmt.Sprintf(renegotiationExtmapVideoSection, "3", renegotiationExtmapNewVideoExtmaps),
+	}
+}
+
+// extmapsByMid parses the SDP into mid -> (extmap ID -> URI), skipping rejected (port 0) sections.
+func extmapsByMid(t *testing.T, raw string) map[string]map[int]string {
+	t.Helper()
+
+	parsed := SessionDescription{Type: SDPTypeOffer, SDP: raw}
+	desc, err := parsed.Unmarshal()
+	require.NoError(t, err)
+
+	out := map[string]map[int]string{}
+	for _, media := range desc.MediaDescriptions {
+		if media.MediaName.Port.Value == 0 {
+			continue
+		}
+		mid, ok := media.Attribute("mid")
+		require.True(t, ok)
+
+		extmaps := map[int]string{}
+		for _, attr := range media.Attributes {
+			if attr.Key != "extmap" {
+				continue
+			}
+			fields := strings.Fields(attr.Value)
+			require.Len(t, fields, 2, "unexpected extmap %q", attr.Value)
+			id, convErr := strconv.Atoi(fields[0])
+			require.NoError(t, convErr)
+			_, dup := extmaps[id]
+			assert.False(t, dup, "mid %s: extmap id %d declared twice", mid, id)
+			extmaps[id] = fields[1]
+		}
+		out[mid] = extmaps
+	}
+
+	return out
+}
+
+// pion/webrtc#3417: when media sections negotiated over time on the same PeerConnection use different
+// extmap ID assignments, every media section of the answer must keep the IDs offered for that very
+// section and must not leak the assignments of earlier sections.
+func TestPeerConnection_Renegotiation_ExtmapIDsFollowOffer(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pc, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	for step, offer := range renegotiationExtmapOffers() {
+		require.NoError(t, pc.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: offer}), "step %d", step+1)
+		answer, err := pc.CreateAnswer(nil)
+		require.NoError(t, err, "step %d", step+1)
+		require.NoError(t, pc.SetLocalDescription(answer), "step %d", step+1)
+
+		offered := extmapsByMid(t, offer)
+		answered := extmapsByMid(t, answer.SDP)
+
+		for mid, answeredExtmaps := range answered {
+			offeredExtmaps, ok := offered[mid]
+			require.True(t, ok, "step %d: answer has unknown mid %s", step+1, mid)
+
+			seenURIs := map[string]int{}
+			for id, uri := range answeredExtmaps {
+				// every (ID, URI) in the answer must come from the same media section of the offer
+				assert.Equal(t, offeredExtmaps[id], uri,
+					"step %d mid %s: extmap id %d is %q in answer but %q in offer", step+1, mid, id, uri, offeredExtmaps[id])
+				// a URI must not be declared twice in one media section
+				if prev, dup := seenURIs[uri]; dup {
+					assert.Failf(t, "duplicate extmap uri", "step %d mid %s: %s declared as id %d and %d", step+1, mid, uri, prev, id)
+				}
+				seenURIs[uri] = id
+			}
+		}
+
+		if step == 3 {
+			// the new video section must keep the offered IDs: 3 is transport-cc, 4 is sdes:mid
+			assert.Equal(t, "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01", answered["3"][3])
+			assert.Equal(t, "urn:ietf:params:rtp-hdrext:sdes:mid", answered["3"][4])
+		}
+	}
 }

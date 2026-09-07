@@ -535,6 +535,12 @@ func (m *MediaEngine) matchRemoteCodec(
 
 // Update header extensions from a remote media section.
 func (m *MediaEngine) updateHeaderExtensionFromMediaSection(media *sdp.MediaDescription) error {
+	// A rejected media section (port 0, unless bundle-only) negotiates nothing, so its extmap
+	// lines must not be learned: they would resurrect the IDs of a stopped transceiver. pion/webrtc#3417
+	if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+		return nil
+	}
+
 	var typ RTPCodecType
 	switch {
 	case strings.EqualFold(media.MediaName.Media, "audio"):
@@ -565,21 +571,34 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 	}
 
 	for _, localExtension := range m.headerExtensions {
-		if localExtension.uri == extension {
-			h := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
-			if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok {
-				h = existingValue
-			}
-
-			switch {
-			case localExtension.isAudio && typ == RTPCodecTypeAudio:
-				h.isAudio = true
-			case localExtension.isVideo && typ == RTPCodecTypeVideo:
-				h.isVideo = true
-			}
-
-			m.negotiatedHeaderExtensions[id] = h
+		if localExtension.uri != extension {
+			continue
 		}
+
+		negotiated := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
+		// Same ID and same URI as a previous negotiation: keep the already negotiated kinds.
+		// If the remote now maps this ID to a different URI, the latest description wins,
+		// otherwise a mapping left over from an earlier (possibly stopped) media section would
+		// leak into later ones. See pion/webrtc#3417.
+		if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok && existingValue.uri == extension {
+			negotiated = existingValue
+		}
+
+		// Keep URI -> ID unique: drop any other ID that an earlier media section used for this URI.
+		for oldID, old := range m.negotiatedHeaderExtensions {
+			if oldID != id && old.uri == extension {
+				delete(m.negotiatedHeaderExtensions, oldID)
+			}
+		}
+
+		switch {
+		case localExtension.isAudio && typ == RTPCodecTypeAudio:
+			negotiated.isAudio = true
+		case localExtension.isVideo && typ == RTPCodecTypeVideo:
+			negotiated.isVideo = true
+		}
+
+		m.negotiatedHeaderExtensions[id] = negotiated
 	}
 
 	return nil

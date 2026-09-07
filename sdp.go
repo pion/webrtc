@@ -616,17 +616,29 @@ func addTransceiverSDP(
 	}
 
 	parameters := mediaEngine.getRTPParametersByKind(transceiver.kind, directions)
+	// When answering, an extension keeps the ID the offerer used in this very media section
+	// (RFC 8285 Section 6). The MediaEngine tracks negotiated IDs per PeerConnection, so IDs of
+	// earlier media sections must not be reused here, and a URI must only appear once. pion/webrtc#3417
+	answeredExtensions := map[string]struct{}{}
 	for _, rtpExtension := range parameters.HeaderExtensions {
+		extensionID := rtpExtension.ID
 		if mediaSection.matchExtensions != nil {
-			if _, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled {
+			offeredID, enabled := mediaSection.matchExtensions[rtpExtension.URI]
+			if !enabled {
 				continue
 			}
+			extensionID = offeredID
 		}
+		if _, answered := answeredExtensions[rtpExtension.URI]; answered {
+			continue
+		}
+		answeredExtensions[rtpExtension.URI] = struct{}{}
+
 		extURL, err := url.Parse(rtpExtension.URI)
 		if err != nil {
 			return false, err
 		}
-		media.WithExtMap(sdp.ExtMap{Value: rtpExtension.ID, URI: extURL})
+		media.WithExtMap(sdp.ExtMap{Value: extensionID, URI: extURL})
 	}
 
 	if len(mediaSection.rids) > 0 {
