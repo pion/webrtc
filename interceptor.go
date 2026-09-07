@@ -28,9 +28,9 @@ import (
 var (
 	errOpusREDNilMediaEngine         = errors.New("media engine must not be nil")
 	errOpusREDNilInterceptorRegistry = errors.New("interceptor registry must not be nil")
-	errOpusREDPayloadTypeOutOfRange  = errors.New("Opus RED payload types must fit in seven bits")
-	errOpusREDPayloadTypeZero        = errors.New("Opus RED payload type must not be zero")
-	errOpusREDPayloadTypeCollision   = errors.New("Opus and RED payload types must be distinct")
+	errOpusREDPayloadTypeOutOfRange  = errors.New("opus RED payload types must fit in seven bits")
+	errOpusREDPayloadTypeZero        = errors.New("opus RED payload type must not be zero")
+	errOpusREDPayloadTypeCollision   = errors.New("opus and RED payload types must be distinct")
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors.
@@ -315,20 +315,10 @@ func ConfigureFlexFEC03(
 	return nil
 }
 
-// ConfigureOpusRED registers an audio/red codec associated with an existing
-// Opus codec and installs transparent RFC 2198 sender and receiver interceptors.
-//
-// It must be called before creating a PeerConnection. Register network-observing
-// interceptors, such as reports, stats, NACK, and TWCC feedback, before calling
-// ConfigureOpusRED so they observe wire RED packets. Register packet-header
-// mutators, such as the TWCC header-extension sender, after ConfigureOpusRED.
-// Applications continue to read and write ordinary Opus RTP packets.
-func ConfigureOpusRED(
-	opusPayloadType PayloadType,
-	redPayloadType PayloadType,
+func validateOpusREDConfiguration(
+	opusPayloadType, redPayloadType PayloadType,
 	mediaEngine *MediaEngine,
 	interceptorRegistry *interceptor.Registry,
-	options ...red.SenderOption,
 ) error {
 	switch {
 	case mediaEngine == nil:
@@ -341,30 +331,40 @@ func ConfigureOpusRED(
 		return errOpusREDPayloadTypeZero
 	case opusPayloadType == redPayloadType:
 		return errOpusREDPayloadTypeCollision
+	default:
+		return nil
 	}
+}
 
+func newOpusREDInterceptorFactories(
+	options []red.SenderOption,
+) (*red.SenderInterceptorFactory, *red.ReceiverInterceptorFactory, error) {
 	sender, err := red.NewSenderInterceptor(options...)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	configuredSender, err := sender.NewInterceptor("")
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err = configuredSender.Close(); err != nil {
-		return err
+		return nil, nil, err
 	}
 	receiver, err := red.NewReceiverInterceptor()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
+	return sender, receiver, nil
+}
+
+func registerOpusREDCodec(mediaEngine *MediaEngine, opusPayloadType, redPayloadType PayloadType) error {
 	mediaEngine.mu.Lock()
+	defer mediaEngine.mu.Unlock()
+
 	opusIndex := -1
 	for i, codec := range mediaEngine.audioCodecs {
 		if codec.PayloadType == redPayloadType {
-			mediaEngine.mu.Unlock()
-
 			return ErrCodecAlreadyRegistered
 		}
 		if codec.PayloadType == opusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
@@ -372,8 +372,6 @@ func ConfigureOpusRED(
 		}
 	}
 	if opusIndex == -1 {
-		mediaEngine.mu.Unlock()
-
 		return ErrCodecNotFound
 	}
 
@@ -390,7 +388,41 @@ func ConfigureOpusRED(
 	mediaEngine.audioCodecs = append(mediaEngine.audioCodecs, RTPCodecParameters{})
 	copy(mediaEngine.audioCodecs[opusIndex+1:], mediaEngine.audioCodecs[opusIndex:])
 	mediaEngine.audioCodecs[opusIndex] = redCodec
-	mediaEngine.mu.Unlock()
+
+	return nil
+}
+
+// ConfigureOpusRED registers an audio/red codec associated with an existing
+// Opus codec and installs transparent RFC 2198 sender and receiver interceptors.
+//
+// It must be called before creating a PeerConnection. Register network-observing
+// interceptors, such as reports, stats, NACK, and TWCC feedback, before calling
+// ConfigureOpusRED so they observe wire RED packets. Register packet-header
+// mutators, such as the TWCC header-extension sender, after ConfigureOpusRED.
+// Applications continue to read and write ordinary Opus RTP packets.
+func ConfigureOpusRED(
+	opusPayloadType PayloadType,
+	redPayloadType PayloadType,
+	mediaEngine *MediaEngine,
+	interceptorRegistry *interceptor.Registry,
+	options ...red.SenderOption,
+) error {
+	if err := validateOpusREDConfiguration(
+		opusPayloadType,
+		redPayloadType,
+		mediaEngine,
+		interceptorRegistry,
+	); err != nil {
+		return err
+	}
+
+	sender, receiver, err := newOpusREDInterceptorFactories(options)
+	if err != nil {
+		return err
+	}
+	if err = registerOpusREDCodec(mediaEngine, opusPayloadType, redPayloadType); err != nil {
+		return err
+	}
 
 	interceptorRegistry.Add(sender)
 	interceptorRegistry.Add(receiver)

@@ -220,7 +220,7 @@ func assertOpusREDStreamInfo(t *testing.T, infos []interceptor.StreamInfo, ssrc 
 
 		return
 	}
-	t.Errorf("no Opus RED StreamInfo found for SSRC %d", ssrc)
+	assert.Failf(t, "missing Opus RED StreamInfo", "no StreamInfo found for SSRC %d", ssrc)
 }
 
 func TestOpusREDTransparentRecoveryAndInterceptorOrdering(t *testing.T) {
@@ -290,7 +290,7 @@ func TestOpusREDTransparentRecoveryAndInterceptorOrdering(t *testing.T) {
 	select {
 	case result = <-resultChannel:
 	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for recovered Opus packets")
+		require.Fail(t, "timed out waiting for recovered Opus packets")
 	}
 	require.NoError(t, result.err)
 	require.Len(t, result.packets, 3)
@@ -319,7 +319,7 @@ func TestOpusREDTransparentRecoveryAndInterceptorOrdering(t *testing.T) {
 	closed = true
 }
 
-func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) {
+func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) { //nolint:cyclop
 	defer test.TimeOut(20 * time.Second).Stop()
 
 	offerPeer, answerPeer, wan := createOpusREDVNetPair(t, nil, true)
@@ -409,7 +409,7 @@ func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) {
 	select {
 	case result = <-resultChannel:
 	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for undeclared RED stream")
+		require.Fail(t, "timed out waiting for undeclared RED stream")
 	}
 	require.NoError(t, result.err)
 	assert.Equal(t, "a", result.rid)

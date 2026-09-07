@@ -72,7 +72,9 @@ func TestConfigureOpusRED(t *testing.T) {
 
 	assert.Contains(t, offer.SDP, "a=rtpmap:97 red/48000/2")
 	assert.Contains(t, offer.SDP, "a=fmtp:97 96/96")
-	assert.Less(t, strings.Index(offer.SDP, "a=rtpmap:97 red/48000/2"), strings.Index(offer.SDP, "a=rtpmap:96 opus/48000/2"))
+	redCodecIndex := strings.Index(offer.SDP, "a=rtpmap:97 red/48000/2")
+	opusCodecIndex := strings.Index(offer.SDP, "a=rtpmap:96 opus/48000/2")
+	assert.Less(t, redCodecIndex, opusCodecIndex)
 	assert.NotContains(t, offer.SDP, "a=ssrc-group:FEC-FR")
 	assert.NotContains(t, offer.SDP, "a=rtcp-fb:96 nack")
 }
@@ -90,6 +92,7 @@ func TestConfigureOpusREDValidationIsAtomic(t *testing.T) {
 		{name: "nil media engine", opus: 96, red: 97, nilEngine: true},
 		{name: "nil interceptor registry", opus: 96, red: 97, nilRegistry: true},
 		{name: "Opus payload type out of range", opus: 128, red: 97, setup: func(t *testing.T, m *MediaEngine) {
+			t.Helper()
 			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
 				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus}, PayloadType: 128,
 			}, RTPCodecTypeAudio))
@@ -99,6 +102,7 @@ func TestConfigureOpusREDValidationIsAtomic(t *testing.T) {
 		{name: "payload type collision", opus: 96, red: 96},
 		{name: "Opus missing", opus: 95, red: 97},
 		{name: "RED payload type already registered", opus: 96, red: 97, setup: func(t *testing.T, m *MediaEngine) {
+			t.Helper()
 			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
 				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypePCMU}, PayloadType: 97,
 			}, RTPCodecTypeAudio))

@@ -152,7 +152,9 @@ func TestOpusREDOfferAnswerPayloadTypes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, offer.SDP, "a=rtpmap:63 red/48000/2")
 	assert.Contains(t, offer.SDP, "a=fmtp:63 111/111")
-	assert.Less(t, strings.Index(offer.SDP, "a=rtpmap:63 red/48000/2"), strings.Index(offer.SDP, "a=rtpmap:111 opus/48000/2"))
+	offerREDIndex := strings.Index(offer.SDP, "a=rtpmap:63 red/48000/2")
+	offerOpusIndex := strings.Index(offer.SDP, "a=rtpmap:111 opus/48000/2")
+	assert.Less(t, offerREDIndex, offerOpusIndex)
 
 	assert.NoError(t, offerPeer.SetLocalDescription(offer))
 	assert.NoError(t, answerPeer.SetRemoteDescription(offer))
@@ -160,7 +162,9 @@ func TestOpusREDOfferAnswerPayloadTypes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, answer.SDP, "a=rtpmap:63 red/48000/2")
 	assert.Contains(t, answer.SDP, "a=fmtp:63 111/111")
-	assert.Less(t, strings.Index(answer.SDP, "a=rtpmap:63 red/48000/2"), strings.Index(answer.SDP, "a=rtpmap:111 opus/48000/2"))
+	answerREDIndex := strings.Index(answer.SDP, "a=rtpmap:63 red/48000/2")
+	answerOpusIndex := strings.Index(answer.SDP, "a=rtpmap:111 opus/48000/2")
+	assert.Less(t, answerREDIndex, answerOpusIndex)
 }
 
 func TestOpusREDPlainOpusFallback(t *testing.T) {

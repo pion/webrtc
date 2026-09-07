@@ -188,6 +188,22 @@ func parseREDFmtp(line string) ([]PayloadType, bool) {
 	return payloadTypes, true
 }
 
+func parseCopyREDPrimaryPayloadType(line string) (PayloadType, bool) {
+	payloadTypes, ok := parseREDFmtp(line)
+	if !ok {
+		return 0, false
+	}
+
+	primaryPayloadType := payloadTypes[0]
+	for _, payloadType := range payloadTypes[1:] {
+		if payloadType != primaryPayloadType {
+			return 0, false
+		}
+	}
+
+	return primaryPayloadType, true
+}
+
 // primaryPayloadTypeForRED returns the primary payload type associated with a
 // supported RED codec and reports whether that primary is a negotiated Opus
 // codec. Copy-Opus RED only supports repeated references to the same codec.
@@ -198,15 +214,9 @@ func primaryPayloadTypeForRED(needle RTPCodecParameters, haystack []RTPCodecPara
 		return false, 0, false
 	}
 
-	payloadTypes, ok := parseREDFmtp(needle.SDPFmtpLine)
+	primaryPayloadType, ok := parseCopyREDPrimaryPayloadType(needle.SDPFmtpLine)
 	if !ok {
 		return true, 0, false
-	}
-	primaryPayloadType = payloadTypes[0]
-	for _, payloadType := range payloadTypes[1:] {
-		if payloadType != primaryPayloadType {
-			return true, 0, false
-		}
 	}
 
 	for _, codec := range haystack {

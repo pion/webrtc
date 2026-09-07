@@ -464,6 +464,65 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 	statsLoop(m.audioCodecs)
 }
 
+func findMatchedCodec(
+	payloadType PayloadType,
+	mimeType string,
+	exactMatches, partialMatches []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType) {
+	for _, codec := range exactMatches {
+		if codec.PayloadType == payloadType && strings.EqualFold(codec.MimeType, mimeType) {
+			return codec, codecMatchExact
+		}
+	}
+	for _, codec := range partialMatches {
+		if codec.PayloadType == payloadType && strings.EqualFold(codec.MimeType, mimeType) {
+			return codec, codecMatchPartial
+		}
+	}
+
+	return RTPCodecParameters{}, codecMatchNone
+}
+
+func matchRemoteREDCodec(
+	remoteCodec RTPCodecParameters,
+	codecs, exactMatches, partialMatches []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType) {
+	remoteOpusPayloadType, ok := parseCopyREDPrimaryPayloadType(remoteCodec.SDPFmtpLine)
+	if !ok {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	remoteOpusCodec, opusMatch := findMatchedCodec(
+		remoteOpusPayloadType,
+		MimeTypeOpus,
+		exactMatches,
+		partialMatches,
+	)
+	if opusMatch == codecMatchNone {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	localOpusCodec, localOpusMatch := codecParametersFuzzySearch(remoteOpusCodec, codecs)
+	if localOpusMatch != opusMatch || !strings.EqualFold(localOpusCodec.MimeType, MimeTypeOpus) {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	localREDPayloadType := findREDPayloadType(localOpusCodec.PayloadType, codecs)
+	localREDCodec := findCodecByPayload(codecs, localREDPayloadType)
+	if localREDPayloadType == PayloadType(0) || localREDCodec == nil {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	toMatchCodec := remoteCodec
+	toMatchCodec.SDPFmtpLine = localREDCodec.SDPFmtpLine
+	localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
+	if matchType == codecMatchExact && opusMatch == codecMatchPartial {
+		matchType = codecMatchPartial
+	}
+
+	return localCodec, matchType
+}
+
 // Look up a codec and enable if it exists.
 //
 //nolint:cyclop
@@ -484,65 +543,7 @@ func (m *MediaEngine) matchRemoteCodec(
 		remoteCodec.RTPCodecCapability.SDPFmtpLine)
 
 	if strings.EqualFold(remoteCodec.MimeType, MimeTypeRED) {
-		payloadTypes, ok := parseREDFmtp(remoteCodec.SDPFmtpLine)
-		if !ok {
-			return RTPCodecParameters{}, codecMatchNone, nil
-		}
-
-		remoteOpusPayloadType := payloadTypes[0]
-		for _, payloadType := range payloadTypes[1:] {
-			if payloadType != remoteOpusPayloadType {
-				return RTPCodecParameters{}, codecMatchNone, nil
-			}
-		}
-
-		opusMatch := codecMatchNone
-		var remoteOpusCodec RTPCodecParameters
-		for _, codec := range exactMatches {
-			if codec.PayloadType == remoteOpusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
-				opusMatch = codecMatchExact
-				remoteOpusCodec = codec
-
-				break
-			}
-		}
-		if opusMatch == codecMatchNone {
-			for _, codec := range partialMatches {
-				if codec.PayloadType == remoteOpusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
-					opusMatch = codecMatchPartial
-					remoteOpusCodec = codec
-
-					break
-				}
-			}
-		}
-		if opusMatch == codecMatchNone {
-			return RTPCodecParameters{}, codecMatchNone, nil
-		}
-
-		localOpusCodec, localOpusMatch := codecParametersFuzzySearch(remoteOpusCodec, codecs)
-		if localOpusMatch != opusMatch || !strings.EqualFold(localOpusCodec.MimeType, MimeTypeOpus) {
-			return RTPCodecParameters{}, codecMatchNone, nil
-		}
-
-		localREDPayloadType := findREDPayloadType(localOpusCodec.PayloadType, codecs)
-		if localREDPayloadType == PayloadType(0) {
-			return RTPCodecParameters{}, codecMatchNone, nil
-		}
-		var localREDCodec RTPCodecParameters
-		for _, codec := range codecs {
-			if codec.PayloadType == localREDPayloadType {
-				localREDCodec = codec
-
-				break
-			}
-		}
-		toMatchCodec := remoteCodec
-		toMatchCodec.SDPFmtpLine = localREDCodec.SDPFmtpLine
-		localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
-		if matchType == codecMatchExact && opusMatch == codecMatchPartial {
-			matchType = codecMatchPartial
-		}
+		localCodec, matchType := matchRemoteREDCodec(remoteCodec, codecs, exactMatches, partialMatches)
 
 		return localCodec, matchType, nil
 	}
