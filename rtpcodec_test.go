@@ -64,6 +64,13 @@ func TestREDCodecAssociation(t *testing.T) {
 	nonOpus := opus
 	nonOpus.MimeType = MimeTypePCMU
 	assert.Equal(t, PayloadType(0), findREDPayloadType(opus.PayloadType, []RTPCodecParameters{red, nonOpus}))
+
+	foundOpus, foundREDPayloadType, ok := opusREDCodecParameters([]RTPCodecParameters{red, opus})
+	assert.True(t, ok)
+	assert.Equal(t, opus, foundOpus)
+	assert.Equal(t, PayloadType(97), foundREDPayloadType)
+	_, _, ok = opusREDCodecParameters([]RTPCodecParameters{opus})
+	assert.False(t, ok)
 }
 
 func TestFilterUnattachedRED(t *testing.T) {

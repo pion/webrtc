@@ -900,6 +900,34 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 	}, nil
 }
 
+// getRTPParametersByPayloadTypeForStream resolves a wire RED payload type to
+// its associated Opus format before an interceptor stream is bound.
+func (m *MediaEngine) getRTPParametersByPayloadTypeForStream(
+	payloadType PayloadType,
+) (RTPParameters, PayloadType, error) {
+	codec, typ, err := m.getCodecByPayload(payloadType)
+	if err != nil {
+		return RTPParameters{}, 0, err
+	}
+	if !strings.EqualFold(codec.MimeType, MimeTypeRED) {
+		params, paramsErr := m.getRTPParametersByPayloadType(payloadType)
+
+		return params, 0, paramsErr
+	}
+
+	codecs := m.getCodecsByKind(typ)
+	_, opusPayloadType, attached := primaryPayloadTypeForRED(codec, codecs)
+	if !attached {
+		return RTPParameters{}, 0, ErrCodecNotFound
+	}
+	params, err := m.getRTPParametersByPayloadType(opusPayloadType)
+	if err != nil {
+		return RTPParameters{}, 0, err
+	}
+
+	return params, payloadType, nil
+}
+
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	switch strings.ToLower(codec.MimeType) {
 	case strings.ToLower(MimeTypeH264):

@@ -2196,7 +2196,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 	}
 
 	payloadType := PayloadType(b[1] & 0x7f)
-	params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
+	params, payloadTypeFEC, err := pc.api.mediaEngine.getRTPParametersByPayloadTypeForStream(payloadType)
 	if err != nil {
 		return err
 	}
@@ -2237,7 +2237,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 		ssrc,
 		0, 0,
 		params.Codecs[0].PayloadType,
-		0, 0,
+		0,
+		payloadTypeFEC,
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)

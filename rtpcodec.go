@@ -231,6 +231,19 @@ func findREDPayloadType(opusPayloadType PayloadType, codecs []RTPCodecParameters
 	return 0
 }
 
+func opusREDCodecParameters(codecs []RTPCodecParameters) (RTPCodecParameters, PayloadType, bool) {
+	for _, codec := range codecs {
+		if !strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+			continue
+		}
+		if redPayloadType := findREDPayloadType(codec.PayloadType, codecs); redPayloadType != PayloadType(0) {
+			return codec, redPayloadType, true
+		}
+	}
+
+	return RTPCodecParameters{}, 0, false
+}
+
 // Given needle CodecParameters, returns if needle is RTX and
 // if primary codec corresponding to that needle is in the haystack of codecs.
 func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCodecParameters) (

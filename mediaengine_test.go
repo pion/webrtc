@@ -106,6 +106,26 @@ func TestMediaEngineOpusREDNegotiation(t *testing.T) {
 	})
 }
 
+func TestMediaEngineResolvesREDWirePayloadType(t *testing.T) {
+	mediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, mediaEngine, 96, 97)
+	description := sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{opusREDMedia("111/111")}}
+	assert.NoError(t, mediaEngine.updateFromRemoteDescription(description))
+
+	params, redPayloadType, err := mediaEngine.getRTPParametersByPayloadTypeForStream(63)
+	assert.NoError(t, err)
+	assert.Equal(t, PayloadType(63), redPayloadType)
+	assert.Len(t, params.Codecs, 1)
+	assert.Equal(t, MimeTypeOpus, params.Codecs[0].MimeType)
+	assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
+
+	params, redPayloadType, err = mediaEngine.getRTPParametersByPayloadTypeForStream(111)
+	assert.NoError(t, err)
+	assert.Zero(t, redPayloadType)
+	assert.Equal(t, MimeTypeOpus, params.Codecs[0].MimeType)
+	assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
+}
+
 func TestOpusREDOfferAnswerPayloadTypes(t *testing.T) {
 	offerMediaEngine := &MediaEngine{}
 	registerOpusREDCodecs(t, offerMediaEngine, 111, 63)
