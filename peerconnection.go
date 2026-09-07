@@ -1072,12 +1072,12 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 // 4.4.1.6 Set the SessionDescription
 //
 //nolint:cyclop
-func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
+func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) (SignalingState, error) {
 	switch {
 	case pc.isClosed.Load():
-		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+		return SignalingStateUnknown, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	case NewSDPType(sd.Type.String()) == SDPTypeUnknown:
-		return &rtcerr.TypeError{
+		return SignalingStateUnknown, &rtcerr.TypeError{
 			Err: fmt.Errorf("%w: '%d' is not a valid enum value of type SDPType", errPeerConnSDPTypeInvalidValue, sd.Type),
 		}
 	}
@@ -1204,10 +1204,9 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			pc.onNegotiationNeeded()
 			pc.mu.Unlock()
 		}
-		pc.onSignalingStateChange(nextState)
 	}
 
-	return err
+	return nextState, err
 }
 
 // SetLocalDescription sets the SessionDescription of the local peer
@@ -1241,9 +1240,12 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	if err := desc.parsed.UnmarshalString(desc.SDP); err != nil {
 		return err
 	}
-	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
+	nextState, err := pc.setDescription(&desc, stateChangeOpSetLocal)
+	if err != nil {
 		return err
 	}
+	// Dispatch after applying the description so handlers see consistent state.
+	defer pc.onSignalingStateChange(nextState)
 
 	// Our own local description declares what we're willing to receive (RFC 9335 Section 4). If a
 	// renegotiation changes that declaration (for example, an answer that now includes Cryptex where
@@ -1405,9 +1407,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if restartErr != nil {
 		return &rtcerr.OperationError{Err: restartErr}
 	}
-	if err = pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
+	nextState, err := pc.setDescription(&desc, stateChangeOpSetRemote)
+	if err != nil {
 		return err
 	}
+	// Dispatch after applying the description so handlers see consistent state.
+	defer pc.onSignalingStateChange(nextState)
 
 	if err = pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
 		return err

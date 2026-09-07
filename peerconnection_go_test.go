@@ -4380,3 +4380,39 @@ func testDataChannelThenMedia(t *testing.T, answererSends bool) {
 	assert.NoError(t, dc.SendText("after"))
 	waitForMessage(t, messages, "after")
 }
+
+// CreateAnswer and SetLocalDescription must succeed when called from an
+// OnSignalingStateChange handler for SignalingStateHaveRemoteOffer, i.e.
+// before SetRemoteDescription has returned.
+// See https://github.com/pion/webrtc/issues/3370.
+func TestPeerConnection_LocalAnswerFromSignalingStateChange(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
+		Direction: RTPTransceiverDirectionSendonly,
+	})
+	assert.NoError(t, err)
+
+	offer, err := offerPC.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	answerSet := make(chan error, 1)
+	answerPC.OnSignalingStateChange(func(ss SignalingState) {
+		if ss != SignalingStateHaveRemoteOffer {
+			return
+		}
+		answer, err := answerPC.CreateAnswer(nil)
+		if err != nil {
+			answerSet <- err
+
+			return
+		}
+		answerSet <- answerPC.SetLocalDescription(answer)
+	})
+
+	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+	assert.NoError(t, <-answerSet)
+	assert.Equal(t, SignalingStateStable, answerPC.SignalingState())
+}
