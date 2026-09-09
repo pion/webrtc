@@ -14,10 +14,55 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	mock_interceptor "github.com/pion/interceptor/pkg/mock"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestRTPSenderOpusREDStreamInfo(t *testing.T) {
+	mediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, mediaEngine, 96, 97)
+
+	var boundStreamInfo interceptor.StreamInfo
+	registry := &interceptor.Registry{}
+	registry.Add(&mock_interceptor.Factory{
+		NewInterceptorFn: func(string) (interceptor.Interceptor, error) {
+			return &mock_interceptor.Interceptor{
+				BindLocalStreamFn: func(info *interceptor.StreamInfo, writer interceptor.RTPWriter) interceptor.RTPWriter {
+					boundStreamInfo = *info
+
+					return writer
+				},
+			}, nil
+		},
+	})
+	peerConnection, err := NewAPI(
+		WithMediaEngine(mediaEngine),
+		WithInterceptorRegistry(registry),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, peerConnection.Close()) })
+
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio",
+		"pion",
+	)
+	assert.NoError(t, err)
+	sender, err := peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+	parameters := sender.GetParameters()
+	assert.Len(t, parameters.Encodings, 1)
+	assert.Zero(t, parameters.Encodings[0].FEC.SSRC)
+	assert.NoError(t, sender.Send(parameters))
+
+	assert.Equal(t, uint8(96), boundStreamInfo.PayloadType)
+	assert.Equal(t, uint8(97), boundStreamInfo.PayloadTypeForwardErrorCorrection)
+	assert.Equal(t, MimeTypeOpus, boundStreamInfo.MimeType)
+	assert.Equal(t, uint32(parameters.Encodings[0].SSRC), boundStreamInfo.SSRC)
+	assert.Zero(t, boundStreamInfo.SSRCForwardErrorCorrection)
+}
 
 func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 10)

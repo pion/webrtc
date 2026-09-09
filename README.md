@@ -98,6 +98,7 @@ He is available to talk about Pion or general WebRTC questions, feel free to rea
 * [Sender/Receiver Reports](https://github.com/pion/interceptor/tree/main/pkg/report)
 * [Transport Wide Congestion Control Feedback](https://github.com/pion/interceptor/tree/main/pkg/twcc)
 * [Bandwidth Estimation](https://github.com/pion/webrtc/tree/main/examples/bandwidth-estimation-from-disk)
+* Opt-in RFC 2198 Opus RED protection through `ConfigureOpusRED`; applications continue to read and write ordinary Opus RTP
 
 #### Security
 * TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA for DTLS v1.2

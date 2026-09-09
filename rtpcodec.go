@@ -156,6 +156,102 @@ func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) Paylo
 	return PayloadType(0)
 }
 
+// parseREDFmtp parses RFC 2198's slash-separated payload type list. The
+// copy-Opus profile requires at least one redundant encoding and a primary
+// encoding, so a single payload type is not valid.
+func parseREDFmtp(line string) ([]PayloadType, bool) {
+	parts := strings.Split(line, "/")
+	if len(parts) < 2 {
+		return nil, false
+	}
+
+	payloadTypes := make([]PayloadType, 0, len(parts))
+	for _, part := range parts {
+		if part == "" {
+			return nil, false
+		}
+		for _, char := range part {
+			if char < '0' || char > '9' {
+				return nil, false
+			}
+		}
+
+		payloadType, err := strconv.ParseUint(part, 10, 7)
+		if err != nil {
+			return nil, false
+		}
+		payloadTypes = append(payloadTypes, PayloadType(payloadType))
+	}
+
+	return payloadTypes, true
+}
+
+func parseCopyREDPrimaryPayloadType(line string) (PayloadType, bool) {
+	payloadTypes, ok := parseREDFmtp(line)
+	if !ok {
+		return 0, false
+	}
+
+	primaryPayloadType := payloadTypes[0]
+	for _, payloadType := range payloadTypes[1:] {
+		if payloadType != primaryPayloadType {
+			return 0, false
+		}
+	}
+
+	return primaryPayloadType, true
+}
+
+// primaryPayloadTypeForRED returns the primary payload type associated with a
+// supported RED codec and reports whether that primary is a negotiated Opus
+// codec. Copy-Opus RED only supports repeated references to the same codec.
+func primaryPayloadTypeForRED(needle RTPCodecParameters, haystack []RTPCodecParameters) (
+	isRED bool, primaryPayloadType PayloadType, primaryExists bool,
+) {
+	if !strings.EqualFold(needle.MimeType, MimeTypeRED) {
+		return false, 0, false
+	}
+
+	primaryPayloadType, ok := parseCopyREDPrimaryPayloadType(needle.SDPFmtpLine)
+	if !ok {
+		return true, 0, false
+	}
+
+	for _, codec := range haystack {
+		if codec.PayloadType == primaryPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+			return true, primaryPayloadType, true
+		}
+	}
+
+	return true, primaryPayloadType, false
+}
+
+// findREDPayloadType returns the RED payload type associated with an Opus
+// payload type, if the codec list contains a valid copy-Opus RED pair.
+func findREDPayloadType(opusPayloadType PayloadType, codecs []RTPCodecParameters) PayloadType {
+	for _, codec := range codecs {
+		isRED, primaryPayloadType, primaryExists := primaryPayloadTypeForRED(codec, codecs)
+		if isRED && primaryExists && primaryPayloadType == opusPayloadType {
+			return codec.PayloadType
+		}
+	}
+
+	return 0
+}
+
+func opusREDCodecParameters(codecs []RTPCodecParameters) (RTPCodecParameters, PayloadType, bool) {
+	for _, codec := range codecs {
+		if !strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+			continue
+		}
+		if redPayloadType := findREDPayloadType(codec.PayloadType, codecs); redPayloadType != PayloadType(0) {
+			return codec, redPayloadType, true
+		}
+	}
+
+	return RTPCodecParameters{}, 0, false
+}
+
 // Given needle CodecParameters, returns if needle is RTX and
 // if primary codec corresponding to that needle is in the haystack of codecs.
 func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCodecParameters) (
@@ -194,6 +290,17 @@ func filterUnattachedRTX(codecs []RTPCodecParameters) []RTPCodecParameters {
 		c := codecs[i]
 		if isRTX, primaryExists := primaryPayloadTypeForRTXExists(c, codecs); isRTX && !primaryExists {
 			// no primary for RTX, remove the RTX
+			codecs = append(codecs[:i], codecs[i+1:]...)
+		}
+	}
+
+	return codecs
+}
+
+// Filter out RED codecs that are malformed or do not have an associated Opus codec.
+func filterUnattachedRED(codecs []RTPCodecParameters) []RTPCodecParameters {
+	for i := len(codecs) - 1; i >= 0; i-- {
+		if isRED, _, primaryExists := primaryPayloadTypeForRED(codecs[i], codecs); isRED && !primaryExists {
 			codecs = append(codecs[:i], codecs[i+1:]...)
 		}
 	}

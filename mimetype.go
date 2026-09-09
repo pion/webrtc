@@ -13,6 +13,9 @@ const (
 	// MimeTypeOpus Opus MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeOpus = "audio/opus"
+	// MimeTypeRED RED MIME type.
+	// Note: Matching should be case insensitive.
+	MimeTypeRED = "audio/red"
 	// MimeTypeVP8 VP8 MIME type
 	// Note: Matching should be case insensitive.
 	MimeTypeVP8 = "video/VP8"

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/sdp/v3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,6 +84,30 @@ func Test_RTPTransceiver_SetCodecPreferences(t *testing.T) {
 
 	assert.NoError(t, tr.SetCodecPreferences([]RTPCodecParameters{}))
 	assert.NotEqual(t, 0, len(tr.getCodecs()))
+}
+
+func Test_RTPTransceiver_OpusREDPreferences(t *testing.T) {
+	mediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, mediaEngine, 96, 97)
+	api := NewAPI(WithMediaEngine(mediaEngine))
+	transceiver := RTPTransceiver{kind: RTPCodecTypeAudio, api: api}
+	opus := mediaEngine.audioCodecs[1]
+	red := mediaEngine.audioCodecs[0]
+
+	assert.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{red}))
+	assert.Empty(t, transceiver.codecs)
+	assert.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{red, opus}))
+	assert.Equal(t, []RTPCodecParameters{red, opus}, transceiver.codecs)
+
+	media := sdp.NewJSEPMediaDescription("audio", []string{}).
+		WithCodec(63, "red", 48000, 2, "111/111").
+		WithCodec(111, "opus", 48000, 2, "")
+	transceiver.setCodecPreferencesFromRemoteDescription(media)
+	assert.Len(t, transceiver.codecs, 2)
+	assert.Equal(t, MimeTypeRED, transceiver.codecs[0].MimeType)
+	assert.Equal(t, PayloadType(97), transceiver.codecs[0].PayloadType)
+	assert.Equal(t, MimeTypeOpus, transceiver.codecs[1].MimeType)
+	assert.Equal(t, PayloadType(96), transceiver.codecs[1].PayloadType)
 }
 
 // Assert that SetCodecPreferences properly filters codecs and PayloadTypes are respected.

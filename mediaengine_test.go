@@ -11,10 +11,196 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func registerOpusREDCodecs(t *testing.T, mediaEngine *MediaEngine, opusPayloadType, redPayloadType PayloadType) {
+	t.Helper()
+	requireNoError := func(err error) {
+		t.Helper()
+		assert.NoError(t, err)
+	}
+
+	requireNoError(mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:    MimeTypeRED,
+			ClockRate:   48000,
+			Channels:    2,
+			SDPFmtpLine: fmt.Sprintf("%d/%d", opusPayloadType, opusPayloadType),
+		},
+		PayloadType: redPayloadType,
+	}, RTPCodecTypeAudio))
+	requireNoError(mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		PayloadType:        opusPayloadType,
+	}, RTPCodecTypeAudio))
+}
+
+func opusREDMedia(redFmtp string) *sdp.MediaDescription {
+	return sdp.NewJSEPMediaDescription("audio", []string{}).
+		WithCodec(63, "red", 48000, 2, redFmtp).
+		WithCodec(111, "opus", 48000, 2, "")
+}
+
+func TestMediaEngineOpusREDNegotiation(t *testing.T) {
+	t.Run("remaps RED fmtp and preserves remote order", func(t *testing.T) {
+		mediaEngine := &MediaEngine{}
+		registerOpusREDCodecs(t, mediaEngine, 96, 97)
+
+		description := sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{opusREDMedia("111/111/111")}}
+		assert.NoError(t, mediaEngine.updateFromRemoteDescription(description))
+		assert.Equal(t, []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{
+					MimeType: MimeTypeRED, ClockRate: 48000, Channels: 2, SDPFmtpLine: "111/111/111",
+				},
+				PayloadType: 63,
+			},
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+				PayloadType:        111,
+			},
+		}, mediaEngine.negotiatedAudioCodecs)
+	})
+
+	for _, test := range []struct {
+		name string
+		fmtp string
+	}{
+		{name: "missing redundant encoding", fmtp: "111"},
+		{name: "missing fmtp", fmtp: ""},
+		{name: "malformed fmtp", fmtp: "opus/opus"},
+		{name: "mixed payload types", fmtp: "111/112"},
+		{name: "out of range payload type", fmtp: "128/128"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			mediaEngine := &MediaEngine{}
+			registerOpusREDCodecs(t, mediaEngine, 96, 97)
+
+			description := sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{opusREDMedia(test.fmtp)}}
+			assert.NoError(t, mediaEngine.updateFromRemoteDescription(description))
+			assert.Len(t, mediaEngine.negotiatedAudioCodecs, 1)
+			assert.Equal(t, MimeTypeOpus, mediaEngine.negotiatedAudioCodecs[0].MimeType)
+		})
+	}
+
+	t.Run("rejects RED attached to non-Opus", func(t *testing.T) {
+		mediaEngine := &MediaEngine{}
+		registerOpusREDCodecs(t, mediaEngine, 96, 97)
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypePCMU, ClockRate: 8000},
+			PayloadType:        0,
+		}, RTPCodecTypeAudio))
+		media := sdp.NewJSEPMediaDescription("audio", []string{}).
+			WithCodec(63, "red", 48000, 2, "0/0").
+			WithCodec(0, "PCMU", 8000, 0, "")
+
+		assert.NoError(t, mediaEngine.updateFromRemoteDescription(sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{media},
+		}))
+		assert.Len(t, mediaEngine.negotiatedAudioCodecs, 1)
+		assert.Equal(t, MimeTypePCMU, mediaEngine.negotiatedAudioCodecs[0].MimeType)
+	})
+}
+
+func TestMediaEngineResolvesREDWirePayloadType(t *testing.T) {
+	mediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, mediaEngine, 96, 97)
+	description := sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{opusREDMedia("111/111")}}
+	assert.NoError(t, mediaEngine.updateFromRemoteDescription(description))
+
+	params, redPayloadType, err := mediaEngine.getRTPParametersByPayloadTypeForStream(63)
+	assert.NoError(t, err)
+	assert.Equal(t, PayloadType(63), redPayloadType)
+	assert.Len(t, params.Codecs, 1)
+	assert.Equal(t, MimeTypeOpus, params.Codecs[0].MimeType)
+	assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
+
+	params, redPayloadType, err = mediaEngine.getRTPParametersByPayloadTypeForStream(111)
+	assert.NoError(t, err)
+	assert.Zero(t, redPayloadType)
+	assert.Equal(t, MimeTypeOpus, params.Codecs[0].MimeType)
+	assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
+}
+
+func TestOpusREDOfferAnswerPayloadTypes(t *testing.T) {
+	offerMediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, offerMediaEngine, 111, 63)
+	answerMediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, answerMediaEngine, 96, 97)
+
+	offerPeer, err := NewAPI(
+		WithMediaEngine(offerMediaEngine),
+		WithInterceptorRegistry(&interceptor.Registry{}),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPeer, err := NewAPI(
+		WithMediaEngine(answerMediaEngine),
+		WithInterceptorRegistry(&interceptor.Registry{}),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		closePairNow(t, offerPeer, answerPeer)
+	})
+
+	_, err = offerPeer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+	offer, err := offerPeer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.Contains(t, offer.SDP, "a=rtpmap:63 red/48000/2")
+	assert.Contains(t, offer.SDP, "a=fmtp:63 111/111")
+	offerREDIndex := strings.Index(offer.SDP, "a=rtpmap:63 red/48000/2")
+	offerOpusIndex := strings.Index(offer.SDP, "a=rtpmap:111 opus/48000/2")
+	assert.Less(t, offerREDIndex, offerOpusIndex)
+
+	assert.NoError(t, offerPeer.SetLocalDescription(offer))
+	assert.NoError(t, answerPeer.SetRemoteDescription(offer))
+	answer, err := answerPeer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.Contains(t, answer.SDP, "a=rtpmap:63 red/48000/2")
+	assert.Contains(t, answer.SDP, "a=fmtp:63 111/111")
+	answerREDIndex := strings.Index(answer.SDP, "a=rtpmap:63 red/48000/2")
+	answerOpusIndex := strings.Index(answer.SDP, "a=rtpmap:111 opus/48000/2")
+	assert.Less(t, answerREDIndex, answerOpusIndex)
+}
+
+func TestOpusREDPlainOpusFallback(t *testing.T) {
+	offerMediaEngine := &MediaEngine{}
+	registerOpusREDCodecs(t, offerMediaEngine, 111, 63)
+	answerMediaEngine := &MediaEngine{}
+	assert.NoError(t, answerMediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		PayloadType:        96,
+	}, RTPCodecTypeAudio))
+
+	offerPeer, err := NewAPI(
+		WithMediaEngine(offerMediaEngine),
+		WithInterceptorRegistry(&interceptor.Registry{}),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answerPeer, err := NewAPI(
+		WithMediaEngine(answerMediaEngine),
+		WithInterceptorRegistry(&interceptor.Registry{}),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		closePairNow(t, offerPeer, answerPeer)
+	})
+
+	_, err = offerPeer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	assert.NoError(t, err)
+	offer, err := offerPeer.CreateOffer(nil)
+	assert.NoError(t, err)
+	assert.NoError(t, offerPeer.SetLocalDescription(offer))
+	assert.NoError(t, answerPeer.SetRemoteDescription(offer))
+	answer, err := answerPeer.CreateAnswer(nil)
+	assert.NoError(t, err)
+	assert.NotContains(t, answer.SDP, " red/48000")
+	assert.Contains(t, answer.SDP, "a=rtpmap:111 opus/48000/2")
+}
 
 // pion/webrtc#1078
 // .

@@ -457,6 +457,65 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 	statsLoop(m.audioCodecs)
 }
 
+func findMatchedCodec(
+	payloadType PayloadType,
+	mimeType string,
+	exactMatches, partialMatches []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType) {
+	for _, codec := range exactMatches {
+		if codec.PayloadType == payloadType && strings.EqualFold(codec.MimeType, mimeType) {
+			return codec, codecMatchExact
+		}
+	}
+	for _, codec := range partialMatches {
+		if codec.PayloadType == payloadType && strings.EqualFold(codec.MimeType, mimeType) {
+			return codec, codecMatchPartial
+		}
+	}
+
+	return RTPCodecParameters{}, codecMatchNone
+}
+
+func matchRemoteREDCodec(
+	remoteCodec RTPCodecParameters,
+	codecs, exactMatches, partialMatches []RTPCodecParameters,
+) (RTPCodecParameters, codecMatchType) {
+	remoteOpusPayloadType, ok := parseCopyREDPrimaryPayloadType(remoteCodec.SDPFmtpLine)
+	if !ok {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	remoteOpusCodec, opusMatch := findMatchedCodec(
+		remoteOpusPayloadType,
+		MimeTypeOpus,
+		exactMatches,
+		partialMatches,
+	)
+	if opusMatch == codecMatchNone {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	localOpusCodec, localOpusMatch := codecParametersFuzzySearch(remoteOpusCodec, codecs)
+	if localOpusMatch != opusMatch || !strings.EqualFold(localOpusCodec.MimeType, MimeTypeOpus) {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	localREDPayloadType := findREDPayloadType(localOpusCodec.PayloadType, codecs)
+	localREDCodec := findCodecByPayload(codecs, localREDPayloadType)
+	if localREDPayloadType == PayloadType(0) || localREDCodec == nil {
+		return RTPCodecParameters{}, codecMatchNone
+	}
+
+	toMatchCodec := remoteCodec
+	toMatchCodec.SDPFmtpLine = localREDCodec.SDPFmtpLine
+	localCodec, matchType := codecParametersFuzzySearch(toMatchCodec, codecs)
+	if matchType == codecMatchExact && opusMatch == codecMatchPartial {
+		matchType = codecMatchPartial
+	}
+
+	return localCodec, matchType
+}
+
 // Look up a codec and enable if it exists.
 //
 //nolint:cyclop
@@ -475,6 +534,12 @@ func (m *MediaEngine) matchRemoteCodec(
 		remoteCodec.RTPCodecCapability.ClockRate,
 		remoteCodec.RTPCodecCapability.Channels,
 		remoteCodec.RTPCodecCapability.SDPFmtpLine)
+
+	if strings.EqualFold(remoteCodec.MimeType, MimeTypeRED) {
+		localCodec, matchType := matchRemoteREDCodec(remoteCodec, codecs, exactMatches, partialMatches)
+
+		return localCodec, matchType, nil
+	}
 
 	if apt, hasApt := remoteFmtp.Parameter("apt"); hasApt { //nolint:nestif
 		payloadType, err := strconv.ParseUint(apt, 10, 8)
@@ -531,6 +596,21 @@ func (m *MediaEngine) matchRemoteCodec(
 	localCodec, matchType := codecParametersFuzzySearch(remoteCodec, codecs)
 
 	return localCodec, matchType, nil
+}
+
+func codecsInRemoteOrder(remoteCodecs, matchedCodecs []RTPCodecParameters) []RTPCodecParameters {
+	ordered := make([]RTPCodecParameters, 0, len(matchedCodecs))
+	for _, remoteCodec := range remoteCodecs {
+		for _, matchedCodec := range matchedCodecs {
+			if remoteCodec.PayloadType == matchedCodec.PayloadType {
+				ordered = append(ordered, matchedCodec)
+
+				break
+			}
+		}
+	}
+
+	return ordered
 }
 
 // Update header extensions from a remote media section.
@@ -694,9 +774,9 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		// use exact matches when they exist, otherwise fall back to partial
 		switch {
 		case len(exactMatches) > 0:
-			err = m.pushCodecs(exactMatches, typ)
+			err = m.pushCodecs(codecsInRemoteOrder(codecs, exactMatches), typ)
 		case len(partialMatches) > 0:
-			err = m.pushCodecs(partialMatches, typ)
+			err = m.pushCodecs(codecsInRemoteOrder(codecs, partialMatches), typ)
 		default:
 			// no match, not negotiated
 			continue
@@ -812,6 +892,34 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 		HeaderExtensions: headerExtensions,
 		Codecs:           []RTPCodecParameters{codec},
 	}, nil
+}
+
+// getRTPParametersByPayloadTypeForStream resolves a wire RED payload type to
+// its associated Opus format before an interceptor stream is bound.
+func (m *MediaEngine) getRTPParametersByPayloadTypeForStream(
+	payloadType PayloadType,
+) (RTPParameters, PayloadType, error) {
+	codec, typ, err := m.getCodecByPayload(payloadType)
+	if err != nil {
+		return RTPParameters{}, 0, err
+	}
+	if !strings.EqualFold(codec.MimeType, MimeTypeRED) {
+		params, paramsErr := m.getRTPParametersByPayloadType(payloadType)
+
+		return params, 0, paramsErr
+	}
+
+	codecs := m.getCodecsByKind(typ)
+	_, opusPayloadType, attached := primaryPayloadTypeForRED(codec, codecs)
+	if !attached {
+		return RTPParameters{}, 0, ErrCodecNotFound
+	}
+	params, err := m.getRTPParametersByPayloadType(opusPayloadType)
+	if err != nil {
+		return RTPParameters{}, 0, err
+	}
+
+	return params, payloadType, nil
 }
 
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
