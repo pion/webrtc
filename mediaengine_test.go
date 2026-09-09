@@ -1010,3 +1010,67 @@ a=ssrc:4281768245 msid:6ff05509-be96-4ef1-a74f-425e14720983 16d5d7fe-d076-4718-9
 		assert.Len(t, mediaEngine.negotiatedVideoCodecs, 2)
 	})
 }
+
+// pion/webrtc#3417: extmap mappings left behind by a stopped media section must not pollute the
+// negotiation of later media sections. Reuses the four Chrome-like offers from peerconnection_renegotiation_test.go.
+func TestMediaEngineHeaderExtensionStaleMediaSection(t *testing.T) {
+	mustParse := func(raw string) sdp.SessionDescription {
+		s := sdp.SessionDescription{}
+		assert.NoError(t, s.Unmarshal([]byte(raw)))
+
+		return s
+	}
+
+	mediaEngine := MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
+	for _, uri := range []string{sdp.SDESMidURI, sdp.SDESRTPStreamIDURI, sdp.SDESRepairRTPStreamIDURI} {
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: uri}, RTPCodecTypeVideo))
+	}
+	for _, typ := range []RTPCodecType{RTPCodecTypeVideo, RTPCodecTypeAudio} {
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, typ))
+	}
+
+	offers := renegotiationExtmapOffers()
+	for _, offer := range offers {
+		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(offer)))
+	}
+	assert.True(t, mediaEngine.negotiatedAudio)
+	assert.True(t, mediaEngine.negotiatedVideo)
+
+	// the latest video section (mid 3) maps 4 to sdes:mid and 3 to transport-cc,
+	// the old 9 -> mid and 4 -> transport-cc must be replaced
+	midID, _, midVideo := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI})
+	assert.Equal(t, 4, midID)
+	assert.True(t, midVideo)
+
+	tccID, tccAudio, tccVideo := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI})
+	assert.Equal(t, 3, tccID)
+	assert.True(t, tccAudio)
+	assert.True(t, tccVideo)
+
+	params := mediaEngine.getRTPParametersByKind(
+		RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
+	)
+	got := map[string]int{}
+	for _, ext := range params.HeaderExtensions {
+		_, dup := got[ext.URI]
+		assert.False(t, dup, "uri %s negotiated under more than one id", ext.URI)
+		got[ext.URI] = ext.ID
+	}
+	assert.Equal(t, map[string]int{
+		sdp.TransportCCURI:           3,
+		sdp.SDESMidURI:               4,
+		sdp.SDESRTPStreamIDURI:       10,
+		sdp.SDESRepairRTPStreamIDURI: 11,
+	}, got)
+
+	// extmap lines of a rejected (port 0) media section must not be learned
+	rejectedWithExtmaps := strings.Replace(offers[1], "a=mid:1\n", "a=mid:1\n"+renegotiationExtmapOldVideoExtmaps, 1)
+	fresh := MediaEngine{}
+	assert.NoError(t, fresh.RegisterDefaultCodecs())
+	assert.NoError(t, fresh.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeVideo))
+	assert.NoError(t, fresh.updateFromRemoteDescription(mustParse(rejectedWithExtmaps)))
+	midID, _, midVideo = fresh.getHeaderExtensionID(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI})
+	assert.Equal(t, 0, midID)
+	assert.False(t, midVideo)
+}
