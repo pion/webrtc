@@ -201,6 +201,12 @@ type SCTPTransportMetadata struct {
 
 	// ZeroChecksumReceivingEnabled indicates whether incoming packets may use zero checksum.
 	ZeroChecksumReceivingEnabled bool `json:"zeroChecksumReceivingEnabled"`
+
+	// NumInboundStreams is the maximum number of inbound streams for this association.
+	NumInboundStreams uint16 `json:"numInboundStreams"`
+
+	// NumOutboundStreams is the maximum number of outbound streams for this association.
+	NumOutboundStreams uint16 `json:"numOutboundStreams"`
 }
 
 func newStatsReportCollector() *statsReportCollector {
