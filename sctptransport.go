@@ -20,6 +20,10 @@ import (
 
 const sctpMaxChannels = uint16(65535)
 
+// defaultSCTPDataChannelOpenTimeout bounds how long an accepted SCTP stream may
+// wait for its DCEP DATA_CHANNEL_OPEN before the stream is closed.
+const defaultSCTPDataChannelOpenTimeout = 10 * time.Second
+
 func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMetadata {
 	partialReliabilityMode := SCTPTransportPartialReliabilityModeNone
 	switch metadata.PartialReliabilityMode {
@@ -279,24 +283,21 @@ func (r *SCTPTransport) Stop() error {
 	return nil
 }
 
-//nolint:cyclop
+// acceptDataChannels accepts incoming SCTP streams and opens a DataChannel
+// for each of them. It only returns when the association stops producing
+// streams; a failure on a single stream never ends the loop.
 func (r *SCTPTransport) acceptDataChannels(
 	assoc *sctp.Association,
 ) {
-ACCEPT:
 	for {
 		// check if the association has been stopped before calling accept.
-		r.lock.RLock()
-		currentAssoc := r.sctpAssociation
-		shouldStop := currentAssoc == nil || currentAssoc != assoc
-		r.lock.RUnlock()
-		if shouldStop {
+		if !r.isCurrentAssociation(assoc) {
 			r.onClose(nil)
 
 			return
 		}
 
-		dc, existing, err := r.acceptDataChannel(assoc)
+		stream, err := assoc.AcceptStream()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				r.log.Errorf("Failed to accept data channel: %v", err)
@@ -308,97 +309,20 @@ ACCEPT:
 
 			return
 		}
-		if existing {
-			continue ACCEPT
+
+		stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
+		// Classify against the live local DataChannel registry rather than a
+		// startup snapshot: applications may create local DataChannels after
+		// the association has started, and the first inbound packet on those
+		// streams is a DataChannelAck, not a new Open.
+		if r.acceptLocalDataChannelGeneration(stream.StreamIdentifier()) {
+			continue
 		}
 
-		var (
-			maxRetransmits    *uint16
-			maxPacketLifeTime *uint16
-		)
-		val := uint16(dc.Config.ReliabilityParameter) //nolint:gosec //G115
-		ordered := true
-
-		switch dc.Config.ChannelType {
-		case datachannel.ChannelTypeReliable:
-			ordered = true
-		case datachannel.ChannelTypeReliableUnordered:
-			ordered = false
-		case datachannel.ChannelTypePartialReliableRexmit:
-			ordered = true
-			maxRetransmits = &val
-		case datachannel.ChannelTypePartialReliableRexmitUnordered:
-			ordered = false
-			maxRetransmits = &val
-		case datachannel.ChannelTypePartialReliableTimed:
-			ordered = true
-			maxPacketLifeTime = &val
-		case datachannel.ChannelTypePartialReliableTimedUnordered:
-			ordered = false
-			maxPacketLifeTime = &val
-		default:
-		}
-
-		sid := dc.StreamIdentifier()
-		rtcDC, err := r.api.newDataChannel(&DataChannelParameters{
-			ID:                &sid,
-			Label:             dc.Config.Label,
-			Protocol:          dc.Config.Protocol,
-			Negotiated:        dc.Config.Negotiated,
-			Ordered:           ordered,
-			MaxPacketLifeTime: maxPacketLifeTime,
-			MaxRetransmits:    maxRetransmits,
-		}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
-		if err != nil {
-			// This data channel is invalid. Close it and log an error.
-			if err1 := dc.Close(); err1 != nil {
-				r.log.Errorf("Failed to close invalid data channel: %v", err1)
-			}
-			r.log.Errorf("Failed to accept data channel: %v", err)
-			r.onError(err)
-			// We've received a datachannel with invalid configuration. We can still receive other datachannels.
-			continue ACCEPT
-		}
-
-		<-r.onDataChannel(rtcDC)
-		rtcDC.handleOpen(dc, true, dc.Config.Negotiated)
-
-		r.lock.Lock()
-		r.dataChannelsOpened++
-		handler := r.onDataChannelOpenedHandler
-		r.lock.Unlock()
-
-		if handler != nil {
-			handler(rtcDC)
-		}
+		// Wait for the DCEP OPEN off the accept loop, so a stream whose OPEN is
+		// delayed or lost cannot block every stream accepted after it.
+		go r.openAcceptedDataChannel(assoc, stream)
 	}
-}
-
-// acceptDataChannel classifies an accepted SCTP stream against the live local
-// DataChannel registry. A startup snapshot is insufficient because applications
-// may create local DataChannels after the SCTP association has started; the
-// first inbound packet on those streams is a DataChannelAck, not a new Open.
-func (r *SCTPTransport) acceptDataChannel(
-	assoc *sctp.Association,
-) (*datachannel.DataChannel, bool, error) {
-	stream, err := assoc.AcceptStream()
-	if err != nil {
-		return nil, false, err
-	}
-
-	stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
-	if r.acceptLocalDataChannelGeneration(stream.StreamIdentifier()) {
-		return nil, true, nil
-	}
-
-	dc, err := datachannel.Server(stream, &datachannel.Config{
-		LoggerFactory: r.api.settingEngine.LoggerFactory,
-	})
-	if err != nil {
-		return nil, false, err
-	}
-
-	return dc, false, nil
 }
 
 type localDataChannelGeneration struct {
@@ -453,6 +377,115 @@ func (r *SCTPTransport) unregisterLocalDataChannelGeneration(
 
 		return
 	}
+}
+
+// openAcceptedDataChannel waits, bounded by the DataChannel open timeout, for
+// the DCEP OPEN on an accepted stream and then announces the DataChannel.
+// Any failure closes just this stream.
+//
+//nolint:cyclop
+func (r *SCTPTransport) openAcceptedDataChannel(assoc *sctp.Association, stream *sctp.Stream) {
+	sid := stream.StreamIdentifier()
+
+	timeout := r.api.settingEngine.sctp.dataChannelOpenTimeout
+	if timeout <= 0 {
+		timeout = defaultSCTPDataChannelOpenTimeout
+	}
+
+	dc, err := func() (*datachannel.DataChannel, error) {
+		if err := stream.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+
+		dc, err := datachannel.Server(stream, &datachannel.Config{
+			LoggerFactory: r.api.settingEngine.LoggerFactory,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return dc, stream.SetReadDeadline(time.Time{})
+	}()
+	if err != nil {
+		r.log.Warnf("Failed to open incoming data channel on stream %d: %v", sid, err)
+		if closeErr := stream.Close(); closeErr != nil {
+			r.log.Debugf("Failed to close stream %d: %v", sid, closeErr)
+		}
+
+		return
+	}
+
+	if !r.isCurrentAssociation(assoc) {
+		_ = dc.Close()
+
+		return
+	}
+
+	var (
+		maxRetransmits    *uint16
+		maxPacketLifeTime *uint16
+	)
+	val := uint16(dc.Config.ReliabilityParameter) //nolint:gosec //G115
+	ordered := true
+
+	switch dc.Config.ChannelType {
+	case datachannel.ChannelTypeReliable:
+		ordered = true
+	case datachannel.ChannelTypeReliableUnordered:
+		ordered = false
+	case datachannel.ChannelTypePartialReliableRexmit:
+		ordered = true
+		maxRetransmits = &val
+	case datachannel.ChannelTypePartialReliableRexmitUnordered:
+		ordered = false
+		maxRetransmits = &val
+	case datachannel.ChannelTypePartialReliableTimed:
+		ordered = true
+		maxPacketLifeTime = &val
+	case datachannel.ChannelTypePartialReliableTimedUnordered:
+		ordered = false
+		maxPacketLifeTime = &val
+	default:
+	}
+
+	rtcDC, err := r.api.newDataChannel(&DataChannelParameters{
+		ID:                &sid,
+		Label:             dc.Config.Label,
+		Protocol:          dc.Config.Protocol,
+		Negotiated:        dc.Config.Negotiated,
+		Ordered:           ordered,
+		MaxPacketLifeTime: maxPacketLifeTime,
+		MaxRetransmits:    maxRetransmits,
+	}, r, r.api.settingEngine.LoggerFactory.NewLogger("ortc"))
+	if err != nil {
+		// This data channel is invalid. Close it and log an error.
+		if err1 := dc.Close(); err1 != nil {
+			r.log.Errorf("Failed to close invalid data channel: %v", err1)
+		}
+		r.log.Errorf("Failed to accept data channel: %v", err)
+		r.onError(err)
+
+		return
+	}
+
+	<-r.onDataChannel(rtcDC)
+	rtcDC.handleOpen(dc, true, dc.Config.Negotiated)
+
+	r.lock.Lock()
+	r.dataChannelsOpened++
+	handler := r.onDataChannelOpenedHandler
+	r.lock.Unlock()
+
+	if handler != nil {
+		handler(rtcDC)
+	}
+}
+
+func (r *SCTPTransport) isCurrentAssociation(assoc *sctp.Association) bool {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.sctpAssociation != nil && r.sctpAssociation == assoc
 }
 
 // OnError sets an event handler which is invoked when the SCTP Association errors.
