@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/pion/datachannel v1.6.2
-	github.com/pion/dtls/v3 v3.1.8
+	github.com/pion/dtls/v3 v3.1.9
 	github.com/pion/ice/v4 v4.4.2
 	github.com/pion/interceptor v0.1.48
 	github.com/pion/logging v0.2.4
@@ -27,6 +27,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
 	github.com/pion/mdns/v2 v2.2.0 // indirect
+	github.com/pion/transport/v5 v5.0.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
