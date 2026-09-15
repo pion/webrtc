@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/ccfb"
 	"github.com/pion/interceptor/pkg/flexfec"
 	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/interceptor/pkg/report"
-	"github.com/pion/interceptor/pkg/rfc8888"
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
@@ -235,11 +235,11 @@ func ConfigureCongestionControlFeedback(mediaEngine *MediaEngine, interceptorReg
 // ConfigureCongestionControlFeedbackWithOptions registers congestion control feedback as
 // defined in RFC 8888 (https://datatracker.ietf.org/doc/rfc8888/) with the provided options.
 func ConfigureCongestionControlFeedbackWithOptions(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry,
-	opts ...rfc8888.Option,
+	opts ...ccfb.Option,
 ) error {
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBACK, Parameter: "ccfb"}, RTPCodecTypeVideo)
 	mediaEngine.RegisterFeedback(RTCPFeedback{Type: TypeRTCPFBACK, Parameter: "ccfb"}, RTPCodecTypeAudio)
-	generator, err := rfc8888.NewSenderInterceptor(opts...)
+	generator, err := ccfb.NewSenderInterceptor(opts...)
 	if err != nil {
 		return err
 	}
