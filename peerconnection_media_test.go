@@ -1202,17 +1202,10 @@ func TestPlanBMediaExchange(t *testing.T) {
 		pcAnswer, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
-		var onTrackWaitGroup sync.WaitGroup
-		onTrackWaitGroup.Add(trackCount)
+		trackReceived, allTracksReceived := eventCountdown(trackCount)
 		pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {
-			onTrackWaitGroup.Done()
+			trackReceived()
 		})
-
-		done := make(chan struct{})
-		go func() {
-			onTrackWaitGroup.Wait()
-			close(done)
-		}()
 
 		_, err = pcAnswer.AddTransceiverFromKind(RTPCodecTypeVideo)
 		assert.NoError(t, err)
@@ -1225,13 +1218,18 @@ func TestPlanBMediaExchange(t *testing.T) {
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 		func() {
+			deadline := time.After(10 * time.Second)
 			for {
 				select {
 				case <-time.After(20 * time.Millisecond):
 					for _, track := range outboundTracks {
 						assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second}))
 					}
-				case <-done:
+				case <-allTracksReceived:
+					return
+				case <-deadline:
+					assert.Fail(t, "timed out waiting for all tracks to be received")
+
 					return
 				}
 			}
@@ -1450,7 +1448,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		assert.NoError(t, signalPair(offerer, answerer))
 
 		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
-		peerConnectionConnected.Wait()
+		<-peerConnectionConnected
 
 		<-seenFiveStreams.Done()
 
@@ -1497,7 +1495,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		assert.NoError(t, signalPair(offerer, answerer))
 
 		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
-		peerConnectionConnected.Wait()
+		<-peerConnectionConnected
 
 		parameters := sender.GetParameters()
 
@@ -1613,7 +1611,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		}))
 
 		peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-		peerConnectionConnected.Wait()
+		<-peerConnectionConnected
 
 		sequenceNumber := uint16(0)
 		sendRTPPacket := func() {
@@ -2026,7 +2024,7 @@ func TestPeerConnection_RIDRepairReaderStartsForPrimaryWrapper(t *testing.T) { /
 
 				return strings.Join(filtered, "\r\n")
 			}))
-			connected.Wait()
+			<-connected
 
 			parameters := sender.GetParameters()
 			var midID, ridID, rsidID uint8
@@ -2909,7 +2907,7 @@ func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cycl
 	}))
 
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	for sequenceNumber := range uint16(rtpPktCount) {
 		pkt := &rtp.Packet{

@@ -552,7 +552,7 @@ func TestDisableCloseByDTLS(t *testing.T) {
 
 	assert.NoError(t, signalPair(offer, answer))
 
-	untilConnectionState(PeerConnectionStateConnected, offer, answer).Wait()
+	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
 	assert.NoError(t, answer.Close())
 
 	time.Sleep(time.Second)
@@ -585,7 +585,7 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	})
 
 	assert.NoError(t, signalPair(offer, answer))
-	untilConnectionState(PeerConnectionStateConnected, offer, answer).Wait()
+	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
 
 	// write should block and return deadline exceeded since the receiver is not reading
 	// and the buffer size is 1500 bytes

@@ -139,24 +139,36 @@ func offerMediaHasDirection(offer SessionDescription, kind RTPCodecType, directi
 	return false
 }
 
-func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) *sync.WaitGroup {
-	var triggered sync.WaitGroup
-	triggered.Add(len(peers))
-
-	for _, p := range peers {
-		var done atomic.Value
-		done.Store(false)
-		hdlr := func(p PeerConnectionState) {
-			if val, ok := done.Load().(bool); ok && (!val && p == state) {
-				done.Store(true)
-				triggered.Done()
-			}
-		}
-
-		p.OnConnectionStateChange(hdlr)
+// eventCountdown returns a function to call once per awaited event and a
+// channel that is closed after count calls. Calls beyond count are ignored.
+func eventCountdown(count int) (func(), <-chan struct{}) {
+	done := make(chan struct{})
+	var remaining atomic.Int64
+	remaining.Store(int64(count))
+	if count <= 0 {
+		close(done)
 	}
 
-	return &triggered
+	return func() {
+		if remaining.Add(-1) == 0 {
+			close(done)
+		}
+	}, done
+}
+
+func untilConnectionState(state PeerConnectionState, peers ...*PeerConnection) <-chan struct{} {
+	peerReached, allReached := eventCountdown(len(peers))
+
+	for _, p := range peers {
+		var once sync.Once
+		p.OnConnectionStateChange(func(s PeerConnectionState) {
+			if s == state {
+				once.Do(peerReached)
+			}
+		})
+	}
+
+	return allReached
 }
 
 func TestNew(t *testing.T) {
@@ -425,13 +437,11 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	// wasCalled is a list of event handlers that were called.
 	wasCalled := []string{}
 	wasCalledMut := &sync.Mutex{}
-	// wg is used to wait for all event handlers to be called.
-	wg := &sync.WaitGroup{}
-	wg.Add(6)
+	handlerCalled, allHandlersCalled := eventCountdown(6)
 
-	// Each sync.Once is used to ensure that we call wg.Done once for each event
-	// handler and don't add multiple entries to wasCalled. The event handlers can
-	// be called more than once in some cases.
+	// Each sync.Once is used to ensure that we count each event handler once and
+	// don't add multiple entries to wasCalled. The event handlers can be called
+	// more than once in some cases.
 	onceOffererOnICEConnectionStateChange := &sync.Once{}
 	onceOffererOnConnectionStateChange := &sync.Once{}
 	onceOffererOnSignalingStateChange := &sync.Once{}
@@ -445,7 +455,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "offerer OnICEConnectionStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 	pcOffer.OnConnectionStateChange(func(PeerConnectionState) {
@@ -453,7 +463,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "offerer OnConnectionStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 	pcOffer.OnSignalingStateChange(func(SignalingState) {
@@ -461,7 +471,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "offerer OnSignalingStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 	pcAnswer.OnICEConnectionStateChange(func(ICEConnectionState) {
@@ -469,7 +479,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "answerer OnICEConnectionStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 	pcAnswer.OnConnectionStateChange(func(PeerConnectionState) {
@@ -477,7 +487,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "answerer OnConnectionStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 	pcAnswer.OnSignalingStateChange(func(SignalingState) {
@@ -485,7 +495,7 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 			wasCalledMut.Lock()
 			defer wasCalledMut.Unlock()
 			wasCalled = append(wasCalled, "answerer OnSignalingStateChange")
-			wg.Done()
+			handlerCalled()
 		})
 	})
 
@@ -494,17 +504,13 @@ func TestPeerConnection_EventHandlers(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	// Wait for all of the event handlers to be triggered.
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		done <- struct{}{}
-	}()
-	timeout := time.After(5 * time.Second)
 	select {
-	case <-done:
-		break
-	case <-timeout:
-		assert.Failf(t, "timed out waitingfor one or more events handlers to be called", "%+v *were* called", wasCalled)
+	case <-allHandlersCalled:
+	case <-time.After(5 * time.Second):
+		wasCalledMut.Lock()
+		called := append([]string(nil), wasCalled...)
+		wasCalledMut.Unlock()
+		assert.Failf(t, "timed out waiting for one or more event handlers to be called", "%+v *were* called", called)
 	}
 
 	closePairNow(t, pcOffer, pcAnswer)
@@ -864,7 +870,7 @@ func TestTransportChain(t *testing.T) {
 
 	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
 	assert.NoError(t, signalPair(offer, answer))
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 
 	assert.NotNil(t, offer.SCTP().Transport().ICETransport())
 
@@ -905,7 +911,7 @@ func TestDTLSClose(t *testing.T) {
 
 	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
 
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 	assert.NoError(t, pcOffer.Close())
 }
 

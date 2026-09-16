@@ -132,8 +132,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	}
 
 	// Wait for PeerConnection to close (may take longer due to cleanup)
-	offerConnectionHasClosed.Wait()
-	answerConnectionHasClosed.Wait()
+	<-offerConnectionHasClosed
+	<-answerConnectionHasClosed
 
 	assert.Contains(
 		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(),
@@ -161,7 +161,7 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 		assert.NoError(t, signalPair(offerPC, answerPC))
 
 		connectionComplete := untilConnectionState(PeerConnectionStateConnected, answerPC)
-		connectionComplete.Wait()
+		<-connectionComplete
 		closePairNow(t, offerPC, answerPC)
 	}
 
