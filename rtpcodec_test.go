@@ -276,3 +276,39 @@ func TestFindFECPayloadType(t *testing.T) {
 		assert.Equal(t, test.ResultPayloadType, findFECPayloadType(test.Haystack))
 	}
 }
+
+func TestFindRTXPayloadType(t *testing.T) {
+	haystack := []RTPCodecParameters{
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
+			PayloadType:        96,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96;rtx-time=3000", nil},
+			PayloadType:        97,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "", nil},
+			PayloadType:        98,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "rtx-time=3000;apt=98", nil},
+			PayloadType:        99,
+		},
+		{
+			RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "apt=100", nil},
+			PayloadType:        101,
+		},
+	}
+
+	// the fmtp line of an RTX codec can carry parameters other than apt,
+	// rtx-time being the one given as an example by RFC 4588.
+	assert.Equal(t, PayloadType(97), findRTXPayloadType(96, haystack))
+	assert.Equal(t, PayloadType(99), findRTXPayloadType(98, haystack))
+
+	// a non-RTX codec that happens to carry apt must not be matched.
+	assert.Equal(t, PayloadType(0), findRTXPayloadType(100, haystack))
+
+	// no RTX codec for this payload type.
+	assert.Equal(t, PayloadType(0), findRTXPayloadType(123, haystack))
+}
