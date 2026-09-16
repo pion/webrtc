@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4/packetio"
+	"github.com/pion/transport/v5/packetio"
 )
 
 const (
@@ -186,7 +186,7 @@ func (m *Mux) dispatch(buf []byte) error {
 	}
 
 	m.lock.Unlock()
-	_, err := endpoint.buffer.Write(buf)
+	_, err := endpoint.buffer.Write(buf, nil)
 
 	// Expected when bytes are received faster than the endpoint can process them (#2152, #2180)
 	if errors.Is(err, packetio.ErrFull) {
@@ -205,7 +205,7 @@ func (m *Mux) handlePendingPackets(endpoint *Endpoint, matchFunc MatchFunc) {
 	pendingPackets := make([][]byte, 0, len(m.pendingPackets))
 	for _, buf := range m.pendingPackets {
 		if matchFunc(buf) {
-			if _, err := endpoint.buffer.Write(buf); err != nil {
+			if _, err := endpoint.buffer.Write(buf, nil); err != nil {
 				m.log.Warnf("Warning: mux: error writing packet to endpoint from pending queue: %s", err)
 			}
 		} else {

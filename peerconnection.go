@@ -1372,6 +1372,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		pc.startTransports(
 			iceRole,
 			dtlsRoleFromSDP(desc.parsed),
+			remoteIsLite,
 			iceDetails.Ufrag,
 			iceDetails.Password,
 			fingerprint,
@@ -1417,7 +1418,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		}
 		go func(track *TrackRemote) {
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-			n, _, err := track.peek(b)
+			n, err := track.peek(b)
 			if err != nil {
 				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
 
@@ -1945,7 +1946,16 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, readStream, interceptor, rtcpReadStream, rtcpInterceptor)
+				return receiver.receiveForRtx(
+					SSRC(0),
+					rsid,
+					streamInfo,
+					readStream,
+					interceptor,
+					result.startRTPReaderImmediately,
+					rtcpReadStream,
+					rtcpInterceptor,
+				)
 			}
 
 			track, err := receiver.receiveForRid(
@@ -1954,6 +1964,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 				streamInfo,
 				readStream,
 				interceptor,
+				result.startRTPReaderImmediately,
 				rtcpReadStream,
 				rtcpInterceptor,
 				peekedPackets,
@@ -2786,6 +2797,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 func (pc *PeerConnection) startTransports(
 	iceRole ICERole,
 	dtlsRole DTLSRole,
+	remoteIsLite bool,
 	remoteUfrag, remotePwd, fingerprint, fingerprintHash string,
 ) {
 	// Start the ice transport
@@ -2794,7 +2806,7 @@ func (pc *PeerConnection) startTransports(
 		ICEParameters{
 			UsernameFragment: remoteUfrag,
 			Password:         remotePwd,
-			ICELite:          false,
+			ICELite:          remoteIsLite,
 		},
 		&iceRole,
 	)

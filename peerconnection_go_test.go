@@ -29,8 +29,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v4/test"
-	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/transport/v5/test"
+	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
@@ -1797,14 +1797,13 @@ a=fmtp:49 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST
 		codecsOfTr2 := pc.GetTransceivers()[1].getCodecs()
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[0], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 94, codecsOfTr2[0].PayloadType)
+		assert.EqualValues(t, 49, codecsOfTr2[0].PayloadType)
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[1], codecs)
 		assert.Equal(t, codecMatchExact, matchType)
-		assert.EqualValues(t, 98, codecsOfTr2[1].PayloadType)
-		// as H.265 (49) is a partial match, it gets pushed to the end
+		assert.EqualValues(t, 94, codecsOfTr2[1].PayloadType)
 		_, matchType = codecParametersFuzzySearch(codecsOfTr2[2], codecs)
-		assert.Equal(t, codecMatchPartial, matchType)
-		assert.EqualValues(t, 49, codecsOfTr2[2].PayloadType)
+		assert.Equal(t, codecMatchExact, matchType)
+		assert.EqualValues(t, 98, codecsOfTr2[2].PayloadType)
 
 		assert.NoError(t, pc.Close())
 	})

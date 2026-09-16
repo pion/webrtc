@@ -246,6 +246,27 @@ func TestIVFWriter_EmptyPayload(t *testing.T) {
 	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{}}))
 }
 
+func TestIVFWriter_VP8DescriptorOnlyPayload(t *testing.T) {
+	// a VP8 payload can legally consist of the descriptor alone, which leaves
+	// the depacketized payload empty.
+	for _, payload := range [][]byte{
+		{0x10},
+		{0x90, 0x00},
+		{0x90, 0x80, 0x05},
+	} {
+		buffer := &bytes.Buffer{}
+
+		writer, err := NewWith(buffer)
+		assert.NoError(t, err)
+
+		assert.NoError(t, writer.WriteRTP(&rtp.Packet{
+			Header:  rtp.Header{Marker: true},
+			Payload: payload,
+		}))
+		assert.Equal(t, 32, buffer.Len()) // only the IVF file header
+	}
+}
+
 func TestIVFWriter_Errors(t *testing.T) {
 	// Creating a Writer with AV1 and VP8
 	_, err := NewWith(&bytes.Buffer{}, WithCodec(mimeTypeAV1), WithCodec(mimeTypeAV1))
