@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -118,9 +119,23 @@ func (r *SCTPTransport) GetCapabilities() SCTPCapabilities {
 // Start the SCTPTransport. Since both local and remote parties must mutually
 // create an SCTPTransport, SCTP SO (Simultaneous Open) is used to establish
 // a connection over SCTP.
+func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
+	return r.StartContext(context.Background(), capabilities)
+}
+
+// StartContext starts the SCTP transport using the remote capabilities.
+// The context controls SCTP association establishment only. Canceling it after
+// establishment does not close the association. Cancellation returns the context
+// error. If an association is being established, its underlying DTLS connection is
+// closed in the background.
+// An already-canceled context leaves the transport and DTLS connection unchanged.
 //
 //nolint:cyclop
-func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
+func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapabilities) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if r.isStarted {
 		return nil
 	}
@@ -143,7 +158,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 			sctp.WithSNAP(r.localSctpInit, remoteSctpInit),
 		)
 	}
-	sctpAssociation, err := sctp.ClientWithOptions(opts...)
+	sctpAssociation, err := sctp.ClientContext(ctx, opts...)
 	if err != nil {
 		return err
 	}
