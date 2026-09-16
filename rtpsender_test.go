@@ -172,7 +172,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 
 	assert.NoError(t, signalPair(sender, receiver))
 
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 
 	assert.NoError(t, rtpSender.SetReadDeadline(time.Now().Add(1*time.Second)))
 	_, _, err = rtpSender.ReadRTCP()

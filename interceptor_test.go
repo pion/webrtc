@@ -360,7 +360,7 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 	assert.NoError(t, signalPair(offerer, answerer))
 
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	<-probeReceiverCreated
 	closePairNow(t, offerer, answerer)

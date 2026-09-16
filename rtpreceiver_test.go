@@ -66,7 +66,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	assert.NoError(t, signalPair(sender, receiver))
 
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
 
 	<-seenPacket.Done()

@@ -1160,21 +1160,13 @@ func TestStatsUnmarshal(t *testing.T) {
 	}
 }
 
-func waitWithTimeout(t *testing.T, wg *sync.WaitGroup) {
+func waitWithTimeout(t *testing.T, event string, done <-chan struct{}) {
 	t.Helper()
 
-	// Wait for all of the event handlers to be triggered.
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		done <- struct{}{}
-	}()
-	timeout := time.After(5 * time.Second)
 	select {
 	case <-done:
-		break
-	case <-timeout:
-		assert.Fail(t, "timed out waiting for waitgroup")
+	case <-time.After(5 * time.Second):
+		require.FailNowf(t, "timed out", "waiting for %s", event)
 	}
 }
 
@@ -1389,6 +1381,7 @@ func TestStatsConvertState(t *testing.T) {
 func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves multiple branches and waits
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
 
 	track1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1")
 	require.NoError(t, err)
@@ -1418,16 +1411,15 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 		assert.NoError(t, offerDC.Send(msg))
 	})
 
-	dcWait := sync.WaitGroup{}
-	dcWait.Add(1)
+	messageReceived, answerDCMessageReceived := eventCountdown(1)
 
-	answerDCChan := make(chan *DataChannel)
+	answerDCChan := make(chan *DataChannel, 1)
 	answerPC.OnDataChannel(func(d *DataChannel) {
 		d.OnOpen(func() {
 			answerDCChan <- d
 		})
 		d.OnMessage(func(DataChannelMessage) {
-			dcWait.Done()
+			messageReceived()
 		})
 	})
 
@@ -1457,9 +1449,14 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	})
 
 	assert.NoError(t, signalPairForStats(offerPC, answerPC))
-	waitWithTimeout(t, &dcWait)
+	waitWithTimeout(t, "the answer data channel message", answerDCMessageReceived)
 
-	answerDC := <-answerDCChan
+	var answerDC *DataChannel
+	select {
+	case answerDC = <-answerDCChan:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "timed out", "waiting for the answer data channel to open")
+	}
 
 	reportPCOffer := offerPC.GetStats()
 	reportPCAnswer := answerPC.GetStats()
@@ -1550,13 +1547,10 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	}
 
 	// Close answer DC now
-	dcWait = sync.WaitGroup{}
-	dcWait.Add(1)
-	offerDC.OnClose(func() {
-		dcWait.Done()
-	})
+	dcClosed, offerDCClosed := eventCountdown(1)
+	offerDC.OnClose(dcClosed)
 	assert.NoError(t, answerDC.Close())
-	waitWithTimeout(t, &dcWait)
+	waitWithTimeout(t, "the offer data channel to close", offerDCClosed)
 	time.Sleep(10 * time.Millisecond)
 
 	reportPCOffer = offerPC.GetStats()
@@ -1593,8 +1587,6 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	for i := range certificates {
 		assert.NotEmpty(t, getCertificateStats(t, reportPCOffer, &certificates[i]))
 	}
-
-	closePairNow(t, offerPC, answerPC)
 }
 
 func TestPeerConnection_GetStats_Closed(t *testing.T) {

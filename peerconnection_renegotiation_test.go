@@ -1202,7 +1202,7 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	assert.Equal(t, len(pcOffer.GetTransceivers()), 1)
 	assert.Equal(t, pcOffer.GetTransceivers()[0].getCurrentDirection(), RTPTransceiverDirectionSendonly)
