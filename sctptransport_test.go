@@ -8,12 +8,14 @@ package webrtc
 import (
 	"bufio"
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/pion/dtls/v3"
 	"github.com/pion/sctp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,6 +63,142 @@ func TestGenerateDataChannelID(t *testing.T) {
 			"expected new id to be added to the map",
 		)
 	}
+}
+
+func TestSCTPTransportStartContextCanceled(t *testing.T) {
+	transport := NewAPI().NewSCTPTransport(nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	require.ErrorIs(t, transport.StartContext(ctx, SCTPCapabilities{}), context.Canceled)
+	assert.False(t, transport.isStarted)
+	assert.Equal(t, SCTPTransportStateConnecting, transport.State())
+	assert.Nil(t, transport.association())
+}
+
+// newSCTPTestDTLSPair connects ICE and DTLS while leaving SCTP unstarted.
+func newSCTPTestDTLSPair(t *testing.T) (*testORTCStack, *testORTCStack) {
+	t.Helper()
+
+	stackA, stackB, err := newORTCPair()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, stackA.close())
+		assert.NoError(t, stackB.close())
+	})
+	signalA, err := stackA.getSignal()
+	require.NoError(t, err)
+	signalB, err := stackB.getSignal()
+	require.NoError(t, err)
+	require.NoError(t, stackA.ice.SetRemoteCandidates(signalB.ICECandidates))
+	require.NoError(t, stackB.ice.SetRemoteCandidates(signalA.ICECandidates))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	started := make(chan error, 1)
+	go func() {
+		role := ICERoleControlled
+		if startErr := stackB.ice.StartContext(ctx, nil, signalA.ICEParameters, &role); startErr != nil {
+			started <- startErr
+
+			return
+		}
+		started <- stackB.dtls.StartContext(ctx, signalA.DTLSParameters)
+	}()
+	role := ICERoleControlling
+	require.NoError(t, stackA.ice.StartContext(ctx, nil, signalB.ICEParameters, &role))
+	require.NoError(t, stackA.dtls.StartContext(ctx, signalB.DTLSParameters))
+	select {
+	case err = <-started:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		require.FailNow(t, "ICE and DTLS setup did not complete")
+	}
+
+	return stackA, stackB
+}
+
+func TestSCTPTransportStartContextInterrupted(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		name := "cancel"
+		if deadline {
+			name = "deadline"
+		}
+		t.Run(name, func(t *testing.T) {
+			stackA, stackB := newSCTPTestDTLSPair(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			wantErr := context.Canceled
+			if deadline {
+				cancel()
+				ctx, cancel = context.WithTimeout(context.Background(), 250*time.Millisecond)
+				wantErr = context.DeadlineExceeded
+			}
+			defer cancel()
+
+			started := make(chan error, 1)
+			go func() {
+				started <- stackA.sctp.StartContext(ctx, SCTPCapabilities{})
+			}()
+
+			// Receiving INIT proves that cancellation interrupts an active handshake.
+			require.NoError(t, stackB.dtls.conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+			packet := make([]byte, 1500)
+			_, err := stackB.dtls.conn.Read(packet)
+			require.NoError(t, err)
+			if !deadline {
+				cancel()
+			}
+
+			select {
+			case err = <-started:
+				require.ErrorIs(t, err, wantErr)
+			case <-time.After(5 * time.Second):
+				require.FailNow(t, "SCTP handshake did not stop when its context ended")
+			}
+			// Cancellation closes DTLS before any test cleanup runs.
+			require.Eventually(t, func() bool {
+				_, writeErr := stackA.dtls.conn.Write(nil)
+
+				return errors.Is(writeErr, dtls.ErrConnClosed)
+			}, 5*time.Second, time.Millisecond)
+			assert.Nil(t, stackA.sctp.association())
+			assert.NotEqual(t, SCTPTransportStateConnected, stackA.sctp.State())
+		})
+	}
+}
+
+func TestSCTPTransportStartContextCancelAfterConnected(t *testing.T) {
+	stackA, stackB := newSCTPTestDTLSPair(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	started := make(chan error, 1)
+	go func() {
+		started <- stackB.sctp.Start(SCTPCapabilities{})
+	}()
+	require.NoError(t, stackA.sctp.StartContext(ctx, SCTPCapabilities{}))
+	select {
+	case err := <-started:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		require.FailNow(t, "SCTP setup did not complete")
+	}
+	cancel()
+
+	// Streams opened before sending are not consumed by the data channel accept loop.
+	sender, err := stackA.sctp.association().OpenStream(0, sctp.PayloadTypeWebRTCBinary)
+	require.NoError(t, err)
+	receiver, err := stackB.sctp.association().OpenStream(0, sctp.PayloadTypeWebRTCBinary)
+	require.NoError(t, err)
+	require.NoError(t, receiver.SetReadDeadline(time.Now().Add(5*time.Second)))
+	message := []byte("still connected")
+	_, err = sender.Write(message)
+	require.NoError(t, err)
+	buf := make([]byte, len(message))
+	n, err := receiver.Read(buf)
+	require.NoError(t, err)
+	assert.Equal(t, message, buf[:n])
+	assert.Equal(t, SCTPTransportStateConnected, stackA.sctp.State())
 }
 
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
