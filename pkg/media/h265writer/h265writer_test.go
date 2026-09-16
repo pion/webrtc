@@ -35,6 +35,20 @@ func TestH265Writer_WriteRTP(t *testing.T) {
 	assert.Equal(t, expectedContent, buf.Bytes(), "Buffer should contain start code followed by VPS payload")
 }
 
+func TestH265Writer_WriteRTP_FragmentedKeyFrame(t *testing.T) {
+	buf := &bytes.Buffer{}
+	writer := NewWith(buf)
+	defer func() {
+		assert.NoError(t, writer.Close())
+	}()
+
+	// an IDR_W_RADL NAL unit split over two FUs, with no parameter set sent in-band
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{0x62, 0x01, 0x93, 0xAF, 0x06}}))
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{0x62, 0x01, 0x53, 0x07, 0x08}}))
+
+	assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x01, 0x26, 0x01, 0xAF, 0x06, 0x07, 0x08}, buf.Bytes())
+}
+
 func TestIsKeyFrame(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -82,13 +96,28 @@ func TestIsKeyFrame(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "Fragmentation Unit with VPS",
-			data:     []byte{0x62, 0x01, 0x40}, // FU with VPS NAL type
+			name:     "Fragmentation Unit start with IDR_W_RADL",
+			data:     []byte{0x62, 0x01, 0x93}, // FU header: S=1, E=0, FuType=19
 			expected: true,
 		},
 		{
-			name:     "Fragmentation Unit with TRAIL_R",
-			data:     []byte{0x62, 0x01, 0x02}, // FU with TRAIL_R NAL type
+			name:     "Fragmentation Unit start with IDR_N_LP",
+			data:     []byte{0x62, 0x01, 0x94}, // FU header: S=1, E=0, FuType=20
+			expected: true,
+		},
+		{
+			name:     "Fragmentation Unit start with TRAIL_R",
+			data:     []byte{0x62, 0x01, 0x81}, // FU header: S=1, E=0, FuType=1
+			expected: false,
+		},
+		{
+			name:     "Fragmentation Unit end with TRAIL_N",
+			data:     []byte{0x62, 0x01, 0x40}, // FU header: S=0, E=1, FuType=0
+			expected: false,
+		},
+		{
+			name:     "Fragmentation Unit start with PREFIX_SEI",
+			data:     []byte{0x62, 0x01, 0xA7}, // FU header: S=1, E=0, FuType=39
 			expected: false,
 		},
 	}
