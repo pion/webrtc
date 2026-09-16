@@ -475,8 +475,9 @@ func (d *DataChannel) SendText(s string) error {
 	return err
 }
 
-// SetWriteDeadline sets the deadline for future Send and SendText calls.
-// A zero time value disables the deadline. Deadlines are only enforced when
+// SetWriteDeadline sets the deadline for pending and future Send and SendText calls.
+// It may be called before the data channel opens. A zero time value disables the
+// deadline. Deadlines are only enforced when
 // SettingEngine.EnableDataChannelBlockWrite(true) is configured.
 func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
 	d.mu.Lock()

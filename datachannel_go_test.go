@@ -90,74 +90,123 @@ func TestDataChannel_OnCloseImmediateAfterClosed(t *testing.T) {
 	assert.Equal(t, int32(1), called.Load())
 }
 
-func TestDataChannelSetWriteDeadline(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	s := SettingEngine{}
-	s.EnableDataChannelBlockWrite(true)
-	s.SetSCTPMaxReceiveBufferSize(1500)
-
-	api := NewAPI(WithSettingEngine(s))
-	offerPC, answerPC, err := api.newPair(Configuration{})
-	assert.NoError(t, err)
-	defer closePairNow(t, offerPC, answerPC)
-
-	releaseMessages := make(chan struct{})
-	defer close(releaseMessages)
-
-	answerPC.OnDataChannel(func(answerDC *DataChannel) {
-		if answerDC.Label() != expectedLabel {
-			return
+func TestDataChannelSetWriteDeadline(t *testing.T) { //nolint:cyclop
+	for _, isString := range []bool{false, true} {
+		name := "Send"
+		if isString {
+			name = "SendText"
 		}
+		t.Run(name, func(t *testing.T) {
+			lim := test.TimeOut(30 * time.Second)
+			defer lim.Stop()
 
-		answerDC.OnMessage(func(DataChannelMessage) {
-			<-releaseMessages
-		})
-	})
+			report := test.CheckRoutines(t)
+			defer report()
 
-	dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
-	assert.NoError(t, err)
+			settings := SettingEngine{}
+			settings.EnableDataChannelBlockWrite(true)
+			settings.SetSCTPMaxReceiveBufferSize(1500)
 
-	assert.NoError(t, dc.SetWriteDeadline(time.Now().Add(500*time.Millisecond)))
+			api := NewAPI(WithSettingEngine(settings))
+			offerPC, answerPC, err := api.newPair(Configuration{})
+			require.NoError(t, err)
+			defer closePairNow(t, offerPC, answerPC)
 
-	opened := make(chan struct{})
-	dc.OnOpen(func() {
-		close(opened)
-	})
+			releaseMessages := make(chan struct{})
+			release := sync.OnceFunc(func() { close(releaseMessages) })
+			defer release()
+			received := make(chan DataChannelMessage, 1)
+			answerPC.OnDataChannel(func(answerDC *DataChannel) {
+				if answerDC.Label() != expectedLabel {
+					return
+				}
 
-	assert.NoError(t, signalPair(offerPC, answerPC))
+				answerDC.OnMessage(func(message DataChannelMessage) {
+					<-releaseMessages
+					if string(message.Data) == "resumed" {
+						received <- message
+					}
+				})
+			})
 
-	select {
-	case <-opened:
-	case <-time.After(time.Second * 10):
-		assert.FailNow(t, "data channel did not open")
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		buf := make([]byte, 1000)
-		for {
-			sendErr := dc.Send(buf)
-			if sendErr != nil {
-				errCh <- sendErr
-
-				return
+			dc, err := offerPC.CreateDataChannel(expectedLabel, nil)
+			require.NoError(t, err)
+			send := dc.Send
+			if isString {
+				send = func(payload []byte) error { return dc.SendText(string(payload)) }
 			}
-		}
-	}()
 
-	select {
-	case err = <-errCh:
-		assert.ErrorIs(t, err, context.DeadlineExceeded)
-	case <-time.After(time.Second * 10):
-		assert.FailNow(t, "data channel send did not observe write deadline")
+			// An expired deadline set before opening must reach the SCTP stream.
+			require.NoError(t, dc.SetWriteDeadline(time.Now().Add(-time.Second)))
+			opened := make(chan struct{})
+			dc.OnOpen(func() { close(opened) })
+			require.NoError(t, signalPair(offerPC, answerPC))
+			select {
+			case <-opened:
+			case <-time.After(10 * time.Second):
+				require.FailNow(t, "data channel did not open")
+			}
+
+			// sendUntilError keeps sending until backpressure and the deadline produce an error.
+			sendUntilError := func() <-chan error {
+				result := make(chan error, 1)
+				go func() {
+					payload := make([]byte, 1000)
+					for {
+						if sendErr := send(payload); sendErr != nil {
+							result <- sendErr
+
+							return
+						}
+					}
+				}()
+
+				return result
+			}
+			select {
+			case err = <-sendUntilError():
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+			case <-time.After(10 * time.Second):
+				require.FailNow(t, "send did not observe the pre-open deadline")
+			}
+
+			// Clear the deadline and fill the receive window before interrupting a pending send.
+			require.NoError(t, dc.SetWriteDeadline(time.Time{}))
+			pending := sendUntilError()
+			require.Eventually(t, func() bool { return dc.BufferedAmount() >= 3000 },
+				10*time.Second, time.Millisecond)
+			select {
+			case err = <-pending:
+				require.FailNow(t, "send returned before setting the new deadline", "%v", err)
+			default:
+			}
+			require.NoError(t, dc.SetWriteDeadline(time.Now().Add(-time.Second)))
+			select {
+			case err = <-pending:
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+			case <-time.After(10 * time.Second):
+				require.FailNow(t, "pending send did not observe the new deadline")
+			}
+
+			// Clearing an expired deadline must allow messages to be delivered again.
+			require.NoError(t, dc.SetWriteDeadline(time.Time{}))
+			release()
+			resumed := make(chan error, 1)
+			go func() { resumed <- send([]byte("resumed")) }()
+			select {
+			case err = <-resumed:
+				require.NoError(t, err)
+			case <-time.After(10 * time.Second):
+				require.FailNow(t, "send did not resume after clearing the deadline")
+			}
+			select {
+			case message := <-received:
+				assert.Equal(t, isString, message.IsString)
+			case <-time.After(10 * time.Second):
+				require.FailNow(t, "message was not delivered after clearing the deadline")
+			}
+		})
 	}
-
-	assert.NoError(t, dc.SetWriteDeadline(time.Time{}))
 }
 
 func TestDataChannel_MessagesAreOrdered(t *testing.T) {
