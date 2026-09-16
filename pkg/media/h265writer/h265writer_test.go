@@ -49,6 +49,21 @@ func TestH265Writer_WriteRTP_FragmentedKeyFrame(t *testing.T) {
 	assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x01, 0x26, 0x01, 0xAF, 0x06, 0x07, 0x08}, buf.Bytes())
 }
 
+func TestH265Writer_WriteRTP_FragmentedKeyFrameWithoutStart(t *testing.T) {
+	buf := &bytes.Buffer{}
+	writer := NewWith(buf)
+	defer func() {
+		assert.NoError(t, writer.Close())
+	}()
+
+	// the start fragment of an IDR_W_RADL was lost, only its end fragment arrives
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{0x62, 0x01, 0x53, 0x07, 0x08}}))
+	// followed by a TRAIL_R NAL unit, which must not be written before a key frame
+	assert.NoError(t, writer.WriteRTP(&rtp.Packet{Payload: []byte{0x02, 0x01, 0xAF, 0x06}}))
+
+	assert.Empty(t, buf.Bytes())
+}
+
 func TestIsKeyFrame(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -104,6 +119,16 @@ func TestIsKeyFrame(t *testing.T) {
 			name:     "Fragmentation Unit start with IDR_N_LP",
 			data:     []byte{0x62, 0x01, 0x94}, // FU header: S=1, E=0, FuType=20
 			expected: true,
+		},
+		{
+			name:     "Fragmentation Unit middle with IDR_W_RADL",
+			data:     []byte{0x62, 0x01, 0x13}, // FU header: S=0, E=0, FuType=19
+			expected: false,
+		},
+		{
+			name:     "Fragmentation Unit end with IDR_W_RADL",
+			data:     []byte{0x62, 0x01, 0x53}, // FU header: S=0, E=1, FuType=19
+			expected: false,
 		},
 		{
 			name:     "Fragmentation Unit start with TRAIL_R",
