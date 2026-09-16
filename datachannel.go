@@ -481,11 +481,11 @@ func (d *DataChannel) SendText(s string) error {
 // SettingEngine.EnableDataChannelBlockWrite(true) is configured.
 func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
 	d.mu.Lock()
-	d.writeDeadline = deadline
-	dataChannel := d.dataChannel
-	d.mu.Unlock()
+	defer d.mu.Unlock()
 
-	if dataChannel == nil {
+	d.writeDeadline = deadline
+
+	if d.dataChannel == nil {
 		if d.ReadyState() == DataChannelStateClosed {
 			return io.ErrClosedPipe
 		}
@@ -493,7 +493,7 @@ func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
 		return nil
 	}
 
-	return dataChannel.SetWriteDeadline(deadline)
+	return d.dataChannel.SetWriteDeadline(deadline)
 }
 
 func (d *DataChannel) ensureOpen() error {
