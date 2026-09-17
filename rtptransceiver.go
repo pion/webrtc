@@ -192,7 +192,7 @@ func matchCodecWithPayloadIdentity(
 		}
 		_, identityMatch := codecParametersFuzzySearch(remoteCodec, []RTPCodecParameters{codec})
 		if identityMatch == codecMatchExact {
-			return codec, matchType
+			return codec, codecMatchExact
 		}
 
 		break
