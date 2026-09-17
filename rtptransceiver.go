@@ -13,7 +13,6 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
-	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
@@ -99,6 +98,10 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 	if err != nil {
 		return
 	}
+	offeredPayloads := make(map[PayloadType]bool, len(remoteCodecs))
+	for _, codec := range remoteCodecs {
+		offeredPayloads[codec.PayloadType] = true
+	}
 
 	// make a copy as this slice is modified
 	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
@@ -115,9 +118,10 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 				continue
 			}
 
-			matchCodec, matchType := codecParametersFuzzySearch(
+			matchCodec, matchType := matchCodecWithPayloadIdentity(
 				remoteCodec,
 				leftCodecs,
+				offeredPayloads,
 			)
 			if matchType == matchFilter {
 				payloadMapping[remoteCodec.PayloadType] = matchCodec.PayloadType
@@ -128,23 +132,9 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 				// removed matched codec for next round
 				remoteCodecs = append(remoteCodecs[:remoteCodecIdx], remoteCodecs[remoteCodecIdx+1:]...)
 
-				needleFmtp := fmtp.Parse(
-					matchCodec.RTPCodecCapability.MimeType,
-					matchCodec.RTPCodecCapability.ClockRate,
-					matchCodec.RTPCodecCapability.Channels,
-					matchCodec.RTPCodecCapability.SDPFmtpLine,
-				)
-
-				for leftCodecIdx := len(leftCodecs) - 1; leftCodecIdx >= 0; leftCodecIdx-- {
-					leftCodec := leftCodecs[leftCodecIdx]
-					leftCodecFmtp := fmtp.Parse(
-						leftCodec.RTPCodecCapability.MimeType,
-						leftCodec.RTPCodecCapability.ClockRate,
-						leftCodec.RTPCodecCapability.Channels,
-						leftCodec.RTPCodecCapability.SDPFmtpLine,
-					)
-
-					if needleFmtp.Match(leftCodecFmtp) {
+				// Remove the codec we selected, not a different equivalent format.
+				for leftCodecIdx, codec := range leftCodecs {
+					if codec.PayloadType == matchCodec.PayloadType {
 						leftCodecs = append(leftCodecs[:leftCodecIdx], leftCodecs[leftCodecIdx+1:]...)
 
 						break
@@ -180,6 +170,35 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 		}
 	}
 	_ = t.SetCodecPreferences(filteredCodecs)
+}
+
+// When equivalent payloads are offered together (for example H265 levels),
+// preserve their identities. If the canonical payload is absent from this media
+// section, retain the existing remapping to codecs negotiated by earlier sections.
+func matchCodecWithPayloadIdentity(
+	remoteCodec RTPCodecParameters,
+	localCodecs []RTPCodecParameters,
+	offeredPayloads map[PayloadType]bool,
+) (RTPCodecParameters, codecMatchType) {
+	matchCodec, matchType := codecParametersFuzzySearch(remoteCodec, localCodecs)
+	if matchType != codecMatchExact || matchCodec.PayloadType == remoteCodec.PayloadType ||
+		!offeredPayloads[matchCodec.PayloadType] {
+		return matchCodec, matchType
+	}
+
+	for _, codec := range localCodecs {
+		if codec.PayloadType != remoteCodec.PayloadType {
+			continue
+		}
+		_, identityMatch := codecParametersFuzzySearch(remoteCodec, []RTPCodecParameters{codec})
+		if identityMatch == codecMatchExact {
+			return codec, codecMatchExact
+		}
+
+		break
+	}
+
+	return matchCodec, matchType
 }
 
 // Sender returns the RTPTransceiver's RTPSender if it has one.
