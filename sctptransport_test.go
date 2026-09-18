@@ -131,6 +131,13 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			wantExtra: 1,
 		},
 		{
+			name: "HandshakeRTOMax",
+			configure: func(se *SettingEngine) {
+				se.sctp.handshakeRTOMax = 150 * time.Millisecond
+			},
+			wantExtra: 1,
+		},
+		{
 			name: "MinCwnd",
 			configure: func(se *SettingEngine) {
 				se.sctp.minCwnd = 11
@@ -159,11 +166,12 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 				se.sctp.rtoMax = time.Second
+				se.sctp.handshakeRTOMax = 150 * time.Millisecond
 				se.sctp.minCwnd = 11
 				se.sctp.fastRtxWnd = 22
 				se.sctp.cwndCAStep = 33
 			},
-			wantExtra: 7,
+			wantExtra: 8,
 		},
 	}
 
