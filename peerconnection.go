@@ -1408,13 +1408,13 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 
 	for _, track := range receiver.Tracks() {
 		if track.SSRC() == 0 || track.RID() != "" {
-			return
+			continue
 		}
 
 		if pc.api.settingEngine.fireOnTrackBeforeFirstRTP {
 			pc.onTrack(track, receiver)
 
-			return
+			continue
 		}
 		go func(track *TrackRemote) {
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
