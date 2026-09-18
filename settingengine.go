@@ -85,14 +85,15 @@ type SettingEngine struct {
 		supportedProtocols            []string
 	}
 	sctp struct {
-		maxReceiveBufferSize uint32
-		enableZeroChecksum   bool
-		rtoMax               time.Duration
-		maxMessageSize       uint32
-		minCwnd              uint32
-		fastRtxWnd           uint32
-		cwndCAStep           uint32
-		enableSnap           bool
+		maxReceiveBufferSize   uint32
+		enableZeroChecksum     bool
+		rtoMax                 time.Duration
+		maxMessageSize         uint32
+		minCwnd                uint32
+		fastRtxWnd             uint32
+		cwndCAStep             uint32
+		enableSnap             bool
+		dataChannelOpenTimeout time.Duration
 	}
 	sdpMediaLevelFingerprints                 bool
 	answeringDTLSRole                         DTLSRole
@@ -673,6 +674,13 @@ func (e *SettingEngine) SetDTLSSupportedProtocols(protocols ...string) {
 // Leave this 0 for the default timeout.
 func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 	e.sctp.rtoMax = rtoMax
+}
+
+// SetSCTPDataChannelOpenTimeout sets how long an incoming SCTP stream may wait
+// for its DCEP DATA_CHANNEL_OPEN message before the stream is closed.
+// Leave this 0 for the default timeout.
+func (e *SettingEngine) SetSCTPDataChannelOpenTimeout(timeout time.Duration) {
+	e.sctp.dataChannelOpenTimeout = timeout
 }
 
 // SetSCTPMinCwnd sets the minimum congestion window size. The congestion window
