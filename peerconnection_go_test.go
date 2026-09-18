@@ -29,6 +29,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
+	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/turn/v5"
@@ -52,6 +54,66 @@ func (api *API) newPair(cfg Configuration) (pcOffer *PeerConnection, pcAnswer *P
 	}
 
 	return pca, pcb, nil
+}
+
+func waitForSRTPReady(t *testing.T, pc *PeerConnection) {
+	t.Helper()
+
+	timer := time.NewTimer(20 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case <-pc.dtlsTransport.srtpReady:
+		return
+	case <-timer.C:
+		assert.FailNow(t, "timed out waiting for SRTP startup")
+	}
+}
+
+func hasCryptexForMedia(t *testing.T, sdpStr string, mediaKind string) bool {
+	t.Helper()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(sdpStr)))
+
+	for _, md := range parsed.MediaDescriptions {
+		if md.MediaName.Media != mediaKind {
+			continue
+		}
+
+		return isCryptexSet(md)
+	}
+
+	assert.FailNowf(t, "media kind %s not found in SDP", mediaKind)
+
+	return false
+}
+
+func hasCryptexForSession(t *testing.T, sdpStr string) bool {
+	t.Helper()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(sdpStr)))
+
+	if _, hasCryptex := parsed.Attribute(sdp.AttrKeyCryptex); hasCryptex {
+		return true
+	}
+
+	return false
+}
+
+func dtlsCryptexMode(pc *PeerConnection) srtp.CryptexMode {
+	return pc.dtlsTransport.getLocalCryptexMode()
+}
+
+func findTransceiverByKind(pc *PeerConnection, kind RTPCodecType) *RTPTransceiver {
+	for _, tr := range pc.GetTransceivers() {
+		if tr != nil && tr.Kind() == kind {
+			return tr
+		}
+	}
+
+	return nil
 }
 
 func TestNew_Go(t *testing.T) {
@@ -285,6 +347,16 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 			},
 			wantErr: &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials},
 		},
+		{
+			name: "update RTPHeaderEncryptionPolicy",
+			init: func() (*PeerConnection, error) {
+				return NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy},
+		},
 	} {
 		pc, err := test.init()
 		assert.NoErrorf(t, err, "SetConfiguration %q: init failed", test.name)
@@ -304,6 +376,7 @@ func TestPeerConnection_GetConfiguration_Go(t *testing.T) {
 
 	cfg := pc.GetConfiguration()
 	assert.Equal(t, false, cfg.AlwaysNegotiateDataChannels)
+	assert.Equal(t, RTPHeaderEncryptionPolicyNegotiate, cfg.RTPHeaderEncryptionPolicy)
 
 	assert.NoError(t, pc.Close())
 }
@@ -2803,4 +2876,1518 @@ func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
 	}
 
 	closePairNow(t, offerPC, answerPC)
+}
+
+func TestCryptexNegotiatedInSDP(t *testing.T) {
+	var desc sdp.SessionDescription
+
+	// Empty SDP
+	desc = sdp.SessionDescription{}
+	negotiatedForAnyMedia, negotiatedForAllMedia := cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+
+	// Cryptex in session-level attribute
+	desc = sdp.SessionDescription{}
+	desc.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Cryptex in media-level attribute in all medias
+	desc = sdp.SessionDescription{}
+	media := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media2.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Cryptex in media-level attribute in some medias
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+
+	// Ignore application section
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "application",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Application only (no RTP m-lines)
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "application",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// Ignore medias with port 0
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	media.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(media)
+	media2 = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+			Port:  sdp.RangedPort{Value: 0},
+		},
+	}
+	desc.WithMedia(media2)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia)
+	assert.True(t, negotiatedForAllMedia)
+
+	// No cryptex anywhere
+	desc = sdp.SessionDescription{}
+	media = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "audio",
+			Port:  sdp.RangedPort{Value: 9},
+		},
+	}
+	desc.WithMedia(media)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia)
+	assert.False(t, negotiatedForAllMedia)
+
+	// Bundle-only zero-port RTP section is treated as active media, not rejected
+	// (RFC 9143 Section 6/7.2), even though no Cryptex is declared anywhere.
+	desc = sdp.SessionDescription{}
+	desc.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE 1 0")
+	dataMedia := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: mediaSectionApplication, Port: sdp.RangedPort{Value: 9}},
+	}
+	dataMedia.WithValueAttribute("mid", "1")
+	desc.WithMedia(dataMedia)
+	bundleOnlyAudio := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: "audio", Port: sdp.RangedPort{Value: 0}},
+	}
+	bundleOnlyAudio.WithValueAttribute("mid", "0")
+	bundleOnlyAudio.WithPropertyAttribute("bundle-only")
+	desc.WithMedia(bundleOnlyAudio)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.False(t, negotiatedForAnyMedia, "no cryptex declared anywhere")
+	assert.False(t, negotiatedForAllMedia, "bundle-only audio section must count as active RTP media")
+
+	// Cryptex declared on the BUNDLE tag media section (here, the data channel section) is
+	// inherited by other bundled sections per RFC 9143 Section 7.1.3 (Cryptex is a TRANSPORT
+	// attribute, carried on the tag section even when the tag itself isn't an RTP section).
+	desc = sdp.SessionDescription{}
+	desc.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE 1 0")
+	dataMedia = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: mediaSectionApplication, Port: sdp.RangedPort{Value: 9}},
+	}
+	dataMedia.WithValueAttribute("mid", "1")
+	dataMedia.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	desc.WithMedia(dataMedia)
+	bundleOnlyAudio = &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: "audio", Port: sdp.RangedPort{Value: 0}},
+	}
+	bundleOnlyAudio.WithValueAttribute("mid", "0")
+	bundleOnlyAudio.WithPropertyAttribute("bundle-only")
+	desc.WithMedia(bundleOnlyAudio)
+	negotiatedForAnyMedia, negotiatedForAllMedia = cryptexNegotiatedInSDP(&desc)
+	assert.True(t, negotiatedForAnyMedia, "expected Cryptex inherited from the BUNDLE tag section")
+	assert.True(t, negotiatedForAllMedia)
+}
+
+func TestCryptexAttributeInOffer(t *testing.T) {
+	// Check if Cryptex attribute is correctly added to offer SDP based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, pcOffer.Close()) }()
+
+			_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+
+			hasVideoCryptex := hasCryptexForMedia(t, offer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, offer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, offer.SDP, mediaSectionApplication)
+			hasSessionCryptex := hasCryptexForSession(t, offer.SDP)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasSessionCryptex, "unexpected session-level a=cryptex")
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.True(t, hasSessionCryptex, "expected session-level a=cryptex")
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+		})
+	}
+}
+
+//nolint:cyclop,dupl
+func TestCryptexAttributeInAnswerForOfferWithCryptex(t *testing.T) {
+	// Check if Cryptex attribute is correctly added to answer SDP based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings when offer contains Cryptex attribute.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			require.NoError(t, err)
+			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+			require.NoError(t, pcAnswer.SetLocalDescription(answer))
+			<-answerGatheringComplete
+			answer = *pcAnswer.LocalDescription()
+
+			hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+			hasSessionCryptex := hasCryptexForSession(t, answer.SDP)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasSessionCryptex, "unexpected session-level a=cryptex")
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.True(t, hasSessionCryptex, "expected session-level a=cryptex")
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+
+			require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			waitForSRTPReady(t, pcAnswer)
+			waitForSRTPReady(t, pcOffer)
+
+			answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+			answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+			require.NotNil(t, answerVideoTr)
+			require.NotNil(t, answerAudioTr)
+
+			if policy == RTPHeaderEncryptionPolicyDisable {
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			} else {
+				assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcOffer))
+				if policy == RTPHeaderEncryptionPolicyRequire {
+					assert.Equal(t, srtp.CryptexModeRequired, dtlsCryptexMode(pcAnswer))
+				} else {
+					assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcAnswer))
+				}
+
+				assert.True(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			}
+		})
+	}
+}
+
+func TestCryptexAttributeInAnswerForOfferWithoutCryptex(t *testing.T) {
+	// Check how answer SDP Cryptex attribute negotiation behaves based on RtpHeaderEncryptionPolicy
+	// and SettingEngine.DisableRTPHeaderEncryption settings when offer does NOT contain Cryptex attribute.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			err = pcAnswer.SetRemoteDescription(offer)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable, RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate:
+				var answer SessionDescription
+				answer, err = pcAnswer.CreateAnswer(nil)
+				require.NoError(t, err)
+				answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+				require.NoError(t, pcAnswer.SetLocalDescription(answer))
+				<-answerGatheringComplete
+				answer = *pcAnswer.LocalDescription()
+
+				require.NoError(t, err)
+				hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+				hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+				hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+
+				require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+				waitForSRTPReady(t, pcAnswer)
+				waitForSRTPReady(t, pcOffer)
+				answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+				answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+				require.NotNil(t, answerVideoTr)
+				require.NotNil(t, answerAudioTr)
+
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			case RTPHeaderEncryptionPolicyRequire:
+				require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired, "expected error for offer without Cryptex")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+		})
+	}
+}
+
+func TestCryptexAttributeInAnswerMissingWhenOffererRequiresCryptex(t *testing.T) {
+	// Check that answer SDP without Cryptex attribute is rejected when offerer requires Cryptex.
+
+	pcOffer, err := NewPeerConnection(Configuration{
+		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
+	})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{
+		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
+	})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	err = pcOffer.SetRemoteDescription(answer)
+	require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired, "expected error for answer without Cryptex")
+}
+
+//nolint:cyclop,dupl
+func TestCryptexAttributeInAnswerForMediaLevelCryptex(t *testing.T) {
+	// Check if Cryptex attribute added at media-level in offer results in correct answer SDP
+	// based on RtpHeaderEncryptionPolicy and SettingEngine.DisableRTPHeaderEncryption settings.
+	// Also check that answer is accepted.
+
+	tests := []RTPHeaderEncryptionPolicy{
+		RTPHeaderEncryptionPolicyUnknown,
+		RTPHeaderEncryptionPolicyDisable,
+		RTPHeaderEncryptionPolicyNegotiate,
+		RTPHeaderEncryptionPolicyRequire,
+	}
+	for _, policy := range tests {
+		t.Run(policy.String(), func(t *testing.T) {
+			pcOffer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
+			})
+			require.NoError(t, err)
+
+			pcAnswer, err := NewPeerConnection(Configuration{
+				RTPHeaderEncryptionPolicy: policy,
+			})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerVideoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+			offerAudioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+			require.NoError(t, err)
+			_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+			require.NoError(t, err)
+
+			offer, err := pcOffer.CreateOffer(nil)
+			require.NoError(t, err)
+			offerGatheringComplete := GatheringCompletePromise(pcOffer)
+			require.NoError(t, pcOffer.SetLocalDescription(offer))
+			<-offerGatheringComplete
+			offer = *pcOffer.LocalDescription()
+
+			// Manually switch offer SDP to media-level Cryptex (and remove session-level Cryptex).
+			offerSDP := &sdp.SessionDescription{}
+			require.NoError(t, offerSDP.Unmarshal([]byte(offer.SDP)))
+			offerSDP.Attributes = slices.DeleteFunc(offerSDP.Attributes, func(a sdp.Attribute) bool {
+				return a.Key == sdp.AttrKeyCryptex
+			})
+			for _, md := range offerSDP.MediaDescriptions {
+				if md.MediaName.Port.Value == 0 || md.MediaName.Media == mediaSectionApplication {
+					continue
+				}
+				md.WithPropertyAttribute(sdp.AttrKeyCryptex)
+			}
+			offerSDPBytes, err := offerSDP.Marshal()
+			require.NoError(t, err)
+			offer.SDP = string(offerSDPBytes)
+
+			require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			answer, err := pcAnswer.CreateAnswer(nil)
+			require.NoError(t, err)
+			answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+			require.NoError(t, pcAnswer.SetLocalDescription(answer))
+			<-answerGatheringComplete
+			answer = *pcAnswer.LocalDescription()
+
+			hasVideoCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindVideo))
+			hasAudioCryptex := hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio))
+			hasApplicationCryptex := hasCryptexForMedia(t, answer.SDP, mediaSectionApplication)
+			hasSessionCryptex := hasCryptexForSession(t, answer.SDP)
+			switch policy {
+			case RTPHeaderEncryptionPolicyDisable:
+				assert.False(t, hasSessionCryptex, "unexpected session-level a=cryptex")
+				assert.False(t, hasVideoCryptex, "unexpected a=cryptex on offer video m-line")
+				assert.False(t, hasAudioCryptex, "unexpected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			case RTPHeaderEncryptionPolicyUnknown, RTPHeaderEncryptionPolicyNegotiate, RTPHeaderEncryptionPolicyRequire:
+				assert.False(t, hasSessionCryptex, "unexpected session-level a=cryptex")
+				assert.True(t, hasVideoCryptex, "expected a=cryptex on offer video m-line")
+				assert.True(t, hasAudioCryptex, "expected a=cryptex on offer audio m-line")
+				assert.False(t, hasApplicationCryptex, "unexpected a=cryptex on offer application m-line")
+			default:
+				assert.FailNow(t, "Should not happen")
+			}
+
+			require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+			waitForSRTPReady(t, pcOffer)
+			waitForSRTPReady(t, pcAnswer)
+			answerVideoTr := findTransceiverByKind(pcAnswer, RTPCodecTypeVideo)
+			answerAudioTr := findTransceiverByKind(pcAnswer, RTPCodecTypeAudio)
+			require.NotNil(t, answerVideoTr)
+			require.NotNil(t, answerAudioTr)
+
+			if policy == RTPHeaderEncryptionPolicyDisable {
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+				assert.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcAnswer))
+
+				assert.False(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.False(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			} else {
+				assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcOffer))
+				if policy == RTPHeaderEncryptionPolicyRequire {
+					assert.Equal(t, srtp.CryptexModeRequired, dtlsCryptexMode(pcAnswer))
+				} else {
+					assert.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcAnswer))
+				}
+
+				assert.True(t, offerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, offerAudioTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerVideoTr.RTPHeaderEncryptionNegotiated())
+				assert.True(t, answerAudioTr.RTPHeaderEncryptionNegotiated())
+			}
+		})
+	}
+}
+
+func TestCryptexAnswerWithPartialMediaCryptexIsRejected(t *testing.T) {
+	// Check that answer SDP with Cryptex attribute on only some media sections is rejected when offerer requires
+	// Cryptex.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	// Modify answer SDP to negotiate Cryptex for only one RTP media section.
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(answer.SDP)))
+	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
+		return a.Key == sdp.AttrKeyCryptex
+	})
+
+	cryptexSet := false
+	tagMid := extractBundleID(parsed)
+	for _, md := range parsed.MediaDescriptions {
+		if md.MediaName.Port.Value == 0 || md.MediaName.Media == mediaSectionApplication {
+			continue
+		}
+		kind := NewRTPCodecType(md.MediaName.Media)
+		if kind != RTPCodecTypeVideo && kind != RTPCodecTypeAudio {
+			continue
+		}
+		md.Attributes = slices.DeleteFunc(md.Attributes, func(a sdp.Attribute) bool {
+			return a.Key == sdp.AttrKeyCryptex
+		})
+		// Keep Cryptex off the BUNDLE tag section, so the other RTP section can't inherit it
+		// from the tag and this stays a genuine partial/mixed-mode negotiation.
+		if !cryptexSet && getMidValue(md) != tagMid {
+			md.WithPropertyAttribute(sdp.AttrKeyCryptex)
+			cryptexSet = true
+		}
+	}
+	require.True(t, cryptexSet)
+
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	answer.SDP = string(marshaled)
+
+	err = pcOffer.SetRemoteDescription(answer)
+	require.ErrorIs(t, err, ErrRTPHeaderEncryptionMixedModeNotSupported)
+}
+
+func TestCryptexRequiredDoesNotFailForDataOnlyOffer(t *testing.T) {
+	// Check that offer with no RTP media sections but with application section is accepted when answerer requires
+	// Cryptex.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.CreateDataChannel("data", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	// Sanity check: offer contains no RTP m-lines.
+	require.NotNil(t, offer.parsed)
+	for _, md := range offer.parsed.MediaDescriptions {
+		require.Equal(t, mediaSectionApplication, md.MediaName.Media)
+	}
+
+	// Required mode must not reject data-only SDP.
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	// Application sections must not carry a=cryptex.
+	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication),
+		"unexpected a=cryptex on answer application m-line")
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+}
+
+func TestCryptexRequiredDataOnlyOfferAcceptsNonCryptexAnswer(t *testing.T) {
+	// Equivalent of libwebrtc's CryptexRequiredDatachannelOnly test: a Require-policy offerer with
+	// only a data channel (no RTP media) must still accept an answer that omits Cryptex entirely,
+	// since Require only applies to negotiated RTP m-lines and there are none. There must be no
+	// speculative Cryptex mode selection just because the offer/answer exchange had no active RTP
+	// media -- a data-only exchange should behave the same as if Cryptex were plainly disabled.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.CreateDataChannel("data", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	// Sanity check: offer contains no RTP m-lines.
+	require.NotNil(t, offer.parsed)
+	for _, md := range offer.parsed.MediaDescriptions {
+		require.Equal(t, mediaSectionApplication, md.MediaName.Media)
+	}
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	// Sanity check: the Disable-policy answerer's answer carries no a=cryptex anywhere.
+	assert.False(t, hasCryptexForSession(t, answer.SDP), "unexpected session-level a=cryptex on answer")
+	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication),
+		"unexpected a=cryptex on answer application m-line")
+
+	// The Require-policy offerer must accept this non-Cryptex, data-only answer without error.
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode())
+	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
+}
+
+func TestCryptexIsStillOfferedDuringRenegotiationIfNotNegotiatedInitially(t *testing.T) {
+	// Check that if Cryptex is offered but not negotiated in initial offer/answer, it is still offered in subsequent
+	// offers.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	_, err = pcOffer.CreateDataChannel("initial_data_channel", nil)
+	require.NoError(t, err)
+
+	// Initial negotiation: offer includes Cryptex, answer does not.
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	// Renegotiation: even though Cryptex wasn't negotiated initially, we should still advertise it.
+	offer2, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+
+	assert.True(t, hasCryptexForSession(t, offer2.SDP), "expected session-level a=cryptex on renegotiation offer")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindVideo)),
+		"unexpected a=cryptex on renegotiation offer video m-line")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindAudio)),
+		"unexpected a=cryptex on renegotiation offer audio m-line")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, mediaSectionApplication),
+		"unexpected a=cryptex on renegotiation offer application m-line")
+}
+
+func TestCryptexModeChangeDuringRenegotiation(t *testing.T) {
+	// Check that if Cryptex is offered but not negotiated in initial offer/answer, and then in subsequent offerer
+	// tries to change Cryptex mode (e.g. by moving it from session-level to media-level), the new mode is
+	// applied to the already-started SRTP session.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	// Initial negotiation completes with Cryptex not negotiated (answerer disables it).
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+	require.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+
+	// Renegotiation offer from answerer, but manually inject Cryptex attribute.
+	offer2, err := pcAnswer.CreateOffer(nil)
+	require.NoError(t, err)
+	offer2GatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(offer2))
+	<-offer2GatheringComplete
+	offer2 = *pcAnswer.LocalDescription()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(offer2.SDP)))
+	for _, md := range parsed.MediaDescriptions {
+		if md.MediaName.Port.Value == 0 || md.MediaName.Media == mediaSectionApplication {
+			continue
+		}
+		kind := NewRTPCodecType(md.MediaName.Media)
+		if kind == RTPCodecTypeAudio || kind == RTPCodecTypeVideo {
+			md.WithPropertyAttribute(sdp.AttrKeyCryptex)
+		}
+	}
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	offer2.SDP = string(marshaled)
+
+	err = pcOffer.SetRemoteDescription(offer2)
+	require.NoError(t, err)
+	pcOffer.ops.Done()
+	require.Equal(t, srtp.CryptexModeEnabled, dtlsCryptexMode(pcOffer))
+}
+
+func TestCryptexDataOnlyThenAddRTPRenegotiation(t *testing.T) {
+	// Check that a data-channel-only initial negotiation between a default/negotiate peer and a
+	// disable peer does not permanently block a later renegotiation that adds the first RTP media.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.CreateDataChannel("data", nil)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+
+	// Neither side has negotiated any RTP media yet; add the first audio transceiver and renegotiate.
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer2, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offer2GatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer2))
+	<-offer2GatheringComplete
+	offer2 = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer2))
+
+	answer2, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answer2GatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer2))
+	<-answer2GatheringComplete
+	answer2 = *pcAnswer.LocalDescription()
+
+	err = pcOffer.SetRemoteDescription(answer2)
+	require.NoError(t, err, "adding the first RTP media must not permanently break renegotiation")
+	require.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
+}
+
+func TestCryptexRejectedAnswerPreservesSignalingState(t *testing.T) {
+	// Check that when SetRemoteDescription rejects an answer due to a Cryptex policy violation, the
+	// PeerConnection's signaling state and pending/current descriptions are left unchanged (RFC 9429
+	// Section 5.10), and that a corrected retry succeeds.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	// Sanity check: the answerer's Disable policy means the answer carries no Cryptex attribute.
+	require.False(t, hasCryptexForSession(t, answer.SDP))
+
+	require.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
+	pendingBefore := pcOffer.PendingLocalDescription()
+	require.NotNil(t, pendingBefore)
+
+	err = pcOffer.SetRemoteDescription(answer)
+	require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired)
+
+	// State must be preserved exactly as it was before the rejected call.
+	assert.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
+	assert.Nil(t, pcOffer.CurrentRemoteDescription())
+	assert.Nil(t, pcOffer.PendingRemoteDescription())
+	require.NotNil(t, pcOffer.PendingLocalDescription())
+	assert.Equal(t, pendingBefore.SDP, pcOffer.PendingLocalDescription().SDP)
+
+	// A corrected answer (with Cryptex added) must still be accepted, proving the connection did
+	// not get stuck in an unrecoverable signaling state.
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(answer.SDP)))
+	parsed.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	answer.SDP = string(marshaled)
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+	assert.Equal(t, SignalingStateStable, pcOffer.SignalingState())
+}
+
+func TestCryptexAsymmetricOfferAnswerPreservesOwnReceiveCapability(t *testing.T) {
+	// Check that when our own offer declares Cryptex receive support but the remote's answer
+	// doesn't, we still configure the SRTP session to accept incoming Cryptex packets. Per RFC 9335
+	// Section 4, a=cryptex declares the advertising endpoint's own receive support, so an answer
+	// without it should only affect what we send, not what we're still willing to receive.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+	require.True(t, hasCryptexForSession(t, offer.SDP), "sanity check: offer declares Cryptex receive support")
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+	require.False(t, hasCryptexForSession(t, answer.SDP), "sanity check: Disable-policy answerer omits Cryptex")
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+
+	// We must stop sending Cryptex, since the answerer declared it can't receive it...
+	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode())
+	// ...but we must still accept it on receive, since our own offer advertised support for it.
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
+}
+
+func TestCryptexIndependentLocalRemoteModeUpdateDuringRenegotiation(t *testing.T) {
+	// Check that a renegotiation-driven Cryptex mode change only touches the direction that
+	// actually changed, now that pion/srtp exposes independent UpdateLocalOptions/UpdateRemoteOptions
+	// instead of a single symmetric UpdateOptions.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+
+	// Both sides negotiated Cryptex symmetrically.
+	require.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
+	require.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
+
+	// Renegotiate. Our own offer is unchanged and still declares Cryptex receive support, but we
+	// manually strip Cryptex from the answer, simulating the peer no longer declaring receive
+	// support. Only the outbound (send) direction should be affected.
+	offer2, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offer2GatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer2))
+	<-offer2GatheringComplete
+	offer2 = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer2))
+
+	answer2, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answer2GatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer2))
+	<-answer2GatheringComplete
+	answer2 = *pcAnswer.LocalDescription()
+
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(answer2.SDP)))
+	filteredAttrs := parsed.Attributes[:0]
+	for _, attr := range parsed.Attributes {
+		if attr.Key != sdp.AttrKeyCryptex {
+			filteredAttrs = append(filteredAttrs, attr)
+		}
+	}
+	parsed.Attributes = filteredAttrs
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	answer2.SDP = string(marshaled)
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer2))
+	pcOffer.ops.Done()
+
+	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode(),
+		"outbound mode must follow the peer's answer, which no longer declares Cryptex")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(),
+		"inbound mode must be unaffected since our own offer still declares Cryptex receive support")
+}
+
+func TestCryptexNegotiatedIsPerTransceiverNotTransport(t *testing.T) {
+	// Check that a transceiver added after Cryptex has already been negotiated on the shared
+	// transport still reports RTPHeaderEncryptionNegotiated()==false until it participates in its
+	// own offer/answer exchange.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	audioTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	require.True(t, audioTr.RTPHeaderEncryptionNegotiated())
+
+	// Add a video transceiver without negotiating it (no offer created/exchanged for it yet).
+	videoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+
+	assert.False(t, videoTr.RTPHeaderEncryptionNegotiated(),
+		"a transceiver that hasn't participated in an offer/answer exchange must report false")
+	assert.True(t, audioTr.RTPHeaderEncryptionNegotiated(), "already-negotiated transceiver is unaffected")
+}
+
+func TestCryptexBundleOnlyZeroPortRTPOfferRequiresPeerCapability(t *testing.T) {
+	// Check the exact reproduction from the review: an offer whose data channel section is the
+	// BUNDLE tag and whose audio section is zero-port + bundle-only, with no Cryptex declared
+	// anywhere. Since the bundle-only audio section counts as active RTP media (RFC 9143 Section
+	// 6/7.2), a Require-policy answerer must reject it, and a Negotiate-policy answerer must accept
+	// it without treating it as Cryptex-capable.
+
+	buildOffer := func(t *testing.T) string {
+		t.Helper()
+
+		offerPC, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, offerPC.Close()) }()
+
+		_, err = offerPC.CreateDataChannel("data", nil)
+		require.NoError(t, err)
+		_, err = offerPC.AddTransceiverFromKind(RTPCodecTypeAudio)
+		require.NoError(t, err)
+
+		offer, err := offerPC.CreateOffer(nil)
+		require.NoError(t, err)
+		offerGatheringComplete := GatheringCompletePromise(offerPC)
+		require.NoError(t, offerPC.SetLocalDescription(offer))
+		<-offerGatheringComplete
+
+		parsed := &sdp.SessionDescription{}
+		require.NoError(t, parsed.Unmarshal([]byte(offerPC.LocalDescription().SDP)))
+
+		// The data channel section is the BUNDLE tag (added first); make audio zero-port and
+		// bundle-only instead of dropping it from the offer entirely.
+		for _, md := range parsed.MediaDescriptions {
+			if md.MediaName.Media == string(MediaKindAudio) {
+				md.MediaName.Port.Value = 0
+				md.WithPropertyAttribute("bundle-only")
+			}
+		}
+
+		marshaled, err := parsed.Marshal()
+		require.NoError(t, err)
+
+		return string(marshaled)
+	}
+
+	t.Run("require rejects without tag Cryptex", func(t *testing.T) {
+		answerPC, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, answerPC.Close()) }()
+
+		err = answerPC.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: buildOffer(t)})
+		require.ErrorIs(t, err, ErrRTPHeaderEncryptionRequired)
+	})
+
+	t.Run("negotiate accepts without treating it as Cryptex-capable", func(t *testing.T) {
+		answerPC, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, answerPC.Close()) }()
+
+		require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: buildOffer(t)}))
+
+		answer, err := answerPC.CreateAnswer(nil)
+		require.NoError(t, err)
+		assert.False(t, hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio)),
+			"the audio section never advertised Cryptex, so the answer must not either")
+	})
+}
+
+func TestRTPHeaderEncryptionNegotiatedInheritsFromBundleTag(t *testing.T) {
+	// Check that a bundle-only media section that inherits Cryptex from the BUNDLE tag section
+	// (RFC 9143 Section 7.1.3) marks its transceiver as negotiated, not just an explicit a=cryptex copy.
+
+	pc, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, pc.Close()) }()
+
+	transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	require.NoError(t, transceiver.SetMid("0"))
+
+	parsed := &sdp.SessionDescription{}
+	parsed.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE 1 0")
+
+	dataMedia := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: mediaSectionApplication, Port: sdp.RangedPort{Value: 9}},
+	}
+	dataMedia.WithValueAttribute("mid", "1")
+	dataMedia.WithPropertyAttribute(sdp.AttrKeyCryptex)
+	parsed.WithMedia(dataMedia)
+
+	audioMedia := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{Media: "audio", Port: sdp.RangedPort{Value: 0}},
+	}
+	audioMedia.WithValueAttribute("mid", "0")
+	audioMedia.WithPropertyAttribute("bundle-only")
+	audioMedia.WithPropertyAttribute("sendrecv")
+	parsed.WithMedia(audioMedia)
+
+	answer := &SessionDescription{Type: SDPTypeAnswer, parsed: parsed}
+	require.NoError(t, setRTPTransceiverCurrentDirection(answer, []*RTPTransceiver{transceiver}, false))
+
+	assert.True(t, transceiver.rtpHeaderEncryptionNegotiated.Load(),
+		"expected Cryptex inherited from the BUNDLE tag section to be reflected on the transceiver")
+}
+
+func TestCryptexReceiveModeUpdatedOnNewLocalAnswer(t *testing.T) {
+	// Check that when a renegotiation offer newly includes Cryptex, and our own answer is
+	// regenerated to mirror it, applying that new local answer updates the SRTP session's receive
+	// mode -- not just the send mode, which is already derived from the remote offer.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+	require.True(t, hasCryptexForSession(t, offer.SDP), "sanity check: offer declares Cryptex")
+
+	// Deliver a version of the offer with Cryptex stripped, simulating signaling that filters the
+	// capability (JSEP Section 5.4 permits this). This makes the answerer's own first answer
+	// genuinely omit Cryptex too, since real RTP media is present (not masked by the data-only
+	// "no active RTP media" default).
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(offer.SDP)))
+	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
+		return a.Key == sdp.AttrKeyCryptex
+	})
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	offerForAnswerer := offer
+	offerForAnswerer.SDP = string(marshaled)
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offerForAnswerer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+	require.False(t, hasCryptexForSession(t, answer.SDP),
+		"sanity check: answer omits Cryptex since the offer appeared to lack it")
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+	require.Equal(t, srtp.CryptexModeDisabled, pcAnswer.dtlsTransport.getRemoteCryptexMode())
+
+	// Renegotiate without any further edits; the offer now reaches the answerer with its Cryptex
+	// declaration intact, and the answerer's Negotiate policy mirrors it in the new answer.
+	offer2, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offer2GatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer2))
+	<-offer2GatheringComplete
+	offer2 = *pcOffer.LocalDescription()
+	require.True(t, hasCryptexForSession(t, offer2.SDP), "sanity check: renegotiation offer carries Cryptex")
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer2))
+
+	answer2, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answer2GatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer2))
+	<-answer2GatheringComplete
+	answer2 = *pcAnswer.LocalDescription()
+	require.True(t, hasCryptexForSession(t, answer2.SDP), "sanity check: new answer mirrors Cryptex")
+	pcAnswer.ops.Done()
+
+	assert.Equal(t, srtp.CryptexModeEnabled, pcAnswer.dtlsTransport.getRemoteCryptexMode(),
+		"applying the new local answer must update the SRTP session's receive mode")
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer2))
+}
+
+func TestCryptexPreservedWhenDescriptionRejected(t *testing.T) {
+	// Check that when SetRemoteDescription is rejected due to an invalid signaling state
+	// transition, the already-active SRTP Cryptex modes are left untouched.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+	require.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
+	require.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
+	require.Equal(t, SignalingStateStable, pcOffer.SignalingState())
+
+	// Signaling is already stable; submitting another answer (even a manipulated one with Cryptex
+	// removed) is an invalid state transition and must be rejected outright.
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(answer.SDP)))
+	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
+		return a.Key == sdp.AttrKeyCryptex
+	})
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	rejectedAnswer := answer
+	rejectedAnswer.SDP = string(marshaled)
+
+	require.Error(t, pcOffer.SetRemoteDescription(rejectedAnswer))
+
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode(),
+		"a rejected description must not mutate the already-active send mode")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(),
+		"a rejected description must not mutate the already-active receive mode")
+}
+
+func TestCryptexPreservedWhenLateStageRejectsRenegotiationOffer(t *testing.T) {
+	// Check that when a renegotiation SetRemoteDescription fails at a stage well after the Cryptex
+	// modes are computed (e.g. a malformed remote m-section, not the earlier Cryptex/signaling-state
+	// checks), the already-active SRTP Cryptex modes are left untouched. The new mode is only meant
+	// to be applied once the whole call is guaranteed to succeed.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
+	wantLocalMode := pcAnswer.dtlsTransport.getLocalCryptexMode()
+	wantRemoteMode := pcAnswer.dtlsTransport.getRemoteCryptexMode()
+	require.Equal(t, srtp.CryptexModeEnabled, wantLocalMode)
+	require.Equal(t, srtp.CryptexModeEnabled, wantRemoteMode)
+
+	// Build a renegotiation offer that both strips Cryptex (which would otherwise change
+	// pcAnswer's negotiated modes) and strips the "mid" attribute from the audio section, so the
+	// call fails deep inside the transceiver-matching loop -- well after Cryptex modes are computed
+	// from the SDP, but before any of it is applied.
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(offer.SDP)))
+	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
+		return a.Key == sdp.AttrKeyCryptex
+	})
+	for _, md := range parsed.MediaDescriptions {
+		if md.MediaName.Media == mediaSectionApplication {
+			continue
+		}
+		md.Attributes = slices.DeleteFunc(md.Attributes, func(a sdp.Attribute) bool {
+			return a.Key == sdp.AttrKeyMID
+		})
+	}
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	brokenOffer2 := offer
+	brokenOffer2.SDP = string(marshaled)
+
+	err = pcAnswer.SetRemoteDescription(brokenOffer2)
+	require.ErrorIs(t, err, errPeerConnRemoteDescriptionWithoutMidValue,
+		"sanity check: failure must come from deep inside the transceiver-matching loop, "+
+			"well after Cryptex modes were computed, not from an earlier check")
+	pcAnswer.ops.Done()
+
+	assert.Equal(t, wantLocalMode, pcAnswer.dtlsTransport.getLocalCryptexMode(),
+		"a call that fails deep inside SetRemoteDescription must not mutate the already-active send mode")
+	assert.Equal(t, wantRemoteMode, pcAnswer.dtlsTransport.getRemoteCryptexMode(),
+		"a call that fails deep inside SetRemoteDescription must not mutate the already-active receive mode")
+}
+
+func TestCryptexAnswerWithTagOnlyCryptexIsAccepted(t *testing.T) {
+	// Check that Cryptex declared only on the BUNDLE tag media section (an ordinary non-zero-port
+	// section, not bundle-only) is inherited by the other bundled RTP sections per RFC 9143
+	// Section 7.1.3, instead of being rejected as mixed mode.
+
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
+	require.NoError(t, err)
+	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	offerGatheringComplete := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	<-offerGatheringComplete
+	offer = *pcOffer.LocalDescription()
+
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	<-answerGatheringComplete
+	answer = *pcAnswer.LocalDescription()
+
+	// Move Cryptex from session-level to only the BUNDLE tag media section.
+	parsed := &sdp.SessionDescription{}
+	require.NoError(t, parsed.Unmarshal([]byte(answer.SDP)))
+	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
+		return a.Key == sdp.AttrKeyCryptex
+	})
+
+	tagMid := extractBundleID(parsed)
+	require.NotEmpty(t, tagMid)
+	for _, md := range parsed.MediaDescriptions {
+		if getMidValue(md) == tagMid {
+			md.WithPropertyAttribute(sdp.AttrKeyCryptex)
+
+			break
+		}
+	}
+
+	marshaled, err := parsed.Marshal()
+	require.NoError(t, err)
+	answer.SDP = string(marshaled)
+
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+	waitForSRTPReady(t, pcOffer)
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
 }
