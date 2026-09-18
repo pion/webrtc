@@ -694,6 +694,10 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	}
 
 	if track == nil {
+		if rsid == "" {
+			return fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+		}
+
 		return fmt.Errorf("%w: ssrc(%d) rsid(%s)", errRTPReceiverForRIDTrackStreamNotFound, ssrc, rsid)
 	}
 
