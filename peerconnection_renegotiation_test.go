@@ -1425,3 +1425,59 @@ func TestNegotiationNotNeededAfterReplaceTrackNil(t *testing.T) {
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
 }
+
+// Answers must retain the negotiated DTLS role when the offerer changes,
+// including when an ICE restart reuses the DTLS association.
+func TestPeerConnection_Renegotiation_DTLSRole(t *testing.T) {
+	for _, role := range []DTLSRole{DTLSRoleAuto, DTLSRoleClient, DTLSRoleServer} {
+		t.Run(role.String(), func(t *testing.T) {
+			lim := test.TimeOut(30 * time.Second)
+			defer lim.Stop()
+			report := test.CheckRoutines(t)
+			defer report()
+
+			settings := SettingEngine{}
+			answerRole := defaultDtlsRoleAnswer
+			if role != DTLSRoleAuto {
+				require.NoError(t, settings.SetAnsweringDTLSRole(role))
+				answerRole = role
+			}
+			api := NewAPI(WithSettingEngine(settings))
+			first, err := api.NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			second, err := api.NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer closePairNow(t, first, second)
+			connected := untilConnectionState(PeerConnectionStateConnected, first, second)
+			require.NoError(t, signalPair(first, second))
+			<-connected
+
+			firstRole := DTLSRoleClient
+			if answerRole == DTLSRoleClient {
+				firstRole = DTLSRoleServer
+			}
+			for _, restart := range []bool{false, true} {
+				for _, pair := range [][2]*PeerConnection{{second, first}, {first, second}} {
+					offerer, answerer := pair[0], pair[1]
+					offer, offerErr := offerer.CreateOffer(&OfferOptions{ICERestart: restart})
+					require.NoError(t, offerErr)
+					gathered := GatheringCompletePromise(offerer)
+					require.NoError(t, offerer.SetLocalDescription(offer))
+					<-gathered
+					require.NoError(t, answerer.SetRemoteDescription(*offerer.LocalDescription()))
+					answer, answerErr := answerer.CreateAnswer(nil)
+					require.NoError(t, answerErr)
+					want := answerRole
+					if answerer == first {
+						want = firstRole
+					}
+					require.Equal(t, want, dtlsRoleFromSDP(answer.parsed))
+					gathered = GatheringCompletePromise(answerer)
+					require.NoError(t, answerer.SetLocalDescription(answer))
+					<-gathered
+					require.NoError(t, offerer.SetRemoteDescription(*answerer.LocalDescription()))
+				}
+			}
+		})
+	}
+}
