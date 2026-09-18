@@ -106,6 +106,11 @@ func trackDetailsFromSDP(
 			continue
 		}
 
+		// The media-level "a=msid" line (Unified Plan) is resolved up front, independent of where
+		// it appears relative to other attributes, since simulcastTrack below can't rely on the
+		// rolling streamID/trackID if the msid line comes after the "a=ssrc-group:SIM" line.
+		mediaStreamID, mediaTrackID := getMediaMsid(media)
+
 		for _, attr := range media.Attributes {
 			switch attr.Key {
 			case sdp.AttrKeySSRCGroup:
@@ -199,11 +204,26 @@ func trackDetailsFromSDP(
 						continue
 					}
 
+					simStreamID, simTrackID := streamID, trackID
+					if mediaStreamID != "" || mediaTrackID != "" {
+						simStreamID, simTrackID = mediaStreamID, mediaTrackID
+					}
+					for i := range tracksInMediaSection {
+						if len(tracksInMediaSection[i].ssrcs) != 1 || !slices.Contains(ssrcs, tracksInMediaSection[i].ssrcs[0]) {
+							continue
+						}
+						if tracksInMediaSection[i].streamID != "" || tracksInMediaSection[i].id != "" {
+							simStreamID, simTrackID = tracksInMediaSection[i].streamID, tracksInMediaSection[i].id
+
+							break
+						}
+					}
+
 					simulcastTrack := trackDetails{
 						mid:      midValue,
 						kind:     codecType,
-						streamID: streamID,
-						id:       trackID,
+						streamID: simStreamID,
+						id:       simTrackID,
 						ssrcs:    ssrcs,
 					}
 					if len(rtxRepairFlows) > 0 {
@@ -286,16 +306,38 @@ func trackDetailsFromSDP(
 				}
 
 				for r, baseSsrc := range rtxRepairFlows {
-					if baseSsrc == ssrc {
-						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = []*SSRC{&repairSsrc}
+					if baseSsrc != ssrc {
+						continue
 					}
+
+					pos := slices.Index(trackDetails.ssrcs, SSRC(ssrc))
+					if pos == -1 {
+						continue
+					}
+
+					if trackDetails.rtxSsrc == nil {
+						trackDetails.rtxSsrc = make([]*SSRC, len(trackDetails.ssrcs))
+					}
+
+					repairSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.rtxSsrc[pos] = &repairSsrc
 				}
 				for r, baseSsrc := range fecRepairFlows {
-					if baseSsrc == ssrc {
-						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = []*SSRC{&fecSsrc}
+					if baseSsrc != ssrc {
+						continue
 					}
+
+					pos := slices.Index(trackDetails.ssrcs, SSRC(ssrc))
+					if pos == -1 {
+						continue
+					}
+
+					if trackDetails.fecSsrc == nil {
+						trackDetails.fecSsrc = make([]*SSRC, len(trackDetails.ssrcs))
+					}
+
+					fecSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.fecSsrc[pos] = &fecSsrc
 				}
 
 				if isNewTrack {
@@ -877,6 +919,23 @@ func getMidValue(media *sdp.MediaDescription) string {
 	}
 
 	return ""
+}
+
+// getMediaMsid returns the media-level "a=msid:<stream_id> <track_label>" attribute, if present,
+// regardless of where it appears among the media section's other attributes.
+func getMediaMsid(media *sdp.MediaDescription) (streamID, trackID string) {
+	for _, attr := range media.Attributes {
+		if attr.Key != sdp.AttrKeyMsid {
+			continue
+		}
+
+		split := strings.Split(attr.Value, " ")
+		if len(split) == 2 {
+			return split[0], split[1]
+		}
+	}
+
+	return "", ""
 }
 
 // SessionDescription contains a MediaSection with Multiple SSRCs, it is Plan-B.

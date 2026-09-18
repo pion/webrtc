@@ -748,11 +748,58 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 						{Key: "ssrc-group", Value: "FEC-FR 5000 5100"},
 					},
 				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc-group", Value: "SIM 3000 4000 5000"},
+						{Key: "ssrc-group", Value: "FID 3000 3100"},
+						{Key: "ssrc-group", Value: "FID 4000 4100"},
+						{Key: "ssrc-group", Value: "FID 5000 5100"},
+						{Key: "ssrc-group", Value: "FEC-FR 3000 3200"},
+						{Key: "ssrc-group", Value: "FEC-FR 4000 4200"},
+						{Key: "ssrc-group", Value: "FEC-FR 5000 5200"},
+						{Key: "ssrc", Value: "3000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "4000 msid:video_trk_label video_trk_guid"},
+						{Key: "ssrc", Value: "5000 msid:video_trk_label video_trk_guid"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "10000 msid:trackA_stream trackA_id"},
+						{Key: "ssrc", Value: "10001 msid:trackA_stream trackA_id"},
+						{Key: "ssrc", Value: "10002 msid:trackB_stream trackB_id"},
+						{Key: "ssrc", Value: "10003 msid:trackB_stream trackB_id"},
+						{Key: "ssrc-group", Value: "SIM 10000 10001"},
+						{Key: "ssrc-group", Value: "SIM 10002 10003"},
+					},
+				},
+				{
+					MediaName: sdp.MediaName{
+						Media: "video",
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "mid", Value: "0"},
+						{Key: "sendrecv"},
+						{Key: "ssrc", Value: "20000 cname:video_cname"},
+						{Key: "ssrc", Value: "20001 cname:video_cname"},
+						{Key: "ssrc-group", Value: "SIM 20000 20001"},
+						{Key: "msid", Value: "video_trk3_label video_trk3_guid"},
+					},
+				},
 			},
 		}
 
 		tracks := trackDetailsFromSDP(log, descr)
-		assert.Equal(t, 7, len(tracks))
+		assert.Equal(t, 11, len(tracks))
 		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[0].ssrcs)
 		assert.Equal(t, "video_trk_label", tracks[0].streamID)
 		assert.Equal(t, []SSRC{4000}, tracks[1].ssrcs)
@@ -777,6 +824,27 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			assert.Equal(t, SSRC(4100), *tracks[6].fecSsrc[1])
 			assert.Equal(t, SSRC(5100), *tracks[6].fecSsrc[2])
 		}
+		assert.Equal(t, []SSRC{3000, 4000, 5000}, tracks[7].ssrcs)
+		assert.Equal(t, "video_trk_label", tracks[7].streamID)
+		if assert.Len(t, tracks[7].rtxSsrc, 3) {
+			assert.Equal(t, SSRC(3100), *tracks[7].rtxSsrc[0])
+			assert.Equal(t, SSRC(4100), *tracks[7].rtxSsrc[1])
+			assert.Equal(t, SSRC(5100), *tracks[7].rtxSsrc[2])
+		}
+		if assert.Len(t, tracks[7].fecSsrc, 3) {
+			assert.Equal(t, SSRC(3200), *tracks[7].fecSsrc[0])
+			assert.Equal(t, SSRC(4200), *tracks[7].fecSsrc[1])
+			assert.Equal(t, SSRC(5200), *tracks[7].fecSsrc[2])
+		}
+		assert.Equal(t, []SSRC{10000, 10001}, tracks[8].ssrcs)
+		assert.Equal(t, "trackA_stream", tracks[8].streamID)
+		assert.Equal(t, "trackA_id", tracks[8].id)
+		assert.Equal(t, []SSRC{10002, 10003}, tracks[9].ssrcs)
+		assert.Equal(t, "trackB_stream", tracks[9].streamID)
+		assert.Equal(t, "trackB_id", tracks[9].id)
+		assert.Equal(t, []SSRC{20000, 20001}, tracks[10].ssrcs)
+		assert.Equal(t, "video_trk3_label", tracks[10].streamID)
+		assert.Equal(t, "video_trk3_guid", tracks[10].id)
 	})
 }
 
