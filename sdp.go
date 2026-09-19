@@ -678,13 +678,26 @@ type mediaSection struct {
 	rids            []*simulcastRid
 }
 
-func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
+// remoteBundleGroup describes the BUNDLE group of the remote description
+// that an answer is being generated for.
+type remoteBundleGroup struct {
+	// mids listed in the remote BUNDLE group.
+	mids string
+
+	// whether the remote description carries a BUNDLE group at all. An
+	// answer may only bundle media sections that the offer bundled
+	// (RFC 8843, section 7.3), so an offer without a group gets an answer
+	// without one.
+	present bool
+}
+
+func bundleMatchFromRemote(matchBundleGroup *remoteBundleGroup) func(mid string) bool {
 	if matchBundleGroup == nil {
 		return func(string) bool {
 			return true
 		}
 	}
-	bundleTags := strings.Split(*matchBundleGroup, " ")
+	bundleTags := strings.Split(matchBundleGroup.mids, " ")
 
 	return func(midValue string) bool {
 		return slices.Contains(bundleTags, midValue)
@@ -693,7 +706,7 @@ func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 
 // populateSDP serializes a PeerConnections state into an SDP.
 //
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func populateSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -707,7 +720,8 @@ func populateSDP(
 	iceParams ICEParameters,
 	mediaSections []mediaSection,
 	iceGatheringState ICEGatheringState,
-	matchBundleGroup *string,
+	matchBundleGroup *remoteBundleGroup,
+	bundlePolicy BundlePolicy,
 	sctpMaxMessageSize uint32,
 	ignoreRidPauseForRecv bool,
 ) (*sdp.SessionDescription, error) {
@@ -772,9 +786,21 @@ func populateSDP(
 		}
 
 		if shouldAddID {
-			if bundleMatch(section.id) {
+			switch {
+			case matchBundleGroup != nil && !matchBundleGroup.present &&
+				bundlePolicy == BundlePolicyMaxBundle:
+				// The remote description has no BUNDLE group. Under max-bundle
+				// pion negotiates a single media track, so keep the first
+				// section and reject the rest. Other policies fall through to
+				// the normal path (which, with no group to match, rejects every
+				// section) to avoid changing spec behavior for balanced and
+				// max-compat, where pion cannot yet offer separate transports.
+				if i != 0 {
+					descr.MediaDescriptions[len(descr.MediaDescriptions)-1].MediaName.Port = sdp.RangedPort{Value: 0}
+				}
+			case bundleMatch(section.id):
 				appendBundle(section.id)
-			} else {
+			default:
 				descr.MediaDescriptions[len(descr.MediaDescriptions)-1].MediaName.Port = sdp.RangedPort{Value: 0}
 			}
 		}
