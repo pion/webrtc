@@ -1369,6 +1369,103 @@ func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+//nolint:cyclop
+func TestPeerConnection_Renegotiation_CodecPreferences(t *testing.T) {
+	testCases := []struct {
+		name                        string
+		setExplicitPreferences      bool
+		expectedAnswerCodecMimeType string
+	}{
+		{
+			name:                        "update remote-derived preferences",
+			expectedAnswerCodecMimeType: MimeTypeH264,
+		},
+		{
+			name:                        "preserve explicit preferences",
+			setExplicitPreferences:      true,
+			expectedAnswerCodecMimeType: MimeTypeVP8,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			report := test.CheckRoutines(t)
+			defer report()
+
+			pcOffer, pcAnswer, err := newPair()
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
+
+			offerTransceivers := make([]*RTPTransceiver, 2)
+			for i := range offerTransceivers {
+				offerTransceivers[i], err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+				require.NoError(t, err)
+			}
+
+			codecByMimeType := func(mimeType string) RTPCodecParameters {
+				for _, codec := range offerTransceivers[0].api.mediaEngine.getCodecsByKind(RTPCodecTypeVideo) {
+					if strings.EqualFold(codec.MimeType, mimeType) {
+						return codec
+					}
+				}
+
+				require.FailNow(t, "codec is not registered", mimeType)
+
+				return RTPCodecParameters{}
+			}
+
+			vp8Codec := codecByMimeType(MimeTypeVP8)
+			h264Codec := codecByMimeType(MimeTypeH264)
+			for _, transceiver := range offerTransceivers {
+				require.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{vp8Codec}))
+			}
+			require.NoError(t, signalPair(pcOffer, pcAnswer))
+
+			answerTransceivers := pcAnswer.GetTransceivers()
+			require.Len(t, answerTransceivers, 2)
+			for _, transceiver := range answerTransceivers {
+				require.Equal(t, MimeTypeVP8, transceiver.getCodecs()[0].MimeType)
+			}
+			if testCase.setExplicitPreferences {
+				require.NoError(t, answerTransceivers[1].SetCodecPreferences([]RTPCodecParameters{vp8Codec}))
+			}
+
+			pcReoffer, err := NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() {
+				require.NoError(t, pcReoffer.Close())
+			}()
+
+			reofferTransceivers := make([]*RTPTransceiver, 2)
+			for i, codec := range []RTPCodecParameters{vp8Codec, h264Codec} {
+				reofferTransceivers[i], err = pcReoffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+				require.NoError(t, err)
+				require.NoError(t, reofferTransceivers[i].SetCodecPreferences([]RTPCodecParameters{codec}))
+			}
+			offer, err := pcReoffer.CreateOffer(nil)
+			require.NoError(t, err)
+			require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+
+			require.Equal(t, MimeTypeVP8, answerTransceivers[0].getCodecs()[0].MimeType)
+			require.Equal(t, testCase.expectedAnswerCodecMimeType, answerTransceivers[1].getCodecs()[0].MimeType)
+			if !testCase.setExplicitPreferences {
+				answer, err := pcAnswer.CreateAnswer(nil)
+				require.NoError(t, err)
+				parsed, err := answer.Unmarshal()
+				require.NoError(t, err)
+				require.Len(t, parsed.MediaDescriptions, 2)
+				for i, mimeType := range []string{MimeTypeVP8, MimeTypeH264} {
+					require.Equal(t, answerTransceivers[i].Mid(), getMidValue(parsed.MediaDescriptions[i]))
+					codecs, err := codecsFromMediaDescription(parsed.MediaDescriptions[i])
+					require.NoError(t, err)
+					require.NotEmpty(t, codecs)
+					require.Equal(t, mimeType, codecs[0].MimeType)
+				}
+			}
+		})
+	}
+}
+
 func TestNegotiationNeededWithRecvonlyTrack(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
