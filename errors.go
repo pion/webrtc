@@ -15,6 +15,12 @@ var (
 	// has already been closed.
 	ErrConnectionClosed = errors.New("connection closed")
 
+	// ErrDTLSRestartNotSupported indicates that DTLS restart is unavailable.
+	ErrDTLSRestartNotSupported = errors.New("DTLS restart is not supported")
+
+	// ErrDTLSRestartRequiresICERestart indicates a DTLS restart without new ICE credentials.
+	ErrDTLSRestartRequiresICERestart = errors.New("DTLS restart requires an ICE restart")
+
 	// ErrDataChannelNotOpen indicates an operation executed when the data
 	// channel is not (yet) open.
 	ErrDataChannelNotOpen = errors.New("data channel not open")
