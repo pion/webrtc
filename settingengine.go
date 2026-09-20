@@ -19,8 +19,8 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
-	"github.com/pion/transport/v4"
-	"github.com/pion/transport/v4/packetio"
+	"github.com/pion/transport/v5"
+	"github.com/pion/transport/v5/packetio"
 	"golang.org/x/net/proxy"
 )
 

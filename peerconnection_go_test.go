@@ -29,8 +29,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v4/test"
-	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/transport/v5/test"
+	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4/internal/util"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
@@ -886,7 +886,7 @@ func TestMulticastDNSHostNameConnection(t *testing.T) {
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
 
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-	connected.Wait()
+	<-connected
 
 	offerLocal := pcOffer.LocalDescription()
 	assert.NotNil(t, offerLocal)
@@ -2401,7 +2401,7 @@ func Test_IPv6(t *testing.T) { //nolint: cyclop
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	offererSelectedPair, err := offerPC.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
@@ -2626,14 +2626,8 @@ func TestAlwaysNegotiateDataChannels_CreateDataChannel(t *testing.T) { //nolint:
 		}
 	})
 
-	connectedWG := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
 	require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true)))
-
-	connected := make(chan struct{})
-	go func() {
-		connectedWG.Wait()
-		close(connected)
-	}()
 
 	select {
 	case <-connected:
@@ -2742,7 +2736,7 @@ func TestSctpSnap(t *testing.T) {
 
 	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
 	assert.NoError(t, signalPair(offer, answer))
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 
 	closePairNow(t, offer, answer)
 }
@@ -2772,7 +2766,7 @@ func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
 
 	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
 	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
-	connected.Wait()
+	<-connected
 
 	// Round 2: add a data channel and renegotiate.
 	dataChannel, err := offerPC.CreateDataChannel("snap", nil)

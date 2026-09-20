@@ -19,8 +19,8 @@ import (
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v4/packetio"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/packetio"
+	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,7 +66,7 @@ func Test_RTPReceiver_SetReadDeadline(t *testing.T) {
 
 	assert.NoError(t, signalPair(sender, receiver))
 
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 	assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0xAA}, Duration: time.Second}))
 
 	<-seenPacket.Done()

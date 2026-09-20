@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
-	"github.com/pion/transport/v4/packetio"
+	"github.com/pion/transport/v5/packetio"
 )
 
 // Endpoint implements net.Conn. It is used to read muxed packets.
@@ -42,7 +42,9 @@ func (e *Endpoint) close() error {
 // Read reads a packet of len(p) bytes from the underlying conn
 // that are matched by the associated MuxFunc.
 func (e *Endpoint) Read(p []byte) (int, error) {
-	return e.buffer.Read(p)
+	n, _, err := e.buffer.Read(p, nil)
+
+	return n, err
 }
 
 // ReadFrom reads a packet of len(p) bytes from the underlying conn

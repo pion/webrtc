@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -217,7 +217,7 @@ func TestICETransport_GetSelectedCandidatePair(t *testing.T) {
 	assert.False(t, statsAvailable)
 
 	assert.NoError(t, signalPair(offerer, answerer))
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	offererSelectedPair, err = offerer.SCTP().Transport().ICETransport().GetSelectedCandidatePair()
 	assert.NoError(t, err)
@@ -244,7 +244,7 @@ func TestICETransport_GetLocalAndRemoteParameters(t *testing.T) {
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
 
 	assert.NoError(t, signalPair(offerer, answerer))
-	peerConnectionConnected.Wait()
+	<-peerConnectionConnected
 
 	offerLocalParameters, err := offerer.SCTP().Transport().ICETransport().GetLocalParameters()
 	assert.NoError(t, err)
