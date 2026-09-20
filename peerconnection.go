@@ -947,6 +947,24 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
+	// Renegotiation reuses the DTLS association, including across ICE restarts.
+	// "the answerer MUST insert an SDP "setup" attribute with an attribute value
+	// that does not change the previously negotiated DTLS roles"
+	// https://www.rfc-editor.org/info/rfc8842/#section-5.3
+	if pc.currentLocalDescription != nil && pc.currentRemoteDescription != nil {
+		if pc.currentLocalDescription.Type == SDPTypeAnswer {
+			connectionRole = connectionRoleFromDtlsRole(dtlsRoleFromSDP(pc.currentLocalDescription.parsed))
+		} else {
+			switch dtlsRoleFromSDP(pc.currentRemoteDescription.parsed) {
+			case DTLSRoleClient:
+				connectionRole = connectionRoleFromDtlsRole(DTLSRoleServer)
+			case DTLSRoleServer:
+				connectionRole = connectionRoleFromDtlsRole(DTLSRoleClient)
+			default:
+			}
+		}
+	}
+
 	descr, err := pc.generateMatchedSDP(
 		pc.rtpTransceivers,
 		useIdentity,

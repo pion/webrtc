@@ -19,7 +19,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/stun/v4"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/proxy"
 )
@@ -552,7 +552,7 @@ func TestDisableCloseByDTLS(t *testing.T) {
 
 	assert.NoError(t, signalPair(offer, answer))
 
-	untilConnectionState(PeerConnectionStateConnected, offer, answer).Wait()
+	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
 	assert.NoError(t, answer.Close())
 
 	time.Sleep(time.Second)
@@ -585,7 +585,7 @@ func TestEnableDataChannelBlockWrite(t *testing.T) {
 	})
 
 	assert.NoError(t, signalPair(offer, answer))
-	untilConnectionState(PeerConnectionStateConnected, offer, answer).Wait()
+	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
 
 	// write should block and return deadline exceeded since the receiver is not reading
 	// and the buffer size is 1500 bytes

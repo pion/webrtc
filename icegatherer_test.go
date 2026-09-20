@@ -19,8 +19,8 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
-	"github.com/pion/transport/v4/test"
-	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/transport/v5/test"
+	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1067,7 +1067,7 @@ func TestICEConnection_AddressRewriteAppend(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
 	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
-	connected.Wait()
+	<-connected
 
 	var hostAddrs []string
 	for _, c := range offerCandidates {
@@ -1373,7 +1373,7 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-	connected.Wait()
+	<-connected
 
 	gotUfrag, gotPwd := parseCreds(pcOffer.LocalDescription().SDP)
 	assert.Equal(t, offerUfrag, gotUfrag)
@@ -1689,7 +1689,7 @@ func TestICEGatherer_HostAcceptanceMinWait(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	connected.Wait()
+	<-connected
 
 	assert.GreaterOrEqual(t, time.Since(start), wait)
 }
@@ -1822,7 +1822,7 @@ func TestICEGatherer_SrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 
 	start := time.Now()
 	assert.NoError(t, signalPair(offerPC, answerPC))
-	connected.Wait()
+	<-connected
 
 	elapsed := time.Since(start)
 	assert.GreaterOrEqual(t, elapsed, wait)
@@ -1911,7 +1911,7 @@ func TestICEGatherer_PrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, pcOffer.AddICECandidate(prflx.ToJSON()))
 
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	connected.Wait()
+	<-connected
 
 	elapsed := time.Since(start)
 	assert.GreaterOrEqual(t, elapsed, wait)
@@ -2079,7 +2079,7 @@ func TestICEGatherer_RelayAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 
 	start := time.Now()
 	assert.NoError(t, signalPair(offerPC, answerPC))
-	connected.Wait()
+	<-connected
 
 	elapsed := time.Since(start)
 	assert.GreaterOrEqual(t, elapsed, wait)
