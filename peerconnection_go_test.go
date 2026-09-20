@@ -400,8 +400,8 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	dropAllDTLS := func([]byte) bool {
 		return false
 	}
-	offerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
-	answerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
+	offerPC.iceTransport.dtlsMatcher = dropAllDTLS
+	answerPC.iceTransport.dtlsMatcher = dropAllDTLS
 
 	assert.NoError(t, signalPair(offerPC, answerPC))
 

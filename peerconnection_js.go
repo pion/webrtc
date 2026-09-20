@@ -241,6 +241,9 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 
 // CreateOffer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (_ SessionDescription, err error) {
+	if options != nil && options.DTLSRestart {
+		return SessionDescription{}, &rtcerr.NotSupportedError{Err: ErrDTLSRestartNotSupported}
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			err = recoveryToError(e)

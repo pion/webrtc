@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/transport/v4/test"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -1424,4 +1425,70 @@ func TestNegotiationNotNeededAfterReplaceTrackNil(t *testing.T) {
 
 	assert.NoError(t, pcOffer.Close())
 	assert.NoError(t, pcAnswer.Close())
+}
+
+func TestPeerConnection_DTLSRestart(t *testing.T) {
+	lim := test.TimeOut(30 * time.Second)
+	defer lim.Stop()
+	report := test.CheckRoutines(t)
+	defer report()
+	first, second, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, first, second)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "stream")
+	require.NoError(t, err)
+	sender, err := first.AddTrack(track)
+	require.NoError(t, err)
+	tracks := make(chan *TrackRemote, 1)
+	second.OnTrack(func(track *TrackRemote, _ *RTPReceiver) { tracks <- track })
+	messages := make(chan string, 1)
+	second.OnDataChannel(func(channel *DataChannel) {
+		channel.OnMessage(func(message DataChannelMessage) { messages <- string(message.Data) })
+	})
+	channel, err := first.CreateDataChannel("restart", nil)
+	require.NoError(t, err)
+	var remote *TrackRemote
+	for sequence := uint16(1); sequence <= 3; sequence++ {
+		previous, engine := first.CurrentLocalDescription(), second.dtlsTransport.dtlsConn
+		offer, offerErr := first.CreateOffer(&OfferOptions{DTLSRestart: true})
+		require.NoError(t, offerErr)
+		require.NotEmpty(t, remoteTLSID(offer.parsed))
+		if previous != nil {
+			require.NotEqual(t, remoteTLSID(previous.parsed), remoteTLSID(offer.parsed))
+			require.Equal(t, remoteDTLSFingerprints(previous.parsed), remoteDTLSFingerprints(offer.parsed))
+			oldICE, iceErr := extractICEDetails(previous.parsed, first.log)
+			require.NoError(t, iceErr)
+			newICE, iceErr := extractICEDetails(offer.parsed, first.log)
+			require.NoError(t, iceErr)
+			require.NotEqual(t, oldICE.Ufrag, newICE.Ufrag)
+		}
+		require.NoError(t, signalPairWithOptions(first, second, withDisableInitialDataChannel(true)))
+		require.Equal(t, remoteTLSID(offer.parsed), remoteTLSID(first.CurrentLocalDescription().parsed))
+		first.ops.Done()
+		second.ops.Done()
+		require.NotSame(t, engine, second.dtlsTransport.dtlsConn)
+		require.Equal(t, DTLSTransportStateConnected, second.dtlsTransport.State())
+		waitDataChannelOpen(t, channel)
+		sendAndExpect(t, channel, messages, strconv.Itoa(int(sequence)))
+		require.NoError(t, track.WriteRTP(&rtp.Packet{Header: rtp.Header{
+			Version: 2, SequenceNumber: sequence, Timestamp: uint32(sequence) * 3000,
+		}, Payload: []byte{0x10, 0x00}}))
+		if remote == nil {
+			remote = <-tracks
+		}
+		require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
+		packet, _, readErr := remote.ReadRTP()
+		require.NoError(t, readErr)
+		require.Equal(t, sequence, packet.SequenceNumber)
+		require.NoError(t, sender.SetReadDeadline(time.Now().Add(5*time.Second)))
+		require.NoError(t, second.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{
+			SenderSSRC: 1234, MediaSSRC: uint32(remote.SSRC()),
+		}}))
+		_, _, readErr = sender.ReadRTCP()
+		require.NoError(t, readErr)
+	}
+	offer, err := first.CreateOffer(&OfferOptions{DTLSRestart: true})
+	require.NoError(t, err)
+	require.NoError(t, first.SetLocalDescription(offer))
+	require.ErrorIs(t, first.SetRemoteDescription(*second.CurrentLocalDescription()), ErrDTLSRestartNotSupported)
 }

@@ -47,11 +47,13 @@ type ICETransport struct {
 	gatherer *ICEGatherer
 	conn     net.Conn
 
-	packetLock     sync.Mutex
-	dtlsHandler    func([]byte) error
-	endpoints      [2]*netconn.Conn
-	pendingPackets [][]byte
-	readLoopDone   chan struct{}
+	packetLock        sync.Mutex
+	connectionChanged chan struct{}
+	dtlsHandler       func([]byte) error
+	dtlsMatcher       func([]byte) bool
+	endpoints         [2]*netconn.Conn
+	pendingPackets    [][]byte
+	readLoopDone      chan struct{}
 
 	ctxCancel func()
 
@@ -95,9 +97,10 @@ func (t *ICETransport) GetSelectedCandidatePairStats() (ICECandidatePairStats, b
 // NewICETransport creates a new NewICETransport.
 func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory) *ICETransport {
 	iceTransport := &ICETransport{
-		gatherer:      gatherer,
-		loggerFactory: loggerFactory,
-		log:           loggerFactory.NewLogger("ortc"),
+		gatherer:          gatherer,
+		loggerFactory:     loggerFactory,
+		log:               loggerFactory.NewLogger("ortc"),
+		connectionChanged: make(chan struct{}, 1),
 	}
 	iceTransport.setState(ICETransportStateNew)
 
@@ -215,6 +218,7 @@ func (t *ICETransport) StartContext(
 	}
 
 	t.conn = iceConn
+	t.notifyConnectionChanged()
 	t.readLoopDone = make(chan struct{})
 	go t.readLoop(iceConn, t.readLoopDone)
 
@@ -297,6 +301,7 @@ func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) 
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
+	t.notifyConnectionChanged()
 	if handler, ok := t.onSelectedCandidatePairChangeHandler.Load().(func(*ICECandidatePair)); ok {
 		handler(pair)
 	}
@@ -424,6 +429,14 @@ func (t *ICETransport) GetRemoteParameters() (ICEParameters, error) {
 
 func (t *ICETransport) setState(i ICETransportState) {
 	t.state.Store(i)
+	t.notifyConnectionChanged()
+}
+
+func (t *ICETransport) notifyConnectionChanged() {
+	select {
+	case t.connectionChanged <- struct{}{}:
+	default:
+	}
 }
 
 func (t *ICETransport) newEndpoint(kind iceEndpointKind) *netconn.Conn {
@@ -455,7 +468,7 @@ func endpointMatcher(kind iceEndpointKind) func([]byte) bool {
 	return matchSRTCP
 }
 
-func (t *ICETransport) setDTLSHandler(handler func([]byte) error) {
+func (t *ICETransport) setDTLSHandler(handler func([]byte) error) func() {
 	t.packetLock.Lock()
 	t.dtlsHandler = handler
 	var pending [][]byte
@@ -464,8 +477,10 @@ func (t *ICETransport) setDTLSHandler(handler func([]byte) error) {
 	}
 	t.packetLock.Unlock()
 
-	for _, packet := range pending {
-		t.handlePacket(handler, packet)
+	return func() {
+		for _, packet := range pending {
+			t.handlePacket(handler, packet)
+		}
 	}
 }
 
@@ -540,6 +555,9 @@ func (t *ICETransport) dispatchPacket(packet []byte) {
 }
 
 func (t *ICETransport) handlePacket(handler func([]byte) error, packet []byte) {
+	if t.dtlsMatcher != nil && matchDTLS(packet) && !t.dtlsMatcher(packet) {
+		return
+	}
 	if err := handler(packet); err != nil && !errors.Is(err, packetio.ErrFull) {
 		t.log.Warnf("failed to dispatch WebRTC packet: %v", err)
 	}

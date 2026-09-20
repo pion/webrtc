@@ -15,6 +15,10 @@ var (
 	// has already been closed.
 	ErrConnectionClosed = errors.New("connection closed")
 
+	// ErrDTLSRestartNotSupported indicates that the remote peer
+	// does not support the requested DTLS restart.
+	ErrDTLSRestartNotSupported = errors.New("DTLS restart is not supported")
+
 	// ErrDataChannelNotOpen indicates an operation executed when the data
 	// channel is not (yet) open.
 	ErrDataChannelNotOpen = errors.New("data channel not open")

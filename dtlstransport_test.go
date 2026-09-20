@@ -13,6 +13,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -23,7 +24,10 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v4/test"
+	"github.com/pion/webrtc/v4/internal/detacheddtls"
+	"github.com/pion/webrtc/v4/internal/netconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // An invalid fingerprint MUST cause DTLSTransport to go to failed state.
@@ -568,4 +572,32 @@ func TestSRTPProtectionProfileFromDTLS(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestDTLSTransport_PausePreservesBufferAndDeadlines(t *testing.T) {
+	lim := test.TimeOut(5 * time.Second)
+	defer lim.Stop()
+	report := test.CheckRoutines(t)
+	defer report()
+	conn := detacheddtls.New(detacheddtls.Config{
+		SetDatagramHandler: func(func([]byte) error) func() { return func() {} },
+		NetConn:            netconn.Config{SetWriteDeadline: func(time.Time) error { return nil }},
+	})
+	defer func() { require.NoError(t, conn.Close()) }()
+	require.NoError(t, conn.Push([]byte("buffered")))
+	require.NoError(t, conn.Pause())
+	buf := make([]byte, 32)
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, "buffered", string(buf[:n]))
+	require.NoError(t, conn.SetWriteDeadline(time.Now().Add(-time.Second)))
+	_, err = conn.Write(buf)
+	require.ErrorIs(t, err, os.ErrDeadlineExceeded)
+	require.NoError(t, conn.SetWriteDeadline(time.Time{}))
+	written := make(chan error, 1)
+	go func() { _, writeErr := conn.Write(buf); written <- writeErr }()
+	require.NoError(t, conn.Close())
+	require.ErrorIs(t, <-written, io.ErrClosedPipe)
+	_, err = conn.Read(buf)
+	require.ErrorIs(t, err, io.EOF)
 }

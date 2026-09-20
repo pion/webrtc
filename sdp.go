@@ -803,13 +803,9 @@ func populateSDP(
 }
 
 func getMidValue(media *sdp.MediaDescription) string {
-	for _, attr := range media.Attributes {
-		if attr.Key == "mid" {
-			return attr.Value
-		}
-	}
+	mid, _ := media.Attribute(sdp.AttrKeyMID)
 
-	return ""
+	return mid
 }
 
 // SessionDescription contains a MediaSection with Multiple SSRCs, it is Plan-B.
@@ -877,50 +873,17 @@ func extractBundleID(desc *sdp.SessionDescription) string {
 	return bundleIDs[1]
 }
 
-func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint:gocognit,cyclop
-	fingerprint := ""
-
-	// Fingerprint on session level has highest priority
-	if sessionFingerprint, haveFingerprint := desc.Attribute("fingerprint"); haveFingerprint {
-		fingerprint = sessionFingerprint
-	}
-
-	if fingerprint == "" { //nolint:nestif
-		bundleID := extractBundleID(desc)
-		if bundleID != "" {
-			// Locate the fingerprint of the bundled media section
-			for _, mediaDescr := range desc.MediaDescriptions {
-				if mid, haveMid := mediaDescr.Attribute("mid"); haveMid {
-					if mid == bundleID && fingerprint == "" {
-						if mediaFingerprint, haveFingerprint := mediaDescr.Attribute("fingerprint"); haveFingerprint {
-							fingerprint = mediaFingerprint
-						}
-					}
-				}
-			}
-		} else {
-			// Take the fingerprint from the first media section which has one.
-			// Note: According to Bundle spec each media section would have it's own transport
-			//       with it's own cert and fingerprint each, so we would need to return a list.
-			for _, mediaDescr := range desc.MediaDescriptions {
-				mediaFingerprint, haveFingerprint := mediaDescr.Attribute("fingerprint")
-				if haveFingerprint && fingerprint == "" {
-					fingerprint = mediaFingerprint
-				}
-			}
-		}
-	}
-
-	if fingerprint == "" {
+func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) {
+	values := transportAttributes(desc, "fingerprint")
+	if len(values) == 0 {
 		return "", "", ErrSessionDescriptionNoFingerprint
 	}
-
-	parts := strings.Split(fingerprint, " ")
-	if len(parts) != 2 {
+	hash, fingerprint, ok := strings.Cut(values[0], " ")
+	if !ok || strings.Contains(fingerprint, " ") {
 		return "", "", ErrSessionDescriptionInvalidFingerprint
 	}
 
-	return parts[1], parts[0], nil
+	return fingerprint, hash, nil
 }
 
 // identifiedMediaDescription contains a MediaDescription with sdpMid and sdpMLineIndex.
@@ -934,17 +897,10 @@ func extractICEDetailsFromMedia( //nolint:cyclop
 	media *identifiedMediaDescription,
 	log logging.LeveledLogger,
 ) (string, string, []ICECandidate, error) {
-	remoteUfrag := ""
-	remotePwd := ""
 	candidates := []ICECandidate{}
 	descr := media.MediaDescription
-
-	if ufrag, haveUfrag := descr.Attribute("ice-ufrag"); haveUfrag {
-		remoteUfrag = ufrag
-	}
-	if pwd, havePwd := descr.Attribute("ice-pwd"); havePwd {
-		remotePwd = pwd
-	}
+	remoteUfrag, _ := descr.Attribute("ice-ufrag")
+	remotePwd, _ := descr.Attribute("ice-pwd")
 
 	// track the last error we saw while parsing candidates.
 	// if we end up with no valid candidates then return prevErr.
@@ -1012,13 +968,9 @@ func extractICEDetails(
 		Candidates: []ICECandidate{},
 	}
 
-	// Ufrag and Pw are allow at session level and thus have highest prio
-	if ufrag, haveUfrag := desc.Attribute("ice-ufrag"); haveUfrag {
-		details.Ufrag = ufrag
-	}
-	if pwd, havePwd := desc.Attribute("ice-pwd"); havePwd {
-		details.Password = pwd
-	}
+	// Session-level ICE credentials take priority.
+	details.Ufrag, _ = desc.Attribute("ice-ufrag")
+	details.Password, _ = desc.Attribute("ice-pwd")
 
 	mediaDescr, ok := selectCandidateMediaSection(desc)
 	if ok {
@@ -1055,23 +1007,15 @@ func selectCandidateMediaSection(sessionDescription *sdp.SessionDescription) (
 
 	for mLineIndex, mediaDescr := range sessionDescription.MediaDescriptions {
 		mid := getMidValue(mediaDescr)
-		// If bundled, only take ICE detail from bundle master section
-		if bundleID != "" {
-			if mid == bundleID {
-				return &identifiedMediaDescription{
-					MediaDescription: mediaDescr,
-					SDPMid:           mid,
-					SDPMLineIndex:    uint16(mLineIndex), //nolint:gosec // G115
-				}, true
-			}
-		} else {
-			// For not-bundled, take ICE details from the first media section
-			return &identifiedMediaDescription{
-				MediaDescription: mediaDescr,
-				SDPMid:           mid,
-				SDPMLineIndex:    uint16(mLineIndex), //nolint:gosec // G115
-			}, true
+		if bundleID != "" && mid != bundleID {
+			continue
 		}
+
+		return &identifiedMediaDescription{
+			MediaDescription: mediaDescr,
+			SDPMid:           mid,
+			SDPMLineIndex:    uint16(mLineIndex), //nolint:gosec // G115
+		}, true
 	}
 
 	return nil, false
@@ -1230,4 +1174,94 @@ func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
 	}
 
 	return nil, nil
+}
+
+// remoteDTLSRestart compares the association described by an established
+// offer/answer pair with a new remote description.
+func remoteDTLSRestart(previousRemote, previousLocal, remote *SessionDescription) bool {
+	if previousRemote == nil || previousLocal == nil || remote == nil {
+		return false
+	}
+	role := dtlsRoleFromSDP(remote.parsed)
+
+	return !slices.Equal(remoteDTLSFingerprints(previousRemote.parsed), remoteDTLSFingerprints(remote.parsed)) ||
+		remoteTLSID(previousRemote.parsed) != remoteTLSID(remote.parsed) ||
+		(role != DTLSRoleAuto && role != negotiatedDTLSRole(previousRemote, previousLocal))
+}
+
+func negotiatedDTLSRole(local, remote *SessionDescription) DTLSRole {
+	role := dtlsRoleFromSDP(local.parsed)
+	if role == DTLSRoleAuto {
+		role = oppositeDTLSRole(dtlsRoleFromSDP(remote.parsed))
+	}
+
+	return role
+}
+
+func oppositeDTLSRole(role DTLSRole) DTLSRole {
+	switch role {
+	case DTLSRoleClient:
+		return DTLSRoleServer
+	case DTLSRoleServer:
+		return DTLSRoleClient
+	default:
+		return DTLSRoleAuto
+	}
+}
+
+func remoteTLSID(desc *sdp.SessionDescription) string {
+	if values := transportAttributes(desc, "tls-id"); len(values) != 0 {
+		return values[0]
+	}
+
+	return ""
+}
+
+func addTLSID(desc *sdp.SessionDescription, id string) {
+	if id == "" {
+		return
+	}
+	for _, media := range desc.MediaDescriptions {
+		media.WithValueAttribute("tls-id", id)
+	}
+}
+
+// transportAttributes selects the bundled transport or the first media section.
+func transportAttributes(desc *sdp.SessionDescription, key string) []string {
+	values := func(attributes []sdp.Attribute) []string {
+		var result []string
+		for _, attribute := range attributes {
+			if attribute.Key == key && attribute.Value != "" {
+				result = append(result, attribute.Value)
+			}
+		}
+
+		return result
+	}
+	if key == "fingerprint" {
+		if result := values(desc.Attributes); len(result) != 0 {
+			return result
+		}
+	}
+	bundleID := extractBundleID(desc)
+	for _, media := range desc.MediaDescriptions {
+		if bundleID != "" && getMidValue(media) != bundleID {
+			continue
+		}
+		if result := values(media.Attributes); len(result) != 0 {
+			return result
+		}
+	}
+
+	return nil
+}
+
+func remoteDTLSFingerprints(desc *sdp.SessionDescription) []string {
+	values := transportAttributes(desc, "fingerprint")
+	for i, value := range values {
+		values[i] = strings.ToLower(strings.Join(strings.Fields(value), " "))
+	}
+	slices.Sort(values)
+
+	return slices.Compact(values)
 }
