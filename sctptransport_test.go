@@ -95,44 +95,36 @@ func newSCTPTestDTLSPair(t *testing.T) (*testORTCStack, *testORTCStack) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	started := make(chan error, 1)
-	go func() {
-		role := ICERoleControlled
-		if startErr := stackB.ice.StartContext(ctx, nil, signalA.ICEParameters, &role); startErr != nil {
-			started <- startErr
+	started := make(chan error, 2)
+	for i, stack := range []*testORTCStack{stackA, stackB} {
+		go func() {
+			role, signal := ICERoleControlling, signalB
+			if i == 1 {
+				role, signal = ICERoleControlled, signalA
+			}
+			if err := stack.ice.StartContext(ctx, nil, signal.ICEParameters, &role); err != nil {
+				started <- err
 
-			return
-		}
-		started <- stackB.dtls.StartContext(ctx, signalA.DTLSParameters)
-	}()
-	role := ICERoleControlling
-	require.NoError(t, stackA.ice.StartContext(ctx, nil, signalB.ICEParameters, &role))
-	require.NoError(t, stackA.dtls.StartContext(ctx, signalB.DTLSParameters))
-	select {
-	case err = <-started:
-		require.NoError(t, err)
-	case <-ctx.Done():
-		require.FailNow(t, "ICE and DTLS setup did not complete")
+				return
+			}
+			started <- stack.dtls.StartContext(ctx, signal.DTLSParameters)
+		}()
 	}
+	require.NoError(t, <-started)
+	require.NoError(t, <-started)
 
 	return stackA, stackB
 }
 
 func TestSCTPTransportStartContextInterrupted(t *testing.T) {
-	for _, deadline := range []bool{false, true} {
-		name := "cancel"
-		if deadline {
-			name = "deadline"
-		}
+	for _, name := range []string{"cancel", "deadline"} {
 		t.Run(name, func(t *testing.T) {
 			stackA, stackB := newSCTPTestDTLSPair(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			wantErr := context.Canceled
-			if deadline {
-				cancel()
-				ctx, cancel = context.WithTimeout(context.Background(), 250*time.Millisecond)
-				wantErr = context.DeadlineExceeded
+			timeout, wantErr := 5*time.Second, context.Canceled
+			if name == "deadline" {
+				timeout, wantErr = 250*time.Millisecond, context.DeadlineExceeded
 			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			started := make(chan error, 1)
@@ -145,7 +137,7 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 			packet := make([]byte, 1500)
 			_, err := stackB.dtls.conn.Read(packet)
 			require.NoError(t, err)
-			if !deadline {
+			if name == "cancel" {
 				cancel()
 			}
 
@@ -162,7 +154,7 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 				return errors.Is(writeErr, dtls.ErrConnClosed)
 			}, 5*time.Second, time.Millisecond)
 			assert.Nil(t, stackA.sctp.association())
-			assert.NotEqual(t, SCTPTransportStateConnected, stackA.sctp.State())
+			assert.Equal(t, SCTPTransportStateClosed, stackA.sctp.State())
 		})
 	}
 }
@@ -174,15 +166,10 @@ func TestSCTPTransportStartContextCancelAfterConnected(t *testing.T) {
 
 	started := make(chan error, 1)
 	go func() {
-		started <- stackB.sctp.Start(SCTPCapabilities{})
+		started <- stackB.sctp.StartContext(ctx, SCTPCapabilities{})
 	}()
 	require.NoError(t, stackA.sctp.StartContext(ctx, SCTPCapabilities{}))
-	select {
-	case err := <-started:
-		require.NoError(t, err)
-	case <-ctx.Done():
-		require.FailNow(t, "SCTP setup did not complete")
-	}
+	require.NoError(t, <-started)
 	cancel()
 
 	// Streams opened before sending are not consumed by the data channel accept loop.

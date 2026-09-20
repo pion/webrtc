@@ -127,7 +127,7 @@ func (r *SCTPTransport) Start(capabilities SCTPCapabilities) error {
 // The context controls SCTP association establishment only. Canceling it after
 // establishment does not close the association. Cancellation returns the context
 // error. If an association is being established, its underlying DTLS connection is
-// closed in the background.
+// closed in the background. A failed association setup leaves the transport closed.
 // An already-canceled context leaves the transport and DTLS connection unchanged.
 //
 //nolint:cyclop
@@ -160,6 +160,10 @@ func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapab
 	}
 	sctpAssociation, err := sctp.ClientContext(ctx, opts...)
 	if err != nil {
+		r.lock.Lock()
+		r.state = SCTPTransportStateClosed
+		r.lock.Unlock()
+
 		return err
 	}
 
