@@ -1486,3 +1486,69 @@ func TestPeerConnection_Renegotiation_DTLSRole(t *testing.T) {
 		})
 	}
 }
+
+func TestPeerConnection_DTLSRestart(t *testing.T) {
+	defer test.TimeOut(30 * time.Second).Stop()
+	defer test.CheckRoutines(t)()
+	first, second, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, first, second)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "stream")
+	require.NoError(t, err)
+	_, err = first.AddTrack(track)
+	require.NoError(t, err)
+	tracks := make(chan *TrackRemote, 1)
+	second.OnTrack(func(track *TrackRemote, _ *RTPReceiver) { tracks <- track })
+	messages := make(chan string, 1)
+	second.OnDataChannel(func(channel *DataChannel) {
+		channel.OnMessage(func(message DataChannelMessage) { messages <- string(message.Data) })
+	})
+	channel, err := first.CreateDataChannel("restart", nil)
+	require.NoError(t, err)
+	var remote *TrackRemote
+	for sequence := uint16(1); sequence <= 3; sequence++ {
+		certificate, engine := first.GetConfiguration().Certificates[0], second.dtlsTransport.dtlsConn
+		if previous := first.CurrentLocalDescription(); previous != nil {
+			invalid := *previous
+			invalid.SDP = strings.Replace(invalid.SDP, "a=mid:", "a=tls-id:restart-without-ice-1234\r\na=mid:", 1)
+			require.ErrorIs(t, second.SetRemoteDescription(invalid), ErrDTLSRestartRequiresICERestart)
+		}
+		offer, offerErr := first.CreateOffer(&OfferOptions{DTLSRestart: true})
+		require.NoError(t, offerErr)
+		require.NotEmpty(t, remoteTLSID(offer.parsed))
+		require.True(t, certificate.Equals(first.GetConfiguration().Certificates[0]))
+		require.NoError(t, signalPairWithOptions(first, second, withDisableInitialDataChannel(true),
+			withModificationFunc(func(description string) string {
+				return strings.ReplaceAll(description, "a=tls-id:"+remoteTLSID(offer.parsed)+"\r\n", "")
+			})))
+		first.ops.Done()
+		second.ops.Done()
+		require.NotSame(t, engine, second.dtlsTransport.dtlsConn)
+		require.Equal(t, DTLSTransportStateConnected, second.dtlsTransport.State())
+		require.Equal(t, first.GetConfiguration().Certificates[0].x509Cert.Raw, second.dtlsTransport.GetRemoteCertificate())
+		waitDataChannelOpen(t, channel)
+		sendAndExpect(t, channel, messages, strconv.Itoa(int(sequence)))
+		require.NoError(t, track.WriteRTP(&rtp.Packet{Header: rtp.Header{
+			Version: 2, SequenceNumber: sequence, Timestamp: uint32(sequence) * 3000,
+		}, Payload: []byte{0x10, 0x00}}))
+		if remote == nil {
+			remote = <-tracks
+		}
+		require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
+		packet, _, readErr := remote.ReadRTP()
+		require.NoError(t, readErr)
+		require.Equal(t, sequence, packet.SequenceNumber)
+	}
+
+	certificate, engine := first.GetConfiguration().Certificates[0], first.dtlsTransport.dtlsConn
+	_, err = first.CreateOffer(&OfferOptions{DTLSRestart: true})
+	require.NoError(t, err)
+	for _, pair := range [][2]*PeerConnection{{second, first}, {first, second}} {
+		require.NoError(t, signalPairWithOptions(pair[0], pair[1], withDisableInitialDataChannel(true)))
+		first.ops.Done()
+		second.ops.Done()
+		require.True(t, certificate.Equals(first.GetConfiguration().Certificates[0]))
+		require.Same(t, engine, first.dtlsTransport.dtlsConn)
+		require.Empty(t, remoteTLSID(first.CurrentLocalDescription().parsed))
+	}
+}

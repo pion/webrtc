@@ -1150,3 +1150,99 @@ func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
 
 	return nil, nil
 }
+
+// remoteDTLSRestart compares the association described by an established
+// offer/answer pair with a new remote description.
+func remoteDTLSRestart(previousRemote, previousLocal, remote *SessionDescription) bool {
+	if previousRemote == nil || previousLocal == nil || remote == nil {
+		return false
+	}
+	role := dtlsRoleFromSDP(remote.parsed)
+
+	return !slices.Equal(remoteDTLSFingerprints(previousRemote.parsed), remoteDTLSFingerprints(remote.parsed)) ||
+		remoteTLSID(previousRemote.parsed) != remoteTLSID(remote.parsed) ||
+		(role != DTLSRoleAuto && role != negotiatedDTLSRole(previousRemote, previousLocal))
+}
+
+func negotiatedDTLSRole(local, remote *SessionDescription) DTLSRole {
+	role := dtlsRoleFromSDP(local.parsed)
+	if role == DTLSRoleAuto {
+		role = oppositeDTLSRole(dtlsRoleFromSDP(remote.parsed))
+	}
+
+	return role
+}
+
+func oppositeDTLSRole(role DTLSRole) DTLSRole {
+	switch role {
+	case DTLSRoleClient:
+		return DTLSRoleServer
+	case DTLSRoleServer:
+		return DTLSRoleClient
+	default:
+		return DTLSRoleAuto
+	}
+}
+
+func remoteTLSID(desc *sdp.SessionDescription) string {
+	if values := transportAttributes(desc, "tls-id"); len(values) != 0 {
+		return values[0]
+	}
+
+	return ""
+}
+
+func addTLSID(desc *sdp.SessionDescription, id string) {
+	if id == "" {
+		return
+	}
+	// https://www.rfc-editor.org/rfc/rfc9429.html#section-5.2.1
+	group, _ := desc.Attribute(sdp.AttrKeyGroup)
+	bundle := strings.Fields(group)
+	for _, media := range desc.MediaDescriptions {
+		if len(bundle) > 1 && bundle[0] == "BUNDLE" && slices.Contains(bundle[2:], getMidValue(media)) {
+			continue
+		}
+		media.WithValueAttribute("tls-id", id)
+	}
+}
+
+// transportAttributes selects the bundled transport or the first media section.
+func transportAttributes(desc *sdp.SessionDescription, key string) []string {
+	values := func(attributes []sdp.Attribute) []string {
+		var result []string
+		for _, attribute := range attributes {
+			if attribute.Key == key && attribute.Value != "" {
+				result = append(result, attribute.Value)
+			}
+		}
+
+		return result
+	}
+	if key == "fingerprint" {
+		if result := values(desc.Attributes); len(result) != 0 {
+			return result
+		}
+	}
+	bundleID := extractBundleID(desc)
+	for _, media := range desc.MediaDescriptions {
+		if bundleID != "" && getMidValue(media) != bundleID {
+			continue
+		}
+		if result := values(media.Attributes); len(result) != 0 {
+			return result
+		}
+	}
+
+	return nil
+}
+
+func remoteDTLSFingerprints(desc *sdp.SessionDescription) []string {
+	values := transportAttributes(desc, "fingerprint")
+	for i, value := range values {
+		values[i] = strings.ToLower(strings.Join(strings.Fields(value), " "))
+	}
+	slices.Sort(values)
+
+	return slices.Compact(values)
+}

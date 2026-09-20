@@ -30,4 +30,9 @@ type OfferOptions struct {
 	// When this value is true, the generated description will have ICE
 	// credentials that are different from the current credentials
 	ICERestart bool
+
+	// DTLSRestart requests a new DTLS association by changing the SDP tls-id
+	// and, on renegotiation, generating a new local certificate and fingerprint.
+	// It also implies ICERestart.
+	DTLSRestart bool
 }
