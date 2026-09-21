@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1937,6 +1938,92 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 
 		closePairNow(t, pcOffer, pcAnswer)
 	})
+}
+
+func TestPeerConnection_StartReceiver_SSRCSimulcastFiresOnTrackPerLayer(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	mediaEngine := &MediaEngine{}
+	require.NoError(t, mediaEngine.RegisterDefaultCodecs())
+	require.NoError(t, ConfigureSimulcastExtensionHeaders(mediaEngine))
+	settings := SettingEngine{}
+	settings.SetFireOnTrackBeforeFirstRTP(true)
+	api := NewAPI(WithMediaEngine(mediaEngine), WithSettingEngine(settings))
+
+	pcOffer, pcAnswer, err := api.newPair(Configuration{})
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	require.NoError(t, err)
+	_, err = pcOffer.AddTrack(track)
+	require.NoError(t, err)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+	<-connected
+
+	// Build a standalone RTPReceiver on the answerer's already-connected DTLS transport so
+	// startReceiver can be exercised directly with a hand-crafted, SSRC-based simulcast track,
+	// without needing a sender able to negotiate "a=ssrc-group:SIM" itself.
+	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, pcAnswer.dtlsTransport)
+	require.NoError(t, err)
+
+	simulcastSSRCs := []SSRC{5000, 5001, 5002}
+	simulcastTrack := trackDetails{
+		mid:      "1",
+		kind:     RTPCodecTypeVideo,
+		streamID: "simulcast",
+		id:       "simulcast",
+		ssrcs:    simulcastSSRCs,
+	}
+
+	var mu sync.Mutex
+	seen := map[SSRC]int{}
+	done := make(chan struct{})
+
+	pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+		// Ignore OnTrack firing for the real negotiated (non-simulcast) video track added above;
+		// only the hand-crafted SSRC-based simulcast layers below matter for this assertion.
+		if !slices.Contains(simulcastSSRCs, trackRemote.SSRC()) {
+			return
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		seen[trackRemote.SSRC()]++
+		if len(seen) == len(simulcastSSRCs) {
+			close(done)
+		}
+	})
+
+	// configureReceiver creates the per-SSRC TrackRemote entries that startReceiver's
+	// receiver.startReceive(...) call expects to already exist.
+	pcAnswer.configureReceiver(simulcastTrack, receiver)
+	pcAnswer.startReceiver(simulcastTrack, receiver)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		mu.Lock()
+		seenCopy := make(map[SSRC]int, len(seen))
+		for ssrc, count := range seen {
+			seenCopy[ssrc] = count
+		}
+		mu.Unlock()
+		require.Fail(t, "did not receive OnTrack for all SSRC layers",
+			"expected %d, got %+v", len(simulcastSSRCs), seenCopy)
+	}
+
+	mu.Lock()
+	for _, ssrc := range simulcastSSRCs {
+		assert.Equal(t, 1, seen[ssrc], "SSRC %d should fire OnTrack exactly once", ssrc)
+	}
+	mu.Unlock()
 }
 
 type simulcastTestTrackLocal struct {
