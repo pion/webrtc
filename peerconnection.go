@@ -1002,12 +1002,12 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 // 4.4.1.6 Set the SessionDescription
 //
 //nolint:gocognit,cyclop
-func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
+func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) (SignalingState, error) {
 	switch {
 	case pc.isClosed.Load():
-		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+		return SignalingStateUnknown, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	case NewSDPType(sd.Type.String()) == SDPTypeUnknown:
-		return &rtcerr.TypeError{
+		return SignalingStateUnknown, &rtcerr.TypeError{
 			Err: fmt.Errorf("%w: '%d' is not a valid enum value of type SDPType", errPeerConnSDPTypeInvalidValue, sd.Type),
 		}
 	}
@@ -1113,10 +1113,9 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 			pc.onNegotiationNeeded()
 			pc.mu.Unlock()
 		}
-		pc.onSignalingStateChange(nextState)
 	}
 
-	return err
+	return nextState, err
 }
 
 // SetLocalDescription sets the SessionDescription of the local peer
@@ -1147,9 +1146,14 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	if err := desc.parsed.UnmarshalString(desc.SDP); err != nil {
 		return err
 	}
-	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
+	nextState, err := pc.setDescription(&desc, stateChangeOpSetLocal)
+	if err != nil {
 		return err
 	}
+	// Issue #3370: the signaling state change event is fired after the
+	// description has been fully applied, so handlers observe a consistent
+	// peer connection state.
+	defer pc.onSignalingStateChange(nextState)
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
@@ -1206,9 +1210,14 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
-	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
-		return err
+	nextState, setErr := pc.setDescription(&desc, stateChangeOpSetRemote)
+	if setErr != nil {
+		return setErr
 	}
+	// Issue #3370: the signaling state change event is fired after the
+	// description has been fully applied, so handlers observe a consistent
+	// peer connection state.
+	defer pc.onSignalingStateChange(nextState)
 
 	if err := pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
 		return err
