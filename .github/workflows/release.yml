@@ -21,4 +21,4 @@ jobs:
   release:
     uses: pion/.goassets/.github/workflows/release.reusable.yml@main
     with:
-      go-version: "1.25" # auto-update/latest-go-version
+      go-version: "1.27" # auto-update/latest-go-version

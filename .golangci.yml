@@ -78,6 +78,8 @@ linters:
     - wrapcheck        # Checks that errors returned from external packages are wrapped
     - wsl              # Whitespace Linter - Forces you to use empty lines!
   settings:
+    lll:
+      line-length: 320
     staticcheck:
       checks:
         - all
@@ -105,6 +107,9 @@ linters:
     govet:
       enable:
         - shadow
+    gosec:
+      excludes:
+        - G117 # noisy secret/password field-name checks.
     revive:
       rules:
         # Prefer 'any' type alias over 'interface{}' for Go 1.18+ compatibility
@@ -151,5 +156,5 @@ formatters:
   exclusions:
     generated: lax
 issues:
-  max-issues-per-linter: 0
   max-same-issues: 0
+  max-issues-per-linter: 0
