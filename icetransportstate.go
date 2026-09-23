@@ -3,7 +3,7 @@
 
 package webrtc
 
-import "github.com/pion/ice/v4"
+import "github.com/pion/ice/v5"
 
 // ICETransportState represents the current state of the ICE transport.
 type ICETransportState int

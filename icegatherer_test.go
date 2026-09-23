@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v4"
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
 	"github.com/pion/transport/v5/test"
@@ -49,12 +49,15 @@ func TestNewICEGatherer_Success(t *testing.T) {
 		}
 	})
 
+	before, err := gatherer.GetLocalParameters()
+	assert.NoError(t, err)
 	assert.NoError(t, gatherer.Gather())
 
 	<-gatherFinished
 
 	params, err := gatherer.GetLocalParameters()
 	assert.NoError(t, err)
+	assert.Equal(t, before, params)
 
 	assert.NotEmpty(t, params.UsernameFragment, "Empty local username frag")
 	assert.NotEmpty(t, params.Password, "Empty local password")
@@ -1358,9 +1361,9 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	const (
 		offerUfrag  = "offerufrag123"
-		offerPwd    = "offerpassword123456789"
+		offerPwd    = "offerpassword1234567890"
 		answerUfrag = "answerufrag123"
-		answerPwd   = "answerpassword12345678"
+		answerPwd   = "answerpassword123456789"
 	)
 
 	pcOffer, err := NewAPI(WithSettingEngine(buildSE(offerNet, offerUfrag, offerPwd))).NewPeerConnection(Configuration{})
@@ -1613,7 +1616,7 @@ func TestICEGatherer_DisableActiveTCP(t *testing.T) { //nolint:cyclop
 				assert.NoError(t, gatherer.Close())
 			}()
 
-			assert.NoError(t, gatherer.createAgent())
+			assert.NoError(t, gatherer.Gather())
 
 			agent := gatherer.getAgent()
 			if !assert.NotNil(t, agent) {

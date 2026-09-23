@@ -9,7 +9,7 @@ package webrtc
 import (
 	"errors"
 
-	"github.com/pion/ice/v4"
+	"github.com/pion/stun/v4"
 )
 
 // ICEServer describes a single STUN and TURN server that can be used by
@@ -22,12 +22,12 @@ type ICEServer struct {
 	CredentialType ICECredentialType
 }
 
-func (s ICEServer) parseURL(i int) (*ice.URL, error) {
-	return ice.ParseURL(s.URLs[i])
+func (s ICEServer) parseURL(i int) (*stun.URI, error) {
+	return stun.ParseURI(s.URLs[i])
 }
 
-func (s ICEServer) validate() ([]*ice.URL, error) {
-	urls := []*ice.URL{}
+func (s ICEServer) validate() ([]*stun.URI, error) {
+	urls := []*stun.URI{}
 
 	for i := range s.URLs {
 		url, err := s.parseURL(i)
@@ -35,7 +35,7 @@ func (s ICEServer) validate() ([]*ice.URL, error) {
 			return nil, err
 		}
 
-		if url.Scheme == ice.SchemeTypeTURN || url.Scheme == ice.SchemeTypeTURNS {
+		if url.Scheme == stun.SchemeTypeTURN || url.Scheme == stun.SchemeTypeTURNS {
 			return nil, errors.New("TURN is not currently supported in the JavaScript/Wasm bindings")
 		}
 
