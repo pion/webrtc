@@ -485,7 +485,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 	} {
 		t.Run("one track per media section/"+group, func(t *testing.T) {
 			descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
-				MediaName: sdp.MediaName{Media: "video"},
+				MediaName: sdp.MediaName{Media: "video", Port: sdp.RangedPort{Value: 9}},
 				Attributes: []sdp.Attribute{
 					{Key: "mid", Value: "0"},
 					{Key: "ssrc-group", Value: group},
@@ -521,6 +521,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "foobar",
 					},
 					Attributes: []sdp.Attribute{
@@ -531,6 +532,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "audio",
 					},
 					Attributes: []sdp.Attribute{
@@ -541,6 +543,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -553,6 +556,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -564,6 +568,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -611,6 +616,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -645,6 +651,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -654,6 +661,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -671,6 +679,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -683,6 +692,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -1812,6 +1822,45 @@ func TestPopulateSDPCandidatePlacement(t *testing.T) {
 				_, inactive := descr.MediaDescriptions[0].Attribute("inactive")
 				assert.True(t, inactive)
 				assert.NotZero(t, descr.MediaDescriptions[0].MediaName.Port.Value)
+			}
+		})
+	}
+}
+
+func TestTrackDetailsFromSDPRejectedMedia(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		port       int
+		bundleOnly bool
+		wantTracks int
+	}{
+		{name: "accepted", port: 9, wantTracks: 1},
+		{name: "rejected", port: 0, wantTracks: 0},
+		{name: "bundle-only", port: 0, bundleOnly: true, wantTracks: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, metadata := range []sdp.Attribute{
+				{Key: sdp.AttrKeySSRC, Value: "1000"},
+				{Key: sdpAttributeRid, Value: "f send"},
+			} {
+				t.Run(metadata.Key, func(t *testing.T) {
+					media := &sdp.MediaDescription{
+						MediaName: sdp.MediaName{Media: "video", Port: sdp.RangedPort{Value: testCase.port}},
+						Attributes: []sdp.Attribute{
+							{Key: "mid", Value: "0"},
+							{Key: sdp.AttrKeySendOnly},
+							{Key: "msid", Value: "stream track"},
+							metadata,
+						},
+					}
+					if testCase.bundleOnly {
+						media.WithPropertyAttribute("bundle-only")
+					}
+					tracks := trackDetailsFromSDP(nil, &sdp.SessionDescription{
+						MediaDescriptions: []*sdp.MediaDescription{media},
+					})
+					require.Len(t, tracks, testCase.wantTracks)
+				})
 			}
 		})
 	}

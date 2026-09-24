@@ -82,6 +82,10 @@ func trackDetailsFromSDP(
 	s *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
 	for _, media := range s.MediaDescriptions {
+		if isRejectedMediaSection(media) {
+			continue
+		}
+
 		direction := getPeerDirection(media, s)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
