@@ -792,7 +792,23 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			dtlsFingerprints, err := certificate.GetFingerprints()
 			assert.NoError(t, err)
 
-			testSdp, err = populateSDP(testSdp, dtlsFingerprints, SDPMediaDescriptionFingerprints, false, true, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil, 0, false, false)
+			testSdp, err = populateSDP(testSdp,
+				false,
+				dtlsFingerprints,
+				SDPMediaDescriptionFingerprints,
+				false,
+				true,
+				engine,
+				sdp.ConnectionRoleActive,
+				[]ICECandidate{},
+				ICEParameters{},
+				media,
+				ICEGatheringStateNew,
+				nil,
+				0,
+				false,
+				false,
+			)
 			assert.NoError(t, err)
 
 			sdparray, err := testSdp.Marshal()
@@ -831,7 +847,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			false,
+		)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -877,7 +910,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			false,
+		)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -916,7 +966,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.Nil(t, err)
 
 		// Test codecs
@@ -943,6 +1010,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -991,7 +1059,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.NoError(t, err)
 
 		// Test codecs
@@ -1012,6 +1097,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		se := SettingEngine{}
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1044,6 +1130,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		offerSdp, err = populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1086,7 +1173,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.Nil(t, err)
 
 		bundle, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1110,8 +1214,25 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := "audio"
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false)
+		matchedBundle := (&sdp.SessionDescription{}).WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio")
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			matchedBundle,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.Nil(t, err)
 
 		bundle, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1137,8 +1258,25 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := ""
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false)
+		matchedBundle := &sdp.SessionDescription{}
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			matchedBundle,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.Nil(t, err)
 
 		_, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1156,7 +1294,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			false,
+			false,
+		)
 		assert.Nil(t, err)
 
 		for _, desc := range offerSdp.MediaDescriptions {
@@ -1177,7 +1332,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, cryptex: true}}
 
 		d := &sdp.SessionDescription{}
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			false,
+		)
 		assert.NoError(t, err)
 
 		found := false
@@ -1202,7 +1374,24 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
 
 		d := &sdp.SessionDescription{}
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, true)
+		offerSdp, err := populateSDP(
+			d,
+			false,
+			[]DTLSFingerprint{},
+			se.sdpMediaLevelFingerprints,
+			se.candidates.ICELite,
+			true,
+			me,
+			connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{},
+			ICEParameters{},
+			mediaSections,
+			ICEGatheringStateComplete,
+			nil,
+			se.getSCTPMaxMessageSize(),
+			se.ignoreRidPauseForRecv,
+			true,
+		)
 		assert.NoError(t, err)
 
 		_, ok := offerSdp.Attribute(sdp.AttrKeyCryptex)
@@ -1500,7 +1689,10 @@ func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
 	original := &SessionDescription{
 		Type: SDPTypeAnswer,
 		parsed: &sdp.SessionDescription{
-			MediaDescriptions: []*sdp.MediaDescription{{Attributes: attributes}},
+			MediaDescriptions: []*sdp.MediaDescription{{
+				MediaName:  sdp.MediaName{Port: sdp.RangedPort{Value: 9}},
+				Attributes: attributes,
+			}},
 		},
 	}
 	before, err := original.parsed.Marshal()
@@ -1516,7 +1708,7 @@ func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
 		}
 	}()
 	for range 100 {
-		populated := populateLocalCandidates(original, gatherer, ICEGatheringStateComplete)
+		populated := populateLocalCandidates(original, nil, nil, gatherer, ICEGatheringStateComplete)
 		require.NotSame(t, original, populated)
 		assert.Contains(t, populated.SDP, "a=end-of-candidates")
 		assert.Equal(t, SDPTypeAnswer, populated.Type)
@@ -1529,4 +1721,98 @@ func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, before, after)
 	assert.Equal(t, backing, attributes[:cap(attributes)])
+}
+
+func TestPopulateSDPCandidatePlacement(t *testing.T) {
+	const dataMid = "data"
+
+	audioBundle, reorderedBundle, emptyBundle := "audio data", "audio video data", ""
+	for _, testCase := range []struct {
+		name          string
+		initialOffer  bool
+		rejectVideo   bool
+		inactiveVideo bool
+		dataOnly      bool
+		bundle        *string
+		candidates    []bool
+	}{
+		{name: "initial offer", initialOffer: true, candidates: []bool{true, true, true}},
+		{name: SDPTypeAnswer.String(), candidates: []bool{true, false, false}},
+		{name: "video codec rejected", rejectVideo: true, candidates: []bool{false, true, false}},
+		{name: "video excluded from bundle", bundle: &audioBundle, candidates: []bool{false, true, false}},
+		{name: "bundle order differs from media order", bundle: &reorderedBundle, candidates: []bool{false, true, false}},
+		{name: "inactive video remains eligible", inactiveVideo: true, candidates: []bool{true, false, false}},
+		{name: "data only", dataOnly: true, candidates: []bool{true}},
+		{name: "all sections disabled", bundle: &emptyBundle, candidates: []bool{false, false, false}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			engine := &MediaEngine{}
+			require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
+			if !testCase.rejectVideo {
+				require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
+					RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
+					PayloadType:        96,
+				}, RTPCodecTypeVideo))
+			}
+			api := NewAPI(WithMediaEngine(engine))
+			video := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api}
+			video.setDirection(RTPTransceiverDirectionRecvonly)
+			if testCase.inactiveVideo {
+				video.setDirection(RTPTransceiverDirectionInactive)
+			}
+			audio := &RTPTransceiver{kind: RTPCodecTypeAudio, api: api}
+			audio.setDirection(RTPTransceiverDirectionRecvonly)
+			sections := []mediaSection{
+				{id: "video", transceivers: []*RTPTransceiver{video}},
+				{id: "audio", transceivers: []*RTPTransceiver{audio}},
+				{id: dataMid, data: true},
+			}
+			if testCase.dataOnly {
+				sections = sections[2:]
+			}
+			candidates := []ICECandidate{{
+				Foundation: "1", Priority: 1, Address: "192.0.2.1", Protocol: ICEProtocolUDP,
+				Port: 1234, Typ: ICECandidateTypeHost, Component: 1,
+			}}
+			var matched *sdp.SessionDescription
+			if testCase.bundle != nil {
+				matched = (&sdp.SessionDescription{}).WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE "+*testCase.bundle)
+			}
+			descr, err := populateSDP(
+				&sdp.SessionDescription{},
+				testCase.initialOffer,
+				nil,
+				false,
+				false,
+				false,
+				engine,
+				sdp.ConnectionRoleActive,
+				candidates,
+				ICEParameters{},
+				sections,
+				ICEGatheringStateComplete,
+				matched,
+				0,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.Len(t, descr.MediaDescriptions, len(testCase.candidates))
+			for index, expected := range testCase.candidates {
+				media := descr.MediaDescriptions[index]
+				_, found := media.Attribute("candidate")
+				assert.Equal(t, expected, found, "candidates on media section %d", index)
+				_, found = media.Attribute("end-of-candidates")
+				assert.Equal(t, expected, found, "end-of-candidates on media section %d", index)
+			}
+			if testCase.inactiveVideo {
+				_, inactive := descr.MediaDescriptions[0].Attribute("inactive")
+				assert.True(t, inactive)
+				assert.NotZero(t, descr.MediaDescriptions[0].MediaName.Port.Value)
+			}
+		})
+	}
 }
