@@ -138,6 +138,12 @@ func createRTCConn() *webrtc.PeerConnection { //nolint:cyclop
 	}()
 
 	pc.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
+		// Read the first packet to determine the codec.
+		packet, _, readErr := tr.ReadRTP()
+		if readErr != nil {
+			return
+		}
+
 		var depacketizer rtp.Depacketizer
 
 		switch tr.Codec().MimeType {
@@ -189,8 +195,8 @@ func createRTCConn() *webrtc.PeerConnection { //nolint:cyclop
 		// SampleBuilder reorders and depacketizes incoming RTP packets
 		sb := samplebuilder.New(100, depacketizer, tr.Codec().ClockRate)
 
-		for rtp, _, readErr := tr.ReadRTP(); readErr == nil; rtp, _, readErr = tr.ReadRTP() {
-			sb.Push(rtp)
+		for ; readErr == nil; packet, _, readErr = tr.ReadRTP() {
+			sb.Push(packet)
 			for sample := sb.Pop(); sample != nil; sample = sb.Pop() {
 				// WriteSample takes sample.Data and packetizes it according to the track's codec
 				err := newTrack.WriteSample(media.Sample{

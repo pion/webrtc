@@ -112,10 +112,9 @@ func main() {
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
-		if strings.EqualFold(track.Codec().MimeType, webrtc.MimeTypeAV1) {
-			fmt.Println("Got AV1 track, saving to disk as output.ivf")
-			saveToDisk(ivfFile, track)
-		}
+		// Only AV1 is registered with the MediaEngine.
+		fmt.Println("Got AV1 track, saving to disk as output.ivf")
+		saveToDisk(ivfFile, track)
 	})
 
 	// Set the handler for ICE connection state

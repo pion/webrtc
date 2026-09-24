@@ -91,7 +91,7 @@ func main() { // nolint:gocognit
 
 	// Set a handler for when a new remote track starts
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
-		fmt.Printf("Track has started, of type %d: %s \n", track.PayloadType(), track.Codec().MimeType)
+		fmt.Printf("Track has started, of kind %s\n", track.Kind())
 		trackNum := trackCount
 		trackCount++
 		// The last timestamp so that we can change the packet to only be the delta

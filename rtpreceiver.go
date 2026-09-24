@@ -41,8 +41,7 @@ type trackStreams struct {
 	repairReaderStarted          bool
 	startRepairReaderImmediately bool
 
-	repairRtcpReadStream  *srtp.ReadStreamSRTCP
-	repairRtcpInterceptor interceptor.RTCPReader
+	repairRtcpReadStream *srtp.ReadStreamSRTCP
 }
 
 type rtxPacketWithAttributes struct {
@@ -66,9 +65,10 @@ type RTPReceiver struct {
 
 	tracks []trackStreams
 
-	closed               atomic.Bool
-	closedChan, received chan any
-	mu                   sync.RWMutex
+	closed     atomic.Bool
+	closedChan chan struct{}
+	received   chan any
+	mu         sync.RWMutex
 
 	tr *RTPTransceiver
 
@@ -90,7 +90,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		kind:       kind,
 		transport:  transport,
 		api:        api,
-		closedChan: make(chan any),
+		closedChan: make(chan struct{}),
 		received:   make(chan any),
 		tracks:     []trackStreams{},
 		rtxPool: sync.Pool{New: func() any {
@@ -260,21 +260,8 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			if err != nil {
 				return err
 			}
-			rtpReadStream := result.rtpReadStream
-			rtpInterceptor := result.rtpInterceptor
-			rtcpReadStream := result.rtcpReadStream
-			rtcpInterceptor := result.rtcpInterceptor
 
-			if err = r.receiveForRtxInternal(
-				rtxSsrc,
-				"",
-				streamInfo,
-				rtpReadStream,
-				rtpInterceptor,
-				result.startRTPReaderImmediately,
-				rtcpReadStream,
-				rtcpInterceptor,
-			); err != nil {
+			if err = r.receiveForRtxInternal(rtxSsrc, "", streamInfo, result); err != nil {
 				return err
 			}
 		}
@@ -300,7 +287,7 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 			r.log.Errorf(useReadSimulcast)
 		}
 
-		return r.tracks[0].rtcpInterceptor.Read(b, a)
+		return r.ReadSimulcast(b, r.tracks[0].track.RID())
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
@@ -310,21 +297,20 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-		var rtcpInterceptor interceptor.RTCPReader
+		for _, track := range r.Tracks() {
+			if track.RID() == rid {
+				if err := track.streamFuture.wait(track.rtcpReadDeadline); err != nil {
+					return 0, nil, err
+				}
+				r.mu.RLock()
+				reader := r.streamsForTrack(track).rtcpInterceptor
+				r.mu.RUnlock()
 
-		r.mu.Lock()
-		for _, t := range r.tracks {
-			if t.track != nil && t.track.rid == rid {
-				rtcpInterceptor = t.rtcpInterceptor
+				return reader.Read(b, a)
 			}
 		}
-		r.mu.Unlock()
 
-		if rtcpInterceptor == nil {
-			return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
-		}
-
-		return rtcpInterceptor.Read(b, a)
+		return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
 
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
@@ -334,8 +320,12 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.
 // ReadRTCP is a convenience method that wraps Read and unmarshal for you.
 // It also runs any configured interceptors.
 func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.Read(b)
+	return readRTCP(r.Read, r.api.settingEngine.getReceiveMTU())
+}
+
+func readRTCP(read func([]byte) (int, interceptor.Attributes, error), mtu uint) ([]rtcp.Packet, interceptor.Attributes, error) {
+	b := make([]byte, mtu)
+	i, attributes, err := read(b)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -422,6 +412,13 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 
 	close(r.closedChan)
 	r.closed.Store(true)
+	for _, streams := range r.tracks {
+		if track := streams.track; track.streamsReadyCancel != nil {
+			track.rtpReadDeadline.Set(time.Time{})
+			track.rtcpReadDeadline.Set(time.Time{})
+			track.streamsReadyCancel()
+		}
+	}
 
 	return err
 }
@@ -540,8 +537,14 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 		return 0, nil, io.EOF
 	}
 
+	r.mu.RLock()
+	var rtpInterceptor interceptor.RTPReader
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpInterceptor.Read(b, a)
+		rtpInterceptor = t.rtpInterceptor
+	}
+	r.mu.RUnlock()
+	if rtpInterceptor != nil {
+		return rtpInterceptor.Read(b, a)
 	}
 
 	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
@@ -553,11 +556,7 @@ func (r *RTPReceiver) receiveForRid(
 	rid string,
 	params RTPParameters,
 	streamInfo *interceptor.StreamInfo,
-	rtpReadStream *srtp.ReadStreamSRTP,
-	rtpInterceptor interceptor.RTPReader,
-	startImmediately bool,
-	rtcpReadStream *srtp.ReadStreamSRTCP,
-	rtcpInterceptor interceptor.RTCPReader,
+	streams *streamsForSSRCResult,
 	peekedPackets []*peekedPacket,
 ) (*TrackRemote, error) {
 	r.mu.Lock()
@@ -568,25 +567,40 @@ func (r *RTPReceiver) receiveForRid(
 	}
 
 	for i := range r.tracks {
-		if r.tracks[i].track.RID() == rid {
-			r.tracks[i].track.mu.Lock()
-			r.tracks[i].track.kind = r.kind
-			r.tracks[i].track.codec = params.Codecs[0]
-			r.tracks[i].track.params = params
-			r.tracks[i].track.ssrc = SSRC(streamInfo.SSRC)
-			r.tracks[i].track.peekedPackets = peekedPackets
-			r.tracks[i].track.mu.Unlock()
-
-			r.tracks[i].streamInfo = streamInfo
-			r.tracks[i].rtpReadStream = rtpReadStream
-			r.tracks[i].rtpInterceptor = rtpInterceptor
-			r.tracks[i].rtcpReadStream = rtcpReadStream
-			r.tracks[i].rtcpInterceptor = rtcpInterceptor
-			r.tracks[i].startRepairReaderImmediately = r.tracks[i].startRepairReaderImmediately || startImmediately
-			r.maybeStartRepairStreamReader(&r.tracks[i])
-
-			return r.tracks[i].track, nil
+		if r.tracks[i].track.RID() != rid {
+			continue
 		}
+		r.tracks[i].track.mu.Lock()
+		r.tracks[i].track.kind = r.kind
+		r.tracks[i].track.codec = params.Codecs[0]
+		r.tracks[i].track.params = params
+		r.tracks[i].track.ssrc = SSRC(streamInfo.SSRC)
+		r.tracks[i].track.peekedPackets = peekedPackets
+		r.tracks[i].track.mu.Unlock()
+
+		r.tracks[i].streamInfo = streamInfo
+		r.tracks[i].rtpReadStream = streams.rtpReadStream
+		r.tracks[i].rtpInterceptor = streams.rtpInterceptor
+		r.tracks[i].rtcpReadStream = streams.rtcpReadStream
+		r.tracks[i].rtcpInterceptor = streams.rtcpInterceptor
+		r.tracks[i].startRepairReaderImmediately = r.tracks[i].startRepairReaderImmediately || streams.startRTPReaderImmediately
+		track := r.tracks[i].track
+		if streams.rtpReadStream != nil {
+			readDeadline, _ := track.rtpReadDeadline.Deadline()
+			if err := streams.rtpReadStream.SetReadDeadline(readDeadline); err != nil {
+				return nil, err
+			}
+		}
+		if streams.rtcpReadStream != nil {
+			readDeadline, _ := track.rtcpReadDeadline.Deadline()
+			if err := streams.rtcpReadStream.SetReadDeadline(readDeadline); err != nil {
+				return nil, err
+			}
+		}
+		track.streamsReadyCancel()
+		r.maybeStartRepairStreamReader(&r.tracks[i])
+
+		return track, nil
 	}
 
 	return nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
@@ -597,25 +611,12 @@ func (r *RTPReceiver) receiveForRtx(
 	ssrc SSRC,
 	rsid string,
 	streamInfo *interceptor.StreamInfo,
-	rtpReadStream *srtp.ReadStreamSRTP,
-	rtpInterceptor interceptor.RTPReader,
-	startImmediately bool,
-	rtcpReadStream *srtp.ReadStreamSRTCP,
-	rtcpInterceptor interceptor.RTCPReader,
+	streams *streamsForSSRCResult,
 ) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	return r.receiveForRtxInternal(
-		ssrc,
-		rsid,
-		streamInfo,
-		rtpReadStream,
-		rtpInterceptor,
-		startImmediately,
-		rtcpReadStream,
-		rtcpInterceptor,
-	)
+	return r.receiveForRtxInternal(ssrc, rsid, streamInfo, streams)
 }
 
 //nolint:gocognit,cyclop
@@ -623,11 +624,7 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	ssrc SSRC,
 	rsid string,
 	streamInfo *interceptor.StreamInfo,
-	rtpReadStream *srtp.ReadStreamSRTP,
-	rtpInterceptor interceptor.RTPReader,
-	startImmediately bool,
-	rtcpReadStream *srtp.ReadStreamSRTCP,
-	rtcpInterceptor interceptor.RTCPReader,
+	streams *streamsForSSRCResult,
 ) error {
 	if r.haveClosed() {
 		return io.EOF
@@ -654,13 +651,12 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	}
 
 	track.repairStreamInfo = streamInfo
-	track.repairReadStream = rtpReadStream
-	track.repairInterceptor = rtpInterceptor
-	track.repairRtcpReadStream = rtcpReadStream
-	track.repairRtcpInterceptor = rtcpInterceptor
+	track.repairReadStream = streams.rtpReadStream
+	track.repairInterceptor = streams.rtpInterceptor
+	track.repairRtcpReadStream = streams.rtcpReadStream
 	track.repairStreamChannel = make(chan rtxPacketWithAttributes, 50)
 	track.repairReaderStarted = false
-	track.startRepairReaderImmediately = track.startRepairReaderImmediately || startImmediately
+	track.startRepairReaderImmediately = track.startRepairReaderImmediately || streams.startRTPReaderImmediately
 	r.maybeStartRepairStreamReader(track)
 
 	return nil
@@ -759,9 +755,10 @@ func (r *RTPReceiver) maybeStartRepairStreamReader(track *trackStreams) { //noli
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.
 func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
+	rid := r.tracks[0].track.RID()
+	r.mu.RUnlock()
 
-	return r.tracks[0].rtcpReadStream.SetReadDeadline(t)
+	return r.SetReadDeadlineSimulcast(t, rid)
 }
 
 // SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid will block before returning.
@@ -772,6 +769,13 @@ func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) e
 
 	for _, t := range r.tracks {
 		if t.track != nil && t.track.rid == rid {
+			if t.track.rtcpReadDeadline != nil {
+				t.track.rtcpReadDeadline.Set(deadline)
+				if t.rtcpReadStream == nil {
+					return nil
+				}
+			}
+
 			return t.rtcpReadStream.SetReadDeadline(deadline)
 		}
 	}
@@ -786,6 +790,13 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 	defer r.mu.RUnlock()
 
 	if t := r.streamsForTrack(reader); t != nil {
+		if reader.rtpReadDeadline != nil {
+			reader.rtpReadDeadline.Set(deadline)
+			if t.rtpReadStream == nil {
+				return nil
+			}
+		}
+
 		return t.rtpReadStream.SetReadDeadline(deadline)
 	}
 

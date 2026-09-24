@@ -131,9 +131,13 @@ func main() {
 				ticker := time.NewTicker(3 * time.Second)
 				defer ticker.Stop()
 				for range ticker.C {
-					fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
+					ssrc := track.SSRC()
+					if ssrc == 0 {
+						continue
+					}
+					fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), ssrc)
 					if writeErr := peerConnection.WriteRTCP(
-						[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}},
+						[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(ssrc)}},
 					); writeErr != nil {
 						fmt.Println(writeErr)
 					}

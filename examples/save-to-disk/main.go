@@ -132,11 +132,11 @@ func main() {
 	// an ivf file, since we could have multiple video tracks we provide a counter.
 	// In your application this is where you would handle/process video
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
-		codec := track.Codec()
-		if strings.EqualFold(codec.MimeType, webrtc.MimeTypeOpus) {
+		// Only Opus audio and VP8 video are registered with the MediaEngine.
+		if track.Kind() == webrtc.RTPCodecTypeAudio {
 			fmt.Println("Got Opus track, saving to disk as output.opus (48 kHz, 2 channels)")
 			saveToDisk(oggFile, track)
-		} else if strings.EqualFold(codec.MimeType, webrtc.MimeTypeVP8) {
+		} else if track.Kind() == webrtc.RTPCodecTypeVideo {
 			fmt.Println("Got VP8 track, saving to disk as output.ivf")
 			saveToDisk(ivfFile, track)
 		}

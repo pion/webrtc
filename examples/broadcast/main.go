@@ -90,6 +90,13 @@ func main() {
 	// Set a handler for when a new remote track starts, this just distributes all our packets
 	// to connected peers
 	peerConnection.OnTrack(func(remoteTrack *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
+		// Read the first packet to determine the codec.
+		rtpBuf := make([]byte, 1400)
+		i, _, readErr := remoteTrack.Read(rtpBuf)
+		if readErr != nil {
+			panic(readErr)
+		}
+
 		// Create a local track, all our SFU clients will be fed via this track
 		localTrack, newTrackErr := webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "video", "pion")
 		if newTrackErr != nil {
@@ -97,16 +104,15 @@ func main() {
 		}
 		localTrackChan <- localTrack
 
-		rtpBuf := make([]byte, 1400)
 		for {
-			i, _, readErr := remoteTrack.Read(rtpBuf)
-			if readErr != nil {
-				panic(readErr)
-			}
-
 			// ErrClosedPipe means we don't have any subscribers, this is ok if no peers have connected yet
 			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
 				panic(err)
+			}
+
+			i, _, readErr = remoteTrack.Read(rtpBuf)
+			if readErr != nil {
+				panic(readErr)
 			}
 		}
 	})

@@ -1195,6 +1195,13 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	pcOffer, pcAnswer, err := newPair()
 	assert.NoError(t, err)
 
+	tracksCh := make(chan *TrackRemote, 2)
+	pcAnswer.OnTrack(func(tr *TrackRemote, _ *RTPReceiver) {
+		if _, _, readErr := tr.ReadRTP(); readErr == nil {
+			tracksCh <- tr
+		}
+	})
+
 	vp8Track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "foo", "bar")
 	assert.NoError(t, err)
 	sender, err := pcOffer.AddTrack(vp8Track)
@@ -1224,11 +1231,6 @@ func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	assert.Equal(t, len(pcOffer.GetTransceivers()), 2)
 	assert.True(t, sender.rtpTransceiver == pcOffer.GetTransceivers()[0])
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
-	tracksCh := make(chan *TrackRemote, 2)
-	pcAnswer.OnTrack(func(tr *TrackRemote, _ *RTPReceiver) {
-		tracksCh <- tr
-	})
 
 	ssrcReuse := sender.GetParameters().Encodings[0].SSRC
 	for range 10 {

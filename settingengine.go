@@ -113,7 +113,6 @@ type SettingEngine struct {
 	srtpProtectionProfiles                    []dtls.SRTPProtectionProfile
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
-	fireOnTrackBeforeFirstRTP                 bool
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
@@ -699,15 +698,6 @@ func (e *SettingEngine) SetICEBindingRequestHandler(
 	bindingRequestHandler func(m *stun.Message, local, remote ice.Candidate, pair *ice.CandidatePair) bool,
 ) {
 	e.iceBindingRequestHandler = bindingRequestHandler
-}
-
-// SetFireOnTrackBeforeFirstRTP sets if firing the OnTrack event should happen
-// before any RTP packets are received. Setting this to true will
-// have the Track's Codec and PayloadTypes be initially set to their
-// zero values in the OnTrack handler.
-// Note: This does not yet affect simulcast tracks.
-func (e *SettingEngine) SetFireOnTrackBeforeFirstRTP(fireOnTrackBeforeFirstRTP bool) {
-	e.fireOnTrackBeforeFirstRTP = fireOnTrackBeforeFirstRTP
 }
 
 // SetHandleUndeclaredSSRCWithoutAnswer controls if an SDP answer is required for

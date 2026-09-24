@@ -227,7 +227,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 // PeerConnection should be able to be torn down at anytime
 // This test adds an input track and asserts
-// OnTrack doesn't fire since no video packets will arrive
+// OnTrack fires even though no media packets arrive
 // No goroutine leaks
 // No deadlocks on shutdown.
 func TestPeerConnection_Media_Shutdown(t *testing.T) { //nolint:cyclop
@@ -266,13 +266,12 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) { //nolint:cyclop
 	_, err = pcAnswer.AddTrack(vp8Track)
 	assert.NoError(t, err)
 
-	var onTrackFiredLock sync.Mutex
-	onTrackFired := false
+	onTrackFired := make(chan struct{})
 
-	pcAnswer.OnTrack(func(*TrackRemote, *RTPReceiver) {
-		onTrackFiredLock.Lock()
-		defer onTrackFiredLock.Unlock()
-		onTrackFired = true
+	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		assert.Zero(t, track.PayloadType())
+		assert.Empty(t, track.Codec())
+		close(onTrackFired)
 	})
 
 	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
@@ -303,11 +302,8 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) { //nolint:cyclop
 		assert.Len(t, transceivers, 2, "Each PeerConnection should have two RTPTransceivers")
 	}
 
+	<-onTrackFired
 	closePairNow(t, pcOffer, pcAnswer)
-
-	onTrackFiredLock.Lock()
-	assert.False(t, onTrackFired, "PeerConnection OnTrack fired even though we got no packets")
-	onTrackFiredLock.Unlock()
 }
 
 // Integration test for behavior around media and disconnected peers
@@ -1466,7 +1462,11 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 		onTrackCalled := &atomic.Bool{}
 		answerer.OnTrack(func(remote *TrackRemote, receiver *RTPReceiver) {
-			assert.Equal(t, remote.rid, ridSelected)
+			if remote.RID() != ridSelected {
+				return
+			}
+			_, _, readErr := remote.ReadRTP()
+			assert.NoError(t, readErr)
 			onTrackCalled.Store(true)
 		})
 
@@ -1558,7 +1558,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 		<-seenOneStream.Done()
 
-		assert.Equal(t, true, onTrackCalled.Load())
+		require.Eventually(t, onTrackCalled.Load, time.Second, time.Millisecond)
 
 		closePairNow(t, offerer, answerer)
 		close(testFinished)
@@ -1630,18 +1630,24 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 			sendRTPPacket()
 		}
 
-		trackRemoteChan := make(chan *TrackRemote, 1)
+		trackReceived := make(chan struct{})
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
-			trackRemoteChan <- trackRemote
+			if trackRemote.ID() != firstTrack.ID() {
+				return
+			}
+
+			_, _, readErr := trackRemote.Read(make([]byte, 1500))
+			assert.NoError(t, readErr)
+			close(trackReceived)
 		})
 
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
-		trackRemote := func() *TrackRemote {
+		func() {
 			for {
 				select {
-				case t := <-trackRemoteChan:
-					return t
+				case <-trackReceived:
+					return
 				default:
 					sendRTPPacket()
 				}
@@ -1658,9 +1664,6 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 				}
 			}
 		}()
-
-		_, _, err = trackRemote.Read(make([]byte, 1500))
-		assert.NoError(t, err)
 
 		closePairNow(t, pcOffer, pcAnswer)
 	})
@@ -1791,19 +1794,30 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 			assert.Equal(t, len(ridMap), 3)
 		}
 
-		ridsFullfilled := func() bool {
-			ridMapLock.Lock()
-			defer ridMapLock.Unlock()
-
-			ridCount := len(ridMap)
-
-			return ridCount == 3
-		}
+		var packetsRead atomic.Int32
+		ridsFullfilled := func() bool { return packetsRead.Load() == 3 }
+		tracksReady, tracksReadyCancel := context.WithCancel(t.Context())
+		defer tracksReadyCancel()
 
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+			assert.Zero(t, trackRemote.SSRC())
+			assert.Zero(t, trackRemote.PayloadType())
+			assert.Empty(t, trackRemote.Codec())
+			assert.NoError(t, trackRemote.SetReadDeadline(time.Now().Add(10*time.Second)))
 			ridMapLock.Lock()
-			defer ridMapLock.Unlock()
-			ridMap[trackRemote.RID()] = ridMap[trackRemote.RID()] + 1
+			ridMap[trackRemote.RID()]++
+			if len(ridMap) == len(rids) {
+				tracksReadyCancel()
+			}
+			ridMapLock.Unlock()
+
+			packet, _, readErr := trackRemote.ReadRTP()
+			if !assert.NoError(t, readErr) {
+				return
+			}
+			assert.Equal(t, uint32(trackRemote.SSRC()), packet.SSRC)
+			assert.Equal(t, MimeTypeVP8, trackRemote.Codec().MimeType)
+			packetsRead.Add(1)
 		})
 
 		parameters := sender.GetParameters()
@@ -1824,6 +1838,7 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 		assert.NotZero(t, ridID)
 
 		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+		<-tracksReady.Done()
 
 		// padding only packets should not affect simulcast probe
 		var sequenceNumber uint16
@@ -1897,6 +1912,7 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 
 		rtcpCounter := uint64(0)
 		pcAnswer.OnTrack(func(trackRemote *TrackRemote, receiver *RTPReceiver) {
+			assert.NoError(t, receiver.SetReadDeadlineSimulcast(time.Now().Add(10*time.Second), trackRemote.RID()))
 			_, _, simulcastReadErr := receiver.ReadSimulcastRTCP(trackRemote.RID())
 			assert.NoError(t, simulcastReadErr)
 			atomic.AddUint64(&rtcpCounter, 1)
@@ -2192,14 +2208,8 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 		assert.Equal(t, len(ridMap), 2)
 	}
 
-	ridsFullfilled := func() bool {
-		ridMapLock.Lock()
-		defer ridMapLock.Unlock()
-
-		ridCount := len(ridMap)
-
-		return ridCount == 2
-	}
+	var streamsRead atomic.Int32
+	ridsFullfilled := func() bool { return streamsRead.Load() == 2 }
 
 	var rtxPacketRead atomic.Int32
 	var wg sync.WaitGroup
@@ -2212,10 +2222,15 @@ func TestPeerConnection_Simulcast_RTX(t *testing.T) { //nolint:cyclop
 
 		defer wg.Done()
 
+		firstPacket := true
 		for {
 			_, attr, rerr := trackRemote.ReadRTP()
 			if rerr != nil {
 				break
+			}
+			if firstPacket {
+				streamsRead.Add(1)
+				firstPacket = false
 			}
 			if pt, ok := attr.Get(AttributeRtxPayloadType).(byte); ok {
 				if pt == 97 {
@@ -2382,6 +2397,11 @@ func TestPeerConnection_Simulcast_LateRIDRSIDAfterReceiverClosed(t *testing.T) {
 	var ridMu sync.Mutex
 
 	pcAnswer.OnTrack(func(trackRemote *TrackRemote, receiver *RTPReceiver) {
+		_, _, readErr := trackRemote.ReadRTP()
+		if !assert.NoError(t, readErr) {
+			return
+		}
+
 		receiverOnce.Do(func() {
 			answerReceiver = receiver
 		})
@@ -2654,14 +2674,16 @@ func TestPeerConnection_Zero_PayloadType(t *testing.T) {
 	_, err = pcOffer.AddTrack(audioTrack)
 	require.NoError(t, err)
 
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
 	trackFired := make(chan struct{})
 
 	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, readErr := track.ReadRTP()
+		require.NoError(t, readErr)
 		require.Equal(t, track.Codec().MimeType, MimeTypePCMU)
 		close(trackFired)
 	})
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	func() {
 		ticker := time.NewTicker(20 * time.Millisecond)
@@ -2697,33 +2719,6 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 
 	rtpSender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
-
-	// Signal pair first to negotiate codecs
-	assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
-	// Get the negotiated payload type for the media codec
-	mediaPayloadType := uint8(rtpSender.GetParameters().Codecs[0].PayloadType)
-
-	// Use deterministic packet dropping: drop every 5th packet (20% loss)
-	// This is more realistic and provides faster, more consistent test results
-	var packetCount atomic.Uint32
-	wan.AddChunkFilter(func(c vnet.Chunk) bool {
-		// Only filter RTP packets (not RTCP, STUN, etc)
-		h := &rtp.Header{}
-		if _, err := h.Unmarshal(c.UserData()); err != nil {
-			return true // Not an RTP packet, let it through
-		}
-
-		// Drop every 5th media packet to trigger NACK/RTX
-		if h.PayloadType == mediaPayloadType {
-			count := packetCount.Add(1)
-			if count%5 == 0 {
-				return false // Drop this packet
-			}
-		}
-
-		return true
-	})
 
 	// Create context for coordinated cleanup
 	testCtx := t.Context()
@@ -2773,7 +2768,8 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 			if !assert.Equal(t, uint32(ssrc), pkt.SSRC, "Unexpected SSRC") {
 				return
 			}
-			if !assert.Equal(t, mediaPayloadType, pkt.PayloadType, "Unexpected payload type") {
+			if !assert.Equal(t, uint8(rtpSender.GetParameters().Codecs[0].PayloadType), pkt.PayloadType,
+				"Unexpected payload type") {
 				return
 			}
 
@@ -2798,6 +2794,33 @@ func Test_PeerConnection_RTX_E2E(t *testing.T) { //nolint:cyclop
 				}
 			}
 		}
+	})
+
+	// Signal pair first to negotiate codecs
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	// Get the negotiated payload type for the media codec
+	mediaPayloadType := uint8(rtpSender.GetParameters().Codecs[0].PayloadType)
+
+	// Use deterministic packet dropping: drop every 5th packet (20% loss)
+	// This is more realistic and provides faster, more consistent test results
+	var packetCount atomic.Uint32
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		// Only filter RTP packets (not RTCP, STUN, etc)
+		h := &rtp.Header{}
+		if _, err := h.Unmarshal(c.UserData()); err != nil {
+			return true // Not an RTP packet, let it through
+		}
+
+		// Drop every 5th media packet to trigger NACK/RTX
+		if h.PayloadType == mediaPayloadType {
+			count := packetCount.Add(1)
+			if count%5 == 0 {
+				return false // Drop this packet
+			}
+		}
+
+		return true
 	})
 
 	// Send packets until RTX is detected or timeout
@@ -2873,6 +2896,10 @@ func TestPeerConnection_Simulcast_Probe_PacketLoss(t *testing.T) { //nolint:cycl
 
 	ctx, cancel := context.WithCancel(context.Background())
 	pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+		if trackRemote.RID() != vp8WriterA.RID() {
+			return
+		}
+
 		actualBuffer := []byte{}
 
 		for range rtpPktCount {
@@ -2958,6 +2985,8 @@ func BenchmarkPeerConnection_Media_WriteRead(b *testing.B) {
 
 	remoteTrackChan := make(chan *TrackRemote, 1)
 	answerPC.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		_, _, readErr := remote.ReadRTP()
+		require.NoError(b, readErr)
 		remoteTrackChan <- remote
 	})
 
@@ -2973,7 +3002,7 @@ func BenchmarkPeerConnection_Media_WriteRead(b *testing.B) {
 		require.NoError(b, track.WriteRTP(packet))
 	}
 
-	// Packets are dropped until the connection is up, so write until OnTrack fires.
+	// Packets are dropped until the connection is up, so write until one is received.
 	var remoteTrack *TrackRemote
 	for remoteTrack == nil {
 		writePacket()
@@ -2983,7 +3012,7 @@ func BenchmarkPeerConnection_Media_WriteRead(b *testing.B) {
 		}
 	}
 
-	// Drain packets queued while waiting for OnTrack.
+	// Drain packets queued while waiting for the first read.
 	readBuf := make([]byte, receiveMTU)
 	for {
 		require.NoError(b, remoteTrack.SetReadDeadline(time.Now().Add(50*time.Millisecond)))

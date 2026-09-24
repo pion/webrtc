@@ -819,6 +819,17 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 	rtpSender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
 
+	done, doneCancel := context.WithCancel(t.Context())
+	defer doneCancel()
+	pcAnswer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		for {
+			if _, _, readErr := remote.ReadRTP(); readErr != nil {
+				break
+			}
+		}
+		doneCancel()
+	})
+
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 
 	params := rtpSender.GetParameters()
@@ -855,16 +866,6 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 		}
 	}()
 
-	done := make(chan struct{})
-	pcAnswer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
-		for {
-			if _, _, readErr := remote.ReadRTP(); readErr != nil {
-				break
-			}
-		}
-		close(done)
-	})
-
 	go func() {
 		for i := range numPackets {
 			time.Sleep(20 * time.Millisecond)
@@ -887,5 +888,5 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, pcOffer, pcAnswer)
-	<-done
+	<-done.Done()
 }
