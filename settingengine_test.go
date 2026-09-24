@@ -537,29 +537,6 @@ func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
 	closePairNow(t, offerer, answerer)
 }
 
-func TestDisableCloseByDTLS(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	s := SettingEngine{}
-	s.DisableCloseByDTLS(true)
-
-	offer, answer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
-	assert.NoError(t, err)
-
-	assert.NoError(t, signalPair(offer, answer))
-
-	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
-	assert.NoError(t, answer.Close())
-
-	time.Sleep(time.Second)
-	assert.True(t, offer.ConnectionState() == PeerConnectionStateConnected)
-	assert.NoError(t, offer.Close())
-}
-
 func TestEnableDataChannelBlockWrite(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()

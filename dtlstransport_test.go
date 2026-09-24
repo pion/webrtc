@@ -79,9 +79,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		}
 	})
 
-	// Also wait for PeerConnection to close (may take longer due to cleanup)
-	offerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcOffer)
-	answerConnectionHasClosed := untilConnectionState(PeerConnectionStateClosed, pcAnswer)
+	peerConnectionsFailed := untilConnectionState(PeerConnectionStateFailed, pcOffer, pcAnswer)
 
 	_, err = pcOffer.CreateDataChannel("unusedDataChannel", nil)
 	assert.NoError(t, err)
@@ -131,21 +129,64 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		assert.Fail(t, "timed out waiting for answer DTLS to fail")
 	}
 
-	// Wait for PeerConnection to close (may take longer due to cleanup)
-	<-offerConnectionHasClosed
-	<-answerConnectionHasClosed
+	<-peerConnectionsFailed
 
-	assert.Contains(
-		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(),
-		"DTLS Transport should be closed or failed",
-	)
+	assert.Equal(t, DTLSTransportStateFailed, pcOffer.SCTP().Transport().State())
 	assert.Nil(t, pcOffer.SCTP().Transport().conn)
+	assert.False(t, pcOffer.isClosed.Load())
 
-	assert.Contains(
-		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcAnswer.SCTP().Transport().State(),
-		"DTLS Transport should be closed or failed",
-	)
+	assert.Equal(t, DTLSTransportStateFailed, pcAnswer.SCTP().Transport().State())
 	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
+	assert.False(t, pcAnswer.isClosed.Load())
+}
+
+// DTLS closure updates the transport without closing the PeerConnection.
+func TestDTLSClose(t *testing.T) {
+	for _, closePeerConnection := range []bool{false, true} {
+		name := "DTLSTransport"
+		if closePeerConnection {
+			name = "PeerConnection"
+		}
+		t.Run(name, func(t *testing.T) {
+			defer test.TimeOut(10 * time.Second).Stop()
+			defer test.CheckRoutines(t)()
+
+			offer, answer, err := newPair()
+			assert.NoError(t, err)
+			defer closePairNow(t, offer, answer)
+
+			_, err = offer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			assert.NoError(t, err)
+			connected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+			assert.NoError(t, signalPair(offer, answer))
+			<-connected
+
+			transport := answer.SCTP().Transport()
+			closed := make(chan struct{})
+			transport.OnStateChange(func(state DTLSTransportState) {
+				if state == DTLSTransportStateClosed {
+					close(closed)
+				}
+			})
+			defer transport.OnStateChange(nil)
+
+			if closePeerConnection {
+				assert.NoError(t, offer.Close())
+			} else {
+				assert.NoError(t, offer.SCTP().Transport().Stop())
+				assert.Equal(t, PeerConnectionStateConnected, offer.ConnectionState())
+			}
+			<-closed
+
+			assert.Equal(t, DTLSTransportStateClosed, transport.State())
+			assert.Equal(t, ICEConnectionStateConnected, answer.ICEConnectionState())
+			assert.Equal(t, PeerConnectionStateConnected, answer.ConnectionState())
+			assert.Equal(t, SignalingStateStable, answer.SignalingState())
+			assert.False(t, answer.isClosed.Load())
+			_, err = answer.CreateOffer(nil)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {

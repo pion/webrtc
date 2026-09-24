@@ -8,7 +8,6 @@ package webrtc
 import (
 	"bufio"
 	"context"
-	"errors"
 	"net"
 	"strings"
 	"sync"
@@ -127,6 +126,14 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
+			dtlsClosed, dtlsClosedCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer dtlsClosedCancel()
+			stackA.dtls.OnStateChange(func(state DTLSTransportState) {
+				if state == DTLSTransportStateClosed {
+					dtlsClosedCancel()
+				}
+			})
+
 			started := make(chan error, 1)
 			go func() {
 				started <- stackA.sctp.StartContext(ctx, SCTPCapabilities{})
@@ -148,11 +155,10 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 				require.FailNow(t, "SCTP handshake did not stop when its context ended")
 			}
 			// Cancellation closes DTLS before any test cleanup runs.
-			require.Eventually(t, func() bool {
-				_, writeErr := stackA.dtls.conn.Write(nil)
-
-				return errors.Is(writeErr, dtls.ErrConnClosed)
-			}, 5*time.Second, time.Millisecond)
+			<-dtlsClosed.Done()
+			require.ErrorIs(t, dtlsClosed.Err(), context.Canceled)
+			_, err = stackA.dtls.conn.Write(nil)
+			require.ErrorIs(t, err, dtls.ErrConnClosed)
 			assert.Nil(t, stackA.sctp.association())
 			assert.Equal(t, SCTPTransportStateClosed, stackA.sctp.State())
 		})
