@@ -222,6 +222,7 @@ var (
 	errNetworkTypeUnknown = errors.New("unknown network type")
 
 	errSDPDoesNotMatchOffer        = errors.New("new sdp does not match previous offer")
+	errSDPPayloadTypeNotFound      = errors.New("payload type not found in media description")
 	errSDPDoesNotMatchAnswer       = errors.New("new sdp does not match previous answer")
 	errPeerConnSDPTypeInvalidValue = errors.New(
 		"provided value is not a valid enum value of type SDPType",
