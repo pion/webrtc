@@ -114,7 +114,6 @@ type SettingEngine struct {
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
 	fireOnTrackBeforeFirstRTP                 bool
-	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
@@ -709,13 +708,6 @@ func (e *SettingEngine) SetICEBindingRequestHandler(
 // Note: This does not yet affect simulcast tracks.
 func (e *SettingEngine) SetFireOnTrackBeforeFirstRTP(fireOnTrackBeforeFirstRTP bool) {
 	e.fireOnTrackBeforeFirstRTP = fireOnTrackBeforeFirstRTP
-}
-
-// DisableCloseByDTLS sets if the connection should be closed when dtls transport is closed.
-// Setting this to true will keep the connection open when dtls transport is closed
-// and relies on the ice failed state to detect the connection is interrupted.
-func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
-	e.disableCloseByDTLS = isEnabled
 }
 
 // SetHandleUndeclaredSSRCWithoutAnswer controls if an SDP answer is required for
