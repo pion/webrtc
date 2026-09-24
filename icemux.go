@@ -5,6 +5,7 @@ package webrtc
 
 import (
 	"net"
+	"time"
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
@@ -26,5 +27,24 @@ func NewICEUDPMux(logger logging.LeveledLogger, udpConn net.PacketConn) ice.UDPM
 	return ice.NewUDPMuxDefault(ice.UDPMuxParams{
 		UDPConn: udpConn,
 		Logger:  logger,
+	})
+}
+
+// NewICEUniversalUDPMux creates a new instance of ice.UniversalUDPMux. It allows many PeerConnections
+// with host, server reflexive and relayed candidates to be served by a single UDP port. Pass the
+// returned mux to both SettingEngine.SetICEUDPMux and SettingEngine.SetICEUDPMuxSrflx to also
+// multiplex the STUN traffic used for server reflexive candidate gathering.
+//
+// xorMappedAddrCacheTTL controls how long a discovered server reflexive (XOR-mapped) address is
+// cached before another STUN binding request is issued.
+func NewICEUniversalUDPMux(
+	logger logging.LeveledLogger,
+	udpConn net.PacketConn,
+	xorMappedAddrCacheTTL time.Duration,
+) ice.UniversalUDPMux {
+	return ice.NewUniversalUDPMuxDefault(ice.UniversalUDPMuxParams{
+		Logger:                logger,
+		UDPConn:               udpConn,
+		XORMappedAddrCacheTTL: xorMappedAddrCacheTTL,
 	})
 }
