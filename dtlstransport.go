@@ -46,8 +46,7 @@ type DTLSTransport struct {
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
 
-	onStateChangeHandler   func(DTLSTransportState)
-	internalOnCloseHandler func()
+	onStateChangeHandler func(DTLSTransportState)
 
 	conn *dtls.Conn
 
@@ -327,46 +326,54 @@ func (t *DTLSTransport) role() DTLSRole {
 
 // Start DTLS transport negotiation with the parameters of the remote DTLS transport.
 func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
-	return t.start(remoteParameters, t.handshakeDTLS)
+	return t.start(context.Background(), remoteParameters, t.handshakeDTLS)
 }
 
 // StartContext starts DTLS transport negotiation with the parameters of the remote DTLS
 // transport. If the context is canceled before the DTLS handshake is complete, the handshake
 // is interrupted and an error is returned.
 func (t *DTLSTransport) StartContext(ctx context.Context, remoteParameters DTLSParameters) error {
-	return t.start(remoteParameters, func(dtlsConn *dtls.Conn) error {
+	return t.start(ctx, remoteParameters, func(dtlsConn *dtls.Conn) error {
 		return dtlsConn.HandshakeContext(ctx)
 	})
 }
 
-func (t *DTLSTransport) start(remoteParameters DTLSParameters, handshake func(*dtls.Conn) error) error {
+func (t *DTLSTransport) start(ctx context.Context, remoteParameters DTLSParameters, handshake func(*dtls.Conn) error) error {
 	role, certificate, err := t.prepareStart(remoteParameters)
 	if err != nil {
 		return err
 	}
 
 	dtlsEndpoint := t.iceTransport.newEndpoint(mux.MatchDTLS)
-	dtlsEndpoint.SetOnClose(t.internalOnCloseHandler)
+	startFinished, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancel()
+	dtlsEndpoint.SetOnClose(func() {
+		go func() {
+			<-startFinished.Done()
+			t.lock.Lock()
+			defer t.lock.Unlock()
+			if t.state == DTLSTransportStateConnected {
+				t.onStateChange(DTLSTransportStateClosed)
+			}
+		}()
+	})
 
 	sharedOpts := t.dtlsSharedOptions(certificate)
 
 	dtlsConn, err := t.connectDTLS(dtlsEndpoint, role, sharedOpts)
 	if err != nil {
-		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsEndpoint.Close()
 
 		return t.failStart(err)
 	}
 
 	if err = handshake(dtlsConn); err != nil {
-		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsConn.Close()
 
 		return t.failStart(err)
 	}
 
 	if err = t.completeStart(dtlsConn); err != nil {
-		dtlsEndpoint.SetOnClose(nil)
 		_ = dtlsConn.Close()
 
 		return err

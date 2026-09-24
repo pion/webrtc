@@ -2090,6 +2090,9 @@ func TestPeerConnectionDeadlock(t *testing.T) {
 // Assert that by default NULL Ciphers aren't enabled. Even if
 // the remote Peer Requests a NULL Cipher we should fail.
 func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
+	defer test.TimeOut(10 * time.Second).Stop()
+	defer test.CheckRoutines(t)()
+
 	settingEngine := SettingEngine{}
 	settingEngine.SetSRTPProtectionProfiles(dtls.SRTP_NULL_HMAC_SHA1_80, dtls.SRTP_NULL_HMAC_SHA1_32)
 	offerPC, err := NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
@@ -2097,20 +2100,19 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 
 	answerPC, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
 
-	assert.NoError(t, signalPair(offerPC, answerPC))
-
-	peerConnectionClosed := make(chan struct{})
-	var closeOnce sync.Once
-
-	answerPC.OnConnectionStateChange(func(s PeerConnectionState) {
-		if s == PeerConnectionStateClosed {
-			closeOnce.Do(func() { close(peerConnectionClosed) })
+	dtlsFailed, dtlsFailedCancel := context.WithCancel(context.Background())
+	defer dtlsFailedCancel()
+	answerPC.SCTP().Transport().OnStateChange(func(s DTLSTransportState) {
+		if s == DTLSTransportStateFailed {
+			dtlsFailedCancel()
 		}
 	})
 
-	<-peerConnectionClosed
-	closePairNow(t, offerPC, answerPC)
+	assert.NoError(t, signalPair(offerPC, answerPC))
+	<-dtlsFailed.Done()
+	assert.Equal(t, DTLSTransportStateFailed, answerPC.SCTP().Transport().State())
 }
 
 func TestICETricklingSupported(t *testing.T) {

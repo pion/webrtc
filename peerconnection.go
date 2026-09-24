@@ -3087,19 +3087,6 @@ func (pc *PeerConnection) startTransports(
 		return
 	}
 
-	pc.dtlsTransport.internalOnCloseHandler = func() {
-		if pc.isClosed.Load() || pc.api.settingEngine.disableCloseByDTLS {
-			return
-		}
-
-		pc.log.Info("Closing PeerConnection from DTLS CloseNotify")
-		go func() {
-			if pcClosErr := pc.Close(); pcClosErr != nil {
-				pc.log.Warnf("Failed to close PeerConnection from DTLS CloseNotify: %s", pcClosErr)
-			}
-		}()
-	}
-
 	pc.dtlsTransport.setLocalCryptexMode(localCryptexMode)
 	pc.dtlsTransport.setRemoteCryptexMode(remoteCryptexMode)
 
