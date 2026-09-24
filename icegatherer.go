@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice/v4"
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
 )
@@ -29,7 +29,8 @@ type ICEGatherer struct {
 	validatedServers []*stun.URI
 	gatherPolicy     ICETransportPolicy
 
-	agent *ice.Agent
+	agent           *ice.Agent
+	localParameters ICEParameters
 
 	onLocalCandidateHandler atomic.Value // func(candidate *ICECandidate)
 	onStateChangeHandler    atomic.Value // func(state ICEGathererState)
@@ -139,11 +140,6 @@ func (g *ICEGatherer) updateServers(servers []ICEServer, policy ICETransportPoli
 	g.validatedServers = validatedServers
 	g.gatherPolicy = policy
 
-	if g.agent != nil && (g.State() != ICEGathererStateGathering ||
-		g.iceCandidatePoolSize == 0) {
-		return g.agent.UpdateOptions(ice.WithUrls(validatedServers))
-	}
-
 	return nil
 }
 
@@ -168,28 +164,40 @@ func (g *ICEGatherer) createAgent() error {
 		return err
 	}
 
-	agent, err := ice.NewAgentWithOptions(options...)
+	// ICE v5 initializes credentials on Gather, but SDP needs them before gathering.
+	parameters := ICEParameters{
+		UsernameFragment: g.api.settingEngine.candidates.UsernameFragment,
+		Password:         g.api.settingEngine.candidates.Password,
+	}
+	if parameters.UsernameFragment == "" {
+		parameters.UsernameFragment, err = ice.GenerateUFrag()
+		if err != nil {
+			return err
+		}
+	}
+	if parameters.Password == "" {
+		parameters.Password, err = ice.GeneratePwd()
+		if err != nil {
+			return err
+		}
+	}
+
+	agent, err := ice.NewAgent(options...)
 	if err != nil {
 		return err
 	}
 
 	g.agent = agent
+	g.localParameters = parameters
 
 	return nil
 }
 
 func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
-	candidateTypes := g.resolveCandidateTypes()
 	nat1To1CandiTyp := g.resolveNAT1To1CandidateType()
 	mDNSMode := g.sanitizedMDNSMode()
 
 	options := g.baseAgentOptions(mDNSMode)
-	if len(candidateTypes) > 0 {
-		options = append(options, ice.WithCandidateTypes(candidateTypes))
-	}
-
-	options = append(options, g.credentialOptions()...)
-
 	rewriteOptions, err := g.addressRewriteOptions(nat1To1CandiTyp)
 	if err != nil {
 		return nil, err
@@ -199,12 +207,7 @@ func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
 	options = append(options, g.miscOptions()...)
 	options = append(options, g.renominationOptions()...)
 
-	requestedNetworkTypes := g.api.settingEngine.candidates.ICENetworkTypes
-	if len(requestedNetworkTypes) == 0 {
-		requestedNetworkTypes = supportedNetworkTypes()
-	}
-
-	return append(options, ice.WithNetworkTypes(toICENetworkTypes(requestedNetworkTypes))), nil
+	return options, nil
 }
 
 func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
@@ -246,7 +249,6 @@ func (g *ICEGatherer) sanitizedMDNSMode() ice.MulticastDNSMode {
 func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.AgentOption {
 	return []ice.AgentOption{
 		ice.WithICELite(g.api.settingEngine.candidates.ICELite),
-		ice.WithUrls(g.validatedServers),
 		ice.WithPortRange(g.api.settingEngine.ephemeralUDP.PortMin, g.api.settingEngine.ephemeralUDP.PortMax),
 		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
 		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
@@ -258,18 +260,6 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithUDPMux(g.api.settingEngine.iceUDPMux),
 		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
 		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
-	}
-}
-
-func (g *ICEGatherer) credentialOptions() []ice.AgentOption {
-	ufrag := g.api.settingEngine.candidates.UsernameFragment
-	pass := g.api.settingEngine.candidates.Password
-	if ufrag == "" && pass == "" {
-		return nil
-	}
-
-	return []ice.AgentOption{
-		ice.WithLocalCredentials(g.api.settingEngine.candidates.UsernameFragment, g.api.settingEngine.candidates.Password),
 	}
 }
 
@@ -413,7 +403,11 @@ func legacyNAT1To1AddressRewriteRules(ips []string, candidateType ice.CandidateT
 }
 
 // Gather ICE candidates.
-func (g *ICEGatherer) Gather() error { //nolint:cyclop
+func (g *ICEGatherer) Gather() error {
+	return g.gather(false)
+}
+
+func (g *ICEGatherer) gather(restart bool) error { //nolint:cyclop
 	if err := g.createAgent(); err != nil {
 		return err
 	}
@@ -481,7 +475,32 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 		return err
 	}
 
-	return agent.GatherCandidates()
+	parameters, err := g.GetLocalParameters()
+	if err != nil {
+		return err
+	}
+	if restart {
+		parameters.UsernameFragment = g.api.settingEngine.candidates.UsernameFragment
+		parameters.Password = g.api.settingEngine.candidates.Password
+	}
+
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	networkTypes := g.api.settingEngine.candidates.ICENetworkTypes
+	if len(networkTypes) == 0 {
+		networkTypes = supportedNetworkTypes()
+	}
+	options := []ice.GatherOption{
+		ice.WithURLs(g.validatedServers),
+		ice.WithNetworkTypes(toICENetworkTypes(networkTypes)),
+		ice.WithLocalCredentials(parameters.UsernameFragment, parameters.Password),
+	}
+	if candidateTypes := g.resolveCandidateTypes(); len(candidateTypes) > 0 {
+		options = append(options, ice.WithCandidateTypes(candidateTypes))
+	}
+
+	return agent.Gather(options...)
 }
 
 // set media stream identification tag and media description index for this gatherer.
@@ -587,6 +606,12 @@ func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
 	frag, pwd, err := agent.GetLocalUserCredentials()
 	if err != nil {
 		return ICEParameters{}, err
+	}
+	if frag == "" && pwd == "" {
+		g.lock.RLock()
+		defer g.lock.RUnlock()
+
+		return g.localParameters, nil
 	}
 
 	return ICEParameters{

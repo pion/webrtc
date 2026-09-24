@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/ice/v4"
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
 	"github.com/pion/transport/v5/test"
@@ -42,6 +42,12 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, ICEGathererStateNew, gatherer.State())
 
+	initialParams, err := gatherer.GetLocalParameters()
+	require.NoError(t, err)
+	assert.NotEmpty(t, initialParams.UsernameFragment)
+	assert.NotEmpty(t, initialParams.Password)
+	assert.Equal(t, ICEGathererStateNew, gatherer.State())
+
 	gatherFinished := make(chan struct{})
 	gatherer.OnLocalCandidate(func(i *ICECandidate) {
 		if i == nil {
@@ -55,6 +61,7 @@ func TestNewICEGatherer_Success(t *testing.T) {
 
 	params, err := gatherer.GetLocalParameters()
 	assert.NoError(t, err)
+	assert.Equal(t, initialParams, params)
 
 	assert.NotEmpty(t, params.UsernameFragment, "Empty local username frag")
 	assert.NotEmpty(t, params.Password, "Empty local password")
