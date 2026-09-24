@@ -201,12 +201,14 @@ func Test_RTPSender_ReplaceTrack_InvalidTrackKindChange(t *testing.T) {
 	rtpSender, err := sender.AddTrack(trackA)
 	assert.NoError(t, err)
 
-	assert.NoError(t, signalPair(sender, receiver))
-
 	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
-	receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
+	receiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, readErr := track.ReadRTP()
+		assert.NoError(t, readErr)
 		seenPacketCancel()
 	})
+
+	assert.NoError(t, signalPair(sender, receiver))
 
 	func() {
 		for range time.Tick(time.Millisecond * 20) {
@@ -249,12 +251,14 @@ func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
 	}})
 	assert.NoError(t, err)
 
-	assert.NoError(t, signalPair(sender, receiver))
-
 	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
-	receiver.OnTrack(func(_ *TrackRemote, _ *RTPReceiver) {
+	receiver.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		_, _, readErr := track.ReadRTP()
+		assert.NoError(t, readErr)
 		seenPacketCancel()
 	})
+
+	assert.NoError(t, signalPair(sender, receiver))
 
 	func() {
 		for range time.Tick(time.Millisecond * 20) {

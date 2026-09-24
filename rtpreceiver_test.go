@@ -7,8 +7,10 @@ package webrtc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -102,7 +104,43 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 		},
 	})
 
+	close(receiver.received)
+	track := receiver.Track()
+
+	reads := []func([]byte) (int, interceptor.Attributes, error){
+		track.Read,
+		receiver.Read,
+		func(b []byte) (int, interceptor.Attributes, error) { return receiver.ReadSimulcast(b, "rid") },
+	}
+
+	var readers sync.WaitGroup
+	for _, read := range reads {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			_, _, readErr := read(make([]byte, 1500))
+			assert.ErrorIs(t, readErr, os.ErrDeadlineExceeded)
+		}()
+	}
+
+	expired := time.Now().Add(-time.Second)
+	assert.NoError(t, track.SetReadDeadline(expired))
+	assert.NoError(t, receiver.SetReadDeadline(expired))
+	assert.NoError(t, receiver.SetReadDeadlineSimulcast(expired, "rid"))
+	readers.Wait()
+
+	assert.NoError(t, track.SetReadDeadline(time.Time{}))
+	assert.NoError(t, receiver.SetReadDeadlineSimulcast(time.Time{}, "rid"))
+	for _, read := range reads {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			_, _, readErr := read(make([]byte, 1500))
+			assert.True(t, errors.Is(readErr, io.EOF) || errors.Is(readErr, io.ErrClosedPipe), "%v", readErr)
+		}()
+	}
 	require.NoError(t, receiver.Stop())
+	readers.Wait()
 
 	params := RTPParameters{
 		Codecs: []RTPCodecParameters{
@@ -126,11 +164,11 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 	)
 
 	for range 50 {
-		track, err := receiver.receiveForRid("rid", params, ridStreamInfo, nil, nil, false, nil, nil, nil)
+		track, err := receiver.receiveForRid("rid", params, ridStreamInfo, &streamsForSSRCResult{}, nil)
 		assert.Nil(t, track)
 		assert.ErrorIs(t, err, io.EOF)
 
-		err = receiver.receiveForRtx(SSRC(0), "rid", rtxStreamInfo, nil, rtpInterceptor, false, nil, nil)
+		err = receiver.receiveForRtx(SSRC(0), "rid", rtxStreamInfo, &streamsForSSRCResult{rtpInterceptor: rtpInterceptor})
 		assert.ErrorIs(t, err, io.EOF)
 	}
 
@@ -167,7 +205,8 @@ func TestRTPReceiverRepairReaderPolicy(t *testing.T) {
 				},
 			)
 			require.NoError(t, receiver.receiveForRtx(
-				2222, "", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, startImmediately, nil, nil,
+				2222, "", &interceptor.StreamInfo{SSRC: 2222},
+				&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: startImmediately},
 			))
 
 			repairReaderStarted := func() bool {
@@ -184,14 +223,7 @@ func TestRTPReceiverRepairReaderPolicy(t *testing.T) {
 			}
 
 			b := make([]byte, receiveMTU)
-			_, err := track.peek(b)
-			require.NoError(t, err)
-			if !startImmediately {
-				assert.False(t, repairReaderStarted())
-				assert.Zero(t, calls.Load())
-			}
-
-			_, _, err = track.Read(b)
+			_, _, err := track.Read(b)
 			require.NoError(t, err)
 			assert.True(t, repairReaderStarted())
 			require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
@@ -229,7 +261,8 @@ func TestTrackRemoteReadUsesEagerRepairChannel(t *testing.T) {
 		},
 	)
 	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, true, nil, nil,
+		2222, "", &interceptor.StreamInfo{SSRC: 2222},
+		&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: true},
 	))
 	require.Eventually(t, func() bool {
 		receiver.mu.RLock()
@@ -263,7 +296,8 @@ func TestRTPReceiverLateRepairBindAfterTrackRead(t *testing.T) {
 		},
 	)
 	require.NoError(t, receiver.receiveForRtx(
-		0, "rid", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, false, nil, nil,
+		0, "rid", &interceptor.StreamInfo{SSRC: 2222},
+		&streamsForSSRCResult{rtpInterceptor: repairReader},
 	))
 
 	receiver.mu.RLock()
@@ -308,29 +342,16 @@ func TestRTPReceiverRIDRepairReaderStartsForPrimaryWrapper(t *testing.T) {
 			}}}
 			bindPrimary := func() error {
 				_, bindErr := receiver.receiveForRid(
-					"rid",
-					params,
-					&interceptor.StreamInfo{SSRC: 1111},
-					nil,
-					interceptor.RTPReaderFunc(nil),
-					true,
-					nil,
-					nil,
-					nil,
+					"rid", params, &interceptor.StreamInfo{SSRC: 1111},
+					&streamsForSSRCResult{rtpInterceptor: interceptor.RTPReaderFunc(nil), startRTPReaderImmediately: true}, nil,
 				)
 
 				return bindErr
 			}
 			bindRTX := func() error {
 				return receiver.receiveForRtx(
-					0,
-					"rid",
-					&interceptor.StreamInfo{SSRC: 2222},
-					nil,
-					repairReader,
-					false,
-					nil,
-					nil,
+					0, "rid", &interceptor.StreamInfo{SSRC: 2222},
+					&streamsForSSRCResult{rtpInterceptor: repairReader},
 				)
 			}
 
@@ -371,7 +392,8 @@ func TestRTPReceiverReadAfterStopDoesNotStartRepairReader(t *testing.T) {
 		},
 	)
 	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, false, nil, nil,
+		2222, "", &interceptor.StreamInfo{SSRC: 2222},
+		&streamsForSSRCResult{rtpInterceptor: repairReader},
 	))
 	require.NoError(t, receiver.Stop())
 
@@ -427,7 +449,8 @@ func newRepairReaderPolicyTestReceiver(
 		PayloadType:        96,
 	}}}
 	track, err := receiver.receiveForRid(
-		"rid", params, &interceptor.StreamInfo{SSRC: 1111}, nil, primaryReader, false, nil, nil, nil,
+		"rid", params, &interceptor.StreamInfo{SSRC: 1111},
+		&streamsForSSRCResult{rtpInterceptor: primaryReader}, nil,
 	)
 	require.NoError(t, err)
 	close(receiver.received)
@@ -442,7 +465,7 @@ func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
 	receiver := &RTPReceiver{
 		kind:       RTPCodecTypeVideo,
 		received:   make(chan any),
-		closedChan: make(chan any),
+		closedChan: make(chan struct{}),
 		rtxPool: sync.Pool{New: func() any {
 			return make([]byte, 1200)
 		}},
@@ -471,7 +494,7 @@ func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
 		},
 	}
 	ridStreamInfo := &interceptor.StreamInfo{SSRC: 1111}
-	track, err := receiver.receiveForRid("rid", params, ridStreamInfo, nil, nil, false, nil, nil, nil)
+	track, err := receiver.receiveForRid("rid", params, ridStreamInfo, &streamsForSSRCResult{}, nil)
 	require.NoError(t, err)
 
 	close(receiver.received)
@@ -499,7 +522,8 @@ func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
 
 	for range 50 {
 		require.NoError(t, receiver.receiveForRtx(
-			SSRC(2222), "", repairStreamInfo, nil, rtpInterceptor, false, nil, nil,
+			SSRC(2222), "", repairStreamInfo,
+			&streamsForSSRCResult{rtpInterceptor: rtpInterceptor},
 		))
 	}
 
@@ -511,7 +535,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	receiver := &RTPReceiver{
 		kind:       RTPCodecTypeVideo,
 		received:   make(chan any),
-		closedChan: make(chan any),
+		closedChan: make(chan struct{}),
 		rtxPool: sync.Pool{New: func() any {
 			return make([]byte, 1200)
 		}},
@@ -559,7 +583,8 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		},
 	)
 	lowTrack, err := receiver.receiveForRid(
-		"low", params, &interceptor.StreamInfo{SSRC: 1111}, nil, lowInterceptor, false, nil, nil, nil,
+		"low", params, &interceptor.StreamInfo{SSRC: 1111},
+		&streamsForSSRCResult{rtpInterceptor: lowInterceptor}, nil,
 	)
 	require.NoError(t, err)
 	lowTrack.mu.Lock()
@@ -587,7 +612,8 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		},
 	)
 	require.NoError(t, receiver.receiveForRtx(
-		SSRC(0), "low", repairStreamInfo, nil, repairInterceptor, false, nil, nil,
+		SSRC(0), "low", repairStreamInfo,
+		&streamsForSSRCResult{rtpInterceptor: repairInterceptor},
 	))
 
 	highInterceptor := interceptor.RTPReaderFunc(
@@ -596,7 +622,8 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		},
 	)
 	_, err = receiver.receiveForRid(
-		"high", params, &interceptor.StreamInfo{SSRC: 2222}, nil, highInterceptor, false, nil, nil, nil,
+		"high", params, &interceptor.StreamInfo{SSRC: 2222},
+		&streamsForSSRCResult{rtpInterceptor: highInterceptor}, nil,
 	)
 	require.NoError(t, err)
 	receiver.tracks[1].track.mu.Lock()
@@ -1019,7 +1046,8 @@ func TestRTPReceiverRepairReaderMalformedPacketNoPanic(t *testing.T) {
 		},
 	)
 	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222}, nil, repairReader, true, nil, nil,
+		2222, "", &interceptor.StreamInfo{SSRC: 2222},
+		&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: true},
 	))
 
 	// The malformed packets must be skipped and the valid packet still forwarded.

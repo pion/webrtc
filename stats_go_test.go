@@ -2368,7 +2368,7 @@ func TestDefaultAudioPlayoutStatsProvider_AccumulateSnapshot(t *testing.T) {
 }
 
 func TestDefaultAudioPlayoutStatsProvider_AddRemoveTrack(t *testing.T) {
-	receiver := &RTPReceiver{closedChan: make(chan any)}
+	receiver := &RTPReceiver{closedChan: make(chan struct{})}
 	track := newTrackRemote(RTPCodecTypeAudio, 1234, 0, "", receiver)
 	samplesPerBatch := 960
 
@@ -2390,7 +2390,7 @@ func TestDefaultAudioPlayoutStatsProvider_AddRemoveTrack(t *testing.T) {
 }
 
 func TestDefaultAudioPlayoutStatsProvider_MultipleProviders(t *testing.T) {
-	receiver := &RTPReceiver{closedChan: make(chan any)}
+	receiver := &RTPReceiver{closedChan: make(chan struct{})}
 	track := newTrackRemote(RTPCodecTypeAudio, 5555, 0, "", receiver)
 	samplesPerBatch := 960
 

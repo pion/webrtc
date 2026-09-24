@@ -503,7 +503,9 @@ func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGatheringState)) {
 }
 
 // OnTrack sets an event handler which is called when remote track
-// arrives from a remote peer.
+// arrives from a remote peer. Tracks declared in the SDP, including simulcast
+// RIDs, are announced without waiting for RTP. Codec and PayloadType are populated
+// when RTP is read, and simulcast SSRCs are populated when their streams are identified.
 func (pc *PeerConnection) OnTrack(f func(*TrackRemote, *RTPReceiver)) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
@@ -1671,32 +1673,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 	}
 
 	for _, track := range receiver.Tracks() {
-		if track.SSRC() == 0 || track.RID() != "" {
-			return
-		}
-
-		if pc.api.settingEngine.fireOnTrackBeforeFirstRTP {
-			pc.onTrack(track, receiver)
-
-			return
-		}
-		go func(track *TrackRemote) {
-			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
-			n, err := track.peek(b)
-			if err != nil {
-				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
-
-				return
-			}
-
-			if err = track.checkAndUpdateTrack(b[:n]); err != nil {
-				pc.log.Warnf("Failed to set codec settings for track SSRC %d (%s)", track.SSRC(), err)
-
-				return
-			}
-
-			pc.onTrack(track, receiver)
-		}(track)
+		pc.onTrack(track, receiver)
 	}
 }
 
@@ -2158,10 +2135,6 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 	if err != nil {
 		return err
 	}
-	readStream := result.rtpReadStream
-	interceptor := result.rtpInterceptor
-	rtcpReadStream := result.rtcpReadStream
-	rtcpInterceptor := result.rtcpInterceptor
 
 	// try to read simulcast IDs from the packet we already have
 	mid, rid, rsid, _, err := handleUnknownRTPPacket(
@@ -2184,7 +2157,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 				readCount--
 			}
 
-			i, attributes, err := interceptor.Read(b, nil)
+			i, attributes, err := result.rtpInterceptor.Read(b, nil)
 			if err != nil {
 				return err
 			}
@@ -2213,35 +2186,12 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRtx(
-					SSRC(0),
-					rsid,
-					streamInfo,
-					readStream,
-					interceptor,
-					result.startRTPReaderImmediately,
-					rtcpReadStream,
-					rtcpInterceptor,
-				)
+				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, result)
 			}
 
-			track, err := receiver.receiveForRid(
-				rid,
-				params,
-				streamInfo,
-				readStream,
-				interceptor,
-				result.startRTPReaderImmediately,
-				rtcpReadStream,
-				rtcpInterceptor,
-				peekedPackets,
-			)
-			if err != nil {
-				return err
-			}
-			pc.onTrack(track, receiver)
+			_, err := receiver.receiveForRid(rid, params, streamInfo, result, peekedPackets)
 
-			return nil
+			return err
 		}
 	}
 

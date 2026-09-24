@@ -21,7 +21,7 @@ import (
 type trackEncoding struct {
 	track TrackLocal
 
-	srtpStream *srtpWriterFuture
+	srtpStream *trackStreamFuture
 
 	rtcpInterceptor interceptor.RTCPReader
 	streamInfo      interceptor.StreamInfo
@@ -311,7 +311,13 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 
 	for idx := range r.trackEncodings {
 		trackEncoding := r.trackEncodings[idx]
-		srtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].SSRC, rtpSender: r}
+		srtpStream := &trackStreamFuture{
+			ssrc:      parameters.Encodings[idx].SSRC,
+			transport: r.transport,
+			ready:     r.transport.srtpReady,
+			stopped:   r.stopCalled,
+			stopErr:   io.ErrClosedPipe,
+		}
 		writeStream := &interceptorToTrackLocalWriter{}
 		rtpParameters := r.api.mediaEngine.getRTPParametersByKind(
 			trackEncoding.track.Kind(),
@@ -418,18 +424,7 @@ func (r *RTPSender) Read(b []byte) (n int, a interceptor.Attributes, err error) 
 
 // ReadRTCP is a convenience method that wraps Read and unmarshals for you.
 func (r *RTPSender) ReadRTCP() ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.Read(b)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pkts, err := rtcp.Unmarshal(b[:i])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return pkts, attributes, nil
+	return readRTCP(r.Read, r.api.settingEngine.getReceiveMTU())
 }
 
 // ReadSimulcast reads incoming RTCP for this RTPSender for given rid.

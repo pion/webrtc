@@ -87,15 +87,17 @@ func main() {
 	// Set a handler for when a new remote track starts. We read the incoming packets, but then
 	// immediately discard them
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) { //nolint: revive
-		fmt.Printf("New incoming track with codec: %s\n", track.Codec().MimeType)
+		fmt.Printf("New incoming track of kind: %s\n", track.Kind())
 
 		go func() {
 			// Print the stats for this individual track
 			for {
 				stats := statsGetter.Get(uint32(track.SSRC()))
 
-				fmt.Printf("Stats for: %s\n", track.Codec().MimeType)
-				fmt.Println(stats.InboundRTPStreamStats)
+				if stats != nil {
+					fmt.Printf("Stats for: %s\n", track.Codec().MimeType)
+					fmt.Println(stats.InboundRTPStreamStats)
+				}
 
 				time.Sleep(statsInterval)
 			}
