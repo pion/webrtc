@@ -78,9 +78,13 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 //nolint:gocognit,gocyclo,cyclop
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
-	s *sdp.SessionDescription,
+	session *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
-	for _, media := range s.MediaDescriptions {
+	for _, media := range session.MediaDescriptions {
+		if isRejectedMediaSection(media) {
+			continue
+		}
+
 		tracksInMediaSection := []trackDetails{}
 		rtxRepairFlows := map[uint64]uint64{}
 		fecRepairFlows := map[uint64]uint64{}
@@ -90,7 +94,7 @@ func trackDetailsFromSDP(
 		trackID := ""
 
 		// If media section is recvonly or inactive skip
-		direction := getPeerDirection(media, s)
+		direction := getPeerDirection(media, session)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
 		}
@@ -200,38 +204,33 @@ func trackDetailsFromSDP(
 					trackID = split[2]
 				}
 
-				isNewTrack := true
-				trackDetails := &trackDetails{}
-				for i := range tracksInMediaSection {
-					for j := range tracksInMediaSection[i].ssrcs {
-						if tracksInMediaSection[i].ssrcs[j] == SSRC(ssrc) {
-							trackDetails = &tracksInMediaSection[i]
-							isNewTrack = false
-						}
-					}
+				track := trackDetailsForSSRC(tracksInMediaSection, SSRC(ssrc))
+				isNewTrack := track == nil
+				if isNewTrack {
+					track = &trackDetails{}
 				}
 
-				trackDetails.mid = midValue
-				trackDetails.kind = codecType
-				trackDetails.streamID = streamID
-				trackDetails.id = trackID
-				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
+				track.mid = midValue
+				track.kind = codecType
+				track.streamID = streamID
+				track.id = trackID
+				track.ssrcs = []SSRC{SSRC(ssrc)}
 
 				for r, baseSsrc := range rtxRepairFlows {
 					if baseSsrc == ssrc {
 						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
+						track.rtxSsrc = &repairSsrc
 					}
 				}
 				for r, baseSsrc := range fecRepairFlows {
 					if baseSsrc == ssrc {
 						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
+						track.fecSsrc = &fecSsrc
 					}
 				}
 
 				if isNewTrack {
-					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)
+					tracksInMediaSection = append(tracksInMediaSection, *track)
 				}
 			}
 		}

@@ -1735,6 +1735,12 @@ func setRTPTransceiverCurrentDirection(
 		_, _, hasCryptex := mediaSectionCryptexState(media, bundleTagMedia, bundleMids)
 		transceiver.setRTPHeaderEncryptionNegotiated(sessionLevelCryptex || hasCryptex)
 
+		if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+			transceiver.setCurrentDirection(RTPTransceiverDirectionInactive)
+
+			continue
+		}
+
 		direction := getPeerDirection(media, answer.parsed)
 
 		// reverse direction if it was a remote answer
@@ -1787,6 +1793,28 @@ func runIfNewReceiver(
 	return false
 }
 
+func (pc *PeerConnection) incomingTrackDetails(remoteDesc *SessionDescription) []trackDetails {
+	// the remote offer can contain tracks rejected by our local answer.
+	pc.mu.RLock()
+	rejectedMids := map[string]struct{}{}
+	if local := pc.currentLocalDescription; local != nil && local.Type == SDPTypeAnswer {
+		for _, media := range local.parsed.MediaDescriptions {
+			if isRejectedMediaSection(media) {
+				rejectedMids[getMidValue(media)] = struct{}{}
+			}
+		}
+	}
+	pc.mu.RUnlock()
+
+	tracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+
+	return slices.DeleteFunc(tracks, func(track trackDetails) bool {
+		_, rejected := rejectedMids[track.mid]
+
+		return rejected
+	})
+}
+
 // configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
 //
 //nolint:gocognit,cyclop
@@ -1795,7 +1823,7 @@ func (pc *PeerConnection) configureRTPReceivers(
 	remoteDesc *SessionDescription,
 	currentTransceivers []*RTPTransceiver,
 ) {
-	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	incomingTracks := pc.incomingTrackDetails(remoteDesc)
 
 	if isRenegotiation { //nolint:nestif
 		for _, transceiver := range currentTransceivers {
@@ -1882,7 +1910,7 @@ func (pc *PeerConnection) configureRTPReceivers(
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
 func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
-	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	incomingTracks := pc.incomingTrackDetails(remoteDesc)
 	if len(incomingTracks) == 0 {
 		return
 	}
@@ -1926,6 +1954,10 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 // startRTPSenders starts all outbound RTP streams.
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
 	for _, transceiver := range currentTransceivers {
+		direction := transceiver.getCurrentDirection()
+		if direction == RTPTransceiverDirectionInactive || direction == RTPTransceiverDirectionRecvonly {
+			continue
+		}
 		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() {
 			err := sender.Send(sender.GetParameters())
 			if err != nil {

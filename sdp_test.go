@@ -474,12 +474,50 @@ func TestSelectCandidateMediaSection(t *testing.T) {
 }
 
 func TestTrackDetailsFromSDP(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		port       int
+		bundleOnly bool
+		wantTracks int
+	}{
+		{name: "accepted", port: 9, wantTracks: 1},
+		{name: "rejected", port: 0, wantTracks: 0},
+		{name: "bundle-only", port: 0, bundleOnly: true, wantTracks: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, metadata := range []sdp.Attribute{
+				{Key: sdp.AttrKeySSRC, Value: "1000"},
+				{Key: sdpAttributeRid, Value: "f send"},
+			} {
+				t.Run(metadata.Key, func(t *testing.T) {
+					media := &sdp.MediaDescription{
+						MediaName: sdp.MediaName{Media: "video", Port: sdp.RangedPort{Value: testCase.port}},
+						Attributes: []sdp.Attribute{
+							{Key: "mid", Value: "0"},
+							{Key: sdp.AttrKeySendOnly},
+							{Key: "msid", Value: "stream track"},
+							metadata,
+						},
+					}
+					if testCase.bundleOnly {
+						media.WithPropertyAttribute("bundle-only")
+					}
+					tracks := trackDetailsFromSDP(nil, &sdp.SessionDescription{
+						MediaDescriptions: []*sdp.MediaDescription{media},
+					})
+					require.Len(t, tracks, testCase.wantTracks)
+				})
+			}
+		})
+	}
+
 	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
 		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
 						Media: "foobar",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "0"},
@@ -490,6 +528,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "audio",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "1"},
@@ -500,6 +539,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "2"},
@@ -512,6 +552,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "3"},
@@ -523,6 +564,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "sendonly"},
@@ -570,6 +612,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "0"},
@@ -602,6 +645,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "inactive"},
@@ -611,6 +655,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "recvonly"},
@@ -628,6 +673,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "0"},
@@ -640,6 +686,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				{
 					MediaName: sdp.MediaName{
 						Media: "video",
+						Port:  sdp.RangedPort{Value: 9},
 					},
 					Attributes: []sdp.Attribute{
 						{Key: "mid", Value: "1"},
