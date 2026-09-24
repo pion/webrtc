@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pion/ice/v4"
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4/internal/mux"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -219,14 +219,7 @@ func (t *ICETransport) restart() error {
 		return fmt.Errorf("%w: unable to restart ICETransport", errICEAgentNotExist)
 	}
 
-	if err := agent.Restart(
-		t.gatherer.api.settingEngine.candidates.UsernameFragment,
-		t.gatherer.api.settingEngine.candidates.Password,
-	); err != nil {
-		return err
-	}
-
-	return t.gatherer.Gather()
+	return t.gatherer.gather(true)
 }
 
 // Stop irreversibly stops the ICETransport.

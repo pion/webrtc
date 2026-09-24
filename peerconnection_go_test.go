@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v3"
-	"github.com/pion/ice/v4"
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
