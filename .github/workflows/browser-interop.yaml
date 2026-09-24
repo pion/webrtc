@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
+name: Browser interoperability
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-interop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interop:
+    uses: pion/browser-tests/.github/workflows/browser-tests.yaml@main
+    with:
+      webrtc-repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      webrtc-ref: ${{ github.event.pull_request.head.sha || github.sha }}
