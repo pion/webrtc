@@ -453,12 +453,13 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit,cycl
 				return true
 			}
 
-			if getPeerDirection(mid) != transceiver.Direction() && getPeerDirection(rm) != transceiver.Direction().Revers() {
+			if getPeerDirection(mid, localDesc.parsed) != transceiver.Direction() &&
+				getPeerDirection(rm, remoteDesc.parsed) != transceiver.Direction().Revers() {
 				return true
 			}
 		case SDPTypeAnswer:
 			// Step 5.3.3
-			if _, ok := mid.Attribute(transceiver.Direction().String()); !ok {
+			if getPeerDirection(mid, localDesc.parsed) != transceiver.Direction() {
 				return true
 			}
 		default:
@@ -685,7 +686,7 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 			return true
 		}
 
-		if getPeerDirection(m) != t.Direction() {
+		if getPeerDirection(m, desc.parsed) != t.Direction() {
 			return true
 		}
 	}
@@ -1304,8 +1305,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 
 			kind := NewRTPCodecType(media.MediaName.Media)
-			direction := getPeerDirection(media)
-			if kind == 0 || direction == RTPTransceiverDirectionUnknown {
+			direction := getPeerDirection(media, pc.RemoteDescription().parsed)
+			if kind == 0 {
 				continue
 			}
 
@@ -1729,10 +1730,7 @@ func setRTPTransceiverCurrentDirection(
 		_, _, hasCryptex := mediaSectionCryptexState(media, bundleTagMedia, bundleMids)
 		transceiver.setRTPHeaderEncryptionNegotiated(sessionLevelCryptex || hasCryptex)
 
-		direction := getPeerDirection(media)
-		if direction == RTPTransceiverDirectionUnknown {
-			continue
-		}
+		direction := getPeerDirection(media, answer.parsed)
 
 		// reverse direction if it was a remote answer
 		if weOffer {
@@ -3341,8 +3339,8 @@ func (pc *PeerConnection) generateMatchedSDP(
 		}
 
 		kind := NewRTPCodecType(media.MediaName.Media)
-		direction := getPeerDirection(media)
-		if kind == 0 || direction == RTPTransceiverDirectionUnknown {
+		direction := getPeerDirection(media, remoteDescription.parsed)
+		if kind == 0 {
 			continue
 		}
 

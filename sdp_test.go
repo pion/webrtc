@@ -1739,3 +1739,15 @@ func TestSctpInit(t *testing.T) {
 		assert.ErrorAs(t, err, &corruptInputError)
 	})
 }
+
+func TestGetPeerDirection(t *testing.T) {
+	session := &sdp.SessionDescription{}
+	media := &sdp.MediaDescription{}
+	assert.Equal(t, RTPTransceiverDirectionSendrecv, getPeerDirection(media, session))
+
+	session.WithPropertyAttribute("sendonly")
+	assert.Equal(t, RTPTransceiverDirectionSendonly, getPeerDirection(media, session))
+
+	media.WithPropertyAttribute("recvonly")
+	assert.Equal(t, RTPTransceiverDirectionRecvonly, getPeerDirection(media, session))
+}
