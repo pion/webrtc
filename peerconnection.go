@@ -3483,7 +3483,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 }
 
 func (pc *PeerConnection) setGatherCompleteHandler(handler func()) {
-	pc.iceGatherer.onGatheringCompleteHandler.Store(handler)
+	pc.iceGatherer.onGatheringCompleteHandler.Store(&handler)
 }
 
 // SCTP returns the SCTPTransport for this PeerConnection
