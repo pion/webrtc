@@ -712,7 +712,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	seenGathering := &atomic.Bool{}
 	seenComplete := &atomic.Bool{}
 
-	seenGatheringAndComplete := make(chan any)
+	seenGatheringAndComplete, gatheringComplete := context.WithCancel(t.Context())
 
 	peerConn, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -731,7 +731,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 		}
 
 		if seenGathering.Load() && seenComplete.Load() {
-			close(seenGatheringAndComplete)
+			peerConn.setGatherCompleteHandler(gatheringComplete)
 		}
 	}
 	peerConn.OnICEGatheringStateChange(onStateChange)
@@ -743,7 +743,7 @@ func TestOnICEGatheringStateChange(t *testing.T) {
 	select {
 	case <-time.After(time.Second * 10):
 		assert.Fail(t, "Gathering and Complete were never seen")
-	case <-seenGatheringAndComplete:
+	case <-seenGatheringAndComplete.Done():
 	}
 
 	assert.NoError(t, peerConn.Close())
