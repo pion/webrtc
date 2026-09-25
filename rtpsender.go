@@ -29,6 +29,29 @@ type trackEncoding struct {
 	context *baseTrackLocalContext
 
 	ssrc, ssrcRTX, ssrcFEC SSRC
+
+	// lastSeqNumber, lastTimestamp and hasLastRTPState record the RTP state
+	// of the most recently replaced track for this encoding, so a new track
+	// bound in its place can continue the RTP stream instead of restarting
+	// it (see #2623).
+	lastSeqNumber   uint16
+	lastTimestamp   uint32
+	hasLastRTPState bool
+}
+
+// rtpSequenceState is implemented by the built-in sample-based TrackLocal
+// types to expose the most recently written RTP sequence number and
+// timestamp, so RTPSender.ReplaceTrack can preserve RTP stream continuity
+// when swapping in a new track.
+type rtpSequenceState interface {
+	lastRTPState() (sequenceNumber uint16, timestamp uint32, ok bool)
+}
+
+// rtpSequenceSeeder is implemented by TrackLocal types that can be seeded
+// with a starting RTP sequence number and timestamp before their first Bind,
+// so RTPSender.ReplaceTrack can continue an existing RTP stream onto them.
+type rtpSequenceSeeder interface {
+	continueSequenceFrom(sequenceNumber uint16, timestamp uint32)
 }
 
 // RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer.
@@ -252,6 +275,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 			if err := replacedTrack.Unbind(context); err != nil {
 				return err
 			}
+
+			e.lastSeqNumber, e.lastTimestamp, e.hasLastRTPState = 0, 0, false
+			if state, ok := replacedTrack.(rtpSequenceState); ok {
+				e.lastSeqNumber, e.lastTimestamp, e.hasLastRTPState = state.lastRTPState()
+			}
 		}
 
 		if !r.hasSent() || track == nil {
@@ -269,6 +297,16 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 	)
 
 	// If we reach this point in the routine, there is only 1 track encoding
+
+	// Seed the new track's RTP sequence number/timestamp from the replaced
+	// track's last known state, if available, so the RTP stream continues
+	// rather than restarting with an unrelated sequence number. Restarting
+	// can desync SRTP's rollover-count tracking and cause the receiver to
+	// silently drop all subsequent packets as replays (see #2623).
+	if seeder, ok := track.(rtpSequenceSeeder); ok && r.trackEncodings[0].hasLastRTPState {
+		seeder.continueSequenceFrom(r.trackEncodings[0].lastSeqNumber, r.trackEncodings[0].lastTimestamp)
+	}
+
 	codec, err := track.Bind(&baseTrackLocalContext{
 		id:              context.ID(),
 		params:          params,
