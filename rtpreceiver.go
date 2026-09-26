@@ -19,7 +19,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track

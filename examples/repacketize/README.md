@@ -7,7 +7,7 @@ repacketize demonstrates how many video codecs can be received, depacketized and
 ### Download and run repacketize
 
 ```
-go install github.com/pion/webrtc/v4/examples/repacketize@latest
+go install github.com/pion/webrtc/v5/examples/repacketize@latest
 ```
 
 ### Open repacketize local page

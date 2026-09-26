@@ -12,7 +12,7 @@ ffmpeg -i $INPUT_FILE -g 30 -b:v 2M output.ivf
 ### Download play-from-disk-fec
 
 ```
-go install github.com/pion/webrtc/v4/examples/play-from-disk-fec@latest
+go install github.com/pion/webrtc/v5/examples/play-from-disk-fec@latest
 ```
 
 ### Open play-from-disk-fec example page

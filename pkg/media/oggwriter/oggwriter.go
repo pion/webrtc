@@ -17,7 +17,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v5/internal/util"
 )
 
 const (

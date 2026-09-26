@@ -1,7 +1,7 @@
 # custom-logger
 
-`custom-logger` is an example demonstrating how to override the default logging behavior of the [Pion WebRTC](https://github.com/pion/webrtc) stack.  
-By default, Pion logs everything to `stdout`.  
+`custom-logger` is an example demonstrating how to override the default logging behavior of the [Pion WebRTC](https://github.com/pion/webrtc) stack.
+By default, Pion logs everything to `stdout`.
 This example shows how to inject a **custom `LoggerFactory`** to handle logs from every subsystem (ICE, DTLS, SCTP, DataChannel...).
 
 ---
@@ -29,7 +29,7 @@ Ideal for:
 ### 1. Install the example
 
 ```
-go install github.com/pion/webrtc/v4/examples/custom-logger@latest
+go install github.com/pion/webrtc/v5/examples/custom-logger@latest
 ```
 Make sure  ```$(go env GOPATH)/bin ```  is in your ```PATH```.
 
@@ -42,7 +42,7 @@ source ~/.zshrc
 ### 2.Run
 `custom-logger` or  `go run main.go`
 
-##  Example output 
+##  Example output
 
 ```
 Creating logger for ice

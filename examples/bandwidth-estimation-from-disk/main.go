@@ -20,9 +20,9 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/cc"
 	"github.com/pion/interceptor/pkg/gcc"
-	"github.com/pion/webrtc/v4"
-	"github.com/pion/webrtc/v4/pkg/media"
-	"github.com/pion/webrtc/v4/pkg/media/ivfreader"
+	"github.com/pion/webrtc/v5"
+	"github.com/pion/webrtc/v5/pkg/media"
+	"github.com/pion/webrtc/v5/pkg/media/ivfreader"
 )
 
 const (

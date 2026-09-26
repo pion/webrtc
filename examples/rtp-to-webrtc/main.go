@@ -17,7 +17,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v5"
 )
 
 // nolint:cyclop

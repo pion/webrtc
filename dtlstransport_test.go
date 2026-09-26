@@ -23,7 +23,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v5/test"
-	"github.com/pion/webrtc/v4/internal/mux"
+	"github.com/pion/webrtc/v5/internal/mux"
 	"github.com/stretchr/testify/assert"
 )
 

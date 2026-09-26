@@ -9,7 +9,7 @@ This proxy functionality is particularly useful when direct peer-to-peer communi
 The example is self-contained and requires no input.
 
 ```bash
-go install github.com/pion/webrtc/v4/examples/ice-proxy@latest
+go install github.com/pion/webrtc/v5/examples/ice-proxy@latest
 ```
 
 ### Run ice-proxy

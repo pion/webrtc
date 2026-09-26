@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/webrtc/v4/pkg/media/h265reader"
+	"github.com/pion/webrtc/v5/pkg/media/h265reader"
 )
 
 const (

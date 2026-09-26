@@ -20,7 +20,7 @@ import (
 
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v5"
 )
 
 // nolint: cyclop

@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v4/pkg/media/oggreader"
+	"github.com/pion/webrtc/v5/pkg/media/oggreader"
 	"github.com/stretchr/testify/assert"
 )
 

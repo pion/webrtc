@@ -15,7 +15,7 @@ ffmpeg -i "$INPUT_FILE" -vn -c:a libopus -ac 2 -frame_duration 20 -page_duration
 ### Download play-from-disk
 
 ```
-go install github.com/pion/webrtc/v4/examples/play-from-disk@latest
+go install github.com/pion/webrtc/v5/examples/play-from-disk@latest
 ```
 
 ### Open play-from-disk example page

@@ -9,7 +9,7 @@ Once the connection is established, messages will automatically be sent from the
 ## Instructions
 ### 1. Download the data-channels server
 ```
-go install github.com/pion/webrtc/v4/examples/data-channels@latest
+go install github.com/pion/webrtc/v5/examples/data-channels@latest
 ```
 
 ### 2. Open JSFiddle

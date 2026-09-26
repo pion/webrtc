@@ -6,7 +6,7 @@
 package webrtc
 
 import (
-	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v5/internal/util"
 )
 
 type testORTCStack struct {

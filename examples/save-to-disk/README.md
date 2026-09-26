@@ -12,7 +12,7 @@ You can then send this video back to your browser using [play-from-disk](https:/
 ## Instructions
 ### Download save-to-disk
 ```
-go install github.com/pion/webrtc/v4/examples/save-to-disk@latest
+go install github.com/pion/webrtc/v5/examples/save-to-disk@latest
 ```
 
 ### Open save-to-disk example page
