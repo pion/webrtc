@@ -40,10 +40,12 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		noCodecPC, err := NewAPI(WithMediaEngine(&MediaEngine{})).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		_, err = pc.AddTrack(track)
+		sender, err := pc.AddTrack(track)
 		assert.NoError(t, err)
 
-		assert.ErrorIs(t, signalPair(pc, noCodecPC), ErrUnsupportedCodec)
+		assert.NoError(t, signalPair(pc, noCodecPC))
+		assert.False(t, sender.hasSent())
+		assert.Equal(t, RTPTransceiverDirectionInactive, pc.GetTransceivers()[0].getCurrentDirection())
 
 		closePairNow(t, noCodecPC, pc)
 	})
