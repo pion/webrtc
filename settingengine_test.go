@@ -133,18 +133,6 @@ func TestDetachDataChannels(t *testing.T) {
 	assert.True(t, s.detach.DataChannels, "Failed to enable detached data channels.")
 }
 
-func TestSetNAT1To1IPs(t *testing.T) {
-	settingEngine := SettingEngine{}
-	assert.Nil(t, settingEngine.candidates.NAT1To1IPs)
-	assert.Equal(t, ICECandidateType(0), settingEngine.candidates.NAT1To1IPCandidateType)
-
-	ips := []string{"1.2.3.4"}
-	typ := ICECandidateTypeHost
-	settingEngine.SetNAT1To1IPs(ips, typ)
-	assert.Equal(t, ips, settingEngine.candidates.NAT1To1IPs, "Failed to set NAT1To1IPs")
-	assert.Equal(t, typ, settingEngine.candidates.NAT1To1IPCandidateType, "Failed to set NAT1To1IPCandidateType")
-}
-
 func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
 	se := SettingEngine{}
 	assert.Nil(t, se.candidates.addressRewriteRules)
@@ -157,15 +145,14 @@ func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
 	assert.NotNil(t, se.candidates.addressRewriteRules)
 	assert.Len(t, se.candidates.addressRewriteRules, 1)
 
-	se.SetNAT1To1IPs([]string{"203.0.113.1"}, ICECandidateTypeHost)
 	assert.NoError(t, se.SetICEAddressRewriteRules())
 	assert.Nil(t, se.candidates.addressRewriteRules)
 
-	assert.ErrorIs(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
+	assert.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
 		External:        []string{"198.51.100.2"},
 		AsCandidateType: ICECandidateTypeHost,
 		Mode:            ICEAddressRewriteReplace,
-	}), errAddressRewriteWithNAT1To1)
+	}))
 }
 
 // ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost demonstrates
