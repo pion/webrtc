@@ -851,9 +851,7 @@ a=fmtp:127 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001
 			}
 
 			api := NewAPI(WithMediaEngine(me))
-			pc, err := api.NewPeerConnection(Configuration{
-				SDPSemantics: SDPSemanticsUnifiedPlan,
-			})
+			pc, err := api.NewPeerConnection(Configuration{})
 			assert.NoError(t, err)
 
 			offer := SessionDescription{

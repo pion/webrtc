@@ -474,6 +474,32 @@ func TestSelectCandidateMediaSection(t *testing.T) {
 }
 
 func TestTrackDetailsFromSDP(t *testing.T) {
+	t.Run("one track per media section", func(t *testing.T) {
+		descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
+			MediaName: sdp.MediaName{Media: "video"},
+			Attributes: []sdp.Attribute{
+				{Key: "mid", Value: "0"},
+				{Key: "ssrc", Value: "4000 msid:repair repair-track"},
+				{Key: "ssrc", Value: "3000 msid:source source-track"},
+				{Key: "ssrc", Value: "5000 msid:other other-track"},
+				{Key: "ssrc", Value: "6000 msid:fec fec-track"},
+				{Key: "ssrc-group", Value: "FID 3000 4000"},
+				{Key: "ssrc-group", Value: "FEC-FR 3000 6000"},
+				{Key: "msid", Value: "stream track"},
+			},
+		}}}
+
+		tracks := trackDetailsFromSDP(nil, descr)
+		require.Len(t, tracks, 1)
+		assert.Equal(t, []SSRC{3000}, tracks[0].ssrcs)
+		assert.Equal(t, "stream", tracks[0].streamID)
+		assert.Equal(t, "track", tracks[0].id)
+		require.NotNil(t, tracks[0].rtxSsrc)
+		require.NotNil(t, tracks[0].fecSsrc)
+		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
+		assert.Equal(t, SSRC(6000), *tracks[0].fecSsrc)
+	})
+
 	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
 		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
@@ -747,7 +773,6 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			assert.NoError(t, err)
 
 			testSdp, err = populateSDP(testSdp,
-				false,
 				dtlsFingerprints,
 				SDPMediaDescriptionFingerprints,
 				false,
@@ -803,7 +828,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -866,7 +890,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -927,7 +950,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -969,7 +991,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1029,7 +1050,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1064,7 +1084,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		se := SettingEngine{}
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1097,7 +1116,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err = populateSDP(
 			&sdp.SessionDescription{},
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1142,7 +1160,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1184,7 +1201,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		matchedBundle := "audio"
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1228,7 +1244,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		matchedBundle := ""
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1263,7 +1278,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1301,7 +1315,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		d := &sdp.SessionDescription{}
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1343,7 +1356,6 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		d := &sdp.SessionDescription{}
 		offerSdp, err := populateSDP(
 			d,
-			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,

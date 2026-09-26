@@ -261,7 +261,6 @@ func (pc *PeerConnection) initConfiguration(configuration Configuration) error {
 	}
 
 	pc.configuration.ICETransportPolicy = configuration.ICETransportPolicy
-	pc.configuration.SDPSemantics = configuration.SDPSemantics
 	pc.configuration.AlwaysNegotiateDataChannels = configuration.AlwaysNegotiateDataChannels
 
 	sanitizedICEServers := configuration.getICEServers()
@@ -736,46 +735,39 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 		// in-parallel steps to create an offer
 		// https://w3c.github.io/webrtc-pc/#dfn-in-parallel-steps-to-create-an-offer
-		isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
-		if pc.currentRemoteDescription != nil && isPlanB {
-			isPlanB = descriptionPossiblyPlanB(pc.currentRemoteDescription)
-		}
-
 		// include unmatched local transceivers
-		if !isPlanB { //nolint:nestif
-			// update the greater mid if the remote description provides a greater one
-			if pc.currentRemoteDescription != nil {
-				var numericMid int
-				for _, media := range pc.currentRemoteDescription.parsed.MediaDescriptions {
-					mid := getMidValue(media)
-					if mid == "" {
-						continue
-					}
-					numericMid, err = strconv.Atoi(mid)
-					if err != nil {
-						continue
-					}
+		// update the greater mid if the remote description provides a greater one
+		if pc.currentRemoteDescription != nil {
+			var numericMid int
+			for _, media := range pc.currentRemoteDescription.parsed.MediaDescriptions {
+				mid := getMidValue(media)
+				if mid == "" {
+					continue
+				}
+				numericMid, err = strconv.Atoi(mid)
+				if err != nil {
+					continue
+				}
+				if numericMid > pc.greaterMid {
+					pc.greaterMid = numericMid
+				}
+			}
+		}
+		for _, t := range currentTransceivers {
+			if mid := t.Mid(); mid != "" {
+				numericMid, errMid := strconv.Atoi(mid)
+				if errMid == nil {
 					if numericMid > pc.greaterMid {
 						pc.greaterMid = numericMid
 					}
 				}
-			}
-			for _, t := range currentTransceivers {
-				if mid := t.Mid(); mid != "" {
-					numericMid, errMid := strconv.Atoi(mid)
-					if errMid == nil {
-						if numericMid > pc.greaterMid {
-							pc.greaterMid = numericMid
-						}
-					}
 
-					continue
-				}
-				pc.greaterMid++
-				err = t.SetMid(strconv.Itoa(pc.greaterMid))
-				if err != nil {
-					return SessionDescription{}, err
-				}
+				continue
+			}
+			pc.greaterMid++
+			err = t.SetMid(strconv.Itoa(pc.greaterMid))
+			if err != nil {
+				return SessionDescription{}, err
 			}
 		}
 
@@ -816,7 +808,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 
 		// Verify local media hasn't changed during offer
 		// generation. Recompute if necessary
-		if isPlanB || !pc.hasLocalDescriptionChanged(&offer) {
+		if !pc.hasLocalDescriptionChanged(&offer) {
 			break
 		}
 		count++
@@ -1288,14 +1280,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	var transceiver *RTPTransceiver
 	localTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
-	detectedPlanB := descriptionIsPlanB(pc.RemoteDescription(), pc.log)
-	if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
-		detectedPlanB = descriptionPossiblyPlanB(pc.RemoteDescription())
-	}
 
 	weOffer := desc.Type == SDPTypeAnswer
 
-	if !weOffer && !detectedPlanB { //nolint:nestif
+	if !weOffer { //nolint:nestif
 		for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 			midValue := getMidValue(media)
 			if midValue == "" {
@@ -1737,7 +1725,7 @@ func runIfNewReceiver(
 	incomingTrack trackDetails,
 	transceivers []*RTPTransceiver,
 	callbackFunc func(incomingTrack trackDetails, receiver *RTPReceiver),
-) bool {
+) {
 	for _, t := range transceivers {
 		if t.Mid() != incomingTrack.mid {
 			continue
@@ -1753,10 +1741,8 @@ func runIfNewReceiver(
 
 		callbackFunc(incomingTrack, receiver)
 
-		return true
+		return
 	}
-
-	return false
 }
 
 // configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
@@ -1848,7 +1834,7 @@ func (pc *PeerConnection) configureRTPReceivers(
 	}
 
 	for _, incomingTrack := range filteredTracks {
-		_ = runIfNewReceiver(incomingTrack, localTransceivers, pc.configureReceiver)
+		runIfNewReceiver(incomingTrack, localTransceivers, pc.configureReceiver)
 	}
 }
 
@@ -1861,37 +1847,8 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 
 	localTransceivers := append([]*RTPTransceiver{}, currentTransceivers...)
 
-	unhandledTracks := incomingTracks[:0]
 	for _, incomingTrack := range incomingTracks {
-		trackHandled := runIfNewReceiver(incomingTrack, localTransceivers, pc.startReceiver)
-		if !trackHandled {
-			unhandledTracks = append(unhandledTracks, incomingTrack)
-		}
-	}
-
-	remoteIsPlanB := false
-	switch pc.configuration.SDPSemantics {
-	case SDPSemanticsPlanB:
-		remoteIsPlanB = true
-	case SDPSemanticsUnifiedPlanWithFallback:
-		remoteIsPlanB = descriptionPossiblyPlanB(pc.RemoteDescription())
-	default:
-		// none
-	}
-
-	if remoteIsPlanB {
-		for _, incomingTrack := range unhandledTracks {
-			t, err := pc.AddTransceiverFromKind(incomingTrack.kind, RTPTransceiverInit{
-				Direction: RTPTransceiverDirectionSendrecv,
-			})
-			if err != nil {
-				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incomingTrack.ssrcs[0], err)
-
-				continue
-			}
-			pc.configureReceiver(incomingTrack, t.Receiver())
-			pc.startReceiver(incomingTrack, t.Receiver())
-		}
+		runIfNewReceiver(incomingTrack, localTransceivers, pc.startReceiver)
 	}
 }
 
@@ -3095,7 +3052,6 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		return nil, err
 	}
 
-	isPlanB := pc.configuration.SDPSemantics == SDPSemanticsPlanB
 	cryptexEnabledByPolicy := pc.configuration.RTPHeaderEncryptionPolicy != RTPHeaderEncryptionPolicyDisable
 
 	mediaSections := []mediaSection{}
@@ -3108,64 +3064,23 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 	}
 	defer pc.sctpTransport.lock.Unlock()
 
-	if isPlanB { //nolint:nestif
-		video := make([]*RTPTransceiver, 0)
-		audio := make([]*RTPTransceiver, 0)
+	for _, t := range transceivers {
+		if sender := t.Sender(); sender != nil {
+			sender.setNegotiated()
+		}
+		mediaSections = append(mediaSections, mediaSection{
+			id:           t.Mid(),
+			transceivers: []*RTPTransceiver{t},
+			cryptex:      false,
+		})
+	}
 
-		for _, t := range transceivers {
-			switch t.kind {
-			case RTPCodecTypeVideo:
-				video = append(video, t)
-			case RTPCodecTypeAudio:
-				audio = append(audio, t)
-			case RTPCodecTypeUnknown:
-				// nothing to do
-			}
-			if sender := t.Sender(); sender != nil {
-				sender.setNegotiated()
-			}
-		}
-
-		if len(video) > 0 {
-			mediaSections = append(mediaSections, mediaSection{
-				id:           "video",
-				transceivers: video,
-				cryptex:      false,
-			})
-		}
-		if len(audio) > 0 {
-			mediaSections = append(mediaSections, mediaSection{
-				id:           "audio",
-				transceivers: audio,
-				cryptex:      false,
-			})
-		}
-
-		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
-			mediaSections = append(mediaSections, mediaSection{
-				id:   "data",
-				data: true,
-			})
-		}
-	} else {
-		for _, t := range transceivers {
-			if sender := t.Sender(); sender != nil {
-				sender.setNegotiated()
-			}
-			mediaSections = append(mediaSections, mediaSection{
-				id:           t.Mid(),
-				transceivers: []*RTPTransceiver{t},
-				cryptex:      false,
-			})
-		}
-
-		if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
-			mediaSections = append(mediaSections, mediaSection{
-				id:       strconv.Itoa(len(mediaSections)),
-				data:     true,
-				sctpInit: localSctpInit,
-			})
-		}
+	if pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0 {
+		mediaSections = append(mediaSections, mediaSection{
+			id:       strconv.Itoa(len(mediaSections)),
+			data:     true,
+			sctpInit: localSctpInit,
+		})
 	}
 
 	dtlsFingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
@@ -3175,7 +3090,6 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 
 	return populateSDP(
 		desc,
-		isPlanB,
 		dtlsFingerprints,
 		pc.api.settingEngine.sdpMediaLevelFingerprints,
 		pc.api.settingEngine.candidates.ICELite,
@@ -3243,11 +3157,6 @@ func (pc *PeerConnection) generateMatchedSDP(
 		}
 	}
 
-	detectedPlanB := descriptionIsPlanB(remoteDescription, pc.log)
-	if pc.configuration.SDPSemantics != SDPSemanticsUnifiedPlan {
-		detectedPlanB = descriptionPossiblyPlanB(remoteDescription)
-	}
-
 	mediaSections := []mediaSection{}
 	alreadyHaveApplicationMediaSection := false
 	var localSctpInit []byte
@@ -3276,75 +3185,30 @@ func (pc *PeerConnection) generateMatchedSDP(
 		}
 
 		kind := NewRTPCodecType(media.MediaName.Media)
-		direction := getPeerDirection(media, remoteDescription.parsed)
 		if kind == 0 {
 			continue
 		}
 
-		sdpSemantics := pc.configuration.SDPSemantics
-
-		switch {
-		case sdpSemantics == SDPSemanticsPlanB || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB:
-			if !detectedPlanB {
-				return nil, &rtcerr.TypeError{
-					Err: fmt.Errorf("%w: Expected PlanB, but RemoteDescription is UnifiedPlan", ErrIncorrectSDPSemantics),
-				}
-			}
-			// If we're responding to a plan-b offer, then we should try to fill up this
-			// media entry with all matching local transceivers
-			mediaTransceivers := []*RTPTransceiver{}
-			for {
-				// keep going until we can't get any more
-				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-				if transceiver == nil {
-					if len(mediaTransceivers) == 0 {
-						transceiver = &RTPTransceiver{kind: kind, api: pc.api, codecs: pc.api.mediaEngine.getCodecsByKind(kind)}
-						transceiver.setDirection(RTPTransceiverDirectionInactive)
-						mediaTransceivers = append(mediaTransceivers, transceiver)
-					}
-
-					break
-				}
-				if sender := transceiver.Sender(); sender != nil {
-					sender.setNegotiated()
-				}
-				mediaTransceivers = append(mediaTransceivers, transceiver)
-			}
-			mediaSections = append(mediaSections, mediaSection{
-				id:           midValue,
-				transceivers: mediaTransceivers,
-				cryptex:      cryptexAtMediaLevel,
-			})
-		case sdpSemantics == SDPSemanticsUnifiedPlan || sdpSemantics == SDPSemanticsUnifiedPlanWithFallback:
-			if detectedPlanB {
-				return nil, &rtcerr.TypeError{
-					Err: fmt.Errorf(
-						"%w: Expected UnifiedPlan, but RemoteDescription is PlanB",
-						ErrIncorrectSDPSemantics,
-					),
-				}
-			}
-			transceiver, localTransceivers = findByMid(midValue, localTransceivers)
-			if transceiver == nil {
-				return nil, fmt.Errorf("%w: %q", errPeerConnTranscieverMidNil, midValue)
-			}
-			if sender := transceiver.Sender(); sender != nil {
-				sender.setNegotiated()
-			}
-			mediaTransceivers := []*RTPTransceiver{transceiver}
-
-			extensions, _ := rtpExtensionsFromMediaDescription(media)
-			mediaSections = append(
-				mediaSections,
-				mediaSection{
-					id:              midValue,
-					transceivers:    mediaTransceivers,
-					matchExtensions: extensions,
-					rids:            getRids(media),
-					cryptex:         cryptexAtMediaLevel,
-				},
-			)
+		transceiver, localTransceivers = findByMid(midValue, localTransceivers)
+		if transceiver == nil {
+			return nil, fmt.Errorf("%w: %q", errPeerConnTranscieverMidNil, midValue)
 		}
+		if sender := transceiver.Sender(); sender != nil {
+			sender.setNegotiated()
+		}
+		mediaTransceivers := []*RTPTransceiver{transceiver}
+
+		extensions, _ := rtpExtensionsFromMediaDescription(media)
+		mediaSections = append(
+			mediaSections,
+			mediaSection{
+				id:              midValue,
+				transceivers:    mediaTransceivers,
+				matchExtensions: extensions,
+				rids:            getRids(media),
+				cryptex:         cryptexAtMediaLevel,
+			},
+		)
 	}
 
 	pc.sctpTransport.lock.Lock()
@@ -3353,45 +3217,32 @@ func (pc *PeerConnection) generateMatchedSDP(
 	var bundleGroup *string
 	// If we are offering also include unmatched local transceivers
 	if includeUnmatched { //nolint:nestif
-		if !detectedPlanB {
-			for _, t := range localTransceivers {
-				if sender := t.Sender(); sender != nil {
-					sender.setNegotiated()
-				}
-				mediaSections = append(mediaSections, mediaSection{
-					id:           t.Mid(),
-					transceivers: []*RTPTransceiver{t},
-					cryptex:      false,
-				})
+		for _, t := range localTransceivers {
+			if sender := t.Sender(); sender != nil {
+				sender.setNegotiated()
 			}
+			mediaSections = append(mediaSections, mediaSection{
+				id:           t.Mid(),
+				transceivers: []*RTPTransceiver{t},
+				cryptex:      false,
+			})
 		}
 
 		if (pc.configuration.AlwaysNegotiateDataChannels || pc.sctpTransport.dataChannelsRequested != 0) &&
 			!alreadyHaveApplicationMediaSection {
-			if detectedPlanB {
-				mediaSections = append(mediaSections, mediaSection{
-					id:   "data",
-					data: true,
-				})
-			} else {
-				if localSctpInit == nil && pc.api.settingEngine.sctp.enableSnap {
-					localSctpInit = pc.sctpTransport.GetSctpInit()
-				}
-				mediaSections = append(mediaSections, mediaSection{
-					id:       strconv.Itoa(len(mediaSections)),
-					data:     true,
-					sctpInit: localSctpInit,
-				})
+			if localSctpInit == nil && pc.api.settingEngine.sctp.enableSnap {
+				localSctpInit = pc.sctpTransport.GetSctpInit()
 			}
+			mediaSections = append(mediaSections, mediaSection{
+				id:       strconv.Itoa(len(mediaSections)),
+				data:     true,
+				sctpInit: localSctpInit,
+			})
 		}
 	} else if remoteDescription != nil {
 		groupValue, _ := remoteDescription.parsed.Attribute(sdp.AttrKeyGroup)
 		groupValue = strings.TrimLeft(groupValue, "BUNDLE")
 		bundleGroup = &groupValue
-	}
-
-	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
-		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
 	}
 
 	dtlsFingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
@@ -3401,7 +3252,6 @@ func (pc *PeerConnection) generateMatchedSDP(
 
 	return populateSDP(
 		desc,
-		detectedPlanB,
 		dtlsFingerprints,
 		pc.api.settingEngine.sdpMediaLevelFingerprints,
 		pc.api.settingEngine.candidates.ICELite,

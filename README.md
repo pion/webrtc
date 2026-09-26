@@ -69,7 +69,7 @@ He is available to talk about Pion or general WebRTC questions, feel free to rea
 * DataChannels
 * Send/Receive audio and video
 * Renegotiation
-* Plan-B and Unified Plan
+* Unified Plan
 * [SettingEngine](https://pkg.go.dev/github.com/pion/webrtc/v5#SettingEngine) for Pion specific extensions
 
 
