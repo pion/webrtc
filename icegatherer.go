@@ -7,7 +7,6 @@ package webrtc
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -159,10 +158,8 @@ func (g *ICEGatherer) createAgent() error {
 		return nil
 	}
 
-	options, err := g.buildAgentOptions()
-	if err != nil {
-		return err
-	}
+	options := g.buildAgentOptions()
+	var err error
 
 	// ICE v5 initializes credentials on Gather, but SDP needs them before gathering.
 	parameters := ICEParameters{
@@ -193,21 +190,16 @@ func (g *ICEGatherer) createAgent() error {
 	return nil
 }
 
-func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
-	nat1To1CandiTyp := g.resolveNAT1To1CandidateType()
-	mDNSMode := g.sanitizedMDNSMode()
-
-	options := g.baseAgentOptions(mDNSMode)
-	rewriteOptions, err := g.addressRewriteOptions(nat1To1CandiTyp)
-	if err != nil {
-		return nil, err
+func (g *ICEGatherer) buildAgentOptions() []ice.AgentOption {
+	options := g.baseAgentOptions(g.sanitizedMDNSMode())
+	if rules := g.api.settingEngine.candidates.addressRewriteRules; len(rules) > 0 {
+		options = append(options, ice.WithAddressRewriteRules(rules...))
 	}
-	options = append(options, rewriteOptions...)
 	options = append(options, g.timeoutOptions()...)
 	options = append(options, g.miscOptions()...)
 	options = append(options, g.renominationOptions()...)
 
-	return options, nil
+	return options
 }
 
 func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
@@ -224,17 +216,6 @@ func (g *ICEGatherer) resolveCandidateTypes() []ice.CandidateType {
 	}
 
 	return nil
-}
-
-func (g *ICEGatherer) resolveNAT1To1CandidateType() ice.CandidateType {
-	switch g.api.settingEngine.candidates.NAT1To1IPCandidateType {
-	case ICECandidateTypeHost:
-		return ice.CandidateTypeHost
-	case ICECandidateTypeSrflx:
-		return ice.CandidateTypeServerReflexive
-	default:
-		return ice.CandidateTypeUnspecified
-	}
 }
 
 func (g *ICEGatherer) sanitizedMDNSMode() ice.MulticastDNSMode {
@@ -261,31 +242,6 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
 		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
 	}
-}
-
-func (g *ICEGatherer) addressRewriteOptions(candidateType ice.CandidateType) ([]ice.AgentOption, error) {
-	rules := g.api.settingEngine.candidates.addressRewriteRules
-	nat1To1IPs := g.api.settingEngine.candidates.NAT1To1IPs
-	if len(rules) > 0 && len(nat1To1IPs) > 0 {
-		return nil, errAddressRewriteWithNAT1To1
-	}
-
-	if len(rules) > 0 {
-		return []ice.AgentOption{ice.WithAddressRewriteRules(rules...)}, nil
-	}
-
-	if len(nat1To1IPs) == 0 {
-		return nil, nil
-	}
-
-	return []ice.AgentOption{
-		ice.WithAddressRewriteRules(
-			legacyNAT1To1AddressRewriteRules(
-				nat1To1IPs,
-				candidateType,
-			)...,
-		),
-	}, nil
 }
 
 func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {
@@ -371,35 +327,6 @@ func (g *ICEGatherer) renominationOptions() []ice.AgentOption {
 	}
 
 	return opts
-}
-
-func legacyNAT1To1AddressRewriteRules(ips []string, candidateType ice.CandidateType) []ice.AddressRewriteRule {
-	catchAll := make([]string, 0, len(ips))
-	rules := make([]ice.AddressRewriteRule, 0, len(ips)+1)
-
-	for _, ip := range ips {
-		splits := strings.SplitN(ip, "/", 2)
-
-		if len(splits) == 2 {
-			rules = append(rules, ice.AddressRewriteRule{
-				External:        []string{splits[0]},
-				Local:           splits[1],
-				AsCandidateType: candidateType,
-			})
-			catchAll = append(catchAll, splits[0])
-		} else {
-			catchAll = append(catchAll, ip)
-		}
-	}
-
-	if len(catchAll) > 0 {
-		rules = append(rules, ice.AddressRewriteRule{
-			External:        catchAll,
-			AsCandidateType: candidateType,
-		})
-	}
-
-	return rules
 }
 
 // Gather ICE candidates.

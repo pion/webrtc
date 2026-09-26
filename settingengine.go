@@ -52,8 +52,6 @@ type SettingEngine struct {
 		InterfaceFilter          func(string) (keep bool)
 		IPFilter                 func(net.IP) (keep bool)
 		RemoteIPFilter           func(net.IP) (keep bool)
-		NAT1To1IPs               []string
-		NAT1To1IPCandidateType   ICECandidateType
 		addressRewriteRules      []ice.AddressRewriteRule
 		MulticastDNSMode         ice.MulticastDNSMode
 		MulticastDNSHostName     string
@@ -324,56 +322,14 @@ func (e *SettingEngine) SetRemoteIPFilter(filter func(net.IP) (keep bool)) {
 	e.candidates.RemoteIPFilter = filter
 }
 
-// SetNAT1To1IPs sets a list of external IP addresses of 1:1 (D)NAT
-// and a candidate type for which the external IP address is used.
-// This is useful when you host a server using Pion on an AWS EC2 instance
-// which has a private address, behind a 1:1 DNAT with a public IP (e.g.
-// Elastic IP). In this case, you can give the public IP address so that
-// Pion will use the public IP address in its candidate instead of the private
-// IP address. The second argument, candidateType, is used to tell Pion which
-// type of candidate should use the given public IP address.
-// Two types of candidates are supported:
-//
-// ICECandidateTypeHost:
-//
-//	The public IP address will be used for the host candidate in the SDP.
-//
-// ICECandidateTypeSrflx:
-//
-//	A server reflexive candidate with the given public IP address will be added to the SDP.
-//
-// Please note that if you choose ICECandidateTypeHost, then the private IP address
-// won't be advertised with the peer. Also, this option cannot be used along with mDNS.
-//
-// If you choose ICECandidateTypeSrflx, it simply adds a server reflexive candidate
-// with the public IP. The host candidate is still available along with mDNS
-// capabilities unaffected. Also, you cannot give STUN server URL at the same time.
-// It will result in an error otherwise.
-//
-// Deprecated: Use SetICEAddressRewriteRules instead. To mirror the legacy
-// behavior, supply ICEAddressRewriteRule with External set to ips, AsCandidateType
-// set to candidateType, and Mode set to ICEAddressRewriteReplace for host
-// candidates or ICEAddressRewriteAppend for server reflexive candidates.
-// Or leave Mode unspecified to use the default behavior;
-// replace for host candidates and append for server reflexive candidates.
-func (e *SettingEngine) SetNAT1To1IPs(ips []string, candidateType ICECandidateType) {
-	e.candidates.NAT1To1IPs = ips
-	e.candidates.NAT1To1IPCandidateType = candidateType
-}
-
 // SetICEAddressRewriteRules configures address rewrite rules for candidate publication.
 // These rules provide fine-grained control over which local addresses are replaced or
 // supplemented with external IPs.
-// This replaces the legacy NAT1To1 settings, which will be deprecated in the future.
 func (e *SettingEngine) SetICEAddressRewriteRules(rules ...ICEAddressRewriteRule) error {
 	if len(rules) == 0 {
 		e.candidates.addressRewriteRules = nil
 
 		return nil
-	}
-
-	if len(e.candidates.NAT1To1IPs) > 0 {
-		return errAddressRewriteWithNAT1To1
 	}
 
 	converted := make([]ice.AddressRewriteRule, 0, len(rules))
