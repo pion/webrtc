@@ -756,11 +756,13 @@ func TestSettingEngine_SCTPSetters(t *testing.T) {
 	var se SettingEngine
 
 	se.EnableSCTPZeroChecksum(true)
+	se.SetSCTPHandshakeRTOMax(150 * time.Millisecond)
 	se.SetSCTPMinCwnd(11)
 	se.SetSCTPFastRtxWnd(22)
 	se.SetSCTPCwndCAStep(33)
 
 	assert.True(t, se.sctp.enableZeroChecksum)
+	assert.Equal(t, 150*time.Millisecond, se.sctp.handshakeRTOMax)
 	assert.Equal(t, uint32(11), se.sctp.minCwnd)
 	assert.Equal(t, uint32(22), se.sctp.fastRtxWnd)
 	assert.Equal(t, uint32(33), se.sctp.cwndCAStep)
