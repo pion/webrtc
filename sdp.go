@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -81,177 +80,110 @@ func trackDetailsFromSDP(
 	s *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
 	for _, media := range s.MediaDescriptions {
-		tracksInMediaSection := []trackDetails{}
-		rtxRepairFlows := map[uint64]uint64{}
-		fecRepairFlows := map[uint64]uint64{}
-
-		// Plan B can have multiple tracks in a single media section
-		streamID := ""
-		trackID := ""
-
-		// If media section is recvonly or inactive skip
 		direction := getPeerDirection(media, s)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
 		}
 
-		midValue := getMidValue(media)
-		if midValue == "" {
+		track := trackDetails{
+			mid:  getMidValue(media),
+			kind: NewRTPCodecType(media.MediaName.Media),
+		}
+		if track.mid == "" || track.kind == 0 {
 			continue
 		}
 
-		codecType := NewRTPCodecType(media.MediaName.Media)
-		if codecType == 0 {
-			continue
+		// Resolve repair streams before selecting the media SSRC, regardless of attribute order.
+		rtxRepairFlows := map[SSRC]SSRC{}
+		fecRepairFlows := map[SSRC]SSRC{}
+		for _, attr := range media.Attributes {
+			if attr.Key != sdp.AttrKeySSRCGroup {
+				continue
+			}
+			fields := strings.Fields(attr.Value)
+			if len(fields) != 3 || (fields[0] != sdp.SemanticTokenFlowIdentification &&
+				fields[0] != sdp.SemanticTokenForwardErrorCorrectionFramework) {
+				continue
+			}
+			base, err := strconv.ParseUint(fields[1], 10, 32)
+			if err != nil {
+				log.Warnf("Failed to parse SSRC: %v", err)
+
+				continue
+			}
+			repair, err := strconv.ParseUint(fields[2], 10, 32)
+			if err != nil {
+				log.Warnf("Failed to parse SSRC: %v", err)
+
+				continue
+			}
+			if fields[0] == sdp.SemanticTokenFlowIdentification {
+				rtxRepairFlows[SSRC(repair)] = SSRC(base)
+			} else {
+				fecRepairFlows[SSRC(repair)] = SSRC(base)
+			}
 		}
 
 		for _, attr := range media.Attributes {
-			switch attr.Key {
-			case sdp.AttrKeySSRCGroup:
-				split := strings.Split(attr.Value, " ")
-				if split[0] == sdp.SemanticTokenFlowIdentification { //nolint:nestif
-					// Add rtx ssrcs to blacklist, to avoid adding them as tracks
-					// Essentially lines like `a=ssrc-group:FID 2231627014 632943048` are processed by this section
-					// as this declares that the second SSRC (632943048) is a rtx repair flow (RFC4588) for the first
-					// (2231627014) as specified in RFC5576
-					if len(split) == 3 {
-						baseSsrc, err := strconv.ParseUint(split[1], 10, 32)
-						if err != nil {
-							log.Warnf("Failed to parse SSRC: %v", err)
+			if attr.Key != sdp.AttrKeySSRC {
+				continue
+			}
+			fields := strings.Fields(attr.Value)
+			if len(fields) == 0 {
+				continue
+			}
+			value, err := strconv.ParseUint(fields[0], 10, 32)
+			if err != nil {
+				log.Warnf("Failed to parse SSRC: %v", err)
 
-							continue
-						}
-						rtxRepairFlow, err := strconv.ParseUint(split[2], 10, 32)
-						if err != nil {
-							log.Warnf("Failed to parse SSRC: %v", err)
-
-							continue
-						}
-						rtxRepairFlows[rtxRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(rtxRepairFlow),
-						) // Remove if rtx was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = &repairSsrc
-							}
-						}
-					}
-				} else if split[0] == sdp.SemanticTokenForwardErrorCorrectionFramework {
-					// Similar to above, lines like `a=ssrc-group:FEC-FR aaaaa bbbbb`
-					// means for video ssrc aaaaa, there's a FEC track bbbbb
-					if len(split) == 3 {
-						baseSsrc, err := strconv.ParseUint(split[1], 10, 32)
-						if err != nil {
-							log.Warnf("Failed to parse SSRC: %v", err)
-
-							continue
-						}
-						fecRepairFlow, err := strconv.ParseUint(split[2], 10, 32)
-						if err != nil {
-							log.Warnf("Failed to parse SSRC: %v", err)
-
-							continue
-						}
-						fecRepairFlows[fecRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(fecRepairFlow),
-						) // Remove if fec was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = &repairSsrc
-							}
-						}
-					}
-				}
-
-			// Handle `a=msid:<stream_id> <track_label>` for Unified plan. The first value is the same as MediaStream.id
-			// in the browser and can be used to figure out which tracks belong to the same stream. The browser should
-			// figure this out automatically when an ontrack event is emitted on RTCPeerConnection.
-			case sdp.AttrKeyMsid:
-				split := strings.Split(attr.Value, " ")
-				if len(split) == 2 {
-					streamID = split[0]
-					trackID = split[1]
-				}
-
-			case sdp.AttrKeySSRC:
-				split := strings.Split(attr.Value, " ")
-				ssrc, err := strconv.ParseUint(split[0], 10, 32)
-				if err != nil {
-					log.Warnf("Failed to parse SSRC: %v", err)
-
-					continue
-				}
-
-				if _, ok := rtxRepairFlows[ssrc]; ok {
-					continue // This ssrc is a RTX repair flow, ignore
-				}
-				if _, ok := fecRepairFlows[ssrc]; ok {
-					continue // This ssrc is a FEC repair flow, ignore
-				}
-
-				if len(split) == 3 && strings.HasPrefix(split[1], "msid:") {
-					streamID = split[1][len("msid:"):]
-					trackID = split[2]
-				}
-
-				isNewTrack := true
-				trackDetails := &trackDetails{}
-				for i := range tracksInMediaSection {
-					for j := range tracksInMediaSection[i].ssrcs {
-						if tracksInMediaSection[i].ssrcs[j] == SSRC(ssrc) {
-							trackDetails = &tracksInMediaSection[i]
-							isNewTrack = false
-						}
-					}
-				}
-
-				trackDetails.mid = midValue
-				trackDetails.kind = codecType
-				trackDetails.streamID = streamID
-				trackDetails.id = trackID
-				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
-
-				for r, baseSsrc := range rtxRepairFlows {
-					if baseSsrc == ssrc {
-						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
-					}
-				}
-				for r, baseSsrc := range fecRepairFlows {
-					if baseSsrc == ssrc {
-						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
-					}
-				}
-
-				if isNewTrack {
-					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)
-				}
+				continue
+			}
+			ssrc := SSRC(value)
+			if _, ok := rtxRepairFlows[ssrc]; ok {
+				continue
+			}
+			if _, ok := fecRepairFlows[ssrc]; ok {
+				continue
+			}
+			if len(track.ssrcs) == 0 {
+				track.ssrcs = []SSRC{ssrc}
+			}
+			if track.ssrcs[0] != ssrc {
+				continue
+			}
+			if len(fields) == 3 && strings.HasPrefix(fields[1], "msid:") {
+				track.streamID = strings.TrimPrefix(fields[1], "msid:")
+				track.id = fields[2]
 			}
 		}
 
-		if rids := getRids(media); len(rids) != 0 && trackID != "" && streamID != "" {
-			simulcastTrack := trackDetails{
-				mid:      midValue,
-				kind:     codecType,
-				streamID: streamID,
-				id:       trackID,
-				rids:     []string{},
+		if msid, ok := media.Attribute(sdp.AttrKeyMsid); ok {
+			if fields := strings.Fields(msid); len(fields) == 2 {
+				track.streamID, track.id = fields[0], fields[1]
 			}
+		}
+
+		if rids := getRids(media); len(rids) != 0 && track.id != "" && track.streamID != "" {
+			track.ssrcs = nil
 			for _, rid := range rids {
-				simulcastTrack.rids = append(simulcastTrack.rids, rid.id)
+				track.rids = append(track.rids, rid.id)
 			}
-
-			tracksInMediaSection = []trackDetails{simulcastTrack}
+		} else if len(track.ssrcs) != 0 {
+			for repair, base := range rtxRepairFlows {
+				if base == track.ssrcs[0] {
+					track.rtxSsrc = &repair
+				}
+			}
+			for repair, base := range fecRepairFlows {
+				if base == track.ssrcs[0] {
+					track.fecSsrc = &repair
+				}
+			}
+		} else {
+			continue
 		}
 
-		incomingTracks = append(incomingTracks, tracksInMediaSection...)
+		incomingTracks = append(incomingTracks, track)
 	}
 
 	return incomingTracks
@@ -446,96 +378,86 @@ func populateLocalCandidates(
 
 //nolint:gocognit,cyclop
 func addSenderSDP(
-	mediaSection mediaSection,
-	isPlanB bool,
+	transceiver *RTPTransceiver,
 	media *sdp.MediaDescription,
 ) {
-	for _, mt := range mediaSection.transceivers {
-		sender := mt.Sender()
-		if sender == nil {
-			continue
+	sender := transceiver.Sender()
+	if sender == nil {
+		return
+	}
+
+	track := sender.Track()
+	if track == nil {
+		return
+	}
+
+	sendParameters := sender.GetParameters()
+	for _, encoding := range sendParameters.Encodings {
+		if encoding.RTX.SSRC != 0 {
+			media = media.WithValueAttribute(
+				"ssrc-group",
+				fmt.Sprintf(
+					"%s %d %d",
+					sdp.SemanticTokenFlowIdentification,
+					encoding.SSRC,
+					encoding.RTX.SSRC,
+				),
+			)
+		}
+		if encoding.FEC.SSRC != 0 {
+			media = media.WithValueAttribute(
+				"ssrc-group",
+				fmt.Sprintf(
+					"%s %d %d",
+					sdp.SemanticTokenForwardErrorCorrectionFramework,
+					encoding.SSRC,
+					encoding.FEC.SSRC,
+				),
+			)
 		}
 
-		track := sender.Track()
-		if track == nil {
-			continue
-		}
+		media = media.WithMediaSource(
+			uint32(encoding.SSRC),
+			track.StreamID(), /* cname */
+			track.StreamID(), /* streamLabel */
+			track.ID(),
+		)
 
-		sendParameters := sender.GetParameters()
-		for _, encoding := range sendParameters.Encodings {
-			if encoding.RTX.SSRC != 0 {
-				media = media.WithValueAttribute(
-					"ssrc-group",
-					fmt.Sprintf(
-						"%s %d %d",
-						sdp.SemanticTokenFlowIdentification,
-						encoding.SSRC,
-						encoding.RTX.SSRC,
-					),
-				)
-			}
-			if encoding.FEC.SSRC != 0 {
-				media = media.WithValueAttribute(
-					"ssrc-group",
-					fmt.Sprintf(
-						"%s %d %d",
-						sdp.SemanticTokenForwardErrorCorrectionFramework,
-						encoding.SSRC,
-						encoding.FEC.SSRC,
-					),
-				)
-			}
-
+		if encoding.RTX.SSRC != 0 {
 			media = media.WithMediaSource(
-				uint32(encoding.SSRC),
+				uint32(encoding.RTX.SSRC),
 				track.StreamID(), /* cname */
 				track.StreamID(), /* streamLabel */
 				track.ID(),
 			)
-
-			if !isPlanB {
-				if encoding.RTX.SSRC != 0 {
-					media = media.WithMediaSource(
-						uint32(encoding.RTX.SSRC),
-						track.StreamID(), /* cname */
-						track.StreamID(), /* streamLabel */
-						track.ID(),
-					)
-				}
-				if encoding.FEC.SSRC != 0 {
-					media = media.WithMediaSource(
-						uint32(encoding.FEC.SSRC),
-						track.StreamID(), /* cname */
-						track.StreamID(), /* streamLabel */
-						track.ID(),
-					)
-				}
-
-				media = media.WithPropertyAttribute("msid:" + track.StreamID() + " " + track.ID())
-			}
+		}
+		if encoding.FEC.SSRC != 0 {
+			media = media.WithMediaSource(
+				uint32(encoding.FEC.SSRC),
+				track.StreamID(), /* cname */
+				track.StreamID(), /* streamLabel */
+				track.ID(),
+			)
 		}
 
-		if len(sendParameters.Encodings) > 1 {
-			sendRids := make([]string, 0, len(sendParameters.Encodings))
+		media = media.WithPropertyAttribute("msid:" + track.StreamID() + " " + track.ID())
+	}
 
-			for _, encoding := range sendParameters.Encodings {
-				media.WithValueAttribute(sdpAttributeRid, encoding.RID+" send")
-				sendRids = append(sendRids, encoding.RID)
-			}
-			// Simulcast
-			media.WithValueAttribute(sdpAttributeSimulcast, "send "+strings.Join(sendRids, ";"))
-		}
+	if len(sendParameters.Encodings) > 1 {
+		sendRids := make([]string, 0, len(sendParameters.Encodings))
 
-		if !isPlanB {
-			break
+		for _, encoding := range sendParameters.Encodings {
+			media.WithValueAttribute(sdpAttributeRid, encoding.RID+" send")
+			sendRids = append(sendRids, encoding.RID)
 		}
+		// Simulcast
+		media.WithValueAttribute(sdpAttributeSimulcast, "send "+strings.Join(sendRids, ";"))
 	}
 }
 
 //nolint:cyclop, gocognit
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
-	isPlanB bool,
 	shouldAddCandidates bool,
 	dtlsFingerprints []DTLSFingerprint,
 	mediaEngine *MediaEngine,
@@ -647,7 +569,7 @@ func addTransceiverSDP(
 		media = media.WithPropertyAttribute(sdp.AttrKeyCryptex)
 	}
 
-	addSenderSDP(mediaSection, isPlanB, media)
+	addSenderSDP(transceiver, media)
 
 	media = media.WithPropertyAttribute(transceiver.Direction().String())
 
@@ -700,7 +622,6 @@ func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 //nolint:cyclop,gocognit
 func populateSDP(
 	descr *sdp.SessionDescription,
-	isPlanB bool,
 	dtlsFingerprints []DTLSFingerprint,
 	mediaDescriptionFingerprint bool,
 	isICELite bool,
@@ -737,7 +658,7 @@ func populateSDP(
 	for i, section := range mediaSections {
 		if section.data && len(section.transceivers) != 0 {
 			return nil, errSDPMediaSectionMediaDataChanInvalid
-		} else if !isPlanB && len(section.transceivers) > 1 {
+		} else if len(section.transceivers) > 1 {
 			return nil, errSDPMediaSectionMultipleTrackInvalid
 		}
 
@@ -761,7 +682,6 @@ func populateSDP(
 		} else {
 			shouldAddID, err = addTransceiverSDP(
 				descr,
-				isPlanB,
 				shouldAddCandidates,
 				mediaDtlsFingerprints,
 				mediaEngine,
@@ -830,43 +750,6 @@ func getMidValue(media *sdp.MediaDescription) string {
 	}
 
 	return ""
-}
-
-// SessionDescription contains a MediaSection with Multiple SSRCs, it is Plan-B.
-func descriptionIsPlanB(desc *SessionDescription, log logging.LeveledLogger) bool {
-	if desc == nil || desc.parsed == nil {
-		return false
-	}
-
-	// Store all MIDs that already contain a track
-	midWithTrack := map[string]bool{}
-
-	for _, trackDetail := range trackDetailsFromSDP(log, desc.parsed) {
-		if _, ok := midWithTrack[trackDetail.mid]; ok {
-			return true
-		}
-		midWithTrack[trackDetail.mid] = true
-	}
-
-	return false
-}
-
-// SessionDescription contains a MediaSection with name `audio`, `video` or `data`
-// If only one SSRC is set we can't know if it is Plan-B or Unified. If users have
-// set fallback mode assume it is Plan-B.
-func descriptionPossiblyPlanB(desc *SessionDescription) bool {
-	if desc == nil || desc.parsed == nil {
-		return false
-	}
-
-	detectionRegex := regexp.MustCompile(`(?i)^(audio|video|data)$`)
-	for _, media := range desc.parsed.MediaDescriptions {
-		if len(detectionRegex.FindStringSubmatch(getMidValue(media))) == 2 {
-			return true
-		}
-	}
-
-	return false
 }
 
 // getPeerDirection resolves media direction according to

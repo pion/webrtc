@@ -87,10 +87,6 @@ var (
 	// the remote description is not set.
 	ErrNoRemoteDescription = errors.New("remote description is not set")
 
-	// ErrIncorrectSDPSemantics indicates that the PeerConnection was configured to
-	// generate SDP Answers with different SDP Semantics than the received Offer.
-	ErrIncorrectSDPSemantics = errors.New("remote SessionDescription semantics does not match configuration")
-
 	// ErrIncorrectSignalingState indicates that the signaling state of PeerConnection is not correct.
 	ErrIncorrectSignalingState = errors.New("operation can not be run in current signaling state")
 
