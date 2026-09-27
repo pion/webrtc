@@ -228,6 +228,7 @@ var (
 	errPeerConnRemoteDescriptionWithoutMidValue       = errors.New(
 		"remoteDescription contained media section without mid value",
 	)
+	errPeerConnRemoteDescriptionDuplicateMid         = errors.New("remoteDescription contained duplicate mid value")
 	errPeerConnRemoteDescriptionNil                  = errors.New("remoteDescription has not been set yet")
 	errMediaSectionHasExplictSSRCAttribute           = errors.New("media section has an explicit SSRC")
 	errPeerConnRemoteSSRCAddTransceiver              = errors.New("could not add transceiver for remote SSRC")
