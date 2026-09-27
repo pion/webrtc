@@ -636,6 +636,24 @@ func TestSetRemoteDescriptionMissingFingerprint(t *testing.T) {
 	})
 }
 
+func TestSetRemoteDescriptionAnswerIncompatibleDirection(t *testing.T) {
+	pc, answer := newSDPValidationAnswer(t)
+	invalid := answer
+	invalid.SDP = strings.NewReplacer(
+		"a=sendrecv\r\n", "a=recvonly\r\n",
+		"a=sendonly\r\n", "a=recvonly\r\n",
+		"a=inactive\r\n", "a=recvonly\r\n",
+	).Replace(answer.SDP)
+
+	if runtime.GOOS == "js" {
+		require.NoError(t, pc.SetRemoteDescription(invalid))
+		assert.Equal(t, SignalingStateStable, pc.SignalingState())
+		assert.Equal(t, invalid.SDP, pc.RemoteDescription().SDP)
+	} else {
+		assertRemoteDescriptionRejected(t, pc, invalid, answer)
+	}
+}
+
 func newSDPValidationOffer(t *testing.T) (*PeerConnection, *PeerConnection, SessionDescription) {
 	t.Helper()
 	offerer, answerer, err := newPair()

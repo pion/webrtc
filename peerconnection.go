@@ -1228,6 +1228,48 @@ func (pc *PeerConnection) LocalDescription() *SessionDescription {
 	return pc.CurrentLocalDescription()
 }
 
+//nolint:cyclop // Validate independent SDP constraints before changing signaling state.
+func (pc *PeerConnection) validateRemoteDescription(desc *SessionDescription) error {
+	mids := map[string]bool{}
+	for _, media := range desc.parsed.MediaDescriptions {
+		mid := getMidValue(media)
+		if mid != "" && mids[mid] {
+			return fmt.Errorf("%w: %q", errPeerConnRemoteDescriptionDuplicateMid, mid)
+		}
+		mids[mid] = true
+	}
+
+	if desc.Type != SDPTypeAnswer && desc.Type != SDPTypePranswer {
+		return nil
+	}
+	offer := pc.PendingLocalDescription()
+	if offer == nil {
+		return nil
+	}
+	if len(desc.parsed.MediaDescriptions) != len(offer.parsed.MediaDescriptions) {
+		return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
+	}
+	for i, media := range desc.parsed.MediaDescriptions {
+		offered := offer.parsed.MediaDescriptions[i]
+		if media.MediaName.Media != offered.MediaName.Media || getMidValue(media) != getMidValue(offered) {
+			return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
+		}
+		_, bundleOnly := media.Attribute("bundle-only")
+		if media.MediaName.Media == mediaSectionApplication || (media.MediaName.Port.Value == 0 && !bundleOnly) {
+			continue
+		}
+		offerDirection := getPeerDirection(offered, offer.parsed)
+		answerDirection := getPeerDirection(media, desc.parsed)
+		if offerDirection != RTPTransceiverDirectionSendrecv &&
+			answerDirection != RTPTransceiverDirectionInactive && answerDirection != offerDirection.Revers() {
+			return &rtcerr.OperationError{Err: fmt.Errorf("%w: incompatible direction for mid %q",
+				errSDPDoesNotMatchOffer, getMidValue(media))}
+		}
+	}
+
+	return nil
+}
+
 // SetRemoteDescription sets the SessionDescription of the remote peer
 //
 //nolint:gocognit,gocyclo,cyclop,maintidx
@@ -1242,27 +1284,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
-	mids := map[string]bool{}
-	for _, media := range desc.parsed.MediaDescriptions {
-		mid := getMidValue(media)
-		if mid != "" && mids[mid] {
-			return fmt.Errorf("%w: %q", errPeerConnRemoteDescriptionDuplicateMid, mid)
-		}
-		mids[mid] = true
-	}
-
-	if desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer {
-		if offer := pc.PendingLocalDescription(); offer != nil {
-			if len(desc.parsed.MediaDescriptions) != len(offer.parsed.MediaDescriptions) {
-				return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
-			}
-			for i, media := range desc.parsed.MediaDescriptions {
-				offered := offer.parsed.MediaDescriptions[i]
-				if media.MediaName.Media != offered.MediaName.Media || getMidValue(media) != getMidValue(offered) {
-					return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
-				}
-			}
-		}
+	if err := pc.validateRemoteDescription(&desc); err != nil {
+		return err
 	}
 
 	// Validate the Cryptex mode before committing any signaling state, so that a rejected
