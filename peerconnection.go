@@ -1256,6 +1256,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if len(desc.parsed.MediaDescriptions) != len(offer.parsed.MediaDescriptions) {
 				return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
 			}
+			for i, media := range desc.parsed.MediaDescriptions {
+				if media.MediaName.Media != offer.parsed.MediaDescriptions[i].MediaName.Media {
+					return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
+				}
+			}
 		}
 	}
 
