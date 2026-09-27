@@ -1242,6 +1242,15 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
+	mids := map[string]bool{}
+	for _, media := range desc.parsed.MediaDescriptions {
+		mid := getMidValue(media)
+		if mid != "" && mids[mid] {
+			return fmt.Errorf("%w: %q", errPeerConnRemoteDescriptionDuplicateMid, mid)
+		}
+		mids[mid] = true
+	}
+
 	// Validate the Cryptex mode before committing any signaling state, so that a rejected
 	// description leaves the PeerConnection in its pre-call state (RFC 9429 Section 5.10).
 	pc.mu.Lock()
