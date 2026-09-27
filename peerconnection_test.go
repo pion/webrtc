@@ -475,6 +475,28 @@ func TestSetRemoteDescriptionMissingICEPassword(t *testing.T) {
 	})
 }
 
+func TestSetRemoteDescriptionMissingFingerprint(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "fingerprint")
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, offer)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "fingerprint")
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
 func newSDPValidationOffer(t *testing.T) (*PeerConnection, *PeerConnection, SessionDescription) {
 	t.Helper()
 	offerer, answerer, err := newPair()

@@ -1256,6 +1256,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return err
 	}
 
+	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
+	if err != nil {
+		return err
+	}
+
 	if err = pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
 		return err
 	}
@@ -1410,11 +1415,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	remoteIsLite := isIceLiteSet(desc.parsed)
-
-	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
-	if err != nil {
-		return err
-	}
 
 	iceRole := ICERoleControlled
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlled agent.
