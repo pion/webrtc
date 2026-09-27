@@ -1515,22 +1515,20 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 		_, err = pcOffer.AddTrack(secondTrack)
 		assert.NoError(t, err)
 
-		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) (filtered string) {
-			shouldDiscard := false
+		require.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) (filtered string) {
+			firstVideo := false
 
 			scanner := bufio.NewScanner(strings.NewReader(sessionDescription))
 			for scanner.Scan() {
 				if strings.HasPrefix(scanner.Text(), "m=video") {
-					shouldDiscard = !shouldDiscard
-				} else if strings.HasPrefix(scanner.Text(), "a=group:BUNDLE") {
-					filtered += "a=group:BUNDLE 1 2\r\n"
-
+					firstVideo = !firstVideo
+				}
+				// Hide the first track's SSRCs while preserving the offered media sections.
+				if firstVideo && strings.HasPrefix(scanner.Text(), "a=ssrc") {
 					continue
 				}
 
-				if !shouldDiscard {
-					filtered += scanner.Text() + "\r\n"
-				}
+				filtered += scanner.Text() + "\r\n"
 			}
 
 			return
