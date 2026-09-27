@@ -1251,11 +1251,16 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return cryptexErr
 	}
 
-	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
+	iceDetails, err := extractICEDetails(desc.parsed, pc.log)
+	if err != nil {
 		return err
 	}
 
-	if err := pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
+	if err = pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
+		return err
+	}
+
+	if err = pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
 		return err
 	}
 
@@ -1304,7 +1309,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if transceiver == nil {
 				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 			} else if direction == RTPTransceiverDirectionInactive {
-				if err := transceiver.Stop(); err != nil {
+				if err = transceiver.Stop(); err != nil {
 					return err
 				}
 			}
@@ -1314,9 +1319,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 			switch {
 			case transceiver == nil:
-				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
-				if err != nil {
-					return err
+				receiver, receiverErr := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
+				if receiverErr != nil {
+					return receiverErr
 				}
 
 				localDirection := RTPTransceiverDirectionRecvonly
@@ -1352,16 +1357,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 
 			if transceiver.Mid() == "" {
-				if err := transceiver.SetMid(midValue); err != nil {
+				if err = transceiver.SetMid(midValue); err != nil {
 					return err
 				}
 			}
 		}
-	}
-
-	iceDetails, err := extractICEDetails(desc.parsed, pc.log)
-	if err != nil {
-		return err
 	}
 
 	if isRenegotiation && pc.iceTransport.haveRemoteCredentialsChange(iceDetails.Ufrag, iceDetails.Password) {
