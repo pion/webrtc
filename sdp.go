@@ -510,6 +510,7 @@ func addTransceiverSDP(
 		// In addition this makes our SDP compliant with RFC 4566 Section 5.7:
 		// https://datatracker.ietf.org/doc/html/rfc4566#section-5.7
 		descr.WithMedia(&sdp.MediaDescription{
+			Attributes: []sdp.Attribute{{Key: sdp.AttrKeyMID, Value: midValue}},
 			MediaName: sdp.MediaName{
 				Media:   transceiver.kind.String(),
 				Port:    sdp.RangedPort{Value: 0},
@@ -744,7 +745,7 @@ func populateSDP(
 
 func getMidValue(media *sdp.MediaDescription) string {
 	for _, attr := range media.Attributes {
-		if attr.Key == "mid" {
+		if attr.Key == sdp.AttrKeyMID {
 			return attr.Value
 		}
 	}
@@ -797,7 +798,7 @@ func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { 
 		if bundleID != "" {
 			// Locate the fingerprint of the bundled media section
 			for _, mediaDescr := range desc.MediaDescriptions {
-				if mid, haveMid := mediaDescr.Attribute("mid"); haveMid {
+				if mid, haveMid := mediaDescr.Attribute(sdp.AttrKeyMID); haveMid {
 					if mid == bundleID && fingerprint == "" {
 						if mediaFingerprint, haveFingerprint := mediaDescr.Attribute("fingerprint"); haveFingerprint {
 							fingerprint = mediaFingerprint

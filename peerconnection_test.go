@@ -480,6 +480,38 @@ func TestSetRemoteDescriptionReorderedMediaSections(t *testing.T) {
 	})
 }
 
+func TestSetRemoteDescriptionChangedMID(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		for i := range parsed.MediaDescriptions[1].Attributes {
+			if parsed.MediaDescriptions[1].Attributes[i].Key == sdp.AttrKeyMID {
+				parsed.MediaDescriptions[1].Attributes[i].Value = "new-mid"
+			}
+		}
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		require.NoError(t, pc.SetRemoteDescription(modified))
+		assert.Equal(t, SignalingStateHaveRemoteOffer, pc.SignalingState())
+		assert.Equal(t, modified.SDP, pc.RemoteDescription().SDP)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		for i := range parsed.MediaDescriptions[1].Attributes {
+			if parsed.MediaDescriptions[1].Attributes[i].Key == sdp.AttrKeyMID {
+				parsed.MediaDescriptions[1].Attributes[i].Value = "new-mid"
+			}
+		}
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
 func TestSetRemoteDescriptionDuplicateMID(t *testing.T) {
 	t.Run("offer", func(t *testing.T) {
 		_, pc, offer := newSDPValidationOffer(t)
