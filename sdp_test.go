@@ -1076,6 +1076,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			assert.True(t, desc.ConnectionInformation != nil, "connection information must be provided for rejected tracks")
 			assert.Equal(t, desc.MediaName.Formats, []string{"0"}, "rejected tracks have 0 for Formats")
 			assert.Equal(t, desc.MediaName.Port, sdp.RangedPort{Value: 0}, "rejected tracks have 0 for Port")
+			assert.Equal(t, "audio", getMidValue(desc), "rejected tracks must preserve their MID")
 			foundRejectedTrack = true
 		}
 		assert.Equal(t, true, foundRejectedTrack, "rejected track wasn't present")
