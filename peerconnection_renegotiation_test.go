@@ -1101,7 +1101,10 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 		trackMapLock.Lock()
 		defer trackMapLock.Unlock()
 
-		for _, track := range trackMap {
+		// New RIDs may already have fired OnTrack during signaling.
+		for _, rid := range originalRids {
+			track := trackMap[rid]
+			require.NotNil(t, track)
 			_, _, err := track.ReadRTP()
 			assert.Equal(t, err, io.EOF)
 		}
@@ -1123,19 +1126,19 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+		assert.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true), withModificationFunc(func(sessionDescription string) string {
 			return signalWithRids(sessionDescription, originalRids)
-		}))
+		})))
 
 		pcAnswer.OnTrack(onTrackHandler)
 		sendUntilAllTracksFired(vp8Writer, originalRids)
 
 		assert.NoError(t, pcOffer.RemoveTrack(rtpTransceiver.Sender()))
-		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+		assert.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true), withModificationFunc(func(sessionDescription string) string {
 			sessionDescription = strings.SplitAfter(sessionDescription, "a=end-of-candidates\r\n")[0]
 
 			return sessionDescription
-		}))
+		})))
 
 		assertTracksClosed(t)
 		closePairNow(t, pcOffer, pcAnswer)
@@ -1157,15 +1160,15 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+		assert.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true), withModificationFunc(func(sessionDescription string) string {
 			return signalWithRids(sessionDescription, originalRids)
-		}))
+		})))
 
 		pcAnswer.OnTrack(onTrackHandler)
 		sendUntilAllTracksFired(vp8Writer, originalRids)
 
 		newRids := []string{"d", "e", "f"}
-		assert.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(sessionDescription string) string {
+		assert.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true), withModificationFunc(func(sessionDescription string) string {
 			scanner := bufio.NewScanner(strings.NewReader(sessionDescription))
 			sessionDescription = ""
 			for scanner.Scan() {
@@ -1178,7 +1181,7 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 			}
 
 			return signalWithRids(sessionDescription, newRids)
-		}))
+		})))
 
 		assertTracksClosed(t)
 		closePairNow(t, pcOffer, pcAnswer)

@@ -1251,6 +1251,14 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		mids[mid] = true
 	}
 
+	if desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer {
+		if offer := pc.PendingLocalDescription(); offer != nil {
+			if len(desc.parsed.MediaDescriptions) != len(offer.parsed.MediaDescriptions) {
+				return &rtcerr.OperationError{Err: errSDPDoesNotMatchOffer}
+			}
+		}
+	}
+
 	// Validate the Cryptex mode before committing any signaling state, so that a rejected
 	// description leaves the PeerConnection in its pre-call state (RFC 9429 Section 5.10).
 	pc.mu.Lock()

@@ -114,6 +114,7 @@ func signalPairWithModification(
 		pcOffer,
 		pcAnswer,
 		withModificationFunc(modificationFunc),
+		withDisableInitialDataChannel(false),
 	)
 }
 
@@ -431,6 +432,30 @@ func TestSetRemoteDescription(t *testing.T) {
 	}
 }
 
+func TestSetRemoteDescriptionMissingMediaSection(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		parsed.MediaDescriptions = parsed.MediaDescriptions[:1]
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		require.NoError(t, pc.SetRemoteDescription(modified))
+		assert.Equal(t, SignalingStateHaveRemoteOffer, pc.SignalingState())
+		assert.Equal(t, modified.SDP, pc.RemoteDescription().SDP)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		parsed.MediaDescriptions = parsed.MediaDescriptions[:1]
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
 func TestSetRemoteDescriptionDuplicateMID(t *testing.T) {
 	t.Run("offer", func(t *testing.T) {
 		_, pc, offer := newSDPValidationOffer(t)
@@ -460,6 +485,32 @@ func TestSetRemoteDescriptionDuplicateMID(t *testing.T) {
 		modified := marshalSDPWithBundle(t, answer, parsed)
 
 		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
+func TestSetRemoteDescriptionRejectedVideo(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		parsed.MediaDescriptions[1].MediaName.Port.Value = 0
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		require.NoError(t, pc.SetRemoteDescription(modified))
+		assert.Equal(t, SignalingStateHaveRemoteOffer, pc.SignalingState())
+		assert.Equal(t, modified.SDP, pc.RemoteDescription().SDP)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		parsed.MediaDescriptions[1].MediaName.Port.Value = 0
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		require.NoError(t, pc.SetRemoteDescription(modified))
+		assert.Equal(t, SignalingStateStable, pc.SignalingState())
+		assert.Equal(t, modified.SDP, pc.RemoteDescription().SDP)
 	})
 }
 
