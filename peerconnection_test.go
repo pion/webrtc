@@ -5,6 +5,8 @@ package webrtc
 
 import (
 	"runtime"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v5/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newPair creates two new peer connections (an offerer and an answerer)
@@ -425,6 +428,125 @@ func TestSetRemoteDescription(t *testing.T) {
 		}
 
 		assert.NoError(t, peerConn.Close())
+	}
+}
+
+func TestSetRemoteDescriptionMissingICEUfrag(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "ice-ufrag")
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, offer)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "ice-ufrag")
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
+func TestSetRemoteDescriptionMissingICEPassword(t *testing.T) {
+	t.Run("offer", func(t *testing.T) {
+		_, pc, offer := newSDPValidationOffer(t)
+		parsed, err := offer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "ice-pwd")
+		modified := marshalSDPWithBundle(t, offer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, offer)
+	})
+
+	t.Run("answer", func(t *testing.T) {
+		pc, answer := newSDPValidationAnswer(t)
+		parsed, err := answer.Unmarshal()
+		require.NoError(t, err)
+		removeSDPValidationAttribute(parsed, "ice-pwd")
+		modified := marshalSDPWithBundle(t, answer, parsed)
+
+		assertRemoteDescriptionRejected(t, pc, modified, answer)
+	})
+}
+
+func newSDPValidationOffer(t *testing.T) (*PeerConnection, *PeerConnection, SessionDescription) {
+	t.Helper()
+	offerer, answerer, err := newPair()
+	require.NoError(t, err)
+	t.Cleanup(func() { closePairNow(t, offerer, answerer) })
+
+	for _, kind := range []RTPCodecType{RTPCodecTypeAudio, RTPCodecTypeVideo} {
+		_, err = offerer.AddTransceiverFromKind(kind, RTPTransceiverInit{
+			Direction: RTPTransceiverDirectionRecvonly,
+		})
+		require.NoError(t, err)
+	}
+	offer, err := offerer.CreateOffer(nil)
+	require.NoError(t, err)
+	gatheringComplete := GatheringCompletePromise(offerer)
+	require.NoError(t, offerer.SetLocalDescription(offer))
+	<-gatheringComplete
+
+	return offerer, answerer, offer
+}
+
+func newSDPValidationAnswer(t *testing.T) (*PeerConnection, SessionDescription) {
+	t.Helper()
+	offerer, answerer, offer := newSDPValidationOffer(t)
+	require.NoError(t, answerer.SetRemoteDescription(offer))
+	answer, err := answerer.CreateAnswer(nil)
+	require.NoError(t, err)
+
+	return offerer, answer
+}
+
+func marshalSDPWithBundle(t *testing.T, original SessionDescription, parsed *sdp.SessionDescription) SessionDescription {
+	t.Helper()
+	group := []string{"BUNDLE"}
+	for _, media := range parsed.MediaDescriptions {
+		mid, _ := media.Attribute(sdp.AttrKeyMID)
+		group = append(group, mid)
+	}
+	for i := range parsed.Attributes {
+		if parsed.Attributes[i].Key == "group" {
+			parsed.Attributes[i].Value = strings.Join(group, " ")
+		}
+	}
+	raw, err := parsed.Marshal()
+	require.NoError(t, err)
+
+	return SessionDescription{Type: original.Type, SDP: string(raw)}
+}
+
+func assertRemoteDescriptionRejected(t *testing.T, pc *PeerConnection, invalid, valid SessionDescription) {
+	t.Helper()
+	stateBefore := pc.SignalingState()
+	localBefore := pc.LocalDescription()
+	pendingLocalBefore := pc.PendingLocalDescription()
+
+	require.Error(t, pc.SetRemoteDescription(invalid))
+	assert.Equal(t, stateBefore, pc.SignalingState())
+	assert.Nil(t, pc.RemoteDescription())
+	assert.Nil(t, pc.PendingRemoteDescription())
+	assert.Nil(t, pc.CurrentRemoteDescription())
+	assert.Equal(t, localBefore, pc.LocalDescription())
+	assert.Equal(t, pendingLocalBefore, pc.PendingLocalDescription())
+	require.NoError(t, pc.SetRemoteDescription(valid), "a corrected description must succeed")
+}
+
+func removeSDPValidationAttribute(desc *sdp.SessionDescription, key string) {
+	filter := func(attributes []sdp.Attribute) []sdp.Attribute {
+		return slices.DeleteFunc(attributes, func(attribute sdp.Attribute) bool { return attribute.Key == key })
+	}
+	desc.Attributes = filter(desc.Attributes)
+	for _, media := range desc.MediaDescriptions {
+		media.Attributes = filter(media.Attributes)
 	}
 }
 

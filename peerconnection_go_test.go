@@ -1029,15 +1029,18 @@ func TestICERestart(t *testing.T) {
 	firstOfferCandidates := extractCandidates(offerPC.LocalDescription().SDP)
 	firstAnswerCandidates := extractCandidates(answerPC.LocalDescription().SDP)
 
-	// Use Trickle ICE for ICE Restart
+	// Hold trickled restart candidates until both peers have the new remote credentials.
+	remoteDescriptionsSet := make(chan struct{})
 	offerPC.OnICECandidate(func(c *ICECandidate) {
 		if c != nil {
+			<-remoteDescriptionsSet
 			assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
 		}
 	})
 
 	answerPC.OnICECandidate(func(c *ICECandidate) {
 		if c != nil {
+			<-remoteDescriptionsSet
 			assert.NoError(t, offerPC.AddICECandidate(c.ToJSON()))
 		}
 	})
@@ -1055,6 +1058,7 @@ func TestICERestart(t *testing.T) {
 
 	assert.NoError(t, answerPC.SetLocalDescription(answer))
 	assert.NoError(t, offerPC.SetRemoteDescription(answer))
+	close(remoteDescriptionsSet)
 
 	// Block until we have connected again
 	connectedWaitGroup.Wait()
@@ -4308,7 +4312,8 @@ func TestCryptexPreservedWhenLateStageRejectsRenegotiationOffer(t *testing.T) {
 	parsed := &sdp.SessionDescription{}
 	require.NoError(t, parsed.Unmarshal([]byte(offer.SDP)))
 	parsed.Attributes = slices.DeleteFunc(parsed.Attributes, func(a sdp.Attribute) bool {
-		return a.Key == sdp.AttrKeyCryptex
+		// Keep ICE transport selection valid after removing the bundled MID.
+		return a.Key == sdp.AttrKeyCryptex || a.Key == sdp.AttrKeyGroup
 	})
 	for _, md := range parsed.MediaDescriptions {
 		if md.MediaName.Media == mediaSectionApplication {
