@@ -9,13 +9,13 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
 	"github.com/pion/sctp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,7 +148,7 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 			require.Eventually(t, func() bool {
 				_, writeErr := stackA.dtls.conn.Write(nil)
 
-				return errors.Is(writeErr, dtls.ErrConnClosed)
+				return errors.Is(writeErr, io.ErrClosedPipe)
 			}, 5*time.Second, time.Millisecond)
 			assert.Nil(t, stackA.sctp.association())
 			assert.Equal(t, SCTPTransportStateClosed, stackA.sctp.State())
