@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
@@ -460,8 +460,8 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	dropAllDTLS := func([]byte) bool {
 		return false
 	}
-	offerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
-	answerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
+	offerPC.iceTransport.dtlsMatcher = dropAllDTLS
+	answerPC.iceTransport.dtlsMatcher = dropAllDTLS
 
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
