@@ -36,6 +36,8 @@ github.com/pion/datachannel v1.6.3 h1:HZAYLpunVI0xi057ZiANl558d0uSpomcWw4UEPz3qX
 github.com/pion/datachannel v1.6.3/go.mod h1:oRmkXVVXxkUbqa8MatgdNHW29kvtQY3HUdjJQsfv2GE=
 github.com/pion/dtls/v3 v3.1.9 h1:rpeycmLIkc4krpk1IxP7+39o11QdCXbmV9+FGi9yZJ8=
 github.com/pion/dtls/v3 v3.1.9/go.mod h1:iKFQNYrjsN2TiA2YKKMqB9MOZaFpjFULBI/A4sW0eyc=
+github.com/pion/dtls/v4 v4.0.0-rc.1 h1:+8pjUyUAD6qww2Y7Po/PFsWq3tOGUIfDiBpluRdeykk=
+github.com/pion/dtls/v4 v4.0.0-rc.1/go.mod h1:P8msRRyK3bGwG3aZccN0Vk8chAMp2nQiBR9O29b86Io=
 github.com/pion/ice/v5 v5.0.0-rc.4 h1:5E8Nv7vhc1xV4mg/Op63GB5baORc6WITd+NSyCB2oxc=
 github.com/pion/ice/v5 v5.0.0-rc.4/go.mod h1:59OCyvCq5joEEaZdtEJ2JD4qJPUaEazegXG9JLknsmo=
 github.com/pion/interceptor v0.1.49 h1:iyBsNHRoLNNXZiJA/DdGvJgdyfS8YWDCzxIAlVjt5nY=

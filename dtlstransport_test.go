@@ -13,18 +13,19 @@ import (
 	"errors"
 	"io"
 	"net"
-	"reflect"
 	"regexp"
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
-	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v3/pkg/protocol/handshake"
+	"github.com/pion/dtls/v4"
+	dtlsCipherSuite "github.com/pion/dtls/v4/pkg/crypto/ciphersuite"
+	dtlsElliptic "github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol"
+	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v5/test"
-	"github.com/pion/webrtc/v5/internal/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // An invalid fingerprint MUST cause DTLSTransport to go to failed state.
@@ -218,6 +219,75 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 	})
 }
 
+func TestPeerConnection_DTLSVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name                                     string
+		offerMin, offerMax, answerMin, answerMax protocol.Version
+		want                                     protocol.Version
+	}{
+		{name: "default", want: protocol.Version1_3},
+		{name: "DTLS1.2", offerMax: protocol.Version1_2, answerMax: protocol.Version1_2, want: protocol.Version1_2},
+		{name: "DTLS1.3", offerMin: protocol.Version1_3, answerMin: protocol.Version1_3, want: protocol.Version1_3},
+		{name: "offer limited to DTLS1.2", offerMax: protocol.Version1_2, want: protocol.Version1_2},
+		{name: "answer limited to DTLS1.2", answerMax: protocol.Version1_2, want: protocol.Version1_2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer test.TimeOut(10 * time.Second).Stop()
+			defer test.CheckRoutines(t)()
+
+			var offerSettings, answerSettings SettingEngine
+			offerSettings.SetDTLSMinVersion(tc.offerMin)
+			offerSettings.SetDTLSMaxVersion(tc.offerMax)
+			answerSettings.SetDTLSMinVersion(tc.answerMin)
+			answerSettings.SetDTLSMaxVersion(tc.answerMax)
+			offer, err := NewAPI(WithSettingEngine(offerSettings)).NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, offer.Close()) }()
+			answer, err := NewAPI(WithSettingEngine(answerSettings)).NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, answer.Close()) }()
+
+			connected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+			require.NoError(t, signalPair(offer, answer))
+			<-connected
+			for _, peer := range []*PeerConnection{offer, answer} {
+				state, ok := peer.dtlsTransport.dtlsConn.ConnectionState()
+				require.True(t, ok)
+				require.Equal(t, tc.want, state.NegotiatedVersion())
+			}
+		})
+	}
+}
+
+func TestDTLSTransport_InvalidVersionRange(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		min, max protocol.Version
+	}{
+		{name: "unsupported minimum", min: protocol.Version1_0},
+		{name: "unsupported maximum", max: protocol.Version1_0},
+		{name: "minimum exceeds maximum", min: protocol.Version1_3, max: protocol.Version1_2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var settings SettingEngine
+			settings.SetDTLSMinVersion(tc.min)
+			settings.SetDTLSMaxVersion(tc.max)
+			api := NewAPI(WithSettingEngine(settings))
+			transport, err := api.NewDTLSTransport(nil, nil)
+			require.NoError(t, err)
+			cert := transport.certificates[0]
+			opts := transport.dtlsSharedOptions(tls.Certificate{
+				Certificate: [][]byte{cert.x509Cert.Raw}, PrivateKey: cert.privateKey,
+			})
+			addr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4444}
+			_, err = dtls.DetachedClient(addr, transport.toDTLSClientOptions(opts)...)
+			require.Error(t, err)
+			_, err = dtls.DetachedServer(addr, transport.toDTLSServerOptions(opts)...)
+			require.Error(t, err)
+		})
+	}
+}
+
 type errConn struct {
 	localAddr  net.Addr
 	remoteAddr net.Addr
@@ -234,27 +304,7 @@ func (c *errConn) SetDeadline(time.Time) error      { return nil }
 func (c *errConn) SetReadDeadline(time.Time) error  { return nil }
 func (c *errConn) SetWriteDeadline(time.Time) error { return nil }
 
-type failingPacketConn struct {
-	localAddr net.Addr
-	readErr   error
-	writeErr  error
-}
-
 var errTestWriteFailed = errors.New("write failed")
-
-func (c *failingPacketConn) ReadFrom([]byte) (int, net.Addr, error) {
-	return 0, c.localAddr, c.readErr
-}
-
-func (c *failingPacketConn) WriteTo([]byte, net.Addr) (int, error) {
-	return 0, c.writeErr
-}
-
-func (c *failingPacketConn) Close() error                     { return nil }
-func (c *failingPacketConn) LocalAddr() net.Addr              { return c.localAddr }
-func (c *failingPacketConn) SetDeadline(time.Time) error      { return nil }
-func (c *failingPacketConn) SetReadDeadline(time.Time) error  { return nil }
-func (c *failingPacketConn) SetWriteDeadline(time.Time) error { return nil }
 
 func TestDTLSTransport_Start_ErrICEConnectionNotStarted(t *testing.T) {
 	api := NewAPI()
@@ -304,12 +354,8 @@ func TestDTLSTransport_Start_UsesConnectContextMaker(t *testing.T) {
 	}
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          conn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
-	defer func() { _ = iceTransport.mux.Close() }()
+	iceTransport.conn = conn
+	defer func() { _ = conn.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
 	assert.NoError(t, err)
@@ -340,25 +386,22 @@ func TestDTLSTransport_Start_ConnectErrorFailsTransport(t *testing.T) {
 	defer func() { _ = remoteConn.Close() }()
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          localConn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
-	defer func() { _ = iceTransport.mux.Close() }()
+	iceTransport.conn = localConn
+	defer func() { _ = localConn.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, DTLSTransportStateNew, transport.State())
 
-	transport.api.settingEngine.dtls.cipherSuites = []dtls.CipherSuiteID{}
+	transport.api.settingEngine.dtls.cipherSuites = []dtlsCipherSuite.ID{}
 
 	err = transport.Start(DTLSParameters{Role: DTLSRoleServer})
 	assert.Error(t, err)
 	assert.Equal(t, DTLSTransportStateFailed, transport.State())
 	assert.Nil(t, transport.conn)
 
-	assert.Equal(t, 2, reflect.ValueOf(iceTransport.mux).Elem().FieldByName("endpoints").Len())
+	assert.NotNil(t, iceTransport.endpoints[iceEndpointSRTP])
+	assert.NotNil(t, iceTransport.endpoints[iceEndpointSRTCP])
 }
 
 func TestDTLSTransport_Start_HandshakeErrorFailsTransport(t *testing.T) {
@@ -379,12 +422,8 @@ func TestDTLSTransport_Start_HandshakeErrorFailsTransport(t *testing.T) {
 	}
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          conn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
-	defer func() { _ = iceTransport.mux.Close() }()
+	iceTransport.conn = conn
+	defer func() { _ = conn.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
 	assert.NoError(t, err)
@@ -395,7 +434,8 @@ func TestDTLSTransport_Start_HandshakeErrorFailsTransport(t *testing.T) {
 	assert.Equal(t, DTLSTransportStateFailed, transport.State())
 	assert.Nil(t, transport.conn)
 
-	assert.Equal(t, 2, reflect.ValueOf(iceTransport.mux).Elem().FieldByName("endpoints").Len())
+	assert.NotNil(t, iceTransport.endpoints[iceEndpointSRTP])
+	assert.NotNil(t, iceTransport.endpoints[iceEndpointSRTCP])
 }
 
 func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
@@ -411,7 +451,7 @@ func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
 		{
 			name: "CustomCipherSuites",
 			configure: func(se *SettingEngine) {
-				se.dtls.customCipherSuites = func() []dtls.CipherSuite {
+				se.dtls.customCipherSuites = func() []dtlsCipherSuite.Suite {
 					return nil
 				}
 			},
@@ -435,8 +475,8 @@ func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
 		{
 			name: "CipherSuites",
 			configure: func(se *SettingEngine) {
-				se.dtls.cipherSuites = []dtls.CipherSuiteID{
-					dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				se.dtls.cipherSuites = []dtlsCipherSuite.ID{
+					dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 				}
 			},
 			wantExtra: 1,
@@ -465,7 +505,7 @@ func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
 		{
 			name: "AllOptional",
 			configure: func(se *SettingEngine) {
-				se.dtls.customCipherSuites = func() []dtls.CipherSuite {
+				se.dtls.customCipherSuites = func() []dtlsCipherSuite.Suite {
 					return nil
 				}
 				se.dtls.retransmissionInterval = time.Second
@@ -473,8 +513,8 @@ func TestDTLSTransport_dtlsSharedOptions_IncludesOptionalOptions(t *testing.T) {
 				window := uint(1)
 				se.replayProtection.DTLS = &window
 
-				se.dtls.cipherSuites = []dtls.CipherSuiteID{
-					dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				se.dtls.cipherSuites = []dtlsCipherSuite.ID{
+					dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 				}
 				se.dtls.ellipticCurves = []dtlsElliptic.Curve{dtlsElliptic.P256}
 				se.dtls.rootCAs = x509.NewCertPool()
@@ -593,42 +633,6 @@ func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T)
 	}
 }
 
-func TestDTLSTransport_handshakeDTLS_DeferredCancel(t *testing.T) {
-	lim := test.TimeOut(time.Second)
-	defer lim.Stop()
-
-	api := NewAPI()
-	transport := &DTLSTransport{api: api}
-
-	connectContextMakerCalled := false
-	cancelCalled := false
-	api.settingEngine.dtls.connectContextMaker = func() (context.Context, func()) {
-		connectContextMakerCalled = true
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		return ctx, func() {
-			cancelCalled = true
-			cancel()
-		}
-	}
-
-	packetConn := &failingPacketConn{
-		localAddr: &net.UDPAddr{IP: net.IPv4zero, Port: 1},
-		readErr:   io.EOF,
-		writeErr:  errTestWriteFailed,
-	}
-
-	dtlsConn, err := dtls.ClientWithOptions(packetConn, &net.UDPAddr{IP: net.IPv4zero, Port: 2})
-	assert.NoError(t, err)
-	defer func() { _ = dtlsConn.Close() }()
-
-	err = transport.handshakeDTLS(dtlsConn)
-	assert.Error(t, err)
-	assert.True(t, connectContextMakerCalled)
-	assert.True(t, cancelCalled)
-}
-
 func TestSRTPProtectionProfileFromDTLS(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -674,6 +678,50 @@ func TestSRTPProtectionProfileFromDTLS(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestDTLSTransport_StartContextInterruptedWhileWaitingForICE(t *testing.T) {
+	for _, action := range []string{"cancel", "stop DTLS", "stop ICE"} {
+		t.Run(action, func(t *testing.T) {
+			defer test.TimeOut(5 * time.Second).Stop()
+			defer test.CheckRoutines(t)()
+
+			api := NewAPI()
+			iceTransport := api.NewICETransport(nil)
+			transport, err := api.NewDTLSTransport(iceTransport, nil)
+			require.NoError(t, err)
+			defer func() { require.NoError(t, transport.Stop()) }()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			connecting := make(chan struct{})
+			transport.OnStateChange(func(state DTLSTransportState) {
+				if state == DTLSTransportStateConnecting {
+					close(connecting)
+				}
+			})
+			result := make(chan error, 1)
+			go func() {
+				result <- transport.StartContext(ctx, DTLSParameters{Role: DTLSRoleServer})
+			}()
+			<-connecting
+
+			switch action {
+			case "cancel":
+				cancel()
+				require.ErrorIs(t, <-result, context.Canceled)
+				require.Equal(t, DTLSTransportStateFailed, transport.State())
+			case "stop DTLS":
+				require.NoError(t, transport.Stop())
+				require.ErrorIs(t, <-result, io.ErrClosedPipe)
+				require.Equal(t, DTLSTransportStateClosed, transport.State())
+			case "stop ICE":
+				require.NoError(t, iceTransport.Stop())
+				require.ErrorIs(t, <-result, io.ErrClosedPipe)
+				require.Equal(t, DTLSTransportStateFailed, transport.State())
+			}
 		})
 	}
 }

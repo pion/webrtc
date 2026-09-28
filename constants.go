@@ -6,7 +6,7 @@ package webrtc
 import (
 	"math"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 )
 
 const (

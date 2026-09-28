@@ -8,14 +8,15 @@ package webrtc
 import (
 	"bufio"
 	"context"
+	"io"
 	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
 	"github.com/pion/sctp"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,6 +117,8 @@ func newSCTPTestDTLSPair(t *testing.T) (*testORTCStack, *testORTCStack) {
 }
 
 func TestSCTPTransportStartContextInterrupted(t *testing.T) {
+	defer test.CheckRoutines(t)()
+
 	for _, name := range []string{"cancel", "deadline"} {
 		t.Run(name, func(t *testing.T) {
 			stackA, stackB := newSCTPTestDTLSPair(t)
@@ -158,7 +161,7 @@ func TestSCTPTransportStartContextInterrupted(t *testing.T) {
 			<-dtlsClosed.Done()
 			require.ErrorIs(t, dtlsClosed.Err(), context.Canceled)
 			_, err = stackA.dtls.conn.Write(nil)
-			require.ErrorIs(t, err, dtls.ErrConnClosed)
+			require.ErrorIs(t, err, io.ErrClosedPipe)
 			assert.Nil(t, stackA.sctp.association())
 			assert.Equal(t, SCTPTransportStateClosed, stackA.sctp.State())
 		})

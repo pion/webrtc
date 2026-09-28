@@ -7,15 +7,28 @@ package webrtc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v5/internal/mux"
+	"github.com/pion/transport/v5/packetio"
+	"github.com/pion/webrtc/v5/internal/netconn"
 	"github.com/pion/webrtc/v5/internal/util"
+)
+
+const maxPendingTransportPackets = 15
+
+type iceEndpointKind uint8
+
+const (
+	iceEndpointSRTP iceEndpointKind = iota
+	iceEndpointSRTCP
 )
 
 // ICETransport allows an application access to information about the ICE
@@ -32,8 +45,15 @@ type ICETransport struct {
 	state atomic.Value // ICETransportState
 
 	gatherer *ICEGatherer
-	conn     *ice.Conn
-	mux      *mux.Mux
+	conn     net.Conn
+
+	packetLock        sync.Mutex
+	connectionChanged chan struct{}
+	dtlsHandler       func([]byte) error
+	dtlsMatcher       func([]byte) bool
+	endpoints         [2]*netconn.Conn
+	pendingPackets    [][]byte
+	readLoopDone      chan struct{}
 
 	ctxCancel func()
 
@@ -77,9 +97,10 @@ func (t *ICETransport) GetSelectedCandidatePairStats() (ICECandidatePairStats, b
 // NewICETransport creates a new NewICETransport.
 func NewICETransport(gatherer *ICEGatherer, loggerFactory logging.LoggerFactory) *ICETransport {
 	iceTransport := &ICETransport{
-		gatherer:      gatherer,
-		loggerFactory: loggerFactory,
-		log:           loggerFactory.NewLogger("ortc"),
+		gatherer:          gatherer,
+		loggerFactory:     loggerFactory,
+		log:               loggerFactory.NewLogger("ortc"),
+		connectionChanged: make(chan struct{}, 1),
 	}
 	iceTransport.setState(ICETransportStateNew)
 
@@ -175,7 +196,7 @@ func (t *ICETransport) StartContext(
 		err = errICERoleUnknown
 	}
 
-	// Reacquire the lock to set the connection/mux
+	// Reacquire the lock to set the connection and start WebRTC packet dispatch.
 	t.lock.Lock()
 	if err != nil {
 		if ctxErr := callerCtx.Err(); ctxErr != nil {
@@ -197,13 +218,9 @@ func (t *ICETransport) StartContext(
 	}
 
 	t.conn = iceConn
-
-	config := mux.Config{
-		Conn:          t.conn,
-		BufferSize:    int(t.gatherer.api.settingEngine.getReceiveMTU()), //nolint:gosec // G115
-		LoggerFactory: t.loggerFactory,
-	}
-	t.mux = mux.NewMux(config)
+	t.notifyConnectionChanged()
+	t.readLoopDone = make(chan struct{})
+	go t.readLoop(iceConn, t.readLoopDone)
 
 	return nil
 }
@@ -242,19 +259,21 @@ func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 		t.ctxCancel()
 	}
 
-	// mux and gatherer can only be set when ICETransport.State != Closed.
-	mux := t.mux
+	conn := t.conn
+	readLoopDone := t.readLoopDone
 	gatherer := t.gatherer
 	t.lock.Unlock()
 
-	if mux != nil {
+	if conn != nil {
 		var closeErrs []error
 		if shouldGracefullyClose && gatherer != nil {
-			// we can't access icegatherer/icetransport.Close via
-			// mux's net.Conn Close so we call it earlier here.
 			closeErrs = append(closeErrs, gatherer.GracefulClose())
 		}
-		closeErrs = append(closeErrs, mux.Close())
+		closeErrs = append(closeErrs, conn.Close())
+		if readLoopDone != nil {
+			<-readLoopDone
+		}
+		t.closeEndpoints()
 
 		return util.FlattenErrs(closeErrs)
 	} else if gatherer != nil {
@@ -275,6 +294,7 @@ func (t *ICETransport) OnSelectedCandidatePairChange(f func(*ICECandidatePair)) 
 }
 
 func (t *ICETransport) onSelectedCandidatePairChange(pair *ICECandidatePair) {
+	t.notifyConnectionChanged()
 	if handler, ok := t.onSelectedCandidatePairChangeHandler.Load().(func(*ICECandidatePair)); ok {
 		handler(pair)
 	}
@@ -402,13 +422,237 @@ func (t *ICETransport) GetRemoteParameters() (ICEParameters, error) {
 
 func (t *ICETransport) setState(i ICETransportState) {
 	t.state.Store(i)
+	t.notifyConnectionChanged()
 }
 
-func (t *ICETransport) newEndpoint(f mux.MatchFunc) *mux.Endpoint {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+func (t *ICETransport) notifyConnectionChanged() {
+	select {
+	case t.connectionChanged <- struct{}{}:
+	default:
+	}
+}
 
-	return t.mux.NewEndpoint(f)
+func (t *ICETransport) newEndpoint(kind iceEndpointKind) *netconn.Conn {
+	endpoint := netconn.New(netconn.Config{
+		Write:            t.write,
+		LocalAddr:        t.localAddr,
+		RemoteAddr:       t.remoteAddr,
+		SetWriteDeadline: t.setWriteDeadline,
+		OnClose:          t.removeEndpoint,
+	})
+
+	t.packetLock.Lock()
+	t.endpoints[kind] = endpoint
+	pending := t.takePendingPacketsLocked(endpointMatcher(kind))
+	t.packetLock.Unlock()
+
+	for _, packet := range pending {
+		t.handlePacket(endpoint.Push, packet)
+	}
+
+	return endpoint
+}
+
+func endpointMatcher(kind iceEndpointKind) func([]byte) bool {
+	if kind == iceEndpointSRTP {
+		return matchSRTP
+	}
+
+	return matchSRTCP
+}
+
+func (t *ICETransport) setDTLSHandler(handler func([]byte) error) func() {
+	t.packetLock.Lock()
+	t.dtlsHandler = handler
+	var pending [][]byte
+	if handler != nil {
+		pending = t.takePendingPacketsLocked(matchDTLS)
+	}
+	t.packetLock.Unlock()
+
+	return func() {
+		for _, packet := range pending {
+			t.handlePacket(handler, packet)
+		}
+	}
+}
+
+func (t *ICETransport) removeEndpoint(endpoint *netconn.Conn) {
+	t.packetLock.Lock()
+	defer t.packetLock.Unlock()
+
+	for kind, current := range t.endpoints {
+		if current == endpoint {
+			t.endpoints[kind] = nil
+		}
+	}
+}
+
+func (t *ICETransport) readLoop(conn net.Conn, done chan<- struct{}) {
+	defer close(done)
+
+	buffer := make([]byte, t.gatherer.api.settingEngine.getReceiveMTU())
+	for {
+		n, err := conn.Read(buffer)
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, ice.ErrClosed):
+			return
+		case errors.Is(err, io.ErrShortBuffer), errors.Is(err, packetio.ErrTimeout):
+			t.log.Errorf("failed to read WebRTC packet: %v", err)
+
+			continue
+		case err != nil:
+			t.log.Errorf("WebRTC packet read loop ended: %v", err)
+
+			return
+		}
+
+		t.dispatchPacket(buffer[:n])
+	}
+}
+
+func (t *ICETransport) dispatchPacket(packet []byte) {
+	if len(packet) == 0 {
+		t.log.Warnf("unable to dispatch zero length packet")
+
+		return
+	}
+
+	t.packetLock.Lock()
+	var handler func([]byte) error
+	switch {
+	case matchDTLS(packet):
+		handler = t.dtlsHandler
+	case matchSRTP(packet):
+		if endpoint := t.endpoints[iceEndpointSRTP]; endpoint != nil {
+			handler = endpoint.Push
+		}
+	case matchSRTCP(packet):
+		if endpoint := t.endpoints[iceEndpointSRTCP]; endpoint != nil {
+			handler = endpoint.Push
+		}
+	}
+	if handler == nil {
+		if len(t.pendingPackets) < maxPendingTransportPackets {
+			t.pendingPackets = append(t.pendingPackets, append([]byte(nil), packet...))
+		} else {
+			t.log.Warnf("no handler for packet starting with %d; pending queue is full", packet[0])
+		}
+		t.packetLock.Unlock()
+
+		return
+	}
+	t.packetLock.Unlock()
+
+	t.handlePacket(handler, packet)
+}
+
+func (t *ICETransport) handlePacket(handler func([]byte) error, packet []byte) {
+	if t.dtlsMatcher != nil && matchDTLS(packet) && !t.dtlsMatcher(packet) {
+		return
+	}
+	if err := handler(packet); err != nil && !errors.Is(err, packetio.ErrFull) {
+		t.log.Warnf("failed to dispatch WebRTC packet: %v", err)
+	}
+}
+
+func (t *ICETransport) takePendingPacketsLocked(match func([]byte) bool) [][]byte {
+	matched := make([][]byte, 0, len(t.pendingPackets))
+	remaining := make([][]byte, 0, len(t.pendingPackets))
+	for _, packet := range t.pendingPackets {
+		if match(packet) {
+			matched = append(matched, packet)
+		} else {
+			remaining = append(remaining, packet)
+		}
+	}
+	t.pendingPackets = remaining
+
+	return matched
+}
+
+func (t *ICETransport) closeEndpoints() {
+	t.packetLock.Lock()
+	endpoints := t.endpoints
+	t.dtlsHandler = nil
+	t.endpoints = [2]*netconn.Conn{}
+	t.packetLock.Unlock()
+
+	for _, endpoint := range endpoints {
+		if endpoint != nil {
+			_ = endpoint.Close()
+		}
+	}
+}
+
+func (t *ICETransport) readLoopFinished() <-chan struct{} {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.readLoopDone
+}
+
+func (t *ICETransport) getConn() net.Conn {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.conn
+}
+
+func (t *ICETransport) write(packet []byte) (int, error) {
+	conn := t.getConn()
+	if conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
+	n, err := conn.Write(packet)
+	if errors.Is(err, ice.ErrNoCandidatePairs) {
+		return 0, nil
+	}
+	if errors.Is(err, ice.ErrClosed) {
+		return 0, io.ErrClosedPipe
+	}
+
+	return n, err
+}
+
+func (t *ICETransport) localAddr() net.Addr {
+	conn := t.getConn()
+	if conn == nil {
+		return nil
+	}
+
+	return conn.LocalAddr()
+}
+
+func (t *ICETransport) remoteAddr() net.Addr {
+	conn := t.getConn()
+	if conn == nil {
+		return nil
+	}
+
+	return conn.RemoteAddr()
+}
+
+func (t *ICETransport) setWriteDeadline(deadline time.Time) error {
+	conn := t.getConn()
+	if conn == nil {
+		return io.ErrClosedPipe
+	}
+
+	return conn.SetWriteDeadline(deadline)
+}
+
+func matchDTLS(packet []byte) bool  { return matchRange(20, 63, packet) }
+func matchSRTP(packet []byte) bool  { return matchRange(128, 191, packet) && !isRTCP(packet) }
+func matchSRTCP(packet []byte) bool { return matchRange(128, 191, packet) && isRTCP(packet) }
+
+func matchRange(lower, upper byte, packet []byte) bool {
+	return len(packet) != 0 && packet[0] >= lower && packet[0] <= upper
+}
+
+func isRTCP(packet []byte) bool {
+	return len(packet) >= 4 && packet[1] >= 192 && packet[1] <= 223
 }
 
 func (t *ICETransport) ensureGatherer() error {
@@ -425,9 +669,7 @@ func (t *ICETransport) ensureGatherer() error {
 
 // Stats reports the current statistics of the ICETransport.
 func (t *ICETransport) Stats() TransportStats {
-	t.lock.RLock()
-	conn := t.conn
-	t.lock.RUnlock()
+	conn := t.getConn()
 
 	stats := TransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
@@ -435,8 +677,13 @@ func (t *ICETransport) Stats() TransportStats {
 		ID:        "iceTransport",
 	}
 	if conn != nil {
-		stats.BytesSent = conn.BytesSent()
-		stats.BytesReceived = conn.BytesReceived()
+		if connWithStats, ok := conn.(interface {
+			BytesSent() uint64
+			BytesReceived() uint64
+		}); ok {
+			stats.BytesSent = connWithStats.BytesSent()
+			stats.BytesReceived = connWithStats.BytesReceived()
+		}
 	}
 
 	return stats

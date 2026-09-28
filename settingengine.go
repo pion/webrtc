@@ -13,9 +13,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/pion/dtls/v3"
-	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v3/pkg/protocol/handshake"
+	"github.com/pion/dtls/v4"
+	dtlsCipherSuite "github.com/pion/dtls/v4/pkg/crypto/ciphersuite"
+	dtlsElliptic "github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol"
+	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
@@ -65,6 +67,8 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
+		minVersion                    protocol.Version
+		maxVersion                    protocol.Version
 		insecureSkipHelloVerify       bool
 		disableInsecureSkipVerify     bool
 		retransmissionInterval        time.Duration
@@ -75,8 +79,8 @@ type SettingEngine struct {
 		clientCAs                     *x509.CertPool
 		rootCAs                       *x509.CertPool
 		keyLogWriter                  io.Writer
-		cipherSuites                  []dtls.CipherSuiteID
-		customCipherSuites            func() []dtls.CipherSuite
+		cipherSuites                  []dtlsCipherSuite.ID
+		customCipherSuites            func() []dtlsCipherSuite.Suite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
 		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
@@ -497,6 +501,18 @@ func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
 	e.receiveMTU = receiveMTU
 }
 
+// SetDTLSMinVersion sets the minimum supported DTLS version.
+// The default is DTLS 1.2. A zero value restores the default.
+func (e *SettingEngine) SetDTLSMinVersion(version protocol.Version) {
+	e.dtls.minVersion = version
+}
+
+// SetDTLSMaxVersion sets the maximum supported DTLS version.
+// The default is DTLS 1.3. A zero value restores the default.
+func (e *SettingEngine) SetDTLSMaxVersion(version protocol.Version) {
+	e.dtls.maxVersion = version
+}
+
 // SetDTLSRetransmissionInterval sets the retranmission interval for DTLS.
 func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 	e.dtls.retransmissionInterval = interval
@@ -585,13 +601,13 @@ func (e *SettingEngine) SetSCTPMaxMessageSize(maxMessageSize uint32) {
 // SetDTLSCipherSuites allows the user to specify a list of DTLS CipherSuites.
 // This allow to control which ciphers implemented by pion/dtls are used during the DTLS handshake.
 // It can be used for DTLS connection hardening.
-func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtls.CipherSuiteID) {
+func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtlsCipherSuite.ID) {
 	e.dtls.cipherSuites = cipherSuites
 }
 
 // SetDTLSCustomerCipherSuites allows the user to specify a list of custom DTLS CipherSuites.
 // It allows to use custom/private DTLS CipherSuites in addition to the ones implemented by pion/dtls.
-func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
+func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtlsCipherSuite.Suite) {
 	e.dtls.customCipherSuites = customCipherSuites
 }
 
