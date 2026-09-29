@@ -4391,3 +4391,15 @@ func TestCryptexAnswerWithTagOnlyCryptexIsAccepted(t *testing.T) {
 	waitForSRTPReady(t, pcOffer)
 	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
 }
+
+func TestCreateOfferICERestartBeforeGathering(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	_, err = pc.CreateDataChannel("data", nil)
+	assert.NoError(t, err)
+
+	_, err = pc.CreateOffer(&OfferOptions{ICERestart: true})
+	assert.NoError(t, err)
+}

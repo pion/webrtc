@@ -215,6 +215,11 @@ func (t *ICETransport) restart() error {
 	defer t.lock.Unlock()
 
 	agent := t.gatherer.getAgent()
+	if agent == nil && t.gatherer.State() == ICEGathererStateNew {
+		// Nothing has been gathered yet, so the first gathering already
+		// starts with fresh credentials.
+		return nil
+	}
 	if agent == nil {
 		return fmt.Errorf("%w: unable to restart ICETransport", errICEAgentNotExist)
 	}
