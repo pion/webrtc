@@ -19,6 +19,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_RTPSender_ReplaceTrack_UnsupportedCodecAfterNil(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, err := NewAPI().newPair(Configuration{})
+	assert.NoError(t, err)
+
+	trackA, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	unsupported, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/unsupported"}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	assert.NoError(t, rtpSender.ReplaceTrack(nil))
+
+	// The sender has no track to re-bind, so the bind error must be returned as is.
+	assert.NotPanics(t, func() {
+		assert.Error(t, rtpSender.ReplaceTrack(unsupported))
+	})
+
+	// The sender is still usable afterwards.
+	assert.NoError(t, rtpSender.ReplaceTrack(trackA))
+
+	closePairNow(t, sender, receiver)
+}
+
 func Test_RTPSender_ReplaceTrack(t *testing.T) { //nolint:cyclop
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()

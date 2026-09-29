@@ -279,9 +279,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		rtcpInterceptor: context.RTCPReader(),
 	})
 	if err != nil {
-		// Re-bind the original track
-		if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
-			return reBindErr
+		// Re-bind the original track, if there was one
+		if replacedTrack != nil {
+			if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
+				return reBindErr
+			}
 		}
 
 		return err
