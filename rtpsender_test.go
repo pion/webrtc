@@ -557,3 +557,35 @@ func Test_RTPSender_SetReadDeadline_Crash(t *testing.T) {
 	assert.NoError(t, stackA.close())
 	assert.NoError(t, stackB.close())
 }
+
+func Test_RTPSender_ReplaceTrack_AfterStop(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, err := newPair()
+	assert.NoError(t, err)
+
+	trackA, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	trackB, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(trackA)
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(sender, receiver))
+
+	assert.NoError(t, rtpSender.Stop())
+
+	assert.ErrorIs(t, rtpSender.ReplaceTrack(trackB), errRTPSenderStopped)
+
+	trackB.mu.RLock()
+	assert.Empty(t, trackB.bindings, "a stopped sender must not bind a new track")
+	trackB.mu.RUnlock()
+
+	closePairNow(t, sender, receiver)
+}

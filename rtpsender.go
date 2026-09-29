@@ -237,6 +237,12 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		return ErrRTPSenderNewTrackHasIncorrectKind
 	}
 
+	// Stop calls ReplaceTrack(nil) to detach the track, so only a
+	// non-nil track is rejected once the sender is stopped.
+	if track != nil && r.hasStopped() {
+		return errRTPSenderStopped
+	}
+
 	// cannot replace simulcast envelope
 	if track != nil && len(r.trackEncodings) > 1 {
 		return ErrRTPSenderNewTrackHasIncorrectEnvelope
