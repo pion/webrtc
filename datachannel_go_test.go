@@ -977,3 +977,34 @@ func TestOnBufferedAmountLowRespectsReadyState(t *testing.T) {
 		}
 	})
 }
+
+func TestDataChannel_CloseBeforeOpenReachesClosed(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
+	pcOffer, pcAnswer, err := newPair()
+	require.NoError(t, err)
+
+	dc, err := pcOffer.CreateDataChannel("closed-early", nil)
+	require.NoError(t, err)
+
+	closed := make(chan struct{})
+	dc.OnClose(func() { close(closed) })
+
+	// Close while the SCTP transport is not started yet.
+	require.NoError(t, dc.Close())
+
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	select {
+	case <-closed:
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "OnClose was not called")
+	}
+
+	assert.Eventually(t, func() bool {
+		return dc.ReadyState() == DataChannelStateClosed
+	}, 5*time.Second, 10*time.Millisecond, "ready state is %s", dc.ReadyState())
+
+	closePairNow(t, pcOffer, pcAnswer)
+}

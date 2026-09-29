@@ -194,6 +194,21 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 	return nil
 }
 
+// finishCloseBeforeOpen completes the closing of a DataChannel that was closed
+// while it was still connecting, so it never had an underlying data channel.
+func (d *DataChannel) finishCloseBeforeOpen() {
+	d.mu.RLock()
+	unopened := d.dataChannel == nil
+	d.mu.RUnlock()
+
+	if !unopened {
+		return
+	}
+
+	d.setReadyState(DataChannelStateClosed)
+	d.onClose()
+}
+
 // Transport returns the SCTPTransport instance the DataChannel is sending over.
 func (d *DataChannel) Transport() *SCTPTransport {
 	d.mu.RLock()

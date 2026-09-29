@@ -175,7 +175,8 @@ func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapab
 
 	var openedDCCount uint32
 	for _, d := range dataChannels {
-		if d.ReadyState() == DataChannelStateConnecting {
+		switch d.ReadyState() { //nolint:exhaustive
+		case DataChannelStateConnecting:
 			err := d.open(r)
 			if err != nil {
 				r.log.Warnf("failed to open data channel: %s", err)
@@ -183,6 +184,8 @@ func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapab
 				continue
 			}
 			openedDCCount++
+		case DataChannelStateClosing:
+			d.finishCloseBeforeOpen()
 		}
 	}
 
