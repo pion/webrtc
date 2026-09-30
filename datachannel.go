@@ -6,12 +6,11 @@
 package webrtc
 
 import (
+	"crypto/rand"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -98,7 +97,7 @@ func (api *API) newDataChannel(
 
 	dataChannel := &DataChannel{
 		sctpTransport:     sctpTransport,
-		statsID:           fmt.Sprintf("DataChannel-%d", time.Now().UnixNano()),
+		statsID:           "DataChannel-" + rand.Text(),
 		label:             params.Label,
 		protocol:          params.Protocol,
 		negotiated:        params.Negotiated,

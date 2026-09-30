@@ -4,18 +4,18 @@ go 1.24.0
 
 require (
 	github.com/pion/datachannel v1.6.3
-	github.com/pion/dtls/v3 v3.1.9
+	github.com/pion/dtls/v3 v3.1.10
 	github.com/pion/ice/v4 v4.4.4
 	github.com/pion/interceptor v0.1.49
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
-	github.com/pion/rtcp v1.2.17
+	github.com/pion/rtcp v1.2.18
 	github.com/pion/rtp v1.10.5
-	github.com/pion/sctp v1.11.3
+	github.com/pion/sctp v1.12.0
 	github.com/pion/sdp/v3 v3.0.20
 	github.com/pion/srtp/v3 v3.1.0
 	github.com/pion/stun/v4 v4.0.1
-	github.com/pion/transport/v5 v5.0.1
+	github.com/pion/transport/v5 v5.1.1
 	github.com/pion/turn/v5 v5.1.2
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.12.1
