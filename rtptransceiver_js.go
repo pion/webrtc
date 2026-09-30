@@ -45,3 +45,10 @@ func (r *RTPTransceiver) Receiver() *RTPReceiver {
 
 	return &RTPReceiver{underlying: underlying}
 }
+
+// RTPHeaderEncryptionNegotiated reports if RFC 9335 RTP Header Extension Encryption ("Cryptex")
+// has been negotiated and is enabled for this transceiver. The underlying browser API does not
+// currently expose this state, so this always returns false.
+func (r *RTPTransceiver) RTPHeaderEncryptionNegotiated() bool {
+	return false
+}

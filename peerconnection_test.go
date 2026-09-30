@@ -227,6 +227,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 					RTCPMuxPolicy:               RTCPMuxPolicyRequire,
 					ICECandidatePoolSize:        1,
 					AlwaysNegotiateDataChannels: true,
+					RTPHeaderEncryptionPolicy:   RTPHeaderEncryptionPolicyNegotiate,
 				})
 				if err != nil {
 					return pc, err
@@ -282,6 +283,16 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 			wantErr: &rtcerr.InvalidModificationError{Err: ErrModifyingRTCPMuxPolicy},
 		},
 		{
+			name: "update RTPHeaderEncryptionPolicy",
+			init: func() (*PeerConnection, error) {
+				return NewPeerConnection(Configuration{})
+			},
+			config: Configuration{
+				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
+			},
+			wantErr: &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy},
+		},
+		{
 			name: "update ICECandidatePoolSize",
 			init: func() (*PeerConnection, error) {
 				pc, err := NewPeerConnection(Configuration{
@@ -326,16 +337,36 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 	}
 }
 
+// TestPeerConnection_SetConfiguration_RejectsBeforeMutating checks that when a SetConfiguration
+// call includes both an invalid, immutable-field change and an otherwise-valid mutable-field
+// change, the rejection leaves the mutable field unapplied instead of partially applying the call.
+func TestPeerConnection_SetConfiguration_RejectsBeforeMutating(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	err = pc.SetConfiguration(Configuration{
+		AlwaysNegotiateDataChannels: true,
+		RTPHeaderEncryptionPolicy:   RTPHeaderEncryptionPolicyRequire,
+	})
+	assert.Equal(t, &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy}, err)
+	assert.False(t, pc.GetConfiguration().AlwaysNegotiateDataChannels,
+		"other fields in the same call must not be applied when the policy change is rejected")
+
+	assert.NoError(t, pc.Close())
+}
+
 func TestPeerConnection_GetConfiguration(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	expected := Configuration{
-		ICEServers:           []ICEServer{},
-		ICETransportPolicy:   ICETransportPolicyAll,
-		BundlePolicy:         BundlePolicyBalanced,
-		RTCPMuxPolicy:        RTCPMuxPolicyRequire,
-		ICECandidatePoolSize: 0,
+		ICEServers:                  []ICEServer{},
+		ICETransportPolicy:          ICETransportPolicyAll,
+		BundlePolicy:                BundlePolicyBalanced,
+		RTCPMuxPolicy:               RTCPMuxPolicyRequire,
+		ICECandidatePoolSize:        0,
+		AlwaysNegotiateDataChannels: false,
+		RTPHeaderEncryptionPolicy:   RTPHeaderEncryptionPolicyNegotiate,
 	}
 	actual := pc.GetConfiguration()
 	assert.True(t, &expected != &actual)
@@ -348,7 +379,7 @@ func TestPeerConnection_GetConfiguration(t *testing.T) {
 	// See: https://github.com/pion/webrtc/issues/513.
 	// assert.Equal(t, len(expected.Certificates), len(actual.Certificates))
 	assert.Equal(t, expected.ICECandidatePoolSize, actual.ICECandidatePoolSize)
-	assert.False(t, actual.AlwaysNegotiateDataChannels)
+	assert.Equal(t, expected.AlwaysNegotiateDataChannels, actual.AlwaysNegotiateDataChannels)
 	assert.NoError(t, pc.Close())
 }
 
