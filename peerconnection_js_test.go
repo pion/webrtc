@@ -8,6 +8,7 @@ import (
 	"syscall/js"
 	"testing"
 
+	"github.com/pion/ice/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,6 +30,7 @@ func TestValueToICECandidate(t *testing.T) {
 				Component:      1,
 				RelatedAddress: "203.0.113.1",
 				RelatedPort:    5000,
+				extensions:     []ice.CandidateExtension{{Key: "raddr", Value: "203.0.113.1"}, {Key: "rport", Value: "5000"}},
 			},
 		}, {
 			// Chrome/Webkit-style ICECandidate:

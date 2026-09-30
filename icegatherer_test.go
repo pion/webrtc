@@ -1437,11 +1437,11 @@ func TestICEGatherer_DisableActiveTCP(t *testing.T) { //nolint:cyclop
 			}
 
 			c, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
-				Network:   "tcp4",
-				Address:   addr.IP.String(),
-				Port:      addr.Port,
-				Component: ice.ComponentRTP,
-				TCPType:   ice.TCPTypePassive,
+				Network:    "tcp4",
+				Address:    addr.IP.String(),
+				Port:       addr.Port,
+				Component:  ice.ComponentRTP,
+				Extensions: []ice.CandidateExtension{{Key: "tcptype", Value: "passive"}},
 			})
 			assert.NoError(t, err)
 			assert.NoError(t, agent.AddRemoteCandidate(c))

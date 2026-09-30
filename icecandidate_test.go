@@ -14,12 +14,12 @@ func TestICECandidate_Convert(t *testing.T) {
 	testCases := []struct {
 		native ICECandidate
 
-		expectedType           ice.CandidateType
-		expectedNetwork        string
-		expectedAddress        string
-		expectedPort           int
-		expectedComponent      uint16
-		expectedRelatedAddress *ice.CandidateRelatedAddress
+		expectedType       ice.CandidateType
+		expectedNetwork    string
+		expectedAddress    string
+		expectedPort       int
+		expectedComponent  uint16
+		expectedExtensions []ice.CandidateExtension
 	}{
 		{
 			ICECandidate{
@@ -57,10 +57,7 @@ func TestICECandidate_Convert(t *testing.T) {
 			"::1",
 			1234,
 			1,
-			&ice.CandidateRelatedAddress{
-				Address: "1.0.0.1",
-				Port:    4321,
-			},
+			[]ice.CandidateExtension{{Key: "raddr", Value: "1.0.0.1"}, {Key: "rport", Value: "4321"}},
 		},
 		{
 			ICECandidate{
@@ -80,10 +77,7 @@ func TestICECandidate_Convert(t *testing.T) {
 			"::1",
 			1234,
 			1,
-			&ice.CandidateRelatedAddress{
-				Address: "1.0.0.1",
-				Port:    4321,
-			},
+			[]ice.CandidateExtension{{Key: "raddr", Value: "1.0.0.1"}, {Key: "rport", Value: "4321"}},
 		},
 	}
 
@@ -109,8 +103,7 @@ func TestICECandidate_Convert(t *testing.T) {
 				Component:  testCase.expectedComponent,
 				Foundation: "foundation",
 				Priority:   128,
-				RelAddr:    testCase.expectedRelatedAddress.Address,
-				RelPort:    testCase.expectedRelatedAddress.Port,
+				Extensions: testCase.expectedExtensions,
 			}
 			expectedICE, err = ice.NewCandidateServerReflexive(&config)
 		case ice.CandidateTypePeerReflexive:
@@ -121,8 +114,7 @@ func TestICECandidate_Convert(t *testing.T) {
 				Component:  testCase.expectedComponent,
 				Foundation: "foundation",
 				Priority:   128,
-				RelAddr:    testCase.expectedRelatedAddress.Address,
-				RelPort:    testCase.expectedRelatedAddress.Port,
+				Extensions: testCase.expectedExtensions,
 			}
 			expectedICE, err = ice.NewCandidatePeerReflexive(&config)
 		}
