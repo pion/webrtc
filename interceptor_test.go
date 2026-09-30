@@ -481,6 +481,19 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	pc2, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
+	done := make(chan struct{})
+	pc2.OnTrack(func(track2 *TrackRemote, _ *RTPReceiver) {
+		for i := range numPackets {
+			if i == 1 {
+				continue
+			}
+			p, _, err2 := track2.ReadRTP()
+			assert.NoError(t, err2)
+			assert.Equal(t, p.SequenceNumber, uint16(i)) //nolint:gosec //G115
+		}
+		close(done)
+	})
+
 	offer, err := pc1.CreateOffer(nil)
 	assert.NoError(t, err)
 	err = pc1.SetLocalDescription(offer)
@@ -531,19 +544,6 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 			}
 		}
 	}()
-
-	done := make(chan struct{})
-	pc2.OnTrack(func(track2 *TrackRemote, _ *RTPReceiver) {
-		for i := range numPackets {
-			if i == 1 {
-				continue
-			}
-			p, _, err2 := track2.ReadRTP()
-			assert.NoError(t, err2)
-			assert.Equal(t, p.SequenceNumber, uint16(i)) //nolint:gosec //G115
-		}
-		close(done)
-	})
 
 	go func() {
 		for i := range numPackets {
