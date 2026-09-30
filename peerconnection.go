@@ -68,6 +68,7 @@ type PeerConnection struct {
 	lastOfferCertificate    *Certificate
 	lastOfferDTLSID         string
 	pendingLocalCertificate *Certificate
+	certificateIndex        int
 	// Whether the remote endpoint can accept trickled ICE candidates.
 	canTrickleICECandidates ICETrickleCapability
 
@@ -700,6 +701,21 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 	return false
 }
 
+func (pc *PeerConnection) nextDTLSCertificate() (*Certificate, error) {
+	if len(pc.configuration.Certificates) == 1 {
+		pc.log.Warn("Only one certificate configured for DTLS restart; generating a new certificate")
+
+		return GenerateCertificate(pc.configuration.Certificates[0].privateKey)
+	}
+	next := (pc.certificateIndex + 1) % len(pc.configuration.Certificates)
+	certificate := pc.configuration.Certificates[next]
+	if !certificate.Expires().IsZero() && time.Now().After(certificate.Expires()) {
+		return nil, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}
+	}
+
+	return &certificate, nil
+}
+
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
 //
@@ -741,13 +757,13 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	if options != nil && options.DTLSRestart {
 		dtlsID = rand.Text()
 		if pc.currentLocalDescription != nil {
-			certificate, err = GenerateCertificate(pc.configuration.Certificates[0].privateKey)
+			certificate, err = pc.nextDTLSCertificate()
 			if err != nil {
 				return SessionDescription{}, err
 			}
 		}
 	}
-	offerCertificate := pc.configuration.Certificates[0]
+	offerCertificate := pc.configuration.Certificates[pc.certificateIndex]
 	if certificate != nil {
 		offerCertificate = *certificate
 	}
@@ -1009,7 +1025,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		false, /*includeUnmatched */
 		connectionRole,
 		pc.api.settingEngine.ignoreRidPauseForRecv,
-		pc.configuration.Certificates[0],
+		pc.configuration.Certificates[pc.certificateIndex],
 	)
 	if err != nil {
 		return SessionDescription{}, err
@@ -1136,7 +1152,11 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 					pc.currentRemoteDescription = sd
 					pc.currentLocalDescription = pc.pendingLocalDescription
 					if certificate := pc.pendingLocalCertificate; certificate != nil {
-						pc.configuration.Certificates = []Certificate{*certificate}
+						if len(pc.configuration.Certificates) == 1 {
+							pc.configuration.Certificates = []Certificate{*certificate}
+						} else {
+							pc.certificateIndex = (pc.certificateIndex + 1) % len(pc.configuration.Certificates)
+						}
 						pc.dtlsTransport.lock.Lock()
 						pc.dtlsTransport.certificates = []Certificate{*certificate}
 						pc.dtlsTransport.lock.Unlock()
