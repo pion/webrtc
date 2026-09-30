@@ -2415,3 +2415,28 @@ func TestDefaultAudioPlayoutStatsProvider_MultipleProviders(t *testing.T) {
 	assert.Contains(t, ids, "media-playout-speaker")
 	assert.Contains(t, ids, "media-playout-headphones")
 }
+
+func TestStatsReport_DataChannelsHaveDistinctStableIDs(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, pc.Close()) })
+
+	channels := make([]*DataChannel, 128)
+	for i := range channels {
+		channels[i], err = pc.CreateDataChannel(fmt.Sprintf("channel-%d", i), nil)
+		require.NoError(t, err)
+	}
+	first := pc.GetStats()
+	second := pc.GetStats()
+	ids := make(map[string]bool)
+	for _, channel := range channels {
+		stats, ok := first.GetDataChannelStats(channel)
+		require.True(t, ok)
+		require.Equal(t, channel.Label(), stats.Label)
+		require.False(t, ids[stats.ID], "duplicate data-channel stats ID")
+		ids[stats.ID] = true
+		current, ok := second.GetDataChannelStats(channel)
+		require.True(t, ok)
+		require.Equal(t, stats.ID, current.ID)
+	}
+}
