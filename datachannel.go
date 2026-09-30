@@ -14,6 +14,7 @@ import (
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
+	"github.com/pion/sctp"
 	"github.com/pion/webrtc/v4/pkg/rtcerr"
 )
 
@@ -168,14 +169,36 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		// avoid holding lock when generating ID, since id generation locks
 		d.mu.Unlock()
 		var dcID *uint16
-		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID)
+		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID, d)
 		if err != nil {
 			return err
 		}
 		d.mu.Lock()
 		d.id = dcID
 	}
-	dc, err := datachannel.Dial(association, *d.id, cfg)
+	if err := sctpTransport.validateDataChannelID(d, association, *d.id); err != nil {
+		d.mu.Unlock()
+
+		return err
+	}
+	stream, err := association.OpenStream(*d.id, sctp.PayloadTypeWebRTCBinary)
+	if err != nil {
+		d.mu.Unlock()
+
+		return err
+	}
+	if err = sctpTransport.bindDataChannel(d, association, stream); err != nil {
+		d.mu.Unlock()
+
+		return err
+	}
+	opened := false
+	defer func() {
+		if !opened {
+			sctpTransport.releaseFailedDataChannelBinding(d)
+		}
+	}()
+	dc, err := datachannel.Client(stream, cfg)
 	if err != nil {
 		d.mu.Unlock()
 
@@ -187,8 +210,12 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 	d.mu.Unlock()
 
+	if !sctpTransport.isDataChannelBound(d, association, stream) {
+		return io.ErrClosedPipe
+	}
 	d.onDial()
 	d.handleOpen(dc, false, d.negotiated)
+	opened = true
 
 	return nil
 }
