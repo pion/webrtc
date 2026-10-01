@@ -482,6 +482,11 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 		)
 	}
 
+	if t.api.settingEngine.enableSped {
+		// Small enough for post-quantum handshake datagrams to fit into STUN, like libwebrtc.
+		sharedOpts = append(sharedOpts, dtls.WithMTU(spedDTLSMTU))
+	}
+
 	if t.api.settingEngine.replayProtection.DTLS != nil {
 		sharedOpts = append(
 			sharedOpts,
@@ -625,6 +630,9 @@ func (t *DTLSTransport) toDTLSClientOptions(sharedOpts []dtls.Option) []dtls.Cli
 
 	return clientOpts
 }
+
+// spedDTLSMTU leaves room for the STUN overhead.
+const spedDTLSMTU = 900
 
 // spedRemoteAddr stands in until ICE selects a pair.
 var spedRemoteAddr = &net.UDPAddr{} //nolint:gochecknoglobals
