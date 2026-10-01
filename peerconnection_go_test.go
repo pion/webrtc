@@ -892,8 +892,8 @@ func configureMulticastDNS(s *SettingEngine) {
 
 	s.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 	s.SetIncludeLoopbackCandidate(true)
-	s.SetIPFilter(func(ip net.IP) bool {
-		return ip.IsLoopback() && ip.To4() != nil
+	s.SetIPFilter(func(info IPFilterInfo) bool {
+		return info.IP.IsLoopback() && info.IP.To4() != nil
 	})
 }
 
