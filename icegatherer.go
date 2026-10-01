@@ -227,13 +227,23 @@ func (g *ICEGatherer) sanitizedMDNSMode() ice.MulticastDNSMode {
 	return ice.MulticastDNSModeQueryOnly
 }
 
+// ipFilter adapts the SettingEngine IP filter to the ice/v5 filter signature.
+func (g *ICEGatherer) ipFilter() func(ice.IPFilterInfo) bool {
+	filter := g.api.settingEngine.candidates.IPFilter
+	if filter == nil {
+		return nil
+	}
+
+	return func(info ice.IPFilterInfo) bool { return filter(info.IP) }
+}
+
 func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.AgentOption {
 	return []ice.AgentOption{
 		ice.WithICELite(g.api.settingEngine.candidates.ICELite),
 		ice.WithPortRange(g.api.settingEngine.ephemeralUDP.PortMin, g.api.settingEngine.ephemeralUDP.PortMax),
 		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
 		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
-		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter),
+		ice.WithIPFilter(g.ipFilter()),
 		ice.WithRemoteIPFilter(g.api.settingEngine.candidates.RemoteIPFilter),
 		ice.WithNet(g.api.settingEngine.net),
 		ice.WithMulticastDNSMode(mDNSMode),
