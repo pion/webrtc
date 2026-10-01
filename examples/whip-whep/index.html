@@ -9,27 +9,32 @@
   </head>
 
   <body>
-    <button onclick="window.doWHIP()">Publish</button>
-    <button onclick="window.doWHEP()">Subscribe</button>
+    <button class="signalingButton" onclick="window.doWHIP()">Publish</button>
+    <button class="signalingButton" onclick="window.doWHEP()">Subscribe</button>
     <h3> Video </h3>
     <video id="videoPlayer" autoplay muted controls style="width: 500"> </video>
 
 
-    <h3> ICE Connection States </h3>
-    <div id="iceConnectionStates"></div> <br />
+    <h3> Connection States </h3>
+    <div id="connectionStates"></div> <br />
   </body>
 
   <script>
     let peerConnection = new RTCPeerConnection()
 
-    peerConnection.oniceconnectionstatechange = () => {
+    peerConnection.onconnectionstatechange = () => {
       let el = document.createElement('p')
-      el.appendChild(document.createTextNode(peerConnection.iceConnectionState))
+      el.appendChild(document.createTextNode(peerConnection.connectionState))
 
-      document.getElementById('iceConnectionStates').appendChild(el);
+      document.getElementById('connectionStates').appendChild(el);
+    }
+
+    const disableSignalingButtons = () => {
+      document.querySelectorAll('.signalingButton').forEach(button => { button.disabled = true })
     }
 
     window.doWHEP = () => {
+      disableSignalingButtons()
       peerConnection.addTransceiver('video', { direction: 'recvonly' })
       peerConnection.addTransceiver('audio', { direction: 'recvonly' })
 
@@ -58,6 +63,7 @@
     }
 
     window.doWHIP = () => {
+      disableSignalingButtons()
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
           document.getElementById('videoPlayer').srcObject = stream
