@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	dtlsv3protocol "github.com/pion/dtls/v3/pkg/protocol"
+	dtlsprotocol "github.com/pion/dtls/v4/pkg/protocol"
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5/packetio"
@@ -46,6 +48,9 @@ type ICETransport struct {
 
 	gatherer *ICEGatherer
 	conn     net.Conn
+
+	// spedAgent is read lock-free as SPED hooks run on the agent's task loop.
+	spedAgent atomic.Pointer[ice.Agent]
 
 	packetLock        sync.Mutex
 	connectionChanged chan struct{}
@@ -171,6 +176,15 @@ func (t *ICETransport) StartContext(
 	}
 	t.role = *role
 
+	sped := t.gatherer.api.settingEngine.enableSped
+	if sped {
+		t.spedAgent.Store(agent)
+		// Runs on the agent's task loop before the binding response is built.
+		agent.SetDTLSCallback(func(packet []byte, _ net.Addr) {
+			t.dispatchPacket(packet)
+		})
+	}
+
 	callerCtx := ctx
 	operationCtx, ctxCancel := context.WithCancel(callerCtx)
 	t.ctxCancel = ctxCancel
@@ -183,17 +197,17 @@ func (t *ICETransport) StartContext(
 	var err error
 	switch *role {
 	case ICERoleControlling:
-		iceConn, err = agent.Dial(operationCtx,
-			params.UsernameFragment,
-			params.Password)
+		iceConn, err = agent.StartDial(params.UsernameFragment, params.Password)
 
 	case ICERoleControlled:
-		iceConn, err = agent.Accept(operationCtx,
-			params.UsernameFragment,
-			params.Password)
+		iceConn, err = agent.StartAccept(params.UsernameFragment, params.Password)
 
 	default:
 		err = errICERoleUnknown
+	}
+	// SPED starts DTLS before a pair is selected.
+	if err == nil && !sped {
+		err = agent.AwaitConnect(operationCtx)
 	}
 
 	// Reacquire the lock to set the connection and start WebRTC packet dispatch.
@@ -507,6 +521,9 @@ func (t *ICETransport) readLoop(conn net.Conn, done chan<- struct{}) {
 			return
 		}
 
+		if agent := t.spedAgent.Load(); agent != nil && matchDTLS(buffer[:n]) {
+			agent.ReportDTLSPacket(buffer[:n])
+		}
 		t.dispatchPacket(buffer[:n])
 	}
 }
@@ -722,4 +739,28 @@ func (t *ICETransport) setRemoteCredentials(newUfrag, newPwd string) error {
 	}
 
 	return agent.SetRemoteCredentials(newUfrag, newPwd)
+}
+
+// piggyback embeds a DTLS flight into STUN. It may run on the agent's task loop
+// so it must not take t.lock or the gatherer lock.
+func (t *ICETransport) piggyback(datagrams [][]byte) bool {
+	agent := t.spedAgent.Load()
+	if agent == nil {
+		return false
+	}
+
+	return agent.Piggyback(datagrams, nil)
+}
+
+// setDTLSHandshakeComplete starts the SPED closing handshake.
+func (t *ICETransport) setDTLSHandshakeComplete(isClient bool, version dtlsprotocol.Version) {
+	agent := t.spedAgent.Load()
+	if agent == nil {
+		return
+	}
+	iceVersion := dtlsv3protocol.Version1_2
+	if version == dtlsprotocol.Version1_3 {
+		iceVersion = dtlsv3protocol.Version1_3
+	}
+	agent.SetDTLSHandshakeComplete(isClient, iceVersion)
 }

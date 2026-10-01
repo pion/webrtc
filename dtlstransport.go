@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -426,6 +427,8 @@ func (t *DTLSTransport) start(
 				RemoteAddr:       t.iceTransport.remoteAddr,
 				SetWriteDeadline: t.iceTransport.setWriteDeadline,
 			},
+			Piggyback:       t.piggybackFunc(),
+			OnHandshakeDone: t.onHandshakeDoneFunc(),
 			OnClose: func() {
 				go func() {
 					<-startFinished.Done()
@@ -557,7 +560,7 @@ func (t *DTLSTransport) connectDTLS(
 			t.iceTransport.State() == ICETransportStateFailed {
 			return nil, io.ErrClosedPipe
 		}
-		if addr := t.iceTransport.remoteAddr(); addr != nil {
+		if addr := t.dtlsRemoteAddr(); addr != nil {
 			if role == DTLSRoleClient {
 				return dtls.DetachedClient(addr, t.toDTLSClientOptions(opts)...)
 			}
@@ -620,6 +623,37 @@ func (t *DTLSTransport) toDTLSClientOptions(sharedOpts []dtls.Option) []dtls.Cli
 	}
 
 	return clientOpts
+}
+
+// spedRemoteAddr stands in until ICE selects a pair.
+var spedRemoteAddr = &net.UDPAddr{} //nolint:gochecknoglobals
+
+func (t *DTLSTransport) dtlsRemoteAddr() net.Addr {
+	if addr := t.iceTransport.remoteAddr(); addr != nil || !t.api.settingEngine.enableSped {
+		return addr
+	}
+
+	return spedRemoteAddr
+}
+
+func (t *DTLSTransport) piggybackFunc() func([][]byte) bool {
+	if !t.api.settingEngine.enableSped {
+		return nil
+	}
+
+	return t.iceTransport.piggyback
+}
+
+func (t *DTLSTransport) onHandshakeDoneFunc() func(*dtls.DetachedConn) {
+	if !t.api.settingEngine.enableSped {
+		return nil
+	}
+
+	return func(conn *dtls.DetachedConn) {
+		if state, ok := conn.ConnectionState(); ok {
+			t.iceTransport.setDTLSHandshakeComplete(state.Role() == dtls.RoleClient, state.NegotiatedVersion())
+		}
+	}
 }
 
 func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {

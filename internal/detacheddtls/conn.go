@@ -10,6 +10,7 @@ package detacheddtls
 import (
 	"context"
 	"io"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -27,6 +28,9 @@ type Config struct {
 	TransportClosed    <-chan struct{}
 	NetConn            netconn.Config
 	OnClose            func()
+	// Piggyback returns true if it took a handshake flight to embed in STUN.
+	Piggyback       func(datagrams [][]byte) bool
+	OnHandshakeDone func(conn *dtls.DetachedConn)
 }
 
 // Conn pumps a DetachedConn and exposes only its plaintext application data as
@@ -44,9 +48,17 @@ type Conn struct {
 	handshakeDone chan error
 	changed       chan struct{}
 	ready         bool
-	closed        bool
-	closeErr      error
-	writeDeadline *deadline.Deadline
+	// piggybacking is set until Piggyback declines a flight.
+	piggybacking  bool
+	piggybackList [][]byte
+	// piggybackFresh indexes the datagrams not yet handed to Piggyback.
+	piggybackFresh int
+	// handshakeFlight is set while piggybackList holds a handshake flight
+	// that the next one replaces.
+	handshakeFlight bool
+	closed          bool
+	closeErr        error
+	writeDeadline   *deadline.Deadline
 }
 
 // New creates a detached DTLS application-data connection.
@@ -97,6 +109,7 @@ func (c *Conn) Start(ctx context.Context, conn *dtls.DetachedConn) error {
 	_ = c.stop(false)
 	done := make(chan error, 1)
 	c.dtlsConn, c.handshakeDone = conn, done
+	c.piggybacking, c.piggybackList, c.handshakeFlight = c.config.Piggyback != nil, nil, false
 	err := conn.Start(ctx)
 	var drain func()
 	if err == nil {
@@ -116,12 +129,37 @@ func (c *Conn) Start(ctx context.Context, conn *dtls.DetachedConn) error {
 
 func (c *Conn) handleDatagram(conn *dtls.DetachedConn, datagram []byte) error {
 	c.driveMu.Lock()
-	defer c.driveMu.Unlock()
 	if c.dtlsConn != conn {
+		c.driveMu.Unlock()
+
 		return nil
 	}
+	handshaking := !c.ready
+	// The caller may be the ICE agent's task loop, avoid the address lookup.
+	var addr net.Addr
+	if !handshaking {
+		addr = c.RemoteAddr()
+	}
+	err := conn.HandleDatagram(datagram, addr)
+	c.driveMu.Unlock()
+	if err != nil || !handshaking || c.config.Piggyback == nil {
+		return err
+	}
 
-	return conn.HandleDatagram(datagram, c.RemoteAddr())
+	// Piggyback the queued reply now so it rides the binding response.
+	c.eventMu.Lock()
+	defer c.eventMu.Unlock()
+	if c.dtlsConn != conn || c.ready {
+		return nil
+	}
+	if err = c.processHandshakeEvents(conn); err != nil {
+		c.driveMu.Lock()
+		c.notify(err)
+		_ = c.stop(false)
+		c.driveMu.Unlock()
+	}
+
+	return nil
 }
 
 func (c *Conn) processEvents() {
@@ -166,6 +204,25 @@ func (c *Conn) processEvents() {
 }
 
 func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
+	return c.processEventsUntil(conn, false)
+}
+
+// processHandshakeEvents stops after DetachedHandshakeDone.
+func (c *Conn) processHandshakeEvents(conn *dtls.DetachedConn) error {
+	return c.processEventsUntil(conn, true)
+}
+
+func (c *Conn) processEventsUntil(conn *dtls.DetachedConn, untilReady bool) error {
+	c.piggybackFresh = len(c.piggybackList)
+	err := c.drainEvents(conn, untilReady)
+	if flushErr := c.flushPiggyback(untilReady); err == nil {
+		err = flushErr
+	}
+
+	return err
+}
+
+func (c *Conn) drainEvents(conn *dtls.DetachedConn, untilReady bool) error { //nolint:cyclop
 	for {
 		event := conn.NextEvent()
 		var err error
@@ -177,10 +234,16 @@ func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
 		case dtls.DetachedApplicationData:
 			err = c.Push(event.Data)
 		case dtls.DetachedHandshakeDone:
+			if c.config.OnHandshakeDone != nil {
+				c.config.OnHandshakeDone(conn)
+			}
 			c.driveMu.Lock()
 			c.ready = true
 			c.notify(nil)
 			c.driveMu.Unlock()
+			if untilReady {
+				return nil
+			}
 		case dtls.DetachedClosed:
 			if event.Err == nil {
 				event.Err = io.EOF
@@ -195,6 +258,52 @@ func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
 }
 
 func (c *Conn) writeDatagrams(datagrams [][]byte) error {
+	if c.piggybacking {
+		if c.handshakeFlight && !c.ready {
+			c.piggybackList, c.piggybackFresh = nil, 0
+		}
+		c.handshakeFlight = false
+		c.piggybackList = append(c.piggybackList, datagrams...)
+
+		return nil
+	}
+
+	return c.writeDatagramsNow(datagrams)
+}
+
+// flushPiggyback hands one drain's datagrams to Piggyback at once as each call
+// replaces the previous flight. After the handshake the list accumulates on top
+// of the last handshake flight, e.g. the DTLS 1.3 server's ACK.
+func (c *Conn) flushPiggyback(onTaskLoop bool) error {
+	if !c.piggybacking || len(c.piggybackList) == c.piggybackFresh {
+		return nil
+	}
+	datagrams := c.piggybackList
+	if c.config.Piggyback(datagrams) {
+		if !c.ready {
+			c.handshakeFlight = true
+
+			return nil
+		}
+		// ICE may connect before a STUN message carries them. Without a
+		// selected pair writing waits for the ICE task loop, never block on it.
+		fresh := datagrams[c.piggybackFresh:]
+		go func() { _ = c.writeDatagramsNow(fresh) }()
+
+		return nil
+	}
+	c.piggybacking, c.piggybackList = false, nil
+	if onTaskLoop {
+		// Writing may wait for the ICE task loop.
+		go func() { _ = c.writeDatagramsNow(datagrams) }()
+
+		return nil
+	}
+
+	return c.writeDatagramsNow(datagrams)
+}
+
+func (c *Conn) writeDatagramsNow(datagrams [][]byte) error {
 	for _, datagram := range datagrams {
 		if _, err := c.config.WriteDatagram(datagram); err != nil {
 			return err
@@ -270,12 +379,13 @@ func (c *Conn) stop(flush bool) error {
 		if flush {
 			for event := c.dtlsConn.NextEvent(); event.Kind != dtls.DetachedNoEvent; event = c.dtlsConn.NextEvent() {
 				if event.Kind == dtls.DetachedWriteDatagrams {
-					errs = append(errs, c.writeDatagrams(event.Datagrams))
+					errs = append(errs, c.writeDatagramsNow(event.Datagrams))
 				}
 			}
 		}
 	}
 	c.dtlsConn, c.ready = nil, false
+	c.piggybacking, c.piggybackList, c.handshakeFlight = false, nil, false
 	c.notify(io.ErrClosedPipe)
 
 	return util.FlattenErrs(errs)
