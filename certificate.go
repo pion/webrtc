@@ -161,12 +161,10 @@ func CertificateFromX509(privateKey crypto.PrivateKey, certificate *x509.Certifi
 	return Certificate{privateKey, certificate, fmt.Sprintf("certificate-%d", time.Now().UnixNano())}
 }
 
-func (c Certificate) collectStats(report *statsReportCollector) error {
-	report.Collecting()
-
+func (c Certificate) stats() (CertificateStats, error) {
 	fingerPrintAlgo, err := c.GetFingerprints()
 	if err != nil {
-		return err
+		return CertificateStats{}, err
 	}
 
 	base64Certificate := base64.RawURLEncoding.EncodeToString(c.x509Cert.Raw)
@@ -181,9 +179,7 @@ func (c Certificate) collectStats(report *statsReportCollector) error {
 		IssuerCertificateID:  c.x509Cert.Issuer.String(),
 	}
 
-	report.Collect(stats.ID, stats)
-
-	return nil
+	return stats, nil
 }
 
 // CertificateFromPEM creates a fresh certificate based on a string containing

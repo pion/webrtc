@@ -3056,7 +3056,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		pc.iceGatherer.collectStats(statsCollector)
 	}
 	if pc.iceTransport != nil {
-		pc.iceTransport.collectStats(statsCollector)
+		pc.dtlsTransport.collectStats(statsCollector)
 	}
 
 	pc.sctpTransport.lock.Lock()
@@ -3088,12 +3088,6 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	statsCollector.Collect(stats.ID, stats)
 
-	certificates := pc.configuration.Certificates
-	for _, certificate := range certificates {
-		if err := certificate.collectStats(statsCollector); err != nil {
-			continue
-		}
-	}
 	pc.mu.Unlock()
 
 	receivers := pc.GetReceivers()

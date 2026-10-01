@@ -675,6 +675,11 @@ func (t *ICETransport) Stats() TransportStats {
 		Timestamp: statsTimestampFrom(time.Now()),
 		Type:      StatsTypeTransport,
 		ID:        "iceTransport",
+		ICERole:   t.Role(),
+		ICEState:  t.State(),
+	}
+	if pairStats, ok := t.GetSelectedCandidatePairStats(); ok {
+		stats.SelectedCandidatePairID = pairStats.ID
 	}
 	if conn != nil {
 		if connWithStats, ok := conn.(interface {
@@ -687,12 +692,6 @@ func (t *ICETransport) Stats() TransportStats {
 	}
 
 	return stats
-}
-
-func (t *ICETransport) collectStats(collector *statsReportCollector) {
-	collector.Collecting()
-	stats := t.Stats()
-	collector.Collect(stats.ID, stats)
 }
 
 func (t *ICETransport) haveRemoteCredentialsChange(newUfrag, newPwd string) bool {

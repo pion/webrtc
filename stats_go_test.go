@@ -832,7 +832,8 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		//nolint:lll
 		RemoteCertificateID: "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
 		DTLSCipher:          "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		SRTPCipher:          "AES_CM_128_HMAC_SHA1_80",
+		TLSVersion:          "FEFD",
+		SRTPCipher:          "SRTP_AES128_CM_HMAC_SHA1_80",
 	}
 	//nolint:lll
 	transportStatsJSON := `
@@ -852,7 +853,8 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "localCertificateId": "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
   "remoteCertificateId": "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
   "dtlsCipher": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-  "srtpCipher": "AES_CM_128_HMAC_SHA1_80"
+  "tlsVersion": "FEFD",
+  "srtpCipher": "SRTP_AES128_CM_HMAC_SHA1_80"
 }
 `
 	iceCandidatePairStats := ICECandidatePairStats{
@@ -1200,10 +1202,10 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport) TransportStats {
 	t.Helper()
 
-	stats, ok := report[statsID]
+	stats, ok := report["iceTransport"]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)
@@ -1378,7 +1380,7 @@ func TestStatsConvertState(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves multiple branches and waits
+func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop,maintidx // involves multiple branches and waits
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 	defer closePairNow(t, offerPC, answerPC)
@@ -1473,6 +1475,16 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	assert.NotEmpty(t, findLocalCandidateStats(reportPCOffer))
 	assert.NotEmpty(t, findRemoteCandidateStats(reportPCOffer))
 	assert.NotEmpty(t, findCandidatePairStats(t, reportPCOffer))
+	offerTransportStats := getTransportStats(t, reportPCOffer)
+	assert.Equal(t, ICETransportStateConnected, offerTransportStats.ICEState)
+	assert.Equal(t, ICERoleControlling, offerTransportStats.ICERole)
+	assert.Equal(t, DTLSTransportStateConnected, offerTransportStats.DTLSState)
+	assert.Contains(t, reportPCOffer, offerTransportStats.SelectedCandidatePairID)
+	assert.Equal(t, offerPC.configuration.Certificates[0].statsID, offerTransportStats.LocalCertificateID)
+	assert.Contains(t, reportPCOffer, offerTransportStats.RemoteCertificateID)
+	assert.NotEmpty(t, offerTransportStats.DTLSCipher)
+	assert.Contains(t, []string{"FEFD", "FEFC"}, offerTransportStats.TLSVersion)
+	assert.NotEmpty(t, offerTransportStats.SRTPCipher)
 
 	connStatsAnswer = getConnectionStats(t, reportPCAnswer, answerPC)
 	assert.Equal(t, uint32(1), connStatsAnswer.DataChannelsOpened)
@@ -1572,8 +1584,8 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
-	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
-	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
+	answerICETransportStats := getTransportStats(t, reportPCAnswer)
+	offerICETransportStats := getTransportStats(t, reportPCOffer)
 	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
 
@@ -1596,6 +1608,31 @@ func TestPeerConnection_GetStats_Closed(t *testing.T) {
 	assert.NoError(t, pc.Close())
 
 	pc.GetStats()
+}
+
+func TestPeerConnection_GetStats_TransportNegotiated(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+
+	before := getTransportStats(t, offerPC.GetStats())
+	assert.Equal(t, DTLSTransportStateNew, before.DTLSState)
+	assert.Empty(t, before.DTLSCipher)
+	assert.Empty(t, before.TLSVersion)
+	assert.Empty(t, before.SRTPCipher)
+	assert.Empty(t, before.LocalCertificateID)
+	assert.Empty(t, before.RemoteCertificateID)
+
+	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
+	require.NoError(t, signalPair(offerPC, answerPC))
+	<-connected
+	connectedStats := getTransportStats(t, offerPC.GetStats())
+	assert.NotEmpty(t, connectedStats.DTLSCipher)
+	assert.NotEmpty(t, connectedStats.TLSVersion)
+	assert.NotEmpty(t, connectedStats.SRTPCipher)
+	assert.NotEmpty(t, connectedStats.LocalCertificateID)
+	assert.NotEmpty(t, connectedStats.RemoteCertificateID)
+
+	closePairNow(t, offerPC, answerPC)
 }
 
 func TestUnmarshalStatsJSON_TypeFieldUnmarshalError(t *testing.T) {

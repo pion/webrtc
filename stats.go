@@ -2005,24 +2005,27 @@ type TransportStats struct {
 
 	// SelectedCandidatePairID is a unique identifier that is associated to the object
 	// that was inspected to produce the ICECandidatePairStats associated with this transport.
-	SelectedCandidatePairID string `json:"selectedCandidatePairId"`
+	SelectedCandidatePairID string `json:"selectedCandidatePairId,omitempty"`
 
 	// LocalCertificateID is the ID of the CertificateStats for the local certificate.
 	// Present only if DTLS is negotiated.
-	LocalCertificateID string `json:"localCertificateId"`
+	LocalCertificateID string `json:"localCertificateId,omitempty"`
 
 	// RemoteCertificateID is the ID of the CertificateStats for the remote certificate.
 	// Present only if DTLS is negotiated.
-	RemoteCertificateID string `json:"remoteCertificateId"`
+	RemoteCertificateID string `json:"remoteCertificateId,omitempty"`
 
 	// DTLSCipher is the descriptive name of the cipher suite used for the DTLS transport,
 	// as defined in the "Description" column of the IANA cipher suite registry.
-	DTLSCipher string `json:"dtlsCipher"`
+	DTLSCipher string `json:"dtlsCipher,omitempty"`
+
+	// TLSVersion is the negotiated DTLS version as uppercase hex, e.g. "FEFD".
+	TLSVersion string `json:"tlsVersion,omitempty"`
 
 	// SRTPCipher is the descriptive name of the protection profile used for the SRTP
 	// transport, as defined in the "Profile" column of the IANA DTLS-SRTP protection
 	// profile registry.
-	SRTPCipher string `json:"srtpCipher"`
+	SRTPCipher string `json:"srtpCipher,omitempty"`
 }
 
 func (s TransportStats) statsMarker() {}

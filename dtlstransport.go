@@ -41,14 +41,17 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
-	iceTransport          *ICETransport
-	certificates          []Certificate
-	remoteParameters      DTLSParameters
-	remoteCertificate     []byte
-	state                 DTLSTransportState
-	srtpProtectionProfile srtp.ProtectionProfile
-	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
-	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
+	iceTransport                *ICETransport
+	certificates                []Certificate
+	remoteParameters            DTLSParameters
+	remoteCertificate           []byte
+	state                       DTLSTransportState
+	srtpProtectionProfile       srtp.ProtectionProfile
+	negotiatedStats             dtlsNegotiatedStats
+	negotiatedLocalCertificate  *Certificate
+	negotiatedRemoteCertificate *Certificate
+	localCryptexMode            srtp.CryptexMode // outbound (send) Cryptex mode
+	remoteCryptexMode           srtp.CryptexMode // inbound (receive) Cryptex mode
 
 	onStateChangeHandler func(DTLSTransportState)
 
@@ -635,6 +638,15 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 		return err
 	}
 	t.srtpProtectionProfile = srtpProtectionProfile
+	t.negotiatedStats = t.getNegotiatedStats(dtlsConn)
+	t.negotiatedLocalCertificate = &t.certificates[0]
+	t.negotiatedRemoteCertificate = nil
+	if remoteCertificate, parseErr := x509.ParseCertificate(t.remoteCertificate); parseErr == nil {
+		t.negotiatedRemoteCertificate = &Certificate{
+			x509Cert: remoteCertificate,
+			statsID:  fmt.Sprintf("certificate-remote-%d", time.Now().UnixNano()),
+		}
+	}
 	if err = t.startSRTP(); err != nil {
 		return err
 	}
@@ -868,4 +880,65 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 	defer t.lock.RUnlock()
 
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
+}
+
+type dtlsNegotiatedStats struct {
+	dtlsCipher string
+	tlsVersion string
+	srtpCipher string
+}
+
+func (t *DTLSTransport) getNegotiatedStats(dtlsConn *dtls.DetachedConn) dtlsNegotiatedStats {
+	negotiatedStats := dtlsNegotiatedStats{srtpCipher: t.srtpProtectionProfile.String()}
+	if state, ok := dtlsConn.ConnectionState(); ok {
+		negotiatedStats.dtlsCipher = state.CipherSuiteID.String()
+		negotiatedStats.tlsVersion = fmt.Sprintf("%04X", uint16(state.NegotiatedVersion()))
+	}
+
+	return negotiatedStats
+}
+
+func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
+	t.lock.RLock()
+	state := t.state
+	certificates := t.certificates
+	negotiatedStats := t.negotiatedStats
+	localCertificate := t.negotiatedLocalCertificate
+	remoteCertificate := t.negotiatedRemoteCertificate
+	t.lock.RUnlock()
+
+	collected := map[string]bool{}
+	collectCertificate := func(certificate *Certificate) string {
+		if certificate == nil {
+			return ""
+		}
+		if collected[certificate.statsID] {
+			return certificate.statsID
+		}
+		certificateStats, err := certificate.stats()
+		if err != nil {
+			return ""
+		}
+		collected[certificateStats.ID] = true
+		collector.Collecting()
+		collector.Collect(certificateStats.ID, certificateStats)
+
+		return certificateStats.ID
+	}
+
+	for i := range certificates {
+		collectCertificate(&certificates[i])
+	}
+	localCertificateID := collectCertificate(localCertificate)
+	remoteCertificateID := collectCertificate(remoteCertificate)
+
+	stats := t.iceTransport.Stats()
+	stats.DTLSState = state
+	stats.DTLSCipher = negotiatedStats.dtlsCipher
+	stats.TLSVersion = negotiatedStats.tlsVersion
+	stats.SRTPCipher = negotiatedStats.srtpCipher
+	stats.LocalCertificateID = localCertificateID
+	stats.RemoteCertificateID = remoteCertificateID
+	collector.Collecting()
+	collector.Collect(stats.ID, stats)
 }
