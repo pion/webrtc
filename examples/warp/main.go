@@ -18,7 +18,6 @@ func main() {
 	var pc *webrtc.PeerConnection
 
 	setupOfferHandler(&pc)
-	setupCandidateHandler(&pc)
 	setupStaticHandler()
 
 	fmt.Println("google-chrome-unstable --force-fieldtrials=" +
@@ -44,9 +43,10 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 			return
 		}
 
-		// Enable SNAP.
+		// Enable SNAP and SPED.
 		s := webrtc.SettingEngine{}
 		s.EnableSctpSnap(true)
+		s.EnableSped(true)
 		api := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 
 		var err error
@@ -59,21 +59,12 @@ func setupOfferHandler(pc **webrtc.PeerConnection) {
 			return
 		}
 
-		setupICECandidateHandler(*pc)
 		setupDataChannelHandler(*pc)
 
 		if err := processOffer(*pc, offer, responseWriter); err != nil {
 			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
 
 			return
-		}
-	})
-}
-
-func setupICECandidateHandler(pc *webrtc.PeerConnection) {
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c != nil {
-			fmt.Printf("🌐 New ICE candidate: %s\n", c.Address)
 		}
 	})
 }
@@ -139,22 +130,6 @@ func processOffer(
 	}
 
 	return nil
-}
-
-func setupCandidateHandler(pc **webrtc.PeerConnection) {
-	http.HandleFunc("/candidate", func(responseWriter http.ResponseWriter, r *http.Request) {
-		var candidate webrtc.ICECandidateInit
-		if err := json.NewDecoder(r.Body).Decode(&candidate); err != nil {
-			http.Error(responseWriter, err.Error(), http.StatusBadRequest)
-
-			return
-		}
-		if *pc != nil {
-			if err := (*pc).AddICECandidate(candidate); err != nil {
-				fmt.Println("Failed to add candidate", err)
-			}
-		}
-	})
 }
 
 func setupStaticHandler() {
