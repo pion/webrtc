@@ -233,7 +233,7 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithPortRange(g.api.settingEngine.ephemeralUDP.PortMin, g.api.settingEngine.ephemeralUDP.PortMax),
 		ice.WithLoggerFactory(g.api.settingEngine.LoggerFactory),
 		ice.WithInterfaceFilter(g.api.settingEngine.candidates.InterfaceFilter),
-		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter),
+		ice.WithIPFilter(g.api.settingEngine.candidates.IPFilter.toICE()),
 		ice.WithRemoteIPFilter(g.api.settingEngine.candidates.RemoteIPFilter),
 		ice.WithNet(g.api.settingEngine.net),
 		ice.WithMulticastDNSMode(mDNSMode),

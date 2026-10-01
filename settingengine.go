@@ -52,7 +52,7 @@ type SettingEngine struct {
 		ICELite                  bool
 		ICENetworkTypes          []NetworkType
 		InterfaceFilter          func(string) (keep bool)
-		IPFilter                 func(net.IP) (keep bool)
+		IPFilter                 IPFilter
 		RemoteIPFilter           func(net.IP) (keep bool)
 		addressRewriteRules      []ice.AddressRewriteRule
 		MulticastDNSMode         ice.MulticastDNSMode
@@ -311,11 +311,35 @@ func (e *SettingEngine) SetInterfaceFilter(filter func(string) (keep bool)) {
 	e.candidates.InterfaceFilter = filter
 }
 
-// SetIPFilter sets the filtering functions when gathering ICE candidates
-// This can be used to exclude certain ip from ICE. Which may be
-// useful if you know a certain ip will never succeed, or if you wish to reduce
-// the amount of information you wish to expose to the remote peer.
-func (e *SettingEngine) SetIPFilter(filter func(net.IP) (keep bool)) {
+// IPFilterInfo describes a local IP address being considered during ICE gathering.
+type IPFilterInfo struct {
+	IP net.IP
+	// CandidateType identifies how IP will be used: ICECandidateTypeHost for a
+	// host candidate, ICECandidateTypeSrflx for a STUN client bind address, or
+	// ICECandidateTypeRelay for a TURN client bind address.
+	CandidateType ICECandidateType
+}
+
+// IPFilter decides whether a local IP address may be used for a candidate type.
+type IPFilter func(IPFilterInfo) (keep bool)
+
+func (filter IPFilter) toICE() func(ice.IPFilterInfo) bool {
+	if filter == nil {
+		return nil
+	}
+
+	return func(info ice.IPFilterInfo) bool {
+		candidateType, _ := convertTypeFromICE(info.CandidateType)
+
+		return filter(IPFilterInfo{IP: info.IP, CandidateType: candidateType})
+	}
+}
+
+// SetIPFilter sets the filter for local IP addresses during ICE gathering.
+// Returning false prevents use of the IP for the specified candidate type.
+// The filter can exclude an IP from host candidates while allowing it for
+// STUN or TURN client binding. A nil filter allows all local IP addresses.
+func (e *SettingEngine) SetIPFilter(filter IPFilter) {
 	e.candidates.IPFilter = filter
 }
 
