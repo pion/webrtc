@@ -90,8 +90,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		Kind:                           "audio",
 		TransportID:                    "T01",
 		CodecID:                        "CIT01_111_minptime=10;useinbandfec=1",
-		FIRCount:                       1,
-		PLICount:                       2,
 		TotalProcessingDelay:           23,
 		NACKCount:                      3,
 		JitterBufferDelay:              24,
@@ -108,10 +106,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		TotalAudioEnergy:               35,
 		TotalSamplesDuration:           36,
 		SLICount:                       4,
-		QPSum:                          5,
-		TotalDecodeTime:                37,
-		TotalInterFrameDelay:           38,
-		TotalSquaredInterFrameDelay:    39,
 		PacketsReceived:                6,
 		PacketsLost:                    7,
 		Jitter:                         8,
@@ -128,30 +122,21 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		TrackID:                        "d57dbc4b-484b-4b40-9088-d3150e3a2010",
 		ReceiverID:                     "R01",
 		RemoteID:                       "ROA2184088143",
-		FramesDecoded:                  17,
-		KeyFramesDecoded:               40,
-		FramesRendered:                 41,
-		FramesDropped:                  42,
-		FrameWidth:                     43,
-		FrameHeight:                    44,
 		LastPacketReceivedTimestamp:    1689668364374.181,
 		HeaderBytesReceived:            45,
 		AverageRTCPInterval:            18,
 		FECPacketsReceived:             19,
 		FECPacketsDiscarded:            46,
 		BytesReceived:                  20,
-		FramesReceived:                 47,
 		PacketsFailedDecryption:        21,
 		PacketsDuplicated:              22,
 		PerDSCPPacketsReceived: map[string]uint32{
 			"123": 23,
 		},
-		DecoderImplementation: "libvpx",
-		PauseCount:            48,
-		TotalPausesDuration:   48.123,
-		FreezeCount:           49,
-		TotalFreezesDuration:  49.321,
-		PowerEfficientDecoder: true,
+		PauseCount:           48,
+		TotalPausesDuration:  48.123,
+		FreezeCount:          49,
+		TotalFreezesDuration: 49.321,
 	}
 	inboundRTPStreamStatsJSON := `
 {
@@ -164,8 +149,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "kind": "audio",
   "transportId": "T01",
   "codecId": "CIT01_111_minptime=10;useinbandfec=1",
-  "firCount": 1,
-  "pliCount": 2,
   "totalProcessingDelay": 23,
   "nackCount": 3,
   "jitterBufferDelay": 24,
@@ -182,10 +165,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "totalAudioEnergy": 35,
   "totalSamplesDuration": 36,
   "sliCount": 4,
-  "qpSum": 5,
-  "totalDecodeTime": 37,
-  "totalInterFrameDelay": 38,
-  "totalSquaredInterFrameDelay": 39,
   "packetsReceived": 6,
   "packetsLost": 7,
   "jitter": 8,
@@ -202,30 +181,21 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "trackId": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
   "receiverId": "R01",
   "remoteId": "ROA2184088143",
-  "framesDecoded": 17,
-  "keyFramesDecoded": 40,
-  "framesRendered": 41,
-  "framesDropped": 42,
-  "frameWidth": 43,
-  "frameHeight": 44,
   "lastPacketReceivedTimestamp": 1689668364374.181,
   "headerBytesReceived": 45,
   "averageRtcpInterval": 18,
   "fecPacketsReceived": 19,
   "fecPacketsDiscarded": 46,
   "bytesReceived": 20,
-  "framesReceived": 47,
   "packetsFailedDecryption": 21,
   "packetsDuplicated": 22,
   "perDscpPacketsReceived": {
     "123": 23
   },
-  "decoderImplementation": "libvpx",
   "pauseCount": 48,
   "totalPausesDuration": 48.123,
   "freezeCount": 49,
-  "totalFreezesDuration": 49.321,
-  "powerEfficientDecoder": true
+  "totalFreezesDuration": 49.321
 }
 `
 	outboundRTPStreamStats := OutboundRTPStreamStats{
@@ -236,7 +206,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		Type:                     StatsTypeOutboundRTP,
 		ID:                       "OT01A2184088143",
 		SSRC:                     2184088143,
-		Kind:                     "audio",
+		Kind:                     "video",
 		TransportID:              "T01",
 		CodecID:                  "COT01_111_minptime=10;useinbandfec=1",
 		HeaderBytesSent:          24,
@@ -293,7 +263,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "type": "outbound-rtp",
   "id": "OT01A2184088143",
   "ssrc": 2184088143,
-  "kind": "audio",
+  "kind": "video",
   "transportId": "T01",
   "codecId": "COT01_111_minptime=10;useinbandfec=1",
   "headerBytesSent": 24,
@@ -1147,6 +1117,39 @@ func TestStatsMarshal(t *testing.T) {
 			assert.JSONEq(t, test.json, string(actualJSON))
 		})
 	}
+}
+
+func TestRTPStreamStatsMarshalKindGating(t *testing.T) {
+	marshalMembers := func(t *testing.T, stats Stats) map[string]any {
+		t.Helper()
+		data, err := json.Marshal(stats)
+		require.NoError(t, err)
+		members := map[string]any{}
+		require.NoError(t, json.Unmarshal(data, &members))
+
+		return members
+	}
+
+	audio := marshalMembers(t, InboundRTPStreamStats{Type: StatsTypeInboundRTP, Kind: "audio", FrameWidth: 640})
+	assert.Contains(t, audio, "audioLevel")
+	assert.Contains(t, audio, "packetsReceived")
+	for _, member := range inboundRTPVideoOnlyMembers {
+		assert.NotContains(t, audio, member)
+	}
+
+	video := marshalMembers(t, InboundRTPStreamStats{Type: StatsTypeInboundRTP, Kind: "video", AudioLevel: 0.5})
+	assert.Equal(t, float64(0), video["framesDecoded"])
+	assert.Contains(t, video, "packetsReceived")
+	for _, member := range inboundRTPAudioOnlyMembers {
+		assert.NotContains(t, video, member)
+	}
+
+	outboundAudio := marshalMembers(t, OutboundRTPStreamStats{Type: StatsTypeOutboundRTP, Kind: "audio", Rid: "hi"})
+	assert.Contains(t, outboundAudio, "packetsSent")
+	for _, member := range outboundRTPVideoOnlyMembers {
+		assert.NotContains(t, outboundAudio, member)
+	}
+	assert.Contains(t, marshalMembers(t, OutboundRTPStreamStats{Type: StatsTypeOutboundRTP, Kind: "video"}), "framesEncoded")
 }
 
 func TestStatsUnmarshal(t *testing.T) {
