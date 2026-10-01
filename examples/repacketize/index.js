@@ -34,6 +34,7 @@ function codecs () {
 }
 
 async function start () {
+  document.getElementById('start').disabled = true
   log('Starting...')
   const screenSrc = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, height: 360 } })
   const video = document.getElementById('screen')
@@ -74,8 +75,8 @@ async function start () {
   pc.setRemoteDescription(sdp)
 }
 
-pc.addEventListener('iceconnectionstatechange', () => {
-  console.log('ICE connection state', pc.iceConnectionState)
+pc.addEventListener('connectionstatechange', () => {
+  log(`Connection state: ${pc.connectionState}`)
 })
 
 pc.ontrack = (t) => {
