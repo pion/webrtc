@@ -101,11 +101,13 @@ func isKeyFrame(data []byte) bool {
 		// For aggregation packets, check if any contained NAL is a key frame
 		return checkAggregationPacketForKeyFrame(data)
 	case typeFU:
-		// For fragmentation units, check the NAL type in the FU header
-		if len(data) < 3 {
+		// For fragmentation units, check the NAL type in the FU header.
+		// Unlike a NAL unit header, the FU header carries it in its low 6 bits (RFC 7798, 4.4.3).
+		// Only a start fragment counts: a key frame cannot be rebuilt from its later fragments alone.
+		if len(data) < 3 || data[2]&0x80 == 0 {
 			return false
 		}
-		fuNaluType := h265reader.NalUnitType((data[2] & 0x7E) >> 1)
+		fuNaluType := h265reader.NalUnitType(data[2] & 0x3F)
 
 		return isKeyFrameNalu(fuNaluType)
 	}
