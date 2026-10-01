@@ -70,21 +70,29 @@ type simulcastStreamPair struct {
 }
 
 type streamsForSSRCResult struct {
-	rtpReadStream             *srtp.ReadStreamSRTP
-	rtpInterceptor            interceptor.RTPReader
-	startRTPReaderImmediately bool
-	rtcpReadStream            *srtp.ReadStreamSRTCP
-	rtcpInterceptor           interceptor.RTCPReader
+	rtpInterceptor  interceptor.RTPReader
+	rtcpReadStream  *srtp.ReadStreamSRTCP
+	rtcpInterceptor interceptor.RTCPReader
 }
 
+// srtpRTPReader pulls merged SRTP packets through their original SSRC's interceptors.
+// Select before reading so interceptors get a real advancing reader and can use their own buffers.
 type srtpRTPReader struct {
-	readStream *srtp.ReadStreamSRTP
+	readStream  *srtp.ReadStreamSRTP
+	interceptor interceptor.RTPReader
+	repair      atomic.Pointer[srtpRTPReader]
 }
 
 func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-	n, err := r.readStream.Read(in)
+	stream, err := r.readStream.NextStream()
+	if err != nil {
+		return 0, a, err
+	}
+	if repair := r.repair.Load(); repair != nil && stream == repair.readStream {
+		return repair.interceptor.Read(in, a)
+	}
 
-	return n, a, err
+	return r.interceptor.Read(in, a)
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
@@ -773,7 +781,14 @@ func (t *DTLSTransport) streamsForSSRC(
 	}
 
 	rtpReader := &srtpRTPReader{readStream: rtpReadStream}
-	rtpInterceptor := t.api.interceptor.BindRemoteStream(&streamInfo, rtpReader)
+	source := rtpReadStream.SourceReader()
+	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(
+		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			n, readErr := source.Read(in)
+
+			return n, a, readErr
+		},
+	))
 
 	srtcpSession, err := t.getSRTCPSession()
 	if err != nil {
@@ -794,11 +809,9 @@ func (t *DTLSTransport) streamsForSSRC(
 	)
 
 	return &streamsForSSRCResult{
-		rtpReadStream:             rtpReadStream,
-		rtpInterceptor:            rtpInterceptor,
-		startRTPReaderImmediately: rtpInterceptor != rtpReader && t.api.settingEngine.BufferFactory == nil,
-		rtcpReadStream:            rtcpReadStream,
-		rtcpInterceptor:           rtcpInterceptor,
+		rtpInterceptor:  rtpReader,
+		rtcpReadStream:  rtcpReadStream,
+		rtcpInterceptor: rtcpInterceptor,
 	}, nil
 }
 
