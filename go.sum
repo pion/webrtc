@@ -140,3 +140,5 @@ github.com/pion/dtls/v4 v4.0.0-rc.1 h1:+8pjUyUAD6qww2Y7Po/PFsWq3tOGUIfDiBpluRdey
 github.com/pion/dtls/v4 v4.0.0-rc.1/go.mod h1:P8msRRyK3bGwG3aZccN0Vk8chAMp2nQiBR9O29b86Io=
 github.com/pion/dtls/v4 v4.0.0-rc.2 h1:6otSstHEqFUpq6GVTMIudY37BTMIKNLhqf7KocV6iGo=
 github.com/pion/dtls/v4 v4.0.0-rc.2/go.mod h1:P8msRRyK3bGwG3aZccN0Vk8chAMp2nQiBR9O29b86Io=
+github.com/pion/dtls/v4 v4.0.0-rc.3 h1:aPHgU7esiVOXB+TmuKGwLjWvzLMPa8qSk2hijVkDJ0U=
+github.com/pion/dtls/v4 v4.0.0-rc.3/go.mod h1:P8msRRyK3bGwG3aZccN0Vk8chAMp2nQiBR9O29b86Io=
