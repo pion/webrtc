@@ -249,6 +249,13 @@ func (m *MediaEngine) addCodec(codecs []RTPCodecParameters, codec RTPCodecParame
 		}
 	}
 
+	codec.rtxPayloadType = nil
+	apt, _ := fmtp.Parse(codec.MimeType, codec.ClockRate, codec.Channels, codec.SDPFmtpLine).Parameter("apt")
+	if payloadType, err := strconv.ParseUint(apt, 10, 7); err == nil {
+		resolved := PayloadType(payloadType)
+		codec.rtxPayloadType = &resolved
+	}
+
 	return append(codecs, codec), nil
 }
 

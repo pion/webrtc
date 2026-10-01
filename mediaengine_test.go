@@ -434,6 +434,9 @@ a=fmtp:97 apt=96
 		assert.NoError(t, err)
 		assert.Equal(t, h264P1RTX.MimeType, MimeTypeRTX)
 		assert.Equal(t, h264P1RTX.SDPFmtpLine, "apt=106")
+		if assert.NotNil(t, h264P1RTX.rtxPayloadType) {
+			assert.Equal(t, PayloadType(106), *h264P1RTX.rtxPayloadType)
+		}
 
 		h264P0Codec, _, err := mediaEngine.getCodecByPayload(108)
 		assert.NoError(t, err)
@@ -443,6 +446,9 @@ a=fmtp:97 apt=96
 		assert.NoError(t, err)
 		assert.Equal(t, h264P0RTX.MimeType, MimeTypeRTX)
 		assert.Equal(t, h264P0RTX.SDPFmtpLine, "apt=108")
+		if assert.NotNil(t, h264P0RTX.rtxPayloadType) {
+			assert.Equal(t, PayloadType(108), *h264P0RTX.rtxPayloadType)
+		}
 	})
 
 	t.Run("Matches when rtx apt for partial match codec", func(t *testing.T) {
