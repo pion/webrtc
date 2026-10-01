@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -70,19 +71,34 @@ type simulcastStreamPair struct {
 }
 
 type streamsForSSRCResult struct {
-	rtpReadStream             *srtp.ReadStreamSRTP
-	rtpInterceptor            interceptor.RTPReader
-	startRTPReaderImmediately bool
-	rtcpReadStream            *srtp.ReadStreamSRTCP
-	rtcpInterceptor           interceptor.RTCPReader
+	rtpReadStream   *srtp.ReadStreamSRTP
+	rtpInterceptor  interceptor.RTPReader
+	rtpReader       *srtpRTPReader
+	rtcpReadStream  *srtp.ReadStreamSRTCP
+	rtcpInterceptor interceptor.RTCPReader
 }
 
+// srtpRTPReader dispatches merged SRTP packets to their original SSRC's interceptors.
 type srtpRTPReader struct {
-	readStream *srtp.ReadStreamSRTP
+	readStream  *srtp.ReadStreamSRTP
+	ssrc        uint32
+	interceptor interceptor.RTPReader
+	packet      []byte
+	repair      atomic.Pointer[srtpRTPReader]
 }
 
 func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 	n, err := r.readStream.Read(in)
+	if err != nil {
+		return n, a, err
+	}
+	reader := r
+	if repair := r.repair.Load(); repair != nil && n >= 12 && binary.BigEndian.Uint32(in[8:12]) == repair.ssrc {
+		reader = repair
+	}
+	reader.packet = in[:n]
+	n, a, err = reader.interceptor.Read(in, a)
+	reader.packet = nil
 
 	return n, a, err
 }
@@ -772,8 +788,17 @@ func (t *DTLSTransport) streamsForSSRC(
 		return nil, err
 	}
 
-	rtpReader := &srtpRTPReader{readStream: rtpReadStream}
-	rtpInterceptor := t.api.interceptor.BindRemoteStream(&streamInfo, rtpReader)
+	// The packet is read once from SRTP, then passed through its SSRC's chain.
+	rtpReader := &srtpRTPReader{readStream: rtpReadStream, ssrc: uint32(ssrc)}
+	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(
+		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			if len(in) < len(rtpReader.packet) {
+				return 0, a, io.ErrShortBuffer
+			}
+
+			return copy(in, rtpReader.packet), a, nil
+		},
+	))
 
 	srtcpSession, err := t.getSRTCPSession()
 	if err != nil {
@@ -794,11 +819,11 @@ func (t *DTLSTransport) streamsForSSRC(
 	)
 
 	return &streamsForSSRCResult{
-		rtpReadStream:             rtpReadStream,
-		rtpInterceptor:            rtpInterceptor,
-		startRTPReaderImmediately: rtpInterceptor != rtpReader && t.api.settingEngine.BufferFactory == nil,
-		rtcpReadStream:            rtcpReadStream,
-		rtcpInterceptor:           rtcpInterceptor,
+		rtpReadStream:   rtpReadStream,
+		rtpInterceptor:  rtpReader,
+		rtpReader:       rtpReader,
+		rtcpReadStream:  rtcpReadStream,
+		rtcpInterceptor: rtcpInterceptor,
 	}, nil
 }
 

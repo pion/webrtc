@@ -11,7 +11,6 @@ import (
 	"io"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pion/interceptor"
@@ -26,8 +25,7 @@ type peekedPacket struct {
 
 // TrackRemote represents a single inbound source of media.
 type TrackRemote struct {
-	mu                  sync.RWMutex
-	repairReadRequested atomic.Bool
+	mu sync.RWMutex
 
 	id       string
 	streamID string
@@ -142,10 +140,6 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		return 0, nil, err
 	}
 
-	if t.repairReadRequested.CompareAndSwap(false, true) {
-		t.receiver.requestRepairStreamReader(t)
-	}
-
 	t.mu.Lock()
 	receiver := t.receiver
 	var peekedPkt *peekedPacket
@@ -164,15 +158,6 @@ func (t *TrackRemote) Read(b []byte) (n int, attributes interceptor.Attributes, 
 		err = t.checkAndUpdateTrack(b)
 
 		return n, peekedPkt.attributes, err
-	}
-
-	// If there's a separate RTX track and an RTX packet is available, return that
-	if rtxPacketReceived := receiver.readRTX(t); rtxPacketReceived != nil {
-		n = copy(b, rtxPacketReceived.pkt)
-		attributes = rtxPacketReceived.attributes
-		rtxPacketReceived.release()
-
-		return n, attributes, nil
 	}
 
 	n, attributes, err = receiver.readRTP(b, t)

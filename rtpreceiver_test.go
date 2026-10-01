@@ -12,7 +12,6 @@ import (
 	"math"
 	"os"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/logging"
 	"github.com/pion/rtp"
-	"github.com/pion/transport/v5/packetio"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -151,384 +149,12 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 	}
 	ridStreamInfo := &interceptor.StreamInfo{SSRC: 1111}
 	rtxStreamInfo := &interceptor.StreamInfo{SSRC: 2222}
-	readCalled := make(chan struct{}, 1)
-	rtpInterceptor := interceptor.RTPReaderFunc(
-		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			select {
-			case readCalled <- struct{}{}:
-			default:
-			}
+	track, err = receiver.receiveForRid("rid", params, ridStreamInfo, &streamsForSSRCResult{}, nil)
+	assert.Nil(t, track)
+	assert.ErrorIs(t, err, io.EOF)
 
-			return 0, a, io.EOF
-		},
-	)
-
-	for range 50 {
-		track, err := receiver.receiveForRid("rid", params, ridStreamInfo, &streamsForSSRCResult{}, nil)
-		assert.Nil(t, track)
-		assert.ErrorIs(t, err, io.EOF)
-
-		err = receiver.receiveForRtx(SSRC(0), "rid", rtxStreamInfo, &streamsForSSRCResult{rtpInterceptor: rtpInterceptor})
-		assert.ErrorIs(t, err, io.EOF)
-	}
-
-	select {
-	case <-readCalled:
-		assert.Fail(t, "repair reader invoked after Stop")
-	case <-time.After(100 * time.Millisecond):
-	}
-}
-
-func TestRTPReceiverRepairReaderPolicy(t *testing.T) {
-	for _, tt := range []struct {
-		name         string
-		customBuffer bool
-		wrapped      bool
-	}{
-		{name: "default buffer passthrough"},
-		{name: "default buffer wrapped", wrapped: true},
-		{name: "custom buffer passthrough", customBuffer: true},
-		{name: "custom buffer wrapped", customBuffer: true, wrapped: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			startImmediately := tt.wrapped && !tt.customBuffer
-			receiver, track := newRepairReaderPolicyTestReceiver(t, tt.customBuffer, 2222, nil)
-			var calls atomic.Int32
-			releaseReader := make(chan struct{})
-			t.Cleanup(func() { close(releaseReader) })
-			repairReader := interceptor.RTPReaderFunc(
-				func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-					calls.Add(1)
-					<-releaseReader
-
-					return 0, a, io.EOF
-				},
-			)
-			require.NoError(t, receiver.receiveForRtx(
-				2222, "", &interceptor.StreamInfo{SSRC: 2222},
-				&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: startImmediately},
-			))
-
-			repairReaderStarted := func() bool {
-				receiver.mu.RLock()
-				defer receiver.mu.RUnlock()
-
-				return receiver.tracks[0].repairReaderStarted
-			}
-			assert.Equal(t, startImmediately, repairReaderStarted())
-			if startImmediately {
-				require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
-			} else {
-				assert.Zero(t, calls.Load())
-			}
-
-			b := make([]byte, receiveMTU)
-			_, _, err := track.Read(b)
-			require.NoError(t, err)
-			assert.True(t, repairReaderStarted())
-			require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
-
-			_, _, err = track.Read(b)
-			require.NoError(t, err)
-			assert.Never(t, func() bool { return calls.Load() > 1 }, 25*time.Millisecond, time.Millisecond)
-		})
-	}
-}
-
-func TestTrackRemoteReadUsesEagerRepairChannel(t *testing.T) {
-	var primaryCalls atomic.Int32
-	primaryReader := interceptor.RTPReaderFunc(
-		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			primaryCalls.Add(1)
-
-			return copy(b, []byte{
-				0x80, 96, 0, 1, 0, 0, 0, 0, 0, 0, 0x04, 0x57, 0xAA,
-			}), a, nil
-		},
-	)
-	receiver, track := newRepairReaderPolicyTestReceiver(t, false, 2222, primaryReader)
-	var repairCalls atomic.Int32
-	repairReader := interceptor.RTPReaderFunc(
-		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			if repairCalls.Add(1) != 1 {
-				return 0, a, io.EOF
-			}
-
-			return copy(b, []byte{
-				0x80, 97, 0x13, 0x88, 0, 0, 0, 0, 0, 0, 0x08, 0xAE,
-				0x04, 0xD2, 0xA1,
-			}), a, nil
-		},
-	)
-	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222},
-		&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: true},
-	))
-	require.Eventually(t, func() bool {
-		receiver.mu.RLock()
-		defer receiver.mu.RUnlock()
-
-		return len(receiver.tracks[0].repairStreamChannel) == 1
-	}, time.Second, time.Millisecond)
-
-	packet, _, err := track.ReadRTP()
-	require.NoError(t, err)
-	require.NotNil(t, packet)
-	assert.Equal(t, uint16(1234), packet.SequenceNumber)
-	assert.Equal(t, []byte{0xA1}, packet.Payload)
-	assert.Zero(t, primaryCalls.Load())
-}
-
-func TestRTPReceiverLateRepairBindAfterTrackRead(t *testing.T) {
-	receiver, track := newRepairReaderPolicyTestReceiver(t, true, 0, nil)
-	_, _, err := track.Read(make([]byte, receiveMTU))
-	require.NoError(t, err)
-
-	var calls atomic.Int32
-	releaseReader := make(chan struct{})
-	t.Cleanup(func() { close(releaseReader) })
-	repairReader := interceptor.RTPReaderFunc(
-		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			calls.Add(1)
-			<-releaseReader
-
-			return 0, a, io.EOF
-		},
-	)
-	require.NoError(t, receiver.receiveForRtx(
-		0, "rid", &interceptor.StreamInfo{SSRC: 2222},
-		&streamsForSSRCResult{rtpInterceptor: repairReader},
-	))
-
-	receiver.mu.RLock()
-	started := receiver.tracks[0].repairReaderStarted
-	receiver.mu.RUnlock()
-	assert.True(t, started)
-	require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
-}
-
-func TestRTPReceiverRIDRepairReaderStartsForPrimaryWrapper(t *testing.T) {
-	for _, primaryFirst := range []bool{true, false} {
-		name := "RTX first"
-		if primaryFirst {
-			name = "primary first"
-		}
-		t.Run(name, func(t *testing.T) {
-			api := NewAPI()
-			receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, &DTLSTransport{api: api})
-			require.NoError(t, err)
-			receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{
-				RTPCodingParameters: RTPCodingParameters{RID: "rid"},
-			}}})
-			close(receiver.received)
-			t.Cleanup(func() {
-				assert.NoError(t, receiver.Stop())
-			})
-
-			var repairCalls atomic.Int32
-			releaseReader := make(chan struct{})
-			t.Cleanup(func() { close(releaseReader) })
-			repairReader := interceptor.RTPReaderFunc(
-				func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-					repairCalls.Add(1)
-					<-releaseReader
-
-					return 0, a, io.EOF
-				},
-			)
-			params := RTPParameters{Codecs: []RTPCodecParameters{{
-				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
-				PayloadType:        96,
-			}}}
-			bindPrimary := func() error {
-				_, bindErr := receiver.receiveForRid(
-					"rid", params, &interceptor.StreamInfo{SSRC: 1111},
-					&streamsForSSRCResult{rtpInterceptor: interceptor.RTPReaderFunc(nil), startRTPReaderImmediately: true}, nil,
-				)
-
-				return bindErr
-			}
-			bindRTX := func() error {
-				return receiver.receiveForRtx(
-					0, "rid", &interceptor.StreamInfo{SSRC: 2222},
-					&streamsForSSRCResult{rtpInterceptor: repairReader},
-				)
-			}
-
-			first, second := bindRTX, bindPrimary
-			if primaryFirst {
-				first, second = bindPrimary, bindRTX
-			}
-			require.NoError(t, first())
-			receiver.mu.RLock()
-			startedAfterFirstBind := receiver.tracks[0].repairReaderStarted
-			receiver.mu.RUnlock()
-			assert.False(t, startedAfterFirstBind)
-			assert.Zero(t, repairCalls.Load())
-
-			require.NoError(t, second())
-			track := receiver.Track()
-			require.NotNil(t, track)
-			assert.False(t, track.repairReadRequested.Load())
-			receiver.mu.RLock()
-			started := receiver.tracks[0].repairReaderStarted
-			startImmediately := receiver.tracks[0].startRepairReaderImmediately
-			receiver.mu.RUnlock()
-			assert.True(t, startImmediately)
-			assert.True(t, started)
-			require.Eventually(t, func() bool { return repairCalls.Load() == 1 }, time.Second, time.Millisecond)
-		})
-	}
-}
-
-func TestRTPReceiverReadAfterStopDoesNotStartRepairReader(t *testing.T) {
-	receiver, track := newRepairReaderPolicyTestReceiver(t, true, 2222, nil)
-	var calls atomic.Int32
-	repairReader := interceptor.RTPReaderFunc(
-		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			calls.Add(1)
-
-			return 0, a, io.EOF
-		},
-	)
-	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222},
-		&streamsForSSRCResult{rtpInterceptor: repairReader},
-	))
-	require.NoError(t, receiver.Stop())
-
-	_, _, err := track.Read(make([]byte, receiveMTU))
-	require.ErrorIs(t, err, io.EOF)
-	receiver.mu.RLock()
-	started := receiver.tracks[0].repairReaderStarted
-	receiver.mu.RUnlock()
-	assert.False(t, started)
-	assert.Zero(t, calls.Load())
-}
-
-func newRepairReaderPolicyTestReceiver(
-	t *testing.T,
-	customBuffer bool,
-	rtxSSRC SSRC,
-	primaryReader interceptor.RTPReader,
-) (*RTPReceiver, *TrackRemote) {
-	t.Helper()
-
-	transportSettings := SettingEngine{}
-	if customBuffer {
-		transportSettings.BufferFactory = func(packetio.BufferPacketType, uint32) io.ReadWriteCloser {
-			return nil
-		}
-	}
-	transportAPI := NewAPI(WithSettingEngine(transportSettings))
-	receiverAPI := NewAPI()
-	receiver, err := receiverAPI.NewRTPReceiver(
-		RTPCodecTypeVideo,
-		&DTLSTransport{api: transportAPI},
-	)
-	require.NoError(t, err)
-
-	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{
-		RTPCodingParameters: RTPCodingParameters{
-			RID:  "rid",
-			SSRC: 1111,
-			RTX:  RTPRtxParameters{SSRC: rtxSSRC},
-		},
-	}}})
-	if primaryReader == nil {
-		primaryReader = interceptor.RTPReaderFunc(
-			func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-				return copy(b, []byte{
-					0x80, 96, 0, 1, 0, 0, 0, 0, 0, 0, 0x04, 0x57, 0xAA,
-				}), a, nil
-			},
-		)
-	}
-	params := RTPParameters{Codecs: []RTPCodecParameters{{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
-		PayloadType:        96,
-	}}}
-	track, err := receiver.receiveForRid(
-		"rid", params, &interceptor.StreamInfo{SSRC: 1111},
-		&streamsForSSRCResult{rtpInterceptor: primaryReader}, nil,
-	)
-	require.NoError(t, err)
-	close(receiver.received)
-	t.Cleanup(func() {
-		assert.NoError(t, receiver.Stop())
-	})
-
-	return receiver, track
-}
-
-func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
-	receiver := &RTPReceiver{
-		kind:       RTPCodecTypeVideo,
-		received:   make(chan any),
-		closedChan: make(chan struct{}),
-		rtxPool: sync.Pool{New: func() any {
-			return make([]byte, 1200)
-		}},
-	}
-
-	receiver.configureReceive(RTPReceiveParameters{
-		Encodings: []RTPDecodingParameters{
-			{
-				RTPCodingParameters: RTPCodingParameters{
-					RID:  "rid",
-					SSRC: 1111,
-					RTX: RTPRtxParameters{
-						SSRC: 2222,
-					},
-				},
-			},
-		},
-	})
-
-	params := RTPParameters{
-		Codecs: []RTPCodecParameters{
-			{
-				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
-				PayloadType:        96,
-			},
-		},
-	}
-	ridStreamInfo := &interceptor.StreamInfo{SSRC: 1111}
-	track, err := receiver.receiveForRid("rid", params, ridStreamInfo, &streamsForSSRCResult{}, nil)
-	require.NoError(t, err)
-
-	close(receiver.received)
-
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-				_ = receiver.readRTX(track)
-			}
-		}
-	}()
-
-	repairStreamInfo := &interceptor.StreamInfo{SSRC: 2222}
-	rtpInterceptor := interceptor.RTPReaderFunc(
-		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			return 0, a, io.EOF
-		},
-	)
-
-	for range 50 {
-		require.NoError(t, receiver.receiveForRtx(
-			SSRC(2222), "", repairStreamInfo,
-			&streamsForSSRCResult{rtpInterceptor: rtpInterceptor},
-		))
-	}
-
-	close(stop)
-	<-done
+	err = receiver.receiveForRtx(SSRC(0), "rid", rtxStreamInfo, &streamsForSSRCResult{})
+	assert.ErrorIs(t, err, io.EOF)
 }
 
 func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
@@ -536,9 +162,6 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		kind:       RTPCodecTypeVideo,
 		received:   make(chan any),
 		closedChan: make(chan struct{}),
-		rtxPool: sync.Pool{New: func() any {
-			return make([]byte, 1200)
-		}},
 	}
 
 	receiver.configureReceive(RTPReceiveParameters{
@@ -871,18 +494,13 @@ func TestRTPReceiverRTXStreamInfoMimeType(t *testing.T) {
 			}
 
 			// Collect the final readers and StreamInfos bound on the receiver side.
-			var (
-				boundStreamInfos        []*interceptor.StreamInfo
-				readerWrappedByMimeType = map[string]bool{}
-			)
+			var boundStreamInfos []*interceptor.StreamInfo
 			mockInterceptor := &mock_interceptor.Interceptor{
 				BindRemoteStreamFn: func(
 					info *interceptor.StreamInfo,
 					reader interceptor.RTPReader,
 				) interceptor.RTPReader {
 					boundStreamInfos = append(boundStreamInfos, info)
-					_, passthrough := reader.(*srtpRTPReader)
-					readerWrappedByMimeType[info.MimeType] = !passthrough
 
 					return reader
 				},
@@ -940,16 +558,11 @@ func TestRTPReceiverRTXStreamInfoMimeType(t *testing.T) {
 			assert.Equal(t, 1, rtxCount,
 				"expected exactly one RTX StreamInfo with MimeType %q, got %d (all types: %v)",
 				MimeTypeRTX, rtxCount, mimeTypes(boundStreamInfos))
-			assert.Equal(t, tt.configureNack, readerWrappedByMimeType[MimeTypeVP8], "primary reader wrapper")
-			assert.False(t, readerWrappedByMimeType[MimeTypeRTX], "RTX reader wrapper")
-
 			rtpReceiver := <-rtpReceiverReceived
 			rtpReceiver.mu.RLock()
-			trackCount := len(rtpReceiver.tracks)
-			repairReaderStarted := trackCount == 1 && rtpReceiver.tracks[0].repairReaderStarted
+			require.Len(t, rtpReceiver.tracks, 1)
+			assert.Same(t, rtpReceiver.tracks[0].repairReader, rtpReceiver.tracks[0].rtpReader.repair.Load())
 			rtpReceiver.mu.RUnlock()
-			require.Equal(t, 1, trackCount)
-			assert.Equal(t, tt.configureNack, repairReaderStarted)
 		})
 	}
 }
@@ -1011,56 +624,57 @@ func TestRTPReceiver_CollectStats_RID(t *testing.T) {
 	assert.Equal(t, rid, inbound.Rid)
 }
 
-func TestRTPReceiverRepairReaderMalformedPacketNoPanic(t *testing.T) {
-	receiver, track := newRepairReaderPolicyTestReceiver(t, false, 2222, nil)
+func TestRTPReceiverRTXMalformedPacketNoPanic(t *testing.T) {
+	api := NewAPI()
+	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, &DTLSTransport{api: api})
+	require.NoError(t, err)
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{
+		RTPCodingParameters: RTPCodingParameters{SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}},
+	}}})
+	track := receiver.Track()
+	close(receiver.received)
+	t.Cleanup(func() { assert.NoError(t, receiver.Stop()) })
 
-	var reads atomic.Int32
+	packets := [][]byte{
+		nil, // Empty read with stale buffer contents.
+		{0x90, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x08, 0xAE},          // Truncated extension.
+		{0xA0, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x08, 0xAE, 0, 1, 0}, // Zero padding length.
+		{0xA0, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x08, 0xAE, 0, 1, 4}, // Padding exceeds payload.
+		{0xA0, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x08, 0xAE, 0, 1},    // Padding leaves a short OSN.
+		{
+			// Valid RTX with CSRC, extra extension padding, marker, and two bytes of RTP padding.
+			0xB1, 0xE1, 0x13, 0x88, 0, 0, 0, 0, 0, 0, 0x08, 0xAE,
+			1, 2, 3, 4, 0xBE, 0xDE, 0, 2, 0x10, 0x42, 0, 0, 0, 0, 0, 0,
+			0x04, 0xD2, 0xA1, 0, 2,
+		},
+	}
 	repairReader := interceptor.RTPReaderFunc(
 		func(b []byte, attributes interceptor.Attributes) (int, interceptor.Attributes, error) {
-			switch reads.Add(1) {
-			case 1:
-				// Zero-length read whose buffer holds garbage (as if recycled
-				// from a prior packet). Without an i == 0 guard the padding
-				// length read b[i-1] is b[-1] -> panic.
-				b[0] = 0xA0 // padding + extension bits set
-
-				return 0, attributes, nil
-			case 2:
-				// Truncated packet: extension bit set (0x90) but only 12 bytes,
-				// shorter than the fixed header + extension header. Without a
-				// length guard the extension length field is parsed from bytes
-				// beyond the packet.
-				return copy(b, []byte{
-					0x90, 97, 0, 1, 0, 0, 0, 0, 0, 0, 0x04, 0x57,
-				}), attributes, nil
-			case 3:
-				// Valid RTX packet: OSN 0x04D2 -> sequence number 1234, payload 0xA1.
-				return copy(b, []byte{
-					0x80, 97, 0x13, 0x88, 0, 0, 0, 0, 0, 0, 0x08, 0xAE,
-					0x04, 0xD2, 0xA1,
-				}), attributes, nil
-			default:
-				// Stop the repair reader once the valid packet was forwarded.
+			if len(packets) == 0 {
 				return 0, attributes, io.EOF
 			}
+			b[0] = 0xA0
+			n := copy(b, packets[0])
+			packets = packets[1:]
+
+			return n, attributes, nil
 		},
 	)
-	require.NoError(t, receiver.receiveForRtx(
-		2222, "", &interceptor.StreamInfo{SSRC: 2222},
-		&streamsForSSRCResult{rtpInterceptor: repairReader, startRTPReaderImmediately: true},
-	))
 
-	// The malformed packets must be skipped and the valid packet still forwarded.
-	require.Eventually(t, func() bool {
-		receiver.mu.RLock()
-		defer receiver.mu.RUnlock()
+	receiver.tracks[0].rtpInterceptor = repairReader
 
-		return len(receiver.tracks[0].repairStreamChannel) == 1
-	}, time.Second, time.Millisecond)
-
-	packet, _, err := track.ReadRTP()
+	packet, attributes, err := track.ReadRTP()
 	require.NoError(t, err)
 	require.NotNil(t, packet)
+	assert.Equal(t, uint8(96), packet.PayloadType)
+	assert.Equal(t, uint32(1111), packet.SSRC)
+	assert.Equal(t, uint8(97), attributes.Get(AttributeRtxPayloadType))
+	assert.Equal(t, uint16(5000), attributes.Get(AttributeRtxSequenceNumber))
+	assert.Equal(t, uint32(2222), attributes.Get(AttributeRtxSsrc))
 	assert.Equal(t, uint16(1234), packet.SequenceNumber)
+	assert.True(t, packet.Marker)
+	assert.Equal(t, []uint32{0x01020304}, packet.CSRC)
+	assert.Equal(t, []byte{0x42}, packet.GetExtension(1))
+	assert.Equal(t, byte(2), packet.Header.PaddingSize)
 	assert.Equal(t, []byte{0xA1}, packet.Payload)
 }
