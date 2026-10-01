@@ -589,7 +589,8 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 	serverOpts = append(serverOpts,
 		dtls.WithClientAuth(clientAuth),
 		dtls.WithClientCAs(t.api.settingEngine.dtls.clientCAs),
-		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify),
+		// ICE already validated the address for SPED.
+		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify || t.api.settingEngine.enableSped),
 	)
 
 	if t.api.settingEngine.dtls.serverHelloMessageHook != nil {
