@@ -2015,8 +2015,8 @@ type TransportStats struct {
 	// Present only if DTLS is negotiated.
 	RemoteCertificateID string `json:"remoteCertificateId"`
 
-	// TLSVersion is the negotiated protocol version as four uppercase hexadecimal digits.
-	// It is empty until DTLS negotiation completes. Value is always "FEFD" (DTLS 1.2)
+	// TLSVersion is the negotiated DTLS version as four uppercase hexadecimal digits.
+	// It is omitted from JSON until DTLS negotiation completes.
 	TLSVersion string `json:"tlsVersion,omitempty"`
 
 	// DTLSCipher is the descriptive name of the cipher suite used for the DTLS transport,

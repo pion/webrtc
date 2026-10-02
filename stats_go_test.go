@@ -1202,10 +1202,10 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport) TransportStats {
 	t.Helper()
 
-	stats, ok := report[statsID]
+	stats, ok := report["iceTransport"]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)

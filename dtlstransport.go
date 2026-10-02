@@ -47,6 +47,9 @@ type DTLSTransport struct {
 	remoteCertificate     []byte
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
+	tlsVersion            string
+	dtlsCipher            string
+	srtpCipher            string
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
 
@@ -236,6 +239,10 @@ func (t *DTLSTransport) wantSRTP() error {
 
 // startSRTP requires the caller holds the lock.
 func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
+	connState, ok := t.conn.ConnectionState()
+	if !ok {
+		return errDtlsKeyExtractionFailed
+	}
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		BufferFactory: t.api.settingEngine.BufferFactory,
@@ -278,12 +285,6 @@ func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
 			srtpConfig.RemoteOptions,
 			srtp.SRTCPNoReplayProtection(),
 		)
-	}
-
-	connState, ok := t.dtlsConn.ConnectionState()
-	if !ok {
-		// nolint
-		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
 	}
 
 	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.roleLocked() == DTLSRoleClient)
@@ -660,12 +661,23 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	if t.state == DTLSTransportStateClosed {
 		return io.ErrClosedPipe
 	}
+	connState, ok := dtlsConn.ConnectionState()
+	if !ok { // never fire in practice.
+		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+	}
+	t.tlsVersion = fmt.Sprintf("%04X", connState.NegotiatedVersion())
+	t.dtlsCipher = connState.CipherSuiteID.String()
+	t.srtpCipher = ""
 	if err != nil {
 		return err
 	}
 	t.srtpProtectionProfile = srtpProtectionProfile
-	if err = t.startSRTP(); err != nil {
-		return err
+	t.srtpCipher = srtpProtectionProfile.String()
+	t.srtpCanStart = true
+	if t.srtpWanted {
+		if err = t.startSRTP(); err != nil {
+			return err
+		}
 	}
 	t.onStateChange(DTLSTransportStateConnected)
 
@@ -902,21 +914,20 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
 }
 
+// updateStats adds cached DTLS information to the underlying ICE transport stats.
+func (t *DTLSTransport) updateStats(stats *TransportStats) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	stats.DTLSState = t.state
+	stats.TLSVersion = t.tlsVersion
+	stats.DTLSCipher = t.dtlsCipher
+	stats.SRTPCipher = t.srtpCipher
+}
+
 func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
 	stats := t.iceTransport.Stats()
-
-	t.lock.RLock()
-	stats.DTLSState = t.state
-	if t.conn != nil {
-		// Pion WebRTC@v4 only negotiates DTLS 1.2.
-		stats.TLSVersion = "FEFD"
-		stats.SRTPCipher = t.srtpProtectionProfile.String()
-		if state, ok := t.conn.ConnectionState(); ok {
-			stats.DTLSCipher = dtls.CipherSuiteName(state.CipherSuiteID)
-		}
-	}
-	t.lock.RUnlock()
-
+	t.updateStats(&stats)
 	collector.Collect(stats.ID, stats)
 }
