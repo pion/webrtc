@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -434,6 +435,8 @@ func (t *DTLSTransport) start(
 				RemoteAddr:       t.iceTransport.remoteAddr,
 				SetWriteDeadline: t.iceTransport.setWriteDeadline,
 			},
+			Piggyback:       t.piggybackFunc(),
+			OnHandshakeDone: t.onHandshakeDoneFunc(),
 			OnClose: func() {
 				go func() {
 					<-startFinished.Done()
@@ -485,6 +488,11 @@ func (t *DTLSTransport) dtlsSharedOptions(certificate tls.Certificate) []dtls.Op
 			sharedOpts,
 			dtls.WithFlightInterval(t.api.settingEngine.dtls.retransmissionInterval),
 		)
+	}
+
+	if t.api.settingEngine.enableSped {
+		// Small enough for post-quantum handshake datagrams to fit into STUN, like libwebrtc.
+		sharedOpts = append(sharedOpts, dtls.WithMTU(spedDTLSMTU))
 	}
 
 	if t.api.settingEngine.replayProtection.DTLS != nil {
@@ -565,7 +573,7 @@ func (t *DTLSTransport) connectDTLS(
 			t.iceTransport.State() == ICETransportStateFailed {
 			return nil, io.ErrClosedPipe
 		}
-		if addr := t.iceTransport.remoteAddr(); addr != nil {
+		if addr := t.dtlsRemoteAddr(); addr != nil {
 			if role == DTLSRoleClient {
 				return dtls.DetachedClient(addr, t.toDTLSClientOptions(opts)...)
 			}
@@ -594,7 +602,8 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 	serverOpts = append(serverOpts,
 		dtls.WithClientAuth(clientAuth),
 		dtls.WithClientCAs(t.api.settingEngine.dtls.clientCAs),
-		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify),
+		// ICE already validated the address for SPED.
+		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify || t.api.settingEngine.enableSped),
 	)
 
 	if t.api.settingEngine.dtls.serverHelloMessageHook != nil {
@@ -628,6 +637,40 @@ func (t *DTLSTransport) toDTLSClientOptions(sharedOpts []dtls.Option) []dtls.Cli
 	}
 
 	return clientOpts
+}
+
+// spedDTLSMTU leaves room for the STUN overhead.
+const spedDTLSMTU = 900
+
+// spedRemoteAddr stands in until ICE selects a pair.
+var spedRemoteAddr = &net.UDPAddr{} //nolint:gochecknoglobals
+
+func (t *DTLSTransport) dtlsRemoteAddr() net.Addr {
+	if addr := t.iceTransport.remoteAddr(); addr != nil || !t.api.settingEngine.enableSped {
+		return addr
+	}
+
+	return spedRemoteAddr
+}
+
+func (t *DTLSTransport) piggybackFunc() func([][]byte) bool {
+	if !t.api.settingEngine.enableSped {
+		return nil
+	}
+
+	return t.iceTransport.piggyback
+}
+
+func (t *DTLSTransport) onHandshakeDoneFunc() func(*dtls.DetachedConn) {
+	if !t.api.settingEngine.enableSped {
+		return nil
+	}
+
+	return func(conn *dtls.DetachedConn) {
+		if state, ok := conn.ConnectionState(); ok {
+			t.iceTransport.setDTLSHandshakeComplete(state.Role() == dtls.RoleClient, state.NegotiatedVersion())
+		}
+	}
 }
 
 func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {

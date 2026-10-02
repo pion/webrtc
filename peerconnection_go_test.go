@@ -4398,3 +4398,44 @@ func TestCryptexAnswerWithTagOnlyCryptexIsAccepted(t *testing.T) {
 	waitForSRTPReady(t, pcOffer)
 	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
 }
+
+func TestWarp(t *testing.T) {
+	s := SettingEngine{}
+	s.EnableSped(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPair(offer, answer))
+	<-peerConnectionsConnected
+
+	closePairNow(t, offer, answer)
+}
+
+func TestWarpClient(t *testing.T) {
+	s := SettingEngine{}
+	s.EnableSped(true)
+	api := NewAPI(WithSettingEngine(s))
+
+	offer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	answer, err := api.NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	assert.NoError(t, signalPairWithModification(
+		offer, answer,
+		func(sessionDescription string) string {
+			return strings.ReplaceAll(
+				sessionDescription,
+				"setup:actpass",
+				"setup:active")
+		}))
+	<-peerConnectionsConnected
+
+	closePairNow(t, offer, answer)
+}

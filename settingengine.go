@@ -118,6 +118,7 @@ type SettingEngine struct {
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
+	enableSped                                bool
 }
 
 type renominationSettings struct {
@@ -706,4 +707,10 @@ func (e *SettingEngine) SetHandleUndeclaredSSRCWithoutAnswer(handleUndeclaredSSR
 // (simulcast layer).
 func (e *SettingEngine) SetIgnoreRidPauseForRecv(ignoreRidPauseForRecv bool) {
 	e.ignoreRidPauseForRecv = ignoreRidPauseForRecv
+}
+
+// EnableSped enables SPED (STUN Protocol for Embedding DTLS) which carries
+// the DTLS handshake in ICE connectivity checks.
+func (e *SettingEngine) EnableSped(enable bool) {
+	e.enableSped = enable
 }
