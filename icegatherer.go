@@ -642,7 +642,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
 				Type:          StatsTypeLocalCandidate,
-				IP:            candidateStats.IP,
+				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,
@@ -670,7 +670,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
 				Type:          StatsTypeRemoteCandidate,
-				IP:            candidateStats.IP,
+				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
 				Protocol:      networkType.Protocol(),
 				CandidateType: candidateType,
