@@ -57,7 +57,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		Type:           StatsTypeCodec,
 		ID:             "COT01_111_minptime=10;useinbandfec=1",
 		PayloadType:    111,
-		CodecType:      CodecTypeEncode,
 		TransportID:    "T01",
 		MimeType:       "audio/opus",
 		ClockRate:      48000,
@@ -71,7 +70,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 	"type": "codec",
 	"id": "COT01_111_minptime=10;useinbandfec=1",
 	"payloadType": 111,
-	"codecType": "encode",
 	"transportId": "T01",
 	"mimeType": "audio/opus",
 	"clockRate": 48000,
@@ -105,31 +103,18 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		AudioLevel:                     34,
 		TotalAudioEnergy:               35,
 		TotalSamplesDuration:           36,
-		SLICount:                       4,
 		PacketsReceived:                6,
 		PacketsLost:                    7,
 		Jitter:                         8,
 		PacketsDiscarded:               9,
-		PacketsRepaired:                10,
-		BurstPacketsLost:               11,
-		BurstPacketsDiscarded:          12,
-		BurstLossCount:                 13,
-		BurstDiscardCount:              14,
-		BurstLossRate:                  15,
-		BurstDiscardRate:               16,
-		GapLossRate:                    17,
-		GapDiscardRate:                 18,
 		TrackIdentifier:                "d57dbc4b-484b-4b40-9088-d3150e3a2010",
 		ReceiverID:                     "R01",
 		RemoteID:                       "ROA2184088143",
 		LastPacketReceivedTimestamp:    1689668364374.181,
 		HeaderBytesReceived:            45,
-		AverageRTCPInterval:            18,
 		FECPacketsReceived:             19,
 		FECPacketsDiscarded:            46,
 		BytesReceived:                  20,
-		PacketsFailedDecryption:        21,
-		PacketsDuplicated:              22,
 		PerDSCPPacketsReceived: map[string]uint32{
 			"123": 23,
 		},
@@ -164,31 +149,18 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "audioLevel": 34,
   "totalAudioEnergy": 35,
   "totalSamplesDuration": 36,
-  "sliCount": 4,
   "packetsReceived": 6,
   "packetsLost": 7,
   "jitter": 8,
   "packetsDiscarded": 9,
-  "packetsRepaired": 10,
-  "burstPacketsLost": 11,
-  "burstPacketsDiscarded": 12,
-  "burstLossCount": 13,
-  "burstDiscardCount": 14,
-  "burstLossRate": 15,
-  "burstDiscardRate": 16,
-  "gapLossRate": 17,
-  "gapDiscardRate": 18,
   "trackIdentifier": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
   "receiverId": "R01",
   "remoteId": "ROA2184088143",
   "lastPacketReceivedTimestamp": 1689668364374.181,
   "headerBytesReceived": 45,
-  "averageRtcpInterval": 18,
   "fecPacketsReceived": 19,
   "fecPacketsDiscarded": 46,
   "bytesReceived": 20,
-  "packetsFailedDecryption": 21,
-  "packetsDuplicated": 22,
   "perDscpPacketsReceived": {
     "123": 23
   },
@@ -215,13 +187,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		FIRCount:                 1,
 		PLICount:                 2,
 		NACKCount:                3,
-		SLICount:                 4,
 		QPSum:                    5,
 		PacketsSent:              6,
-		PacketsDiscardedOnSend:   7,
-		FECPacketsSent:           8,
 		BytesSent:                9,
-		BytesDiscardedOnSend:     10,
 		TrackID:                  "d57dbc4b-484b-4b40-9088-d3150e3a2010",
 		SenderID:                 "S01",
 		RemoteID:                 "ROA2184088143",
@@ -237,7 +205,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		KeyFramesEncoded:         33,
 		TotalEncodeTime:          14,
 		TotalPacketSendDelay:     34,
-		AverageRTCPInterval:      15,
 		QualityLimitationReason:  "cpu",
 		QualityLimitationDurations: map[string]float64{
 			"none":      16,
@@ -272,13 +239,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "firCount": 1,
   "pliCount": 2,
   "nackCount": 3,
-  "sliCount": 4,
   "qpSum": 5,
   "packetsSent": 6,
-  "packetsDiscardedOnSend": 7,
-  "fecPacketsSent": 8,
   "bytesSent": 9,
-  "bytesDiscardedOnSend": 10,
   "trackId": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
   "senderId": "S01",
   "remoteId": "ROA2184088143",
@@ -294,7 +257,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "keyFramesEncoded": 33,
   "totalEncodeTime": 14,
   "totalPacketSendDelay": 34,
-  "averageRtcpInterval": 15,
   "qualityLimitationReason": "cpu",
   "qualityLimitationDurations": {
     "none": 16,
@@ -323,21 +285,11 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		FIRCount:                  1,
 		PLICount:                  2,
 		NACKCount:                 3,
-		SLICount:                  4,
 		QPSum:                     5,
 		PacketsReceived:           6,
 		PacketsLost:               7,
 		Jitter:                    8,
 		PacketsDiscarded:          9,
-		PacketsRepaired:           10,
-		BurstPacketsLost:          11,
-		BurstPacketsDiscarded:     12,
-		BurstLossCount:            13,
-		BurstDiscardCount:         14,
-		BurstLossRate:             15,
-		BurstDiscardRate:          16,
-		GapLossRate:               17,
-		GapDiscardRate:            18,
 		LocalID:                   "RIA2184088143",
 		RoundTripTime:             19,
 		TotalRoundTripTime:        21,
@@ -356,21 +308,11 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "firCount": 1,
   "pliCount": 2,
   "nackCount": 3,
-  "sliCount": 4,
   "qpSum": 5,
   "packetsReceived": 6,
   "packetsLost": 7,
   "jitter": 8,
   "packetsDiscarded": 9,
-  "packetsRepaired": 10,
-  "burstPacketsLost": 11,
-  "burstPacketsDiscarded": 12,
-  "burstLossCount": 13,
-  "burstDiscardCount": 14,
-  "burstLossRate": 15,
-  "burstDiscardRate": 16,
-  "gapLossRate": 17,
-  "gapDiscardRate": 18,
   "localId": "RIA2184088143",
   "roundTripTime": 19,
   "totalRoundTripTime": 21,
@@ -389,13 +331,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		FIRCount:                  1,
 		PLICount:                  2,
 		NACKCount:                 3,
-		SLICount:                  4,
 		QPSum:                     5,
 		PacketsSent:               1259,
-		PacketsDiscardedOnSend:    6,
-		FECPacketsSent:            7,
 		BytesSent:                 92654,
-		BytesDiscardedOnSend:      8,
 		LocalID:                   "IT01A2184088143",
 		RemoteTimestamp:           1689668361298,
 		ReportsSent:               9,
@@ -415,39 +353,15 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "firCount": 1,
   "pliCount": 2,
   "nackCount": 3,
-  "sliCount": 4,
   "qpSum": 5,
   "packetsSent": 1259,
-  "packetsDiscardedOnSend": 6,
-  "fecPacketsSent": 7,
   "bytesSent": 92654,
-  "bytesDiscardedOnSend": 8,
   "localId": "IT01A2184088143",
   "remoteTimestamp": 1689668361298,
   "reportsSent": 9,
   "roundTripTime": 10,
   "totalRoundTripTime": 11,
   "roundTripTimeMeasurements": 12
-}
-`
-	csrcStats := RTPContributingSourceStats{
-		Timestamp:            1688978831527.718,
-		Type:                 StatsTypeCSRC,
-		ID:                   "ROA2184088143",
-		ContributorSSRC:      2184088143,
-		InboundRTPStreamID:   "IT01A2184088143",
-		PacketsContributedTo: 5,
-		AudioLevel:           0.3,
-	}
-	csrcStatsJSON := `
-{
-  "timestamp": 1688978831527.718,
-  "type": "csrc",
-  "id": "ROA2184088143",
-  "contributorSsrc": 2184088143,
-  "inboundRtpStreamId": "IT01A2184088143",
-  "packetsContributedTo": 5,
-  "audioLevel": 0.3
 }
 `
 	audioSourceStats := AudioSourceStats{
@@ -1014,11 +928,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 			name:  "remote_outbound_rtp_stream_stats",
 			stats: remoteOutboundRTPStreamStats,
 			json:  remoteOutboundRTPStreamStatsJSON,
-		},
-		{
-			name:  "rtp_contributing_source_stats",
-			stats: csrcStats,
-			json:  csrcStatsJSON,
 		},
 		{
 			name:  "audio_source_stats",
@@ -1718,18 +1627,6 @@ func TestUnmarshalRemoteOutboundRTPStreamStats_ErrorWrap(t *testing.T) {
 	require.Error(t, err)
 
 	assert.ErrorContains(t, err, "unmarshal remote outbound rtp stream stats:")
-
-	var ute *json.UnmarshalTypeError
-	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")
-}
-
-func TestUnmarshalCSRCStats_ErrorWrap(t *testing.T) {
-	bad := []byte(`{"packetsContributedTo":"nope"}`)
-
-	_, err := unmarshalCSRCStats(bad)
-	require.Error(t, err)
-
-	assert.ErrorContains(t, err, "unmarshal csrc stats:")
 
 	var ute *json.UnmarshalTypeError
 	assert.True(t, errors.As(err, &ute), "expected underlying error to be *json.UnmarshalTypeError")

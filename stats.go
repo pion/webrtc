@@ -41,8 +41,6 @@ func UnmarshalStatsJSON(b []byte) (Stats, error) { //nolint:cyclop
 		return unmarshalRemoteInboundRTPStreamStats(b)
 	case StatsTypeRemoteOutboundRTP:
 		return unmarshalRemoteOutboundRTPStreamStats(b)
-	case StatsTypeCSRC:
-		return unmarshalCSRCStats(b)
 	case StatsTypeMediaSource:
 		return unmarshalMediaSourceStats(b)
 	case StatsTypeMediaPlayout:
@@ -92,9 +90,6 @@ const (
 
 	// StatsTypeRemoteOutboundRTP is used by RemoteOutboundRTPStreamStats.
 	StatsTypeRemoteOutboundRTP StatsType = "remote-outbound-rtp"
-
-	// StatsTypeCSRC is used by RTPContributingSourceStats.
-	StatsTypeCSRC StatsType = "csrc"
 
 	// StatsTypeMediaSource is used by AudioSourceStats or VideoSourceStats depending on kind.
 	StatsTypeMediaSource = "media-source"
@@ -231,20 +226,6 @@ func (src *statsReportCollector) Ready() StatsReport {
 	return src.report
 }
 
-// CodecType specifies whether a CodecStats objects represents a media format
-// that is being encoded or decoded.
-type CodecType string
-
-const (
-	// CodecTypeEncode means the attached CodecStats represents a media format that
-	// is being encoded, or that the implementation is prepared to encode.
-	CodecTypeEncode CodecType = "encode"
-
-	// CodecTypeDecode means the attached CodecStats represents a media format
-	// that the implementation is prepared to decode.
-	CodecTypeDecode CodecType = "decode"
-)
-
 // CodecStats contains statistics for a codec that is currently being used by RTP streams
 // being sent or received by this PeerConnection object.
 type CodecStats struct {
@@ -261,9 +242,6 @@ type CodecStats struct {
 
 	// PayloadType as used in RTP encoding or decoding
 	PayloadType PayloadType `json:"payloadType"`
-
-	// CodecType of this CodecStats
-	CodecType CodecType `json:"codecType"`
 
 	// TransportID is the unique identifier of the transport on which this codec is
 	// being used, which can be used to look up the corresponding TransportStats object.
@@ -430,10 +408,6 @@ type InboundRTPStreamStats struct {
 	// compute an average audio level over different intervals. Does not exist for video.
 	TotalSamplesDuration float64 `json:"totalSamplesDuration"`
 
-	// SLICount counts the total number of Slice Loss Indication (SLI) packets received
-	// by the sender. This metric is only valid for video and is sent by receiver.
-	SLICount uint32 `json:"sliCount"`
-
 	// QPSum is the sum of the QP values of frames passed. The count of frames is
 	// in FramesDecoded for inbound stream stats, and in FramesEncoded for outbound stream stats.
 	QPSum uint64 `json:"qpSum"`
@@ -471,37 +445,6 @@ type InboundRTPStreamStats struct {
 	// buffer due to late or early-arrival, i.e., these packets are not played out.
 	// RTP packets discarded due to packet duplication are not reported in this metric.
 	PacketsDiscarded uint32 `json:"packetsDiscarded"`
-
-	// PacketsRepaired is the cumulative number of lost RTP packets repaired after applying
-	// an error-resilience mechanism. It is measured for the primary source RTP packets
-	// and only counted for RTP packets that have no further chance of repair.
-	PacketsRepaired uint32 `json:"packetsRepaired"`
-
-	// BurstPacketsLost is the cumulative number of RTP packets lost during loss bursts.
-	BurstPacketsLost uint32 `json:"burstPacketsLost"`
-
-	// BurstPacketsDiscarded is the cumulative number of RTP packets discarded during discard bursts.
-	BurstPacketsDiscarded uint32 `json:"burstPacketsDiscarded"`
-
-	// BurstLossCount is the cumulative number of bursts of lost RTP packets.
-	BurstLossCount uint32 `json:"burstLossCount"`
-
-	// BurstDiscardCount is the cumulative number of bursts of discarded RTP packets.
-	BurstDiscardCount uint32 `json:"burstDiscardCount"`
-
-	// BurstLossRate is the fraction of RTP packets lost during bursts to the
-	// total number of RTP packets expected in the bursts.
-	BurstLossRate float64 `json:"burstLossRate"`
-
-	// BurstDiscardRate is the fraction of RTP packets discarded during bursts to
-	// the total number of RTP packets expected in bursts.
-	BurstDiscardRate float64 `json:"burstDiscardRate"`
-
-	// GapLossRate is the fraction of RTP packets lost during the gap periods.
-	GapLossRate float64 `json:"gapLossRate"`
-
-	// GapDiscardRate is the fraction of RTP packets discarded during the gap periods.
-	GapDiscardRate float64 `json:"gapDiscardRate"`
 
 	// TrackIdentifier is the id of the MediaStreamTrack receiving this stream.
 	TrackIdentifier string `json:"trackIdentifier"`
@@ -553,12 +496,6 @@ type InboundRTPStreamStats struct {
 	// payload over the transport.
 	HeaderBytesReceived uint64 `json:"headerBytesReceived"`
 
-	// AverageRTCPInterval is the average RTCP interval between two consecutive compound RTCP packets.
-	// This is calculated by the sending endpoint when sending compound RTCP reports.
-	// Compound packets must contain at least a RTCP RR or SR packet and an SDES packet
-	// with the CNAME item.
-	AverageRTCPInterval float64 `json:"averageRtcpInterval"`
-
 	// FECPacketsReceived is the total number of RTP FEC packets received for this SSRC.
 	// This counter can also be incremented when receiving FEC packets in-band with media packets (e.g., with Opus).
 	FECPacketsReceived uint32 `json:"fecPacketsReceived"`
@@ -578,18 +515,6 @@ type InboundRTPStreamStats struct {
 	// FramesReceived represents the total number of complete frames received on this RTP stream.
 	// This metric is incremented when the complete frame is received. Does not exist for audio.
 	FramesReceived uint32 `json:"framesReceived"`
-
-	// PacketsFailedDecryption is the cumulative number of RTP packets that failed
-	// to be decrypted. These packets are not counted by PacketsDiscarded.
-	PacketsFailedDecryption uint32 `json:"packetsFailedDecryption"`
-
-	// PacketsDuplicated is the cumulative number of packets discarded because they
-	// are duplicated. Duplicate packets are not counted in PacketsDiscarded.
-	//
-	// Duplicated packets have the same RTP sequence number and content as a previously
-	// received packet. If multiple duplicates of a packet are received, all of them are counted.
-	// An improved estimate of lost packets can be calculated by adding PacketsDuplicated to PacketsLost.
-	PacketsDuplicated uint32 `json:"packetsDuplicated"`
 
 	// PerDSCPPacketsReceived is the total number of packets received for this SSRC,
 	// per Differentiated Services code point (DSCP) [RFC2474]. DSCPs are identified
@@ -738,10 +663,6 @@ type OutboundRTPStreamStats struct {
 	// received by the sender and is sent by receiver.
 	NACKCount uint32 `json:"nackCount"`
 
-	// SLICount counts the total number of Slice Loss Indication (SLI) packets received
-	// by the sender. This metric is only valid for video and is sent by receiver.
-	SLICount uint32 `json:"sliCount"`
-
 	// QPSum is the sum of the QP values of frames passed. The count of frames is
 	// in FramesDecoded for inbound stream stats, and in FramesEncoded for outbound stream stats.
 	QPSum uint64 `json:"qpSum"`
@@ -749,25 +670,8 @@ type OutboundRTPStreamStats struct {
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
 	PacketsSent uint32 `json:"packetsSent"`
 
-	// PacketsDiscardedOnSend is the total number of RTP packets for this SSRC that
-	// have been discarded due to socket errors, i.e. a socket error occurred when handing
-	// the packets to the socket. This might happen due to various reasons, including
-	// full buffer or no available memory.
-	PacketsDiscardedOnSend uint32 `json:"packetsDiscardedOnSend"`
-
-	// FECPacketsSent is the total number of RTP FEC packets sent for this SSRC.
-	// This counter can also be incremented when sending FEC packets in-band with
-	// media packets (e.g., with Opus).
-	FECPacketsSent uint32 `json:"fecPacketsSent"`
-
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
-
-	// BytesDiscardedOnSend is the total number of bytes for this SSRC that have
-	// been discarded due to socket errors, i.e. a socket error occurred when handing
-	// the packets containing the bytes to the socket. This might happen due to various
-	// reasons, including full buffer or no available memory.
-	BytesDiscardedOnSend uint64 `json:"bytesDiscardedOnSend"`
 
 	// TrackID is the identifier of the stats object representing the current track
 	// attachment to the sender of this stream, a SenderAudioTrackAttachmentStats
@@ -847,11 +751,6 @@ type OutboundRTPStreamStats struct {
 	// a packet is emitted from the RTP packetizer until it is handed over to the OS network socket.
 	// This measurement is added to totalPacketSendDelay when packetsSent is incremented.
 	TotalPacketSendDelay float64 `json:"totalPacketSendDelay"`
-
-	// AverageRTCPInterval is the average RTCP interval between two consecutive compound RTCP
-	// packets. This is calculated by the sending endpoint when sending compound RTCP reports.
-	// Compound packets must contain at least a RTCP RR or SR packet and an SDES packet with the CNAME item.
-	AverageRTCPInterval float64 `json:"averageRtcpInterval"`
 
 	// QualityLimitationReason is the current reason for limiting the resolution and/or framerate,
 	// or "none" if not limited. Only valid for video.
@@ -951,10 +850,6 @@ type RemoteInboundRTPStreamStats struct {
 	// received by the sender and is sent by receiver.
 	NACKCount uint32 `json:"nackCount"`
 
-	// SLICount counts the total number of Slice Loss Indication (SLI) packets received
-	// by the sender. This metric is only valid for video and is sent by receiver.
-	SLICount uint32 `json:"sliCount"`
-
 	// QPSum is the sum of the QP values of frames passed. The count of frames is
 	// in FramesDecoded for inbound stream stats, and in FramesEncoded for outbound stream stats.
 	QPSum uint64 `json:"qpSum"`
@@ -973,37 +868,6 @@ type RemoteInboundRTPStreamStats struct {
 	// buffer due to late or early-arrival, i.e., these packets are not played out.
 	// RTP packets discarded due to packet duplication are not reported in this metric.
 	PacketsDiscarded uint32 `json:"packetsDiscarded"`
-
-	// PacketsRepaired is the cumulative number of lost RTP packets repaired after applying
-	// an error-resilience mechanism. It is measured for the primary source RTP packets
-	// and only counted for RTP packets that have no further chance of repair.
-	PacketsRepaired uint32 `json:"packetsRepaired"`
-
-	// BurstPacketsLost is the cumulative number of RTP packets lost during loss bursts.
-	BurstPacketsLost uint32 `json:"burstPacketsLost"`
-
-	// BurstPacketsDiscarded is the cumulative number of RTP packets discarded during discard bursts.
-	BurstPacketsDiscarded uint32 `json:"burstPacketsDiscarded"`
-
-	// BurstLossCount is the cumulative number of bursts of lost RTP packets.
-	BurstLossCount uint32 `json:"burstLossCount"`
-
-	// BurstDiscardCount is the cumulative number of bursts of discarded RTP packets.
-	BurstDiscardCount uint32 `json:"burstDiscardCount"`
-
-	// BurstLossRate is the fraction of RTP packets lost during bursts to the
-	// total number of RTP packets expected in the bursts.
-	BurstLossRate float64 `json:"burstLossRate"`
-
-	// BurstDiscardRate is the fraction of RTP packets discarded during bursts to
-	// the total number of RTP packets expected in bursts.
-	BurstDiscardRate float64 `json:"burstDiscardRate"`
-
-	// GapLossRate is the fraction of RTP packets lost during the gap periods.
-	GapLossRate float64 `json:"gapLossRate"`
-
-	// GapDiscardRate is the fraction of RTP packets discarded during the gap periods.
-	GapDiscardRate float64 `json:"gapDiscardRate"`
 
 	// LocalID is used for looking up the local OutboundRTPStreamStats object for the same SSRC.
 	LocalID string `json:"localId"`
@@ -1083,10 +947,6 @@ type RemoteOutboundRTPStreamStats struct {
 	// received by the sender and is sent by receiver.
 	NACKCount uint32 `json:"nackCount"`
 
-	// SLICount counts the total number of Slice Loss Indication (SLI) packets received
-	// by the sender. This metric is only valid for video and is sent by receiver.
-	SLICount uint32 `json:"sliCount"`
-
 	// QPSum is the sum of the QP values of frames passed. The count of frames is
 	// in FramesDecoded for inbound stream stats, and in FramesEncoded for outbound stream stats.
 	QPSum uint64 `json:"qpSum"`
@@ -1094,25 +954,8 @@ type RemoteOutboundRTPStreamStats struct {
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
 	PacketsSent uint32 `json:"packetsSent"`
 
-	// PacketsDiscardedOnSend is the total number of RTP packets for this SSRC that
-	// have been discarded due to socket errors, i.e. a socket error occurred when handing
-	// the packets to the socket. This might happen due to various reasons, including
-	// full buffer or no available memory.
-	PacketsDiscardedOnSend uint32 `json:"packetsDiscardedOnSend"`
-
-	// FECPacketsSent is the total number of RTP FEC packets sent for this SSRC.
-	// This counter can also be incremented when sending FEC packets in-band with
-	// media packets (e.g., with Opus).
-	FECPacketsSent uint32 `json:"fecPacketsSent"`
-
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
-
-	// BytesDiscardedOnSend is the total number of bytes for this SSRC that have
-	// been discarded due to socket errors, i.e. a socket error occurred when handing
-	// the packets containing the bytes to the socket. This might happen due to various
-	// reasons, including full buffer or no available memory.
-	BytesDiscardedOnSend uint64 `json:"bytesDiscardedOnSend"`
 
 	// LocalID is used for looking up the local InboundRTPStreamStats object for the same SSRC.
 	LocalID string `json:"localId"`
@@ -1158,54 +1001,6 @@ func unmarshalRemoteOutboundRTPStreamStats(b []byte) (RemoteOutboundRTPStreamSta
 	}
 
 	return remoteOutboundRTPStreamStats, nil
-}
-
-// RTPContributingSourceStats contains statistics for a contributing source (CSRC) that contributed
-// to an inbound RTP stream.
-type RTPContributingSourceStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// ContributorSSRC is the SSRC identifier of the contributing source represented
-	// by this stats object. It is a 32-bit unsigned integer that appears in the CSRC
-	// list of any packets the relevant source contributed to.
-	ContributorSSRC SSRC `json:"contributorSsrc"`
-
-	// InboundRTPStreamID is the ID of the InboundRTPStreamStats object representing
-	// the inbound RTP stream that this contributing source is contributing to.
-	InboundRTPStreamID string `json:"inboundRtpStreamId"`
-
-	// PacketsContributedTo is the total number of RTP packets that this contributing
-	// source contributed to. This value is incremented each time a packet is counted
-	// by InboundRTPStreamStats.packetsReceived, and the packet's CSRC list contains
-	// the SSRC identifier of this contributing source, ContributorSSRC.
-	PacketsContributedTo uint32 `json:"packetsContributedTo"`
-
-	// AudioLevel is present if the last received RTP packet that this source contributed
-	// to contained an [RFC6465] mixer-to-client audio level header extension. The value
-	// of audioLevel is between 0..1 (linear), where 1.0 represents 0 dBov, 0 represents
-	// silence, and 0.5 represents approximately 6 dBSPL change in the sound pressure level from 0 dBov.
-	AudioLevel float64 `json:"audioLevel"`
-}
-
-func (s RTPContributingSourceStats) statsMarker() {}
-
-func unmarshalCSRCStats(b []byte) (RTPContributingSourceStats, error) {
-	var csrcStats RTPContributingSourceStats
-	err := json.Unmarshal(b, &csrcStats)
-	if err != nil {
-		return RTPContributingSourceStats{}, fmt.Errorf("unmarshal csrc stats: %w", err)
-	}
-
-	return csrcStats, nil
 }
 
 // AudioSourceStats represents an audio track that is attached to one or more senders.
