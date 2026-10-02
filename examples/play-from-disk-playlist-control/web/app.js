@@ -35,7 +35,6 @@ async function startSession () {
   pc.onconnectionstatechange = () => log(`Peer state: ${pc.connectionState}`)
   pc.ontrack = event => {
     audio.srcObject = event.streams[0]
-    audio.play().catch(() => {})
   }
   pc.ondatachannel = event => {
     if (event.channel.label !== 'playlist') {
