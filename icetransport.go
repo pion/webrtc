@@ -689,9 +689,10 @@ func (t *ICETransport) Stats() TransportStats {
 	return stats
 }
 
-func (t *ICETransport) collectStats(collector *statsReportCollector) {
+func (t *ICETransport) collectStats(collector *statsReportCollector, dtlsTransport *DTLSTransport) {
 	collector.Collecting()
 	stats := t.Stats()
+	dtlsTransport.updateStats(&stats)
 	collector.Collect(stats.ID, stats)
 }
 
