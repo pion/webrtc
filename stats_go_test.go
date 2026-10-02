@@ -133,10 +133,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		PerDSCPPacketsReceived: map[string]uint32{
 			"123": 23,
 		},
-		PauseCount:           48,
-		TotalPausesDuration:  48.123,
-		FreezeCount:          49,
-		TotalFreezesDuration: 49.321,
 	}
 	inboundRTPStreamStatsJSON := `
 {
@@ -191,11 +187,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "packetsDuplicated": 22,
   "perDscpPacketsReceived": {
     "123": 23
-  },
-  "pauseCount": 48,
-  "totalPausesDuration": 48.123,
-  "freezeCount": 49,
-  "totalFreezesDuration": 49.321
+  }
 }
 `
 	outboundRTPStreamStats := OutboundRTPStreamStats{
