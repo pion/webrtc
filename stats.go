@@ -503,9 +503,8 @@ type InboundRTPStreamStats struct {
 	// GapDiscardRate is the fraction of RTP packets discarded during the gap periods.
 	GapDiscardRate float64 `json:"gapDiscardRate"`
 
-	// TrackID is the identifier of the stats object representing the receiving track,
-	// a ReceiverAudioTrackAttachmentStats or ReceiverVideoTrackAttachmentStats.
-	TrackID string `json:"trackId"`
+	// TrackIdentifier is the id of the MediaStreamTrack receiving this stream.
+	TrackIdentifier string `json:"trackIdentifier"`
 
 	// ReceiverID is the stats ID used to look up the AudioReceiverStats or VideoReceiverStats
 	// object receiving this stream.
