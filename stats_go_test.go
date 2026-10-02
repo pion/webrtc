@@ -703,8 +703,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		LocalCertificateID: "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
 		//nolint:lll
 		RemoteCertificateID: "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+		TLSVersion:          "FEFD",
 		DTLSCipher:          "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		SRTPCipher:          "AES_CM_128_HMAC_SHA1_80",
+		SRTPCipher:          "SRTP_AES128_CM_HMAC_SHA1_80",
 	}
 	//nolint:lll
 	transportStatsJSON := `
@@ -723,8 +724,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "selectedCandidatePairId": "CPxIhBDNnT_sPDhy1TB",
   "localCertificateId": "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
   "remoteCertificateId": "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+  "tlsVersion": "FEFD",
   "dtlsCipher": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-  "srtpCipher": "AES_CM_128_HMAC_SHA1_80"
+  "srtpCipher": "SRTP_AES128_CM_HMAC_SHA1_80"
 }
 `
 	iceCandidatePairStats := ICECandidatePairStats{
@@ -1096,10 +1098,10 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport) TransportStats {
 	t.Helper()
 
-	stats, ok := report[statsID]
+	stats, ok := report["iceTransport"]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)
@@ -1507,8 +1509,8 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
-	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
-	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
+	answerICETransportStats := getTransportStats(t, reportPCAnswer)
+	offerICETransportStats := getTransportStats(t, reportPCOffer)
 	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
 
