@@ -119,7 +119,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		BurstDiscardRate:               16,
 		GapLossRate:                    17,
 		GapDiscardRate:                 18,
-		TrackID:                        "d57dbc4b-484b-4b40-9088-d3150e3a2010",
+		TrackIdentifier:                "d57dbc4b-484b-4b40-9088-d3150e3a2010",
 		ReceiverID:                     "R01",
 		RemoteID:                       "ROA2184088143",
 		LastPacketReceivedTimestamp:    1689668364374.181,
@@ -174,7 +174,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "burstDiscardRate": 16,
   "gapLossRate": 17,
   "gapDiscardRate": 18,
-  "trackId": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
+  "trackIdentifier": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
   "receiverId": "R01",
   "remoteId": "ROA2184088143",
   "lastPacketReceivedTimestamp": 1689668364374.181,
@@ -1517,6 +1517,7 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 			for _, inboundStats := range matches {
 				assert.Equal(t, StatsTypeInboundRTP, inboundStats.Type)
 				assert.Equal(t, tr.SSRC(), inboundStats.SSRC)
+				assert.Equal(t, tr.ID(), inboundStats.TrackIdentifier)
 				assert.NotEmpty(t, inboundStats.Kind)
 				assert.NotEmpty(t, inboundStats.TransportID)
 				assert.Greater(t, inboundStats.PacketsReceived, uint32(0))
