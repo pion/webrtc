@@ -828,7 +828,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		Priority:      2122260223,
 		URL:           "example.com",
 		RelayProtocol: "tcp",
-		Deleted:       true,
 	}
 	localIceCandidateStatsJSON := `
 {
@@ -843,8 +842,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "candidateType": "host",
   "priority": 2122260223,
   "url": "example.com",
-  "relayProtocol": "tcp",
-  "deleted": true
+  "relayProtocol": "tcp"
 }
 `
 	remoteIceCandidateStats := ICECandidateStats{
@@ -859,7 +857,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		Priority:      2122194687,
 		URL:           "example.com",
 		RelayProtocol: "tcp",
-		Deleted:       true,
 	}
 	remoteIceCandidateStatsJSON := `
 {
@@ -873,8 +870,7 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "candidateType": "host",
   "priority": 2122194687,
   "url": "example.com",
-  "relayProtocol": "tcp",
-  "deleted": true
+  "relayProtocol": "tcp"
 }
 `
 	certificateStats := CertificateStats{
