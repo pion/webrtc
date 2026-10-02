@@ -2290,8 +2290,8 @@ var (
 	inboundRTPVideoOnlyMembers = []string{
 		"framesDecoded", "keyFramesDecoded", "framesRendered", "framesDropped",
 		"frameWidth", "frameHeight", "framesPerSecond", "qpSum", "totalDecodeTime",
-		"totalInterFrameDelay", "totalSquaredInterFrameDelay", "firCount", "pliCount",
-		"framesReceived", "decoderImplementation", "powerEfficientDecoder",
+		"totalInterFrameDelay", "totalSquaredInterFrameDelay", "pauseCount", "totalPausesDuration",
+		"freezeCount", "totalFreezesDuration", "firCount", "pliCount", "framesReceived", "decoderImplementation", "powerEfficientDecoder",
 		"framesAssembledFromMultiplePackets", "totalAssemblyTime",
 		"totalCorruptionProbability", "totalSquaredCorruptionProbability", "corruptionMeasurements",
 	}
