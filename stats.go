@@ -2348,9 +2348,9 @@ type ICECandidateStats struct {
 	// preserving privacy.
 	NetworkType string `json:"networkType,omitempty"`
 
-	// IP is the IP address of the candidate, allowing for IPv4 addresses and
-	// IPv6 addresses, but fully qualified domain names (FQDNs) are not allowed.
-	IP string `json:"ip"`
+	// Address is the address of the candidate, allowing for IPv4 addresses,
+	// IPv6 addresses, and fully qualified domain names (FQDNs).
+	Address string `json:"address"`
 
 	// Port is the port number of the candidate.
 	Port int32 `json:"port"`
