@@ -32,6 +32,7 @@ pc.ontrack = (event) => {
   const video = document.createElement('video')
   video.srcObject = event.streams[0]
   video.autoplay = true
+  video.playsInline = true
   video.width = '500'
   const label = document.createElement('div')
   label.textContent = event.streams[0].id

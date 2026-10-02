@@ -32,7 +32,7 @@
       var el = document.createElement(event.track.kind)
       el.srcObject = event.streams[0]
       el.autoplay = true
-      el.controls = true
+      el.playsInline = true
 
       event.track.onmute = function(event) {
         el.parentNode.removeChild(el);

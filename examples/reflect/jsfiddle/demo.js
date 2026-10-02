@@ -30,7 +30,7 @@ pc.ontrack = function (event) {
   const el = document.createElement(event.track.kind)
   el.srcObject = event.streams[0]
   el.autoplay = true
-  el.controls = true
+  el.playsInline = true
 
   document.getElementById('remoteVideos').appendChild(el)
 }
