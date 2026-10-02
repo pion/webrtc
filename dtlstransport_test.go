@@ -10,7 +10,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"regexp"
@@ -247,6 +249,17 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 			require.NoError(t, err)
 			defer func() { require.NoError(t, answer.Close()) }()
 
+			for _, peer := range []*PeerConnection{offer, answer} {
+				stats := getTransportStats(t, peer.GetStats(), "iceTransport")
+				encoded, marshalErr := json.Marshal(stats)
+				require.NoError(t, marshalErr)
+				var fields map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(encoded, &fields))
+				for _, name := range []string{"tlsVersion", "dtlsCipher", "srtpCipher"} {
+					assert.NotContains(t, fields, name)
+				}
+			}
+
 			connected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
 			require.NoError(t, signalPair(offer, answer))
 			<-connected
@@ -254,6 +267,16 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 				state, ok := peer.dtlsTransport.dtlsConn.ConnectionState()
 				require.True(t, ok)
 				require.Equal(t, tc.want, state.NegotiatedVersion())
+				stats := getTransportStats(t, peer.GetStats(), "iceTransport")
+				assert.Equal(t, fmt.Sprintf("%04X", tc.want), stats.TLSVersion)
+				assert.Equal(t, state.CipherSuiteID.String(), stats.DTLSCipher)
+				assert.NotEmpty(t, stats.DTLSCipher)
+				assert.Equal(t, "SRTP_AEAD_AES_256_GCM", stats.SRTPCipher)
+				require.NoError(t, peer.Close())
+				closedStats := getTransportStats(t, peer.GetStats(), "iceTransport")
+				assert.Equal(t, stats.TLSVersion, closedStats.TLSVersion)
+				assert.Equal(t, stats.DTLSCipher, closedStats.DTLSCipher)
+				assert.Equal(t, stats.SRTPCipher, closedStats.SRTPCipher)
 			}
 		})
 	}
