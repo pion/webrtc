@@ -649,7 +649,6 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Priority:      int32(candidateStats.Priority), //nolint:gosec
 				URL:           candidateStats.URL,
 				RelayProtocol: candidateStats.RelayProtocol,
-				Deleted:       candidateStats.Deleted,
 			}
 			collector.Collect(stats.ID, stats)
 		}

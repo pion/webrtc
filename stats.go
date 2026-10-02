@@ -2166,14 +2166,6 @@ type ICECandidateStats struct {
 	// TURN server. This is only present for local candidates. Valid values for
 	// the TURN URL protocol is one of udp, tcp, or tls.
 	RelayProtocol string `json:"relayProtocol"`
-
-	// Deleted is true if the candidate has been deleted/freed. For host candidates,
-	// this means that any network resources (typically a socket) associated with the
-	// candidate have been released. For TURN candidates, this means the TURN allocation
-	// is no longer active.
-	//
-	// Only defined for local candidates. For remote candidates, this property is not applicable.
-	Deleted bool `json:"deleted"`
 }
 
 func (s ICECandidateStats) statsMarker() {}
