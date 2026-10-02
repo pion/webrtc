@@ -496,6 +496,16 @@ func addTransceiverSDP(
 			}
 		}
 	}
+	if transceiver.stopped.Load() {
+		media.MediaName.Port.Value = 0
+		if len(codecs) == 0 {
+			media.MediaName.Formats = []string{"0"}
+		}
+		media.WithPropertyAttribute(sdp.AttrKeyInactive)
+		descr.WithMedia(media)
+
+		return false, nil
+	}
 	if len(codecs) == 0 {
 		// If we are sender and we have no codecs throw an error early
 		if transceiver.Sender() != nil {
