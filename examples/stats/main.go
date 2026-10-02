@@ -168,7 +168,7 @@ func main() {
 			switch stat := s.(type) {
 			case webrtc.ICECandidateStats:
 				if stat.Type == webrtc.StatsTypeRemoteCandidate {
-					fmt.Printf("%s IP(%s) Port(%d)\n", stat.Type, stat.IP, stat.Port)
+					fmt.Printf("%s Address(%s) Port(%d)\n", stat.Type, stat.Address, stat.Port)
 				}
 			default:
 			}

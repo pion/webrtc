@@ -84,6 +84,8 @@ type RTPCodecParameters struct {
 	PayloadType PayloadType
 
 	statsID string
+	// Resolved when the codec is registered or negotiated; nil means no valid apt.
+	rtxPayloadType *PayloadType
 }
 
 // RTPParameters is a list of negotiated codecs and header extensions
