@@ -460,3 +460,78 @@ m=video 9 UDP/TLS/RTP/SAVPF %s`, strings.Join(formats, " ")), "\n")
 		})
 	}
 }
+
+// Assert that a transceiver, once stopped, is rejected in offers.
+func Test_RTPTransceiver_Stopped_Transceiver_Is_Rejected(t *testing.T) {
+	m := &MediaEngine{}
+	require.NoError(t, m.RegisterDefaultCodecs())
+
+	offerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, offerPC.Close()) })
+	answerPC, err := NewAPI(WithMediaEngine(m)).NewPeerConnection(Configuration{})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, answerPC.Close()) })
+
+	offerTransceiver, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	_, err = answerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+
+	offer, err := offerPC.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, offerPC.SetLocalDescription(offer))
+	require.NoError(t, answerPC.SetRemoteDescription(offer))
+	answer, err := answerPC.CreateAnswer(nil)
+	require.NoError(t, err)
+	require.NoError(t, answerPC.SetLocalDescription(answer))
+	require.NoError(t, offerPC.SetRemoteDescription(answer))
+
+	require.NotEmpty(t, offerTransceiver.Mid(), "A transceiver should have been associated after applying an answer")
+	require.NoError(t, offerTransceiver.Stop())
+	offer, err = offerPC.CreateOffer(nil)
+	require.NoError(t, err)
+	require.Len(t, offer.parsed.MediaDescriptions, 1)
+	mediaDesc := offer.parsed.MediaDescriptions[0]
+	assert.Equal(t, 0, mediaDesc.MediaName.Port.Value, "After stopping a transceiver it should be rejected in offers")
+	assert.Equal(t, offerTransceiver.Mid(), getMidValue(mediaDesc))
+	_, bundleOnly := mediaDesc.Attribute("bundle-only")
+	assert.False(t, bundleOnly, "Rejected media must not be marked bundle-only")
+	assert.NotContains(t, offer.SDP, "a=group:BUNDLE "+offerTransceiver.Mid())
+
+	require.NoError(t, offerPC.SetLocalDescription(offer))
+	require.NoError(t, answerPC.SetRemoteDescription(offer))
+	answer, err = answerPC.CreateAnswer(nil)
+	require.NoError(t, err)
+	require.Len(t, answer.parsed.MediaDescriptions, 1)
+	assert.Zero(t, answer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+	require.NoError(t, answerPC.SetLocalDescription(answer))
+	require.NoError(t, offerPC.SetRemoteDescription(answer))
+}
+
+// Inactive media is paused, rather than permanently rejected.
+func Test_RTPTransceiver_Inactive_Transceiver_Is_Not_Rejected(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+	t.Cleanup(func() { closePairNow(t, offerPC, answerPC) })
+	transceiver, err := offerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+
+	for _, direction := range []RTPTransceiverDirection{
+		RTPTransceiverDirectionSendrecv,
+		RTPTransceiverDirectionInactive,
+		RTPTransceiverDirectionSendrecv,
+	} {
+		transceiver.setDirection(direction)
+		offer, err := offerPC.CreateOffer(nil)
+		require.NoError(t, err)
+		require.NoError(t, offerPC.SetLocalDescription(offer))
+		require.NoError(t, answerPC.SetRemoteDescription(offer))
+		answer, err := answerPC.CreateAnswer(nil)
+		require.NoError(t, err)
+		require.Len(t, answer.parsed.MediaDescriptions, 1)
+		assert.NotZero(t, answer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+		require.NoError(t, answerPC.SetLocalDescription(answer))
+		require.NoError(t, offerPC.SetRemoteDescription(answer))
+	}
+}

@@ -23,6 +23,7 @@ type RTPTransceiver struct {
 	direction              atomic.Value // RTPTransceiverDirection
 	currentDirection       atomic.Value // RTPTransceiverDirection
 	currentRemoteDirection atomic.Value // RTPTransceiverDirection
+	stopped                atomic.Bool
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
@@ -322,6 +323,7 @@ func (t *RTPTransceiver) Stop() error {
 
 	t.setDirection(RTPTransceiverDirectionInactive)
 	t.setCurrentDirection(RTPTransceiverDirectionInactive)
+	t.stopped.Store(true)
 
 	return nil
 }
