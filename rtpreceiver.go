@@ -428,15 +428,16 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		}
 
 		inboundStats := InboundRTPStreamStats{
-			Rid:         remoteTrack.RID(),
-			Mid:         mid,
-			Timestamp:   now,
-			Type:        StatsTypeInboundRTP,
-			ID:          inboundID,
-			SSRC:        remoteTrack.SSRC(),
-			Kind:        r.kind.String(),
-			TransportID: "iceTransport",
-			CodecID:     codecID,
+			Rid:             remoteTrack.RID(),
+			Mid:             mid,
+			Timestamp:       now,
+			Type:            StatsTypeInboundRTP,
+			ID:              inboundID,
+			SSRC:            remoteTrack.SSRC(),
+			Kind:            r.kind.String(),
+			TrackIdentifier: remoteTrack.ID(),
+			TransportID:     "iceTransport",
+			CodecID:         codecID,
 		}
 		r.populateInboundStats(&inboundStats, statsGetter, remoteTrack)
 
