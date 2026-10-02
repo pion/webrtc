@@ -831,8 +831,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		LocalCertificateID: "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
 		//nolint:lll
 		RemoteCertificateID: "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+		TLSVersion:          "FEFD",
 		DTLSCipher:          "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		SRTPCipher:          "AES_CM_128_HMAC_SHA1_80",
+		SRTPCipher:          "SRTP_AES128_CM_HMAC_SHA1_80",
 	}
 	//nolint:lll
 	transportStatsJSON := `
@@ -851,8 +852,9 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "selectedCandidatePairId": "CPxIhBDNnT_sPDhy1TB",
   "localCertificateId": "CFF4:4F:C4:C7:F3:31:6C:B9:D5:AD:19:64:05:9F:2F:E9:00:70:56:1E:BA:92:29:3A:08:CE:1B:27:CF:2D:AB:24",
   "remoteCertificateId": "CF62:AF:88:F7:F3:0F:D6:C4:93:91:1E:AD:52:F0:A4:12:04:F9:48:E7:06:16:BA:A3:86:26:8F:1E:38:1C:48:49",
+  "tlsVersion": "FEFD",
   "dtlsCipher": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-  "srtpCipher": "AES_CM_128_HMAC_SHA1_80"
+  "srtpCipher": "SRTP_AES128_CM_HMAC_SHA1_80"
 }
 `
 	iceCandidatePairStats := ICECandidatePairStats{
@@ -1378,7 +1380,7 @@ func TestStatsConvertState(t *testing.T) {
 	}
 }
 
-func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves multiple branches and waits
+func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop,maintidx // involves multiple branches and waits
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 	defer closePairNow(t, offerPC, answerPC)
@@ -1391,6 +1393,17 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 
 	baseLineReportPCOffer := offerPC.GetStats()
 	baseLineReportPCAnswer := answerPC.GetStats()
+	for _, report := range []StatsReport{baseLineReportPCOffer, baseLineReportPCAnswer} {
+		stats := getTransportStats(t, report, "iceTransport")
+		assert.Empty(t, stats.DTLSCipher)
+		assert.Empty(t, stats.SRTPCipher)
+		encoded, marshalErr := json.Marshal(stats)
+		require.NoError(t, marshalErr)
+		var fields map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(encoded, &fields))
+		assert.NotContains(t, fields, "dtlsCipher")
+		assert.NotContains(t, fields, "srtpCipher")
+	}
 
 	connStatsOffer := getConnectionStats(t, baseLineReportPCOffer, offerPC)
 	connStatsAnswer := getConnectionStats(t, baseLineReportPCAnswer, answerPC)
@@ -1574,6 +1587,12 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 
 	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
 	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
+	assert.Equal(t, "FEFD", offerICETransportStats.TLSVersion)
+	assert.Equal(t, "FEFD", answerICETransportStats.TLSVersion)
+	assert.Equal(t, "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", offerICETransportStats.DTLSCipher)
+	assert.Equal(t, offerICETransportStats.DTLSCipher, answerICETransportStats.DTLSCipher)
+	assert.Equal(t, "SRTP_AEAD_AES_256_GCM", offerICETransportStats.SRTPCipher)
+	assert.Equal(t, offerICETransportStats.SRTPCipher, answerICETransportStats.SRTPCipher)
 	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
 

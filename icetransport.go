@@ -449,12 +449,6 @@ func (t *ICETransport) Stats() TransportStats {
 	return stats
 }
 
-func (t *ICETransport) collectStats(collector *statsReportCollector) {
-	collector.Collecting()
-	stats := t.Stats()
-	collector.Collect(stats.ID, stats)
-}
-
 func (t *ICETransport) haveRemoteCredentialsChange(newUfrag, newPwd string) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
