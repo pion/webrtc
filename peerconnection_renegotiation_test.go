@@ -978,9 +978,8 @@ func TestNegotiationNeededStressOneSided(t *testing.T) {
 	const expectedTrackCount = 500
 	ctx, done := context.WithCancel(context.Background())
 	pcA.OnNegotiationNeeded(func() {
-		count := len(pcA.GetTransceivers())
 		assert.NoError(t, signalPair(pcA, pcB))
-		if count == expectedTrackCount {
+		if len(pcB.GetTransceivers()) == expectedTrackCount {
 			done()
 		}
 	})
