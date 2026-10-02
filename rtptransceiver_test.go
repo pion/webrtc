@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/sdp/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -376,6 +377,24 @@ a=fmtp:97 level-id=186;profile-id=1`, formats,
 			}
 		})
 	}
+}
+
+func TestRTPTransceiverPreferRepairRID(t *testing.T) {
+	media := &sdp.MediaDescription{MediaName: sdp.MediaName{Media: "video"}}
+	media.WithCodec(96, "VP8", 90000, 0, "")
+	media.WithCodec(97, "rtx", 90000, 0, "apt=96")
+	media.WithValueAttribute("rid", "f send")
+	tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: NewAPI()}
+	tr.setCodecPreferencesFromRemoteDescription(media)
+	codecs := tr.getCodecs()
+	require.Len(t, codecs, 2)
+	assert.Equal(t, MimeTypeRTX, codecs[1].MimeType)
+
+	media.WithValueAttribute("extmap", "1 "+sdp.SDESRepairRTPStreamIDURI)
+	tr.setCodecPreferencesFromRemoteDescription(media)
+	codecs = tr.getCodecs()
+	require.Len(t, codecs, 1)
+	assert.Equal(t, MimeTypeVP8, codecs[0].MimeType)
 }
 
 func TestRTPTransceiverEquivalentCodecSelection(t *testing.T) {
