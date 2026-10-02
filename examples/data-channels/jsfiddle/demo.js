@@ -19,7 +19,7 @@ sendChannel.onclose = () => console.log('sendChannel has closed')
 sendChannel.onopen = () => console.log('sendChannel has opened')
 sendChannel.onmessage = e => log(`Message from DataChannel '${sendChannel.label}' payload '${e.data}'`)
 
-pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
+pc.onconnectionstatechange = e => log(pc.connectionState)
 pc.onicecandidate = event => {
   if (event.candidate === null) {
     document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
@@ -43,6 +43,7 @@ window.startSession = () => {
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
+  document.getElementById('startSessionButton').disabled = true
 
   try {
     pc.setRemoteDescription(JSON.parse(atob(sd)))

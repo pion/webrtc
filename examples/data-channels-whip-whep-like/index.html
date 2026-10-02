@@ -9,8 +9,8 @@
   </head>
 
   <body>
-    <button onclick="window.doWHIP()">Publish</button>
-    <button onclick="window.doWHEP()">Subscribe</button>
+    <button class="signalingButton" onclick="window.doWHIP()">Publish</button>
+    <button class="signalingButton" onclick="window.doWHEP()">Subscribe</button>
     <br />
 Message<br />
 <textarea id="message">This is my DataChannel message!</textarea> <br/>
@@ -19,8 +19,8 @@ Message<br />
     <div id="logs"></div>
 
 
-    <h3> ICE Connection States </h3>
-    <div id="iceConnectionStates"></div> <br />
+    <h3> Connection States </h3>
+    <div id="connectionStates"></div> <br />
   </body>
 
   <script>
@@ -35,14 +35,19 @@ Message<br />
     sendChannel.onopen = () => console.log('sendChannel has opened')
     sendChannel.onmessage = e => log(`From ${e.data}`)
 
-    peerConnection.oniceconnectionstatechange = () => {
+    peerConnection.onconnectionstatechange = () => {
       let el = document.createElement('p')
-      el.appendChild(document.createTextNode(peerConnection.iceConnectionState))
+      el.appendChild(document.createTextNode(peerConnection.connectionState))
 
-      document.getElementById('iceConnectionStates').appendChild(el);
+      document.getElementById('connectionStates').appendChild(el);
+    }
+
+    const disableSignalingButtons = () => {
+      document.querySelectorAll('.signalingButton').forEach(button => { button.disabled = true })
     }
 
     window.doWHEP = () => {
+      disableSignalingButtons()
 
       peerConnection.createOffer().then(offer => {
         peerConnection.setLocalDescription(offer)
@@ -65,6 +70,7 @@ Message<br />
     }
 
     window.doWHIP = () => {
+      disableSignalingButtons()
           peerConnection.createOffer().then(offer => {
             peerConnection.setLocalDescription(offer)
 
