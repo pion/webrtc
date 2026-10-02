@@ -539,6 +539,9 @@ func (pc *PeerConnection) OnICEConnectionStateChange(f func(ICEConnectionState))
 }
 
 func (pc *PeerConnection) onICEConnectionStateChange(cs ICEConnectionState) {
+	if pc.isClosed.Load() {
+		return
+	}
 	pc.iceConnectionState.Store(cs)
 	pc.log.Infof("ICE connection state changed: %s", cs)
 	if handler, ok := pc.onICEConnectionStateChangeHandler.Load().(func(ICEConnectionState)); ok && handler != nil {
@@ -887,12 +890,13 @@ func (pc *PeerConnection) updateConnectionState(
 	iceConnectionState ICEConnectionState,
 	dtlsTransportState DTLSTransportState,
 ) {
+	// Close sets the closed state without firing an event.
+	if pc.isClosed.Load() {
+		return
+	}
+
 	connectionState := PeerConnectionStateNew
 	switch {
-	// The RTCPeerConnection object's [[IsClosed]] slot is true.
-	case pc.isClosed.Load():
-		connectionState = PeerConnectionStateClosed
-
 	// Any of the RTCIceTransports or RTCDtlsTransports are in a "failed" state.
 	case iceConnectionState == ICEConnectionStateFailed || dtlsTransportState == DTLSTransportStateFailed:
 		connectionState = PeerConnectionStateFailed
@@ -2923,8 +2927,9 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 		closeErrs = append(closeErrs, pc.iceTransport.Stop())
 	}
 
-	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #10, #11), without firing events.
+	pc.iceConnectionState.Store(ICEConnectionStateClosed)
+	pc.connectionState.Store(PeerConnectionStateClosed)
 
 	closeErrs = append(closeErrs, doGracefulCloseOps()...)
 

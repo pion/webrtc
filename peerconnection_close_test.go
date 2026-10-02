@@ -8,6 +8,7 @@ package webrtc
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,12 +37,19 @@ func TestPeerConnection_Close(t *testing.T) {
 		close(awaitSetup)
 	})
 
-	awaitICEClosed := make(chan struct{})
-	pcAnswer.OnICEConnectionStateChange(func(i ICEConnectionState) {
-		if i == ICEConnectionStateClosed {
-			close(awaitICEClosed)
-		}
-	})
+	var closedEvents atomic.Int32
+	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
+		pc.OnICEConnectionStateChange(func(state ICEConnectionState) {
+			if state == ICEConnectionStateClosed {
+				closedEvents.Add(1)
+			}
+		})
+		pc.OnConnectionStateChange(func(state PeerConnectionState) {
+			if state == PeerConnectionStateClosed {
+				closedEvents.Add(1)
+			}
+		})
+	}
 
 	_, err = pcOffer.CreateDataChannel("data", nil)
 	assert.NoError(t, err)
@@ -52,7 +60,13 @@ func TestPeerConnection_Close(t *testing.T) {
 
 	closePairNow(t, pcOffer, pcAnswer)
 
-	<-awaitICEClosed
+	// Close sets the states without firing events, like browsers do.
+	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
+		assert.Equal(t, ICEConnectionStateClosed, pc.ICEConnectionState())
+		assert.Equal(t, PeerConnectionStateClosed, pc.ConnectionState())
+	}
+	time.Sleep(100 * time.Millisecond)
+	assert.Zero(t, closedEvents.Load())
 }
 
 // Assert that a PeerConnection that is shutdown before ICE starts doesn't leak.
