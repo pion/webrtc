@@ -24,7 +24,8 @@ type RTPTransceiver struct {
 	currentDirection       atomic.Value // RTPTransceiverDirection
 	currentRemoteDirection atomic.Value // RTPTransceiverDirection
 
-	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
+	codecs                     []RTPCodecParameters
+	codecPreferencesFromRemote bool
 
 	kind RTPCodecType
 
@@ -56,8 +57,19 @@ func newRTPTransceiver(
 // SetCodecPreferences sets preferred list of supported codecs
 // if codecs is empty or nil we reset to default from MediaEngine.
 func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error {
+	return t.setCodecPreferences(codecs, false, false)
+}
+
+func (t *RTPTransceiver) setCodecPreferences(
+	codecs []RTPCodecParameters,
+	fromRemoteDescription bool,
+	requireExistingRemotePreferences bool,
+) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if requireExistingRemotePreferences && !t.codecPreferencesFromRemote {
+		return nil
+	}
 
 	for _, codec := range codecs {
 		if _, matchType := codecParametersFuzzySearch(
@@ -68,6 +80,7 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	}
 
 	t.codecs = filterUnattachedRTX(codecs)
+	t.codecPreferencesFromRemote = fromRemoteDescription
 
 	return nil
 }
@@ -96,9 +109,23 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	return filterUnattachedRTX(filteredCodecs)
 }
 
-// match codecs from remote description, used when remote is offerer and creating a transceiver
-// from remote description with the aim of keeping order of codecs in remote description.
-func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
+// setCodecPreferencesFromRemoteDescription matches codecs from the remote description when
+// creating a transceiver, with the aim of keeping their order from the remote description.
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) {
+	t.setCodecPreferencesFromRemoteDescriptionIfNeeded(media, false)
+}
+
+// updateCodecPreferencesFromRemoteDescription refreshes preferences that were previously derived
+// from a remote description, without overwriting preferences provided through SetCodecPreferences.
+func (t *RTPTransceiver) updateCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) {
+	t.setCodecPreferencesFromRemoteDescriptionIfNeeded(media, true)
+}
+
+//nolint:cyclop
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescriptionIfNeeded(
+	media *sdp.MediaDescription,
+	requireExistingRemotePreferences bool,
+) {
 	remoteCodecs, err := codecsFromMediaDescription(media)
 	if err != nil {
 		return
@@ -174,7 +201,7 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 			}
 		}
 	}
-	_ = t.SetCodecPreferences(filteredCodecs)
+	_ = t.setCodecPreferences(filteredCodecs, true, requireExistingRemotePreferences)
 }
 
 // When equivalent payloads are offered together (for example H265 levels),
