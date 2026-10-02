@@ -630,6 +630,13 @@ type InboundRTPStreamStats struct {
 
 func (s InboundRTPStreamStats) statsMarker() {}
 
+// MarshalJSON omits the members the specification does not allow for Kind.
+func (s InboundRTPStreamStats) MarshalJSON() ([]byte, error) {
+	type inboundRTPStreamStats InboundRTPStreamStats
+
+	return marshalKindGated(inboundRTPStreamStats(s), s.Kind, inboundRTPVideoOnlyMembers, inboundRTPAudioOnlyMembers)
+}
+
 func unmarshalInboundRTPStreamStats(b []byte) (InboundRTPStreamStats, error) {
 	var inboundRTPStreamStats InboundRTPStreamStats
 	err := json.Unmarshal(b, &inboundRTPStreamStats)
@@ -884,6 +891,13 @@ type OutboundRTPStreamStats struct {
 }
 
 func (s OutboundRTPStreamStats) statsMarker() {}
+
+// MarshalJSON omits the members the specification does not allow for Kind.
+func (s OutboundRTPStreamStats) MarshalJSON() ([]byte, error) {
+	type outboundRTPStreamStats OutboundRTPStreamStats
+
+	return marshalKindGated(outboundRTPStreamStats(s), s.Kind, outboundRTPVideoOnlyMembers, nil)
+}
 
 func unmarshalOutboundRTPStreamStats(b []byte) (OutboundRTPStreamStats, error) {
 	var outboundRTPStreamStats OutboundRTPStreamStats
@@ -2473,4 +2487,59 @@ func unmarshalSCTPTransportStats(b []byte) (SCTPTransportStats, error) {
 	}
 
 	return sctpTransportStats, nil
+}
+
+// Members that MUST NOT exist for the other kind, per https://w3c.github.io/webrtc-stats/.
+//
+//nolint:gochecknoglobals
+var (
+	inboundRTPVideoOnlyMembers = []string{
+		"framesDecoded", "keyFramesDecoded", "framesRendered", "framesDropped",
+		"frameWidth", "frameHeight", "framesPerSecond", "qpSum", "totalDecodeTime",
+		"totalInterFrameDelay", "totalSquaredInterFrameDelay", "firCount", "pliCount",
+		"framesReceived", "decoderImplementation", "powerEfficientDecoder",
+		"framesAssembledFromMultiplePackets", "totalAssemblyTime",
+		"totalCorruptionProbability", "totalSquaredCorruptionProbability", "corruptionMeasurements",
+	}
+	inboundRTPAudioOnlyMembers = []string{
+		"totalSamplesReceived", "concealedSamples", "silentConcealedSamples", "concealmentEvents",
+		"insertedSamplesForDeceleration", "removedSamplesForAcceleration", "audioLevel",
+		"totalAudioEnergy", "totalSamplesDuration", "playoutId",
+	}
+	outboundRTPVideoOnlyMembers = []string{
+		"rid", "encodingIndex", "frameWidth", "frameHeight", "framesPerSecond", "framesSent",
+		"hugeFramesSent", "framesEncoded", "keyFramesEncoded", "qpSum", "psnrSum",
+		"psnrMeasurements", "totalEncodeTime", "qualityLimitationReason",
+		"qualityLimitationDurations", "qualityLimitationResolutionChanges", "firCount",
+		"pliCount", "encoderImplementation", "powerEfficientEncoder", "scalabilityMode",
+	}
+)
+
+// marshalKindGated marshals stats and drops the members not allowed for kind.
+func marshalKindGated(stats any, kind string, videoOnly, audioOnly []string) ([]byte, error) {
+	data, err := json.Marshal(stats)
+	if err != nil {
+		return nil, err
+	}
+
+	var drop []string
+	switch kind {
+	case "audio":
+		drop = videoOnly
+	case "video":
+		drop = audioOnly
+	}
+	if len(drop) == 0 {
+		return data, nil
+	}
+
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(data, &members); err != nil {
+		return nil, err
+	}
+	for _, member := range drop {
+		delete(members, member)
+	}
+
+	return json.Marshal(members)
 }
