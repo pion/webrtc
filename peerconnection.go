@@ -193,6 +193,9 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 	pc.dtlsTransport = dtlsTransport
+	pc.dtlsTransport.internalOnStateChangeHandler = func(state DTLSTransportState) {
+		pc.updateConnectionState(pc.ICEConnectionState(), state)
+	}
 
 	// Create the SCTP transport
 	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
@@ -3144,7 +3147,6 @@ func (pc *PeerConnection) startTransports(
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 	if err != nil {
 		pc.log.Warnf("Failed to start manager: %s", err)
 
@@ -3469,12 +3471,10 @@ func (pc *PeerConnection) restartDTLS(remote, local *SessionDescription) {
 
 		return
 	}
-	pc.updateConnectionState(pc.ICEConnectionState(), DTLSTransportStateConnecting)
 	err = pc.dtlsTransport.start(DTLSParameters{
 		Role:         role,
 		Fingerprints: []DTLSFingerprint{{Algorithm: hash, Value: fingerprint}},
 	}, DTLSTransportStateConnected, pc.api.settingEngine.dtls.connectContextMaker)
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 	if err != nil {
 		pc.log.Warnf("Failed to restart DTLS: %s", err)
 	}

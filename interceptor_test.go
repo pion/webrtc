@@ -26,6 +26,7 @@ import (
 	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // E2E test of the features of Interceptors
@@ -889,4 +890,80 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, pcOffer, pcAnswer)
 	<-done.Done()
+}
+
+// TestInterceptorNackReply is an end-to-end test for the NACK responder.
+// It tests that we do receive a resent packet to a NACK, both with and
+// without negotiating an RTX track.
+func TestInterceptorNackReply(t *testing.T) {
+	to := test.TimeOut(time.Second * 20)
+	defer to.Stop()
+
+	t.Run("RTX", func(t *testing.T) { testInterceptorNackReply(t, true) })
+	t.Run("NoRTX", func(t *testing.T) { testInterceptorNackReply(t, false) })
+}
+
+func testInterceptorNackReply(t *testing.T, negotiateRTX bool) {
+	t.Helper()
+
+	pc1, pc2, wan := createVNetPair(t, nil)
+	defer func() {
+		closePairNow(t, pc1, pc2)
+		assert.NoError(t, wan.Stop())
+	}()
+
+	dropped := false
+	wan.AddChunkFilter(func(c vnet.Chunk) bool {
+		var header rtp.Header
+		if _, err := header.Unmarshal(c.UserData()); err == nil && header.Version == 2 && header.PayloadType == 96 && !dropped {
+			dropped = true
+
+			return false
+		}
+
+		return true
+	})
+
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	require.NoError(t, err)
+	sender, err := pc1.AddTrack(track)
+	require.NoError(t, err)
+	if !negotiateRTX {
+		require.NoError(t, sender.rtpTransceiver.SetCodecPreferences(sender.GetParameters().Codecs[:1]))
+	}
+
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			if _, _, readErr := sender.Read(buf); readErr != nil {
+				return
+			}
+		}
+	}()
+
+	tracks := make(chan *TrackRemote, 1)
+	pc2.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) { tracks <- remote })
+	connected := untilConnectionState(PeerConnectionStateConnected, pc1, pc2)
+	require.NoError(t, signalPairWithOptions(pc1, pc2, withDisableInitialDataChannel(true)))
+	<-connected
+
+	packet := &rtp.Packet{Header: rtp.Header{Version: 2, Timestamp: 1234}, Payload: []byte{42}}
+	require.NoError(t, track.WriteRTP(packet))
+	packet.SequenceNumber++
+	require.NoError(t, track.WriteRTP(packet))
+
+	remote := <-tracks
+	first, _, err := remote.ReadRTP()
+	require.NoError(t, err)
+	require.Equal(t, uint16(1), first.SequenceNumber)
+	require.NoError(t, pc2.WriteRTCP([]rtcp.Packet{&rtcp.TransportLayerNack{
+		MediaSSRC: uint32(remote.SSRC()),
+		Nacks:     []rtcp.NackPair{{PacketID: 0}},
+	}}))
+	reply, attributes, err := remote.ReadRTP()
+	require.NoError(t, err)
+	assert.Equal(t, uint16(0), reply.SequenceNumber)
+	assert.Equal(t, packet.Timestamp, reply.Timestamp)
+	assert.Equal(t, packet.Payload, reply.Payload)
+	assert.Equal(t, negotiateRTX, attributes.Get(AttributeRtxSsrc) != nil)
 }

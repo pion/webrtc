@@ -50,7 +50,8 @@ type DTLSTransport struct {
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
 
-	onStateChangeHandler func(DTLSTransportState)
+	onStateChangeHandler         func(DTLSTransportState)
+	internalOnStateChangeHandler func(DTLSTransportState)
 
 	conn     *detacheddtls.Conn
 	dtlsConn *dtls.DetachedConn
@@ -144,6 +145,9 @@ func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
 	t.state = state
 	handler := t.onStateChangeHandler
 	if handler != nil {
+		handler(state)
+	}
+	if handler := t.internalOnStateChangeHandler; handler != nil {
 		handler(state)
 	}
 }
@@ -434,13 +438,17 @@ func (t *DTLSTransport) start(
 				RemoteAddr:       t.iceTransport.remoteAddr,
 				SetWriteDeadline: t.iceTransport.setWriteDeadline,
 			},
-			OnClose: func() {
+			OnClose: func(err error) {
 				go func() {
 					<-startFinished.Done()
 					t.lock.Lock()
 					defer t.lock.Unlock()
 					if t.state == DTLSTransportStateConnected {
-						t.onStateChange(DTLSTransportStateClosed)
+						state := DTLSTransportStateClosed
+						if err != nil && !errors.Is(err, dtls.ErrConnClosed) && !errors.Is(err, io.EOF) {
+							state = DTLSTransportStateFailed
+						}
+						t.onStateChange(state)
 					}
 				}()
 			},
@@ -653,11 +661,11 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 
 func (t *DTLSTransport) failStart(err error) error {
 	t.lock.Lock()
+	conn := t.conn
+	t.conn, t.dtlsConn = nil, nil
 	if t.state != DTLSTransportStateClosed {
 		t.onStateChange(DTLSTransportStateFailed)
 	}
-	conn := t.conn
-	t.conn, t.dtlsConn = nil, nil
 	t.lock.Unlock()
 	if conn != nil {
 		_ = conn.Close()
