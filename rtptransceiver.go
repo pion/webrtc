@@ -67,7 +67,7 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 		}
 	}
 
-	t.codecs = filterUnattachedRTX(codecs)
+	t.codecs = filterUnattachedRED(filterUnattachedRTX(codecs))
 
 	return nil
 }
@@ -79,7 +79,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
 	if len(t.codecs) == 0 {
-		return filterUnattachedRTX(mediaEngineCodecs)
+		return filterUnattachedRED(filterUnattachedRTX(mediaEngineCodecs))
 	}
 
 	filteredCodecs := []RTPCodecParameters{}
@@ -93,7 +93,55 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 		}
 	}
 
-	return filterUnattachedRTX(filteredCodecs)
+	return filterUnattachedRED(filterUnattachedRTX(filteredCodecs))
+}
+
+func codecIndexByPayloadType(codecs []RTPCodecParameters, payloadType PayloadType) int {
+	for i, codec := range codecs {
+		if codec.PayloadType == payloadType {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func insertCodec(codecs []RTPCodecParameters, codec RTPCodecParameters, index int) []RTPCodecParameters {
+	codecs = append(codecs, RTPCodecParameters{})
+	copy(codecs[index+1:], codecs[index:])
+	codecs[index] = codec
+
+	return codecs
+}
+
+func addREDCodecsInRemoteOrder(
+	filteredCodecs []RTPCodecParameters,
+	payloadMapping map[PayloadType]PayloadType,
+	remoteCodecs, mediaEngineCodecs []RTPCodecParameters,
+) []RTPCodecParameters {
+	for remotePayloadType, mediaEnginePayloadType := range payloadMapping {
+		remoteRED := findREDPayloadType(remotePayloadType, remoteCodecs)
+		mediaEngineRED := findREDPayloadType(mediaEnginePayloadType, mediaEngineCodecs)
+		if remoteRED == PayloadType(0) || mediaEngineRED == PayloadType(0) {
+			continue
+		}
+
+		redCodec := findCodecByPayload(mediaEngineCodecs, mediaEngineRED)
+		opusIndex := codecIndexByPayloadType(filteredCodecs, mediaEnginePayloadType)
+		if redCodec == nil || opusIndex == -1 {
+			continue
+		}
+
+		remoteREDIndex := codecIndexByPayloadType(remoteCodecs, remoteRED)
+		remoteOpusIndex := codecIndexByPayloadType(remoteCodecs, remotePayloadType)
+		insertIndex := opusIndex
+		if remoteREDIndex > remoteOpusIndex {
+			insertIndex++
+		}
+		filteredCodecs = insertCodec(filteredCodecs, *redCodec, insertIndex)
+	}
+
+	return filteredCodecs
 }
 
 // match codecs from remote description, used when remote is offerer and creating a transceiver
@@ -103,13 +151,15 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 	if err != nil {
 		return
 	}
+	allRemoteCodecs := append([]RTPCodecParameters{}, remoteCodecs...)
 	offeredPayloads := make(map[PayloadType]bool, len(remoteCodecs))
 	for _, codec := range remoteCodecs {
 		offeredPayloads[codec.PayloadType] = true
 	}
 
 	// make a copy as this slice is modified
-	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
+	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
+	leftCodecs := append([]RTPCodecParameters{}, mediaEngineCodecs...)
 
 	// find codec matches between what is in remote description and
 	// the transceivers codecs and use payload type registered to
@@ -119,7 +169,8 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 		filteredCodecs := []RTPCodecParameters{}
 		for remoteCodecIdx := len(remoteCodecs) - 1; remoteCodecIdx >= 0; remoteCodecIdx-- {
 			remoteCodec := remoteCodecs[remoteCodecIdx]
-			if strings.EqualFold(remoteCodec.RTPCodecCapability.MimeType, MimeTypeRTX) {
+			if strings.EqualFold(remoteCodec.RTPCodecCapability.MimeType, MimeTypeRTX) ||
+				strings.EqualFold(remoteCodec.RTPCodecCapability.MimeType, MimeTypeRED) {
 				continue
 			}
 
@@ -153,6 +204,10 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 
 	filteredCodecs := filterByMatchType(codecMatchExact)
 	filteredCodecs = append(filteredCodecs, filterByMatchType(codecMatchPartial)...)
+
+	// RED is a dependent format and can only be placed after its Opus payload
+	// type has been mapped.
+	filteredCodecs = addREDCodecsInRemoteOrder(filteredCodecs, payloadMapping, allRemoteCodecs, mediaEngineCodecs)
 
 	// find RTX associations and add those
 	for remotePayloadType, mediaEnginePayloadType := range payloadMapping {

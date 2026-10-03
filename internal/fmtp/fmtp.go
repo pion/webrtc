@@ -11,6 +11,7 @@ import (
 func defaultClockRate(mimeType string) uint32 {
 	defaults := map[string]uint32{
 		"audio/opus": 48000,
+		"audio/red":  48000,
 		"audio/pcmu": 8000,
 		"audio/pcma": 8000,
 	}
@@ -25,6 +26,7 @@ func defaultClockRate(mimeType string) uint32 {
 func defaultChannels(mimeType string) uint16 {
 	defaults := map[string]uint16{
 		"audio/opus": 2,
+		"audio/red":  2,
 	}
 
 	if def, ok := defaults[strings.ToLower(mimeType)]; ok {
