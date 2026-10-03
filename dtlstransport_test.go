@@ -22,7 +22,7 @@ import (
 	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v4/internal/mux"
 	"github.com/stretchr/testify/assert"
 )
@@ -132,8 +132,8 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	}
 
 	// Wait for PeerConnection to close (may take longer due to cleanup)
-	offerConnectionHasClosed.Wait()
-	answerConnectionHasClosed.Wait()
+	<-offerConnectionHasClosed
+	<-answerConnectionHasClosed
 
 	assert.Contains(
 		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(),
@@ -161,7 +161,7 @@ func TestPeerConnection_DTLSRoleSettingEngine(t *testing.T) {
 		assert.NoError(t, signalPair(offerPC, answerPC))
 
 		connectionComplete := untilConnectionState(PeerConnectionStateConnected, answerPC)
-		connectionComplete.Wait()
+		<-connectionComplete
 		closePairNow(t, offerPC, answerPC)
 	}
 

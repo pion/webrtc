@@ -15,7 +15,7 @@ import (
 
 	"github.com/pion/interceptor"
 	mock_interceptor "github.com/pion/interceptor/pkg/mock"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
@@ -217,7 +217,7 @@ func Test_RTPSender_SetReadDeadline(t *testing.T) {
 
 	assert.NoError(t, signalPair(sender, receiver))
 
-	peerConnectionsConnected.Wait()
+	<-peerConnectionsConnected
 
 	assert.NoError(t, rtpSender.SetReadDeadline(time.Now().Add(1*time.Second)))
 	_, _, err = rtpSender.ReadRTCP()

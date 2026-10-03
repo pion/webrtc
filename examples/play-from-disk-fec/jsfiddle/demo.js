@@ -23,7 +23,7 @@ pc.ontrack = function (event) {
   document.getElementById('remoteVideos').appendChild(el)
 }
 
-pc.oniceconnectionstatechange = (e) => log(pc.iceConnectionState)
+pc.onconnectionstatechange = (e) => log(pc.connectionState)
 pc.onicecandidate = (event) => {
   if (event.candidate === null) {
     document.getElementById('localSessionDescription').value = btoa(
@@ -37,6 +37,7 @@ window.startSession = () => {
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
+  document.getElementById('startSessionButton').disabled = true
 
   try {
     // Set the remote offer

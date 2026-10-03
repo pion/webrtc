@@ -10,8 +10,8 @@
   <body>
     <h1>ICE TCP</h1>
 
-    <h3> ICE Connection States </h3>
-    <div id="iceConnectionStates"></div> <br />
+    <h3> Connection States </h3>
+    <div id="connectionStates"></div> <br />
 
     <h3> Inbound DataChannel Messages </h3>
     <div id="inboundDataChannelMessages"></div>
@@ -28,11 +28,11 @@
       document.getElementById('inboundDataChannelMessages').appendChild(el);
     }
 
-    pc.oniceconnectionstatechange = () => {
+    pc.onconnectionstatechange = () => {
       let el = document.createElement('p')
-      el.appendChild(document.createTextNode(pc.iceConnectionState))
+      el.appendChild(document.createTextNode(pc.connectionState))
 
-      document.getElementById('iceConnectionStates').appendChild(el);
+      document.getElementById('connectionStates').appendChild(el);
     }
 
     pc.createOffer()

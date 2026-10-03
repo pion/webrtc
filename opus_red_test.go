@@ -18,8 +18,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v4/test"
-	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/transport/v5/test"
+	"github.com/pion/transport/v5/vnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -251,7 +251,7 @@ func TestOpusREDTransparentRecoveryAndInterceptorOrdering(t *testing.T) {
 
 	connected := untilConnectionState(PeerConnectionStateConnected, offerPeer, answerPeer)
 	require.NoError(t, signalPair(offerPeer, answerPeer))
-	connected.Wait()
+	<-connected
 
 	ssrc := uint32(sender.GetParameters().Encodings[0].SSRC)
 	var wireMutex sync.Mutex
@@ -361,7 +361,7 @@ func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) { //nolint:cyclop
 	require.NoError(t, signalPairWithModification(offerPeer, answerPeer, func(raw string) string {
 		return stripSSRC.ReplaceAllString(raw, "")
 	}))
-	connected.Wait()
+	<-connected
 
 	var midID, ridID uint8
 	for _, extension := range sender.GetParameters().HeaderExtensions {

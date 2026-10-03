@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 )
 
