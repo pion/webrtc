@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -459,19 +458,8 @@ func (r *RTPReceiver) populateInboundStats(
 		return
 	}
 
-	// Wrap-around casting by design, with warnings if overflow/underflow is detected.
-	pr := stats.InboundRTPStreamStats.PacketsReceived
-	if pr > math.MaxUint32 {
-		r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
-	}
-	inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
-
-	pl := stats.InboundRTPStreamStats.PacketsLost
-	if pl > math.MaxInt32 || pl < math.MinInt32 {
-		r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
-	}
-	inboundStats.PacketsLost = int32(pl) //nolint:gosec
-
+	inboundStats.PacketsReceived = stats.InboundRTPStreamStats.PacketsReceived
+	inboundStats.PacketsLost = stats.InboundRTPStreamStats.PacketsLost
 	inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
 	inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
 	inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
