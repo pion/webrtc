@@ -1,0 +1,201 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly> -->
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opus RED · Test 01</title>
+  <style>
+    :root { color-scheme: light; --paper:#f2f6fb; --ink:#182b49; --line:#ccd8e8; --blue:#214fc6; --teal:#146a63; --muted:#526582; --red:#b83d4c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1320px; margin:0 auto; padding:32px; }
+    header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:24px; }
+    .eyebrow { margin:0 0 4px; color:var(--muted); letter-spacing:.1em; font-size:12px; text-transform:uppercase; }
+    h1 { margin:0; font:600 34px/1.2 "Avenir Next","Segoe UI",sans-serif; letter-spacing:-.035em; }
+    .topology { margin:10px 0 0; color:var(--muted); }
+    .pill { padding:7px 12px; border:1px solid var(--line); border-radius:20px; white-space:nowrap; font-size:12px; font-weight:650; }
+    .pass { color:var(--teal); background:#e7f3ee; border-color:#aacdc2; }
+    .fail { color:var(--red); background:#fbeef0; border-color:#e5bdc4; }
+    .bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:18px 20px; background:#fff; border:1px solid var(--line); border-radius:10px; }
+    button,.button { display:inline-block; appearance:none; border:1px solid var(--line); border-radius:6px; padding:10px 16px; background:#fff; color:var(--ink); font:600 14px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; cursor:pointer; text-decoration:none; }
+    button.primary { background:var(--blue); color:white; border-color:var(--blue); }
+    button:disabled,.button.disabled { opacity:.4; cursor:default; pointer-events:none; }
+    button:hover:not(:disabled),.button:hover:not(.disabled) { border-color:var(--blue); }
+    :focus-visible { outline:3px solid #7d9dec; outline-offset:3px; }
+    .push { margin-left:auto; }
+    #message { margin:12px 2px 20px; color:var(--muted); min-height:23px; overflow-wrap:anywhere; }
+    .tabs { display:flex; gap:6px; margin-bottom:14px; }
+    .tabs button { padding:8px 16px; background:transparent; border-color:transparent; }
+    .tabs button[aria-pressed="true"] { background:#e1eafa; border-color:#b5c9ec; color:var(--blue); }
+    .metrics { display:grid; grid-template-columns:repeat(5,1fr); background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:20px; }
+    .metric { padding:15px 20px; border-right:1px solid var(--line); }
+    .metric:last-child { border-right:0; }
+    .metric span { display:block; color:var(--muted); font-size:12px; }
+    .metric strong { display:block; font:600 28px/1.4 "Avenir Next","Segoe UI",sans-serif; }
+    section { margin:20px 0; }
+    h2 { margin:0 0 10px; font-size:16px; }
+    .audio-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .audio-box { background:#fff; padding:16px 20px; border:1px solid var(--line); border-radius:8px; }
+    .audio-box label { display:block; margin-bottom:9px; font-size:13px; font-weight:600; }
+    audio { width:100%; height:36px; }
+    .note { color:var(--muted); font-size:12px; margin:9px 2px; }
+    .table-wrap { overflow:auto; max-height:520px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+    th { position:sticky; top:0; z-index:1; background:#e7edf7; color:var(--ink); padding:10px 15px; font-weight:650; white-space:nowrap; }
+    td { padding:9px 15px; border-top:1px solid #e3eaf4; vertical-align:top; }
+    tbody tr:nth-child(even) { background:#f8fafd; }
+    .mono { font:12px/1.6 ui-monospace,"SFMono-Regular",Consolas,monospace; }
+    .muted { color:var(--muted); }
+    .copy { display:inline-block; color:var(--blue); background:#ebf0fe; border:1px solid #d6e1fa; border-radius:4px; margin:3px 4px 0 0; padding:1px 6px; font-size:11px; }
+    .match { color:var(--teal); font-weight:600; }
+    .mismatch { color:var(--red); font-weight:600; }
+    #checks td:first-child { width:36%; }
+    .empty { padding:32px; text-align:center; color:var(--muted); }
+    details { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 16px; }
+    summary { cursor:pointer; font-weight:600; font-size:13px; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.6 ui-monospace,"SFMono-Regular",Consolas,monospace; }
+    footer { color:var(--muted); font-size:12px; padding:8px 0; }
+    @media(max-width:760px) { main { padding:20px 14px; } header { flex-direction:column; gap:12px; } h1 { font-size:29px; } .metrics { grid-template-columns:repeat(3,1fr); } .metric { border-bottom:1px solid var(--line); padding:12px; } .audio-grid { grid-template-columns:1fr; } .push { margin-left:0; } th,td { padding:8px 10px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><p class="eyebrow">Opus RED qualification / Test 01</p><h1>No packet loss</h1><p class="topology">Two Pion peers · 300 packets · 20 ms · 1200-byte RTP limit</p></div>
+    <span class="pill" id="badge">Checking setup</span>
+  </header>
+  <div class="bar">
+    <button class="primary" id="run-plain" disabled>Run plain</button>
+    <button class="primary" id="run-red" disabled>Run RED</button>
+    <button id="reset" disabled>Reset</button>
+    <a class="button disabled push" id="export" aria-disabled="true">Export result</a>
+  </div>
+  <p id="message" role="status" aria-live="polite">Checking prerequisites…</p>
+  <div class="tabs" role="group" aria-label="Trial result">
+    <button id="view-plain" aria-pressed="true">Plain result</button>
+    <button id="view-red" aria-pressed="false">RED result</button>
+  </div>
+  <div class="metrics" aria-label="Packet totals">
+    <div class="metric"><span>Original packets</span><strong id="sent">—</strong></div>
+    <div class="metric"><span>Application packets</span><strong id="received">—</strong></div>
+    <div class="metric"><span>RED wire packets</span><strong id="red-count">—</strong></div>
+    <div class="metric"><span>Exact matches</span><strong id="matches">—</strong></div>
+    <div class="metric"><span>Largest RTP packet</span><strong id="max-size">—</strong></div>
+  </div>
+  <section><h2>Decoded audio</h2>
+    <div class="audio-grid">
+      <div class="audio-box"><label for="reference">Reference</label><audio id="reference" controls preload="none"></audio></div>
+      <div class="audio-box"><label for="received-audio">Received</label><audio id="received-audio" controls preload="none"></audio></div>
+    </div><p class="note">Listening remains manual. PCM comparison is included in the checks below.</p>
+  </section>
+  <section><h2>Packet evidence <span class="muted" id="trial-label"></span></h2>
+    <div class="table-wrap"><table><thead><tr><th>Sequence</th><th>Original Opus</th><th>Wire packet</th><th>Application output</th></tr></thead><tbody id="packets"><tr><td colspan="4" class="empty">Run a trial to inspect its packets.</td></tr></tbody></table></div>
+  </section>
+  <section><h2>Checks</h2><div class="table-wrap"><table><thead><tr><th>Assertion</th><th>Result</th><th>Evidence</th></tr></thead><tbody id="checks"><tr><td colspan="3" class="empty">No result yet.</td></tr></tbody></table></div></section>
+  <details><summary>Run metadata and accepted SDP</summary><pre id="metadata">No result yet.</pre></details>
+  <footer>Test 02: single-packet loss — not implemented. This test controls Pion peers; native browser interoperability is a later test.</footer>
+</main>
+<script>
+  const results = { plain:null, red:null };
+  let selected = 'plain', busy = false, ready = false;
+  const el = id => document.getElementById(id);
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const same = (a,b) => !!a && !!b && ['sequence','timestamp','ssrc','payloadType','payloadLength','payloadSHA256'].every(k => a[k] === b[k]);
+  function controls() {
+    ['run-plain','run-red'].forEach(id => el(id).disabled = busy || !ready);
+    el('reset').disabled = busy;
+    const available = !!results[selected]?.id;
+    el('export').classList.toggle('disabled', !available || busy);
+    el('export').setAttribute('aria-disabled', String(!available || busy));
+    if (available) el('export').href = '/api/export?mode=' + selected;
+  }
+  function badge(text, kind='') { el('badge').textContent = text; el('badge').className = 'pill ' + kind; }
+  function show(mode) {
+    selected = mode;
+    ['plain','red'].forEach(m => el('view-' + m).setAttribute('aria-pressed', String(m === mode)));
+    const result = results[mode];
+    controls();
+    if (!result) {
+      ['sent','received','red-count','matches','max-size'].forEach(id => el(id).textContent = '—');
+      el('packets').innerHTML = '<tr><td colspan="4" class="empty">Run this trial to inspect its packets.</td></tr>';
+      el('checks').innerHTML = '<tr><td colspan="3" class="empty">No result yet.</td></tr>';
+      el('metadata').textContent = 'No result yet.';
+      el('trial-label').textContent = '';
+      ['reference','received-audio'].forEach(id => { el(id).pause(); el(id).removeAttribute('src'); el(id).load(); });
+      if (!busy && ready) badge('Ready');
+      return;
+    }
+    const originals = result.senderEvidence?.original || [];
+    const wire = result.senderEvidence?.sent || [];
+    const outputs = result.output || [];
+    const bySequence = new Map(outputs.map(p => [p.sequence,p]));
+    const sourceByTime = new Map(originals.map(p => [p.timestamp,p]));
+    const wireBySequence = new Map(wire.map(p => [p.sequence,p]));
+    el('sent').textContent = originals.length;
+    el('received').textContent = outputs.length;
+    el('red-count').textContent = wire.filter(p => (p.blocks || []).length > 0).length;
+    el('matches').textContent = originals.filter(p => same(p,bySequence.get(p.sequence))).length;
+    el('max-size').textContent = wire.length ? Math.max(...wire.map(p => p.rtpSize)) + ' B' : '—';
+    el('trial-label').textContent = ' / ' + mode + ' / ' + result.id;
+    el('packets').innerHTML = originals.map(p => {
+      const sent = wireBySequence.get(p.sequence), output = bySequence.get(p.sequence);
+      const blocks = sent?.blocks || [];
+      const copies = blocks.map(b => {
+        const source = sourceByTime.get((p.timestamp - b.timestampOffset) >>> 0);
+        return '<span class="copy">copy ' + escape(source ? '#' + source.sequence : '?') + ' · ' + escape(b.timestampOffset) + ' ticks · ' + escape(b.payloadLength) + ' B</span>';
+      }).join('');
+      const original = '<span class="mono">ts ' + p.timestamp + ' · ' + p.payloadLength + ' B<br>' + escape(p.payloadSHA256?.slice(0,16)) + '</span>';
+      const onWire = sent ? '<span class="mono">' + (blocks.length ? 'RED' : 'Opus') + ' · PT ' + sent.payloadType + ' · ' + sent.rtpSize + ' B</span><br>' + copies : '<span class="mismatch">Missing</span>';
+      const delivered = output ? '<span class="mono">ts ' + output.timestamp + ' · ' + output.payloadLength + ' B<br>' + escape(output.payloadSHA256?.slice(0,16)) + '</span><br><span class="' + (same(p,output)?'match':'mismatch') + '">' + (same(p,output)?'Exact match':'Mismatch') + '</span>' : '<span class="mismatch">Missing</span>';
+      return '<tr><td class="mono">' + p.sequence + '</td><td>' + original + '</td><td>' + onWire + '</td><td>' + delivered + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="empty">No packets recorded.</td></tr>';
+    el('checks').innerHTML = (result.assertions || []).map(a => '<tr><td>' + escape(a.name) + '</td><td class="' + (a.passed?'match':'mismatch') + '">' + (a.passed?'PASS':'FAIL') + '</td><td>' + escape(a.detail) + '</td></tr>').join('') || '<tr><td colspan="3" class="empty">' + escape(result.error || (result.errors || []).join('; ') || 'No assertions recorded.') + '</td></tr>';
+    const audio = result.audio || {};
+    ['reference','received'].forEach(kind => {
+      const player = el(kind === 'reference'?'reference':'received-audio');
+      player.pause();
+      if (audio[kind]?.wavPath) player.src = '/api/audio?mode=' + mode + '&kind=' + kind + '&id=' + encodeURIComponent(result.id);
+      else player.removeAttribute('src');
+      player.load();
+    });
+    const metadata = {...result};
+    delete metadata.senderEvidence; delete metadata.receiverEvidence; delete metadata.output; delete metadata.assertions;
+    el('metadata').textContent = JSON.stringify({...metadata, bindings:{sender:result.senderEvidence?.bindings,receiver:result.receiverEvidence?.bindings}},null,2);
+    if (!busy) badge(result.status || 'FAIL', result.status === 'PASS'?'pass':'fail');
+  }
+  async function run(mode) {
+    if (busy || !ready) return;
+    busy = true; controls(); badge('Running ' + (mode === 'red'?'RED':'plain'));
+    el('message').textContent = 'Sending 300 packets at 20 ms, then checking packet evidence and decoded audio…';
+    try {
+      const response = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});
+      const result = await response.json();
+      results[mode] = result;
+      el('message').textContent = result.status === 'PASS' ? 'Trial passed. Inspect the packets, checks, and audio, then export the result.' : (result.error || (result.errors || []).join('; ') || 'Trial failed. Inspect and export its evidence.');
+    } catch (error) { results[mode] = {status:'FAIL',errors:[error.message]}; el('message').textContent = error.message; }
+    finally { busy = false; show(mode); }
+  }
+  el('run-plain').addEventListener('click',()=>run('plain'));
+  el('run-red').addEventListener('click',()=>run('red'));
+  el('view-plain').addEventListener('click',()=>show('plain'));
+  el('view-red').addEventListener('click',()=>show('red'));
+  el('reset').addEventListener('click',async()=>{
+    if (busy) return;
+    try {
+      const response = await fetch('/api/reset',{method:'POST'});
+      if (!response.ok) throw new Error('Reset failed');
+      results.plain = null; results.red = null; show('plain');
+      el('message').textContent = 'Display reset. Exported evidence remains on disk.';
+    } catch(error) { el('message').textContent = error.message; }
+  });
+  fetch('/api/status').then(r=>r.json()).then(status=>{
+    ready = status.ready;
+    badge(ready?'Ready':'Blocked',ready?'':'fail');
+    el('message').textContent = ready ? 'Run plain first, then RED. Each trial creates fresh Pion connections.' : status.blocked;
+    controls();
+  }).catch(error=>{badge('Controller unavailable','fail');el('message').textContent=error.message;});
+</script>
+</body>
+</html>
