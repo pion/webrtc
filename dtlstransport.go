@@ -815,3 +815,22 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
 }
+
+func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats := t.iceTransport.Stats()
+
+	t.lock.RLock()
+	stats.DTLSState = t.state
+	if t.conn != nil {
+		// Pion WebRTC@v4 only negotiates DTLS 1.2.
+		stats.TLSVersion = "FEFD"
+		stats.SRTPCipher = t.srtpProtectionProfile.String()
+		if state, ok := t.conn.ConnectionState(); ok {
+			stats.DTLSCipher = dtls.CipherSuiteName(state.CipherSuiteID)
+		}
+	}
+	t.lock.RUnlock()
+
+	collector.Collect(stats.ID, stats)
+}

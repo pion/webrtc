@@ -3023,8 +3023,8 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	if pc.iceGatherer != nil {
 		pc.iceGatherer.collectStats(statsCollector)
 	}
-	if pc.iceTransport != nil {
-		pc.iceTransport.collectStats(statsCollector)
+	if pc.dtlsTransport != nil {
+		pc.dtlsTransport.collectStats(statsCollector)
 	}
 
 	pc.sctpTransport.lock.Lock()
