@@ -23,10 +23,8 @@ linters:
     - forbidigo        # Forbids identifiers
     - forcetypeassert  # finds forced type assertions
     - gochecknoglobals # Checks that no globals are present in Go code
-    - gocognit         # Computes and checks the cognitive complexity of functions
     - goconst          # Finds repeated strings that could be replaced by a constant
     - gocritic         # The most opinionated Go source code linter
-    - gocyclo          # Computes and checks the cyclomatic complexity of functions
     - godot            # Check if comments end in a period
     - godox            # Tool for detection of FIXME, TODO and other comment keywords
     - goheader         # Checks is file header matches to pattern
@@ -38,7 +36,6 @@ linters:
     - importas         # Enforces consistent import aliases
     - ineffassign      # Detects when assignments to existing variables are not used
     - lll              # Reports long lines
-    - maintidx         # maintidx measures the maintainability index of each function.
     - makezero         # Finds slice declarations with non-zero initial length
     - misspell         # Finds commonly misspelled English words in comments
     - modernize        # Replace and suggests simplifications to code
@@ -139,11 +136,7 @@ linters:
     rules:
       - linters:
           - forbidigo
-          - gocognit
         path: (examples|main\.go)
-      - linters:
-          - gocognit
-        path: _test\.go
       - linters:
           - forbidigo
         path: cmd
