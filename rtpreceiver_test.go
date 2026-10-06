@@ -324,9 +324,8 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 	inbound, ok := got.(InboundRTPStreamStats)
 	require.True(t, ok)
 
-	// Wrap-around semantics for casts
-	assert.Equal(t, uint32(pr), inbound.PacketsReceived) //nolint:gosec
-	assert.Equal(t, int32(pl), inbound.PacketsLost)      //nolint:gosec
+	assert.Equal(t, pr, inbound.PacketsReceived)
+	assert.Equal(t, pl, inbound.PacketsLost)
 	assert.Equal(t, jitter, inbound.Jitter)
 	assert.Equal(t, bytes, inbound.BytesReceived)
 	assert.Equal(t, hdrBytes, inbound.HeaderBytesReceived)

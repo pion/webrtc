@@ -378,6 +378,43 @@ a=fmtp:97 level-id=186;profile-id=1`, formats,
 	}
 }
 
+func TestRTPTransceiverPreferRepairRID(t *testing.T) {
+	for _, simulcast := range []bool{false, true} {
+		t.Run(fmt.Sprintf("simulcast=%t", simulcast), func(t *testing.T) {
+			offerPC, err := NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() { assert.NoError(t, offerPC.Close()) }()
+			answerPC, err := NewPeerConnection(Configuration{})
+			require.NoError(t, err)
+			defer func() { assert.NoError(t, answerPC.Close()) }()
+
+			track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("a"))
+			require.NoError(t, err)
+			sender, err := offerPC.AddTrack(track)
+			require.NoError(t, err)
+			if simulcast {
+				second, trackErr := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("b"))
+				require.NoError(t, trackErr)
+				require.NoError(t, sender.AddEncoding(second))
+			}
+
+			offer, err := offerPC.CreateOffer(nil)
+			require.NoError(t, err)
+			require.NoError(t, offerPC.SetLocalDescription(offer))
+			require.NoError(t, answerPC.SetRemoteDescription(offer))
+			answer, err := answerPC.CreateAnswer(nil)
+			require.NoError(t, err)
+			require.NoError(t, answerPC.SetLocalDescription(answer))
+			require.NoError(t, offerPC.SetRemoteDescription(answer))
+
+			negotiated := offerPC.RemoteDescription().SDP
+			assert.Contains(t, negotiated, "VP8/90000")
+			assert.Equal(t, !simulcast, strings.Contains(negotiated, "rtx/90000"))
+			assert.Equal(t, simulcast, strings.Contains(negotiated, "a=rid:a recv"))
+		})
+	}
+}
+
 func TestRTPTransceiverEquivalentCodecSelection(t *testing.T) {
 	codec := func(payload PayloadType, format string) RTPCodecParameters {
 		return RTPCodecParameters{

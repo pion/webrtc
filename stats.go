@@ -432,11 +432,11 @@ type InboundRTPStreamStats struct {
 	TotalSquaredInterFrameDelay float64 `json:"totalSquaredInterFrameDelay"`
 
 	// PacketsReceived is the total number of RTP packets received for this SSRC.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// PacketsLost is the total number of RTP packets lost for this SSRC. Note that
 	// because of how this is estimated, it can be negative if more packets are received than sent.
-	PacketsLost int32 `json:"packetsLost"`
+	PacketsLost int64 `json:"packetsLost"`
 
 	// Jitter is the packet jitter measured in seconds for this SSRC
 	Jitter float64 `json:"jitter"`
@@ -444,7 +444,7 @@ type InboundRTPStreamStats struct {
 	// PacketsDiscarded is the cumulative number of RTP packets discarded by the jitter
 	// buffer due to late or early-arrival, i.e., these packets are not played out.
 	// RTP packets discarded due to packet duplication are not reported in this metric.
-	PacketsDiscarded uint32 `json:"packetsDiscarded"`
+	PacketsDiscarded uint64 `json:"packetsDiscarded"`
 
 	// TrackIdentifier is the id of the MediaStreamTrack receiving this stream.
 	TrackIdentifier string `json:"trackIdentifier"`
@@ -498,7 +498,7 @@ type InboundRTPStreamStats struct {
 
 	// FECPacketsReceived is the total number of RTP FEC packets received for this SSRC.
 	// This counter can also be incremented when receiving FEC packets in-band with media packets (e.g., with Opus).
-	FECPacketsReceived uint32 `json:"fecPacketsReceived"`
+	FECPacketsReceived uint64 `json:"fecPacketsReceived"`
 
 	// FECPacketsDiscarded is the total number of RTP FEC packets received for this SSRC where the
 	// error correction payload was discarded by the application. This may happen
@@ -855,11 +855,11 @@ type RemoteInboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsReceived is the total number of RTP packets received for this SSRC.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// PacketsLost is the total number of RTP packets lost for this SSRC. Note that
 	// because of how this is estimated, it can be negative if more packets are received than sent.
-	PacketsLost int32 `json:"packetsLost"`
+	PacketsLost int64 `json:"packetsLost"`
 
 	// Jitter is the packet jitter measured in seconds for this SSRC
 	Jitter float64 `json:"jitter"`
@@ -952,7 +952,7 @@ type RemoteOutboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
@@ -1782,10 +1782,10 @@ type TransportStats struct {
 	ID string `json:"id"`
 
 	// PacketsSent represents the total number of packets sent over this transport.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// PacketsReceived represents the total number of packets received on this transport.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// BytesSent represents the total number of payload bytes sent on this PeerConnection
 	// not including headers or padding.
@@ -1972,10 +1972,10 @@ type ICECandidatePairStats struct {
 	Nominated bool `json:"nominated"`
 
 	// PacketsSent represents the total number of packets sent on this candidate pair.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// PacketsReceived represents the total number of packets received on this candidate pair.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// BytesSent represents the total number of payload bytes sent on this candidate pair
 	// not including headers or padding.
@@ -2095,7 +2095,7 @@ type ICECandidatePairStats struct {
 	// when handing the packets containing the bytes to the socket. This might happen due
 	// to various reasons, including full buffer or no available memory.
 	// Calculated as defined in [RFC3550] section 6.4.1.
-	BytesDiscardedOnSend uint32 `json:"bytesDiscardedOnSend"`
+	BytesDiscardedOnSend uint64 `json:"bytesDiscardedOnSend"`
 }
 
 func (s ICECandidatePairStats) statsMarker() {}

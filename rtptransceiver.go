@@ -98,7 +98,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 // match codecs from remote description, used when remote is offerer and creating a transceiver
 // from remote description with the aim of keeping order of codecs in remote description.
-func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop,gocognit
 	remoteCodecs, err := codecsFromMediaDescription(media)
 	if err != nil {
 		return
@@ -154,8 +154,16 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 	filteredCodecs := filterByMatchType(codecMatchExact)
 	filteredCodecs = append(filteredCodecs, filterByMatchType(codecMatchPartial)...)
 
+	extensions, _ := rtpExtensionsFromMediaDescription(media)
+	_, repairRID := extensions[sdp.SDESRepairRTPStreamIDURI]
+	preferRepairRID := repairRID && len(getRids(media)) > 0
+
 	// find RTX associations and add those
 	for remotePayloadType, mediaEnginePayloadType := range payloadMapping {
+		if preferRepairRID {
+			break
+		}
+
 		remoteRTX := findRTXPayloadType(remotePayloadType, remoteCodecs)
 		if remoteRTX == PayloadType(0) {
 			continue
