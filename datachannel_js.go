@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"syscall/js"
+	"time"
 
 	"github.com/pion/datachannel"
 )
@@ -158,6 +159,11 @@ func (d *DataChannel) SendText(s string) (err error) {
 	}()
 	d.underlying.Call("send", s)
 	return nil
+}
+
+// SetWriteDeadline is unsupported by browser RTCDataChannel.
+func (d *DataChannel) SetWriteDeadline(time.Time) error {
+	return errors.New("DataChannel.SetWriteDeadline is unsupported on js/wasm")
 }
 
 // Detach allows you to detach the underlying datachannel. This provides
