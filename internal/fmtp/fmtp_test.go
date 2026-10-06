@@ -53,11 +53,6 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 
-func TestREDDefaults(t *testing.T) {
-	assert.True(t, ClockRateEqual("audio/red", 0, 48000))
-	assert.True(t, ChannelsEqual("audio/red", 0, 2))
-}
-
 func TestParse(t *testing.T) {
 	for _, ca := range []struct {
 		name      string
@@ -768,6 +763,28 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 				"'%s' and '%s' are expected to be %s, but treated as %s",
 				ca.b, ca.a, consistString[ca.consist], consistString[c],
 			)
+		})
+	}
+}
+
+func TestDefaults(t *testing.T) {
+	for _, ca := range []struct {
+		mimeType  string
+		clockRate uint32
+		channels  uint16
+	}{
+		{"audio/opus", 48000, 2},
+		{"audio/OPUS", 48000, 2},
+		{"audio/red", 48000, 2},
+		{"audio/RED", 48000, 2},
+		{"audio/pcmu", 8000, 1},
+		{"audio/PCMA", 8000, 1},
+		{"audio/multiopus", 90000, 1},
+		{"video/vp8", 90000, 0},
+	} {
+		t.Run(ca.mimeType, func(t *testing.T) {
+			assert.Equal(t, ca.clockRate, defaultClockRate(ca.mimeType))
+			assert.Equal(t, ca.channels, defaultChannels(ca.mimeType))
 		})
 	}
 }

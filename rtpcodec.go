@@ -144,6 +144,55 @@ func codecParametersFuzzySearch(
 	return RTPCodecParameters{}, codecMatchNone
 }
 
+// parseCodecFMTPs parses each codec's fmtp line once, so a caller searching many
+// needles against the same haystack does not re-parse it per needle.
+func parseCodecFMTPs(codecs []RTPCodecParameters) []fmtp.FMTP {
+	parsed := make([]fmtp.FMTP, len(codecs))
+	for i, c := range codecs {
+		parsed[i] = fmtp.Parse(
+			c.RTPCodecCapability.MimeType,
+			c.RTPCodecCapability.ClockRate,
+			c.RTPCodecCapability.Channels,
+			c.RTPCodecCapability.SDPFmtpLine)
+	}
+
+	return parsed
+}
+
+func codecParametersFuzzySearchParsed(
+	needle RTPCodecParameters,
+	haystack []RTPCodecParameters,
+	haystackFmtp []fmtp.FMTP,
+) (RTPCodecParameters, codecMatchType) {
+	needleFmtp := fmtp.Parse(
+		needle.RTPCodecCapability.MimeType,
+		needle.RTPCodecCapability.ClockRate,
+		needle.RTPCodecCapability.Channels,
+		needle.RTPCodecCapability.SDPFmtpLine)
+
+	// First attempt to match on MimeType + ClockRate + Channels + SDPFmtpLine
+	for i, c := range haystack {
+		if needleFmtp.Match(haystackFmtp[i]) {
+			return c, codecMatchExact
+		}
+	}
+
+	// Fallback to just MimeType + ClockRate + Channels
+	for _, c := range haystack {
+		if strings.EqualFold(c.RTPCodecCapability.MimeType, needle.RTPCodecCapability.MimeType) &&
+			fmtp.ClockRateEqual(c.RTPCodecCapability.MimeType,
+				c.RTPCodecCapability.ClockRate,
+				needle.RTPCodecCapability.ClockRate) &&
+			fmtp.ChannelsEqual(c.RTPCodecCapability.MimeType,
+				c.RTPCodecCapability.Channels,
+				needle.RTPCodecCapability.Channels) {
+			return c, codecMatchPartial
+		}
+	}
+
+	return RTPCodecParameters{}, codecMatchNone
+}
+
 // Given a CodecParameters find the RTX CodecParameters if one exists.
 func findRTXPayloadType(needle PayloadType, haystack []RTPCodecParameters) PayloadType {
 	aptStr := fmt.Sprintf("apt=%d", needle)
