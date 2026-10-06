@@ -1683,6 +1683,11 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		go func(track *TrackRemote) {
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 			n, err := track.peek(b)
+			for errors.Is(err, ErrCodecNotFound) {
+				// peek only buffers successful reads, so the rejected packet was
+				// consumed and retrying waits for the next packet.
+				n, err = track.peek(b)
+			}
 			if err != nil {
 				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
 
