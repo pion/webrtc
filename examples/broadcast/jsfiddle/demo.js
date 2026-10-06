@@ -41,7 +41,7 @@ window.createSession = isPublisher => {
       const el = document.getElementById('video1')
       el.srcObject = event.streams[0]
       el.autoplay = true
-      el.controls = true
+      el.playsInline = true
     }
   }
 

@@ -12,7 +12,7 @@
     <button class="signalingButton" onclick="window.doWHIP()">Publish</button>
     <button class="signalingButton" onclick="window.doWHEP()">Subscribe</button>
     <h3> Video </h3>
-    <video id="videoPlayer" autoplay muted controls style="width: 500"> </video>
+    <video id="videoPlayer" autoplay playsinline style="width: 500"> </video>
 
 
     <h3> Connection States </h3>
@@ -66,6 +66,7 @@
       disableSignalingButtons()
       navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
+          document.getElementById('videoPlayer').muted = true
           document.getElementById('videoPlayer').srcObject = stream
           stream.getTracks().forEach(track => peerConnection.addTrack(track, stream))
 
