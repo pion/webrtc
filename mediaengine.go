@@ -438,7 +438,7 @@ func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParame
 	return RTPCodecParameters{}, 0, ErrCodecNotFound
 }
 
-func (m *MediaEngine) collectStats(collector *statsReportCollector) {
+func (m *MediaEngine) collectStats(collector *statsReportCollector, transportStatsID string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -449,6 +449,7 @@ func (m *MediaEngine) collectStats(collector *statsReportCollector) {
 				Timestamp:   statsTimestampFrom(time.Now()),
 				Type:        StatsTypeCodec,
 				ID:          codec.statsID,
+				TransportID: transportStatsID,
 				PayloadType: codec.PayloadType,
 				MimeType:    codec.MimeType,
 				ClockRate:   codec.ClockRate,
