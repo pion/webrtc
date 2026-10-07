@@ -603,7 +603,7 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 	return g.agent
 }
 
-func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
+func (g *ICEGatherer) collectStats(collector *statsReportCollector, transportStatsID string) {
 	agent := g.getAgent()
 	if agent == nil {
 		return
@@ -621,6 +621,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 
 				continue
 			}
+			stats.TransportID = transportStatsID
 
 			collector.Collect(stats.ID, stats)
 		}
@@ -641,6 +642,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeLocalCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
@@ -668,6 +670,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeRemoteCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port

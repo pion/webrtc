@@ -1236,9 +1236,6 @@ type DataChannelStats struct {
 	// DataChannelIdentifier is the "id" attribute of the DataChannel object.
 	DataChannelIdentifier int32 `json:"dataChannelIdentifier"`
 
-	// TransportID the ID of the TransportStats object for transport used to carry this datachannel.
-	TransportID string `json:"transportId"`
-
 	// State is the "readyState" value of the DataChannel object.
 	State DataChannelState `json:"state"`
 

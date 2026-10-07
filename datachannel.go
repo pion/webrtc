@@ -749,8 +749,7 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		ID:        d.statsID,
 		Label:     d.label,
 		Protocol:  d.protocol,
-		// TransportID string `json:"transportId"`
-		State: d.ReadyState(),
+		State:     d.ReadyState(),
 	}
 
 	if d.id != nil {
