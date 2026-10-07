@@ -8,6 +8,7 @@ package webrtc
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4/internal/util"
@@ -34,6 +35,14 @@ type TrackLocalStaticRTP struct {
 	id, rid, streamID string
 	initalTimestamp   *uint32
 	initialSeqNumber  *uint16
+
+	// lastSequenceNumber, lastTimestamp and hasWrittenRTP record the RTP
+	// state of the most recently written packet, so RTPSender.ReplaceTrack
+	// can seed a replacement track to continue the RTP stream instead of
+	// restarting it with an unrelated sequence number (see #2623).
+	lastSequenceNumber atomic.Uint32
+	lastTimestamp      atomic.Uint32
+	hasWrittenRTP      atomic.Bool
 }
 
 // NewTrackLocalStaticRTP returns a TrackLocalStaticRTP.
@@ -130,6 +139,18 @@ func (s *TrackLocalStaticRTP) Unbind(t TrackLocalContext) error {
 	return ErrUnbindFailed
 }
 
+// lastRTPState returns the most recently written RTP sequence number and
+// timestamp for this track, if any packet has been written yet. It is used
+// by RTPSender.ReplaceTrack to preserve RTP stream continuity when this
+// track is replaced by a fresh TrackLocal (see #2623).
+func (s *TrackLocalStaticRTP) lastRTPState() (sequenceNumber uint16, timestamp uint32, ok bool) {
+	if !s.hasWrittenRTP.Load() {
+		return 0, 0, false
+	}
+
+	return uint16(s.lastSequenceNumber.Load()), s.lastTimestamp.Load(), true //nolint:gosec // G115
+}
+
 // ID is the unique identifier for this Track. This should be unique for the
 // stream, but doesn't have to globally unique. A common example would be 'audio' or 'video'
 // and StreamID would be 'desktop' or 'webcam'.
@@ -195,6 +216,10 @@ func (s *TrackLocalStaticRTP) WriteRTP(p *rtp.Packet) error {
 func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	s.lastSequenceNumber.Store(uint32(packet.Header.SequenceNumber))
+	s.lastTimestamp.Store(packet.Header.Timestamp)
+	s.hasWrittenRTP.Store(true)
 
 	writeErrs := []error{}
 
@@ -334,6 +359,39 @@ func (s *TrackLocalStaticSample) Bind(t TrackLocalContext) (RTPCodecParameters, 
 // because a track has been stopped.
 func (s *TrackLocalStaticSample) Unbind(t TrackLocalContext) error {
 	return s.rtpTrack.Unbind(t)
+}
+
+// lastRTPState returns the most recently written RTP sequence number and
+// timestamp for this track, if any packet has been written yet. It is used
+// by RTPSender.ReplaceTrack to preserve RTP stream continuity when this
+// track is replaced by a fresh TrackLocal (see #2623).
+func (s *TrackLocalStaticSample) lastRTPState() (sequenceNumber uint16, timestamp uint32, ok bool) {
+	return s.rtpTrack.lastRTPState()
+}
+
+// continueSequenceFrom seeds this not-yet-bound track's initial RTP sequence
+// number and timestamp so that, once Bind creates its packetizer, the RTP
+// stream continues from the given state instead of starting at an unrelated
+// value. It is a no-op if the packetizer has already been created, or if the
+// caller already requested explicit values via WithRTPSequenceNumber/
+// WithRTPTimestamp.
+func (s *TrackLocalStaticSample) continueSequenceFrom(sequenceNumber uint16, timestamp uint32) {
+	s.rtpTrack.mu.Lock()
+	defer s.rtpTrack.mu.Unlock()
+
+	if s.packetizer != nil {
+		return
+	}
+
+	if s.rtpTrack.initialSeqNumber == nil {
+		next := sequenceNumber + 1
+		s.rtpTrack.initialSeqNumber = &next
+	}
+
+	if s.rtpTrack.initalTimestamp == nil {
+		ts := timestamp
+		s.rtpTrack.initalTimestamp = &ts
+	}
 }
 
 // WriteSample writes a Sample to the TrackLocalStaticSample
