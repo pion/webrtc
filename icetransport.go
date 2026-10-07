@@ -193,6 +193,24 @@ func (t *ICETransport) StartContext(
 	}
 
 	if t.State() == ICETransportStateClosed {
+		// The transport was stopped while Dial/Accept was in flight.
+		// Release the cancel function, mirroring the error path above.
+		ctxCancel()
+		t.ctxCancel = nil
+
+		// Closing the gatherer releases the underlying ICE agent and its
+		// sockets. It must happen outside the transport lock: the close
+		// synchronously invokes the user's OnStateChange callback, which
+		// may re-enter the transport and would deadlock on t.lock. The
+		// close is idempotent and serialized by the gatherer lock, so
+		// racing with a concurrent Stop is safe.
+		gatherer := t.gatherer
+		t.lock.Unlock()
+		if gatherer != nil {
+			_ = gatherer.Close()
+		}
+		t.lock.Lock()
+
 		return errICETransportClosed
 	}
 
