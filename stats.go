@@ -668,19 +668,10 @@ type OutboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
-
-	// TrackID is the identifier of the stats object representing the current track
-	// attachment to the sender of this stream, a SenderAudioTrackAttachmentStats
-	// or SenderVideoTrackAttachmentStats.
-	TrackID string `json:"trackId"`
-
-	// SenderID is the stats ID used to look up the AudioSenderStats or VideoSenderStats
-	// object sending this stream.
-	SenderID string `json:"senderId"`
 
 	// RemoteID is used for looking up the remote RemoteInboundRTPStreamStats object
 	// for the same SSRC.

@@ -182,8 +182,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 		QPSum:                    5,
 		PacketsSent:              6,
 		BytesSent:                9,
-		TrackID:                  "d57dbc4b-484b-4b40-9088-d3150e3a2010",
-		SenderID:                 "S01",
 		RemoteID:                 "ROA2184088143",
 		LastPacketSentTimestamp:  11,
 		TargetBitrate:            12,
@@ -234,8 +232,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
   "qpSum": 5,
   "packetsSent": 6,
   "bytesSent": 9,
-  "trackId": "d57dbc4b-484b-4b40-9088-d3150e3a2010",
-  "senderId": "S01",
   "remoteId": "ROA2184088143",
   "lastPacketSentTimestamp": 11,
   "targetBitrate": 12,
@@ -1195,6 +1191,67 @@ func findInboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []InboundRTPStream
 	return result
 }
 
+func findOutboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []OutboundRTPStreamStats {
+	result := []OutboundRTPStreamStats{}
+	for _, s := range report {
+		if stats, ok := s.(OutboundRTPStreamStats); ok && stats.SSRC == ssrc {
+			result = append(result, stats)
+		}
+	}
+
+	return result
+}
+
+func assertInboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection) {
+	t.Helper()
+
+	for _, r := range pc.GetReceivers() {
+		for _, tr := range r.Tracks() {
+			if tr.SSRC() == 0 {
+				continue
+			}
+			matches := findInboundRTPStatsBySSRC(report, tr.SSRC())
+			require.NotEmpty(t, matches)
+
+			for _, inboundStats := range matches {
+				assert.Equal(t, StatsTypeInboundRTP, inboundStats.Type)
+				assert.Equal(t, tr.SSRC(), inboundStats.SSRC)
+				assert.Equal(t, tr.ID(), inboundStats.TrackIdentifier)
+				assert.NotEmpty(t, inboundStats.Kind)
+				assert.NotEmpty(t, inboundStats.TransportID)
+				assert.Greater(t, inboundStats.PacketsReceived, uint64(0))
+				assert.GreaterOrEqual(t, inboundStats.PacketsLost, int64(0))
+				assert.Greater(t, inboundStats.BytesReceived, uint64(0))
+				assert.GreaterOrEqual(t, inboundStats.Jitter, 0.0)
+				assert.GreaterOrEqual(t, inboundStats.HeaderBytesReceived, uint64(0))
+				assert.GreaterOrEqual(t, inboundStats.LastPacketReceivedTimestamp, StatsTimestamp(0))
+				assert.GreaterOrEqual(t, inboundStats.FIRCount, uint32(0))
+				assert.GreaterOrEqual(t, inboundStats.PLICount, uint32(0))
+				assert.GreaterOrEqual(t, inboundStats.NACKCount, uint32(0))
+			}
+		}
+	}
+}
+
+func assertOutboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection) {
+	t.Helper()
+
+	for _, sender := range pc.GetSenders() {
+		ssrc := sender.GetParameters().Encodings[0].SSRC
+		matches := findOutboundRTPStatsBySSRC(report, ssrc)
+		require.Len(t, matches, 1)
+
+		outboundStats := matches[0]
+		assert.Equal(t, StatsTypeOutboundRTP, outboundStats.Type)
+		assert.Equal(t, sender.rtpTransceiver.Mid(), outboundStats.Mid)
+		assert.Equal(t, "video", outboundStats.Kind)
+		assert.NotEmpty(t, outboundStats.TransportID)
+		assert.Greater(t, outboundStats.PacketsSent, uint64(0))
+		assert.Greater(t, outboundStats.BytesSent, uint64(0))
+		assert.Greater(t, outboundStats.HeaderBytesSent, uint64(0))
+	}
+}
+
 func signalPairForStats(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
 	offerChan := make(chan SessionDescription)
 	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
@@ -1410,33 +1467,10 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	// Get fresh stats after sending the sample
 	reportPCAnswer = answerPC.GetStats()
 
-	receivers := answerPC.GetReceivers()
-	for _, r := range receivers {
-		for _, tr := range r.Tracks() {
-			if tr.SSRC() == 0 {
-				continue
-			}
-			matches := findInboundRTPStatsBySSRC(reportPCAnswer, tr.SSRC())
-			require.NotEmpty(t, matches)
+	assertInboundRTPStats(t, reportPCAnswer, answerPC)
 
-			for _, inboundStats := range matches {
-				assert.Equal(t, StatsTypeInboundRTP, inboundStats.Type)
-				assert.Equal(t, tr.SSRC(), inboundStats.SSRC)
-				assert.Equal(t, tr.ID(), inboundStats.TrackIdentifier)
-				assert.NotEmpty(t, inboundStats.Kind)
-				assert.NotEmpty(t, inboundStats.TransportID)
-				assert.Greater(t, inboundStats.PacketsReceived, uint64(0))
-				assert.GreaterOrEqual(t, inboundStats.PacketsLost, int64(0))
-				assert.Greater(t, inboundStats.BytesReceived, uint64(0))
-				assert.GreaterOrEqual(t, inboundStats.Jitter, 0.0)
-				assert.GreaterOrEqual(t, inboundStats.HeaderBytesReceived, uint64(0))
-				assert.GreaterOrEqual(t, inboundStats.LastPacketReceivedTimestamp, StatsTimestamp(0))
-				assert.GreaterOrEqual(t, inboundStats.FIRCount, uint32(0))
-				assert.GreaterOrEqual(t, inboundStats.PLICount, uint32(0))
-				assert.GreaterOrEqual(t, inboundStats.NACKCount, uint32(0))
-			}
-		}
-	}
+	reportPCOffer = offerPC.GetStats()
+	assertOutboundRTPStats(t, reportPCOffer, offerPC)
 	assert.NoError(t, err)
 	for i := range offerPC.api.mediaEngine.videoCodecs {
 		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.videoCodecs[i]))
