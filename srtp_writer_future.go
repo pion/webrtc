@@ -27,6 +27,11 @@ type srtpWriterFuture struct {
 }
 
 func (s *srtpWriterFuture) init(returnWhenNoSRTP bool) error { //nolint:cyclop
+	// Sending needs SRTP, which otherwise starts only when a negotiation
+	// brings media, and never on the ORTC path.
+	if err := s.rtpSender.transport.wantSRTP(); err != nil {
+		return err
+	}
 	if returnWhenNoSRTP {
 		select {
 		case <-s.rtpSender.stopCalled:

@@ -55,6 +55,8 @@ type DTLSTransport struct {
 	srtpEndpoint, srtcpEndpoint *mux.Endpoint
 	simulcastStreams            []simulcastStreamPair
 	srtpReady                   chan struct{}
+	srtpWanted                  bool // media was negotiated, guarded by lock
+	srtpCanStart                bool // DTLS is connected, guarded by lock
 
 	dtlsMatcher mux.MatchFunc
 
@@ -158,6 +160,9 @@ func (t *DTLSTransport) State() DTLSTransportState {
 // WriteRTCP sends a user provided RTCP packet to the connected peer. If no peer is connected the
 // packet is discarded.
 func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
+	if err := t.wantSRTP(); err != nil {
+		return 0, err
+	}
 	raw, err := rtcp.Marshal(pkts)
 	if err != nil {
 		return 0, err
@@ -203,6 +208,22 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	defer t.lock.RUnlock()
 
 	return t.remoteCertificate
+}
+
+// wantSRTP starts the SRTP sessions now, or once DTLS connects. It is called
+// when a negotiation brings media.
+func (t *DTLSTransport) wantSRTP() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.srtpWanted {
+		return nil
+	}
+	t.srtpWanted = true
+	if !t.srtpCanStart {
+		return nil
+	}
+
+	return t.startSRTP()
 }
 
 // startSRTP requires the caller holds the lock.
@@ -599,7 +620,14 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 
-	return t.startSRTP()
+	// SRTP starts once media is negotiated, so a connection with only data
+	// channels runs no SRTP sessions.
+	t.srtpCanStart = true
+	if t.srtpWanted {
+		return t.startSRTP()
+	}
+
+	return nil
 }
 
 func (t *DTLSTransport) failStart(err error) error {
@@ -708,6 +736,9 @@ func (t *DTLSTransport) streamsForSSRC(
 	ssrc SSRC,
 	streamInfo interceptor.StreamInfo,
 ) (*streamsForSSRCResult, error) {
+	if err := t.wantSRTP(); err != nil {
+		return nil, err
+	}
 	srtpSession, err := t.getSRTPSession()
 	if err != nil {
 		return nil, err

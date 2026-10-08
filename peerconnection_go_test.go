@@ -56,6 +56,16 @@ func (api *API) newPair(cfg Configuration) (pcOffer *PeerConnection, pcAnswer *P
 	return pca, pcb, nil
 }
 
+// waitForDTLSConnected waits for the DTLS transport, which is when SRTP would
+// start if the connection had media. A data only connection never starts SRTP.
+func waitForDTLSConnected(t *testing.T, pc *PeerConnection) {
+	t.Helper()
+
+	assert.Eventually(t, func() bool {
+		return pc.dtlsTransport.State() == DTLSTransportStateConnected
+	}, 20*time.Second, 10*time.Millisecond, "timed out waiting for DTLS")
+}
+
 func waitForSRTPReady(t *testing.T, pc *PeerConnection) {
 	t.Helper()
 
@@ -3599,8 +3609,8 @@ func TestCryptexRequiredDataOnlyOfferAcceptsNonCryptexAnswer(t *testing.T) {
 	// The Require-policy offerer must accept this non-Cryptex, data-only answer without error.
 	require.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	waitForSRTPReady(t, pcOffer)
-	waitForSRTPReady(t, pcAnswer)
+	waitForDTLSConnected(t, pcOffer)
+	waitForDTLSConnected(t, pcAnswer)
 	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode())
 	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
 }
@@ -3756,8 +3766,8 @@ func TestCryptexDataOnlyThenAddRTPRenegotiation(t *testing.T) {
 
 	require.NoError(t, pcOffer.SetRemoteDescription(answer))
 
-	waitForSRTPReady(t, pcOffer)
-	waitForSRTPReady(t, pcAnswer)
+	waitForDTLSConnected(t, pcOffer)
+	waitForDTLSConnected(t, pcAnswer)
 
 	// Neither side has negotiated any RTP media yet; add the first audio transceiver and renegotiate.
 	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeAudio)
@@ -3781,6 +3791,8 @@ func TestCryptexDataOnlyThenAddRTPRenegotiation(t *testing.T) {
 
 	err = pcOffer.SetRemoteDescription(answer2)
 	require.NoError(t, err, "adding the first RTP media must not permanently break renegotiation")
+	waitForSRTPReady(t, pcOffer)
+	waitForSRTPReady(t, pcAnswer)
 	require.Equal(t, srtp.CryptexModeDisabled, dtlsCryptexMode(pcOffer))
 }
 
