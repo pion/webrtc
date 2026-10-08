@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -1480,4 +1481,89 @@ func TestPeerConnection_Renegotiation_DTLSRole(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPeerConnection_Renegotiation_ReuseAfterInactive asserts that a track sent
+// on a transceiver that the remote description made inactive more than once
+// still fires OnTrack. Every inactive remote description stops the transceiver,
+// so the receiver that replaced the first stopped one must be replaced too.
+func TestPeerConnection_Renegotiation_ReuseAfterInactive(t *testing.T) {
+	for _, codec := range []struct{ name, mimeType string }{
+		{"VP8", MimeTypeVP8},
+		{"Opus", MimeTypeOpus},
+	} {
+		for _, inactiveOffers := range []int{1, 2, 3} {
+			t.Run(fmt.Sprintf("%s_%d_inactive", codec.name, inactiveOffers), func(t *testing.T) {
+				testRenegotiationReuseAfterInactive(t, codec.mimeType, inactiveOffers)
+			})
+		}
+	}
+}
+
+func testRenegotiationReuseAfterInactive(t *testing.T, mimeType string, inactiveOffers int) {
+	t.Helper()
+
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	pcOffer, pcAnswer, err := newPair()
+	assert.NoError(t, err)
+
+	trackIDs := make(chan string, 2)
+	pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+		trackIDs <- track.ID()
+		go func() {
+			for {
+				if _, _, readErr := track.ReadRTP(); readErr != nil {
+					return
+				}
+			}
+		}()
+	})
+
+	first, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: mimeType}, "first", "pion")
+	assert.NoError(t, err)
+	transceiver, err := pcOffer.AddTransceiverFromTrack(first,
+		RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
+	assert.NoError(t, err)
+
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	firstReceived := make(chan struct{})
+	go func() {
+		<-trackIDs
+		close(firstReceived)
+	}()
+	sendVideoUntilDone(t, firstReceived, []*TrackLocalStaticSample{first})
+
+	// The transceiver goes inactive, and stays so while the offerer renegotiates.
+	assert.NoError(t, pcOffer.RemoveTrack(transceiver.Sender()))
+	for range inactiveOffers {
+		assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	}
+
+	// A new track reuses the transceiver.
+	second, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: mimeType}, "second", "pion")
+	assert.NoError(t, err)
+	_, err = pcOffer.AddTrack(second)
+	assert.NoError(t, err)
+	assert.NoError(t, signalPair(pcOffer, pcAnswer))
+	assert.True(t, sdpMidHasSsrc(*pcOffer.LocalDescription(), transceiver.Mid(),
+		transceiver.Sender().trackEncodings[0].ssrc), "the new track must reuse the transceiver")
+
+	secondReceived := make(chan struct{})
+	received := ""
+	go func() {
+		select {
+		case received = <-trackIDs:
+		case <-time.After(10 * time.Second):
+		}
+		close(secondReceived)
+	}()
+	sendVideoUntilDone(t, secondReceived, []*TrackLocalStaticSample{second})
+	assert.Equal(t, "second", received)
+
+	closePairNow(t, pcOffer, pcAnswer)
 }
