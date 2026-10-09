@@ -38,7 +38,8 @@ type SampleBuilder struct {
 	// prepared contains the samples that have been processed to date
 	prepared sampleSequenceLocation
 
-	lastSampleTimestamp *uint32
+	lastSampleTimestamp    uint32
+	hasLastSampleTimestamp bool
 
 	// number of packets forced to be dropped
 	droppedPackets uint16
@@ -199,12 +200,17 @@ func (s *SampleBuilder) Push(packet *rtp.Packet) {
 	s.purgeBuffers(false)
 }
 
-// Flush marks all samples in the buffer to be popped.
+// Flush marks all samples in the buffer to be popped and resets cross-sample
+// state so a subsequent RTP stream is not affected by packets processed before
+// the flush.
 func (s *SampleBuilder) Flush() {
 	s.purgeBuffers(true)
-}
 
-const secondToNanoseconds = 1000000000
+	s.hasLastSampleTimestamp = false
+	s.lastSampleTimestamp = 0
+	s.droppedPackets = 0
+	s.paddingPackets = 0
+}
 
 // buildSample creates a sample from a valid collection of RTP Packets by
 // walking forwards building a sample if everything looks good clear and
@@ -273,7 +279,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if !s.depacketizer.IsPartitionHead(s.buffer[consume.head].Payload) {
 		isPadding := false
 		for i := consume.head; i != consume.tail; i++ {
-			if s.lastSampleTimestamp != nil && *s.lastSampleTimestamp == s.buffer[i].Timestamp && len(s.buffer[i].Payload) == 0 {
+			if s.hasLastSampleTimestamp && s.lastSampleTimestamp == s.buffer[i].Timestamp && len(s.buffer[i].Payload) == 0 {
 				isPadding = true
 			}
 		}
@@ -288,7 +294,11 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	}
 
 	// merge all the buffers into a sample
-	data := []byte{}
+	var dataLen int
+	for i := consume.head; i != consume.tail; i++ {
+		dataLen += len(s.buffer[i].Payload)
+	}
+	data := make([]byte, 0, dataLen)
 	var metadata any
 	var rtpHeaders []*rtp.Header
 	for i := consume.head; i != consume.tail; i++ {
@@ -308,9 +318,16 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	}
 	samples := afterTimestamp - sampleTimestamp
 
+	var duration time.Duration
+	if s.sampleRate == 0 {
+		duration = 0
+	} else {
+		duration = time.Duration(samples) * time.Second / time.Duration(s.sampleRate)
+	}
+
 	sample := &media.Sample{
 		Data:               data,
-		Duration:           time.Duration((float64(samples)/float64(s.sampleRate))*secondToNanoseconds) * time.Nanosecond,
+		Duration:           duration,
 		PacketTimestamp:    sampleTimestamp,
 		PrevDroppedPackets: s.droppedPackets,
 		Metadata:           metadata,
@@ -319,8 +336,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	s.droppedPackets = 0
 	s.paddingPackets = 0
-	s.lastSampleTimestamp = new(uint32)
-	*s.lastSampleTimestamp = sampleTimestamp
+	s.lastSampleTimestamp = sampleTimestamp
+	s.hasLastSampleTimestamp = true
 
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
