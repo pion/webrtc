@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4/packetio"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/packetio"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -276,7 +276,7 @@ func BenchmarkDispatch(b *testing.B) {
 		if err != nil {
 			b.Errorf("dispatch: %v", err)
 		}
-		_, err = endpoint.buffer.Read(buf2)
+		_, _, err = endpoint.buffer.Read(buf2, nil)
 		if err != nil {
 			b.Errorf("read: %v", err)
 		}

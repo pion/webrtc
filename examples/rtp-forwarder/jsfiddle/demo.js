@@ -21,7 +21,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     pc.createOffer().then(d => pc.setLocalDescription(d)).catch(log)
   }).catch(log)
 
-pc.oniceconnectionstatechange = e => log(pc.iceConnectionState)
+pc.onconnectionstatechange = e => log(pc.connectionState)
 pc.onicecandidate = event => {
   if (event.candidate === null) {
     document.getElementById('localSessionDescription').value = btoa(JSON.stringify(pc.localDescription))
@@ -33,6 +33,7 @@ window.startSession = () => {
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
+  document.getElementById('startSessionButton').disabled = true
 
   try {
     pc.setRemoteDescription(JSON.parse(atob(sd)))

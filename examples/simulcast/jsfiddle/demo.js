@@ -10,8 +10,8 @@ const pc = new RTCPeerConnection({
   }]
 })
 
-pc.oniceconnectionstatechange = (e) => {
-  console.log('connection state change', pc.iceConnectionState)
+pc.onconnectionstatechange = (e) => {
+  console.log('connection state change', pc.connectionState)
 }
 pc.onicecandidate = (event) => {
   if (event.candidate === null) {
@@ -85,6 +85,7 @@ window.startSession = () => {
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
+  document.getElementById('startSessionButton').disabled = true
 
   try {
     console.log('answer', JSON.parse(atob(sd)))

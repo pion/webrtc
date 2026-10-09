@@ -12,8 +12,8 @@ const pc = new RTCPeerConnection({
   ]
 })
 
-pc.oniceconnectionstatechange = e => {
-  console.debug('connection state change', pc.iceConnectionState)
+pc.onconnectionstatechange = e => {
+  console.debug('connection state change', pc.connectionState)
 }
 pc.onicecandidate = event => {
   if (event.candidate === null) {
@@ -69,6 +69,7 @@ window.startSession = () => {
   if (sd === '') {
     return alert('Session Description must not be empty')
   }
+  document.getElementById('startSessionButton').disabled = true
 
   try {
     pc.setRemoteDescription(JSON.parse(atob(sd)))

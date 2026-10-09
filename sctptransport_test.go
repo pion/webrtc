@@ -8,12 +8,14 @@ package webrtc
 import (
 	"bufio"
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/pion/dtls/v3"
 	"github.com/pion/sctp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,6 +63,129 @@ func TestGenerateDataChannelID(t *testing.T) {
 			"expected new id to be added to the map",
 		)
 	}
+}
+
+func TestSCTPTransportStartContextCanceled(t *testing.T) {
+	transport := NewAPI().NewSCTPTransport(nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	require.ErrorIs(t, transport.StartContext(ctx, SCTPCapabilities{}), context.Canceled)
+	assert.False(t, transport.isStarted)
+	assert.Equal(t, SCTPTransportStateConnecting, transport.State())
+	assert.Nil(t, transport.association())
+}
+
+// newSCTPTestDTLSPair connects ICE and DTLS while leaving SCTP unstarted.
+func newSCTPTestDTLSPair(t *testing.T) (*testORTCStack, *testORTCStack) {
+	t.Helper()
+
+	stackA, stackB, err := newORTCPair()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, stackA.close())
+		assert.NoError(t, stackB.close())
+	})
+	signalA, err := stackA.getSignal()
+	require.NoError(t, err)
+	signalB, err := stackB.getSignal()
+	require.NoError(t, err)
+	require.NoError(t, stackA.ice.SetRemoteCandidates(signalB.ICECandidates))
+	require.NoError(t, stackB.ice.SetRemoteCandidates(signalA.ICECandidates))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	started := make(chan error, 2)
+	for i, stack := range []*testORTCStack{stackA, stackB} {
+		go func() {
+			role, signal := ICERoleControlling, signalB
+			if i == 1 {
+				role, signal = ICERoleControlled, signalA
+			}
+			if err := stack.ice.StartContext(ctx, nil, signal.ICEParameters, &role); err != nil {
+				started <- err
+
+				return
+			}
+			started <- stack.dtls.StartContext(ctx, signal.DTLSParameters)
+		}()
+	}
+	require.NoError(t, <-started)
+	require.NoError(t, <-started)
+
+	return stackA, stackB
+}
+
+func TestSCTPTransportStartContextInterrupted(t *testing.T) {
+	for _, name := range []string{"cancel", "deadline"} {
+		t.Run(name, func(t *testing.T) {
+			stackA, stackB := newSCTPTestDTLSPair(t)
+			timeout, wantErr := 5*time.Second, context.Canceled
+			if name == "deadline" {
+				timeout, wantErr = 250*time.Millisecond, context.DeadlineExceeded
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+
+			started := make(chan error, 1)
+			go func() {
+				started <- stackA.sctp.StartContext(ctx, SCTPCapabilities{})
+			}()
+
+			// Receiving INIT proves that cancellation interrupts an active handshake.
+			require.NoError(t, stackB.dtls.conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+			packet := make([]byte, 1500)
+			_, err := stackB.dtls.conn.Read(packet)
+			require.NoError(t, err)
+			if name == "cancel" {
+				cancel()
+			}
+
+			select {
+			case err = <-started:
+				require.ErrorIs(t, err, wantErr)
+			case <-time.After(5 * time.Second):
+				require.FailNow(t, "SCTP handshake did not stop when its context ended")
+			}
+			// Cancellation closes DTLS before any test cleanup runs.
+			require.Eventually(t, func() bool {
+				_, writeErr := stackA.dtls.conn.Write(nil)
+
+				return errors.Is(writeErr, dtls.ErrConnClosed)
+			}, 5*time.Second, time.Millisecond)
+			assert.Nil(t, stackA.sctp.association())
+			assert.Equal(t, SCTPTransportStateClosed, stackA.sctp.State())
+		})
+	}
+}
+
+func TestSCTPTransportStartContextCancelAfterConnected(t *testing.T) {
+	stackA, stackB := newSCTPTestDTLSPair(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	started := make(chan error, 1)
+	go func() {
+		started <- stackB.sctp.StartContext(ctx, SCTPCapabilities{})
+	}()
+	require.NoError(t, stackA.sctp.StartContext(ctx, SCTPCapabilities{}))
+	require.NoError(t, <-started)
+	cancel()
+
+	// Streams opened before sending are not consumed by the data channel accept loop.
+	sender, err := stackA.sctp.association().OpenStream(0, sctp.PayloadTypeWebRTCBinary)
+	require.NoError(t, err)
+	receiver, err := stackB.sctp.association().OpenStream(0, sctp.PayloadTypeWebRTCBinary)
+	require.NoError(t, err)
+	require.NoError(t, receiver.SetReadDeadline(time.Now().Add(5*time.Second)))
+	message := []byte("still connected")
+	_, err = sender.Write(message)
+	require.NoError(t, err)
+	buf := make([]byte, len(message))
+	n, err := receiver.Read(buf)
+	require.NoError(t, err)
+	assert.Equal(t, message, buf[:n])
+	assert.Equal(t, SCTPTransportStateConnected, stackA.sctp.State())
 }
 
 func TestSCTPTransportMetadataNotReady(t *testing.T) {
@@ -352,18 +477,31 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 				close(writeDetach)
 			})
 
+			offerConnected := make(chan struct{}, 1)
+			answerConnected := make(chan struct{}, 1)
+			offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+				if state == PeerConnectionStateConnected {
+					select {
+					case offerConnected <- struct{}{}:
+					default:
+					}
+				}
+			})
+			answerPC.OnConnectionStateChange(func(state PeerConnectionState) {
+				if state == PeerConnectionStateConnected {
+					select {
+					case answerConnected <- struct{}{}:
+					default:
+					}
+				}
+			})
+
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				connestd := make(chan struct{}, 1)
-				offerPC.OnConnectionStateChange(func(state PeerConnectionState) {
-					if state == PeerConnectionStateConnected {
-						connestd <- struct{}{}
-					}
-				})
 				select {
-				case <-connestd:
+				case <-offerConnected:
 				case <-time.After(10 * time.Second):
 					assert.Fail(t, "conn establishment timed out")
 
@@ -379,14 +517,8 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			}()
 			go func() {
 				defer wg.Done()
-				connestd := make(chan struct{}, 1)
-				answerPC.OnConnectionStateChange(func(state PeerConnectionState) {
-					if state == PeerConnectionStateConnected {
-						connestd <- struct{}{}
-					}
-				})
 				select {
-				case <-connestd:
+				case <-answerConnected:
 				case <-time.After(10 * time.Second):
 					assert.Fail(t, "connection establishment timed out")
 
@@ -406,7 +538,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 	for range N {
 		select {
 		case <-done:
-		case <-time.After(20 * time.Second):
+		case <-time.After(30 * time.Second):
 			assert.Fail(t, "timed out")
 		}
 	}

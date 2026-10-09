@@ -40,6 +40,8 @@ const (
 
 	outboundMTU = 1200
 
+	sctpOutboundMTU = 1191
+
 	rtpPayloadTypeBitmask = 0x7F
 
 	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"

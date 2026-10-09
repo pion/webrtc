@@ -3,8 +3,6 @@
 name: Browser E2E
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -15,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: test
         run: |
           docker build -t pion-webrtc-e2e -f e2e/Dockerfile .

@@ -14,7 +14,7 @@ import (
 
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v3"
+	"github.com/pion/stun/v4"
 )
 
 // ICEGatherer gathers local host, server reflexive and relay
@@ -35,7 +35,7 @@ type ICEGatherer struct {
 	onStateChangeHandler    atomic.Value // func(state ICEGathererState)
 
 	// Used for GatheringCompletePromise
-	onGatheringCompleteHandler atomic.Value // func()
+	onGatheringCompleteHandler atomic.Pointer[func()]
 
 	api *API
 
@@ -330,7 +330,7 @@ func (g *ICEGatherer) timeoutOptions() []ice.AgentOption {
 }
 
 func (g *ICEGatherer) miscOptions() []ice.AgentOption {
-	opts := make([]ice.AgentOption, 0, 4)
+	opts := make([]ice.AgentOption, 0, 5)
 
 	if g.api.settingEngine.candidates.MulticastDNSHostName != "" {
 		opts = append(opts, ice.WithMulticastDNSHostName(g.api.settingEngine.candidates.MulticastDNSHostName))
@@ -346,6 +346,10 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 
 	if g.api.settingEngine.iceMaxBindingRequests != nil {
 		opts = append(opts, ice.WithMaxBindingRequests(*g.api.settingEngine.iceMaxBindingRequests))
+	}
+
+	if g.api.settingEngine.iceUseCandidateCheckPriority {
+		opts = append(opts, ice.WithEnableUseCandidateCheckPriority())
 	}
 
 	return opts
@@ -427,11 +431,6 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 			onLocalCandidateHandler = handler
 		}
 
-		onGatheringCompleteHandler := func() {}
-		if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
-			onGatheringCompleteHandler = handler
-		}
-
 		sdpMid := ""
 
 		if mid, ok := g.sdpMid.Load().(string); ok {
@@ -459,7 +458,9 @@ func (g *ICEGatherer) Gather() error { //nolint:cyclop
 			onLocalCandidateHandler(&c)
 		} else {
 			g.setState(ICEGathererStateComplete)
-			onGatheringCompleteHandler()
+			if handler := g.onGatheringCompleteHandler.Load(); handler != nil && *handler != nil {
+				(*handler)()
+			}
 
 			// If gathering completes before flushing (i.e., before SetLocalDescription), avoid triggering nil.
 			// Users expect valid candidates to be emitted before the nil completion signal.
@@ -558,8 +559,8 @@ func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
 	// onGatheringCompleteHandler is used solely by the GatheringCompletePromise helper and the common usage
 	// for that helper is aided by ensuring that this completion is fired in case the PC/ICEGatherer are closed
 	// before gathering actually completes. If things have already completed then this should be a no-op
-	if handler, ok := g.onGatheringCompleteHandler.Load().(func()); ok && handler != nil {
-		handler()
+	if handler := g.onGatheringCompleteHandler.Load(); handler != nil && *handler != nil {
+		(*handler)()
 	}
 
 	g.agent = nil

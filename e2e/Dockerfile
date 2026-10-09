@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 # SPDX-License-Identifier: MIT
 
-FROM golang:1.26-alpine
+FROM golang:1.27-alpine
 
 RUN apk add --no-cache \
   chromium \

@@ -39,7 +39,7 @@ const (
 	listenAddr     = ":8080"
 	sctpPort       = 5000
 	maxMessageSize = 64 * 1024 * 1024
-	outboundMTU    = 1200
+	outboundMTU    = 1191
 	readBufferSize = 20 * 1024 * 1024
 )
 

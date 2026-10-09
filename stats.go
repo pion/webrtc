@@ -2015,14 +2015,18 @@ type TransportStats struct {
 	// Present only if DTLS is negotiated.
 	RemoteCertificateID string `json:"remoteCertificateId"`
 
+	// TLSVersion is the negotiated protocol version as four uppercase hexadecimal digits.
+	// It is empty until DTLS negotiation completes. Value is always "FEFD" (DTLS 1.2)
+	TLSVersion string `json:"tlsVersion,omitempty"`
+
 	// DTLSCipher is the descriptive name of the cipher suite used for the DTLS transport,
 	// as defined in the "Description" column of the IANA cipher suite registry.
-	DTLSCipher string `json:"dtlsCipher"`
+	DTLSCipher string `json:"dtlsCipher,omitempty"`
 
 	// SRTPCipher is the descriptive name of the protection profile used for the SRTP
 	// transport, as defined in the "Profile" column of the IANA DTLS-SRTP protection
 	// profile registry.
-	SRTPCipher string `json:"srtpCipher"`
+	SRTPCipher string `json:"srtpCipher,omitempty"`
 }
 
 func (s TransportStats) statsMarker() {}

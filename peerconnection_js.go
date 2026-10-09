@@ -34,6 +34,10 @@ type PeerConnection struct {
 	// Used by GatheringCompletePromise
 	onGatherCompleteHandler func()
 
+	// The browser's getConfiguration() never echoes back this non-standard dictionary member, so
+	// it must be tracked here to validate immutability and to answer GetConfiguration correctly.
+	rtpHeaderEncryptionPolicy RTPHeaderEncryptionPolicy
+
 	// A reference to the associated API state used by this connection
 	api *API
 }
@@ -51,11 +55,16 @@ func (api *API) NewPeerConnection(configuration Configuration) (_ *PeerConnectio
 			err = recoveryToError(e)
 		}
 	}()
+	rtpHeaderEncryptionPolicy := configuration.RTPHeaderEncryptionPolicy
+	if rtpHeaderEncryptionPolicy == RTPHeaderEncryptionPolicyUnknown {
+		rtpHeaderEncryptionPolicy = RTPHeaderEncryptionPolicyNegotiate
+	}
 	configMap := configurationToValue(configuration)
 	underlying := js.Global().Get("window").Get("RTCPeerConnection").New(configMap)
 	return &PeerConnection{
-		underlying: underlying,
-		api:        api,
+		underlying:                underlying,
+		api:                       api,
+		rtpHeaderEncryptionPolicy: rtpHeaderEncryptionPolicy,
 	}, nil
 }
 
@@ -195,6 +204,15 @@ func (pc *PeerConnection) checkConfiguration(configuration Configuration) error 
 		}
 	}
 
+	// RTPHeaderEncryptionPolicy is immutable after construction, like BundlePolicy/RTCPMuxPolicy
+	// above. The underlying browser's setConfiguration ignores this non-standard dictionary
+	// member, so this must be validated here rather than relying on the browser to reject it.
+	if configuration.RTPHeaderEncryptionPolicy != RTPHeaderEncryptionPolicyUnknown {
+		if configuration.RTPHeaderEncryptionPolicy != pc.rtpHeaderEncryptionPolicy {
+			return &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy}
+		}
+	}
+
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #7)
 	if configuration.ICECandidatePoolSize != 0 {
 		if configuration.ICECandidatePoolSize != existingConfig.ICECandidatePoolSize &&
@@ -236,7 +254,11 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) (err err
 // has been called with Configuration passed as its only argument.
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-getconfiguration
 func (pc *PeerConnection) GetConfiguration() Configuration {
-	return valueToConfiguration(pc.underlying.Call("getConfiguration"))
+	config := valueToConfiguration(pc.underlying.Call("getConfiguration"))
+	// The browser doesn't know about this non-standard field, so it's tracked separately.
+	config.RTPHeaderEncryptionPolicy = pc.rtpHeaderEncryptionPolicy
+
+	return config
 }
 
 // CreateOffer starts the PeerConnection and generates the localDescription
@@ -402,24 +424,31 @@ func (pc *PeerConnection) Close() (err error) {
 
 	// Release any handlers as required by the syscall/js API.
 	if pc.onSignalingStateChangeHandler != nil {
+		pc.underlying.Set("onsignalingstatechange", js.Null())
 		pc.onSignalingStateChangeHandler.Release()
 	}
 	if pc.onDataChannelHandler != nil {
+		pc.underlying.Set("ondatachannel", js.Null())
 		pc.onDataChannelHandler.Release()
 	}
 	if pc.onNegotiationNeededHandler != nil {
+		pc.underlying.Set("onnegotiationneeded", js.Null())
 		pc.onNegotiationNeededHandler.Release()
 	}
 	if pc.onConnectionStateChangeHandler != nil {
+		pc.underlying.Set("onconnectionstatechange", js.Null())
 		pc.onConnectionStateChangeHandler.Release()
 	}
 	if pc.onICEConnectionStateChangeHandler != nil {
+		pc.underlying.Set("oniceconnectionstatechange", js.Null())
 		pc.onICEConnectionStateChangeHandler.Release()
 	}
 	if pc.onICECandidateHandler != nil {
+		pc.underlying.Set("onicecandidate", js.Null())
 		pc.onICECandidateHandler.Release()
 	}
 	if pc.onICEGatheringStateChangeHandler != nil {
+		pc.underlying.Set("onicegatheringstatechange", js.Null())
 		pc.onICEGatheringStateChangeHandler.Release()
 	}
 
@@ -568,6 +597,7 @@ func configurationToValue(configuration Configuration) js.Value {
 		"peerIdentity":                stringToValueOrUndefined(configuration.PeerIdentity),
 		"iceCandidatePoolSize":        uint8ToValueOrUndefined(configuration.ICECandidatePoolSize),
 		"alwaysNegotiateDataChannels": boolToValueOrUndefined(configuration.AlwaysNegotiateDataChannels),
+		"rtpHeaderEncryptionPolicy":   stringEnumToValueOrUndefined(configuration.RTPHeaderEncryptionPolicy.String()),
 
 		// Note: Certificates are not currently supported.
 		// "certificates": configuration.Certificates,
@@ -616,6 +646,11 @@ func valueToConfiguration(configValue js.Value) Configuration {
 	if configValue.IsNull() || configValue.IsUndefined() {
 		return Configuration{}
 	}
+	// Unrecognized values fall back to RTPHeaderEncryptionPolicyUnknown, matching the other
+	// policy converters below.
+	rtpHeaderEncryptionPolicy, _ := newRTPHeaderEncryptionPolicy(
+		valueToStringOrZero(configValue.Get("rtpHeaderEncryptionPolicy")))
+
 	return Configuration{
 		ICEServers:                  valueToICEServers(configValue.Get("iceServers")),
 		ICETransportPolicy:          NewICETransportPolicy(valueToStringOrZero(configValue.Get("iceTransportPolicy"))),
@@ -624,6 +659,7 @@ func valueToConfiguration(configValue js.Value) Configuration {
 		PeerIdentity:                valueToStringOrZero(configValue.Get("peerIdentity")),
 		ICECandidatePoolSize:        valueToUint8OrZero(configValue.Get("iceCandidatePoolSize")),
 		AlwaysNegotiateDataChannels: valueToBoolOrFalse(configValue.Get("alwaysNegotiateDataChannels")),
+		RTPHeaderEncryptionPolicy:   rtpHeaderEncryptionPolicy,
 
 		// Note: Certificates are not supported.
 		// Certificates []Certificate
