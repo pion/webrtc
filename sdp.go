@@ -28,8 +28,8 @@ type trackDetails struct {
 	streamID string
 	id       string
 	ssrcs    []SSRC
-	rtxSsrc  *SSRC
-	fecSsrc  *SSRC
+	rtxSsrc  []*SSRC
+	fecSsrc  []*SSRC
 	rids     []string
 }
 
@@ -74,7 +74,7 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 
 // extract all trackDetails from an SDP.
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:gocognit,gocyclo,cyclop,nestif
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
 	s *sdp.SessionDescription,
@@ -101,6 +101,17 @@ func trackDetailsFromSDP(
 				continue
 			}
 			fields := strings.Fields(attr.Value)
+			if len(fields) > 0 && fields[0] == ssrcGroupSimulcast && len(track.ssrcs) == 0 {
+				for _, field := range fields[1:] {
+					value, err := strconv.ParseUint(field, 10, 32)
+					if err != nil {
+						log.Warnf("Failed to parse SSRC: %v", err)
+
+						continue
+					}
+					track.ssrcs = append(track.ssrcs, SSRC(value))
+				}
+			}
 			if len(fields) != 3 || (fields[0] != sdp.SemanticTokenFlowIdentification &&
 				fields[0] != sdp.SemanticTokenForwardErrorCorrectionFramework) {
 				continue
@@ -170,13 +181,19 @@ func trackDetailsFromSDP(
 			}
 		} else if len(track.ssrcs) != 0 {
 			for repair, base := range rtxRepairFlows {
-				if base == track.ssrcs[0] {
-					track.rtxSsrc = &repair
+				if pos := slices.Index(track.ssrcs, base); pos != -1 {
+					if track.rtxSsrc == nil {
+						track.rtxSsrc = make([]*SSRC, len(track.ssrcs))
+					}
+					track.rtxSsrc[pos] = &repair
 				}
 			}
 			for repair, base := range fecRepairFlows {
-				if base == track.ssrcs[0] {
-					track.fecSsrc = &repair
+				if pos := slices.Index(track.ssrcs, base); pos != -1 {
+					if track.fecSsrc == nil {
+						track.fecSsrc = make([]*SSRC, len(track.ssrcs))
+					}
+					track.fecSsrc[pos] = &repair
 				}
 			}
 		} else {
@@ -201,12 +218,12 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 			encodings[i].SSRC = trackDetails.ssrcs[i]
 		}
 
-		if trackDetails.rtxSsrc != nil {
-			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc
+		if len(trackDetails.rtxSsrc) > i && trackDetails.rtxSsrc[i] != nil {
+			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc[i]
 		}
 
-		if trackDetails.fecSsrc != nil {
-			encodings[i].FEC.SSRC = *trackDetails.fecSsrc
+		if len(trackDetails.fecSsrc) > i && trackDetails.fecSsrc[i] != nil {
+			encodings[i].FEC.SSRC = *trackDetails.fecSsrc[i]
 		}
 	}
 

@@ -15,6 +15,7 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1670,7 +1671,7 @@ func TestPeerConnection_RaceReplaceTrack(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
+func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop,gocyclo,maintidx
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -1678,207 +1679,268 @@ func TestPeerConnection_Simulcast(t *testing.T) { //nolint:cyclop
 	defer report()
 
 	rids := []string{"a", "b", "c"}
+	for _, name := range []string{"E2E", "RTCP", "SSRC"} {
+		t.Run(name, func(t *testing.T) {
+			api := NewAPI()
+			if name == "SSRC" {
+				mediaEngine := &MediaEngine{}
+				registry := &interceptor.Registry{}
+				require.NoError(t, mediaEngine.RegisterDefaultCodecs())
+				require.NoError(t, ConfigureNack(mediaEngine, registry))
+				api = NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(registry))
+			}
+			pcOffer, pcAnswer, err := api.newPair(Configuration{})
+			require.NoError(t, err)
+			defer closePairNow(t, pcOffer, pcAnswer)
 
-	t.Run("E2E", func(t *testing.T) {
-		pcOffer, pcAnswer, err := newPair()
-		assert.NoError(t, err)
-
-		vp8WriterA, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[0]),
-		)
-		assert.NoError(t, err)
-
-		vp8WriterB, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[1]),
-		)
-		assert.NoError(t, err)
-
-		vp8WriterC, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[2]),
-		)
-		assert.NoError(t, err)
-
-		sender, err := pcOffer.AddTrack(vp8WriterA)
-		assert.NoError(t, err)
-		assert.NotNil(t, sender)
-
-		assert.NoError(t, sender.AddEncoding(vp8WriterB))
-		assert.NoError(t, sender.AddEncoding(vp8WriterC))
-
-		var ridMapLock sync.RWMutex
-		ridMap := map[string]int{}
-
-		assertRidCorrect := func(t *testing.T) {
-			t.Helper()
-
-			ridMapLock.Lock()
-			defer ridMapLock.Unlock()
-
+			var sender *RTPSender
+			var tracks []*TrackLocalStaticRTP
 			for _, rid := range rids {
-				assert.Equal(t, ridMap[rid], 1)
+				track, trackErr := NewTrackLocalStaticRTP(
+					RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "stream", WithRTPStreamID(rid),
+				)
+				require.NoError(t, trackErr)
+				if sender == nil {
+					sender, err = pcOffer.AddTrack(track)
+					require.NoError(t, err)
+				} else {
+					require.NoError(t, sender.AddEncoding(track))
+				}
+				tracks = append(tracks, track)
 			}
-			assert.Equal(t, len(ridMap), 3)
-		}
 
-		var packetsRead atomic.Int32
-		ridsFullfilled := func() bool { return packetsRead.Load() == 3 }
-		tracksReady, tracksReadyCancel := context.WithCancel(t.Context())
-		defer tracksReadyCancel()
-
-		pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
-			assert.Zero(t, trackRemote.SSRC())
-			assert.Zero(t, trackRemote.PayloadType())
-			assert.Empty(t, trackRemote.Codec())
-			assert.NoError(t, trackRemote.SetReadDeadline(time.Now().Add(10*time.Second)))
-			ridMapLock.Lock()
-			ridMap[trackRemote.RID()]++
-			if len(ridMap) == len(rids) {
-				tracksReadyCancel()
+			var midID, ridID uint8
+			for _, extension := range sender.GetParameters().HeaderExtensions {
+				switch extension.URI {
+				case sdp.SDESMidURI:
+					midID = uint8(extension.ID) //nolint:gosec // G115
+				case sdp.SDESRTPStreamIDURI:
+					ridID = uint8(extension.ID) //nolint:gosec // G115
+				}
 			}
-			ridMapLock.Unlock()
 
-			packet, _, readErr := trackRemote.ReadRTP()
-			if !assert.NoError(t, readErr) {
-				return
+			switch name {
+			case "E2E":
+				assert.NotZero(t, midID)
+				assert.NotZero(t, ridID)
+				var ridMapLock sync.RWMutex
+				ridMap := map[string]int{}
+
+				assertRidCorrect := func(t *testing.T) {
+					t.Helper()
+
+					ridMapLock.Lock()
+					defer ridMapLock.Unlock()
+
+					for _, rid := range rids {
+						assert.Equal(t, ridMap[rid], 1)
+					}
+					assert.Equal(t, len(ridMap), 3)
+				}
+
+				var packetsRead atomic.Int32
+				ridsFullfilled := func() bool { return packetsRead.Load() == 3 }
+				tracksReady, tracksReadyCancel := context.WithCancel(t.Context())
+				defer tracksReadyCancel()
+
+				pcAnswer.OnTrack(func(trackRemote *TrackRemote, _ *RTPReceiver) {
+					assert.Zero(t, trackRemote.SSRC())
+					assert.Zero(t, trackRemote.PayloadType())
+					assert.Empty(t, trackRemote.Codec())
+					assert.NoError(t, trackRemote.SetReadDeadline(time.Now().Add(10*time.Second)))
+					ridMapLock.Lock()
+					ridMap[trackRemote.RID()]++
+					if len(ridMap) == len(rids) {
+						tracksReadyCancel()
+					}
+					ridMapLock.Unlock()
+
+					packet, _, readErr := trackRemote.ReadRTP()
+					if !assert.NoError(t, readErr) {
+						return
+					}
+					assert.Equal(t, uint32(trackRemote.SSRC()), packet.SSRC)
+					assert.Equal(t, MimeTypeVP8, trackRemote.Codec().MimeType)
+					packetsRead.Add(1)
+				})
+
+				parameters := sender.GetParameters()
+				assert.Equal(t, "a", parameters.Encodings[0].RID)
+				assert.Equal(t, "b", parameters.Encodings[1].RID)
+				assert.Equal(t, "c", parameters.Encodings[2].RID)
+
+				assert.NoError(t, signalPair(pcOffer, pcAnswer))
+				<-tracksReady.Done()
+
+				// Padding-only packets should not exhaust the remaining simulcast probe budget.
+				var sequenceNumber uint16
+				for sequenceNumber = 0; sequenceNumber < simulcastProbeCount+10; sequenceNumber++ {
+					time.Sleep(20 * time.Millisecond)
+
+					for _, track := range tracks {
+						pkt := &rtp.Packet{
+							Header: rtp.Header{
+								Version:        2,
+								SequenceNumber: sequenceNumber,
+								PayloadType:    96,
+								Padding:        sequenceNumber >= simulcastProbeCount-1,
+							},
+							Payload: []byte{0x00, 0x02},
+						}
+
+						assert.NoError(t, track.WriteRTP(pkt))
+					}
+				}
+				assert.False(t, ridsFullfilled(), "Simulcast probe should not be fulfilled by padding only packets")
+
+				for ; !ridsFullfilled(); sequenceNumber++ {
+					time.Sleep(20 * time.Millisecond)
+
+					for _, track := range tracks {
+						pkt := &rtp.Packet{
+							Header: rtp.Header{
+								Version:        2,
+								SequenceNumber: sequenceNumber,
+								PayloadType:    96,
+							},
+							Payload: []byte{0x00},
+						}
+						assert.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+						assert.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
+
+						assert.NoError(t, track.WriteRTP(pkt))
+					}
+				}
+
+				assertRidCorrect(t)
+			case "RTCP":
+				assert.NotZero(t, midID)
+				assert.NotZero(t, ridID)
+				rtcpCounter := uint64(0)
+				pcAnswer.OnTrack(func(trackRemote *TrackRemote, receiver *RTPReceiver) {
+					assert.NoError(t, receiver.SetReadDeadlineSimulcast(time.Now().Add(10*time.Second), trackRemote.RID()))
+					_, _, simulcastReadErr := receiver.ReadSimulcastRTCP(trackRemote.RID())
+					assert.NoError(t, simulcastReadErr)
+					atomic.AddUint64(&rtcpCounter, 1)
+				})
+
+				assert.NoError(t, signalPair(pcOffer, pcAnswer))
+
+				for sequenceNumber := uint16(0); atomic.LoadUint64(&rtcpCounter) < 3; sequenceNumber++ {
+					time.Sleep(20 * time.Millisecond)
+
+					for _, track := range tracks {
+						pkt := &rtp.Packet{
+							Header: rtp.Header{
+								Version:        2,
+								SequenceNumber: sequenceNumber,
+								PayloadType:    96,
+							},
+							Payload: []byte{0x00},
+						}
+						assert.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
+						assert.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
+
+						assert.NoError(t, track.WriteRTP(pkt))
+					}
+				}
+			case "SSRC":
+				received := make(chan *TrackRemote, len(tracks))
+				pcAnswer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) { received <- track })
+				connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+				for _, layerCount := range []int{2, 3} {
+					encodings := sender.GetParameters().Encodings[:layerCount]
+					sequenceNumber := uint16(layerCount) //nolint:gosec // G115
+					group := []string{"SIM"}
+					for _, encoding := range encodings {
+						group = append(group, fmt.Sprint(encoding.SSRC))
+					}
+					require.NoError(t, signalPairWithModification(pcOffer, pcAnswer, func(raw string) string {
+						description := &sdp.SessionDescription{}
+						require.NoError(t, description.Unmarshal([]byte(raw)))
+						for _, media := range description.MediaDescriptions {
+							if media.MediaName.Media != RTPCodecTypeVideo.String() {
+								continue
+							}
+							media.Attributes = slices.DeleteFunc(media.Attributes, func(attr sdp.Attribute) bool {
+								return attr.Key == "rid" || attr.Key == "simulcast" || attr.Key == "msid" ||
+									(attr.Key == "ssrc" && strings.Contains(attr.Value, "msid:"))
+							})
+							media.Attributes = append([]sdp.Attribute{{Key: "ssrc-group", Value: strings.Join(group, " ")}}, media.Attributes...)
+							media.WithValueAttribute("msid", "stream video")
+						}
+						encoded, marshalErr := description.Marshal()
+						require.NoError(t, marshalErr)
+
+						return string(encoded)
+					}))
+					<-connected
+
+					for _, track := range tracks[:layerCount] {
+						require.NoError(t, track.WriteRTP(&rtp.Packet{
+							Header: rtp.Header{Version: 2, SequenceNumber: sequenceNumber}, Payload: []byte("video"),
+						}))
+					}
+
+					receivers := pcAnswer.GetReceivers()
+					require.Len(t, receivers, 1)
+					receiver := receivers[0]
+					seen := map[SSRC]bool{}
+					for range encodings {
+						var track *TrackRemote
+						select {
+						case track = <-received:
+						case <-time.After(5 * time.Second):
+							require.FailNow(t, "missing simulcast layer")
+						}
+						require.False(t, seen[track.SSRC()], "duplicate layer")
+						seen[track.SSRC()] = true
+						pos := slices.IndexFunc(encodings, func(encoding RTPEncodingParameters) bool {
+							return encoding.SSRC == track.SSRC()
+						})
+						require.NotEqual(t, -1, pos)
+						require.Equal(t, encodings[pos].RTX.SSRC, track.RtxSSRC())
+						require.Empty(t, track.RID())
+						require.Equal(t, "video", track.ID())
+						require.Equal(t, "stream", track.StreamID())
+						require.NoError(t, track.SetReadDeadline(time.Now().Add(time.Second)))
+						packet, _, readErr := track.ReadRTP()
+						require.NoError(t, readErr)
+						require.Equal(t, uint32(track.SSRC()), packet.SSRC)
+						require.Equal(t, []byte("video"), packet.Payload)
+						require.NoError(t, pcAnswer.WriteRTCP([]rtcp.Packet{&rtcp.TransportLayerNack{
+							MediaSSRC: uint32(track.SSRC()),
+							Nacks:     []rtcp.NackPair{{PacketID: sequenceNumber}},
+						}}))
+						require.NoError(t, sender.SetReadDeadlineSimulcast(time.Now().Add(time.Second), encodings[pos].RID))
+						_, _, readErr = sender.ReadSimulcastRTCP(encodings[pos].RID)
+						require.NoError(t, readErr)
+						repaired, attributes, readErr := track.ReadRTP()
+						require.NoError(t, readErr)
+						require.Equal(t, packet, repaired)
+						require.Equal(t, uint32(track.RtxSSRC()), attributes.Get(AttributeRtxSsrc))
+					}
+
+					for _, encoding := range encodings {
+						require.True(t, seen[encoding.SSRC])
+						report := &rtcp.SenderReport{SSRC: uint32(encoding.SSRC), PacketCount: 123}
+						require.NoError(t, pcOffer.WriteRTCP([]rtcp.Packet{report}))
+						require.NoError(t, receiver.SetReadDeadlineSimulcastSSRC(time.Now().Add(time.Second), encoding.SSRC))
+						packets, _, readErr := receiver.ReadSimulcastSSRCRTCP(encoding.SSRC)
+						require.NoError(t, readErr)
+						require.Equal(t, []rtcp.Packet{report}, packets)
+
+						require.NoError(t, receiver.SetReadDeadlineSimulcastSSRC(time.Now(), encoding.SSRC))
+						_, _, readErr = receiver.ReadSimulcastSSRC(make([]byte, 1500), encoding.SSRC)
+						require.Error(t, readErr)
+					}
+					require.Error(t, receiver.SetReadDeadlineSimulcastSSRC(time.Now(), 0))
+					_, _, err = receiver.ReadSimulcastSSRCRTCP(0)
+					require.Error(t, err)
+				}
 			}
-			assert.Equal(t, uint32(trackRemote.SSRC()), packet.SSRC)
-			assert.Equal(t, MimeTypeVP8, trackRemote.Codec().MimeType)
-			packetsRead.Add(1)
 		})
-
-		parameters := sender.GetParameters()
-		assert.Equal(t, "a", parameters.Encodings[0].RID)
-		assert.Equal(t, "b", parameters.Encodings[1].RID)
-		assert.Equal(t, "c", parameters.Encodings[2].RID)
-
-		var midID, ridID uint8
-		for _, extension := range parameters.HeaderExtensions {
-			switch extension.URI {
-			case sdp.SDESMidURI:
-				midID = uint8(extension.ID) //nolint:gosec // G115
-			case sdp.SDESRTPStreamIDURI:
-				ridID = uint8(extension.ID) //nolint:gosec // G115
-			}
-		}
-		assert.NotZero(t, midID)
-		assert.NotZero(t, ridID)
-
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-		<-tracksReady.Done()
-
-		// Padding-only packets should not exhaust the remaining simulcast probe budget.
-		var sequenceNumber uint16
-		for sequenceNumber = 0; sequenceNumber < simulcastProbeCount+10; sequenceNumber++ {
-			time.Sleep(20 * time.Millisecond)
-
-			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
-				pkt := &rtp.Packet{
-					Header: rtp.Header{
-						Version:        2,
-						SequenceNumber: sequenceNumber,
-						PayloadType:    96,
-						Padding:        sequenceNumber >= simulcastProbeCount-1,
-					},
-					Payload: []byte{0x00, 0x02},
-				}
-
-				assert.NoError(t, track.WriteRTP(pkt))
-			}
-		}
-		assert.False(t, ridsFullfilled(), "Simulcast probe should not be fulfilled by padding only packets")
-
-		for ; !ridsFullfilled(); sequenceNumber++ {
-			time.Sleep(20 * time.Millisecond)
-
-			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
-				pkt := &rtp.Packet{
-					Header: rtp.Header{
-						Version:        2,
-						SequenceNumber: sequenceNumber,
-						PayloadType:    96,
-					},
-					Payload: []byte{0x00},
-				}
-				assert.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
-				assert.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
-
-				assert.NoError(t, track.WriteRTP(pkt))
-			}
-		}
-
-		assertRidCorrect(t)
-		closePairNow(t, pcOffer, pcAnswer)
-	})
-
-	t.Run("RTCP", func(t *testing.T) {
-		pcOffer, pcAnswer, err := newPair()
-		assert.NoError(t, err)
-
-		vp8WriterA, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[0]),
-		)
-		assert.NoError(t, err)
-
-		vp8WriterB, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[1]),
-		)
-		assert.NoError(t, err)
-
-		vp8WriterC, err := NewTrackLocalStaticRTP(
-			RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion2", WithRTPStreamID(rids[2]),
-		)
-		assert.NoError(t, err)
-
-		sender, err := pcOffer.AddTrack(vp8WriterA)
-		assert.NoError(t, err)
-		assert.NotNil(t, sender)
-
-		assert.NoError(t, sender.AddEncoding(vp8WriterB))
-		assert.NoError(t, sender.AddEncoding(vp8WriterC))
-
-		rtcpCounter := uint64(0)
-		pcAnswer.OnTrack(func(trackRemote *TrackRemote, receiver *RTPReceiver) {
-			assert.NoError(t, receiver.SetReadDeadlineSimulcast(time.Now().Add(10*time.Second), trackRemote.RID()))
-			_, _, simulcastReadErr := receiver.ReadSimulcastRTCP(trackRemote.RID())
-			assert.NoError(t, simulcastReadErr)
-			atomic.AddUint64(&rtcpCounter, 1)
-		})
-
-		var midID, ridID uint8
-		for _, extension := range sender.GetParameters().HeaderExtensions {
-			switch extension.URI {
-			case sdp.SDESMidURI:
-				midID = uint8(extension.ID) //nolint:gosec // G115
-			case sdp.SDESRTPStreamIDURI:
-				ridID = uint8(extension.ID) //nolint:gosec // G115
-			}
-		}
-		assert.NotZero(t, midID)
-		assert.NotZero(t, ridID)
-
-		assert.NoError(t, signalPair(pcOffer, pcAnswer))
-
-		for sequenceNumber := uint16(0); atomic.LoadUint64(&rtcpCounter) < 3; sequenceNumber++ {
-			time.Sleep(20 * time.Millisecond)
-
-			for _, track := range []*TrackLocalStaticRTP{vp8WriterA, vp8WriterB, vp8WriterC} {
-				pkt := &rtp.Packet{
-					Header: rtp.Header{
-						Version:        2,
-						SequenceNumber: sequenceNumber,
-						PayloadType:    96,
-					},
-					Payload: []byte{0x00},
-				}
-				assert.NoError(t, pkt.Header.SetExtension(midID, []byte("0")))
-				assert.NoError(t, pkt.Header.SetExtension(ridID, []byte(track.RID())))
-
-				assert.NoError(t, track.WriteRTP(pkt))
-			}
-		}
-
-		closePairNow(t, pcOffer, pcAnswer)
-	})
+	}
 }
 
 type simulcastTestTrackLocal struct {
