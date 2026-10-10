@@ -1683,6 +1683,11 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		go func(track *TrackRemote) {
 			b := make([]byte, pc.api.settingEngine.getReceiveMTU())
 			n, err := track.peek(b)
+			for errors.Is(err, ErrCodecNotFound) {
+				// peek only buffers successful reads, so the rejected packet was
+				// consumed and retrying waits for the next packet.
+				n, err = track.peek(b)
+			}
 			if err != nil {
 				pc.log.Warnf("Could not determine PayloadType for SSRC %d (%s)", track.SSRC(), err)
 
@@ -2109,7 +2114,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 	}
 
 	payloadType := PayloadType(b[1] & 0x7f)
-	params, err := pc.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
+	params, payloadTypeFEC, err := pc.api.mediaEngine.getRTPParametersByPayloadTypeForStream(payloadType)
 	if err != nil {
 		return err
 	}
@@ -2150,7 +2155,8 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 		ssrc,
 		0, 0,
 		params.Codecs[0].PayloadType,
-		0, 0,
+		0,
+		payloadTypeFEC,
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)
@@ -2600,7 +2606,18 @@ func (pc *PeerConnection) AddTransceiverFromKind(
 		if len(codecs) == 0 {
 			return nil, ErrNoCodecsAvailable
 		}
-		track, err := NewTrackLocalStaticSample(codecs[0].RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
+		var mediaCodec *RTPCodecParameters
+		for i := range codecs {
+			if !strings.EqualFold(codecs[i].MimeType, MimeTypeRED) {
+				mediaCodec = &codecs[i]
+
+				break
+			}
+		}
+		if mediaCodec == nil {
+			return nil, ErrNoCodecsAvailable
+		}
+		track, err := NewTrackLocalStaticSample(mediaCodec.RTPCodecCapability, util.MathRandAlpha(16), util.MathRandAlpha(16))
 		if err != nil {
 			return nil, err
 		}

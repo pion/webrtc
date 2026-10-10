@@ -10,7 +10,7 @@ import (
 
 func defaultClockRate(mimeType string) uint32 {
 	switch {
-	case strings.EqualFold(mimeType, "audio/opus"):
+	case strings.EqualFold(mimeType, "audio/opus"), strings.EqualFold(mimeType, "audio/red"):
 		return 48000
 	case strings.EqualFold(mimeType, "audio/pcmu"), strings.EqualFold(mimeType, "audio/pcma"):
 		return 8000
@@ -20,11 +20,11 @@ func defaultClockRate(mimeType string) uint32 {
 }
 
 // defaultChannels returns the channel count implied by an omitted encoding
-// parameter: RFC 8866 says one for audio, except Opus which RFC 7587 fixes
-// at two. Video has no channel count, so it returns zero.
+// parameter: RFC 8866 says one for audio, except Opus and Opus RED which use
+// two. Video has no channel count, so it returns zero.
 func defaultChannels(mimeType string) uint16 {
 	switch {
-	case strings.EqualFold(mimeType, "audio/opus"):
+	case strings.EqualFold(mimeType, "audio/opus"), strings.EqualFold(mimeType, "audio/red"):
 		return 2
 	case len(mimeType) >= 6 && strings.EqualFold(mimeType[:6], "audio/"):
 		return 1

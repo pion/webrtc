@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/pion/interceptor"
 	mock_interceptor "github.com/pion/interceptor/pkg/mock"
+	"github.com/pion/interceptor/pkg/red"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -27,6 +29,118 @@ import (
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestConfigureOpusRED(t *testing.T) {
+	mediaEngine := &MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypePCMU, ClockRate: 8000},
+		PayloadType:        0,
+	}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		PayloadType:        96,
+	}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeG722, ClockRate: 8000},
+		PayloadType:        9,
+	}, RTPCodecTypeAudio))
+	registry := &interceptor.Registry{}
+
+	assert.NoError(t, ConfigureOpusRED(96, 97, mediaEngine, registry, red.SenderMaxPacketSize(1400)))
+	assert.Len(t, mediaEngine.audioCodecs, 4)
+	assert.Equal(t, MimeTypeRED, mediaEngine.audioCodecs[1].MimeType)
+	assert.Equal(t, PayloadType(97), mediaEngine.audioCodecs[1].PayloadType)
+	assert.Equal(t, uint32(48000), mediaEngine.audioCodecs[1].ClockRate)
+	assert.Equal(t, uint16(2), mediaEngine.audioCodecs[1].Channels)
+	assert.Equal(t, "96/96", mediaEngine.audioCodecs[1].SDPFmtpLine)
+	assert.Empty(t, mediaEngine.audioCodecs[1].RTCPFeedback)
+	assert.Equal(t, MimeTypeOpus, mediaEngine.audioCodecs[2].MimeType)
+
+	peerConnection, err := NewAPI(
+		WithMediaEngine(mediaEngine),
+		WithInterceptorRegistry(registry),
+	).NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, peerConnection.Close()) })
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeOpus}, "audio", "pion")
+	assert.NoError(t, err)
+	_, err = peerConnection.AddTrack(track)
+	assert.NoError(t, err)
+	offer, err := peerConnection.CreateOffer(nil)
+	assert.NoError(t, err)
+
+	assert.Contains(t, offer.SDP, "a=rtpmap:97 red/48000/2")
+	assert.Contains(t, offer.SDP, "a=fmtp:97 96/96")
+	redCodecIndex := strings.Index(offer.SDP, "a=rtpmap:97 red/48000/2")
+	opusCodecIndex := strings.Index(offer.SDP, "a=rtpmap:96 opus/48000/2")
+	assert.Less(t, redCodecIndex, opusCodecIndex)
+	assert.NotContains(t, offer.SDP, "a=ssrc-group:FEC-FR")
+	assert.NotContains(t, offer.SDP, "a=rtcp-fb:96 nack")
+}
+
+func TestConfigureOpusREDValidationIsAtomic(t *testing.T) {
+	tests := []struct {
+		name        string
+		opus        PayloadType
+		red         PayloadType
+		setup       func(*testing.T, *MediaEngine)
+		options     []red.SenderOption
+		nilEngine   bool
+		nilRegistry bool
+	}{
+		{name: "nil media engine", opus: 96, red: 97, nilEngine: true},
+		{name: "nil interceptor registry", opus: 96, red: 97, nilRegistry: true},
+		{name: "Opus payload type out of range", opus: 128, red: 97, setup: func(t *testing.T, m *MediaEngine) {
+			t.Helper()
+			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus}, PayloadType: 128,
+			}, RTPCodecTypeAudio))
+		}},
+		{name: "RED payload type out of range", opus: 96, red: 128},
+		{name: "RED payload type zero", opus: 96, red: 0},
+		{name: "payload type collision", opus: 96, red: 96},
+		{name: "Opus missing", opus: 95, red: 97},
+		{name: "RED payload type already registered", opus: 96, red: 97, setup: func(t *testing.T, m *MediaEngine) {
+			t.Helper()
+			assert.NoError(t, m.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypePCMU}, PayloadType: 97,
+			}, RTPCodecTypeAudio))
+		}},
+		{name: "invalid sender option", opus: 96, red: 97, options: []red.SenderOption{red.SenderMaxPacketSize(0)}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mediaEngine := &MediaEngine{}
+			if test.setup != nil {
+				test.setup(t, mediaEngine)
+			}
+			if test.opus != 128 {
+				assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+					RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus}, PayloadType: 96,
+				}, RTPCodecTypeAudio))
+			}
+			before := append([]RTPCodecParameters{}, mediaEngine.audioCodecs...)
+			registry := &interceptor.Registry{}
+			configuredMediaEngine := mediaEngine
+			configuredRegistry := registry
+			if test.nilEngine {
+				configuredMediaEngine = nil
+			}
+			if test.nilRegistry {
+				configuredRegistry = nil
+			}
+
+			assert.Error(t, ConfigureOpusRED(
+				test.opus, test.red, configuredMediaEngine, configuredRegistry, test.options...,
+			))
+			assert.Equal(t, before, mediaEngine.audioCodecs)
+			built, err := registry.Build("atomic-validation")
+			assert.NoError(t, err)
+			assert.IsType(t, &interceptor.NoOp{}, built)
+		})
+	}
+}
 
 // E2E test of the features of Interceptors
 // * Assert an extension can be set on an outbound packet

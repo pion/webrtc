@@ -775,6 +775,8 @@ func TestDefaults(t *testing.T) {
 	}{
 		{"audio/opus", 48000, 2},
 		{"audio/OPUS", 48000, 2},
+		{"audio/red", 48000, 2},
+		{"audio/RED", 48000, 2},
 		{"audio/pcmu", 8000, 1},
 		{"audio/PCMA", 8000, 1},
 		{"audio/multiopus", 90000, 1},

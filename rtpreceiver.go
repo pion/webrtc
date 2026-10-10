@@ -205,8 +205,14 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 
 	globalParams := r.getParameters()
 	codec := RTPCodecCapability{}
+	payloadType, payloadTypeFEC := PayloadType(0), PayloadType(0)
 	if len(globalParams.Codecs) != 0 {
 		codec = globalParams.Codecs[0].RTPCodecCapability
+	}
+	if opusCodec, redPayloadType, ok := opusREDCodecParameters(globalParams.Codecs); ok {
+		codec = opusCodec.RTPCodecCapability
+		payloadType = opusCodec.PayloadType
+		payloadTypeFEC = redPayloadType
 	}
 
 	for i := range parameters.Encodings {
@@ -230,7 +236,10 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		streams.streamInfo = createStreamInfo(
 			"",
 			parameters.Encodings[i].SSRC,
-			0, 0, 0, 0, 0,
+			0, 0,
+			payloadType,
+			0,
+			payloadTypeFEC,
 			codec,
 			globalParams.HeaderExtensions,
 		)
