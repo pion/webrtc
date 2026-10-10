@@ -4391,3 +4391,68 @@ func TestCryptexAnswerWithTagOnlyCryptexIsAccepted(t *testing.T) {
 	waitForSRTPReady(t, pcOffer)
 	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode())
 }
+
+func newPairWithRejectedVideo(
+	t *testing.T,
+	direction RTPTransceiverDirection,
+) (*PeerConnection, *PeerConnection) {
+	t.Helper()
+
+	offerer, answerer, err := newPair()
+	require.NoError(t, err)
+	t.Cleanup(func() { closePairNow(t, offerer, answerer) })
+
+	_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo,
+		RTPTransceiverInit{Direction: direction})
+	require.NoError(t, err)
+	_, err = offerer.CreateDataChannel("keepalive", nil)
+	require.NoError(t, err)
+
+	offer, err := offerer.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, offerer.SetLocalDescription(offer))
+	require.NoError(t, answerer.SetRemoteDescription(offer))
+	answer, err := answerer.CreateAnswer(nil)
+	require.NoError(t, err)
+
+	rejected := answer.parsed.MediaDescriptions[0]
+	require.Contains(t, rejected.MediaName.Formats, "96")
+	rejected.MediaName.Port.Value = 0
+	for index := range answer.parsed.Attributes {
+		if answer.parsed.Attributes[index].Key == sdp.AttrKeyGroup {
+			answer.parsed.Attributes[index].Value = "BUNDLE 1"
+		}
+	}
+	raw, err := answer.parsed.Marshal()
+	require.NoError(t, err)
+	answer.SDP = string(raw)
+	answerer.lastAnswer = answer.SDP
+	require.NoError(t, answerer.SetLocalDescription(answer))
+	require.NoError(t, offerer.SetRemoteDescription(answer))
+
+	return offerer, answerer
+}
+
+func TestReofferWithRejectedDynamicCodec(t *testing.T) {
+	for _, role := range []SDPType{SDPTypeOffer, SDPTypeAnswer} {
+		t.Run(role.String(), func(t *testing.T) {
+			pc, remote := newPairWithRejectedVideo(t, RTPTransceiverDirectionRecvonly)
+			if role == SDPTypeAnswer {
+				pc, remote = remote, pc
+			}
+
+			offer, err := pc.CreateOffer(nil)
+			require.NoError(t, err)
+			require.Zero(t, offer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+			require.Equal(t, "0", getMidValue(offer.parsed.MediaDescriptions[0]))
+			require.NoError(t, pc.SetLocalDescription(offer))
+			require.NoError(t, remote.SetRemoteDescription(offer),
+				"a rejected dynamic payload must not require missing codec metadata")
+			answer, err := remote.CreateAnswer(nil)
+			require.NoError(t, err)
+			require.NoError(t, remote.SetLocalDescription(answer))
+			require.NoError(t, pc.SetRemoteDescription(answer))
+			require.Zero(t, answer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+		})
+	}
+}
