@@ -33,5 +33,3 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
-
-replace github.com/pion/interceptor => github.com/gokuljs/interceptor v0.0.0-20261005182723-ac462482153f

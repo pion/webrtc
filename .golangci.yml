@@ -75,9 +75,6 @@ linters:
     - wrapcheck        # Checks that errors returned from external packages are wrapped
     - wsl              # Whitespace Linter - Forces you to use empty lines!
   settings:
-    gomoddirectives:
-      replace-allow-list:
-        - github.com/pion/interceptor
     lll:
       line-length: 320
     staticcheck:
