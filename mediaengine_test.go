@@ -195,23 +195,51 @@ a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
 a=rtpmap:111 opus/48000/2
 `
 
-		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio))
-		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(headerExtensions)))
+		for _, testCase := range []struct {
+			name, sdp string
+			rejected  bool
+		}{
+			{"Active", headerExtensions, false},
+			{"Rejected only", strings.Replace(headerExtensions, "m=audio 9", "m=audio 0", 1), true},
+			{"Rejected first", strings.Replace(headerExtensions, "m=audio", `m=audio 0 UDP/TLS/RTP/SAVPF 0
+a=rtpmap:0 PCMU/8000
+a=extmap:5 urn:ietf:params:rtp-hdrext:sdes:mid
+m=audio`, 1), false},
+			{"Bundle only", strings.Replace(headerExtensions, "m=audio 9", "m=audio 0", 1) + "a=bundle-only\n", false},
+		} {
+			t.Run(testCase.name, func(t *testing.T) {
+				mediaEngine := MediaEngine{}
+				assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
+				assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio))
+				assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(testCase.sdp)))
 
-		assert.False(t, mediaEngine.negotiatedVideo)
-		assert.True(t, mediaEngine.negotiatedAudio)
+				assert.False(t, mediaEngine.negotiatedVideo)
+				assert.True(t, mediaEngine.negotiatedAudio)
 
-		absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
-		assert.Equal(t, absID, 0)
-		assert.False(t, absAudioEnabled)
-		assert.False(t, absVideoEnabled)
+				params := mediaEngine.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
+				if testCase.rejected {
+					assert.Empty(t, params.Codecs)
+					assert.Empty(t, params.HeaderExtensions)
 
-		midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
-		assert.Equal(t, midID, 7)
-		assert.True(t, midAudioEnabled)
-		assert.False(t, midVideoEnabled)
+					return
+				}
+
+				absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
+				assert.Equal(t, absID, 0)
+				assert.False(t, absAudioEnabled)
+				assert.False(t, absVideoEnabled)
+
+				midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
+				assert.Equal(t, midID, 7)
+				assert.True(t, midAudioEnabled)
+				assert.False(t, midVideoEnabled)
+
+				assert.ElementsMatch(t, []RTPHeaderExtensionParameter{{URI: sdp.SDESMidURI, ID: 7}}, params.HeaderExtensions)
+				if assert.Len(t, params.Codecs, 1) {
+					assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
+				}
+			})
+		}
 	})
 
 	t.Run("Different Header Extensions on same codec", func(t *testing.T) {
