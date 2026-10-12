@@ -565,6 +565,15 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	}()
 
 	<-done
+	assert.Eventually(t, func() bool {
+		for _, stats := range pc2.GetStats() {
+			if inbound, ok := stats.(InboundRTPStreamStats); ok {
+				return (inbound.NACKCount > 0) == requestNack
+			}
+		}
+
+		return false
+	}, time.Second, 10*time.Millisecond)
 	err = pc1.Close()
 	assert.NoError(t, err)
 	err = pc2.Close()
