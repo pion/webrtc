@@ -782,6 +782,64 @@ a=rtpmap:111 opus/48000/2
 	assert.NotEqual(t, 5, extensions[voIndex].ID)
 }
 
+func TestMediaEngineRenegotiatedHeaderExtensionIDsAreMediaSectionScoped(t *testing.T) {
+	mustParse := func(raw string) sdp.SessionDescription {
+		s := sdp.SessionDescription{}
+		assert.NoError(t, s.Unmarshal([]byte(raw)))
+
+		return s
+	}
+
+	mediaEngine := MediaEngine{}
+	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
+	assert.NoError(t, mediaEngine.RegisterHeaderExtension(
+		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
+	))
+	assert.NoError(t, ConfigureSimulcastExtensionHeaders(&mediaEngine))
+
+	const stoppedVideo = `v=0
+o=- 4596489990601351948 2 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 0 UDP/TLS/RTP/SAVPF 96
+a=mid:1
+a=rtpmap:96 VP8/90000
+a=extmap:4 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:9 urn:ietf:params:rtp-hdrext:sdes:mid
+`
+
+	const laterVideo = `v=0
+o=- 4596489990601351948 3 IN IP4 127.0.0.1
+s=-
+t=0 0
+m=video 9 UDP/TLS/RTP/SAVPF 96
+a=mid:3
+a=rtpmap:96 VP8/90000
+a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id
+`
+
+	assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(stoppedVideo)))
+	assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(laterVideo)))
+
+	params := mediaEngine.getRTPParametersByKind(
+		RTPCodecTypeVideo,
+		[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
+	)
+
+	idsByURI := map[string]int{}
+	for _, extension := range params.HeaderExtensions {
+		idsByURI[extension.URI] = extension.ID
+	}
+
+	assert.Equal(t, 3, idsByURI[sdp.TransportCCURI])
+	assert.Equal(t, 4, idsByURI[sdp.SDESMidURI])
+	assert.Equal(t, 10, idsByURI[sdp.SDESRTPStreamIDURI])
+	assert.Equal(t, 11, idsByURI[sdp.SDESRepairRTPStreamIDURI])
+}
+
 func TestCaseInsensitiveMimeType(t *testing.T) {
 	const offerSdp = `
 v=0
