@@ -615,6 +615,7 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var rejectedAudio, rejectedVideo bool
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 
@@ -623,6 +624,13 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			typ = RTPCodecTypeAudio
 		case strings.EqualFold(media.MediaName.Media, "video"):
 			typ = RTPCodecTypeVideo
+		}
+
+		if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+			rejectedAudio = rejectedAudio || typ == RTPCodecTypeAudio
+			rejectedVideo = rejectedVideo || typ == RTPCodecTypeVideo
+
+			continue
 		}
 
 		switch {
@@ -717,6 +725,10 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			return err
 		}
 	}
+
+	// Rejected sections must not block active sections or fall back to local codecs.
+	m.negotiatedAudio = m.negotiatedAudio || rejectedAudio
+	m.negotiatedVideo = m.negotiatedVideo || rejectedVideo
 
 	return nil
 }
