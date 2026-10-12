@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -242,24 +243,39 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 		}
 	}
 	// process paused stream like "a=simulcast:send 1;~2;~3"
-	if simulcastAttr != "" {
-		if space := strings.Index(simulcastAttr, " "); space > 0 {
-			simulcastAttr = simulcastAttr[space+1:]
-		}
-		ridStates := strings.SplitSeq(simulcastAttr, ";")
-		for ridState := range ridStates {
-			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
+	if simulcastAttr == "" {
+		return rids
+	}
 
-						break
-					}
+	if space := strings.Index(simulcastAttr, " "); space > 0 {
+		simulcastAttr = simulcastAttr[space+1:]
+	}
+	simulcastOrder := map[string]int{}
+	for ridState := range strings.SplitSeq(simulcastAttr, ";") {
+		ridID, paused := strings.CutPrefix(ridState, "~")
+		if paused {
+			for _, rid := range rids {
+				if rid.id == ridID {
+					rid.paused = true
+
+					break
 				}
 			}
 		}
+		if _, ok := simulcastOrder[ridID]; ridID != "" && !ok {
+			simulcastOrder[ridID] = len(simulcastOrder)
+		}
 	}
+	orderOf := func(id string) int {
+		if idx, ok := simulcastOrder[id]; ok {
+			return idx
+		}
+
+		return len(simulcastOrder)
+	}
+	slices.SortStableFunc(rids, func(a, b *simulcastRid) int {
+		return cmp.Compare(orderOf(a.id), orderOf(b.id))
+	})
 
 	return rids
 }

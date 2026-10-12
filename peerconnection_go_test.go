@@ -476,8 +476,6 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	offerPC.iceTransport.dtlsMatcher = dropAllDTLS
 	answerPC.iceTransport.dtlsMatcher = dropAllDTLS
 
-	assert.NoError(t, signalPair(offerPC, answerPC))
-
 	iceComplete := make(chan any)
 	answerPC.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
 		if iceState == ICEConnectionStateConnected {
@@ -490,6 +488,8 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 			}
 		}
 	})
+
+	assert.NoError(t, signalPair(offerPC, answerPC))
 
 	<-iceComplete
 	closePairNow(t, offerPC, answerPC)

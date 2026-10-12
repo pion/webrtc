@@ -1425,6 +1425,16 @@ func TestGetRIDs(t *testing.T) {
 	if !found {
 		assert.Fail(t, "rid values should contain 'f'")
 	}
+
+	mediaDescr[0].Attributes = append(mediaDescr[0].Attributes,
+		sdp.Attribute{Key: sdpAttributeRid, Value: "q send"},
+		sdp.Attribute{Key: sdpAttributeRid, Value: "h send"},
+		sdp.Attribute{Key: sdpAttributeSimulcast, Value: "send h;~f;q"},
+	)
+	rids = getRids(mediaDescr[0])
+	require.Len(t, rids, 3)
+	assert.Equal(t, []string{"h", "f", "q"}, []string{rids[0].id, rids[1].id, rids[2].id})
+	assert.True(t, rids[1].paused)
 }
 
 // TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
