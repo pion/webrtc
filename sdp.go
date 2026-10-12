@@ -6,9 +6,11 @@
 package webrtc
 
 import (
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -297,10 +299,12 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 		if space := strings.Index(simulcastAttr, " "); space > 0 {
 			simulcastAttr = simulcastAttr[space+1:]
 		}
+		simulcastOrder := map[string]int{}
 		ridStates := strings.SplitSeq(simulcastAttr, ";")
 		for ridState := range ridStates {
+			ridID := ridState
 			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
+				ridID = ridState[1:]
 				for _, rid := range rids {
 					if rid.id == ridID {
 						rid.paused = true
@@ -309,7 +313,22 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 					}
 				}
 			}
+			if ridID != "" {
+				if _, ok := simulcastOrder[ridID]; !ok {
+					simulcastOrder[ridID] = len(simulcastOrder)
+				}
+			}
 		}
+		orderOf := func(id string) int {
+			if idx, ok := simulcastOrder[id]; ok {
+				return idx
+			}
+
+			return math.MaxInt
+		}
+		slices.SortStableFunc(rids, func(a, b *simulcastRid) int {
+			return cmp.Compare(orderOf(a.id), orderOf(b.id))
+		})
 	}
 
 	return rids
