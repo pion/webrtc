@@ -26,7 +26,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.17.0 // indirect
-	github.com/pion/dtls/v3 v3.1.10 // indirect
+	github.com/pion/dtls/v3 v3.1.11 // indirect
 	github.com/pion/mdns/v2 v2.2.2 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
