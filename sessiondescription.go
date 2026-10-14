@@ -56,6 +56,40 @@ func (sd *SessionDescription) Unmarshal() (*sdp.SessionDescription, error) {
 	return sd.parsed, nil
 }
 
+func (sd *SessionDescription) updateWithCandidate(candidate ICECandidateInit) error {
+	// Reparse the copy to avoid mutating the shared attributes.
+	parsed, err := sd.Unmarshal()
+	if err != nil {
+		return err
+	}
+
+	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+	for index, media := range parsed.MediaDescriptions {
+		switch {
+		case candidate.SDPMid != nil:
+			if mid, _ := media.Attribute(sdp.AttrKeyMID); mid != *candidate.SDPMid {
+				continue
+			}
+		case candidate.SDPMLineIndex != nil:
+			if index != int(*candidate.SDPMLineIndex) {
+				continue
+			}
+		default:
+			continue
+		}
+
+		media.WithValueAttribute("candidate", candidateValue)
+	}
+
+	marshaled, err := parsed.Marshal()
+	if err != nil {
+		return err
+	}
+	sd.SDP = string(marshaled)
+
+	return nil
+}
+
 func hasICETrickleOption(desc *sdp.SessionDescription) bool {
 	if value, ok := desc.Attribute(sdp.AttrKeyICEOptions); ok && hasTrickleOptionValue(value) {
 		return true

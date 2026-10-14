@@ -211,6 +211,7 @@ var (
 
 	errICEConnectionNotStarted        = errors.New("ICE connection not started")
 	errICECandidateTypeUnknown        = errors.New("unknown candidate type")
+	errICECandidateInvalid            = errors.New("ICE candidate must not contain carriage returns or newlines")
 	errICEInvalidConvertCandidateType = errors.New(
 		"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type",
 	)
@@ -265,6 +266,7 @@ var (
 	errRTPReceiverReceiveAlreadyCalled        = errors.New("Receive has already been called")
 	errRTPReceiverWithSSRCTrackStreamNotFound = errors.New("unable to find stream for Track with SSRC")
 	errRTPReceiverForRIDTrackStreamNotFound   = errors.New("no trackStreams found for RID")
+	errRTPReceiverForSSRCTrackStreamNotFound  = errors.New("no trackStreams found for SSRC")
 
 	errRTPSenderTrackNil             = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")

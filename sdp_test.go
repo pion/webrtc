@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
@@ -474,31 +475,45 @@ func TestSelectCandidateMediaSection(t *testing.T) {
 }
 
 func TestTrackDetailsFromSDP(t *testing.T) {
-	t.Run("one track per media section", func(t *testing.T) {
-		descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
-			MediaName: sdp.MediaName{Media: "video"},
-			Attributes: []sdp.Attribute{
-				{Key: "mid", Value: "0"},
-				{Key: "ssrc", Value: "4000 msid:repair repair-track"},
-				{Key: "ssrc", Value: "3000 msid:source source-track"},
-				{Key: "ssrc", Value: "5000 msid:other other-track"},
-				{Key: "ssrc", Value: "6000 msid:fec fec-track"},
-				{Key: "ssrc-group", Value: "FID 3000 4000"},
-				{Key: "ssrc-group", Value: "FEC-FR 3000 6000"},
-				{Key: "msid", Value: "stream track"},
-			},
-		}}}
+	for group, expected := range map[string][]SSRC{
+		"":                      {3000},
+		"SIM 3000 5000":         {3000, 5000},
+		"SIM 5000 3000":         {5000, 3000},
+		"SIM 3000 invalid 5000": {3000, 5000},
+		"SIM":                   {3000},
+	} {
+		t.Run("one track per media section/"+group, func(t *testing.T) {
+			descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
+				MediaName: sdp.MediaName{Media: "video"},
+				Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "0"},
+					{Key: "ssrc-group", Value: group},
+					{Key: "ssrc", Value: "4000 msid:repair repair-track"},
+					{Key: "ssrc", Value: "3000 msid:source source-track"},
+					{Key: "ssrc", Value: "5000 msid:other other-track"},
+					{Key: "ssrc", Value: "6000 msid:fec fec-track"},
+					{Key: "ssrc-group", Value: "FID 3000 4000"},
+					{Key: "ssrc-group", Value: "FEC-FR 3000 6000"},
+					{Key: "msid", Value: "stream track"},
+				},
+			}}}
 
-		tracks := trackDetailsFromSDP(nil, descr)
-		require.Len(t, tracks, 1)
-		assert.Equal(t, []SSRC{3000}, tracks[0].ssrcs)
-		assert.Equal(t, "stream", tracks[0].streamID)
-		assert.Equal(t, "track", tracks[0].id)
-		require.NotNil(t, tracks[0].rtxSsrc)
-		require.NotNil(t, tracks[0].fecSsrc)
-		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[0].fecSsrc)
-	})
+			tracks := trackDetailsFromSDP(logging.NewDefaultLoggerFactory().NewLogger("test"), descr)
+			require.Len(t, tracks, 1)
+			assert.Equal(t, expected, tracks[0].ssrcs)
+			assert.Equal(t, "stream", tracks[0].streamID)
+			assert.Equal(t, "track", tracks[0].id)
+			for _, encoding := range trackDetailsToRTPReceiveParameters(&tracks[0]).Encodings {
+				if encoding.SSRC == 3000 {
+					assert.Equal(t, SSRC(4000), encoding.RTX.SSRC)
+					assert.Equal(t, SSRC(6000), encoding.FEC.SSRC)
+				} else {
+					assert.Zero(t, encoding.RTX.SSRC)
+					assert.Zero(t, encoding.FEC.SSRC)
+				}
+			}
+		})
+	}
 
 	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
 		descr := &sdp.SessionDescription{
@@ -616,10 +631,12 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		assert.Equal(t, RTPCodecTypeVideo, track.kind)
 		assert.Equal(t, SSRC(3000), track.ssrcs[0])
 		assert.Equal(t, "video_trk_label", track.streamID)
-		require.NotNil(t, track.rtxSsrc, "missing RTX ssrc for video track")
-		assert.Equal(t, SSRC(4000), *track.rtxSsrc)
-		require.NotNil(t, track.fecSsrc, "missing FEC ssrc for video track")
-		assert.Equal(t, SSRC(5000), *track.fecSsrc)
+		require.Len(t, track.rtxSsrc, 1)
+		require.NotNil(t, track.rtxSsrc[0], "missing RTX ssrc for video track")
+		assert.Equal(t, SSRC(4000), *track.rtxSsrc[0])
+		require.Len(t, track.fecSsrc, 1)
+		require.NotNil(t, track.fecSsrc[0], "missing FEC ssrc for video track")
+		assert.Equal(t, SSRC(5000), *track.fecSsrc[0])
 	})
 
 	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
@@ -680,8 +697,10 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 2, len(tracks))
-		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc)
+		require.Len(t, tracks[0].rtxSsrc, 1)
+		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc[0])
+		require.Len(t, tracks[1].rtxSsrc, 1)
+		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc[0])
 	})
 }
 

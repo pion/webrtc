@@ -1931,6 +1931,9 @@ func (pc *PeerConnection) configureRTPReceivers(
 						if details := trackDetailsForSSRC(incomingTracks, track.ssrc); details != nil {
 							track.id = details.id
 							track.streamID = details.streamID
+							if len(details.ssrcs) != len(tracks) {
+								receiverNeedsStopped = true
+							}
 
 							return
 						}
@@ -2150,10 +2153,14 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 
 	// If a SSRC already exists in the RemoteDescription don't perform heuristics upon it
 	for _, track := range trackDetailsFromSDP(pc.log, remoteDescription.parsed) {
-		if track.rtxSsrc != nil && ssrc == *track.rtxSsrc {
+		if slices.ContainsFunc(track.rtxSsrc, func(s *SSRC) bool {
+			return s != nil && ssrc == *s
+		}) {
 			return nil
 		}
-		if track.fecSsrc != nil && ssrc == *track.fecSsrc {
+		if slices.ContainsFunc(track.fecSsrc, func(s *SSRC) bool {
+			return s != nil && ssrc == *s
+		}) {
 			return nil
 		}
 		if slices.Contains(track.ssrcs, ssrc) {
@@ -2415,49 +2422,80 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates.
-func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
-	remoteDesc := pc.RemoteDescription()
+func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error { //nolint:cyclop
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	remoteDesc := pc.currentRemoteDescription
+	if pc.pendingRemoteDescription != nil {
+		remoteDesc = pc.pendingRemoteDescription
+	}
+
 	if remoteDesc == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	}
+	if strings.ContainsAny(candidate.Candidate, "\r\n") {
+		return errICECandidateInvalid
+	}
 
 	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
-
 	if candidateValue == "" {
 		return pc.iceTransport.AddRemoteCandidate(nil)
 	}
 
 	cand, err := ice.UnmarshalCandidate(candidateValue)
+	if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
+		pc.log.Warnf("Discarding remote candidate: %s", err)
+
+		return nil
+	}
 	if err != nil {
-		if errors.Is(err, ice.ErrUnknownCandidateTyp) || errors.Is(err, ice.ErrDetermineNetworkType) {
-			pc.log.Warnf("Discarding remote candidate: %s", err)
-
-			return nil
-		}
-
 		return err
 	}
+	if ufrag, ok := cand.GetExtension("ufrag"); ok && candidate.UsernameFragment == nil {
+		candidate.UsernameFragment = &ufrag.Value
+	}
 
+	if candidate.UsernameFragment == nil {
+		details, extractErr := extractICEDetails(remoteDesc.parsed, pc.log)
+		if extractErr != nil {
+			return extractErr
+		}
+		candidate.UsernameFragment = &details.Ufrag
+	}
 	// Reject candidates from old generations.
 	// If candidate.usernameFragment is not null,
 	// and is not equal to any username fragment present in the corresponding media
 	//  description of an applied remote description,
 	// return a promise rejected with a newly created OperationError.
 	// https://w3c.github.io/webrtc-pc/#dom-peerconnection-addicecandidate
-	if ufrag, ok := cand.GetExtension("ufrag"); ok {
-		if !pc.descriptionContainsUfrag(remoteDesc.parsed, ufrag.Value) {
-			pc.log.Errorf("dropping candidate with ufrag %s because it doesn't match the current ufrags", ufrag.Value)
+	if !pc.descriptionContainsUfrag(remoteDesc.parsed, *candidate.UsernameFragment) {
+		pc.log.Errorf("dropping candidate with ufrag %s because it doesn't match the current ufrags", *candidate.UsernameFragment)
 
-			return nil
-		}
+		return nil
 	}
 
 	c, err := newICECandidateFromICE(cand, "", 0)
 	if err != nil {
 		return err
 	}
+	if err := pc.iceTransport.AddRemoteCandidate(&c); err != nil {
+		return err
+	}
 
-	return pc.iceTransport.AddRemoteCandidate(&c)
+	for _, description := range []**SessionDescription{&pc.pendingRemoteDescription, &pc.currentRemoteDescription} {
+		if *description == nil || !pc.descriptionContainsUfrag((*description).parsed, *candidate.UsernameFragment) {
+			continue
+		}
+		// Publish a copy so descriptions already returned to callers stay immutable.
+		updated := **description
+		if err := updated.updateWithCandidate(candidate); err != nil {
+			return err
+		}
+		*description = &updated
+	}
+
+	return nil
 }
 
 // Return true if the sdp contains a specific ufrag.
