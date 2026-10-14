@@ -1759,7 +1759,7 @@ func unmarshalReceiverStats(b []byte) (Stats, error) {
 	}
 }
 
-// TransportStats contains transport statistics related to the PeerConnection object.
+// TransportStats contains statistics for a DTLS transport and its underlying ICE transport.
 type TransportStats struct {
 	// Timestamp is the timestamp associated with this object.
 	Timestamp StatsTimestamp `json:"timestamp"`

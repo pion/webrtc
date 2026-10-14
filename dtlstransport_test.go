@@ -297,7 +297,7 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 			defer func() { require.NoError(t, answer.Close()) }()
 
 			for _, peer := range []*PeerConnection{offer, answer} {
-				stats := getTransportStats(t, peer.GetStats())
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
 				encoded, marshalErr := json.Marshal(stats)
 				require.NoError(t, marshalErr)
 				var fields map[string]json.RawMessage
@@ -314,13 +314,27 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 				state, ok := peer.dtlsTransport.dtlsConn.ConnectionState()
 				require.True(t, ok)
 				require.Equal(t, tc.want, state.NegotiatedVersion())
-				stats := getTransportStats(t, peer.GetStats())
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
 				assert.Equal(t, fmt.Sprintf("%04X", tc.want), stats.TLSVersion)
+				assert.Equal(t, peer.iceTransport.Role(), stats.ICERole)
+				assert.Equal(t, peer.iceTransport.State(), stats.ICEState)
+				assert.Equal(t, DTLSTransportStateConnected, stats.DTLSState)
+				directStats := peer.dtlsTransport.Stats()
+				assert.Equal(t, stats.ID, directStats.ID)
+				assert.Equal(t, stats.TLSVersion, directStats.TLSVersion)
+				assert.NotZero(t, directStats.BytesSent)
+				assert.NotZero(t, directStats.BytesReceived)
 				assert.Equal(t, state.CipherSuiteID.String(), stats.DTLSCipher)
 				assert.NotEmpty(t, stats.DTLSCipher)
 				assert.Equal(t, "SRTP_AEAD_AES_256_GCM", stats.SRTPCipher)
+			}
+			for _, peer := range []*PeerConnection{offer, answer} {
+				stats := peer.dtlsTransport.Stats()
 				require.NoError(t, peer.Close())
-				closedStats := getTransportStats(t, peer.GetStats())
+				closedStats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, stats.ID, closedStats.ID)
+				assert.Equal(t, DTLSTransportStateClosed, closedStats.DTLSState)
+				assert.Equal(t, ICETransportStateClosed, closedStats.ICEState)
 				assert.Equal(t, stats.TLSVersion, closedStats.TLSVersion)
 				assert.Equal(t, stats.DTLSCipher, closedStats.DTLSCipher)
 				assert.Equal(t, stats.SRTPCipher, closedStats.SRTPCipher)

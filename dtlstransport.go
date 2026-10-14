@@ -41,6 +41,7 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
+	statsID               string
 	iceTransport          *ICETransport
 	certificates          []Certificate
 	remoteParameters      DTLSParameters
@@ -104,6 +105,7 @@ func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, intercep
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
 	trans := &DTLSTransport{
+		statsID:      "DTLSTransport-" + rand.Text(),
 		iceTransport: transport,
 		api:          api,
 		state:        DTLSTransportStateNew,
@@ -896,13 +898,32 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
 }
 
-// updateStats adds cached DTLS information to the underlying ICE transport stats.
-func (t *DTLSTransport) updateStats(stats *TransportStats) {
+// Stats reports statistics for the DTLSTransport and its underlying ICETransport.
+func (t *DTLSTransport) Stats() TransportStats {
 	t.lock.RLock()
-	defer t.lock.RUnlock()
+	stats := TransportStats{
+		Timestamp:  statsTimestampNow(),
+		Type:       StatsTypeTransport,
+		ID:         t.statsID,
+		DTLSState:  t.state,
+		TLSVersion: t.tlsVersion,
+		DTLSCipher: t.dtlsCipher,
+		SRTPCipher: t.srtpCipher,
+	}
+	iceTransport := t.iceTransport
+	t.lock.RUnlock()
 
-	stats.DTLSState = t.state
-	stats.TLSVersion = t.tlsVersion
-	stats.DTLSCipher = t.dtlsCipher
-	stats.SRTPCipher = t.srtpCipher
+	if iceTransport != nil {
+		stats.ICERole = iceTransport.Role()
+		stats.ICEState = iceTransport.State()
+		stats.BytesSent, stats.BytesReceived = iceTransport.byteCounts()
+	}
+
+	return stats
+}
+
+func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats := t.Stats()
+	collector.Collect(stats.ID, stats)
 }

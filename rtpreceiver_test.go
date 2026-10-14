@@ -317,8 +317,9 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 
 	// Minimal RTPReceiver with one track
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeVideo,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeVideo,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", receiver)
 	receiver.tracks = []trackStreams{{track: tr}}
@@ -354,8 +355,9 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutPull(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	track := newTrackRemote(RTPCodecTypeAudio, 7777, 0, "", receiver)
@@ -393,8 +395,9 @@ func TestRTPReceiver_CollectStats_AudioPlayoutPull(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutSharedProvider(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	trackOne := newTrackRemote(RTPCodecTypeAudio, 5555, 0, "", receiver)
@@ -433,8 +436,9 @@ func TestRTPReceiver_CollectStats_AudioPlayoutSharedProvider(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutTimestampAlignment(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	track := newTrackRemote(RTPCodecTypeAudio, 9999, 0, "", receiver)
@@ -607,8 +611,9 @@ func TestRTPReceiver_CollectStats_RID(t *testing.T) {
 	fg := &fakeGetter{s: stats.Stats{}}
 
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeVideo,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeVideo,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	// Case 1: RID empty

@@ -1098,13 +1098,11 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport, transport *DTLSTransport) TransportStats {
 	t.Helper()
 
-	stats, ok := report["iceTransport"]
-	assert.True(t, ok)
-	transportStats, ok := stats.(TransportStats)
-	assert.True(t, ok)
+	transportStats, ok := report.GetTransportStats(transport)
+	require.True(t, ok)
 	assert.Equal(t, transportStats.Type, StatsTypeTransport)
 
 	return transportStats
@@ -1207,8 +1205,8 @@ func findOutboundRTPStatsBySSRC(report StatsReport, ssrc SSRC) []OutboundRTPStre
 func assertInboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection) {
 	t.Helper()
 
-	for _, r := range pc.GetReceivers() {
-		for _, tr := range r.Tracks() {
+	for _, receiver := range pc.GetReceivers() {
+		for _, tr := range receiver.Tracks() {
 			if tr.SSRC() == 0 {
 				continue
 			}
@@ -1220,7 +1218,8 @@ func assertInboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection)
 				assert.Equal(t, tr.SSRC(), inboundStats.SSRC)
 				assert.Equal(t, tr.ID(), inboundStats.TrackIdentifier)
 				assert.NotEmpty(t, inboundStats.Kind)
-				assert.NotEmpty(t, inboundStats.TransportID)
+				transportStats := getTransportStats(t, report, receiver.Transport())
+				assert.Equal(t, transportStats.ID, inboundStats.TransportID)
 				assert.Greater(t, inboundStats.PacketsReceived, uint64(0))
 				assert.GreaterOrEqual(t, inboundStats.PacketsLost, int64(0))
 				assert.Greater(t, inboundStats.BytesReceived, uint64(0))
@@ -1247,7 +1246,8 @@ func assertOutboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection
 		assert.Equal(t, StatsTypeOutboundRTP, outboundStats.Type)
 		assert.Equal(t, sender.rtpTransceiver.Mid(), outboundStats.Mid)
 		assert.Equal(t, "video", outboundStats.Kind)
-		assert.NotEmpty(t, outboundStats.TransportID)
+		transportStats := getTransportStats(t, report, sender.Transport())
+		assert.Equal(t, transportStats.ID, outboundStats.TransportID)
 		assert.Greater(t, outboundStats.PacketsSent, uint64(0))
 		assert.Greater(t, outboundStats.BytesSent, uint64(0))
 		assert.Greater(t, outboundStats.HeaderBytesSent, uint64(0))
@@ -1509,10 +1509,10 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
-	answerICETransportStats := getTransportStats(t, reportPCAnswer)
-	offerICETransportStats := getTransportStats(t, reportPCOffer)
-	assert.GreaterOrEqual(t, offerICETransportStats.BytesSent, answerICETransportStats.BytesReceived)
-	assert.GreaterOrEqual(t, answerICETransportStats.BytesSent, offerICETransportStats.BytesReceived)
+	answerTransportStats := getTransportStats(t, reportPCAnswer, answerPC.dtlsTransport)
+	offerTransportStats := getTransportStats(t, reportPCOffer, offerPC.dtlsTransport)
+	assert.GreaterOrEqual(t, offerTransportStats.BytesSent, answerTransportStats.BytesReceived)
+	assert.GreaterOrEqual(t, answerTransportStats.BytesSent, offerTransportStats.BytesReceived)
 
 	answerSCTPTransportStats := getSctpTransportStats(t, reportPCAnswer)
 	offerSCTPTransportStats := getSctpTransportStats(t, reportPCOffer)
