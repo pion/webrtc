@@ -469,7 +469,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 			SSRC:            remoteTrack.SSRC(),
 			Kind:            r.kind.String(),
 			TrackIdentifier: remoteTrack.ID(),
-			TransportID:     "iceTransport",
+			TransportID:     iceTransportStatsID,
 			CodecID:         codecID,
 		}
 		r.populateInboundStats(&inboundStats, statsGetter, remoteTrack)

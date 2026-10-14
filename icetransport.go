@@ -667,6 +667,8 @@ func (t *ICETransport) ensureGatherer() error {
 	return nil
 }
 
+const iceTransportStatsID = "iceTransport"
+
 // Stats reports the current statistics of the ICETransport.
 func (t *ICETransport) Stats() TransportStats {
 	conn := t.getConn()
@@ -674,7 +676,7 @@ func (t *ICETransport) Stats() TransportStats {
 	stats := TransportStats{
 		Timestamp: statsTimestampFrom(time.Now()),
 		Type:      StatsTypeTransport,
-		ID:        "iceTransport",
+		ID:        iceTransportStatsID,
 	}
 	if conn != nil {
 		if connWithStats, ok := conn.(interface {

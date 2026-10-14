@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -484,6 +485,52 @@ func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) err
 	}
 
 	return fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
+}
+
+func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	if statsGetter == nil || !r.hasSent() || r.hasStopped() {
+		return
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mid := ""
+	if r.rtpTransceiver != nil {
+		mid = r.rtpTransceiver.Mid()
+	}
+	now := statsTimestampNow()
+	for _, trackEncoding := range r.trackEncodings {
+		if trackEncoding.track == nil || trackEncoding.context == nil {
+			continue
+		}
+
+		collector.Collecting()
+
+		outboundStats := OutboundRTPStreamStats{
+			Mid:         mid,
+			Rid:         trackEncoding.track.RID(),
+			Timestamp:   now,
+			Type:        StatsTypeOutboundRTP,
+			ID:          fmt.Sprintf("outbound-rtp-%d", uint32(trackEncoding.ssrc)),
+			SSRC:        trackEncoding.ssrc,
+			Kind:        r.kind.String(),
+			TransportID: iceTransportStatsID,
+		}
+		if codecs := trackEncoding.context.params.Codecs; len(codecs) > 0 {
+			outboundStats.CodecID = codecs[0].statsID
+		}
+		if stats := statsGetter.Get(uint32(trackEncoding.ssrc)); stats != nil {
+			outboundStats.PacketsSent = stats.OutboundRTPStreamStats.PacketsSent
+			outboundStats.BytesSent = stats.OutboundRTPStreamStats.BytesSent
+			outboundStats.HeaderBytesSent = stats.OutboundRTPStreamStats.HeaderBytesSent
+			outboundStats.NACKCount = stats.OutboundRTPStreamStats.NACKCount
+			outboundStats.FIRCount = stats.OutboundRTPStreamStats.FIRCount
+			outboundStats.PLICount = stats.OutboundRTPStreamStats.PLICount
+		}
+
+		collector.Collect(outboundStats.ID, outboundStats)
+	}
 }
 
 // hasSent tells if data has been ever sent for this instance.
