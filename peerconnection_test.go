@@ -43,9 +43,9 @@ func withModificationFunc(f func(string) string) func(*signalPairOptions) {
 	}
 }
 
-func withDisableInitialDataChannel(disable bool) func(*signalPairOptions) {
+func withDisableInitialDataChannel() func(*signalPairOptions) {
 	return func(o *signalPairOptions) {
-		o.disableInitialDataChannel = disable
+		o.disableInitialDataChannel = true
 	}
 }
 

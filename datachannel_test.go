@@ -124,7 +124,7 @@ func benchmarkDataChannelSend(b *testing.B, numChannels int) { //nolint:cyclop
 		dataChannels = append(dataChannels, dc)
 	}
 
-	err = signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true))
+	err = signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel())
 	if err != nil {
 		b.Fatalf("Failed to signal PeerConnection pair: %v", err)
 	}

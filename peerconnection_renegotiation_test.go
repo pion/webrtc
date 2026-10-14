@@ -1415,7 +1415,7 @@ func TestPeerConnection_DTLSRestart(t *testing.T) {
 		require.NoError(t, offerErr)
 		require.NotEmpty(t, remoteTLSID(offer.parsed))
 		require.True(t, certificate.Equals(first.GetConfiguration().Certificates[0]))
-		require.NoError(t, signalPairWithOptions(first, second, withDisableInitialDataChannel(true),
+		require.NoError(t, signalPairWithOptions(first, second, withDisableInitialDataChannel(),
 			withModificationFunc(func(description string) string {
 				return strings.ReplaceAll(description, "a=tls-id:"+remoteTLSID(offer.parsed)+"\r\n", "")
 			})))
@@ -1442,7 +1442,7 @@ func TestPeerConnection_DTLSRestart(t *testing.T) {
 	_, err = first.CreateOffer(&OfferOptions{DTLSRestart: true})
 	require.NoError(t, err)
 	for _, pair := range [][2]*PeerConnection{{second, first}, {first, second}} {
-		require.NoError(t, signalPairWithOptions(pair[0], pair[1], withDisableInitialDataChannel(true)))
+		require.NoError(t, signalPairWithOptions(pair[0], pair[1], withDisableInitialDataChannel()))
 		first.ops.Done()
 		second.ops.Done()
 		require.True(t, certificate.Equals(first.GetConfiguration().Certificates[0]))

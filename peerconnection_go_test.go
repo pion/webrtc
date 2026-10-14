@@ -2581,7 +2581,7 @@ func TestAlwaysNegotiateDataChannels_CreateDataChannel(t *testing.T) { //nolint:
 	})
 
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true)))
+	require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel()))
 
 	select {
 	case <-connected:
@@ -2719,7 +2719,7 @@ func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
 	assert.NoError(t, err)
 
 	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
-	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel()))
 	<-connected
 
 	// Round 2: add a data channel and renegotiate.

@@ -674,26 +674,16 @@ func (t *ICETransport) ensureGatherer() error {
 	return nil
 }
 
-// Stats reports the current statistics of the ICETransport.
-func (t *ICETransport) Stats() TransportStats {
-	conn := t.getConn()
-
-	stats := TransportStats{
-		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeTransport,
-		ID:        "iceTransport",
-	}
-	if conn != nil {
-		if connWithStats, ok := conn.(interface {
-			BytesSent() uint64
-			BytesReceived() uint64
-		}); ok {
-			stats.BytesSent = connWithStats.BytesSent()
-			stats.BytesReceived = connWithStats.BytesReceived()
-		}
+func (t *ICETransport) byteCounts() (sent, received uint64) {
+	conn, ok := t.getConn().(interface {
+		BytesSent() uint64
+		BytesReceived() uint64
+	})
+	if !ok {
+		return 0, 0
 	}
 
-	return stats
+	return conn.BytesSent(), conn.BytesReceived()
 }
 
 func (t *ICETransport) haveRemoteCredentialsChange(newUfrag, newPwd string) bool {

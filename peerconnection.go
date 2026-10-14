@@ -1413,8 +1413,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if transceiver == nil {
 				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 			} else if direction == RTPTransceiverDirectionInactive {
-				if err := transceiver.Stop(); err != nil {
-					return err
+				if stopErr := transceiver.Stop(); stopErr != nil {
+					return stopErr
 				}
 			}
 			if transceiver != nil {
@@ -1423,9 +1423,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 			switch {
 			case transceiver == nil:
-				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
-				if err != nil {
-					return err
+				receiver, receiverErr := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
+				if receiverErr != nil {
+					return receiverErr
 				}
 
 				localDirection := RTPTransceiverDirectionRecvonly
@@ -1461,8 +1461,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 
 			if transceiver.Mid() == "" {
-				if err := transceiver.SetMid(midValue); err != nil {
-					return err
+				if midErr := transceiver.SetMid(midValue); midErr != nil {
+					return midErr
 				}
 			}
 		}
@@ -3541,6 +3541,10 @@ func (pc *PeerConnection) generateMatchedSDP(
 		groupValue, _ := remoteDescription.parsed.Attribute(sdp.AttrKeyGroup)
 		groupValue = strings.TrimLeft(groupValue, "BUNDLE")
 		bundleGroup = &groupValue
+	}
+
+	if pc.configuration.SDPSemantics == SDPSemanticsUnifiedPlanWithFallback && detectedPlanB {
+		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
 	}
 
 	dtlsFingerprints, err := certificate.GetFingerprints()
