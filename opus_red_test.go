@@ -19,8 +19,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
-	"github.com/pion/transport/v4/test"
-	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/transport/v5/test"
+	"github.com/pion/transport/v5/vnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -216,7 +216,7 @@ func assertOpusREDStreamInfo(t *testing.T, infos []interceptor.StreamInfo, ssrc 
 	assert.Failf(t, "missing Opus RED StreamInfo", "no StreamInfo found for SSRC %d", ssrc)
 }
 
-func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
+func TestOpusREDReceiverRejectsUnnegotiatedPacket(t *testing.T) {
 	defer test.TimeOut(20 * time.Second).Stop()
 
 	remoteObservation := &opusREDObservation{}
@@ -262,18 +262,16 @@ func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
 	assert.NotContains(t, answerSDP, " red/48000")
 	assert.NotContains(t, answerSDP, "a=rtpmap:63")
 
+	// v5 announces negotiated tracks before receiving their first RTP packet.
+	var remote *TrackRemote
+	select {
+	case remote = <-remoteTrack:
+	case <-time.After(3 * time.Second):
+		require.Fail(t, "timed out waiting for negotiated Opus track")
+	}
+	require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
+
 	ssrc := uint32(sender.GetParameters().Encodings[0].SSRC)
-	require.Eventually(t, func() bool {
-		_, remoteStreamInfos := remoteObservation.snapshot()
-		for _, info := range remoteStreamInfos {
-			if info.SSRC == ssrc && info.MimeType == MimeTypeOpus {
-				return info.PayloadTypeForwardErrorCorrection == 0
-			}
-		}
-
-		return false
-	}, time.Second, 10*time.Millisecond, "Opus-only stream was not bound without RED")
-
 	track.mu.RLock()
 	bindings := slices.Clone(track.bindings)
 	track.mu.RUnlock()
@@ -293,22 +291,23 @@ func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
 	}
 
 	writePacket(testOpusREDPayloadType, 100, []byte{uint8(testOpusREDOpusPayloadType), 0x01})
+	_, _, err = remote.ReadRTP()
+	require.ErrorIs(t, err, ErrCodecNotFound)
 	require.Eventually(t, func() bool {
-		wirePayloadTypes, _ := remoteObservation.snapshot()
+		_, remoteStreamInfos := remoteObservation.snapshot()
+		for _, info := range remoteStreamInfos {
+			if info.SSRC == ssrc && info.MimeType == MimeTypeOpus {
+				return info.PayloadTypeForwardErrorCorrection == 0
+			}
+		}
 
-		return slices.Contains(wirePayloadTypes, uint8(testOpusREDPayloadType))
-	}, time.Second, 10*time.Millisecond, "initial RED packet was not consumed")
-	assert.Zero(t, onTrackCount.Load())
+		return false
+	}, time.Second, 10*time.Millisecond, "Opus-only stream was not bound without RED")
+	wirePayloadTypes, _ := remoteObservation.snapshot()
+	assert.Contains(t, wirePayloadTypes, uint8(testOpusREDPayloadType))
+	assert.Equal(t, int32(1), onTrackCount.Load())
 
 	writePacket(testOpusREDOpusPayloadType, 101, []byte{0x02})
-
-	var remote *TrackRemote
-	select {
-	case remote = <-remoteTrack:
-	case <-time.After(3 * time.Second):
-		require.Fail(t, "timed out waiting for Opus track after unnegotiated RED packet")
-	}
-
 	firstOpus, _, err := remote.ReadRTP()
 	require.NoError(t, err)
 	assert.Equal(t, uint8(testOpusREDOpusPayloadType), firstOpus.PayloadType)
@@ -373,7 +372,7 @@ func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) {
 	require.NoError(t, signalPairWithModification(offerPeer, answerPeer, func(raw string) string {
 		return stripSSRC.ReplaceAllString(raw, "")
 	}))
-	connected.Wait()
+	<-connected
 
 	var midID, ridID uint8
 	for _, extension := range sender.GetParameters().HeaderExtensions {
