@@ -434,11 +434,13 @@ func ExampleConfigureOpusRED() {
 	_ = mediaEngine.RegisterDefaultCodecs()
 	registry := &interceptor.Registry{}
 
-	// Add reports, stats, NACK, and TWCC feedback before RED so they see wire packets.
+	// 1. Register network observers first so they see wire RED packets.
 	_ = RegisterDefaultInterceptors(mediaEngine, registry)
+	// 2. Register RED between the network observers and RTP header writers.
 	_ = ConfigureOpusRED(111, 63, mediaEngine, registry, red.SenderMaxPacketSize(1200))
-	// Header mutators belong outside RED and are therefore registered afterward.
+	// 3. Register header writers last so RED accounts for their header extensions.
 	_ = ConfigureTWCCHeaderExtensionSender(mediaEngine, registry)
 
+	// Finish registration before creating the API and its PeerConnections.
 	_ = NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(registry))
 }

@@ -181,6 +181,8 @@ func ConfigureNackWithOptions(mediaEngine *MediaEngine, interceptorRegistry *int
 
 // ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
 // a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
+// When using ConfigureOpusRED, call this function afterward so RED's packet-size
+// limit includes the TWCC header extension.
 func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	if err := mediaEngine.RegisterHeaderExtension(
 		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
@@ -393,10 +395,18 @@ func registerOpusREDCodec(mediaEngine *MediaEngine, opusPayloadType, redPayloadT
 // ConfigureOpusRED registers an audio/red codec associated with an existing
 // Opus codec and installs transparent RFC 2198 sender and receiver interceptors.
 //
-// It must be called before creating a PeerConnection. Register network-observing
-// interceptors, such as reports, stats, NACK, and TWCC feedback, before calling
-// ConfigureOpusRED so they observe wire RED packets. Register packet-header
-// mutators, such as the TWCC header-extension sender, after ConfigureOpusRED.
+// Register codecs and interceptors before creating a PeerConnection, using the
+// same MediaEngine and interceptor.Registry throughout. The registration order is:
+//
+//  1. RegisterDefaultInterceptors, or custom network observers such as reports,
+//     stats, NACK, and TWCC feedback.
+//  2. ConfigureOpusRED.
+//  3. ConfigureTWCCHeaderExtensionSender and any other RTP header writers.
+//
+// Later registrations wrap earlier ones. On outgoing RTP, header writers run
+// before RED encodes the packet, so its packet-size limit includes their header
+// extensions. Network observers see the wire RED packets on both send and receive.
+//
 // Applications continue to read and write ordinary Opus RTP packets.
 func ConfigureOpusRED(
 	opusPayloadType PayloadType,
