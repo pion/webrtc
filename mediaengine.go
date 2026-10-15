@@ -902,7 +902,8 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 }
 
 // getRTPParametersByPayloadTypeForStream resolves a wire RED payload type to
-// its associated Opus format before an interceptor stream is bound.
+// Opus and gets its RED payload type from the negotiated codecs, regardless of
+// which payload type the first packet uses.
 func (m *MediaEngine) getRTPParametersByPayloadTypeForStream(
 	payloadType PayloadType,
 ) (RTPParameters, PayloadType, error) {
@@ -910,23 +911,24 @@ func (m *MediaEngine) getRTPParametersByPayloadTypeForStream(
 	if err != nil {
 		return RTPParameters{}, 0, err
 	}
-	if !strings.EqualFold(codec.MimeType, MimeTypeRED) {
-		params, paramsErr := m.getRTPParametersByPayloadType(payloadType)
-
-		return params, 0, paramsErr
-	}
-
 	codecs := m.getCodecsByKind(typ)
-	_, opusPayloadType, attached := primaryPayloadTypeForRED(codec, codecs)
-	if !attached {
-		return RTPParameters{}, 0, ErrCodecNotFound
+	primaryPayloadType := payloadType
+	if strings.EqualFold(codec.MimeType, MimeTypeRED) {
+		_, associatedPayloadType, attached := primaryPayloadTypeForRED(codec, codecs)
+		if !attached {
+			return RTPParameters{}, 0, ErrCodecNotFound
+		}
+		primaryPayloadType = associatedPayloadType
 	}
-	params, err := m.getRTPParametersByPayloadType(opusPayloadType)
+	params, err := m.getRTPParametersByPayloadType(primaryPayloadType)
 	if err != nil {
 		return RTPParameters{}, 0, err
 	}
+	if strings.EqualFold(codec.MimeType, MimeTypeRED) {
+		return params, codec.PayloadType, nil
+	}
 
-	return params, payloadType, nil
+	return params, findREDPayloadType(primaryPayloadType, codecs), nil
 }
 
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {

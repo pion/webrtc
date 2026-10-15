@@ -121,7 +121,7 @@ func TestMediaEngineResolvesREDWirePayloadType(t *testing.T) {
 
 	params, redPayloadType, err = mediaEngine.getRTPParametersByPayloadTypeForStream(111)
 	assert.NoError(t, err)
-	assert.Zero(t, redPayloadType)
+	assert.Equal(t, PayloadType(63), redPayloadType)
 	assert.Equal(t, MimeTypeOpus, params.Codecs[0].MimeType)
 	assert.Equal(t, PayloadType(111), params.Codecs[0].PayloadType)
 }
