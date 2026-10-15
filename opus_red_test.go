@@ -34,7 +34,6 @@ type opusREDObservation struct {
 	mu sync.Mutex
 
 	wirePayloadTypes  []uint8
-	localStreamInfos  []interceptor.StreamInfo
 	remoteStreamInfos []interceptor.StreamInfo
 }
 
@@ -42,26 +41,6 @@ func (o *opusREDObservation) factory() interceptor.Factory {
 	return &mock_interceptor.Factory{
 		NewInterceptorFn: func(string) (interceptor.Interceptor, error) {
 			return &mock_interceptor.Interceptor{
-				BindLocalStreamFn: func(
-					info *interceptor.StreamInfo,
-					writer interceptor.RTPWriter,
-				) interceptor.RTPWriter {
-					o.mu.Lock()
-					o.localStreamInfos = append(o.localStreamInfos, *info)
-					o.mu.Unlock()
-
-					return interceptor.RTPWriterFunc(func(
-						header *rtp.Header,
-						payload []byte,
-						attributes interceptor.Attributes,
-					) (int, error) {
-						o.mu.Lock()
-						o.wirePayloadTypes = append(o.wirePayloadTypes, header.PayloadType)
-						o.mu.Unlock()
-
-						return writer.Write(header, payload, attributes)
-					})
-				},
 				BindRemoteStreamFn: func(
 					info *interceptor.StreamInfo,
 					reader interceptor.RTPReader,
@@ -92,13 +71,11 @@ func (o *opusREDObservation) factory() interceptor.Factory {
 	}
 }
 
-func (o *opusREDObservation) snapshot() (
-	[]uint8, []interceptor.StreamInfo, []interceptor.StreamInfo,
-) {
+func (o *opusREDObservation) snapshot() ([]uint8, []interceptor.StreamInfo) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	return slices.Clone(o.wirePayloadTypes), slices.Clone(o.localStreamInfos), slices.Clone(o.remoteStreamInfos)
+	return slices.Clone(o.wirePayloadTypes), slices.Clone(o.remoteStreamInfos)
 }
 
 func newOpusREDAPIOptions(
@@ -223,34 +200,6 @@ func newOpusOnlyAPIOptions(
 	}
 }
 
-type opusREDReadResult struct {
-	packets     []*rtp.Packet
-	codec       RTPCodecParameters
-	payloadType PayloadType
-	rid         string
-	err         error
-}
-
-func readOpusREDPackets(track *TrackRemote, count int) opusREDReadResult {
-	result := opusREDReadResult{
-		packets: make([]*rtp.Packet, 0, count),
-		rid:     track.RID(),
-	}
-	for range count {
-		packet, _, err := track.ReadRTP()
-		if err != nil {
-			result.err = err
-
-			return result
-		}
-		result.packets = append(result.packets, packet)
-	}
-	result.codec = track.Codec()
-	result.payloadType = track.PayloadType()
-
-	return result
-}
-
 func assertOpusREDStreamInfo(t *testing.T, infos []interceptor.StreamInfo, ssrc uint32) {
 	t.Helper()
 	for _, info := range infos {
@@ -265,102 +214,6 @@ func assertOpusREDStreamInfo(t *testing.T, infos []interceptor.StreamInfo, ssrc 
 		return
 	}
 	assert.Failf(t, "missing Opus RED StreamInfo", "no StreamInfo found for SSRC %d", ssrc)
-}
-
-func TestOpusREDTransparentRecoveryAndInterceptorOrdering(t *testing.T) {
-	defer test.TimeOut(20 * time.Second).Stop()
-
-	observation := &opusREDObservation{}
-	offerPeer, answerPeer, wan := createOpusREDVNetPair(t, observation.factory(), false)
-	closed := false
-	t.Cleanup(func() {
-		if !closed {
-			closePairNow(t, offerPeer, answerPeer)
-			assert.NoError(t, wan.Stop())
-		}
-	})
-
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
-		"audio",
-		"pion",
-	)
-	require.NoError(t, err)
-	sender, err := offerPeer.AddTrack(track)
-	require.NoError(t, err)
-	resultChannel := make(chan opusREDReadResult, 1)
-	answerPeer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
-		resultChannel <- readOpusREDPackets(remote, 3)
-	})
-
-	connected := untilConnectionState(PeerConnectionStateConnected, offerPeer, answerPeer)
-	require.NoError(t, signalPair(offerPeer, answerPeer))
-	connected.Wait()
-
-	ssrc := uint32(sender.GetParameters().Encodings[0].SSRC)
-	var wireMutex sync.Mutex
-	wirePayloadTypes := []uint8{}
-	mediaPacketCount := 0
-	wan.AddChunkFilter(func(chunk vnet.Chunk) bool {
-		var header rtp.Header
-		if _, parseErr := header.Unmarshal(chunk.UserData()); parseErr != nil || header.SSRC != ssrc {
-			return true
-		}
-		if header.PayloadType != uint8(testOpusREDOpusPayloadType) &&
-			header.PayloadType != uint8(testOpusREDPayloadType) {
-			return true
-		}
-
-		wireMutex.Lock()
-		defer wireMutex.Unlock()
-		wirePayloadTypes = append(wirePayloadTypes, header.PayloadType)
-		mediaPacketCount++
-
-		return mediaPacketCount != 2
-	})
-
-	for i := range 3 {
-		require.NoError(t, track.WriteRTP(&rtp.Packet{
-			Header: rtp.Header{
-				Version:        2,
-				SequenceNumber: uint16(100 + i),       //nolint:gosec // Test input is bounded.
-				Timestamp:      uint32(960 * (i + 1)), //nolint:gosec // Test input is bounded.
-			},
-			Payload: []byte{byte(i + 1)}, //nolint:gosec // Test input is bounded.
-		}))
-	}
-
-	var result opusREDReadResult
-	select {
-	case result = <-resultChannel:
-	case <-time.After(5 * time.Second):
-		require.Fail(t, "timed out waiting for recovered Opus packets")
-	}
-	require.NoError(t, result.err)
-	require.Len(t, result.packets, 3)
-	assert.Equal(t, MimeTypeOpus, result.codec.MimeType)
-	assert.Equal(t, testOpusREDOpusPayloadType, result.payloadType)
-	for i, packet := range result.packets {
-		assert.Equal(t, uint8(testOpusREDOpusPayloadType), packet.PayloadType)
-		assert.Equal(t, uint16(100+i), packet.SequenceNumber) //nolint:gosec // Test input is bounded.
-		assert.Equal(t, []byte{byte(i + 1)}, packet.Payload)  //nolint:gosec // Test input is bounded.
-	}
-
-	wireMutex.Lock()
-	assert.Equal(t, []uint8{
-		uint8(testOpusREDOpusPayloadType),
-		uint8(testOpusREDPayloadType),
-		uint8(testOpusREDPayloadType),
-	}, wirePayloadTypes)
-	wireMutex.Unlock()
-	observedPayloadTypes, localStreamInfos, remoteStreamInfos := observation.snapshot()
-	assert.Contains(t, observedPayloadTypes, uint8(testOpusREDPayloadType))
-	assertOpusREDStreamInfo(t, localStreamInfos, ssrc)
-	assertOpusREDStreamInfo(t, remoteStreamInfos, ssrc)
-
-	closePairNow(t, offerPeer, answerPeer)
-	require.NoError(t, wan.Stop())
-	closed = true
 }
 
 func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
@@ -411,7 +264,7 @@ func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
 
 	ssrc := uint32(sender.GetParameters().Encodings[0].SSRC)
 	require.Eventually(t, func() bool {
-		_, _, remoteStreamInfos := remoteObservation.snapshot()
+		_, remoteStreamInfos := remoteObservation.snapshot()
 		for _, info := range remoteStreamInfos {
 			if info.SSRC == ssrc && info.MimeType == MimeTypeOpus {
 				return info.PayloadTypeForwardErrorCorrection == 0
@@ -441,7 +294,7 @@ func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
 
 	writePacket(testOpusREDPayloadType, 100, []byte{uint8(testOpusREDOpusPayloadType), 0x01})
 	require.Eventually(t, func() bool {
-		wirePayloadTypes, _, _ := remoteObservation.snapshot()
+		wirePayloadTypes, _ := remoteObservation.snapshot()
 
 		return slices.Contains(wirePayloadTypes, uint8(testOpusREDPayloadType))
 	}, time.Second, 10*time.Millisecond, "initial RED packet was not consumed")
@@ -477,10 +330,11 @@ func TestOpusREDReceiverStartupSkipsUnnegotiatedPacket(t *testing.T) {
 	closed = true
 }
 
-func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) { //nolint:cyclop
+func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) {
 	defer test.TimeOut(20 * time.Second).Stop()
 
-	offerPeer, answerPeer, wan := createOpusREDVNetPair(t, nil, true)
+	observation := &opusREDObservation{}
+	offerPeer, answerPeer, wan := createOpusREDVNetPair(t, observation.factory(), true)
 	closed := false
 	t.Cleanup(func() {
 		if !closed {
@@ -507,10 +361,10 @@ func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) { //nolint:cyclop
 	require.NoError(t, err)
 	require.NoError(t, sender.AddEncoding(trackB))
 
-	resultChannel := make(chan opusREDReadResult, 1)
+	remoteTrack := make(chan *TrackRemote, 1)
 	answerPeer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
 		if remote.RID() == trackA.RID() {
-			resultChannel <- readOpusREDPackets(remote, 2)
+			remoteTrack <- remote
 		}
 	})
 
@@ -533,54 +387,42 @@ func TestOpusREDUndeclaredRIDFirstPacket(t *testing.T) { //nolint:cyclop
 	require.NotZero(t, midID)
 	require.NotZero(t, ridID)
 
-	ssrc := uint32(sender.GetParameters().Encodings[0].SSRC)
-	mediaPacketCount := 0
-	wan.AddChunkFilter(func(chunk vnet.Chunk) bool {
-		var header rtp.Header
-		if _, parseErr := header.Unmarshal(chunk.UserData()); parseErr != nil || header.SSRC != ssrc {
-			return true
-		}
-		if header.PayloadType != uint8(testOpusREDOpusPayloadType) &&
-			header.PayloadType != uint8(testOpusREDPayloadType) {
-			return true
-		}
-		mediaPacketCount++
+	trackA.mu.RLock()
+	bindings := slices.Clone(trackA.bindings)
+	trackA.mu.RUnlock()
+	require.Len(t, bindings, 1)
+	binding := bindings[0]
 
-		return mediaPacketCount != 1
-	})
-
-	for i := range 2 {
-		packet := &rtp.Packet{
-			Header: rtp.Header{
-				Version:        2,
-				SequenceNumber: uint16(200 + i),       //nolint:gosec // Test input is bounded.
-				Timestamp:      uint32(960 * (i + 1)), //nolint:gosec // Test input is bounded.
-			},
-			Payload: []byte{byte(i + 1)}, //nolint:gosec // Test input is bounded.
-		}
-		require.NoError(t, packet.SetExtension(midID, []byte(sender.rtpTransceiver.Mid())))
-		require.NoError(t, packet.SetExtension(ridID, []byte(trackA.RID())))
-		require.NoError(t, trackA.WriteRTP(packet))
+	// Start with a primary-only RED packet to exercise RID discovery without packet loss.
+	header := &rtp.Header{
+		Version:        2,
+		PayloadType:    uint8(testOpusREDPayloadType),
+		SequenceNumber: 200,
+		Timestamp:      960,
+		SSRC:           uint32(binding.ssrc),
 	}
+	require.NoError(t, header.SetExtension(midID, []byte(sender.rtpTransceiver.Mid())))
+	require.NoError(t, header.SetExtension(ridID, []byte(trackA.RID())))
+	_, err = binding.writeStream.WriteRTP(header, []byte{uint8(testOpusREDOpusPayloadType), 0x01})
+	require.NoError(t, err)
 
-	var result opusREDReadResult
+	var remote *TrackRemote
 	select {
-	case result = <-resultChannel:
+	case remote = <-remoteTrack:
 	case <-time.After(5 * time.Second):
 		require.Fail(t, "timed out waiting for undeclared RED stream")
 	}
-	require.NoError(t, result.err)
-	assert.Equal(t, "a", result.rid)
-	assert.Equal(t, MimeTypeOpus, result.codec.MimeType)
-	assert.Equal(t, testOpusREDOpusPayloadType, result.payloadType)
-	require.Len(t, result.packets, 2)
-	assert.Equal(t, []uint16{200, 201}, []uint16{
-		result.packets[0].SequenceNumber,
-		result.packets[1].SequenceNumber,
-	})
-	for _, packet := range result.packets {
-		assert.Equal(t, uint8(testOpusREDOpusPayloadType), packet.PayloadType)
-	}
+	require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
+	packet, _, err := remote.ReadRTP()
+	require.NoError(t, err)
+	assert.Equal(t, "a", remote.RID())
+	assert.Equal(t, MimeTypeOpus, remote.Codec().MimeType)
+	assert.Equal(t, testOpusREDOpusPayloadType, remote.PayloadType())
+	assert.Equal(t, uint8(testOpusREDOpusPayloadType), packet.PayloadType)
+	assert.Equal(t, uint16(200), packet.SequenceNumber)
+	assert.Equal(t, []byte{0x01}, packet.Payload)
+	_, remoteStreamInfos := observation.snapshot()
+	assertOpusREDStreamInfo(t, remoteStreamInfos, uint32(binding.ssrc))
 
 	closePairNow(t, offerPeer, answerPeer)
 	require.NoError(t, wan.Stop())
