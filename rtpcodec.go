@@ -172,12 +172,6 @@ func parseREDFmtp(line string) ([]PayloadType, bool) {
 		if part == "" {
 			return nil, false
 		}
-		for _, char := range part {
-			if char < '0' || char > '9' {
-				return nil, false
-			}
-		}
-
 		payloadType, err := strconv.ParseUint(part, 10, 7)
 		if err != nil {
 			return nil, false
