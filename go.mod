@@ -35,4 +35,4 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 )
 
-replace github.com/pion/interceptor => github.com/gokuljs/interceptor v0.0.0-20261005182723-ac462482153f
+replace github.com/pion/interceptor => github.com/gokuljs/interceptor v0.0.0-20261015151928-3aa6e8b50268

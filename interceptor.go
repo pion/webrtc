@@ -345,13 +345,6 @@ func newOpusREDInterceptorFactories(
 	if err != nil {
 		return nil, nil, err
 	}
-	configuredSender, err := sender.NewInterceptor("")
-	if err != nil {
-		return nil, nil, err
-	}
-	if err = configuredSender.Close(); err != nil {
-		return nil, nil, err
-	}
 	receiver, err := red.NewReceiverInterceptor()
 	if err != nil {
 		return nil, nil, err
