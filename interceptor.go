@@ -385,9 +385,7 @@ func registerOpusREDCodec(mediaEngine *MediaEngine, opusPayloadType, redPayloadT
 		PayloadType: redPayloadType,
 		statsID:     fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano()),
 	}
-	mediaEngine.audioCodecs = append(mediaEngine.audioCodecs, RTPCodecParameters{})
-	copy(mediaEngine.audioCodecs[opusIndex+1:], mediaEngine.audioCodecs[opusIndex:])
-	mediaEngine.audioCodecs[opusIndex] = redCodec
+	mediaEngine.audioCodecs = insertCodec(mediaEngine.audioCodecs, redCodec, opusIndex)
 
 	return nil
 }
