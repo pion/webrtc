@@ -15,7 +15,9 @@ import (
 	"testing"
 	"time"
 
+	dtlsprotocol "github.com/pion/dtls/v4/pkg/protocol"
 	"github.com/pion/ice/v5"
+	"github.com/pion/logging"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -353,4 +355,11 @@ func TestICETransport_GetLocalAndRemoteParameters(t *testing.T) {
 	assert.Equal(t, answerLocalParameters.Password, offerRemoteParameters.Password)
 
 	closePairNow(t, offerer, answerer)
+}
+
+func TestICETransport_SpedHooksWithoutAgent(t *testing.T) {
+	transport := NewICETransport(nil, logging.NewDefaultLoggerFactory())
+
+	assert.False(t, transport.piggyback([][]byte{{22}}))
+	transport.setDTLSHandshakeComplete(true, dtlsprotocol.Version1_2)
 }
