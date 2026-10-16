@@ -72,6 +72,8 @@ type ICEAddressRewriteRule struct {
 	AsCandidateType ICECandidateType
 	Mode            ICEAddressRewriteMode
 	Networks        []NetworkType
+	OriginalPort    int
+	NewPort         int
 }
 
 func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
@@ -87,6 +89,8 @@ func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
 		AsCandidateType: candidateType,
 		Mode:            mode,
 		Networks:        networks,
+		OriginalPort:    r.OriginalPort,
+		NewPort:         r.NewPort,
 	}
 
 	return rule
