@@ -1801,6 +1801,20 @@ func (pc *PeerConnection) configureRTPReceivers(
 
 			tracks := transceiver.Receiver().Tracks()
 			if len(tracks) == 0 {
+				// An inactive remote description stops the transceiver. A receiver
+				// that replaced a stopped one has no tracks, and if a later inactive
+				// description stopped it too, it must be replaced again: a track sent
+				// on this transceiver afterwards would never fire OnTrack.
+				if receiver.haveClosed() {
+					newReceiver, err := pc.api.NewRTPReceiver(receiver.kind, pc.dtlsTransport)
+					if err != nil {
+						pc.log.Warnf("Failed to create new RtpReceiver: %s", err)
+
+						continue
+					}
+					transceiver.setReceiver(newReceiver)
+				}
+
 				continue
 			}
 
