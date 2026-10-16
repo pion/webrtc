@@ -1456,10 +1456,12 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			transceiver, localTransceivers = findByMid(midValue, localTransceivers)
 			if transceiver == nil {
 				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
-			} else if direction == RTPTransceiverDirectionInactive {
+			} else if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
 				if err = transceiver.Stop(); err != nil {
 					return err
 				}
+			} else if direction == RTPTransceiverDirectionInactive {
+				transceiver.setDirection(RTPTransceiverDirectionInactive)
 			}
 			if transceiver != nil {
 				transceiver.setCurrentRemoteDirection(direction)
