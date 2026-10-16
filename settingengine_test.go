@@ -398,6 +398,14 @@ func TestSetSCTPRTOMax(t *testing.T) {
 	assert.Equal(t, expSize, s.sctp.rtoMax)
 }
 
+func TestSetSCTPDataChannelOpenTimeout(t *testing.T) {
+	s := SettingEngine{}
+	assert.Equal(t, time.Duration(0), s.sctp.dataChannelOpenTimeout)
+
+	s.SetSCTPDataChannelOpenTimeout(3 * time.Second)
+	assert.Equal(t, 3*time.Second, s.sctp.dataChannelOpenTimeout)
+}
+
 func TestSetICEUseCandidateCheckPriority(t *testing.T) {
 	settingEngine := SettingEngine{}
 	assert.False(t, settingEngine.iceUseCandidateCheckPriority)
