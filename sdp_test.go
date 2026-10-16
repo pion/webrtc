@@ -1395,6 +1395,27 @@ func TestGetRIDs(t *testing.T) {
 	}
 }
 
+func TestGetRIDsOrderFollowsSimulcast(t *testing.T) {
+	media := &sdp.MediaDescription{
+		MediaName: sdp.MediaName{
+			Media: "video",
+		},
+		Attributes: []sdp.Attribute{
+			{Key: sdpAttributeRid, Value: "q send"},
+			{Key: sdpAttributeRid, Value: "h send"},
+			{Key: sdpAttributeRid, Value: "f send"},
+			{Key: sdpAttributeSimulcast, Value: "send f;h;q"},
+		},
+	}
+
+	got := make([]string, 0, 3)
+	for _, rid := range getRids(media) {
+		got = append(got, rid.id)
+	}
+
+	assert.Equal(t, []string{"f", "h", "q"}, got)
+}
+
 // TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
 // a=simulcast: attribute contains empty tokens (trailing ";", ";;", or a
 // direction-only value with no rid list).
