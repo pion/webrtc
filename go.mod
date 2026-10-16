@@ -9,7 +9,7 @@ require (
 	github.com/pion/interceptor v0.1.49
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
-	github.com/pion/rtcp v1.2.18
+	github.com/pion/rtcp v1.2.19
 	github.com/pion/rtp v1.10.5
 	github.com/pion/sctp v1.12.0
 	github.com/pion/sdp/v3 v3.0.20
@@ -34,3 +34,5 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
+
+replace github.com/pion/interceptor => github.com/gokuljs/interceptor v0.0.0-20261015151928-3aa6e8b50268
