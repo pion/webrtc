@@ -917,6 +917,9 @@ func (t *DTLSTransport) Stats() TransportStats {
 		stats.ICERole = iceTransport.Role()
 		stats.ICEState = iceTransport.State()
 		stats.BytesSent, stats.BytesReceived = iceTransport.byteCounts()
+		if pair, err := iceTransport.GetSelectedCandidatePair(); err == nil && pair != nil {
+			stats.SelectedCandidatePairID = pair.statsID
+		}
 	}
 
 	return stats
