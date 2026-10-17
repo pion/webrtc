@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -45,6 +46,7 @@ type DTLSTransport struct {
 	certificates          []Certificate
 	remoteParameters      DTLSParameters
 	remoteCertificate     []byte
+	remoteCertificates    [][]byte
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
 	tlsVersion            string
@@ -52,6 +54,9 @@ type DTLSTransport struct {
 	srtpCipher            string
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
+
+	localCertificateStats  CertificateStats
+	remoteCertificateStats []CertificateStats
 
 	onStateChangeHandler         func(DTLSTransportState)
 	internalOnStateChangeHandler func(DTLSTransportState)
@@ -420,7 +425,9 @@ func (t *DTLSTransport) start(
 		t.srtpEndpoint = t.iceTransport.newEndpoint(iceEndpointSRTP)
 		t.srtcpEndpoint = t.iceTransport.newEndpoint(iceEndpointSRTCP)
 	}
-	t.remoteParameters, t.remoteCertificate = remoteParameters, nil
+	t.remoteParameters, t.remoteCertificate, t.remoteCertificates = remoteParameters, nil, nil
+	t.remoteCertificateStats = nil
+	t.setLocalCertificateStats()
 	conn, cert, role := t.conn, t.certificates[0], t.roleLocked()
 	t.onStateChange(DTLSTransportStateConnecting)
 	t.lock.Unlock()
@@ -578,6 +585,7 @@ func (t *DTLSTransport) verifyPeerCertificateFunc() func([][]byte, [][]*x509.Cer
 		t.lock.Lock()
 		defer t.lock.Unlock()
 		t.remoteCertificate = rawCerts[0]
+		t.remoteCertificates = rawCerts
 
 		if t.api.settingEngine.disableCertificateFingerprintVerification {
 			return nil
@@ -701,9 +709,34 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 			return err
 		}
 	}
+	t.setRemoteCertificateStats()
 	t.onStateChange(DTLSTransportStateConnected)
 
 	return nil
+}
+
+// setLocalCertificateStats requires the caller holds the lock.
+func (t *DTLSTransport) setLocalCertificateStats() {
+	t.localCertificateStats, _ = newCertificateStats(t.certificates[0].x509Cert)
+}
+
+// setRemoteCertificateStats requires the caller holds the lock.
+func (t *DTLSTransport) setRemoteCertificateStats() {
+	issuerID := ""
+	for _, der := range slices.Backward(t.remoteCertificates) {
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			continue
+		}
+		remoteStats, err := newCertificateStats(cert)
+		if err != nil {
+			continue
+		}
+		remoteStats.IssuerCertificateID = issuerID
+		issuerID = remoteStats.ID
+		t.remoteCertificateStats = append(t.remoteCertificateStats, remoteStats)
+	}
+	slices.Reverse(t.remoteCertificateStats)
 }
 
 func (t *DTLSTransport) failStart(err error) error {
@@ -943,6 +976,12 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 
 // Stats reports statistics for the DTLSTransport and its underlying ICETransport.
 func (t *DTLSTransport) Stats() TransportStats {
+	stats, _ := t.stats()
+
+	return stats
+}
+
+func (t *DTLSTransport) stats() (TransportStats, []CertificateStats) {
 	t.lock.RLock()
 	stats := TransportStats{
 		Timestamp:  statsTimestampNow(),
@@ -953,8 +992,21 @@ func (t *DTLSTransport) Stats() TransportStats {
 		DTLSCipher: t.dtlsCipher,
 		SRTPCipher: t.srtpCipher,
 	}
+	var certificateStats []CertificateStats
+	if t.localCertificateStats.ID != "" {
+		stats.LocalCertificateID = t.localCertificateStats.ID
+		certificateStats = append(certificateStats, t.localCertificateStats)
+	}
+	if len(t.remoteCertificateStats) > 0 {
+		stats.RemoteCertificateID = t.remoteCertificateStats[0].ID
+		certificateStats = append(certificateStats, t.remoteCertificateStats...)
+	}
 	iceTransport := t.iceTransport
 	t.lock.RUnlock()
+
+	for i := range certificateStats {
+		certificateStats[i].Timestamp = stats.Timestamp
+	}
 
 	if iceTransport != nil {
 		stats.ICERole = iceTransport.Role()
@@ -965,11 +1017,16 @@ func (t *DTLSTransport) Stats() TransportStats {
 		}
 	}
 
-	return stats
+	return stats, certificateStats
 }
 
 func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
-	stats := t.Stats()
+	stats, certificateStats := t.stats()
 	collector.Collect(stats.ID, stats)
+
+	for _, certStats := range certificateStats {
+		collector.Collecting()
+		collector.Collect(certStats.ID, certStats)
+	}
 }

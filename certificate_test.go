@@ -93,7 +93,6 @@ func TestGenerateCertificateExpires(t *testing.T) {
 
 	x509Cert := CertificateFromX509(sk, &x509.Certificate{})
 	assert.NotNil(t, x509Cert)
-	assert.Contains(t, x509Cert.statsID, "certificate")
 }
 
 func TestPEM(t *testing.T) {

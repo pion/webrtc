@@ -1249,6 +1249,9 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	if err := pc.setDescription(&desc, stateChangeOpSetLocal); err != nil {
 		return err
 	}
+	pc.dtlsTransport.lock.Lock()
+	pc.dtlsTransport.setLocalCertificateStats()
+	pc.dtlsTransport.lock.Unlock()
 
 	// Our own local description declares what we're willing to receive (RFC 9335 Section 4). If a
 	// renegotiation changes that declaration (for example, an answer that now includes Cryptex where
@@ -3178,12 +3181,6 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	statsCollector.Collect(stats.ID, stats)
 
-	certificates := pc.configuration.Certificates
-	for _, certificate := range certificates {
-		if err := certificate.collectStats(statsCollector); err != nil {
-			continue
-		}
-	}
 	pc.mu.Unlock()
 
 	receivers := pc.GetReceivers()
