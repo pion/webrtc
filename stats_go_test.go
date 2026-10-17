@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -2001,4 +2002,78 @@ func TestStatsReport_DataChannelsHaveDistinctStableIDs(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, stats.ID, current.ID)
 	}
+}
+
+func assertStatsReferencesResolve(t *testing.T, report StatsReport) {
+	t.Helper()
+
+	for id, stat := range report {
+		raw, err := json.Marshal(stat)
+		require.NoError(t, err)
+
+		var members map[string]any
+		require.NoError(t, json.Unmarshal(raw, &members))
+
+		for key, value := range members {
+			switch {
+			case strings.HasSuffix(key, "Ids"):
+				ids, ok := value.([]any)
+				if !assert.Truef(t, ok, "%s.%s is not a list", id, key) {
+					continue
+				}
+				for _, ref := range ids {
+					refID, _ := ref.(string)
+					_, found := report[refID]
+					assert.Truef(t, found, "%s.%s entry %q can be resolved", id, key, refID)
+				}
+			case strings.HasSuffix(key, "Id"):
+				refID, _ := value.(string)
+				_, found := report[refID]
+				assert.Truef(t, found, "%s.%s %q can be resolved", id, key, refID)
+			}
+		}
+	}
+}
+
+// https://github.com/web-platform-tests/wpt/blob/master/webrtc-stats/supported-stats.https.html
+func TestPeerConnection_GetStats_ReferencesResolve(t *testing.T) {
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
+
+	var tracks []*TrackLocalStaticSample
+	for _, pc := range []*PeerConnection{offerPC, answerPC} {
+		for _, codec := range []RTPCodecCapability{{MimeType: MimeTypeVP8}, {MimeType: MimeTypeOpus}} {
+			track, trackErr := NewTrackLocalStaticSample(codec, "track", "pion")
+			require.NoError(t, trackErr)
+			_, err = pc.AddTrack(track)
+			require.NoError(t, err)
+			tracks = append(tracks, track)
+		}
+	}
+
+	_, err = offerPC.CreateDataChannel("dc", nil)
+	require.NoError(t, err)
+
+	var received atomic.Int64
+	for _, pc := range []*PeerConnection{offerPC, answerPC} {
+		pc.OnTrack(func(track *TrackRemote, _ *RTPReceiver) {
+			if _, _, readErr := track.ReadRTP(); readErr == nil {
+				received.Add(1)
+			}
+		})
+	}
+
+	require.NoError(t, signalPairForStats(offerPC, answerPC))
+
+	assert.Eventually(t, func() bool {
+		for _, track := range tracks {
+			assert.NoError(t, track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: time.Second / 30}))
+		}
+
+		return received.Load() == int64(len(tracks))
+	}, 5*time.Second, 20*time.Millisecond)
+
+	assertStatsReferencesResolve(t, offerPC.GetStats())
+	assertStatsReferencesResolve(t, answerPC.GetStats())
 }
