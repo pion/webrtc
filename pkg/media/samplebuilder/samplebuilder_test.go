@@ -620,6 +620,105 @@ func TestSampleBuilder_Flush(t *testing.T) {
 	assert.Equal(t, expected, samples)
 }
 
+func TestSampleBuilder_FlushResetsState(t *testing.T) {
+	assert := assert.New(t)
+	fd := New(50, &fakeDepacketizer{
+		headChecker: true,
+		headBytes:   []byte{0x01},
+	}, 1)
+
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5000, Timestamp: 1}, Payload: []byte{0x01},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5001, Timestamp: 1}, Payload: []byte{0x02},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5002, Timestamp: 1, Marker: true}, Payload: []byte{0x03},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5003, Timestamp: 1}, Payload: []byte{},
+	})
+
+	first := fd.Pop()
+	assert.NotNil(first, "precondition: first sample should be built")
+	assert.Equal([]byte{0x01, 0x02, 0x03}, first.Data)
+	assert.Equal(uint32(1), first.PacketTimestamp)
+
+	fd.Flush()
+
+	// After Flush, lastSampleTimestamp is cleared so empty packets matching the
+	// pre-flush timestamp are not treated as late padding from the old stream.
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5004, Timestamp: 1}, Payload: []byte{},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5005, Timestamp: 1}, Payload: []byte{},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5006, Timestamp: 3}, Payload: []byte{0x01},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5007, Timestamp: 3, Marker: true}, Payload: []byte{0x04},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5008, Timestamp: 4}, Payload: []byte{0x01},
+	})
+
+	samples := []*media.Sample{}
+	for range 5 {
+		if sample := fd.Pop(); sample != nil {
+			samples = append(samples, sample)
+		}
+	}
+
+	assert.Equal([]*media.Sample{
+		{Data: []byte{0x01, 0x04}, Duration: time.Second, PacketTimestamp: 3, PrevDroppedPackets: 2},
+	}, samples)
+}
+
+func TestSampleBuilder_ValidSampleSameTimestampAfterFlush(t *testing.T) {
+	assert := assert.New(t)
+	fd := New(50, &fakeDepacketizer{
+		headChecker: true,
+		headBytes:   []byte{0x01},
+	}, 1)
+
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5000, Timestamp: 100}, Payload: []byte{0x01},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5001, Timestamp: 100, Marker: true}, Payload: []byte{0x02},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 5002, Timestamp: 100}, Payload: []byte{},
+	})
+
+	first := fd.Pop()
+	assert.NotNil(first, "precondition: first sample should be built")
+	assert.Equal([]byte{0x01, 0x02}, first.Data)
+	assert.Equal(uint32(100), first.PacketTimestamp)
+
+	fd.Flush()
+
+	// Valid partition head at the same timestamp must not be misclassified as padding.
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 6000, Timestamp: 100}, Payload: []byte{0x01},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 6001, Timestamp: 100, Marker: true}, Payload: []byte{0x02},
+	})
+	fd.Push(&rtp.Packet{
+		Header: rtp.Header{SequenceNumber: 6002, Timestamp: 100}, Payload: []byte{},
+	})
+
+	sample := fd.Pop()
+	assert.NotNil(sample, "valid frame must not be misclassified as padding after flush")
+	assert.Equal([]byte{0x01, 0x02}, sample.Data)
+	assert.Equal(uint32(100), sample.PacketTimestamp)
+	assert.Nil(fd.Pop(), "no extra samples should be emitted")
+}
+
 func BenchmarkSampleBuilderSequential(b *testing.B) {
 	fd := New(100, &fakeDepacketizer{}, 1)
 	b.ResetTimer()
@@ -725,6 +824,11 @@ func BenchmarkSampleBuilderFragmented(b *testing.B) {
 	if b.N > 200 && validSamples < b.N/2-100 {
 		b.Errorf("Got %v (N=%v)", validSamples, b.N)
 	}
+}
+
+func TestNewZeroSampleRate(t *testing.T) {
+	sb := New(50, &fakeDepacketizer{}, 0)
+	assert.NotNil(t, sb)
 }
 
 func BenchmarkSampleBuilderFragmentedLoss(b *testing.B) {
