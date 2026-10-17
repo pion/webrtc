@@ -1293,11 +1293,6 @@ type TransportStats struct {
 	// not including headers or padding.
 	BytesReceived uint64 `json:"bytesReceived"`
 
-	// RTCPTransportStatsID is the ID of the transport that gives stats for the RTCP
-	// component If RTP and RTCP are not multiplexed and this record has only
-	// the RTP component stats.
-	RTCPTransportStatsID string `json:"rtcpTransportStatsId"`
-
 	// ICERole is set to the current value of the "role" attribute of the underlying
 	// DTLSTransport's "iceTransport".
 	ICERole ICERole `json:"iceRole"`
