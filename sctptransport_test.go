@@ -252,7 +252,6 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 		{
 			name: "BlockWrite",
 			configure: func(se *SettingEngine) {
-				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 			},
 			wantExtra: 1,
@@ -290,7 +289,6 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			configure: func(se *SettingEngine) {
 				se.sctp.maxReceiveBufferSize = 1024
 				se.sctp.enableZeroChecksum = true
-				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 				se.sctp.rtoMax = time.Second
 				se.sctp.minCwnd = 11
