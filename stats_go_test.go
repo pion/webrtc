@@ -163,7 +163,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 	outboundRTPStreamStats := OutboundRTPStreamStats{
 		Mid:                      "1",
 		Rid:                      "hi",
-		MediaSourceID:            "SA5",
 		Timestamp:                1688978831527.718,
 		Type:                     StatsTypeOutboundRTP,
 		ID:                       "OT01A2184088143",
@@ -213,7 +212,6 @@ func getStatsSamples() []statSample { //nolint:cyclop,maintidx
 {
   "mid": "1",
   "rid": "hi",
-  "mediaSourceId": "SA5",
   "timestamp": 1688978831527.718,
   "type": "outbound-rtp",
   "id": "OT01A2184088143",

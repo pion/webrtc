@@ -580,9 +580,9 @@ type OutboundRTPStreamStats struct {
 	// Must not exist for audio.
 	Rid string `json:"rid"`
 
-	// MediaSourceID is the identifier of the stats object representing the track currently
-	// attached to the sender of this stream, an RTCMediaSourceStats.
-	MediaSourceID string `json:"mediaSourceId"`
+	// nolint:godox
+	// TODO: add media-source stats.
+	// MediaSourceID string `json:"mediaSourceId"`
 
 	// Timestamp is the timestamp associated with this object.
 	Timestamp StatsTimestamp `json:"timestamp"`
