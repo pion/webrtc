@@ -1192,7 +1192,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		}
 		pc.configureRTPReceivers(haveLocalDescription, remoteDesc, currentTransceivers)
 		pc.ops.Enqueue(func() {
-			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
+			pc.startRTP(remoteDesc, currentTransceivers)
 		})
 	}
 
@@ -1404,7 +1404,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 			pc.configureRTPReceivers(true, &desc, currentTransceivers)
 			pc.ops.Enqueue(func() {
-				pc.startRTP(true, &desc, currentTransceivers)
+				pc.startRTP(&desc, currentTransceivers)
 			})
 		}
 
@@ -1460,7 +1460,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			remoteCryptexMode,
 		)
 		if weOffer {
-			pc.startRTP(false, &desc, currentTransceivers)
+			pc.startRTP(&desc, currentTransceivers)
 		}
 	})
 
@@ -3117,7 +3117,6 @@ func (pc *PeerConnection) startTransports(
 
 // nolint: gocognit
 func (pc *PeerConnection) startRTP(
-	isRenegotiation bool,
 	remoteDesc *SessionDescription,
 	currentTransceivers []*RTPTransceiver,
 ) {
