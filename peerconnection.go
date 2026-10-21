@@ -56,6 +56,7 @@ type PeerConnection struct {
 	idpLoginURL *string
 
 	isClosed                                *atomic.Bool
+	undeclaredStarted                       atomic.Bool // the undeclared media processors run
 	isGracefullyClosingOrClosed             bool
 	isCloseDone                             chan struct{}
 	isGracefulCloseDone                     chan struct{}
@@ -1272,7 +1273,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 			if restartDTLS {
 				pc.restartDTLS(remoteDesc, &desc)
 			}
-			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
+			pc.startRTP(remoteDesc, currentTransceivers)
 		})
 	}
 
@@ -1544,7 +1545,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				if restartDTLS {
 					pc.restartDTLS(&desc, pc.CurrentLocalDescription())
 				}
-				pc.startRTP(true, &desc, currentTransceivers)
+				pc.startRTP(&desc, currentTransceivers)
 			})
 		}
 
@@ -1595,7 +1596,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			remoteCryptexMode,
 		)
 		if weOffer {
-			pc.startRTP(false, &desc, currentTransceivers)
+			pc.startRTP(&desc, currentTransceivers)
 		}
 	})
 
@@ -3194,12 +3195,18 @@ func (pc *PeerConnection) startTransports(
 
 // nolint: gocognit
 func (pc *PeerConnection) startRTP(
-	isRenegotiation bool,
 	remoteDesc *SessionDescription,
 	currentTransceivers []*RTPTransceiver,
 ) {
-	if !isRenegotiation {
-		pc.undeclaredMediaProcessor()
+	// SRTP and the undeclared media processors serve audio and video only, so
+	// a connection with only data channels does without their goroutines.
+	if hasMedia(remoteDesc, currentTransceivers) {
+		if err := pc.dtlsTransport.wantSRTP(); err != nil {
+			pc.log.Warnf("Failed to start SRTP: %s", err)
+		}
+		if pc.undeclaredStarted.CompareAndSwap(false, true) {
+			pc.undeclaredMediaProcessor()
+		}
 	}
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
@@ -3516,4 +3523,22 @@ func (pc *PeerConnection) restartDTLS(remote, local *SessionDescription) {
 	if err != nil {
 		pc.log.Warnf("Failed to restart DTLS: %s", err)
 	}
+}
+
+// hasMedia reports whether a negotiation carries audio or video: a transceiver,
+// or a media section other than the data channel's.
+func hasMedia(remoteDesc *SessionDescription, transceivers []*RTPTransceiver) bool {
+	if len(transceivers) > 0 {
+		return true
+	}
+	if remoteDesc == nil || remoteDesc.parsed == nil {
+		return false
+	}
+	for _, m := range remoteDesc.parsed.MediaDescriptions {
+		if m.MediaName.Media != mediaSectionApplication {
+			return true
+		}
+	}
+
+	return false
 }
