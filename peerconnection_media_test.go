@@ -24,6 +24,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/transport/v5/vnet"
@@ -130,7 +131,11 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 				close(awaitRTPRecvClosed)
 
 				return
-			} else if bytes.Equal(p.Payload, []byte{0x10, 0x00}) && !haveClosedAwaitRTPRecv {
+			}
+
+			var vp8Packet codecs.VP8Packet
+			payload, decodeErr := vp8Packet.Unmarshal(p.Payload)
+			if assert.NoError(t, decodeErr) && bytes.Equal(payload, []byte{0x00}) && !haveClosedAwaitRTPRecv {
 				haveClosedAwaitRTPRecv = true
 				close(awaitRTPRecv)
 			}
