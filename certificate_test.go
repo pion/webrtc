@@ -6,18 +6,23 @@
 package webrtc
 
 import (
+	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type signerOnly struct{ crypto.Signer }
 
 func TestGenerateCertificateRSA(t *testing.T) {
 	sk, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -170,4 +175,42 @@ func TestMultiPriv(t *testing.T) {
 	cert, err := CertificateFromPEM(certPriv + certHeader + certCert + certPriv)
 	assert.Nil(t, cert)
 	assert.Equal(t, errCertificatePEMMultiplePriv, err)
+}
+
+func TestCertificateEqualsEd25519(t *testing.T) {
+	_, sk, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+
+	tpl := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, sk.Public(), sk)
+	assert.NoError(t, err)
+	x, err := x509.ParseCertificate(der)
+	assert.NoError(t, err)
+
+	c := CertificateFromX509(sk, x)
+	other := c
+	assert.True(t, c.Equals(other))
+}
+
+func TestCertificateEqualsCustomSigner(t *testing.T) {
+	_, sk, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+
+	tpl := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, sk.Public(), sk)
+	assert.NoError(t, err)
+	x, err := x509.ParseCertificate(der)
+	assert.NoError(t, err)
+
+	c1 := CertificateFromX509(signerOnly{sk}, x)
+	c2 := CertificateFromX509(signerOnly{sk}, x)
+	assert.True(t, c1.Equals(c2))
 }
