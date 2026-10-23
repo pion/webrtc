@@ -535,6 +535,10 @@ func (m *MediaEngine) matchRemoteCodec(
 
 // Update header extensions from a remote media section.
 func (m *MediaEngine) updateHeaderExtensionFromMediaSection(media *sdp.MediaDescription) error {
+	if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+		return nil
+	}
+
 	var typ RTPCodecType
 	switch {
 	case strings.EqualFold(media.MediaName.Media, "audio"):
@@ -565,21 +569,29 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 	}
 
 	for _, localExtension := range m.headerExtensions {
-		if localExtension.uri == extension {
-			h := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
-			if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok {
-				h = existingValue
-			}
-
-			switch {
-			case localExtension.isAudio && typ == RTPCodecTypeAudio:
-				h.isAudio = true
-			case localExtension.isVideo && typ == RTPCodecTypeVideo:
-				h.isVideo = true
-			}
-
-			m.negotiatedHeaderExtensions[id] = h
+		if localExtension.uri != extension {
+			continue
 		}
+
+		h := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
+		if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok && existingValue.uri == extension {
+			h = existingValue
+		}
+
+		for oldID, old := range m.negotiatedHeaderExtensions {
+			if oldID != id && old.uri == extension {
+				delete(m.negotiatedHeaderExtensions, oldID)
+			}
+		}
+
+		switch {
+		case localExtension.isAudio && typ == RTPCodecTypeAudio:
+			h.isAudio = true
+		case localExtension.isVideo && typ == RTPCodecTypeVideo:
+			h.isVideo = true
+		}
+
+		m.negotiatedHeaderExtensions[id] = h
 	}
 
 	return nil
