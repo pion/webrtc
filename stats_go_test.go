@@ -1268,6 +1268,8 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	offerTransportStats := getTransportStats(t, reportPCOffer, offerPC.dtlsTransport)
 	assert.GreaterOrEqual(t, offerTransportStats.BytesSent, answerTransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerTransportStats.BytesSent, offerTransportStats.BytesReceived)
+	assert.Contains(t, reportPCOffer, offerTransportStats.SelectedCandidatePairID)
+	assert.Contains(t, reportPCAnswer, answerTransportStats.SelectedCandidatePairID)
 
 	answerSCTPTransportStats := getSctpTransportStats(t, reportPCAnswer)
 	offerSCTPTransportStats := getSctpTransportStats(t, reportPCOffer)
