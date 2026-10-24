@@ -164,7 +164,7 @@ func (s *SampleBuilder) purgeBuffers(flush bool) {
 		if s.active.hasData() && (s.active.head == s.filled.head) {
 			// attempt to force the active packet to be consumed even though
 			// outstanding data may be pending arrival
-			if s.buildSample(true) != nil {
+			if s.buildSample(true) {
 				continue
 			}
 
@@ -208,16 +208,16 @@ const secondToNanoseconds = 1000000000
 
 // buildSample creates a sample from a valid collection of RTP Packets by
 // walking forwards building a sample if everything looks good clear and
-// update buffer+values
+// update buffer+values. It returns whether packets were consumed, including discarded samples.
 //
 //nolint:gocognit,cyclop
-func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
+func (s *SampleBuilder) buildSample(purgingBuffers bool) bool {
 	if s.active.empty() {
 		s.active = s.filled
 	}
 
 	if s.active.empty() {
-		return nil
+		return false
 	}
 
 	if s.filled.compare(s.active.tail) == slCompareInside {
@@ -227,12 +227,6 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	var consume sampleSequenceLocation
 
 	for i := s.active.head; s.buffer[i] != nil && s.active.compare(i) != slCompareAfter; i++ {
-		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
-			consume.head = s.active.head
-			consume.tail = i + 1
-
-			break
-		}
 		headTimestamp, hasData := s.fetchTimestamp(s.active)
 		if hasData && s.buffer[i].Timestamp != headTimestamp {
 			consume.head = s.active.head
@@ -240,24 +234,30 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 			break
 		}
+		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
+			consume.head = s.active.head
+			consume.tail = i + 1
+
+			break
+		}
 	}
 
 	if consume.empty() {
-		return nil
+		return false
 	}
 
 	if !purgingBuffers && s.buffer[consume.tail] == nil {
 		// wait for the next packet after this set of packets to arrive
 		// to ensure at least one post sample timestamp is known
 		// (unless we have to release right now)
-		return nil
+		return false
 	}
 
 	sampleTimestamp, _ := s.fetchTimestamp(s.active)
 	afterTimestamp := sampleTimestamp
 
 	// scan for any packet after the current and use that time stamp as the diff point
-	for i := consume.tail; i < s.active.tail; i++ {
+	for i := consume.tail; i != s.active.tail; i++ {
 		if s.buffer[i] != nil {
 			afterTimestamp = s.buffer[i].Timestamp
 
@@ -284,23 +284,27 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 		s.purgeConsumedLocation(consume, true)
 		s.purgeConsumedBuffers()
 
-		return nil
+		return true
 	}
 
 	// merge all the buffers into a sample
 	data := []byte{}
 	var metadata any
 	var rtpHeaders []*rtp.Header
-	for i := consume.head; i != consume.tail; i++ {
-		payload, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
+	for sequence := consume.head; sequence != consume.tail; sequence++ {
+		payload, err := s.depacketizer.Unmarshal(s.buffer[sequence].Payload)
 		if err != nil {
-			return nil
+			s.droppedPackets += consume.count()
+			s.purgeConsumedLocation(consume, true)
+			s.purgeConsumedBuffers()
+
+			return true
 		}
-		if i == consume.head && s.packetHeadHandler != nil {
+		if sequence == consume.head && s.packetHeadHandler != nil {
 			metadata = s.packetHeadHandler(s.depacketizer)
 		}
 		if s.returnRTPHeaders {
-			h := s.buffer[i].Header.Clone()
+			h := s.buffer[sequence].Header.Clone()
 			rtpHeaders = append(rtpHeaders, &h)
 		}
 
@@ -328,15 +332,20 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	s.purgeConsumedLocation(consume, true)
 	s.purgeConsumedBuffers()
 
-	return sample
+	return true
 }
 
 // Pop compiles pushed RTP packets into media samples and then
 // returns the next valid sample (or nil if no sample is compiled).
 func (s *SampleBuilder) Pop() *media.Sample {
-	_ = s.buildSample(false)
-	if s.prepared.empty() {
-		return nil
+	for {
+		consumed := s.buildSample(false)
+		if !s.prepared.empty() {
+			break
+		}
+		if !consumed {
+			return nil
+		}
 	}
 	var result *media.Sample
 	result, s.preparedSamples[s.prepared.head] = s.preparedSamples[s.prepared.head], nil
