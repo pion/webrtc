@@ -636,16 +636,8 @@ func TestDataChannel_BundleOnlyPortZero(t *testing.T) {
 
 	const applicationMLine = "m=application 9 UDP/DTLS/SCTP webrtc-datachannel"
 	require.Contains(t, offerPC.LocalDescription().SDP, applicationMLine)
-	bundleOnlyOfferSDP := strings.Replace(
-		offerPC.LocalDescription().SDP,
-		applicationMLine,
-		"m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only",
-		1,
-	)
-	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{
-		Type: SDPTypeOffer,
-		SDP:  bundleOnlyOfferSDP,
-	}))
+	bundleOnlyOfferSDP := strings.Replace(offerPC.LocalDescription().SDP, applicationMLine, "m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only", 1)
+	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: bundleOnlyOfferSDP}))
 
 	answer, err := answerPC.CreateAnswer(nil)
 	require.NoError(t, err)

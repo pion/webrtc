@@ -90,11 +90,7 @@ func TestICEServer_validate(t *testing.T) {
 
 		for i, testCase := range testCases {
 			_, err := testCase.iceServer.urls()
-			assert.EqualError(t,
-				err,
-				testCase.expectedErr.Error(),
-				"testCase: %d %v", i, testCase,
-			)
+			assert.EqualError(t, err, testCase.expectedErr.Error(), "testCase: %d %v", i, testCase)
 		}
 	})
 	t.Run("JsonFailure", func(t *testing.T) {

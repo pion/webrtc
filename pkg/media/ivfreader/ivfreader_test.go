@@ -100,12 +100,7 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 	assert.Nil(err, "Should have parsed frame #1 without error")
 	assert.Equal(uint32(4), header.FrameSize, "Frame header frameSize should be 4")
 	assert.Equal(4, len(payload), "Payload should be length 4")
-	assert.Equal(
-		payload,
-		[]byte{
-			0xDE, 0xAD, 0xBE, 0xEF,
-		},
-		"Payload value should be 0xDEADBEEF")
+	assert.Equal(payload, []byte{0xDE, 0xAD, 0xBE, 0xEF}, "Payload value should be 0xDEADBEEF")
 	assert.Equal(int64(ivfFrameHeaderSize+ivfFileHeaderSize+header.FrameSize), reader.bytesReadSuccesfully)
 	previousBytesRead := reader.bytesReadSuccesfully
 
@@ -115,13 +110,7 @@ func TestIVFReader_ParseValidFrames(t *testing.T) {
 	assert.Nil(err, "Should have parsed frame #2 without error")
 	assert.Equal(uint32(12), header.FrameSize, "Frame header frameSize should be 4")
 	assert.Equal(12, len(payload), "Payload should be length 12")
-	assert.Equal(
-		payload,
-		[]byte{
-			0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD,
-			0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-		},
-		"Payload value should be 0xDEADBEEFDEADBEEF")
+	assert.Equal(payload, []byte{0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF}, "Payload value should be 0xDEADBEEFDEADBEEF")
 	assert.Equal(int64(ivfFrameHeaderSize+header.FrameSize)+previousBytesRead, reader.bytesReadSuccesfully)
 }
 

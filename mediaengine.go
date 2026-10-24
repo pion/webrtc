@@ -611,7 +611,7 @@ func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) 
 }
 
 // Update the MediaEngine from a remote description.
-func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error { //nolint:cyclop,gocognit
+func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error { //nolint:cyclop
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -742,7 +742,7 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	return nil
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 

@@ -50,7 +50,7 @@ func TestVideoCase(t *testing.T) {
 	assert.NoError(t, pc.Close())
 }
 
-func TestMediaEngineRemoteDescription(t *testing.T) { //nolint:maintidx
+func TestMediaEngineRemoteDescription(t *testing.T) {
 	mustParse := func(raw string) sdp.SessionDescription {
 		s := sdp.SessionDescription{}
 		assert.NoError(t, s.Unmarshal([]byte(raw)))
@@ -197,24 +197,18 @@ a=rtpmap:111 opus/48000/2
 
 		mediaEngine := MediaEngine{}
 		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio),
-		)
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.SDESMidURI}, RTPCodecTypeAudio))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, mediaEngine.negotiatedVideo)
 		assert.True(t, mediaEngine.negotiatedAudio)
 
-		absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(
-			RTPHeaderExtensionCapability{sdp.ABSSendTimeURI},
-		)
+		absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
 		assert.Equal(t, absID, 0)
 		assert.False(t, absAudioEnabled)
 		assert.False(t, absVideoEnabled)
 
-		midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(
-			RTPHeaderExtensionCapability{sdp.SDESMidURI},
-		)
+		midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
 		assert.Equal(t, midID, 7)
 		assert.True(t, midAudioEnabled)
 		assert.False(t, midVideoEnabled)
@@ -235,27 +229,19 @@ a=rtpmap:111 opus/48000/2
 
 		mediaEngine := MediaEngine{}
 		assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{URI: "urn:ietf:params:rtp-hdrext:sdes:mid"}, RTPCodecTypeAudio,
-		))
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{URI: "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"}, RTPCodecTypeAudio,
-		))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: "urn:ietf:params:rtp-hdrext:sdes:mid"}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"}, RTPCodecTypeAudio))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(headerExtensions)))
 
 		assert.False(t, mediaEngine.negotiatedVideo)
 		assert.True(t, mediaEngine.negotiatedAudio)
 
-		absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(
-			RTPHeaderExtensionCapability{sdp.ABSSendTimeURI},
-		)
+		absID, absAudioEnabled, absVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
 		assert.Equal(t, absID, 0)
 		assert.False(t, absAudioEnabled)
 		assert.False(t, absVideoEnabled)
 
-		midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(
-			RTPHeaderExtensionCapability{sdp.SDESMidURI},
-		)
+		midID, midAudioEnabled, midVideoEnabled := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
 		assert.Equal(t, midID, 7)
 		assert.True(t, midAudioEnabled)
 		assert.False(t, midVideoEnabled)
@@ -273,12 +259,7 @@ a=rtpmap:98 H264/90000
 a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
-			},
-			PayloadType: 127,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil}, PayloadType: 127}, RTPCodecTypeVideo))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, mediaEngine.negotiatedVideo)
@@ -302,12 +283,7 @@ a=rtpmap:96 H264/90000
 a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
-			},
-			PayloadType: 127,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil}, PayloadType: 127}, RTPCodecTypeVideo))
 		assert.Error(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		_, _, err := mediaEngine.getCodecByPayload(96)
@@ -323,10 +299,7 @@ m=video 60323 UDP/TLS/RTP/SAVPF 96
 a=rtpmap:96 VP9/90000
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", nil},
-			PayloadType:        98,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=0", nil}, PayloadType: 98}, RTPCodecTypeVideo))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, mediaEngine.negotiatedVideo)
@@ -344,10 +317,7 @@ m=video 60323 UDP/TLS/RTP/SAVPF 96
 a=rtpmap:96 VP8/90000
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        96,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 96}, RTPCodecTypeVideo))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, mediaEngine.negotiatedVideo)
@@ -379,42 +349,14 @@ a=rtpmap:97 rtx/90000
 a=fmtp:97 apt=96
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        96,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
-			PayloadType:        97,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", nil,
-			},
-			PayloadType: 102,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=102", nil},
-			PayloadType:        103,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", nil,
-			},
-			PayloadType: 104,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=104", nil},
-			PayloadType:        105,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=2", nil},
-			PayloadType:        98,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=98", nil},
-			PayloadType:        99,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 96}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil}, PayloadType: 97}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f", nil}, PayloadType: 102}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=102", nil}, PayloadType: 103}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f", nil}, PayloadType: 104}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=104", nil}, PayloadType: 105}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=2", nil}, PayloadType: 98}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=98", nil}, PayloadType: 99}, RTPCodecTypeVideo))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, mediaEngine.negotiatedVideo)
@@ -464,18 +406,9 @@ a=rtpmap:97 rtx/90000
 a=fmtp:97 apt=96
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        94,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=1", nil},
-			PayloadType:        96,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil},
-			PayloadType:        97,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 94}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP9, 90000, 0, "profile-id=1", nil}, PayloadType: 96}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "apt=96", nil}, PayloadType: 97}, RTPCodecTypeVideo))
 		assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(profileLevels)))
 
 		assert.True(t, mediaEngine.negotiatedVideo)
@@ -490,23 +423,15 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 	defer report()
 
 	registerCodec := func(m *MediaEngine) {
-		assert.NoError(t, m.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-				PayloadType:        111,
-			}, RTPCodecTypeAudio))
+		assert.NoError(t, m.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 	}
 
 	t.Run("No Direction", func(t *testing.T) {
 		mediaEngine := &MediaEngine{}
 		registerCodec(mediaEngine)
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio,
-		))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio))
 
-		params := mediaEngine.getRTPParametersByKind(
-			RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
-		)
+		params := mediaEngine.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 
 		assert.Equal(t, 1, len(params.HeaderExtensions))
 	})
@@ -514,14 +439,9 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 	t.Run("Same Direction", func(t *testing.T) {
 		mediaEngine := &MediaEngine{}
 		registerCodec(mediaEngine)
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionRecvonly,
-		))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionRecvonly))
 
-		params := mediaEngine.getRTPParametersByKind(
-			RTPCodecTypeAudio,
-			[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
-		)
+		params := mediaEngine.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 
 		assert.Equal(t, 1, len(params.HeaderExtensions))
 	})
@@ -529,13 +449,9 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 	t.Run("Different Direction", func(t *testing.T) {
 		mediaEngine := &MediaEngine{}
 		registerCodec(mediaEngine)
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly,
-		))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionSendonly))
 
-		params := mediaEngine.getRTPParametersByKind(
-			RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
-		)
+		params := mediaEngine.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 
 		assert.Equal(t, 0, len(params.HeaderExtensions))
 	})
@@ -544,33 +460,19 @@ func TestMediaEngineHeaderExtensionDirection(t *testing.T) {
 		mediaEngine := &MediaEngine{}
 		registerCodec(mediaEngine)
 
-		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv,
-		), ErrRegisterHeaderExtensionInvalidDirection)
-		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionInactive,
-		), ErrRegisterHeaderExtensionInvalidDirection)
-		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirection(0),
-		), ErrRegisterHeaderExtensionInvalidDirection)
+		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionSendrecv), ErrRegisterHeaderExtensionInvalidDirection)
+		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirectionInactive), ErrRegisterHeaderExtensionInvalidDirection)
+		assert.ErrorIs(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio, RTPTransceiverDirection(0)), ErrRegisterHeaderExtensionInvalidDirection)
 	})
 
 	t.Run("Unique extmapid with different codec", func(t *testing.T) {
 		mediaEngine := &MediaEngine{}
 		registerCodec(mediaEngine)
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio),
-		)
-		assert.NoError(t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"pion-header-test2"}, RTPCodecTypeVideo),
-		)
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test"}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"pion-header-test2"}, RTPCodecTypeVideo))
 
-		audio := mediaEngine.getRTPParametersByKind(
-			RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
-		)
-		video := mediaEngine.getRTPParametersByKind(
-			RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
-		)
+		audio := mediaEngine.getRTPParametersByKind(RTPCodecTypeAudio, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
+		video := mediaEngine.getRTPParametersByKind(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 
 		assert.Equal(t, 1, len(audio.HeaderExtensions))
 		assert.Equal(t, 1, len(video.HeaderExtensions))
@@ -583,17 +485,9 @@ func TestMediaEngineDoubleRegister(t *testing.T) {
 	t.Run("Same Codec", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
 
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-				PayloadType:        111,
-			}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-				PayloadType:        111,
-			}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 		assert.Equal(t, len(mediaEngine.audioCodecs), 1)
 	})
@@ -601,17 +495,9 @@ func TestMediaEngineDoubleRegister(t *testing.T) {
 	t.Run("Case Insensitive Audio Codec", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
 
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{"audio/OPUS", 48000, 0, "", nil},
-				PayloadType:        111,
-			}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{"audio/OPUS", 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{"audio/opus", 48000, 0, "", nil},
-				PayloadType:        111,
-			}, RTPCodecTypeAudio))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{"audio/opus", 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 		assert.Equal(t, len(mediaEngine.audioCodecs), 1)
 	})
@@ -619,26 +505,10 @@ func TestMediaEngineDoubleRegister(t *testing.T) {
 	t.Run("Case Insensitive Video Codec", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
 
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeRTX), 90000, 0, "", nil},
-				PayloadType:        98,
-			}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "", nil},
-				PayloadType:        98,
-			}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeFlexFEC), 90000, 0, "", nil},
-				PayloadType:        100,
-			}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(
-			RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil},
-				PayloadType:        100,
-			}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeRTX), 90000, 0, "", nil}, PayloadType: 98}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeRTX, 90000, 0, "", nil}, PayloadType: 98}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{strings.ToUpper(MimeTypeFlexFEC), 90000, 0, "", nil}, PayloadType: 100}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil}, PayloadType: 100}, RTPCodecTypeVideo))
 		assert.Equal(t, len(mediaEngine.videoCodecs), 2)
 		isRTX := mediaEngine.isRTXEnabled(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionRecvonly})
 		assert.True(t, isRTX)
@@ -652,17 +522,9 @@ func TestMediaEngineDoubleRegister(t *testing.T) {
 func TestMediaEngineDoubleRegisterDifferentCodec(t *testing.T) {
 	mediaEngine := MediaEngine{}
 
-	assert.NoError(t, mediaEngine.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeG722, 8000, 0, "", nil},
-			PayloadType:        111,
-		}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeG722, 8000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
-	assert.Error(t, ErrCodecAlreadyRegistered, mediaEngine.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-			PayloadType:        111,
-		}, RTPCodecTypeAudio))
+	assert.Error(t, ErrCodecAlreadyRegistered, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 	assert.Equal(t, len(mediaEngine.audioCodecs), 1)
 }
@@ -671,11 +533,7 @@ func TestMediaEngineDoubleRegisterDifferentCodec(t *testing.T) {
 func TestUpdateHeaderExtenstionToClonedMediaEngine(t *testing.T) {
 	src := MediaEngine{}
 
-	assert.NoError(t, src.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil},
-			PayloadType:        111,
-		}, RTPCodecTypeAudio))
+	assert.NoError(t, src.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 0, "", nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 	assert.NoError(t, src.RegisterHeaderExtension(RTPHeaderExtensionCapability{"test-extension"}, RTPCodecTypeAudio))
 
@@ -713,54 +571,33 @@ a=rtpmap:111 opus/48000/2
 	mediaEngine := MediaEngine{}
 	assert.NoError(t, mediaEngine.RegisterDefaultCodecs())
 
-	assert.NoError(
-		t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeVideo,
-		),
-	)
-	assert.NoError(
-		t, mediaEngine.RegisterHeaderExtension(
-			RTPHeaderExtensionCapability{"urn:3gpp:video-orientation"}, RTPCodecTypeVideo,
-		),
-	)
+	assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{"urn:3gpp:video-orientation"}, RTPCodecTypeVideo))
 
-	assert.NoError(
-		t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeAudio),
-	)
-	assert.NoError(
-		t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.AudioLevelURI}, RTPCodecTypeAudio),
-	)
+	assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.SDESMidURI}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{sdp.AudioLevelURI}, RTPCodecTypeAudio))
 
 	assert.NoError(t, mediaEngine.updateFromRemoteDescription(mustParse(sdpSnippet)))
 
 	assert.True(t, mediaEngine.negotiatedAudio)
 	assert.False(t, mediaEngine.negotiatedVideo)
 
-	id, audioNegotiated, videoNegotiated := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{
-		sdp.ABSSendTimeURI,
-	})
+	id, audioNegotiated, videoNegotiated := mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.ABSSendTimeURI})
 	assert.Equal(t, id, 0)
 	assert.False(t, audioNegotiated)
 	assert.False(t, videoNegotiated)
 
-	id, audioNegotiated, videoNegotiated = mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{
-		sdp.SDESMidURI,
-	})
+	id, audioNegotiated, videoNegotiated = mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.SDESMidURI})
 	assert.Equal(t, id, 2)
 	assert.True(t, audioNegotiated)
 	assert.False(t, videoNegotiated)
 
-	id, audioNegotiated, videoNegotiated = mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{
-		sdp.AudioLevelURI,
-	})
+	id, audioNegotiated, videoNegotiated = mediaEngine.getHeaderExtensionID(RTPHeaderExtensionCapability{sdp.AudioLevelURI})
 	assert.Equal(t, id, 1)
 	assert.True(t, audioNegotiated)
 	assert.False(t, videoNegotiated)
 
-	params := mediaEngine.getRTPParametersByKind(
-		RTPCodecTypeVideo,
-		[]RTPTransceiverDirection{RTPTransceiverDirectionSendonly},
-	)
+	params := mediaEngine.getRTPParametersByKind(RTPCodecTypeVideo, []RTPTransceiverDirection{RTPTransceiverDirectionSendonly})
 	extensions := params.HeaderExtensions
 
 	assert.Equal(t, 2, len(extensions))
@@ -906,13 +743,7 @@ a=rtcp-fb:96 nack
 		t.Helper()
 
 		mediaEngine := &MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, RTCPFeedback: []RTCPFeedback{
-				{Type: TypeRTCPFBTransportCC},
-				{Type: TypeRTCPFBNACK},
-			}},
-			PayloadType: 96,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, RTCPFeedback: []RTCPFeedback{{Type: TypeRTCPFBTransportCC}, {Type: TypeRTCPFBNACK}}}, PayloadType: 96}, RTPCodecTypeVideo))
 
 		peerConnection, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
@@ -922,11 +753,7 @@ a=rtcp-fb:96 nack
 			assert.NoError(t, err)
 		}
 
-		assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{
-			Type: SDPTypeOffer,
-			SDP:  offerSdp,
-		},
-		))
+		assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: offerSdp}))
 
 		answer, err := peerConnection.CreateAnswer(nil)
 		assert.NoError(t, err)
