@@ -293,7 +293,13 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		var nOfferReceived uint32
 		var nAnswerReceived uint32
 
-		done := make(chan bool)
+		done := make(chan bool, 1)
+		signalDone := func() {
+			select {
+			case done <- true:
+			default:
+			}
+		}
 
 		answerPC.OnDataChannel(func(answerDC *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
@@ -324,7 +330,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 			answerDC.OnBufferedAmountLow(func() {
 				atomic.AddUint32(&nAnswerBufferedAmountLowCbs, 1)
 				if atomic.LoadUint32(&nOfferBufferedAmountLowCbs) > 0 {
-					done <- true
+					signalDone()
 				}
 			})
 		})
@@ -355,7 +361,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		offerDC.OnBufferedAmountLow(func() {
 			atomic.AddUint32(&nOfferBufferedAmountLowCbs, 1)
 			if atomic.LoadUint32(&nAnswerBufferedAmountLowCbs) > 0 {
-				done <- true
+				signalDone()
 			}
 		})
 
