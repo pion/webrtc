@@ -471,14 +471,14 @@ func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints b
 
 // SetICETCPMux enables ICE-TCP when set to a non-nil value. Make sure that
 // NetworkTypeTCP4 or NetworkTypeTCP6 is enabled as well.
-func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
+func (e *SettingEngine) SetICETCPMux(tcpMux ICETCPMux) {
 	e.iceTCPMux = tcpMux
 }
 
 // SetICEUDPMux allows ICE traffic to come through a single UDP port, drastically
 // simplifying deployments where ports will need to be opened/forwarded.
 // UDPMux should be started prior to creating PeerConnections.
-func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
+func (e *SettingEngine) SetICEUDPMux(udpMux ICEUDPMux) {
 	e.iceUDPMux = udpMux
 }
 
