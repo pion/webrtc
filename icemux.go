@@ -4,6 +4,7 @@
 package webrtc
 
 import (
+	"io"
 	"net"
 	"time"
 
@@ -11,9 +12,24 @@ import (
 	"github.com/pion/logging"
 )
 
+// ICETCPMux multiplexes ICE connections over a shared TCP listener.
+type ICETCPMux interface {
+	io.Closer
+	GetConnByUfrag(ufrag string, isIPv6 bool, local net.IP) (net.PacketConn, error)
+	RemoveConnByUfrag(ufrag string)
+}
+
+// ICEUDPMux multiplexes ICE connections over shared UDP sockets.
+type ICEUDPMux interface {
+	io.Closer
+	GetConn(ufrag string, addr net.Addr) (net.PacketConn, error)
+	RemoveConnByUfrag(ufrag string)
+	GetListenAddresses() []net.Addr
+}
+
 // NewICETCPMux creates a new instance of ice.TCPMuxDefault. It enables use of
 // passive ICE TCP candidates.
-func NewICETCPMux(logger logging.LeveledLogger, listener net.Listener, readBufferSize int) ice.TCPMux {
+func NewICETCPMux(logger logging.LeveledLogger, listener net.Listener, readBufferSize int) ICETCPMux {
 	return ice.NewTCPMuxDefault(ice.TCPMuxParams{
 		Listener:        listener,
 		Logger:          logger,
@@ -24,7 +40,7 @@ func NewICETCPMux(logger logging.LeveledLogger, listener net.Listener, readBuffe
 
 // NewICEUDPMux creates a new instance of ice.UDPMuxDefault. It allows many PeerConnections to be served
 // by a single UDP Port.
-func NewICEUDPMux(logger logging.LeveledLogger, udpConn net.PacketConn) ice.UDPMux {
+func NewICEUDPMux(logger logging.LeveledLogger, udpConn net.PacketConn) ICEUDPMux {
 	return ice.NewUDPMuxDefault(ice.UDPMuxParams{
 		UDPConn: udpConn,
 		Logger:  logger,
