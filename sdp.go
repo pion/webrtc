@@ -284,7 +284,11 @@ func addCandidatesToMediaDescriptions(
 	candidates []ICECandidate,
 	mediaDescr *sdp.MediaDescription,
 	iceGatheringState ICEGatheringState,
+	rtcpMuxPolicy RTCPMuxPolicy,
 ) error {
+	_, rtcpMux := mediaDescr.Attribute(sdp.AttrKeyRTCPMux)
+	separateRTCP := mediaDescr.MediaName.Media != mediaSectionApplication && (!rtcpMux || rtcpMuxPolicy == RTCPMuxPolicyNegotiate)
+
 	appendCandidateIfNew := func(c ice.Candidate, attributes []sdp.Attribute) {
 		marshaled := c.Marshal()
 		for _, a := range attributes {
@@ -305,8 +309,10 @@ func addCandidatesToMediaDescriptions(
 		candidate.SetComponent(1)
 		appendCandidateIfNew(candidate, mediaDescr.Attributes)
 
-		candidate.SetComponent(2)
-		appendCandidateIfNew(candidate, mediaDescr.Attributes)
+		if separateRTCP {
+			candidate.SetComponent(2)
+			appendCandidateIfNew(candidate, mediaDescr.Attributes)
+		}
 	}
 
 	if iceGatheringState != ICEGatheringStateComplete {
@@ -365,7 +371,7 @@ func addDataMediaSection(
 	}
 
 	if shouldAddCandidates {
-		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState); err != nil {
+		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState, RTCPMuxPolicyRequire); err != nil {
 			return err
 		}
 	}
@@ -375,10 +381,23 @@ func addDataMediaSection(
 	return nil
 }
 
+func rtcpMuxPolicyForAnswer(policy RTCPMuxPolicy, remoteDescription *SessionDescription) RTCPMuxPolicy {
+	if remoteDescription != nil && remoteDescription.parsed != nil && len(remoteDescription.parsed.MediaDescriptions) > 0 {
+		// Candidates are added to the first media section only.
+		if _, rtcpMux := remoteDescription.parsed.MediaDescriptions[0].Attribute(sdp.AttrKeyRTCPMux); rtcpMux {
+			return RTCPMuxPolicyRequire
+		}
+	}
+
+	return policy
+}
+
 func populateLocalCandidates(
 	sessionDescription *SessionDescription,
 	i *ICEGatherer,
 	iceGatheringState ICEGatheringState,
+	rtcpMuxPolicy RTCPMuxPolicy,
+	remoteDescription *SessionDescription,
 ) *SessionDescription {
 	if sessionDescription == nil || i == nil {
 		return sessionDescription
@@ -390,9 +409,12 @@ func populateLocalCandidates(
 	}
 
 	parsed := sessionDescription.parsed
+	if sessionDescription.Type != SDPTypeOffer {
+		rtcpMuxPolicy = rtcpMuxPolicyForAnswer(rtcpMuxPolicy, remoteDescription)
+	}
 	if len(parsed.MediaDescriptions) > 0 {
 		mediaDescr := parsed.MediaDescriptions[0]
-		if err = addCandidatesToMediaDescriptions(candidates, mediaDescr, iceGatheringState); err != nil {
+		if err = addCandidatesToMediaDescriptions(candidates, mediaDescr, iceGatheringState, rtcpMuxPolicy); err != nil {
 			return sessionDescription
 		}
 	}
@@ -501,6 +523,7 @@ func addTransceiverSDP(
 	iceGatheringState ICEGatheringState,
 	mediaSection mediaSection,
 	ignoreRidPauseForRecv bool,
+	rtcpMuxPolicy RTCPMuxPolicy,
 ) (bool, error) {
 	transceivers := mediaSection.transceivers
 	if len(transceivers) < 1 {
@@ -612,7 +635,7 @@ func addTransceiverSDP(
 	}
 
 	if shouldAddCandidates {
-		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState); err != nil {
+		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState, rtcpMuxPolicy); err != nil {
 			return false, err
 		}
 	}
@@ -670,6 +693,7 @@ func populateSDP(
 	sctpMaxMessageSize uint32,
 	ignoreRidPauseForRecv bool,
 	cryptexAtSessionLevel bool,
+	rtcpMuxPolicy RTCPMuxPolicy,
 ) (*sdp.SessionDescription, error) {
 	var err error
 	mediaDtlsFingerprints := []DTLSFingerprint{}
@@ -726,6 +750,7 @@ func populateSDP(
 				iceGatheringState,
 				section,
 				ignoreRidPauseForRecv,
+				rtcpMuxPolicy,
 			)
 			if err != nil {
 				return nil, err
