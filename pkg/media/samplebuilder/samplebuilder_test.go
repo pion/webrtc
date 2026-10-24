@@ -231,6 +231,7 @@ func TestSampleBuilder(t *testing.T) { //nolint:maintidx
 			},
 			samples: []*media.Sample{
 				{Data: []byte{0x04, 0x05}, Duration: time.Second * time.Duration(2), PacketTimestamp: 4000, PrevDroppedPackets: 13},
+				{Data: []byte{0x04}, Duration: time.Second, PacketTimestamp: 7000, PrevDroppedPackets: 1},
 			},
 			withHeadChecker:  true,
 			headBytes:        []byte{0x04},
@@ -261,6 +262,7 @@ func TestSampleBuilder(t *testing.T) { //nolint:maintidx
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
 				{Data: []byte{1, 2, 3}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // first sample
+				{Data: []byte{1, 7}, Duration: time.Second, PacketTimestamp: 3, PrevDroppedPackets: 2},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
@@ -286,6 +288,7 @@ func TestSampleBuilder(t *testing.T) { //nolint:maintidx
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
 				{Data: []byte{1, 2}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // 1st sample
+				{Data: []byte{1}, Duration: time.Second, PacketTimestamp: 2, PrevDroppedPackets: 2},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
