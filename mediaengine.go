@@ -822,6 +822,7 @@ func (m *MediaEngine) getRTPParametersByPayloadType(payloadType PayloadType) (RT
 	}, nil
 }
 
+//nolint:cyclop // Each supported codec maps directly to its RTP payloader.
 func payloaderForCodec(codec RTPCodecCapability) (rtp.Payloader, error) {
 	switch strings.ToLower(codec.MimeType) {
 	case strings.ToLower(MimeTypeH264):
