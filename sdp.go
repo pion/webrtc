@@ -75,7 +75,7 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 
 // extract all trackDetails from an SDP.
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:cyclop
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
 	s *sdp.SessionDescription,
@@ -444,7 +444,7 @@ func populateLocalCandidates(
 	}
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func addSenderSDP(
 	mediaSection mediaSection,
 	isPlanB bool,
@@ -532,7 +532,7 @@ func addSenderSDP(
 	}
 }
 
-//nolint:cyclop, gocognit
+//nolint:cyclop
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -697,7 +697,7 @@ func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
 
 // populateSDP serializes a PeerConnections state into an SDP.
 //
-//nolint:cyclop,gocognit
+//nolint:cyclop
 func populateSDP(
 	descr *sdp.SessionDescription,
 	isPlanB bool,
@@ -901,7 +901,7 @@ func extractBundleID(desc *sdp.SessionDescription) string {
 	return bundleIDs[1]
 }
 
-func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint:gocognit,cyclop
+func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint:cyclop
 	fingerprint := ""
 
 	// Fingerprint on session level has highest priority
@@ -1031,7 +1031,7 @@ type sdpICEDetails struct {
 func extractICEDetails(
 	desc *sdp.SessionDescription,
 	log logging.LeveledLogger,
-) (*sdpICEDetails, error) { // nolint:gocognit
+) (*sdpICEDetails, error) {
 	details := &sdpICEDetails{
 		Candidates: []ICECandidate{},
 	}

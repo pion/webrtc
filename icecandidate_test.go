@@ -175,14 +175,7 @@ func TestNewIdentifiedICECandidateFromICE(t *testing.T) {
 }
 
 func TestNewIdentifiedICECandidatesFromICE(t *testing.T) {
-	ic, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
-		Network:    "udp",
-		Address:    "::1",
-		Port:       1234,
-		Component:  1,
-		Foundation: "foundation",
-		Priority:   128,
-	})
+	ic, err := ice.NewCandidateHost(&ice.CandidateHostConfig{Network: "udp", Address: "::1", Port: 1234, Component: 1, Foundation: "foundation", Priority: 128})
 
 	assert.NoError(t, err)
 

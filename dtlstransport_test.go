@@ -94,10 +94,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	case offer := <-offerChan:
 		// Replace with invalid fingerprint
 		re := regexp.MustCompile(`sha-256 (.*?)\r`)
-		offer.SDP = re.ReplaceAllString(
-			offer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		offer.SDP = re.ReplaceAllString(offer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
@@ -105,10 +102,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		assert.NoError(t, err)
 		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-		answer.SDP = re.ReplaceAllString(
-			answer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		answer.SDP = re.ReplaceAllString(answer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 	case <-time.After(5 * time.Second):
@@ -135,16 +129,10 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	<-offerConnectionHasClosed
 	<-answerConnectionHasClosed
 
-	assert.Contains(
-		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(),
-		"DTLS Transport should be closed or failed",
-	)
+	assert.Contains(t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcOffer.SCTP().Transport().State(), "DTLS Transport should be closed or failed")
 	assert.Nil(t, pcOffer.SCTP().Transport().conn)
 
-	assert.Contains(
-		t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcAnswer.SCTP().Transport().State(),
-		"DTLS Transport should be closed or failed",
-	)
+	assert.Contains(t, []DTLSTransportState{DTLSTransportStateClosed, DTLSTransportStateFailed}, pcAnswer.SCTP().Transport().State(), "DTLS Transport should be closed or failed")
 	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
 }
 
@@ -263,11 +251,7 @@ func TestDTLSTransport_Start_UsesConnectContextMaker(t *testing.T) {
 	}
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          conn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
+	iceTransport.mux = mux.NewMux(mux.Config{Conn: conn, BufferSize: 1500, LoggerFactory: loggerFactory})
 	defer func() { _ = iceTransport.mux.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
@@ -299,11 +283,7 @@ func TestDTLSTransport_Start_ConnectErrorFailsTransport(t *testing.T) {
 	defer func() { _ = remoteConn.Close() }()
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          localConn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
+	iceTransport.mux = mux.NewMux(mux.Config{Conn: localConn, BufferSize: 1500, LoggerFactory: loggerFactory})
 	defer func() { _ = iceTransport.mux.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)
@@ -338,11 +318,7 @@ func TestDTLSTransport_Start_HandshakeErrorFailsTransport(t *testing.T) {
 	}
 
 	iceTransport := NewICETransport(nil, loggerFactory)
-	iceTransport.mux = mux.NewMux(mux.Config{
-		Conn:          conn,
-		BufferSize:    1500,
-		LoggerFactory: loggerFactory,
-	})
+	iceTransport.mux = mux.NewMux(mux.Config{Conn: conn, BufferSize: 1500, LoggerFactory: loggerFactory})
 	defer func() { _ = iceTransport.mux.Close() }()
 
 	transport, err := api.NewDTLSTransport(iceTransport, nil)

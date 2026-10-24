@@ -28,18 +28,12 @@ func TestGenerateCertificateRSA(t *testing.T) {
 	sk, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.Nil(t, err)
 
-	skPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(sk),
-	})
+	skPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(sk)})
 
 	cert, err := GenerateCertificate(sk)
 	assert.Nil(t, err)
 
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.x509Cert.Raw,
-	})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.x509Cert.Raw})
 
 	_, err = tls.X509KeyPair(certPEM, skPEM)
 	assert.Nil(t, err)
@@ -52,18 +46,12 @@ func TestGenerateCertificateECDSA(t *testing.T) {
 	skDER, err := x509.MarshalECPrivateKey(sk)
 	assert.Nil(t, err)
 
-	skPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: skDER,
-	})
+	skPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: skDER})
 
 	cert, err := GenerateCertificate(sk)
 	assert.Nil(t, err)
 
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.x509Cert.Raw,
-	})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.x509Cert.Raw})
 
 	_, err = tls.X509KeyPair(certPEM, skPEM)
 	assert.Nil(t, err)

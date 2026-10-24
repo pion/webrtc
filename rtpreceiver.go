@@ -618,7 +618,7 @@ func (r *RTPReceiver) receiveForRtx(
 	)
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (r *RTPReceiver) receiveForRtxInternal(
 	ssrc SSRC,
 	rsid string,
@@ -667,7 +667,7 @@ func (r *RTPReceiver) receiveForRtxInternal(
 }
 
 // maybeStartRepairStreamReader starts repair processing when needed. The caller must hold r.mu.
-func (r *RTPReceiver) maybeStartRepairStreamReader(track *trackStreams) { //nolint:cyclop,gocognit
+func (r *RTPReceiver) maybeStartRepairStreamReader(track *trackStreams) { //nolint:cyclop
 	if track.repairReaderStarted || track.repairInterceptor == nil {
 		return
 	}

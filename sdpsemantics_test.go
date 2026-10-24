@@ -27,22 +27,11 @@ func TestSDPSemantics_String(t *testing.T) {
 		{SDPSemanticsUnifiedPlan, "unified-plan"},
 	}
 
-	assert.Equal(t,
-		ErrUnknownType.Error(),
-		SDPSemantics(42).String(),
-	)
+	assert.Equal(t, ErrUnknownType.Error(), SDPSemantics(42).String())
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.value.String(),
-			"testCase: %d %v", i, testCase,
-		)
-		assert.Equal(t,
-			testCase.value,
-			newSDPSemantics(testCase.expectedString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.value.String(), "testCase: %d %v", i, testCase)
+		assert.Equal(t, testCase.value, newSDPSemantics(testCase.expectedString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -59,11 +48,7 @@ func TestSDPSemantics_JSON(t *testing.T) {
 	for i, testCase := range testCases {
 		res, err := json.Marshal(testCase.value)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			testCase.JSON,
-			res,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.JSON, res, "testCase: %d %v", i, testCase)
 
 		var v SDPSemantics
 		err = json.Unmarshal(testCase.JSON, &v)
@@ -107,29 +92,19 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
-	opc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsPlanB,
-	})
+	opc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionSendrecv,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionSendrecv,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionSendrecv,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionSendrecv,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendrecv})
 	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
@@ -147,9 +122,7 @@ func TestSDPSemantics_PlanBOfferTransceivers(t *testing.T) {
 		}
 	}
 
-	apc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsPlanB,
-	})
+	apc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 	assert.NoError(t, err)
 
 	assert.NoError(t, apc.SetRemoteDescription(offer))
@@ -170,19 +143,13 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
-	opc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsPlanB,
-	})
+	opc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
@@ -190,24 +157,16 @@ func TestSDPSemantics_PlanBAnswerSenders(t *testing.T) {
 
 	assert.ObjectsAreEqual(getMdNames(offer.parsed), []string{"video", "audio", "data"})
 
-	apc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsPlanB,
-	})
+	apc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{
-		MimeType:    MimeTypeH264,
-		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
-	}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video1)
 	assert.NoError(t, err)
 
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{
-		MimeType:    MimeTypeH264,
-		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
-	}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video2)
@@ -251,19 +210,13 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
-	opc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsPlanB,
-	})
+	opc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	_, err = opc.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
 	offer, err := opc.CreateOffer(nil)
@@ -271,24 +224,16 @@ func TestSDPSemantics_UnifiedPlanWithFallback(t *testing.T) {
 
 	assert.ObjectsAreEqual(getMdNames(offer.parsed), []string{"video", "audio", "data"})
 
-	apc, err := NewPeerConnection(Configuration{
-		SDPSemantics: SDPSemanticsUnifiedPlanWithFallback,
-	})
+	apc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsUnifiedPlanWithFallback})
 	assert.NoError(t, err)
 
-	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{
-		MimeType:    MimeTypeH264,
-		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
-	}, "1", "1")
+	video1, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "1", "1")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video1)
 	assert.NoError(t, err)
 
-	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{
-		MimeType:    MimeTypeH264,
-		SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
-	}, "2", "2")
+	video2, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeH264, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f"}, "2", "2")
 	assert.NoError(t, err)
 
 	_, err = apc.AddTrack(video2)
@@ -354,9 +299,7 @@ func TestSDPSemantics_SetRemoteDescription_Mismatch(t *testing.T) {
 	defer lim.Stop()
 
 	t.Run("PlanB", func(t *testing.T) {
-		pc, err := NewPeerConnection(Configuration{
-			SDPSemantics: SDPSemanticsUnifiedPlan,
-		})
+		pc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsUnifiedPlan})
 		assert.NoError(t, err)
 
 		err = pc.SetRemoteDescription(SessionDescription{SDP: planBOffer, Type: SDPTypeOffer})
@@ -369,9 +312,7 @@ func TestSDPSemantics_SetRemoteDescription_Mismatch(t *testing.T) {
 	})
 
 	t.Run("UnifiedPlan", func(t *testing.T) {
-		pc, err := NewPeerConnection(Configuration{
-			SDPSemantics: SDPSemanticsPlanB,
-		})
+		pc, err := NewPeerConnection(Configuration{SDPSemantics: SDPSemanticsPlanB})
 		assert.NoError(t, err)
 
 		err = pc.SetRemoteDescription(SessionDescription{SDP: unifiedPlanOffer, Type: SDPTypeOffer})

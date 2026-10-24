@@ -173,38 +173,19 @@ func TestNew_Go(t *testing.T) {
 				secretKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				assert.Nil(t, err)
 
-				certificate, err := NewCertificate(secretKey, x509.Certificate{
-					Version:      2,
-					SerialNumber: big.NewInt(1653),
-					NotBefore:    time.Now().AddDate(0, -2, 0),
-					NotAfter:     time.Now().AddDate(0, -1, 0),
-				})
+				certificate, err := NewCertificate(secretKey, x509.Certificate{Version: 2, SerialNumber: big.NewInt(1653), NotBefore: time.Now().AddDate(0, -2, 0), NotAfter: time.Now().AddDate(0, -1, 0)})
 				assert.Nil(t, err)
 
-				return api.NewPeerConnection(Configuration{
-					Certificates: []Certificate{*certificate},
-				})
+				return api.NewPeerConnection(Configuration{Certificates: []Certificate{*certificate}})
 			}, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}},
 			{func() (*PeerConnection, error) {
-				return api.NewPeerConnection(Configuration{
-					ICEServers: []ICEServer{
-						{
-							URLs: []string{
-								"stun:stun.l.google.com:19302",
-								"turns:google.de?transport=tcp",
-							},
-							Username: "unittest",
-						},
-					},
-				})
+				return api.NewPeerConnection(Configuration{ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302", "turns:google.de?transport=tcp"}, Username: "unittest"}}})
 			}, &rtcerr.InvalidAccessError{Err: ErrNoTurnCredentials}},
 		}
 
 		for i, testCase := range testCases {
 			pc, err := testCase.initialize()
-			assert.EqualError(t, err, testCase.expectedErr.Error(),
-				"testCase: %d %v", i, testCase,
-			)
+			assert.EqualError(t, err, testCase.expectedErr.Error(), "testCase: %d %v", i, testCase)
 			if pc != nil {
 				assert.NoError(t, pc.Close())
 			}
@@ -270,11 +251,7 @@ func TestPeerConnection_SetConfiguration_Go(t *testing.T) {
 		{
 			name: "valid",
 			init: func() (*PeerConnection, error) {
-				pc, err := api.NewPeerConnection(Configuration{
-					PeerIdentity:         "unittest",
-					Certificates:         []Certificate{*certificate1},
-					ICECandidatePoolSize: 1,
-				})
+				pc, err := api.NewPeerConnection(Configuration{PeerIdentity: "unittest", Certificates: []Certificate{*certificate1}, ICECandidatePoolSize: 1})
 				if err != nil {
 					return pc, err
 				}
@@ -1196,10 +1173,7 @@ func TestPeerConnection_ICERestart_SetConfiguration_NewServers(t *testing.T) {
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
-	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: loggerFactory,
-	})
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
 	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{offerIP}})
@@ -1259,8 +1233,7 @@ func TestPeerConnection_ICERestart_SetConfiguration_NewServers(t *testing.T) {
 	<-offerGatherComplete
 
 	// Verify initial offer has no srflx candidates.
-	assert.NotContains(t, offerPC.LocalDescription().SDP, "srflx",
-		"should not have srflx candidates without STUN servers")
+	assert.NotContains(t, offerPC.LocalDescription().SDP, "srflx", "should not have srflx candidates without STUN servers")
 
 	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
 
@@ -1294,8 +1267,7 @@ func TestPeerConnection_ICERestart_SetConfiguration_NewServers(t *testing.T) {
 	<-offerGatherComplete
 
 	// Verify the offer now has srflx candidates from the STUN server.
-	assert.Contains(t, offerPC.LocalDescription().SDP, "srflx",
-		"should have srflx candidates after restart with STUN servers")
+	assert.Contains(t, offerPC.LocalDescription().SDP, "srflx", "should have srflx candidates after restart with STUN servers")
 
 	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
 
@@ -1483,17 +1455,14 @@ func TestICELite(t *testing.T) {
 	peerConnection, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	assert.NoError(t, peerConnection.SetRemoteDescription(
-		SessionDescription{SDP: liteOffer, Type: SDPTypeOffer},
-	))
+	assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{SDP: liteOffer, Type: SDPTypeOffer}))
 
 	SDPAnswer, err := peerConnection.CreateAnswer(nil)
 	assert.NoError(t, err)
 
 	assert.NoError(t, peerConnection.SetLocalDescription(SDPAnswer))
 
-	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.Role(),
-		"pion did not set state to ICE-CONTROLLED against ice-light offer")
+	assert.Equal(t, ICERoleControlling, peerConnection.iceTransport.Role(), "pion did not set state to ICE-CONTROLLED against ice-light offer")
 
 	assert.NoError(t, peerConnection.Close())
 }
@@ -1515,17 +1484,12 @@ func TestPeerConnection_TransceiverDirection(t *testing.T) {
 				return err
 			}
 
-			_, err = pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
-				{Direction: dir},
-			}...)
+			_, err = pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{{Direction: dir}}...)
 
 			return err
 		}
 
-		_, err := pc.AddTransceiverFromKind(
-			RTPCodecTypeVideo,
-			RTPTransceiverInit{Direction: dir},
-		)
+		_, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: dir})
 
 		return err
 	}
@@ -1639,17 +1603,12 @@ func TestPeerConnection_MediaDirectionInSDP(t *testing.T) {
 				return nil, err
 			}
 
-			transceiver, err := pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{
-				{Direction: dir},
-			}...)
+			transceiver, err := pc.AddTransceiverFromTrack(track, []RTPTransceiverInit{{Direction: dir}}...)
 
 			return transceiver.Sender(), err
 		}
 
-		transceiver, err := pc.AddTransceiverFromKind(
-			RTPCodecTypeVideo,
-			RTPTransceiverInit{Direction: dir},
-		)
+		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: dir})
 
 		return transceiver.Sender(), err
 	}
@@ -1836,30 +1795,14 @@ a=rtpmap:49 H265/90000
 a=fmtp:49 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        94,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
-			},
-			PayloadType: 98,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH265, 90000, 0, "level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST", nil,
-			},
-			PayloadType: 49,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 94}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil}, PayloadType: 98}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH265, 90000, 0, "level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST", nil}, PayloadType: 49}, RTPCodecTypeVideo))
 
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
-		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
-			Type: SDPTypeOffer,
-			SDP:  remoteSdp,
-		}))
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSdp}))
 
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
@@ -1921,25 +1864,14 @@ a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
 a=sendonly
 `
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        94,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil,
-			},
-			PayloadType: 98,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 94}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeH264, 90000, 0, "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", nil}, PayloadType: 98}, RTPCodecTypeVideo))
 
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 		pc, err := api.NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
-			Type: SDPTypeOffer,
-			SDP:  remoteSdp,
-		}))
+		assert.NoError(t, pc.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSdp}))
 
 		ans, _ := pc.CreateAnswer(nil)
 		assert.NoError(t, pc.SetLocalDescription(ans))
@@ -2130,9 +2062,7 @@ func TestICETricklingSupported(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	offer, err := pc.CreateOffer(&OfferOptions{
-		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
-	})
+	offer, err := pc.CreateOffer(&OfferOptions{OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true}})
 	assert.NoError(t, err)
 	assert.Contains(t, offer.SDP, "a=ice-options:trickle")
 	assert.NoError(t, pc.Close())
@@ -2161,14 +2091,9 @@ func TestICETricklingSupported(t *testing.T) {
 		"",
 	}, "\r\n")
 
-	assert.NoError(t, pcAnswer.SetRemoteDescription(SessionDescription{
-		Type: SDPTypeOffer,
-		SDP:  offerSDP,
-	}))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: offerSDP}))
 
-	answer, err := pcAnswer.CreateAnswer(&AnswerOptions{
-		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
-	})
+	answer, err := pcAnswer.CreateAnswer(&AnswerOptions{OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true}})
 	assert.NoError(t, err)
 	assert.Contains(t, answer.SDP, "a=ice-options:trickle")
 
@@ -2219,10 +2144,7 @@ func TestICERenominationAdvertised(t *testing.T) {
 		"",
 	}, "\r\n")
 
-	assert.NoError(t, pcAnswer.SetRemoteDescription(SessionDescription{
-		Type: SDPTypeOffer,
-		SDP:  offerSDP,
-	}))
+	assert.NoError(t, pcAnswer.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: offerSDP}))
 
 	answer, err := pcAnswer.CreateAnswer(nil)
 	assert.NoError(t, err)
@@ -2288,27 +2210,11 @@ a=ssrc:29586368 cname:janus
 
 	mediaEngine := &MediaEngine{}
 
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
-		},
-		PayloadType: 96,
-	}, RTPCodecTypeVideo))
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
-		},
-		PayloadType: 111,
-	}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 	api := NewAPI(WithMediaEngine(mediaEngine))
-	pc, err := api.NewPeerConnection(Configuration{
-		ICEServers: []ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	})
+	pc, err := api.NewPeerConnection(Configuration{ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}}})
 	assert.NoError(t, err)
 
 	pc.OnICECandidate(func(candidate *ICECandidate) {
@@ -2322,10 +2228,7 @@ a=ssrc:29586368 cname:janus
 		assert.Contains(t, []uint16{0, 1}, candidate.SDPMLineIndex)
 	})
 
-	assert.NoError(t, pc.SetRemoteDescription(SessionDescription{
-		Type: SDPTypeOffer,
-		SDP:  remoteSdp,
-	}))
+	assert.NoError(t, pc.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: remoteSdp}))
 
 	gatherComplete := GatheringCompletePromise(pc)
 	ans, _ := pc.CreateAnswer(nil)
@@ -2344,27 +2247,11 @@ func TestTranceiverMediaStreamIdentification(t *testing.T) {
 
 	mediaEngine := &MediaEngine{}
 
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
-		},
-		PayloadType: 96,
-	}, RTPCodecTypeVideo))
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
-		},
-		PayloadType: 111,
-	}, RTPCodecTypeAudio))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 111}, RTPCodecTypeAudio))
 
 	api := NewAPI(WithMediaEngine(mediaEngine))
-	pcOfferer, pcAnswerer, err := api.newPair(Configuration{
-		ICEServers: []ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	})
+	pcOfferer, pcAnswerer, err := api.newPair(Configuration{ICEServers: []ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}}})
 	assert.NoError(t, err)
 
 	pcOfferer.OnICECandidate(func(candidate *ICECandidate) {
@@ -2387,14 +2274,10 @@ func TestTranceiverMediaStreamIdentification(t *testing.T) {
 		assert.Contains(t, []uint16{0, 1}, candidate.SDPMLineIndex)
 	})
 
-	videoTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	videoTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
-	audioTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{
-		Direction: RTPTransceiverDirectionRecvonly,
-	})
+	audioTransceiver, err := pcOfferer.AddTransceiverFromKind(RTPCodecTypeAudio, RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	assert.NoError(t, err)
 
 	assert.NoError(t, videoTransceiver.SetMid(videoMid))
@@ -2426,9 +2309,7 @@ func Test_WriteRTCP_Disconnected(t *testing.T) {
 	peerConnection, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	assert.Error(t, peerConnection.WriteRTCP(
-		[]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 5, MediaSSRC: 10}}),
-	)
+	assert.Error(t, peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.RapidResynchronizationRequest{SenderSSRC: 5, MediaSSRC: 10}}))
 
 	assert.NoError(t, peerConnection.Close())
 }
@@ -2544,9 +2425,7 @@ func TestAddICECandidate__DroppingOldGenerationCandidates(t *testing.T) {
 	loggerFactory := &testICELoggerFactory{logger: testLogger}
 
 	// Create a new API with the custom logger
-	api := NewAPI(WithSettingEngine(SettingEngine{
-		LoggerFactory: loggerFactory,
-	}))
+	api := NewAPI(WithSettingEngine(SettingEngine{LoggerFactory: loggerFactory}))
 
 	pc, err := api.NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -2607,9 +2486,7 @@ func TestPeerConnectionCanTrickleICECandidatesGo(t *testing.T) {
 	_, err = offerPC.CreateDataChannel("trickle", nil)
 	assert.NoError(t, err)
 
-	offer, err := offerPC.CreateOffer(&OfferOptions{
-		OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true},
-	})
+	offer, err := offerPC.CreateOffer(&OfferOptions{OfferAnswerOptions: OfferAnswerOptions{ICETricklingSupported: true}})
 	assert.NoError(t, err)
 	assert.NoError(t, offerPC.SetLocalDescription(offer))
 	assert.Equal(t, ICETrickleCapabilityUnknown, answerPC.CanTrickleICECandidates())
@@ -3068,9 +2945,7 @@ func TestCryptexAttributeInOffer(t *testing.T) {
 	}
 	for _, policy := range tests {
 		t.Run(policy.String(), func(t *testing.T) {
-			pcOffer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: policy,
-			})
+			pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: policy})
 			require.NoError(t, err)
 			defer func() { require.NoError(t, pcOffer.Close()) }()
 
@@ -3120,14 +2995,10 @@ func TestCryptexAttributeInAnswerForOfferWithCryptex(t *testing.T) {
 	}
 	for _, policy := range tests {
 		t.Run(policy.String(), func(t *testing.T) {
-			pcOffer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
-			})
+			pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
 			require.NoError(t, err)
 
-			pcAnswer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: policy,
-			})
+			pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: policy})
 			require.NoError(t, err)
 			defer closePairNow(t, pcOffer, pcAnswer)
 
@@ -3221,14 +3092,10 @@ func TestCryptexAttributeInAnswerForOfferWithoutCryptex(t *testing.T) {
 	}
 	for _, policy := range tests {
 		t.Run(policy.String(), func(t *testing.T) {
-			pcOffer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
-			})
+			pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
 			require.NoError(t, err)
 
-			pcAnswer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: policy,
-			})
+			pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: policy})
 			require.NoError(t, err)
 			defer closePairNow(t, pcOffer, pcAnswer)
 
@@ -3294,14 +3161,10 @@ func TestCryptexAttributeInAnswerForOfferWithoutCryptex(t *testing.T) {
 func TestCryptexAttributeInAnswerMissingWhenOffererRequiresCryptex(t *testing.T) {
 	// Check that answer SDP without Cryptex attribute is rejected when offerer requires Cryptex.
 
-	pcOffer, err := NewPeerConnection(Configuration{
-		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire,
-	})
+	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
 	require.NoError(t, err)
 
-	pcAnswer, err := NewPeerConnection(Configuration{
-		RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable,
-	})
+	pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyDisable})
 	require.NoError(t, err)
 	defer closePairNow(t, pcOffer, pcAnswer)
 
@@ -3346,14 +3209,10 @@ func TestCryptexAttributeInAnswerForMediaLevelCryptex(t *testing.T) {
 	}
 	for _, policy := range tests {
 		t.Run(policy.String(), func(t *testing.T) {
-			pcOffer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate,
-			})
+			pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyNegotiate})
 			require.NoError(t, err)
 
-			pcAnswer, err := NewPeerConnection(Configuration{
-				RTPHeaderEncryptionPolicy: policy,
-			})
+			pcAnswer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: policy})
 			require.NoError(t, err)
 			defer closePairNow(t, pcOffer, pcAnswer)
 
@@ -3556,8 +3415,7 @@ func TestCryptexRequiredDoesNotFailForDataOnlyOffer(t *testing.T) {
 	answer = *pcAnswer.LocalDescription()
 
 	// Application sections must not carry a=cryptex.
-	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication),
-		"unexpected a=cryptex on answer application m-line")
+	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication), "unexpected a=cryptex on answer application m-line")
 
 	require.NoError(t, pcOffer.SetRemoteDescription(answer))
 }
@@ -3603,8 +3461,7 @@ func TestCryptexRequiredDataOnlyOfferAcceptsNonCryptexAnswer(t *testing.T) {
 
 	// Sanity check: the Disable-policy answerer's answer carries no a=cryptex anywhere.
 	assert.False(t, hasCryptexForSession(t, answer.SDP), "unexpected session-level a=cryptex on answer")
-	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication),
-		"unexpected a=cryptex on answer application m-line")
+	assert.False(t, hasCryptexForMedia(t, answer.SDP, mediaSectionApplication), "unexpected a=cryptex on answer application m-line")
 
 	// The Require-policy offerer must accept this non-Cryptex, data-only answer without error.
 	require.NoError(t, pcOffer.SetRemoteDescription(answer))
@@ -3657,12 +3514,9 @@ func TestCryptexIsStillOfferedDuringRenegotiationIfNotNegotiatedInitially(t *tes
 	require.NoError(t, err)
 
 	assert.True(t, hasCryptexForSession(t, offer2.SDP), "expected session-level a=cryptex on renegotiation offer")
-	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindVideo)),
-		"unexpected a=cryptex on renegotiation offer video m-line")
-	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindAudio)),
-		"unexpected a=cryptex on renegotiation offer audio m-line")
-	assert.False(t, hasCryptexForMedia(t, offer2.SDP, mediaSectionApplication),
-		"unexpected a=cryptex on renegotiation offer application m-line")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindVideo)), "unexpected a=cryptex on renegotiation offer video m-line")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, string(MediaKindAudio)), "unexpected a=cryptex on renegotiation offer audio m-line")
+	assert.False(t, hasCryptexForMedia(t, offer2.SDP, mediaSectionApplication), "unexpected a=cryptex on renegotiation offer application m-line")
 }
 
 func TestCryptexModeChangeDuringRenegotiation(t *testing.T) {
@@ -3977,10 +3831,8 @@ func TestCryptexIndependentLocalRemoteModeUpdateDuringRenegotiation(t *testing.T
 	require.NoError(t, pcOffer.SetRemoteDescription(answer2))
 	pcOffer.ops.Done()
 
-	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode(),
-		"outbound mode must follow the peer's answer, which no longer declares Cryptex")
-	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(),
-		"inbound mode must be unaffected since our own offer still declares Cryptex receive support")
+	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode(), "outbound mode must follow the peer's answer, which no longer declares Cryptex")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(), "inbound mode must be unaffected since our own offer still declares Cryptex receive support")
 }
 
 func TestCryptexNegotiatedIsPerTransceiverNotTransport(t *testing.T) {
@@ -4023,8 +3875,7 @@ func TestCryptexNegotiatedIsPerTransceiverNotTransport(t *testing.T) {
 	videoTr, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
 	require.NoError(t, err)
 
-	assert.False(t, videoTr.RTPHeaderEncryptionNegotiated(),
-		"a transceiver that hasn't participated in an offer/answer exchange must report false")
+	assert.False(t, videoTr.RTPHeaderEncryptionNegotiated(), "a transceiver that hasn't participated in an offer/answer exchange must report false")
 	assert.True(t, audioTr.RTPHeaderEncryptionNegotiated(), "already-negotiated transceiver is unaffected")
 }
 
@@ -4089,8 +3940,7 @@ func TestCryptexBundleOnlyZeroPortRTPOfferRequiresPeerCapability(t *testing.T) {
 
 		answer, err := answerPC.CreateAnswer(nil)
 		require.NoError(t, err)
-		assert.False(t, hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio)),
-			"the audio section never advertised Cryptex, so the answer must not either")
+		assert.False(t, hasCryptexForMedia(t, answer.SDP, string(MediaKindAudio)), "the audio section never advertised Cryptex, so the answer must not either")
 	})
 }
 
@@ -4127,8 +3977,7 @@ func TestRTPHeaderEncryptionNegotiatedInheritsFromBundleTag(t *testing.T) {
 	answer := &SessionDescription{Type: SDPTypeAnswer, parsed: parsed}
 	require.NoError(t, setRTPTransceiverCurrentDirection(answer, []*RTPTransceiver{transceiver}, false))
 
-	assert.True(t, transceiver.rtpHeaderEncryptionNegotiated.Load(),
-		"expected Cryptex inherited from the BUNDLE tag section to be reflected on the transceiver")
+	assert.True(t, transceiver.rtpHeaderEncryptionNegotiated.Load(), "expected Cryptex inherited from the BUNDLE tag section to be reflected on the transceiver")
 }
 
 func TestCryptexReceiveModeUpdatedOnNewLocalAnswer(t *testing.T) {
@@ -4176,8 +4025,7 @@ func TestCryptexReceiveModeUpdatedOnNewLocalAnswer(t *testing.T) {
 	require.NoError(t, pcAnswer.SetLocalDescription(answer))
 	<-answerGatheringComplete
 	answer = *pcAnswer.LocalDescription()
-	require.False(t, hasCryptexForSession(t, answer.SDP),
-		"sanity check: answer omits Cryptex since the offer appeared to lack it")
+	require.False(t, hasCryptexForSession(t, answer.SDP), "sanity check: answer omits Cryptex since the offer appeared to lack it")
 
 	require.NoError(t, pcOffer.SetRemoteDescription(answer))
 
@@ -4206,8 +4054,7 @@ func TestCryptexReceiveModeUpdatedOnNewLocalAnswer(t *testing.T) {
 	require.True(t, hasCryptexForSession(t, answer2.SDP), "sanity check: new answer mirrors Cryptex")
 	pcAnswer.ops.Done()
 
-	assert.Equal(t, srtp.CryptexModeEnabled, pcAnswer.dtlsTransport.getRemoteCryptexMode(),
-		"applying the new local answer must update the SRTP session's receive mode")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcAnswer.dtlsTransport.getRemoteCryptexMode(), "applying the new local answer must update the SRTP session's receive mode")
 
 	require.NoError(t, pcOffer.SetRemoteDescription(answer2))
 }
@@ -4264,10 +4111,8 @@ func TestCryptexPreservedWhenDescriptionRejected(t *testing.T) {
 
 	require.Error(t, pcOffer.SetRemoteDescription(rejectedAnswer))
 
-	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode(),
-		"a rejected description must not mutate the already-active send mode")
-	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(),
-		"a rejected description must not mutate the already-active receive mode")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getLocalCryptexMode(), "a rejected description must not mutate the already-active send mode")
+	assert.Equal(t, srtp.CryptexModeEnabled, pcOffer.dtlsTransport.getRemoteCryptexMode(), "a rejected description must not mutate the already-active receive mode")
 }
 
 func TestCryptexPreservedWhenLateStageRejectsRenegotiationOffer(t *testing.T) {
@@ -4334,15 +4179,11 @@ func TestCryptexPreservedWhenLateStageRejectsRenegotiationOffer(t *testing.T) {
 	brokenOffer2.SDP = string(marshaled)
 
 	err = pcAnswer.SetRemoteDescription(brokenOffer2)
-	require.ErrorIs(t, err, errPeerConnRemoteDescriptionWithoutMidValue,
-		"sanity check: failure must come from deep inside the transceiver-matching loop, "+
-			"well after Cryptex modes were computed, not from an earlier check")
+	require.ErrorIs(t, err, errPeerConnRemoteDescriptionWithoutMidValue, "sanity check: failure must come from deep inside the transceiver-matching loop, "+"well after Cryptex modes were computed, not from an earlier check")
 	pcAnswer.ops.Done()
 
-	assert.Equal(t, wantLocalMode, pcAnswer.dtlsTransport.getLocalCryptexMode(),
-		"a call that fails deep inside SetRemoteDescription must not mutate the already-active send mode")
-	assert.Equal(t, wantRemoteMode, pcAnswer.dtlsTransport.getRemoteCryptexMode(),
-		"a call that fails deep inside SetRemoteDescription must not mutate the already-active receive mode")
+	assert.Equal(t, wantLocalMode, pcAnswer.dtlsTransport.getLocalCryptexMode(), "a call that fails deep inside SetRemoteDescription must not mutate the already-active send mode")
+	assert.Equal(t, wantRemoteMode, pcAnswer.dtlsTransport.getRemoteCryptexMode(), "a call that fails deep inside SetRemoteDescription must not mutate the already-active receive mode")
 }
 
 func TestCryptexAnswerWithTagOnlyCryptexIsAccepted(t *testing.T) {
@@ -4524,8 +4365,7 @@ func testDataChannelThenMedia(t *testing.T, answererSends bool) {
 	require.ErrorIs(t, gotRTP.Err(), context.Canceled, "no RTP packet arrived after renegotiation")
 	waitForSRTP(t, pcOffer, pcAnswer)
 	for _, pc := range []*PeerConnection{pcOffer, pcAnswer} {
-		assert.Eventually(t, pc.undeclaredStarted.Load, 10*time.Second, 10*time.Millisecond,
-			"undeclared media processors did not start after renegotiation")
+		assert.Eventually(t, pc.undeclaredStarted.Load, 10*time.Second, 10*time.Millisecond, "undeclared media processors did not start after renegotiation")
 	}
 
 	assert.NoError(t, dc.SendText("after"))

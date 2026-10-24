@@ -239,17 +239,9 @@ func TestDataChannel_Open(t *testing.T) {
 		ordered := true
 		dataChannelID := uint16(0)
 
-		answerDC, err := answerPC.CreateDataChannel(expectedLabel, &DataChannelInit{
-			ID:         &dataChannelID,
-			Negotiated: &negotiated,
-			Ordered:    &ordered,
-		})
+		answerDC, err := answerPC.CreateDataChannel(expectedLabel, &DataChannelInit{ID: &dataChannelID, Negotiated: &negotiated, Ordered: &ordered})
 		assert.NoError(t, err)
-		offerDC, err := offerPC.CreateDataChannel(expectedLabel, &DataChannelInit{
-			ID:         &dataChannelID,
-			Negotiated: &negotiated,
-			Ordered:    &ordered,
-		})
+		offerDC, err := offerPC.CreateDataChannel(expectedLabel, &DataChannelInit{ID: &dataChannelID, Negotiated: &negotiated, Ordered: &ordered})
 		assert.NoError(t, err)
 
 		answerDC.OnMessage(func(DataChannelMessage) {

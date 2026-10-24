@@ -327,10 +327,7 @@ func TestOggWriter_ExplicitChannelMappings(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, writer)
 
-			track, err := writer.NewTrack(
-				1111,
-				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
-			)
+			track, err := writer.NewTrack(1111, WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap))
 			assert.NoError(t, err)
 			assert.NotNil(t, track)
 			assert.NoError(t, track.WriteRTP(validOpusPacketForTest(t, 1000, 1111)))
@@ -467,10 +464,7 @@ func TestOggWriter_RejectsInvalidChannelMappings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name+"/writer-default", func(t *testing.T) {
-			writer, err := NewWriter(
-				&bytes.Buffer{},
-				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
-			)
+			writer, err := NewWriter(&bytes.Buffer{}, WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap))
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Nil(t, writer)
 		})
@@ -480,10 +474,7 @@ func TestOggWriter_RejectsInvalidChannelMappings(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, writer)
 
-			track, err := writer.NewTrack(
-				1111,
-				WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap),
-			)
+			track, err := writer.NewTrack(1111, WithChannelMapping(tt.mappingFamily, tt.streams, tt.coupled, tt.channelMap))
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Nil(t, track)
 		})
@@ -542,14 +533,7 @@ func TestOggWriter_LargePayload(t *testing.T) {
 	err = writer.WriteRTP(validPacket)
 	assert.NoError(t, err)
 
-	data := createPageForSerial(
-		writer.checksumTable,
-		rawPkt,
-		pageHeaderTypeContinuationOfStream,
-		0,
-		writer.track.serial,
-		1,
-	)
+	data := createPageForSerial(writer.checksumTable, rawPkt, pageHeaderTypeContinuationOfStream, 0, writer.track.serial, 1)
 	assert.Equal(t, uint8(4), data[26])
 }
 
@@ -561,15 +545,7 @@ func TestOggWriter_BoundaryPayloadSplitsTerminatingLace(t *testing.T) {
 	track.pageIndex = 7
 	buffer := &bytes.Buffer{}
 
-	err = writePage(
-		buffer,
-		nil,
-		generateChecksumTable(),
-		track,
-		payload,
-		pageHeaderTypeContinuationOfStream,
-		960,
-	)
+	err = writePage(buffer, nil, generateChecksumTable(), track, payload, pageHeaderTypeContinuationOfStream, 960)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(9), track.pageIndex)
 
@@ -670,11 +646,7 @@ func parseRawOggPages(t *testing.T, data []byte) []rawOggPage {
 			return nil
 		}
 
-		pages = append(pages, rawOggPage{
-			header:       header,
-			segmentTable: segmentTable,
-			payload:      data[payloadOffset:nextOffset],
-		})
+		pages = append(pages, rawOggPage{header: header, segmentTable: segmentTable, payload: data[payloadOffset:nextOffset]})
 		offset = nextOffset
 	}
 
@@ -928,10 +900,7 @@ func TestOggWriter_NewWriter(t *testing.T) {
 
 		headerType, ok := pageHeader.HeaderType(payload)
 		if ok {
-			pageOrder = append(pageOrder, pageOrderEntry{
-				kind:   string(headerType),
-				serial: pageHeader.Serial,
-			})
+			pageOrder = append(pageOrder, pageOrderEntry{kind: string(headerType), serial: pageHeader.Serial})
 
 			switch headerType {
 			case oggreader.HeaderOpusID:
@@ -946,10 +915,7 @@ func TestOggWriter_NewWriter(t *testing.T) {
 			continue
 		}
 
-		pageOrder = append(pageOrder, pageOrderEntry{
-			kind:   "audio",
-			serial: pageHeader.Serial,
-		})
+		pageOrder = append(pageOrder, pageOrderEntry{kind: "audio", serial: pageHeader.Serial})
 		audioSerials = append(audioSerials, pageHeader.Serial)
 		audioGranules = append(audioGranules, pageHeader.GranulePosition)
 	}
@@ -966,14 +932,8 @@ func TestOggWriter_NewWriter(t *testing.T) {
 	assert.Equal(t, []uint32{serial1, serial2}, opusTagsSerials)
 	assert.Equal(t, []uint32{serial1, serial2}, audioSerials)
 	assert.Equal(t, []uint64{960, 960}, audioGranules)
-	assert.Equal(t, map[uint32]uint32{
-		serial1: 48000,
-		serial2: 16000,
-	}, opusHeadSampleRates)
-	assert.Equal(t, map[uint32]uint8{
-		serial1: 1,
-		serial2: 2,
-	}, opusHeadChannelCounts)
+	assert.Equal(t, map[uint32]uint32{serial1: 48000, serial2: 16000}, opusHeadSampleRates)
+	assert.Equal(t, map[uint32]uint8{serial1: 1, serial2: 2}, opusHeadChannelCounts)
 }
 
 func TestOggWriter_NewWriterWritesOpusTags(t *testing.T) {
@@ -981,34 +941,15 @@ func TestOggWriter_NewWriterWritesOpusTags(t *testing.T) {
 	serial1 := uint32(0x01020304)
 	serial2 := uint32(0x05060708)
 
-	writer, err := NewWriter(
-		buffer,
-		WithVendor("pion-test-suite"),
-		WithUserComments(UserComment{Comment: "ENCODER", Value: "pion-oggwriter"}),
-	)
+	writer, err := NewWriter(buffer, WithVendor("pion-test-suite"), WithUserComments(UserComment{Comment: "ENCODER", Value: "pion-oggwriter"}))
 	assert.NoError(t, err)
 	assert.NotNil(t, writer)
 
-	track1, err := writer.NewTrack(
-		1111,
-		WithSerial(serial1),
-		WithUserComments(
-			UserComment{Comment: "ARTIST", Value: "Julia"},
-			UserComment{Comment: "TITLE", Value: "First Track"},
-		),
-	)
+	track1, err := writer.NewTrack(1111, WithSerial(serial1), WithUserComments(UserComment{Comment: "ARTIST", Value: "Julia"}, UserComment{Comment: "TITLE", Value: "First Track"}))
 	assert.NoError(t, err)
 	assert.NotNil(t, track1)
 
-	track2, err := writer.NewTrack(
-		2222,
-		WithSerial(serial2),
-		WithVendor("track-two-vendor"),
-		WithUserComments(
-			UserComment{Comment: "ARTIST", Value: "Jade Bob"},
-			UserComment{Comment: "ALBUM", Value: "Fanta"},
-		),
-	)
+	track2, err := writer.NewTrack(2222, WithSerial(serial2), WithVendor("track-two-vendor"), WithUserComments(UserComment{Comment: "ARTIST", Value: "Jade Bob"}, UserComment{Comment: "ALBUM", Value: "Fanta"}))
 	assert.NoError(t, err)
 	assert.NotNil(t, track2)
 
@@ -1021,18 +962,10 @@ func TestOggWriter_NewWriterWritesOpusTags(t *testing.T) {
 	}
 
 	assert.Equal(t, "pion-test-suite", tagsBySerial[serial1].Vendor)
-	assert.Equal(t, []oggreader.UserComment{
-		{Comment: "ENCODER", Value: "pion-oggwriter"},
-		{Comment: "ARTIST", Value: "Julia"},
-		{Comment: "TITLE", Value: "First Track"},
-	}, tagsBySerial[serial1].UserComments)
+	assert.Equal(t, []oggreader.UserComment{{Comment: "ENCODER", Value: "pion-oggwriter"}, {Comment: "ARTIST", Value: "Julia"}, {Comment: "TITLE", Value: "First Track"}}, tagsBySerial[serial1].UserComments)
 
 	assert.Equal(t, "track-two-vendor", tagsBySerial[serial2].Vendor)
-	assert.Equal(t, []oggreader.UserComment{
-		{Comment: "ENCODER", Value: "pion-oggwriter"},
-		{Comment: "ARTIST", Value: "Jade Bob"},
-		{Comment: "ALBUM", Value: "Fanta"},
-	}, tagsBySerial[serial2].UserComments)
+	assert.Equal(t, []oggreader.UserComment{{Comment: "ENCODER", Value: "pion-oggwriter"}, {Comment: "ARTIST", Value: "Jade Bob"}, {Comment: "ALBUM", Value: "Fanta"}}, tagsBySerial[serial2].UserComments)
 }
 
 func TestOggWriter_RejectsInvalidOpusTags(t *testing.T) {

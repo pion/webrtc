@@ -25,11 +25,7 @@ func TestNewSignalingState(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedState,
-			newSignalingState(testCase.stateString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedState, newSignalingState(testCase.stateString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -48,11 +44,7 @@ func TestSignalingState_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.state.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.state.String(), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -153,11 +145,7 @@ func TestSignalingState_Transitions(t *testing.T) {
 			assert.Error(t, err, "testCase: %d %s", i, tc.desc)
 		} else {
 			assert.NoError(t, err, "testCase: %d %s", i, tc.desc)
-			assert.Equal(t,
-				tc.next,
-				next,
-				"testCase: %d %s", i, tc.desc,
-			)
+			assert.Equal(t, tc.next, next, "testCase: %d %s", i, tc.desc)
 		}
 	}
 }

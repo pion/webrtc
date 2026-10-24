@@ -27,40 +27,22 @@ func TestSessionDescription_JSON(t *testing.T) {
 
 	for i, testCase := range testCases {
 		descData, err := json.Marshal(testCase.desc)
-		assert.Nil(t,
-			err,
-			"testCase: %d %v marshal err: %v", i, testCase, err,
-		)
+		assert.Nil(t, err, "testCase: %d %v marshal err: %v", i, testCase, err)
 
-		assert.Equal(t,
-			string(descData),
-			testCase.expectedString,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, string(descData), testCase.expectedString, "testCase: %d %v", i, testCase)
 
 		var desc SessionDescription
 		err = json.Unmarshal(descData, &desc)
 
 		if testCase.unmarshalErr != nil {
-			assert.Equal(t,
-				err,
-				testCase.unmarshalErr,
-				"testCase: %d %v", i, testCase,
-			)
+			assert.Equal(t, err, testCase.unmarshalErr, "testCase: %d %v", i, testCase)
 
 			continue
 		}
 
-		assert.Nil(t,
-			err,
-			"testCase: %d %v unmarshal err: %v", i, testCase, err,
-		)
+		assert.Nil(t, err, "testCase: %d %v unmarshal err: %v", i, testCase, err)
 
-		assert.Equal(t,
-			desc,
-			testCase.desc,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, desc, testCase.desc, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -98,19 +80,9 @@ func TestSessionDescription_UnmarshalError(t *testing.T) {
 }
 
 func TestHasICETrickleOption(t *testing.T) {
-	baseSession := strings.Join([]string{
-		"v=0",
-		"o=- 0 0 IN IP4 127.0.0.1",
-		"s=-",
-		"t=0 0",
-	}, "\r\n") + "\r\n"
+	baseSession := strings.Join([]string{"v=0", "o=- 0 0 IN IP4 127.0.0.1", "s=-", "t=0 0"}, "\r\n") + "\r\n"
 
-	baseMedia := strings.Join([]string{
-		"m=audio 9 UDP/TLS/RTP/SAVPF 111",
-		"c=IN IP4 0.0.0.0",
-		"a=mid:0",
-		"a=rtpmap:111 opus/48000/2",
-	}, "\r\n") + "\r\n"
+	baseMedia := strings.Join([]string{"m=audio 9 UDP/TLS/RTP/SAVPF 111", "c=IN IP4 0.0.0.0", "a=mid:0", "a=rtpmap:111 opus/48000/2"}, "\r\n") + "\r\n"
 
 	testCases := []struct {
 		name     string
