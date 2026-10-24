@@ -298,6 +298,8 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 
 			for _, peer := range []*PeerConnection{offer, answer} {
 				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, DTLSTransportStateNew, stats.DTLSState)
+				assert.Equal(t, ICETransportStateNew, stats.ICEState)
 				encoded, marshalErr := json.Marshal(stats)
 				require.NoError(t, marshalErr)
 				var fields map[string]json.RawMessage
