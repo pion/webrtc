@@ -487,7 +487,8 @@ m=video 9 UDP/TLS/RTP/SAVPF %s`, strings.Join(formats, " ")), "\n")
 			}
 			parsed, err := offer.Unmarshal()
 			require.NoError(t, err)
-			tr.setCodecPreferencesFromRemoteDescription(parsed.MediaDescriptions[0])
+			require.NoError(t, tr.setCodecPreferencesFromRemoteDescription(parsed.MediaDescriptions[0]))
+			require.NoError(t, tr.updateCodecPreferencesFromRemoteDescription(parsed.MediaDescriptions[0]))
 			got := tr.getCodecs()
 			require.Len(t, got, len(tc.want))
 			for i, payload := range tc.want {
