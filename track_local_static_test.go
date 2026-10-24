@@ -6,8 +6,10 @@
 package webrtc
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync/atomic"
 	"testing"
@@ -15,11 +17,59 @@ import (
 
 	"github.com/pion/interceptor"
 	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestTrackLocalStaticSample_H266(t *testing.T) {
+	for _, mimeType := range []string{MimeTypeH266, "video/h266"} {
+		for _, size := range []int{32, 4000} {
+			t.Run(fmt.Sprintf("%s/%d", mimeType, size), func(t *testing.T) {
+				capability := RTPCodecCapability{MimeType: mimeType, ClockRate: 90000}
+				track, err := NewTrackLocalStaticSample(capability, "video", "pion")
+				require.NoError(t, err)
+
+				var packets []*rtp.Packet
+				writer := &interceptorToTrackLocalWriter{}
+				writer.interceptor.Store(interceptor.RTPWriterFunc(func(header *rtp.Header, payload []byte, _ interceptor.Attributes) (int, error) {
+					packet := &rtp.Packet{Header: *header, Payload: payload}
+					packets = append(packets, packet.Clone())
+
+					return len(payload), nil
+				}))
+				ctx := &baseTrackLocalContext{
+					id: "h266", ssrc: 1234, writeStream: writer,
+					params: RTPParameters{Codecs: []RTPCodecParameters{{RTPCodecCapability: capability, PayloadType: 98}}},
+				}
+				_, err = track.Bind(ctx)
+				require.NoError(t, err)
+				t.Cleanup(func() { assert.NoError(t, track.Unbind(ctx)) })
+
+				data := append([]byte{0, 0, 0, 1, 0, 1}, bytes.Repeat([]byte{0x42}, size)...)
+				require.NoError(t, track.WriteSample(media.Sample{Data: data, Duration: time.Second / 30}))
+				require.NotEmpty(t, packets)
+				if size > int(outboundMTU) {
+					require.Greater(t, len(packets), 1)
+				}
+				depacketizer := &codecs.H266Depacketizer{}
+				var decoded []byte
+				for i, packet := range packets {
+					assert.Equal(t, uint32(1234), packet.SSRC)
+					assert.Equal(t, uint8(98), packet.PayloadType)
+					assert.LessOrEqual(t, packet.MarshalSize(), int(outboundMTU))
+					assert.Equal(t, i == len(packets)-1, packet.Marker)
+					payload, decodeErr := depacketizer.Unmarshal(packet.Payload)
+					require.NoError(t, decodeErr)
+					decoded = append(decoded, payload...)
+				}
+				assert.Equal(t, data, decoded)
+			})
+		}
+	}
+}
 
 // If a remote doesn't support a Codec used by a `TrackLocalStatic`
 // an error should be returned to the user.
