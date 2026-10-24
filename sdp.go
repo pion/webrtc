@@ -318,13 +318,9 @@ func addCandidatesToMediaDescriptions(
 	if iceGatheringState != ICEGatheringStateComplete {
 		return nil
 	}
-	for _, a := range mediaDescr.Attributes {
-		if a.Key == "end-of-candidates" {
-			return nil
-		}
+	if _, ok := mediaDescr.Attribute(sdp.AttrKeyEndOfCandidates); !ok {
+		mediaDescr.WithPropertyAttribute(sdp.AttrKeyEndOfCandidates)
 	}
-
-	mediaDescr.WithPropertyAttribute("end-of-candidates")
 
 	return nil
 }
