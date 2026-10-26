@@ -53,12 +53,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		assert.NoError(t, err)
 
 		mediaEngine := &MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeType: "video/VP9", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil,
-			},
-			PayloadType: 96,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP9", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo))
 
 		vp9OnlyPC, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
@@ -78,9 +73,7 @@ func Test_TrackLocalStatic_NoCodecIntersection(t *testing.T) {
 		offerer, answerer, err := newPair()
 		assert.NoError(t, err)
 
-		invalidCodecTrack, err := NewTrackLocalStaticSample(
-			RTPCodecCapability{MimeType: "video/invalid-codec"}, "video", "pion",
-		)
+		invalidCodecTrack, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: "video/invalid-codec"}, "video", "pion")
 		assert.NoError(t, err)
 
 		_, err = offerer.AddTrack(invalidCodecTrack)
@@ -130,28 +123,10 @@ func Test_TrackLocalStatic_PayloadType(t *testing.T) {
 	defer report()
 
 	mediaEngineOne := &MediaEngine{}
-	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 100,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 100}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
-	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 200,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 200}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -308,28 +283,10 @@ func (p *TestPacketizer) GeneratePadding(samples uint32) []*rtp.Packet {
 
 func Test_TrackLocalStatic_Padding(t *testing.T) {
 	mediaEngineOne := &MediaEngine{}
-	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 100,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 100}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
-	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 200,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 200}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -423,16 +380,7 @@ func Test_TrackLocalStatic_Payloader(t *testing.T) {
 	const mimeTypeCustomCodec = "video/custom-codec"
 
 	mediaEngine := &MediaEngine{}
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     mimeTypeCustomCodec,
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 96,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: mimeTypeCustomCodec, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo))
 
 	offerer, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -478,12 +426,7 @@ func Test_TrackLocalStatic_Timestamp(t *testing.T) {
 	defer report()
 
 	initialTimestamp := uint32(12345)
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-		WithRTPTimestamp(initialTimestamp),
-	)
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPTimestamp(initialTimestamp))
 	assert.NoError(t, err)
 
 	pcOffer, pcAnswer, err := newPair()
@@ -519,12 +462,7 @@ func Test_TrackLocalStatic_SequenceNumber(t *testing.T) {
 	defer report()
 
 	initialSeqNumber := uint16(12345)
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-		WithRTPSequenceNumber(initialSeqNumber),
-	)
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPSequenceNumber(initialSeqNumber))
 	assert.NoError(t, err)
 
 	pcOffer, pcAnswer, err := newPair()
@@ -579,11 +517,7 @@ func (d dummyTrackLocalContext) CodecParameters() []RTPCodecParameters {
 }
 
 func Test_TrackLocalStaticRTP_Unbind_ErrUnbindFailed(t *testing.T) {
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-	)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	require.NoError(t, err)
 
 	ctx := dummyTrackLocalContext{id: "nonexistent-id"}
@@ -593,11 +527,7 @@ func Test_TrackLocalStaticRTP_Unbind_ErrUnbindFailed(t *testing.T) {
 }
 
 func Test_TrackLocalStaticRTP_Kind_Default(t *testing.T) {
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: "application/unknown"},
-		"id",
-		"stream",
-	)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: "application/unknown"}, "id", "stream")
 	require.NoError(t, err)
 
 	require.Equal(t, RTPCodecType(0), track.Kind())
@@ -627,11 +557,7 @@ func (errWriter) WriteRTP(_ *rtp.Header, _ []byte) (int, error) { return 0, errW
 func (errWriter) Write(_ []byte) (int, error)                   { return 0, nil }
 
 func Test_TrackLocalStaticRTP_writeRTP_ReturnsError(t *testing.T) {
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"id",
-		"stream",
-	)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "id", "stream")
 	require.NoError(t, err)
 
 	track.mu.Lock()
@@ -651,11 +577,7 @@ func Test_TrackLocalStaticRTP_writeRTP_ReturnsError(t *testing.T) {
 }
 
 func Test_TrackLocalStaticRTP_Write_UnmarshalError(t *testing.T) {
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"id",
-		"stream",
-	)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "id", "stream")
 	require.NoError(t, err)
 
 	n, werr := track.Write([]byte{0x80}) // < 12-byte RTP header
@@ -682,11 +604,7 @@ func Test_TrackLocalStaticSample_Codec_ReturnsConfiguredCodec(t *testing.T) {
 var errPayloaderBoom = errors.New("payloader boom")
 
 func Test_TrackLocalStaticSample_Bind_PayloaderError(t *testing.T) {
-	sample, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
-		"video",
-		"pion",
-	)
+	sample, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, "video", "pion")
 	require.NoError(t, err)
 
 	sample.rtpTrack.mu.Lock()
@@ -728,11 +646,7 @@ func (f *fakePacketizer) Packetize(_ []byte, _ uint32) []*rtp.Packet {
 }
 
 func Test_TrackLocalStaticSample_WriteSample_AppendErrors(t *testing.T) {
-	testSample, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-	)
+	testSample, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	require.NoError(t, err)
 
 	testSample.rtpTrack.mu.Lock()
@@ -769,11 +683,7 @@ func Test_TrackLocalStaticSample_WriteSample_AppendErrors(t *testing.T) {
 }
 
 func Test_TrackLocalStaticSample_GeneratePadding_PacketizerNil_ReturnsNil(t *testing.T) {
-	s, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-	)
+	s, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	require.NoError(t, err)
 
 	err = s.GeneratePadding(10)
@@ -781,11 +691,7 @@ func Test_TrackLocalStaticSample_GeneratePadding_PacketizerNil_ReturnsNil(t *tes
 }
 
 func Test_TrackLocalStaticSample_GeneratePadding_AppendsAndReturnsError(t *testing.T) {
-	testSample, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video",
-		"pion",
-	)
+	testSample, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	require.NoError(t, err)
 
 	testSample.rtpTrack.mu.Lock()
@@ -827,10 +733,7 @@ func Test_TrackRemote_Msid(t *testing.T) {
 }
 
 func Test_TrackRemote_checkAndUpdateTrack_ShortPacket(t *testing.T) {
-	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", &RTPReceiver{
-		api:  &API{mediaEngine: &MediaEngine{}},
-		kind: RTPCodecTypeVideo,
-	})
+	tr := newTrackRemote(RTPCodecTypeVideo, 0, 0, "", &RTPReceiver{api: &API{mediaEngine: &MediaEngine{}}, kind: RTPCodecTypeVideo})
 
 	err := tr.checkAndUpdateTrack([]byte{0x80})
 	require.ErrorIs(t, err, errRTPTooShort)
@@ -851,13 +754,7 @@ func Test_TrackRemote_checkAndUpdateTrack_CodecNotFound(t *testing.T) {
 
 func Test_TrackRemote_ReadRTP_UnmarshalError(t *testing.T) {
 	me := &MediaEngine{}
-	require.NoError(t, me.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:  MimeTypeVP8,
-			ClockRate: 90000,
-		},
-		PayloadType: 96,
-	}, RTPCodecTypeVideo))
+	require.NoError(t, me.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, PayloadType: 96}, RTPCodecTypeVideo))
 
 	api := &API{
 		mediaEngine:   me,
@@ -911,10 +808,7 @@ func TestTrackLocalStaticSample_WriteSample_NoTimestampDrift(t *testing.T) {
 	totalDuration := time.Hour
 	numFrames := int(totalDuration / frameDuration)
 
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: clockRate},
-		"video", "pion",
-	)
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: clockRate}, "video", "pion")
 	assert.NoError(t, err)
 
 	pack := &countingPacketizer{}
@@ -926,10 +820,7 @@ func TestTrackLocalStaticSample_WriteSample_NoTimestampDrift(t *testing.T) {
 	track.rtpTrack.mu.Unlock()
 
 	for range numFrames {
-		err := track.WriteSample(media.Sample{
-			Data:     []byte{0x00},
-			Duration: frameDuration,
-		})
+		err := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: frameDuration})
 		assert.NoError(t, err)
 	}
 
@@ -943,9 +834,7 @@ func TestTrackLocalStaticSample_WriteSample_NoTimestampDrift(t *testing.T) {
 		drift = expected - got
 	}
 
-	t.Logf("frames=%d frameDuration=%s expectedTicks=%d gotTicks=%d driftTicks=%d driftSeconds=%.6f",
-		numFrames, frameDuration, expected, got, drift, float64(drift)/float64(clockRate),
-	)
+	t.Logf("frames=%d frameDuration=%s expectedTicks=%d gotTicks=%d driftTicks=%d driftSeconds=%.6f", numFrames, frameDuration, expected, got, drift, float64(drift)/float64(clockRate))
 
 	assert.LessOrEqual(t, drift, uint64(1), "timestamp drift should be negligible")
 }
@@ -957,10 +846,7 @@ func TestTrackLocalStaticSample_WriteSample_DroppedPackets_NoDrift(t *testing.T)
 	numFrames := int(totalDuration / frameDuration)
 	tickF := frameDuration.Seconds() * float64(clockRate)
 
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: clockRate},
-		"video", "pion",
-	)
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: clockRate}, "video", "pion")
 	assert.NoError(t, err)
 
 	pack := &countingPacketizer{}
@@ -992,11 +878,7 @@ func TestTrackLocalStaticSample_WriteSample_DroppedPackets_NoDrift(t *testing.T)
 		remainder = curTotal - float64(curTicks)
 		expectedTotal += uint64(curTicks)
 
-		err := track.WriteSample(media.Sample{
-			Data:               []byte{0x00},
-			Duration:           frameDuration,
-			PrevDroppedPackets: drops,
-		})
+		err := track.WriteSample(media.Sample{Data: []byte{0x00}, Duration: frameDuration, PrevDroppedPackets: drops})
 		assert.NoError(t, err)
 	}
 
@@ -1009,9 +891,7 @@ func TestTrackLocalStaticSample_WriteSample_DroppedPackets_NoDrift(t *testing.T)
 		drift = expectedTotal - got
 	}
 
-	t.Logf("frames=%d frameDuration=%s expectedTicks=%d gotTicks=%d driftTicks=%d driftSeconds=%.6f",
-		numFrames, frameDuration, expectedTotal, got, drift, float64(drift)/float64(clockRate),
-	)
+	t.Logf("frames=%d frameDuration=%s expectedTicks=%d gotTicks=%d driftTicks=%d driftSeconds=%.6f", numFrames, frameDuration, expectedTotal, got, drift, float64(drift)/float64(clockRate))
 
 	assert.LessOrEqual(t, drift, uint64(1), "timestamp drift with drops should be negligible")
 }

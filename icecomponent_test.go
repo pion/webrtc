@@ -20,11 +20,7 @@ func TestICEComponent(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			newICEComponent(testCase.componentString),
-			testCase.expectedComponent,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, newICEComponent(testCase.componentString), testCase.expectedComponent, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -39,10 +35,6 @@ func TestICEComponent_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.state.String(),
-			testCase.expectedString,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.state.String(), testCase.expectedString, "testCase: %d %v", i, testCase)
 	}
 }

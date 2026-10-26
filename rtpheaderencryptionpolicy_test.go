@@ -27,11 +27,7 @@ func TestNewRTPHeaderEncryptionPolicy(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "testCase: %d %v", i, testCase)
 		}
-		assert.Equal(t,
-			testCase.expectedPolicy,
-			pol,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedPolicy, pol, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -47,11 +43,7 @@ func TestRTPHeaderEncryptionPolicy_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.policy.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.policy.String(), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -73,11 +65,7 @@ func TestRTPHeaderEncryptionPolicy_MarshalUnmarshal(t *testing.T) {
 			assert.Error(t, err, "testCase: %d %v", i, testCase)
 		} else {
 			assert.NoError(t, err, "testCase: %d %v", i, testCase)
-			assert.Equal(t,
-				testCase,
-				policy,
-				"testCase: %d %v", i, testCase,
-			)
+			assert.Equal(t, testCase, policy, "testCase: %d %v", i, testCase)
 		}
 	}
 }

@@ -106,6 +106,7 @@ type SettingEngine struct {
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
+	iceUDPMuxSrflx                            ice.UniversalUDPMux
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
 	iceUseCandidateCheckPriority              bool
@@ -217,10 +218,11 @@ func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }
 
-// EnableDataChannelBlockWrite allows data channels to block on write,
-// it only works if DetachDataChannels is enabled.
-func (e *SettingEngine) EnableDataChannelBlockWrite(nonblockWrite bool) {
-	e.dataChannelBlockWrite = nonblockWrite
+// EnableDataChannelBlockWrite allows data channels to block on write.
+// Blocking writes may be interrupted with DataChannel.SetWriteDeadline
+// or the SetWriteDeadline method on a detached data channel.
+func (e *SettingEngine) EnableDataChannelBlockWrite(blockWrite bool) {
+	e.dataChannelBlockWrite = blockWrite
 }
 
 // SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
@@ -478,6 +480,15 @@ func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
 // UDPMux should be started prior to creating PeerConnections.
 func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
 	e.iceUDPMux = udpMux
+}
+
+// SetICEUDPMuxSrflx allows ICE traffic from server reflexive candidates to be
+// multiplexed onto a single UDP port. This enables STUN binding requests, used
+// to gather server reflexive candidates, to share the same port as host
+// candidates instead of allocating an additional port per PeerConnection.
+// The mux should be started prior to creating PeerConnections.
+func (e *SettingEngine) SetICEUDPMuxSrflx(udpMuxSrflx ice.UniversalUDPMux) {
+	e.iceUDPMuxSrflx = udpMuxSrflx
 }
 
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.

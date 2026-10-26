@@ -217,7 +217,7 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 		opts = append(opts, sctp.WithEnableZeroChecksum(true))
 	}
 
-	if r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite {
+	if r.api.settingEngine.dataChannelBlockWrite {
 		opts = append(opts, sctp.WithBlockWrite(true))
 	}
 
@@ -494,9 +494,10 @@ func (r *SCTPTransport) Metadata() (SCTPTransportMetadata, bool) {
 // Stats reports the current statistics of the SCTPTransport.
 func (r *SCTPTransport) Stats() SCTPTransportStats {
 	stats := SCTPTransportStats{
-		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeSCTPTransport,
-		ID:        "sctpTransport",
+		Timestamp:   statsTimestampFrom(time.Now()),
+		Type:        StatsTypeSCTPTransport,
+		ID:          "sctpTransport",
+		TransportID: r.Transport().statsID,
 	}
 
 	association := r.association()

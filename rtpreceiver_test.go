@@ -111,19 +111,7 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, dtlsTransport)
 	require.NoError(t, err)
 
-	receiver.configureReceive(RTPReceiveParameters{
-		Encodings: []RTPDecodingParameters{
-			{
-				RTPCodingParameters: RTPCodingParameters{
-					RID:  "rid",
-					SSRC: 1111,
-					RTX: RTPRtxParameters{
-						SSRC: 2222,
-					},
-				},
-			},
-		},
-	})
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{RID: "rid", SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}}}}})
 
 	close(receiver.received)
 	track := receiver.Track()
@@ -187,12 +175,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		closedChan: make(chan struct{}),
 	}
 
-	receiver.configureReceive(RTPReceiveParameters{
-		Encodings: []RTPDecodingParameters{
-			{RTPCodingParameters: RTPCodingParameters{RID: "low", SSRC: 1111}},
-			{RTPCodingParameters: RTPCodingParameters{RID: "high", SSRC: 2222}},
-		},
-	})
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{RID: "low", SSRC: 1111}}, {RTPCodingParameters: RTPCodingParameters{RID: "high", SSRC: 2222}}}})
 
 	params := RTPParameters{
 		Codecs: []RTPCodecParameters{
@@ -203,16 +186,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 		},
 	}
 
-	lowPkt, err := rtp.Packet{
-		Header: rtp.Header{
-			Version:        2,
-			PayloadType:    96,
-			SequenceNumber: 1,
-			Timestamp:      1,
-			SSRC:           1111,
-		},
-		Payload: []byte{0x01},
-	}.Marshal()
+	lowPkt, err := rtp.Packet{Header: rtp.Header{Version: 2, PayloadType: 96, SequenceNumber: 1, Timestamp: 1, SSRC: 1111}, Payload: []byte{0x01}}.Marshal()
 	require.NoError(t, err)
 
 	lowCh := make(chan []byte, 10)
@@ -228,10 +202,7 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 			return n, a, nil
 		},
 	)
-	lowTrack, err := receiver.receiveForRid(
-		"low", params, &interceptor.StreamInfo{SSRC: 1111},
-		&streamsForSSRCResult{rtpInterceptor: lowInterceptor}, nil,
-	)
+	lowTrack, err := receiver.receiveForRid("low", params, &interceptor.StreamInfo{SSRC: 1111}, &streamsForSSRCResult{rtpInterceptor: lowInterceptor}, nil)
 	require.NoError(t, err)
 	lowTrack.mu.Lock()
 	lowTrack.payloadType = 96
@@ -257,20 +228,14 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 			return 0, a, io.EOF
 		},
 	)
-	require.NoError(t, receiver.receiveForRtx(
-		SSRC(0), "low", repairStreamInfo,
-		&streamsForSSRCResult{rtpInterceptor: repairInterceptor},
-	))
+	require.NoError(t, receiver.receiveForRtx(SSRC(0), "low", repairStreamInfo, &streamsForSSRCResult{rtpInterceptor: repairInterceptor}))
 
 	highInterceptor := interceptor.RTPReaderFunc(
 		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 			return 0, a, io.EOF
 		},
 	)
-	_, err = receiver.receiveForRid(
-		"high", params, &interceptor.StreamInfo{SSRC: 2222},
-		&streamsForSSRCResult{rtpInterceptor: highInterceptor}, nil,
-	)
+	_, err = receiver.receiveForRid("high", params, &interceptor.StreamInfo{SSRC: 2222}, &streamsForSSRCResult{rtpInterceptor: highInterceptor}, nil)
 	require.NoError(t, err)
 	receiver.tracks[1].track.mu.Lock()
 	receiver.tracks[1].track.payloadType = 96
@@ -317,8 +282,9 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 
 	// Minimal RTPReceiver with one track
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeVideo,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeVideo,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 	tr := newTrackRemote(RTPCodecTypeVideo, ssrc, 0, "", receiver)
 	receiver.tracks = []trackStreams{{track: tr}}
@@ -354,8 +320,9 @@ func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutPull(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	track := newTrackRemote(RTPCodecTypeAudio, 7777, 0, "", receiver)
@@ -393,8 +360,9 @@ func TestRTPReceiver_CollectStats_AudioPlayoutPull(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutSharedProvider(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	trackOne := newTrackRemote(RTPCodecTypeAudio, 5555, 0, "", receiver)
@@ -433,8 +401,9 @@ func TestRTPReceiver_CollectStats_AudioPlayoutSharedProvider(t *testing.T) {
 
 func TestRTPReceiver_CollectStats_AudioPlayoutTimestampAlignment(t *testing.T) {
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeAudio,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeAudio,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	track := newTrackRemote(RTPCodecTypeAudio, 9999, 0, "", receiver)
@@ -531,18 +500,11 @@ func TestRTPReceiverRTXStreamInfoMimeType(t *testing.T) {
 				NewInterceptorFn: func(_ string) (interceptor.Interceptor, error) { return mockInterceptor, nil },
 			})
 
-			sender, receiver, err := NewAPI(
-				WithMediaEngine(mediaEngine),
-				WithInterceptorRegistry(ir),
-			).newPair(Configuration{})
+			sender, receiver, err := NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(ir)).newPair(Configuration{})
 			require.NoError(t, err)
 			defer closePairNow(t, sender, receiver)
 
-			track, err := NewTrackLocalStaticSample(
-				RTPCodecCapability{MimeType: MimeTypeVP8},
-				"video",
-				"pion",
-			)
+			track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 			require.NoError(t, err)
 
 			_, err = sender.AddTrack(track)
@@ -577,9 +539,7 @@ func TestRTPReceiverRTXStreamInfoMimeType(t *testing.T) {
 					rtxCount++
 				}
 			}
-			assert.Equal(t, 1, rtxCount,
-				"expected exactly one RTX StreamInfo with MimeType %q, got %d (all types: %v)",
-				MimeTypeRTX, rtxCount, mimeTypes(boundStreamInfos))
+			assert.Equal(t, 1, rtxCount, "expected exactly one RTX StreamInfo with MimeType %q, got %d (all types: %v)", MimeTypeRTX, rtxCount, mimeTypes(boundStreamInfos))
 			rtpReceiver := <-rtpReceiverReceived
 			rtpReceiver.mu.RLock()
 			require.Len(t, rtpReceiver.tracks, 1)
@@ -607,8 +567,9 @@ func TestRTPReceiver_CollectStats_RID(t *testing.T) {
 	fg := &fakeGetter{s: stats.Stats{}}
 
 	receiver := &RTPReceiver{
-		kind: RTPCodecTypeVideo,
-		log:  logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
+		transport: &DTLSTransport{statsID: t.Name()},
+		kind:      RTPCodecTypeVideo,
+		log:       logging.NewDefaultLoggerFactory().NewLogger("RTPReceiverTest"),
 	}
 
 	// Case 1: RID empty
@@ -650,9 +611,7 @@ func TestRTPReceiverRTXMalformedPacketNoPanic(t *testing.T) {
 	api := NewAPI()
 	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, &DTLSTransport{api: api})
 	require.NoError(t, err)
-	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{
-		RTPCodingParameters: RTPCodingParameters{SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}},
-	}}})
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}}}}})
 	track := receiver.Track()
 	close(receiver.received)
 	t.Cleanup(func() { assert.NoError(t, receiver.Stop()) })
@@ -729,9 +688,7 @@ func newRTXReadTestReceiver(t *testing.T, api *API) (*RTPReceiver, func(*rtp.Pac
 	transport.srtcpSession.Store(rtcpSession)
 	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, transport)
 	require.NoError(t, err)
-	require.NoError(t, receiver.Receive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{
-		RTPCodingParameters: RTPCodingParameters{SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}},
-	}}}))
+	require.NoError(t, receiver.Receive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{SSRC: 1111, RTX: RTPRtxParameters{SSRC: 2222}}}}}))
 	t.Cleanup(func() { assert.NoError(t, receiver.Stop()) })
 	require.NoError(t, receiver.Track().SetReadDeadline(time.Now().Add(time.Second)))
 	encrypt, err := srtp.CreateContext(key, salt, config.Profile)
@@ -775,9 +732,7 @@ func TestRTPReceiverReadPullsRTXProbeThroughTWCC(t *testing.T) {
 	api := NewAPI(WithInterceptorRegistry(registry))
 	api.interceptor, err = registry.Build("")
 	require.NoError(t, err)
-	require.NoError(t, api.mediaEngine.RegisterHeaderExtension(
-		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
-	))
+	require.NoError(t, api.mediaEngine.RegisterHeaderExtension(RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo))
 	feedback := make(chan *rtcp.TransportLayerCC, 1)
 	api.interceptor.BindRTCPWriter(interceptor.RTCPWriterFunc(func(packets []rtcp.Packet, _ interceptor.Attributes) (int, error) {
 		for _, packet := range packets {

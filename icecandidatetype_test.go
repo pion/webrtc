@@ -29,11 +29,7 @@ func TestICECandidateType(t *testing.T) {
 		} else {
 			assert.NoError(t, err, "testCase: %d %v", i, testCase)
 		}
-		assert.Equal(t,
-			testCase.expectedType,
-			actual,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedType, actual, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -50,10 +46,6 @@ func TestICECandidateType_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.cType.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.cType.String(), "testCase: %d %v", i, testCase)
 	}
 }

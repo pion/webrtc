@@ -59,9 +59,11 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
+	mediaEngineFmtp := parseCodecFMTPs(mediaEngineCodecs)
 	for _, codec := range codecs {
-		if _, matchType := codecParametersFuzzySearch(
-			codec, t.api.mediaEngine.getCodecsByKind(t.kind),
+		if _, matchType := codecParametersFuzzySearchParsed(
+			codec, mediaEngineCodecs, mediaEngineFmtp,
 		); matchType == codecMatchNone {
 			return fmt.Errorf("%w %s", errRTPTransceiverCodecUnsupported, codec.MimeType)
 		}
@@ -83,8 +85,11 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	}
 
 	filteredCodecs := []RTPCodecParameters{}
+	mediaEngineFmtp := parseCodecFMTPs(mediaEngineCodecs)
 	for _, codec := range t.codecs {
-		if c, matchType := codecParametersFuzzySearch(codec, mediaEngineCodecs); matchType != codecMatchNone {
+		if c, matchType := codecParametersFuzzySearchParsed(
+			codec, mediaEngineCodecs, mediaEngineFmtp,
+		); matchType != codecMatchNone {
 			if codec.PayloadType == 0 {
 				codec.PayloadType = c.PayloadType
 			}
@@ -146,7 +151,7 @@ func addREDCodecsInRemoteOrder(
 
 // match codecs from remote description, used when remote is offerer and creating a transceiver
 // from remote description with the aim of keeping order of codecs in remote description.
-func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop,gocognit
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
 	remoteCodecs, err := codecsFromMediaDescription(media)
 	if err != nil {
 		return

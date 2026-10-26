@@ -58,10 +58,7 @@ func TestGenerateDataChannelID(t *testing.T) {
 		err := testCase.s.generateAndSetDataChannelID(testCase.role, &idPtr)
 		assert.NoError(t, err, "failed to generate data channel id")
 		assert.Equal(t, testCase.result, *idPtr)
-		assert.Contains(
-			t, testCase.s.dataChannelIDsUsed, *idPtr,
-			"expected new id to be added to the map",
-		)
+		assert.Contains(t, testCase.s.dataChannelIDsUsed, *idPtr, "expected new id to be added to the map")
 	}
 }
 
@@ -204,19 +201,9 @@ func TestSCTPTransportMetadataNotReady(t *testing.T) {
 }
 
 func TestNewSCTPTransportMetadata(t *testing.T) {
-	metadata := newSCTPTransportMetadata(sctp.AssociationMetadata{
-		MessageInterleavingEnabled:   true,
-		PartialReliabilityMode:       sctp.PartialReliabilityModeIForwardTSN,
-		ZeroChecksumSendingEnabled:   true,
-		ZeroChecksumReceivingEnabled: true,
-	})
+	metadata := newSCTPTransportMetadata(sctp.AssociationMetadata{MessageInterleavingEnabled: true, PartialReliabilityMode: sctp.PartialReliabilityModeIForwardTSN, ZeroChecksumSendingEnabled: true, ZeroChecksumReceivingEnabled: true})
 
-	assert.Equal(t, SCTPTransportMetadata{
-		MessageInterleavingEnabled:   true,
-		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
-		ZeroChecksumSendingEnabled:   true,
-		ZeroChecksumReceivingEnabled: true,
-	}, metadata)
+	assert.Equal(t, SCTPTransportMetadata{MessageInterleavingEnabled: true, PartialReliabilityMode: SCTPTransportPartialReliabilityModeIForwardTSN, ZeroChecksumSendingEnabled: true, ZeroChecksumReceivingEnabled: true}, metadata)
 }
 
 func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
@@ -252,7 +239,6 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 		{
 			name: "BlockWrite",
 			configure: func(se *SettingEngine) {
-				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 			},
 			wantExtra: 1,
@@ -290,7 +276,6 @@ func TestSCTPTransport_sctpClientOptions_IncludesOptionalOptions(t *testing.T) {
 			configure: func(se *SettingEngine) {
 				se.sctp.maxReceiveBufferSize = 1024
 				se.sctp.enableZeroChecksum = true
-				se.detach.DataChannels = true
 				se.dataChannelBlockWrite = true
 				se.sctp.rtoMax = time.Second
 				se.sctp.minCwnd = 11
@@ -336,10 +321,7 @@ func TestSCTPTransportOnClose(t *testing.T) {
 			dc, createErr := offerPC.CreateDataChannel(expectedLabel, nil)
 			assert.NoError(t, createErr, "Failed to create a PC pair for testing")
 			dc.OnMessage(func(msg DataChannelMessage) {
-				assert.Equal(
-					t, []byte("hello"), msg.Data,
-					"invalid msg received",
-				)
+				assert.Equal(t, []byte("hello"), msg.Data, "invalid msg received")
 				recvMsg <- struct{}{}
 			})
 			dc.OnOpen(func() {
@@ -463,10 +445,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			negotiated := true
 			id := uint16(0)
 			readDetach := make(chan struct{})
-			dc1, err := offerPC.CreateDataChannel("", &DataChannelInit{
-				Negotiated: &negotiated,
-				ID:         &id,
-			})
+			dc1, err := offerPC.CreateDataChannel("", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 			assert.NoError(t, err)
 
 			dc1.OnOpen(func() {
@@ -475,10 +454,7 @@ func TestSCTPTransportOutOfBandNegotiatedDataChannelDetach(t *testing.T) { //nol
 			})
 
 			writeDetach := make(chan struct{})
-			dc2, err := answerPC.CreateDataChannel("", &DataChannelInit{
-				Negotiated: &negotiated,
-				ID:         &id,
-			})
+			dc2, err := answerPC.CreateDataChannel("", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 			assert.NoError(t, err)
 
 			dc2.OnOpen(func() {

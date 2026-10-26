@@ -65,6 +65,10 @@ func RegisterDefaultInterceptorsWithOptions(mediaEngine *MediaEngine, intercepto
 		options.twccOptions = append(options.twccOptions, twcc.WithLoggerFactory(options.loggerFactory))
 	}
 
+	if err := ConfigureStatsInterceptorWithOptions(interceptorRegistry, options.statsOptions...); err != nil {
+		return err
+	}
+
 	if err := ConfigureNackWithOptions(mediaEngine, interceptorRegistry, options.nackGeneratorOptions,
 		options.nackResponderOptions...); err != nil {
 		return err
@@ -76,10 +80,6 @@ func RegisterDefaultInterceptorsWithOptions(mediaEngine *MediaEngine, intercepto
 	}
 
 	if err := ConfigureSimulcastExtensionHeaders(mediaEngine); err != nil {
-		return err
-	}
-
-	if err := ConfigureStatsInterceptorWithOptions(interceptorRegistry, options.statsOptions...); err != nil {
 		return err
 	}
 

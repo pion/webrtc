@@ -8,6 +8,8 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	"github.com/pion/ice/v5"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestICETransport_StartContextClosesOnCancel(t *testing.T) {
@@ -114,13 +117,95 @@ func TestICETransport_StartContextStopDoesNotReportCallerCancel(t *testing.T) {
 	case err = <-errCh:
 		assert.Error(t, err)
 		assert.NotErrorIs(t, err, context.Canceled)
-		assert.True(t,
-			errors.Is(err, ice.ErrCanceledByCaller) || errors.Is(err, ice.ErrClosed),
-			"expected ICE shutdown error, got %v",
-			err,
-		)
+		assert.True(t, errors.Is(err, ice.ErrCanceledByCaller) || errors.Is(err, ice.ErrClosed), "expected ICE shutdown error, got %v", err)
 	case <-time.After(time.Second):
 		assert.FailNow(t, "StartContext did not return after Stop")
+	}
+}
+
+func TestICETransport_StopDuringStart(t *testing.T) {
+	for _, roles := range [][2]ICERole{
+		{ICERoleControlling, ICERoleControlled},
+		{ICERoleControlled, ICERoleControlling},
+	} {
+		t.Run(roles[0].String(), func(t *testing.T) {
+			lim := test.TimeOut(30 * time.Second)
+			defer lim.Stop()
+			report := test.CheckRoutines(t)
+
+			settings := SettingEngine{}
+			settings.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+			settings.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+			api := NewAPI(WithSettingEngine(settings))
+
+			var (
+				transports [2]*ICETransport
+				candidates [2][]ICECandidate
+				parameters [2]ICEParameters
+			)
+			for i := range transports {
+				gatherer, err := api.NewICEGatherer(ICEGatherOptions{})
+				require.NoError(t, err)
+				transports[i] = api.NewICETransport(gatherer)
+				t.Cleanup(func() { assert.NoError(t, transports[i].Stop()) })
+				gatherer.OnStateChange(func(state ICEGathererState) {
+					if state == ICEGathererStateClosed {
+						assert.Error(t, transports[i].Start(nil, ICEParameters{}, nil))
+					}
+				})
+
+				gathered := make(chan struct{})
+				gatherer.OnLocalCandidate(func(candidate *ICECandidate) {
+					if candidate == nil {
+						close(gathered)
+					}
+				})
+				require.NoError(t, gatherer.Gather())
+				<-gathered
+				candidates[i], err = gatherer.GetLocalCandidates()
+				require.NoError(t, err)
+				require.NotEmpty(t, candidates[i])
+				parameters[i], err = gatherer.GetLocalParameters()
+				require.NoError(t, err)
+			}
+			require.NoError(t, transports[0].SetRemoteCandidates(candidates[1]))
+			require.NoError(t, transports[1].SetRemoteCandidates(candidates[0]))
+
+			stopped := make(chan error, 1)
+			transports[0].OnConnectionStateChange(func(state ICETransportState) {
+				if state == ICETransportStateConnected {
+					stopped <- transports[0].Stop()
+				}
+			})
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			localResult, remoteResult := make(chan error, 1), make(chan error, 1)
+			go func() { localResult <- transports[0].StartContext(ctx, nil, parameters[1], &roles[0]) }()
+			go func() { remoteResult <- transports[1].StartContext(ctx, nil, parameters[0], &roles[1]) }()
+
+			select {
+			case err := <-stopped:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				require.FailNow(t, "Stop did not return from the Connected callback")
+			}
+			require.NoError(t, transports[1].Stop())
+			for _, result := range []chan error{localResult, remoteResult} {
+				assert.Contains(t, []error{nil, errICETransportClosed, ice.ErrClosed, ice.ErrCanceledByCaller}, <-result)
+			}
+
+			// Check sockets and goroutines before the fallback cleanup can close them.
+			config := net.ListenConfig{}
+			for _, candidate := range candidates[0] {
+				conn, err := config.ListenPacket(ctx, "udp4", net.JoinHostPort(candidate.Address, strconv.Itoa(int(candidate.Port))))
+				require.NoError(t, err, "Stop left a candidate socket open")
+				assert.NoError(t, conn.Close())
+			}
+			report()
+			assert.Equal(t, ICETransportStateClosed, transports[0].State())
+			assert.Equal(t, ICETransportStateClosed, transports[1].State())
+		})
 	}
 }
 
@@ -190,10 +275,7 @@ func TestICETransport_OnSelectedCandidatePairChange(t *testing.T) {
 	assert.NoError(t, signalPair(pcOffer, pcAnswer))
 	<-iceComplete
 
-	assert.NotEmpty(
-		t, atomic.LoadInt32(&senderCalledCandidateChange),
-		"Sender ICETransport OnSelectedCandidateChange was never called",
-	)
+	assert.NotEmpty(t, atomic.LoadInt32(&senderCalledCandidateChange), "Sender ICETransport OnSelectedCandidateChange was never called")
 
 	closePairNow(t, pcOffer, pcAnswer)
 }

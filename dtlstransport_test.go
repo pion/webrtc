@@ -103,10 +103,7 @@ func testInvalidFingerprintCausesFailed(t *testing.T, restart bool) { //nolint:c
 		offer = *pcOffer.LocalDescription()
 		// Replace with invalid fingerprint
 		re := regexp.MustCompile(`sha-256 (.*?)\r`)
-		offer.SDP = re.ReplaceAllString(
-			offer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		offer.SDP = re.ReplaceAllString(offer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
@@ -114,10 +111,7 @@ func testInvalidFingerprintCausesFailed(t *testing.T, restart bool) { //nolint:c
 		assert.NoError(t, err)
 		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-		answer.SDP = re.ReplaceAllString(
-			answer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		answer.SDP = re.ReplaceAllString(answer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 	case <-time.After(5 * time.Second):
@@ -297,7 +291,9 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 			defer func() { require.NoError(t, answer.Close()) }()
 
 			for _, peer := range []*PeerConnection{offer, answer} {
-				stats := getTransportStats(t, peer.GetStats())
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, DTLSTransportStateNew, stats.DTLSState)
+				assert.Equal(t, ICETransportStateNew, stats.ICEState)
 				encoded, marshalErr := json.Marshal(stats)
 				require.NoError(t, marshalErr)
 				var fields map[string]json.RawMessage
@@ -314,13 +310,27 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 				state, ok := peer.dtlsTransport.dtlsConn.ConnectionState()
 				require.True(t, ok)
 				require.Equal(t, tc.want, state.NegotiatedVersion())
-				stats := getTransportStats(t, peer.GetStats())
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
 				assert.Equal(t, fmt.Sprintf("%04X", tc.want), stats.TLSVersion)
+				assert.Equal(t, peer.iceTransport.Role(), stats.ICERole)
+				assert.Equal(t, peer.iceTransport.State(), stats.ICEState)
+				assert.Equal(t, DTLSTransportStateConnected, stats.DTLSState)
+				directStats := peer.dtlsTransport.Stats()
+				assert.Equal(t, stats.ID, directStats.ID)
+				assert.Equal(t, stats.TLSVersion, directStats.TLSVersion)
+				assert.NotZero(t, directStats.BytesSent)
+				assert.NotZero(t, directStats.BytesReceived)
 				assert.Equal(t, state.CipherSuiteID.String(), stats.DTLSCipher)
 				assert.NotEmpty(t, stats.DTLSCipher)
 				assert.Equal(t, "SRTP_AEAD_AES_256_GCM", stats.SRTPCipher)
+			}
+			for _, peer := range []*PeerConnection{offer, answer} {
+				stats := peer.dtlsTransport.Stats()
 				require.NoError(t, peer.Close())
-				closedStats := getTransportStats(t, peer.GetStats())
+				closedStats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, stats.ID, closedStats.ID)
+				assert.Equal(t, DTLSTransportStateClosed, closedStats.DTLSState)
+				assert.Equal(t, ICETransportStateClosed, closedStats.ICEState)
 				assert.Equal(t, stats.TLSVersion, closedStats.TLSVersion)
 				assert.Equal(t, stats.DTLSCipher, closedStats.DTLSCipher)
 				assert.Equal(t, stats.SRTPCipher, closedStats.SRTPCipher)
@@ -346,9 +356,7 @@ func TestDTLSTransport_InvalidVersionRange(t *testing.T) {
 			transport, err := api.NewDTLSTransport(nil, nil)
 			require.NoError(t, err)
 			cert := transport.certificates[0]
-			opts := transport.dtlsSharedOptions(tls.Certificate{
-				Certificate: [][]byte{cert.x509Cert.Raw}, PrivateKey: cert.privateKey,
-			})
+			opts := transport.dtlsSharedOptions(tls.Certificate{Certificate: [][]byte{cert.x509Cert.Raw}, PrivateKey: cert.privateKey})
 			addr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4444}
 			_, err = dtls.DetachedClient(addr, transport.toDTLSClientOptions(opts)...)
 			require.Error(t, err)

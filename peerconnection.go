@@ -56,6 +56,7 @@ type PeerConnection struct {
 	idpLoginURL *string
 
 	isClosed                                *atomic.Bool
+	undeclaredStarted                       atomic.Bool // the undeclared media processors run
 	isGracefullyClosingOrClosed             bool
 	isCloseDone                             chan struct{}
 	isGracefulCloseDone                     chan struct{}
@@ -171,8 +172,8 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		pc.api.mediaEngine = api.mediaEngine
 	} else {
 		pc.api.mediaEngine = api.mediaEngine.copy()
-		pc.api.mediaEngine.setMultiCodecNegotiation(!api.settingEngine.disableMediaEngineMultipleCodecs)
 	}
+	pc.api.mediaEngine.setMultiCodecNegotiation(!api.settingEngine.disableMediaEngineMultipleCodecs)
 
 	if err = pc.initConfiguration(configuration); err != nil {
 		return nil, err
@@ -397,7 +398,7 @@ func (pc *PeerConnection) negotiationNeededOp() {
 	}
 }
 
-func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:gocognit,cyclop
+func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:cyclop
 	// To check if negotiation is needed for connection, perform the following checks:
 	// Skip 1, 2 steps
 	// Step 3
@@ -568,7 +569,7 @@ func (pc *PeerConnection) onConnectionStateChange(cs PeerConnectionState) {
 
 // SetConfiguration updates the configuration of this PeerConnection object.
 // https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration
-func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { //nolint:gocognit,cyclop
+func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { //nolint:cyclop
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-setconfiguration (step #2)
 	if pc.isClosed.Load() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -725,7 +726,7 @@ func (pc *PeerConnection) nextDTLSCertificate() (*Certificate, error) {
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:cyclop
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
@@ -1070,7 +1071,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 
 // 4.4.1.6 Set the SessionDescription
 //
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeOp) error {
 	switch {
 	case pc.isClosed.Load():
@@ -1272,7 +1273,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 			if restartDTLS {
 				pc.restartDTLS(remoteDesc, &desc)
 			}
-			pc.startRTP(haveLocalDescription, remoteDesc, currentTransceivers)
+			pc.startRTP(remoteDesc, currentTransceivers)
 		})
 	}
 
@@ -1359,7 +1360,7 @@ func (pc *PeerConnection) validateRemoteDescription(desc *SessionDescription) er
 
 // SetRemoteDescription sets the SessionDescription of the remote peer
 //
-//nolint:gocognit,gocyclo,cyclop,maintidx
+//nolint:cyclop
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if pc.isClosed.Load() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
@@ -1544,7 +1545,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				if restartDTLS {
 					pc.restartDTLS(&desc, pc.CurrentLocalDescription())
 				}
-				pc.startRTP(true, &desc, currentTransceivers)
+				pc.startRTP(&desc, currentTransceivers)
 			})
 		}
 
@@ -1595,7 +1596,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			remoteCryptexMode,
 		)
 		if weOffer {
-			pc.startRTP(false, &desc, currentTransceivers)
+			pc.startRTP(&desc, currentTransceivers)
 		}
 	})
 
@@ -1893,7 +1894,7 @@ func runIfNewReceiver(
 
 // configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
 //
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (pc *PeerConnection) configureRTPReceivers(
 	isRenegotiation bool,
 	remoteDesc *SessionDescription,
@@ -2145,7 +2146,7 @@ func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
 	}
 }
 
-func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:gocyclo,maintidx,gocognit,cyclop,lll
+func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssrc SSRC) error { //nolint:cyclop,lll
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
 		return errPeerConnRemoteDescriptionNil
@@ -3107,10 +3108,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	pc.mu.Lock()
 	if pc.iceGatherer != nil {
-		pc.iceGatherer.collectStats(statsCollector)
+		pc.iceGatherer.collectStats(statsCollector, pc.dtlsTransport.statsID)
 	}
-	if pc.iceTransport != nil {
-		pc.iceTransport.collectStats(statsCollector, pc.dtlsTransport)
+	if pc.dtlsTransport != nil {
+		pc.dtlsTransport.collectStats(statsCollector)
 	}
 
 	pc.sctpTransport.lock.Lock()
@@ -3159,7 +3160,7 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		sender.collectStats(statsCollector, pc.statsGetter)
 	}
 
-	pc.api.mediaEngine.collectStats(statsCollector)
+	pc.api.mediaEngine.collectStats(statsCollector, pc.dtlsTransport.statsID)
 
 	return statsCollector.Ready()
 }
@@ -3204,14 +3205,19 @@ func (pc *PeerConnection) startTransports(
 	}
 }
 
-// nolint: gocognit
 func (pc *PeerConnection) startRTP(
-	isRenegotiation bool,
 	remoteDesc *SessionDescription,
 	currentTransceivers []*RTPTransceiver,
 ) {
-	if !isRenegotiation {
-		pc.undeclaredMediaProcessor()
+	// SRTP and the undeclared media processors serve audio and video only, so
+	// a connection with only data channels does without their goroutines.
+	if hasMedia(remoteDesc, currentTransceivers) {
+		if err := pc.dtlsTransport.wantSRTP(); err != nil {
+			pc.log.Warnf("Failed to start SRTP: %s", err)
+		}
+		if pc.undeclaredStarted.CompareAndSwap(false, true) {
+			pc.undeclaredMediaProcessor()
+		}
 	}
 
 	pc.startRTPReceivers(remoteDesc, currentTransceivers)
@@ -3307,7 +3313,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 // generateMatchedSDP generates a SDP and takes the remote state into account.
 // This is used everytime we have a RemoteDescription
 //
-//nolint:gocognit,gocyclo,cyclop,maintidx
+//nolint:cyclop
 func (pc *PeerConnection) generateMatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity, includeUnmatched bool,
@@ -3528,4 +3534,22 @@ func (pc *PeerConnection) restartDTLS(remote, local *SessionDescription) {
 	if err != nil {
 		pc.log.Warnf("Failed to restart DTLS: %s", err)
 	}
+}
+
+// hasMedia reports whether a negotiation carries audio or video: a transceiver,
+// or a media section other than the data channel's.
+func hasMedia(remoteDesc *SessionDescription, transceivers []*RTPTransceiver) bool {
+	if len(transceivers) > 0 {
+		return true
+	}
+	if remoteDesc == nil || remoteDesc.parsed == nil {
+		return false
+	}
+	for _, m := range remoteDesc.parsed.MediaDescriptions {
+		if m.MediaName.Media != mediaSectionApplication {
+			return true
+		}
+	}
+
+	return false
 }

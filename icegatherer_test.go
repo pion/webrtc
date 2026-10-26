@@ -73,6 +73,39 @@ func TestNewICEGatherer_Success(t *testing.T) {
 	assert.NoError(t, gatherer.Close())
 }
 
+func TestICEGatherer_UDPMuxSrflx(t *testing.T) {
+	report := test.CheckRoutines(t)
+	defer report()
+
+	listenConfig := net.ListenConfig{}
+	stunConn, err := listenConfig.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	server, err := turn.NewServer(turn.ServerConfig{PacketConnConfigs: []turn.PacketConnConfig{{PacketConn: stunConn}}})
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, server.Close()) }()
+
+	muxConn, err := listenConfig.ListenPacket(t.Context(), "udp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	mux := NewICEUniversalUDPMux(nil, muxConn, 0)
+	defer func() { assert.NoError(t, mux.Close()) }()
+
+	se := SettingEngine{}
+	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+	se.SetIncludeLoopbackCandidate(true)
+	se.SetICEUDPMux(mux)
+	se.SetICEUDPMuxSrflx(mux)
+
+	for range 2 {
+		candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{ICEServers: []ICEServer{{URLs: []string{"stun:" + stunConn.LocalAddr().String()}}}})
+		var types []ICECandidateType
+		for _, candidate := range candidates {
+			types = append(types, candidate.Typ)
+			assert.Equal(t, muxConn.LocalAddr().String(), fmt.Sprintf("%s:%d", candidate.Address, candidate.Port))
+		}
+		assert.ElementsMatch(t, []ICECandidateType{ICECandidateTypeHost, ICECandidateTypeSrflx}, types)
+	}
+}
+
 func TestICEGather_mDNSCandidateGathering(t *testing.T) {
 	// Limit runtime in case of deadlocks
 	lim := test.TimeOut(time.Second * 20)
@@ -185,31 +218,17 @@ func TestICEGatherer_NoHostPolicyVNet(t *testing.T) { //nolint:cyclop
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
-	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: loggerFactory,
-	})
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
-	stunNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{stunIP},
-	})
+	stunNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{stunIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, wan.AddNet(stunNet))
 
-	clientLAN, err := vnet.NewRouter(&vnet.RouterConfig{
-		StaticIPs: []string{fmt.Sprintf("%s/%s", externalIP, localIP)},
-		CIDR:      "10.0.0.0/24",
-		NATType: &vnet.NATType{
-			Mode: vnet.NATModeNAT1To1,
-		},
-		LoggerFactory: loggerFactory,
-	})
+	clientLAN, err := vnet.NewRouter(&vnet.RouterConfig{StaticIPs: []string{fmt.Sprintf("%s/%s", externalIP, localIP)}, CIDR: "10.0.0.0/24", NATType: &vnet.NATType{Mode: vnet.NATModeNAT1To1}, LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
-	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP},
-	})
+	clientNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, clientLAN.AddNet(clientNet))
 	assert.NoError(t, wan.AddRouter(clientLAN))
@@ -252,10 +271,7 @@ func TestICEGatherer_NoHostPolicyVNet(t *testing.T) { //nolint:cyclop
 		se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 		se.SetNet(clientNet)
 
-		gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{
-			ICEServers:      []ICEServer{iceServer},
-			ICEGatherPolicy: policy,
-		})
+		gatherer, err := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{ICEServers: []ICEServer{iceServer}, ICEGatherPolicy: policy})
 		assert.NoError(t, err)
 		defer func() {
 			assert.NoError(t, gatherer.Close())
@@ -328,15 +344,10 @@ func TestICEGatherer_AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 		localIP    = "10.0.0.1"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -355,12 +366,7 @@ func TestICEGatherer_AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	}
 
 	t.Run("HostReplace", func(t *testing.T) {
-		candidates := run(ICEAddressRewriteRule{
-			External:        []string{externalIP},
-			Local:           localIP,
-			AsCandidateType: ICECandidateTypeHost,
-			Mode:            ICEAddressRewriteReplace,
-		})
+		candidates := run(ICEAddressRewriteRule{External: []string{externalIP}, Local: localIP, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace})
 		assert.NotEmpty(t, candidates)
 
 		var hostAddrs []string
@@ -378,10 +384,7 @@ func TestICEGatherer_AddressRewriteRulesVNet(t *testing.T) { //nolint:cyclop
 	})
 
 	t.Run("SrflxAppend", func(t *testing.T) {
-		candidates := run(ICEAddressRewriteRule{
-			External:        []string{externalIP},
-			AsCandidateType: ICECandidateTypeSrflx,
-		})
+		candidates := run(ICEAddressRewriteRule{External: []string{externalIP}, AsCandidateType: ICECandidateTypeSrflx})
 		assert.NotEmpty(t, candidates)
 
 		var hostAddrs []string
@@ -419,15 +422,10 @@ func TestICEGatherer_AddressRewriteRuleFilters(t *testing.T) { //nolint:cyclop
 			externalIP = "203.0.113.20"
 		)
 
-		router, err := vnet.NewRouter(&vnet.RouterConfig{
-			CIDR:          "10.0.0.0/16",
-			LoggerFactory: logging.NewDefaultLoggerFactory(),
-		})
+		router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/16", LoggerFactory: logging.NewDefaultLoggerFactory()})
 		require.NoError(t, err)
 
-		nw, err := vnet.NewNet(&vnet.NetConfig{
-			StaticIPs: []string{firstIP, secondIP},
-		})
+		nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{firstIP, secondIP}})
 		require.NoError(t, err)
 		require.NoError(t, router.AddNet(nw))
 		require.NoError(t, router.Start())
@@ -439,12 +437,7 @@ func TestICEGatherer_AddressRewriteRuleFilters(t *testing.T) { //nolint:cyclop
 		se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 		se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 		se.SetNet(nw)
-		require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-			External:        []string{externalIP},
-			CIDR:            "10.0.0.0/24",
-			AsCandidateType: ICECandidateTypeHost,
-			Mode:            ICEAddressRewriteReplace,
-		}))
+		require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{externalIP}, CIDR: "10.0.0.0/24", AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace}))
 
 		candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{})
 
@@ -466,15 +459,10 @@ func TestICEGatherer_AddressRewriteRuleFilters(t *testing.T) { //nolint:cyclop
 			externalIP = "203.0.113.50"
 		)
 
-		router, err := vnet.NewRouter(&vnet.RouterConfig{
-			CIDR:          "10.0.0.0/24",
-			LoggerFactory: logging.NewDefaultLoggerFactory(),
-		})
+		router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 		require.NoError(t, err)
 
-		nw, err := vnet.NewNet(&vnet.NetConfig{
-			StaticIPs: []string{localIP},
-		})
+		nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 		require.NoError(t, err)
 		require.NoError(t, router.AddNet(nw))
 		require.NoError(t, router.Start())
@@ -486,12 +474,7 @@ func TestICEGatherer_AddressRewriteRuleFilters(t *testing.T) { //nolint:cyclop
 		se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 		se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 		se.SetNet(nw)
-		require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-			External:        []string{externalIP},
-			AsCandidateType: ICECandidateTypeHost,
-			Mode:            ICEAddressRewriteReplace,
-			Networks:        []NetworkType{NetworkTypeUDP6},
-		}))
+		require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{externalIP}, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace, Networks: []NetworkType{NetworkTypeUDP6}}))
 
 		candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{})
 
@@ -521,15 +504,10 @@ func TestICEGatherer_AddressRewriteHostAppendAndReplace(t *testing.T) {
 		secondExternal = "203.0.113.31"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{firstLocal, secondLocal},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{firstLocal, secondLocal}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -583,15 +561,10 @@ func TestICEGatherer_AddressRewriteSrflxReplace(t *testing.T) {
 		externalIP = "203.0.113.60"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -603,11 +576,7 @@ func TestICEGatherer_AddressRewriteSrflxReplace(t *testing.T) {
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 	se.SetNet(nw)
-	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{externalIP},
-		AsCandidateType: ICECandidateTypeSrflx,
-		Mode:            ICEAddressRewriteReplace,
-	}))
+	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{externalIP}, AsCandidateType: ICECandidateTypeSrflx, Mode: ICEAddressRewriteReplace}))
 
 	candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{})
 
@@ -642,15 +611,10 @@ func TestICEGatherer_AddressRewriteSrflxAppendWithCatchAll(t *testing.T) {
 		replaceIP = "203.0.113.80"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -702,15 +666,10 @@ func TestICEGatherer_AddressRewriteMultipleRulesOrdering(t *testing.T) {
 		externalIP   = "203.0.113.70"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP, otherLocalIP},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP, otherLocalIP}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -763,15 +722,10 @@ func TestICEGatherer_AddressRewriteIfaceScope(t *testing.T) {
 		externalIP = "203.0.113.90"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	nw, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{localIP},
-	})
+	nw, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{localIP}})
 	require.NoError(t, err)
 	require.NoError(t, router.AddNet(nw))
 	require.NoError(t, router.Start())
@@ -825,19 +779,12 @@ func TestICEConnection_AddressRewriteAppend(t *testing.T) { //nolint:cyclop
 		offerExternal = "203.0.113.200"
 	)
 
-	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, err)
 
-	offerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{offerIP},
-	})
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{offerIP}})
 	require.NoError(t, err)
-	answerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{answerIP},
-	})
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{answerIP}})
 	require.NoError(t, err)
 
 	require.NoError(t, wan.AddNet(offerNet))
@@ -851,11 +798,7 @@ func TestICEConnection_AddressRewriteAppend(t *testing.T) { //nolint:cyclop
 	offerSE.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	offerSE.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 	offerSE.SetNet(offerNet)
-	require.NoError(t, offerSE.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{offerExternal},
-		AsCandidateType: ICECandidateTypeHost,
-		Mode:            ICEAddressRewriteAppend,
-	}))
+	require.NoError(t, offerSE.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{offerExternal}, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteAppend}))
 
 	answerSE := SettingEngine{}
 	answerSE.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
@@ -897,11 +840,7 @@ func TestICEAddressRewriteDropRule(t *testing.T) {
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 
-	err := se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        nil,
-		AsCandidateType: ICECandidateTypeHost,
-		Mode:            ICEAddressRewriteReplace,
-	})
+	err := se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: nil, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace})
 	assert.NoError(t, err, "rule is allowed to be configured, validation happens in ice")
 
 	gatherer, gErr := NewAPI(WithSettingEngine(se)).NewICEGatherer(ICEGatherOptions{})
@@ -929,19 +868,12 @@ func TestICEGatherer_AddressRewriteRelayVNet(t *testing.T) { //nolint:cyclop
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: loggerFactory,
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: loggerFactory})
 	require.NoError(t, err)
 
-	turnNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{turnIP},
-	})
+	turnNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{turnIP}})
 	require.NoError(t, err)
-	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{clientIP},
-	})
+	clientNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{clientIP}})
 	require.NoError(t, err)
 
 	require.NoError(t, router.AddNet(turnNet))
@@ -985,22 +917,9 @@ func TestICEGatherer_AddressRewriteRelayVNet(t *testing.T) { //nolint:cyclop
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 	se.SetNet(clientNet)
-	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{relayExternal},
-		AsCandidateType: ICECandidateTypeRelay,
-		Mode:            ICEAddressRewriteReplace,
-	}))
+	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{relayExternal}, AsCandidateType: ICECandidateTypeRelay, Mode: ICEAddressRewriteReplace}))
 
-	candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{
-		ICEServers: []ICEServer{
-			{
-				URLs:       []string{fmt.Sprintf("turn:%s:%s?transport=udp", turnIP, turnListenPort)},
-				Username:   "user",
-				Credential: "pass",
-			},
-		},
-		ICEGatherPolicy: ICETransportPolicyRelay,
-	})
+	candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{ICEServers: []ICEServer{{URLs: []string{fmt.Sprintf("turn:%s:%s?transport=udp", turnIP, turnListenPort)}, Username: "user", Credential: "pass"}}, ICEGatherPolicy: ICETransportPolicyRelay})
 
 	var relayAddrs []string
 	for _, c := range candidates {
@@ -1030,19 +949,12 @@ func TestICEGatherer_AddressRewriteRelayAppendVNet(t *testing.T) { //nolint:cycl
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: loggerFactory,
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: loggerFactory})
 	require.NoError(t, err)
 
-	turnNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{turnIP},
-	})
+	turnNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{turnIP}})
 	require.NoError(t, err)
-	clientNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{clientIP},
-	})
+	clientNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{clientIP}})
 	require.NoError(t, err)
 
 	require.NoError(t, router.AddNet(turnNet))
@@ -1083,22 +995,9 @@ func TestICEGatherer_AddressRewriteRelayAppendVNet(t *testing.T) { //nolint:cycl
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
 	se.SetNet(clientNet)
-	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{relayExternal},
-		AsCandidateType: ICECandidateTypeRelay,
-		Mode:            ICEAddressRewriteAppend,
-	}))
+	require.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{relayExternal}, AsCandidateType: ICECandidateTypeRelay, Mode: ICEAddressRewriteAppend}))
 
-	candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{
-		ICEServers: []ICEServer{
-			{
-				URLs:       []string{fmt.Sprintf("turn:%s:%s?transport=udp", turnIP, turnListenPort)},
-				Username:   "user",
-				Credential: "pass",
-			},
-		},
-		ICEGatherPolicy: ICETransportPolicyRelay,
-	})
+	candidates := gatherCandidatesWithSettingEngine(t, se, ICEGatherOptions{ICEServers: []ICEServer{{URLs: []string{fmt.Sprintf("turn:%s:%s?transport=udp", turnIP, turnListenPort)}, Username: "user", Credential: "pass"}}, ICEGatherPolicy: ICETransportPolicyRelay})
 
 	var relayAddrs []string
 	for _, c := range candidates {
@@ -1139,10 +1038,7 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 		return ufrag, pwd
 	}
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
 	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"10.0.0.2"}})
@@ -1176,9 +1072,7 @@ func TestICEGatherer_StaticLocalCredentialsVNet(t *testing.T) { //nolint:cyclop
 
 	pcOffer, err := NewAPI(WithSettingEngine(buildSE(offerNet, offerUfrag, offerPwd))).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
-	pcAnswer, err := NewAPI(
-		WithSettingEngine(buildSE(answerNet, answerUfrag, answerPwd)),
-	).NewPeerConnection(Configuration{})
+	pcAnswer, err := NewAPI(WithSettingEngine(buildSE(answerNet, answerUfrag, answerPwd))).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 	defer closePairNow(t, pcOffer, pcAnswer)
 
@@ -1259,24 +1153,17 @@ func TestICEGatherer_MaxBindingRequests(t *testing.T) { //nolint:cyclop
 
 	const maxReq uint16 = 2
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	offerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.4"},
-	})
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4"}})
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	answerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.5"},
-	})
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.5"}})
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -1436,13 +1323,7 @@ func TestICEGatherer_DisableActiveTCP(t *testing.T) { //nolint:cyclop
 				return
 			}
 
-			c, err := ice.NewCandidateHost(&ice.CandidateHostConfig{
-				Network:    "tcp4",
-				Address:    addr.IP.String(),
-				Port:       addr.Port,
-				Component:  ice.ComponentRTP,
-				Extensions: []ice.CandidateExtension{{Key: "tcptype", Value: "passive"}},
-			})
+			c, err := ice.NewCandidateHost(&ice.CandidateHostConfig{Network: "tcp4", Address: addr.IP.String(), Port: addr.Port, Component: ice.ComponentRTP, Extensions: []ice.CandidateExtension{{Key: "tcptype", Value: "passive"}}})
 			assert.NoError(t, err)
 			assert.NoError(t, agent.AddRemoteCandidate(c))
 
@@ -1526,48 +1407,25 @@ func TestICEGatherer_SrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
-	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          externalRouterSubnet,
-		LoggerFactory: loggerFactory,
-	})
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: externalRouterSubnet, LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
-	stunNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{stunIP},
-	})
+	stunNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{stunIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, wan.AddNet(stunNet))
 
-	offerLAN, err := vnet.NewRouter(&vnet.RouterConfig{
-		StaticIPs: []string{fmt.Sprintf("%s/%s", offerExternalIP, offerLocalIP)},
-		CIDR:      "10.0.0.0/24",
-		NATType: &vnet.NATType{
-			Mode: vnet.NATModeNAT1To1,
-		},
-		LoggerFactory: loggerFactory,
-	})
+	offerLAN, err := vnet.NewRouter(&vnet.RouterConfig{StaticIPs: []string{fmt.Sprintf("%s/%s", offerExternalIP, offerLocalIP)}, CIDR: "10.0.0.0/24", NATType: &vnet.NATType{Mode: vnet.NATModeNAT1To1}, LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
-	offerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{offerLocalIP},
-	})
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{offerLocalIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, offerLAN.AddNet(offerNet))
 	assert.NoError(t, wan.AddRouter(offerLAN))
 
-	answerLAN, err := vnet.NewRouter(&vnet.RouterConfig{
-		StaticIPs: []string{fmt.Sprintf("%s/%s", answerExternalIP, answerLocalIP)},
-		CIDR:      "10.0.1.0/24",
-		NATType: &vnet.NATType{
-			Mode: vnet.NATModeNAT1To1,
-		},
-		LoggerFactory: loggerFactory,
-	})
+	answerLAN, err := vnet.NewRouter(&vnet.RouterConfig{StaticIPs: []string{fmt.Sprintf("%s/%s", answerExternalIP, answerLocalIP)}, CIDR: "10.0.1.0/24", NATType: &vnet.NATType{Mode: vnet.NATModeNAT1To1}, LoggerFactory: loggerFactory})
 	assert.NoError(t, err)
 
-	answerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{answerLocalIP},
-	})
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{answerLocalIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, answerLAN.AddNet(answerNet))
 	assert.NoError(t, wan.AddRouter(answerLAN))
@@ -1618,14 +1476,10 @@ func TestICEGatherer_SrflxAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 		URLs: []string{fmt.Sprintf("stun:%s:%d", stunIP, stunPort)},
 	}
 
-	offerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(offerNet))).NewPeerConnection(Configuration{
-		ICEServers: []ICEServer{iceServer},
-	})
+	offerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(offerNet))).NewPeerConnection(Configuration{ICEServers: []ICEServer{iceServer}})
 	assert.NoError(t, err)
 
-	answerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(answerNet))).NewPeerConnection(Configuration{
-		ICEServers: []ICEServer{iceServer},
-	})
+	answerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(answerNet))).NewPeerConnection(Configuration{ICEServers: []ICEServer{iceServer}})
 	assert.NoError(t, err)
 	defer closePairNow(t, offerPC, answerPC)
 
@@ -1738,15 +1592,10 @@ func TestICEGatherer_STUNGatherTimeout(t *testing.T) {
 
 	timeout := 200 * time.Millisecond
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
-	net, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"10.0.0.2"},
-	})
+	net, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"10.0.0.2"}})
 	assert.NoError(t, err)
 
 	assert.NoError(t, router.AddNet(net))
@@ -1805,10 +1654,7 @@ func TestICEGatherer_RelayAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 	)
 	wait := 500 * time.Millisecond
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
 	turnNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{turnIP}})
@@ -1873,16 +1719,10 @@ func TestICEGatherer_RelayAcceptanceMinWait(t *testing.T) { //nolint:cyclop
 		CredentialType: ICECredentialTypePassword,
 	}
 
-	offerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(offerNet))).NewPeerConnection(Configuration{
-		ICEServers:         []ICEServer{iceServer},
-		ICETransportPolicy: ICETransportPolicyRelay,
-	})
+	offerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(offerNet))).NewPeerConnection(Configuration{ICEServers: []ICEServer{iceServer}, ICETransportPolicy: ICETransportPolicyRelay})
 	assert.NoError(t, err)
 
-	answerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(answerNet))).NewPeerConnection(Configuration{
-		ICEServers:         []ICEServer{iceServer},
-		ICETransportPolicy: ICETransportPolicyRelay,
-	})
+	answerPC, err := NewAPI(WithSettingEngine(buildSettingEngine(answerNet))).NewPeerConnection(Configuration{ICEServers: []ICEServer{iceServer}, ICETransportPolicy: ICETransportPolicyRelay})
 	assert.NoError(t, err)
 	defer closePairNow(t, offerPC, answerPC)
 
@@ -2018,15 +1858,9 @@ func TestICEGatherer_RenominationSendsNomination(t *testing.T) { //nolint:cyclop
 	recvCh := make(chan string, 4)
 	negotiated := true
 	id := uint16(0)
-	offerDC, err := offerPC.CreateDataChannel("renomination-dc", &DataChannelInit{
-		Negotiated: &negotiated,
-		ID:         &id,
-	})
+	offerDC, err := offerPC.CreateDataChannel("renomination-dc", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 	assert.NoError(t, err)
-	answerDC, err := answerPC.CreateDataChannel("renomination-dc", &DataChannelInit{
-		Negotiated: &negotiated,
-		ID:         &id,
-	})
+	answerDC, err := answerPC.CreateDataChannel("renomination-dc", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 	assert.NoError(t, err)
 	answerDC.OnMessage(func(msg DataChannelMessage) {
 		select {
@@ -2105,15 +1939,9 @@ func TestICEGatherer_RenominationSwitchesPair(t *testing.T) { //nolint:cyclop
 	recvCh := make(chan string, 4)
 	negotiated := true
 	id := uint16(0)
-	offerDC, err := offerPC.CreateDataChannel("renomination-dc", &DataChannelInit{
-		Negotiated: &negotiated,
-		ID:         &id,
-	})
+	offerDC, err := offerPC.CreateDataChannel("renomination-dc", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 	assert.NoError(t, err)
-	answerDC, err := answerPC.CreateDataChannel("renomination-dc", &DataChannelInit{
-		Negotiated: &negotiated,
-		ID:         &id,
-	})
+	answerDC, err := answerPC.CreateDataChannel("renomination-dc", &DataChannelInit{Negotiated: &negotiated, ID: &id})
 	assert.NoError(t, err)
 	answerDC.OnMessage(func(msg DataChannelMessage) {
 		select {
@@ -2185,8 +2013,7 @@ func TestICEGatherer_RenominationSwitchesPair(t *testing.T) { //nolint:cyclop
 
 	initialPair := selectedCandidatePair(t, offerPC)
 	initialStat, initialStatOK := getAgent(t, offerPC).GetSelectedCandidatePairStats()
-	t.Logf("initial selected pair: %s<->%s (%s/%s)",
-		initialPair.Local.Address(), initialPair.Remote.Address(), initialPair.Local.Type(), initialPair.Remote.Type())
+	t.Logf("initial selected pair: %s<->%s (%s/%s)", initialPair.Local.Address(), initialPair.Remote.Address(), initialPair.Local.Type(), initialPair.Remote.Type())
 
 	waitForTwoRemoteCandidates(t, offerPC)
 	waitForTwoRemoteCandidates(t, answerPC)
@@ -2200,10 +2027,7 @@ func TestICEGatherer_RenominationSwitchesPair(t *testing.T) { //nolint:cyclop
 	assert.NotNil(t, switchRemote.Type())
 	assert.False(t, switchLocal.Equal(switchRemote), "switch local and remote candidates should be different")
 
-	t.Logf(
-		"renomination target: %s/%s -> %s/%s",
-		switchLocal.Address(), switchLocal.Type(), switchRemote.Address(), switchRemote.Type(),
-	)
+	t.Logf("renomination target: %s/%s -> %s/%s", switchLocal.Address(), switchLocal.Type(), switchRemote.Address(), switchRemote.Type())
 
 	agent := getAgent(t, offerPC)
 	if !assert.Eventually(t, func() bool {
@@ -2223,9 +2047,7 @@ func TestICEGatherer_RenominationSwitchesPair(t *testing.T) { //nolint:cyclop
 
 	finalStat, ok := agent.GetSelectedCandidatePairStats()
 	assert.True(t, ok)
-	assert.NotEqual(
-		t, initialStat.RemoteCandidateID, finalStat.RemoteCandidateID, "selected pair should change after renomination",
-	)
+	assert.NotEqual(t, initialStat.RemoteCandidateID, finalStat.RemoteCandidateID, "selected pair should change after renomination")
 
 	finalLocal := findCandidateByID(t, agent, finalStat.LocalCandidateID, true)
 	finalRemote := findCandidateByID(t, agent, finalStat.RemoteCandidateID, false)
@@ -2276,21 +2098,14 @@ func buildRenominationVNetPair(
 ) (*PeerConnection, *PeerConnection, func()) {
 	t.Helper()
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
-	netStack, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.4"},
-	})
+	netStack, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4"}})
 	assert.NoError(t, err)
 	assert.NoError(t, router.AddNet(netStack))
 
-	answerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.5"},
-	})
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.5"}})
 	assert.NoError(t, err)
 	assert.NoError(t, router.AddNet(answerNet))
 
@@ -2473,14 +2288,7 @@ func candidatePairSummary(t *testing.T, agent *ice.Agent) string {
 	stats := agent.GetCandidatePairsStats()
 	summary := make([]string, 0, len(stats))
 	for _, stat := range stats {
-		summary = append(summary, fmt.Sprintf(
-			"%s<->%s state=%s nominated=%v rtt=%.2fms",
-			localMap[stat.LocalCandidateID],
-			remoteMap[stat.RemoteCandidateID],
-			stat.State,
-			stat.Nominated,
-			stat.CurrentRoundTripTime*1000,
-		))
+		summary = append(summary, fmt.Sprintf("%s<->%s state=%s nominated=%v rtt=%.2fms", localMap[stat.LocalCandidateID], remoteMap[stat.RemoteCandidateID], stat.State, stat.Nominated, stat.CurrentRoundTripTime*1000))
 	}
 
 	return strings.Join(summary, "; ")
@@ -2621,21 +2429,14 @@ func buildStagedRenominationPair(
 		secondaryAnswerIP = "10.0.0.5"
 	)
 
-	router, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "10.0.0.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	router, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "10.0.0.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
-	offerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{primaryOfferIP, secondaryOfferIP},
-	})
+	offerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{primaryOfferIP, secondaryOfferIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, router.AddNet(offerNet))
 
-	answerNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{primaryAnswerIP, secondaryAnswerIP},
-	})
+	answerNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{primaryAnswerIP, secondaryAnswerIP}})
 	assert.NoError(t, err)
 	assert.NoError(t, router.AddNet(answerNet))
 
@@ -2649,10 +2450,7 @@ func buildStagedRenominationPair(
 	// prefer srflx/prflx nomination first so the test reliably observes the switch to host via renomination.
 	offerSE.SetSrflxAcceptanceMinWait(0)
 	offerSE.SetHostAcceptanceMinWait(3 * time.Second)
-	configuredRenominationOptions := append(
-		[]RenominationOption{WithRenominationInterval(200 * time.Millisecond)},
-		renominationOptions...,
-	)
+	configuredRenominationOptions := append([]RenominationOption{WithRenominationInterval(200 * time.Millisecond)}, renominationOptions...)
 	assert.NoError(t, offerSE.SetICERenomination(configuredRenominationOptions...))
 
 	answerSE := SettingEngine{}

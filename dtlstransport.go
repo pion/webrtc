@@ -41,6 +41,7 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
+	statsID               string
 	iceTransport          *ICETransport
 	certificates          []Certificate
 	remoteParameters      DTLSParameters
@@ -63,6 +64,8 @@ type DTLSTransport struct {
 	srtpEndpoint, srtcpEndpoint *netconn.Conn
 	simulcastStreams            []simulcastStreamPair
 	srtpReady                   chan struct{}
+	srtpWanted                  bool // media was negotiated, guarded by lock
+	srtpCanStart                bool // DTLS is connected, guarded by lock
 
 	api *API
 	log logging.LeveledLogger
@@ -111,6 +114,7 @@ func (r *srtpRTPReader) Read(in []byte, attributes interceptor.Attributes) (int,
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
 	trans := &DTLSTransport{
+		statsID:      "DTLSTransport-" + rand.Text(),
 		iceTransport: transport,
 		api:          api,
 		state:        DTLSTransportStateNew,
@@ -181,6 +185,9 @@ func (t *DTLSTransport) State() DTLSTransportState {
 // WriteRTCP sends a user provided RTCP packet to the connected peer. If no peer is connected the
 // packet is discarded.
 func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
+	if err := t.wantSRTP(); err != nil {
+		return 0, err
+	}
 	raw, err := rtcp.Marshal(pkts)
 	if err != nil {
 		return 0, err
@@ -229,6 +236,30 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	defer t.lock.RUnlock()
 
 	return t.remoteCertificate
+}
+
+// wantSRTP starts the SRTP sessions now, or once DTLS connects. It is called
+// when a negotiation brings media.
+func (t *DTLSTransport) wantSRTP() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.srtpWanted {
+		return nil
+	}
+	t.srtpWanted = true
+	if !t.srtpCanStart {
+		return nil
+	}
+
+	if t.dtlsConn == nil {
+		return io.ErrClosedPipe
+	}
+	connState, ok := t.dtlsConn.ConnectionState()
+	if !ok {
+		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+	}
+
+	return t.startSRTP(&connState)
 }
 
 // startSRTP requires the caller holds the lock.
@@ -663,8 +694,12 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	}
 	t.srtpProtectionProfile = srtpProtectionProfile
 	t.srtpCipher = srtpProtectionProfile.String()
-	if err = t.startSRTP(&connState); err != nil {
-		return err
+	// Start media sessions only when needed, and refresh their keys on DTLS restart.
+	t.srtpCanStart = true
+	if t.srtpWanted {
+		if err = t.startSRTP(&connState); err != nil {
+			return err
+		}
 	}
 	t.onStateChange(DTLSTransportStateConnected)
 
@@ -790,6 +825,9 @@ func (t *DTLSTransport) streamsForSSRC(
 	ssrc SSRC,
 	streamInfo interceptor.StreamInfo,
 ) (*streamsForSSRCResult, error) {
+	if err := t.wantSRTP(); err != nil {
+		return nil, err
+	}
 	srtpSession, err := t.getSRTPSession()
 	if err != nil {
 		return nil, err
@@ -912,13 +950,32 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
 }
 
-// updateStats adds cached DTLS information to the underlying ICE transport stats.
-func (t *DTLSTransport) updateStats(stats *TransportStats) {
+// Stats reports statistics for the DTLSTransport and its underlying ICETransport.
+func (t *DTLSTransport) Stats() TransportStats {
 	t.lock.RLock()
-	defer t.lock.RUnlock()
+	stats := TransportStats{
+		Timestamp:  statsTimestampNow(),
+		Type:       StatsTypeTransport,
+		ID:         t.statsID,
+		DTLSState:  t.state,
+		TLSVersion: t.tlsVersion,
+		DTLSCipher: t.dtlsCipher,
+		SRTPCipher: t.srtpCipher,
+	}
+	iceTransport := t.iceTransport
+	t.lock.RUnlock()
 
-	stats.DTLSState = t.state
-	stats.TLSVersion = t.tlsVersion
-	stats.DTLSCipher = t.dtlsCipher
-	stats.SRTPCipher = t.srtpCipher
+	if iceTransport != nil {
+		stats.ICERole = iceTransport.Role()
+		stats.ICEState = iceTransport.State()
+		stats.BytesSent, stats.BytesReceived = iceTransport.byteCounts()
+	}
+
+	return stats
+}
+
+func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats := t.Stats()
+	collector.Collect(stats.ID, stats)
 }

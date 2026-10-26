@@ -519,7 +519,7 @@ func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter st
 			ID:          fmt.Sprintf("outbound-rtp-%d", uint32(trackEncoding.ssrc)),
 			SSRC:        trackEncoding.ssrc,
 			Kind:        r.kind.String(),
-			TransportID: iceTransportStatsID,
+			TransportID: r.transport.statsID,
 		}
 		if codecs := trackEncoding.context.params.Codecs; len(codecs) > 0 {
 			outboundStats.CodecID = codecs[0].statsID

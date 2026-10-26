@@ -72,6 +72,8 @@ type ICEAddressRewriteRule struct {
 	AsCandidateType ICECandidateType
 	Mode            ICEAddressRewriteMode
 	Networks        []NetworkType
+	OriginalPort    int
+	NewPort         int
 }
 
 func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
@@ -87,6 +89,8 @@ func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
 		AsCandidateType: candidateType,
 		Mode:            mode,
 		Networks:        networks,
+		OriginalPort:    r.OriginalPort,
+		NewPort:         r.NewPort,
 	}
 
 	return rule
@@ -239,6 +243,7 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithMulticastDNSMode(mDNSMode),
 		ice.WithTCPMux(g.api.settingEngine.iceTCPMux),
 		ice.WithUDPMux(g.api.settingEngine.iceUDPMux),
+		ice.WithUDPMuxSrflx(g.api.settingEngine.iceUDPMuxSrflx),
 		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
 		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
 	}
@@ -603,7 +608,7 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 	return g.agent
 }
 
-func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
+func (g *ICEGatherer) collectStats(collector *statsReportCollector, transportStatsID string) {
 	agent := g.getAgent()
 	if agent == nil {
 		return
@@ -621,6 +626,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 
 				continue
 			}
+			stats.TransportID = transportStatsID
 
 			collector.Collect(stats.ID, stats)
 		}
@@ -641,6 +647,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeLocalCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
@@ -668,6 +675,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeRemoteCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
