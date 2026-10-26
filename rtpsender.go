@@ -354,7 +354,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		}
 		trackEncoding.context.params.Codecs = []RTPCodecParameters{codec}
 		payloadTypeFEC := findFECPayloadType(rtpParameters.Codecs)
-		if redPayloadType := findREDPayloadType(codec.PayloadType, rtpParameters.Codecs); redPayloadType != 0 {
+		if redPayloadType := findREDPayloadType(codec.PayloadType, parameters.Codecs); redPayloadType != 0 {
 			payloadTypeFEC = redPayloadType
 		}
 
