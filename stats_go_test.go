@@ -1227,11 +1227,11 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	}
 
 	// Close answer DC now
-	dcClosed, offerDCClosed := eventCountdown(1)
+	dcClosed, bothDCsClosed := eventCountdown(2)
 	offerDC.OnClose(dcClosed)
+	answerDC.OnClose(dcClosed)
 	assert.NoError(t, answerDC.Close())
-	waitWithTimeout(t, "the offer data channel to close", offerDCClosed)
-	time.Sleep(10 * time.Millisecond)
+	waitWithTimeout(t, "both data channels to close", bothDCsClosed)
 
 	reportPCOffer = offerPC.GetStats()
 	reportPCAnswer = answerPC.GetStats()
