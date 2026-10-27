@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
@@ -560,6 +561,8 @@ func TestSampleBuilder_Flush(t *testing.T) {
 
 	assert.Nil(t, fd.Pop(), "Unexpected sample is returned. Test precondition may be broken")
 
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1012, Timestamp: 10}}) // Trailing dropped packet.
+
 	fd.Flush()
 
 	samples := []*media.Sample{}
@@ -573,6 +576,42 @@ func TestSampleBuilder_Flush(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, samples)
+
+	// Reuse the builder without carrying dropped packets into the next stream.
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2000, Timestamp: 10, Marker: true}, Payload: []byte{0x01}})
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2001, Timestamp: 11}, Payload: []byte{0x01}})
+	assert.Equal(t, &media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 10}, fd.Pop())
+}
+
+func TestSampleBuilder_H264(t *testing.T) {
+	for _, mtu := range []uint16{4, 1200} { // Fragmented and single-packet NAL units.
+		t.Run(fmt.Sprint(mtu), func(t *testing.T) {
+			sb := New(50, &codecs.H264Packet{}, 90000)
+			payloads := (&codecs.H264Payloader{}).Payload(mtu, []byte{0x65, 1, 2, 3, 4})
+			for i, payload := range payloads {
+				sb.Push(&rtp.Packet{
+					Header: rtp.Header{
+						SequenceNumber: uint16(i), //nolint:gosec // The fixture produces at most two packets.
+						Timestamp:      1,
+						Marker:         i == len(payloads)-1,
+					},
+					Payload: payload,
+				})
+			}
+			sb.Flush()
+			assert.Equal(t, &media.Sample{Data: []byte{0, 0, 0, 1, 0x65, 1, 2, 3, 4}, PacketTimestamp: 1}, sb.Pop())
+		})
+	}
+}
+
+func TestSampleBuilder_ZeroSampleRate(t *testing.T) {
+	sb := New(50, &fakeDepacketizer{}, 0)
+	sb.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 1, Marker: true}, Payload: []byte{0x01}})
+	sb.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 2, Marker: true}, Payload: []byte{0x02}})
+	assert.Equal(t, &media.Sample{Data: []byte{0x01}, PacketTimestamp: 1}, sb.Pop())
+
+	sb.Flush()
+	assert.Equal(t, &media.Sample{Data: []byte{0x02}, PacketTimestamp: 2}, sb.Pop())
 }
 
 func BenchmarkSampleBuilderSequential(b *testing.B) {

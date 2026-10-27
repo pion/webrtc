@@ -19,11 +19,11 @@ func defaultClockRate(mimeType string) uint32 {
 	return 90000
 }
 
-// defaultChannels returns the channel count implied by an omitted encoding
+// DefaultChannels returns the channel count implied by an omitted encoding
 // parameter: RFC 8866 says one for audio, except Opus which RFC 7587 fixes
 // at two. Opus RED uses the same channel count as Opus. Video has no channel
 // count, so it returns zero.
-func defaultChannels(mimeType string) uint16 {
+func DefaultChannels(mimeType string) uint16 {
 	switch {
 	case strings.EqualFold(mimeType, "audio/opus"), strings.EqualFold(mimeType, "audio/red"):
 		return 2
@@ -71,10 +71,10 @@ func ChannelsEqual(mimeType string, valA, valB uint16) bool {
 	// In this case, use default values.
 	// It would be better to remove this exception in a future major release.
 	if valA == 0 {
-		valA = defaultChannels(mimeType)
+		valA = DefaultChannels(mimeType)
 	}
 	if valB == 0 {
-		valB = defaultChannels(mimeType)
+		valB = DefaultChannels(mimeType)
 	}
 
 	// RFC8866: channel count "is OPTIONAL and may be omitted
