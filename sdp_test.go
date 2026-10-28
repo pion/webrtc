@@ -10,6 +10,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1552,4 +1553,47 @@ func TestGetPeerDirection(t *testing.T) {
 
 	media.WithPropertyAttribute("recvonly")
 	assert.Equal(t, RTPTransceiverDirectionRecvonly, getPeerDirection(media, session))
+}
+
+func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, gatherer.Close()) })
+	_, err = gatherer.GetLocalCandidates()
+	require.NoError(t, err)
+
+	attributes := make([]sdp.Attribute, 1, 8)
+	attributes[0] = sdp.Attribute{Key: sdp.AttrKeyMID, Value: "0"}
+	original := &SessionDescription{
+		Type: SDPTypeAnswer,
+		parsed: &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{{Attributes: attributes}},
+		},
+	}
+	before, err := original.parsed.Marshal()
+	require.NoError(t, err)
+	original.SDP = string(before)
+	backing := slices.Clone(attributes[:cap(attributes)])
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 100 {
+			selectCandidateMediaSection(original.parsed)
+		}
+	}()
+	for range 100 {
+		populated := populateLocalCandidates(original, gatherer, ICEGatheringStateComplete)
+		require.NotSame(t, original, populated)
+		assert.Contains(t, populated.SDP, "a=end-of-candidates")
+		assert.Equal(t, SDPTypeAnswer, populated.Type)
+		_, complete := populated.parsed.MediaDescriptions[0].Attribute("end-of-candidates")
+		assert.True(t, complete)
+	}
+	<-done
+
+	after, err := original.parsed.Marshal()
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+	assert.Equal(t, backing, attributes[:cap(attributes)])
 }
