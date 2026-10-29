@@ -2346,42 +2346,7 @@ func Test_WriteRTCP_Disconnected(t *testing.T) {
 	assert.NoError(t, peerConnection.Close())
 }
 
-func Test_IPv6(t *testing.T) { //nolint: cyclop
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		t.Skip()
-	}
-
-	IPv6Supported := false
-	for _, iface := range interfaces {
-		addrs, netErr := iface.Addrs()
-		if netErr != nil {
-			continue
-		}
-
-		// Loop over the addresses for the interface.
-		for _, addr := range addrs {
-			var ip net.IP
-
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-
-			if ip == nil || ip.To4() != nil || ip.IsLinkLocalUnicast() || ip.IsLoopback() {
-				continue
-			}
-
-			IPv6Supported = true
-		}
-	}
-
-	if !IPv6Supported {
-		t.Skip()
-	}
-
+func Test_IPv6(t *testing.T) {
 	lim := test.TimeOut(time.Second * 5)
 	defer lim.Stop()
 
@@ -2390,9 +2355,22 @@ func Test_IPv6(t *testing.T) { //nolint: cyclop
 
 	settingEngine := SettingEngine{}
 	settingEngine.SetNetworkTypes([]NetworkType{NetworkTypeUDP6})
+	settingEngine.SetIncludeLoopbackCandidate(true)
 
-	offerPC, answerPC, err := NewAPI(WithSettingEngine(settingEngine)).newPair(Configuration{})
-	assert.NoError(t, err)
+	var peers [2]*PeerConnection
+	for i := range peers {
+		conn, err := (&net.ListenConfig{}).ListenPacket(t.Context(), "udp6", "[::1]:0")
+		if err != nil {
+			t.Skipf("IPv6 loopback is unavailable: %v", err)
+		}
+		mux := ice.NewUDPMuxDefault(ice.UDPMuxParams{UDPConn: conn})
+		defer func() { require.NoError(t, mux.Close()) }()
+		settingEngine.SetICEUDPMux(mux)
+		peers[i], err = NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+		defer func() { require.NoError(t, peers[i].Close()) }()
+	}
+	offerPC, answerPC := peers[0], peers[1]
 
 	peerConnectionConnected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
 	assert.NoError(t, signalPair(offerPC, answerPC))
@@ -2417,8 +2395,6 @@ func Test_IPv6(t *testing.T) { //nolint: cyclop
 		assert.NoError(t, err)
 		assert.Equal(t, iceCandidate.NetworkType(), ice.NetworkTypeUDP6)
 	}
-
-	closePairNow(t, offerPC, answerPC)
 }
 
 type testICELogger struct {
