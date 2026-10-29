@@ -1844,7 +1844,7 @@ func (s *simulcastTestTrackLocal) WriteRTP(pkt *rtp.Packet) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }
 
 func TestPeerConnection_RIDSetRTX(t *testing.T) { //nolint:cyclop

@@ -9,6 +9,7 @@ package detacheddtls
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -17,7 +18,6 @@ import (
 	"github.com/pion/dtls/v4"
 	"github.com/pion/transport/v5/deadline"
 	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // Config contains the transport operations used by a Conn.
@@ -249,7 +249,7 @@ func (c *Conn) close(flushEvents bool, cause error) error {
 	var onClose func(error)
 	if !c.closed {
 		c.closed = true
-		c.closeErr = util.FlattenErrs([]error{c.stop(flushEvents), c.Conn.Close()})
+		c.closeErr = errors.Join(c.stop(flushEvents), c.Conn.Close())
 		c.writeDeadline.Set(time.Time{})
 		c.config.SetDatagramHandler(nil)
 		onClose = c.config.OnClose
@@ -278,7 +278,7 @@ func (c *Conn) stop(flush bool) error {
 	c.dtlsConn, c.ready = nil, false
 	c.notify(io.ErrClosedPipe)
 
-	return util.FlattenErrs(errs)
+	return errors.Join(errs...)
 }
 
 func (c *Conn) notify(err error) {
