@@ -353,6 +353,10 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			return err
 		}
 		trackEncoding.context.params.Codecs = []RTPCodecParameters{codec}
+		payloadTypeFEC := findFECPayloadType(rtpParameters.Codecs)
+		if redPayloadType := findREDPayloadType(codec.PayloadType, parameters.Codecs); redPayloadType != 0 {
+			payloadTypeFEC = redPayloadType
+		}
 
 		trackEncoding.streamInfo = *createStreamInfo(
 			r.id,
@@ -361,7 +365,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 			parameters.Encodings[idx].FEC.SSRC,
 			codec.PayloadType,
 			findRTXPayloadType(codec.PayloadType, rtpParameters.Codecs),
-			findFECPayloadType(rtpParameters.Codecs),
+			payloadTypeFEC,
 			codec.RTPCodecCapability,
 			parameters.HeaderExtensions,
 		)

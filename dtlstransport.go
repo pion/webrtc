@@ -83,23 +83,30 @@ type streamsForSSRCResult struct {
 }
 
 // srtpRTPReader pulls merged SRTP packets through their original SSRC's interceptors.
-// Select before reading so interceptors get a real advancing reader and can use their own buffers.
+// Streams with separate RTX select their source before entering its interceptor chain.
 type srtpRTPReader struct {
 	readStream  *srtp.ReadStreamSRTP
 	interceptor interceptor.RTPReader
 	repair      atomic.Pointer[srtpRTPReader]
+	isOpusRED   bool
 }
 
-func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-	stream, err := r.readStream.NextStream()
-	if err != nil {
-		return 0, a, err
-	}
-	if repair := r.repair.Load(); repair != nil && stream == repair.readStream {
-		return repair.interceptor.Read(in, a)
+func (r *srtpRTPReader) Read(in []byte, attributes interceptor.Attributes) (int, interceptor.Attributes, error) {
+	if r.isOpusRED {
+		// RED can buffer multiple Opus packets from one SRTP packet. Let its
+		// source reader wait for input only after those packets are drained.
+		return r.interceptor.Read(in, attributes)
 	}
 
-	return r.interceptor.Read(in, a)
+	stream, err := r.readStream.NextStream()
+	if err != nil {
+		return 0, attributes, err
+	}
+	if repair := r.repair.Load(); repair != nil && stream == repair.readStream {
+		return repair.interceptor.Read(in, attributes)
+	}
+
+	return r.interceptor.Read(in, attributes)
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
@@ -831,13 +838,22 @@ func (t *DTLSTransport) streamsForSSRC(
 		return nil, err
 	}
 
-	rtpReader := &srtpRTPReader{readStream: rtpReadStream}
+	rtpReader := &srtpRTPReader{
+		readStream: rtpReadStream,
+		isOpusRED: strings.EqualFold(streamInfo.MimeType, MimeTypeOpus) &&
+			streamInfo.PayloadTypeForwardErrorCorrection != 0,
+	}
 	source := rtpReadStream.SourceReader()
+	if rtpReader.isOpusRED {
+		// Apply source selection and deadlines when RED needs a new wire packet,
+		// after it has delivered any buffered recovery packets.
+		source = rtpReadStream
+	}
 	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(
-		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+		func(in []byte, attributes interceptor.Attributes) (int, interceptor.Attributes, error) {
 			n, readErr := source.Read(in)
 
-			return n, a, readErr
+			return n, attributes, readErr
 		},
 	))
 
