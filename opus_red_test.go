@@ -34,6 +34,7 @@ type opusREDObservation struct {
 	mu sync.Mutex
 
 	wirePayloadTypes  []uint8
+	localStreamInfos  []interceptor.StreamInfo
 	remoteStreamInfos []interceptor.StreamInfo
 }
 
@@ -41,6 +42,16 @@ func (o *opusREDObservation) factory() interceptor.Factory {
 	return &mock_interceptor.Factory{
 		NewInterceptorFn: func(string) (interceptor.Interceptor, error) {
 			return &mock_interceptor.Interceptor{
+				BindLocalStreamFn: func(
+					info *interceptor.StreamInfo,
+					writer interceptor.RTPWriter,
+				) interceptor.RTPWriter {
+					o.mu.Lock()
+					o.localStreamInfos = append(o.localStreamInfos, *info)
+					o.mu.Unlock()
+
+					return writer
+				},
 				BindRemoteStreamFn: func(
 					info *interceptor.StreamInfo,
 					reader interceptor.RTPReader,
@@ -69,6 +80,13 @@ func (o *opusREDObservation) factory() interceptor.Factory {
 			}, nil
 		},
 	}
+}
+
+func (o *opusREDObservation) localSnapshot() []interceptor.StreamInfo {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	return slices.Clone(o.localStreamInfos)
 }
 
 func (o *opusREDObservation) snapshot() ([]uint8, []interceptor.StreamInfo) {
@@ -442,4 +460,105 @@ func ExampleConfigureOpusRED() {
 
 	// Finish registration before creating the API and its PeerConnections.
 	_ = NewAPI(WithMediaEngine(mediaEngine), WithInterceptorRegistry(registry))
+}
+
+func TestOpusREDSenderUsesNegotiatedOpusOnly(t *testing.T) {
+	defer test.TimeOut(20 * time.Second).Stop()
+
+	observation := &opusREDObservation{}
+	offerPeer, answerPeer, wan := createOpusREDVNetPair(t, observation.factory(), false)
+	closed := false
+	t.Cleanup(func() {
+		if !closed {
+			closePairNow(t, offerPeer, answerPeer)
+			assert.NoError(t, wan.Stop())
+		}
+	})
+
+	// The offerer only receives. It offers Opus and RED.
+	_, err := offerPeer.AddTransceiverFromKind(
+		RTPCodecTypeAudio,
+		RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly},
+	)
+	require.NoError(t, err)
+
+	// The answerer is the sender. Its MediaEngine negotiates RED from the
+	// offer, but its transceiver preferences exclude it.
+	track, err := NewTrackLocalStaticRTP(
+		RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio", "pion",
+	)
+	require.NoError(t, err)
+	transceiver, err := answerPeer.AddTransceiverFromTrack(
+		track,
+		RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly},
+	)
+	require.NoError(t, err)
+	require.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2,
+		},
+		PayloadType: testOpusREDOpusPayloadType,
+	}}))
+	sender := transceiver.Sender()
+
+	remoteTracks := make(chan *TrackRemote, 1)
+	offerPeer.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		remoteTracks <- remote
+	})
+
+	connected := untilConnectionState(PeerConnectionStateConnected, offerPeer, answerPeer)
+	require.NoError(t, signalPair(offerPeer, answerPeer))
+	<-connected
+
+	// Preconditions: RED was offered and rejected. Without the first one
+	// the test would pass vacuously.
+	assert.Contains(t, offerPeer.LocalDescription().SDP, " red/48000")
+	assert.NotContains(t, answerPeer.LocalDescription().SDP, " red/48000")
+
+	require.Eventually(t, sender.hasSent, 3*time.Second, 10*time.Millisecond)
+
+	// Fails with the old rtpParameters.Codecs code: FEC payload type is 63.
+	var found bool
+	for _, info := range observation.localSnapshot() {
+		if info.MimeType != MimeTypeOpus {
+			continue
+		}
+		found = true
+		assert.Equal(t, uint8(testOpusREDOpusPayloadType), info.PayloadType)
+		assert.Zero(t, info.PayloadTypeForwardErrorCorrection)
+	}
+	require.True(t, found, "no local Opus StreamInfo observed on sender")
+
+	var remote *TrackRemote
+	select {
+	case remote = <-remoteTracks:
+	case <-time.After(3 * time.Second):
+		require.Fail(t, "timed out waiting for remote Opus track")
+	}
+	require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
+
+	for seq := uint16(1); seq <= 3; seq++ {
+		require.NoError(t, track.WriteRTP(&rtp.Packet{
+			Header: rtp.Header{
+				Version: 2, SequenceNumber: seq, Timestamp: uint32(seq) * 960,
+			},
+			Payload: []byte{0x01, 0x02},
+		}))
+
+		packet, _, readErr := remote.ReadRTP()
+		require.NoError(t, readErr)
+		assert.Equal(t, uint8(testOpusREDOpusPayloadType), packet.PayloadType)
+		assert.Equal(t, seq, packet.SequenceNumber)
+	}
+
+	wirePayloadTypes, _ := observation.snapshot()
+	require.NotEmpty(t, wirePayloadTypes)
+	for _, pt := range wirePayloadTypes {
+		assert.Equal(t, uint8(testOpusREDOpusPayloadType), pt)
+	}
+
+	closePairNow(t, offerPeer, answerPeer)
+	require.NoError(t, wan.Stop())
+	closed = true
 }
