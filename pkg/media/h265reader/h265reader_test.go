@@ -61,30 +61,6 @@ func TestH265Reader_NextNAL(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func TestH265Reader_processByte(t *testing.T) {
-	reader := &H265Reader{
-		nalBuffer:                   []byte{1, 2, 3, 0, 0},
-		countOfConsecutiveZeroBytes: 2,
-	}
-
-	// Test finding NAL boundary
-	nalFound := reader.processByte(1)
-	assert.True(t, nalFound)
-	assert.Equal(t, 3, len(reader.nalBuffer))
-
-	// Test zero byte counting
-	reader.countOfConsecutiveZeroBytes = 0
-	nalFound = reader.processByte(0)
-	assert.False(t, nalFound)
-	assert.Equal(t, 1, reader.countOfConsecutiveZeroBytes)
-
-	// Test non-zero, non-one byte
-	reader.countOfConsecutiveZeroBytes = 5
-	nalFound = reader.processByte(0xFF)
-	assert.False(t, nalFound)
-	assert.Equal(t, 0, reader.countOfConsecutiveZeroBytes)
-}
-
 func TestH265Reader_SEIPrefixSuffixSkippedByDefault(t *testing.T) {
 	// Build a small Annex-B stream: VPS, PrefixSEI, SuffixSEI, SPS
 	// NAL header is 2 bytes. NAL unit type is encoded in bits 1..6 of the first byte.
@@ -93,6 +69,7 @@ func TestH265Reader_SEIPrefixSuffixSkippedByDefault(t *testing.T) {
 		0x0, 0x0, 0x0, 0x1, 0x4E, 0x01, 0xFF, // PrefixSEI (type 39)
 		0x0, 0x0, 0x0, 0x1, 0x50, 0x01, 0xFF, // SuffixSEI (type 40)
 		0x0, 0x0, 0x0, 0x1, 0x42, 0x01, 0xFF, // SPS (type 33)
+		0x0, 0x0, 0x0, 0x1, 0x4E, 0x01, 0xFF, // Final PrefixSEI (type 39)
 	}
 
 	reader, err := NewReader(bytes.NewReader(stream))

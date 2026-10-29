@@ -89,6 +89,7 @@ func TestSkipSEI(t *testing.T) {
 		0x0, 0x0, 0x0, 0x1, 0xAA,
 		0x0, 0x0, 0x0, 0x1, 0x6, // SEI
 		0x0, 0x0, 0x0, 0x1, 0xAB,
+		0x0, 0x0, 0x0, 0x1, 0x6, // Final SEI
 	}
 
 	reader := CreateReader(h264Bytes, require)
@@ -100,6 +101,10 @@ func TestSkipSEI(t *testing.T) {
 	nal, err = reader.NextNAL()
 	require.Nil(err)
 	require.Equal(byte(0xAB), nal.Data[0])
+
+	nal, err = reader.NextNAL()
+	require.ErrorIs(err, io.EOF)
+	require.Nil(nal)
 }
 
 func TestIncludeSEI(t *testing.T) {

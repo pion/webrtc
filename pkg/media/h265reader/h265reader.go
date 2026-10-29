@@ -5,20 +5,16 @@
 package h265reader
 
 import (
-	"bytes"
 	"errors"
 	"io"
+
+	"github.com/pion/webrtc/v5/internal/annexb"
 )
 
 // H265Reader reads data from stream and constructs h265 nal units.
 type H265Reader struct {
-	stream                      io.Reader
-	nalBuffer                   []byte
-	countOfConsecutiveZeroBytes int
-	nalPrefixParsed             bool
-	readBuffer                  []byte
-	tmpReadBuf                  []byte
-	includeSEI                  bool
+	reader     *annexb.Reader
+	includeSEI bool
 }
 
 var (
@@ -26,26 +22,13 @@ var (
 	errDataIsNotH265Stream = errors.New("data is not a H265/HEVC bitstream")
 )
 
-func (reader *H265Reader) shouldSkipNAL(naluType NalUnitType) bool {
-	return !reader.includeSEI && (naluType == NalUnitTypePrefixSei || naluType == NalUnitTypeSuffixSei)
-}
-
 // NewReader creates new H265Reader.
 func NewReader(in io.Reader) (*H265Reader, error) {
 	if in == nil {
 		return nil, errNilReader
 	}
 
-	reader := &H265Reader{
-		stream:          in,
-		nalBuffer:       make([]byte, 0),
-		nalPrefixParsed: false,
-		readBuffer:      make([]byte, 0),
-		tmpReadBuf:      make([]byte, 4096),
-		includeSEI:      false,
-	}
-
-	return reader, nil
+	return &H265Reader{reader: annexb.New(in, errDataIsNotH265Stream)}, nil
 }
 
 // Option configures the behavior of H265Reader.
@@ -97,144 +80,21 @@ type NAL struct {
 	Data []byte // header bytes + rbsp
 }
 
-func (reader *H265Reader) read(numToRead int) (data []byte, e error) {
-	for len(reader.readBuffer) < numToRead {
-		n, err := reader.stream.Read(reader.tmpReadBuf)
-		if err != nil {
-			return nil, err
-		}
-		if n == 0 {
-			break
-		}
-		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
-	}
-
-	numShouldRead := min(numToRead, len(reader.readBuffer))
-	data = reader.readBuffer[0:numShouldRead]
-	reader.readBuffer = reader.readBuffer[numShouldRead:]
-
-	return data, nil
-}
-
-func (reader *H265Reader) bitStreamStartsWithH265Prefix() (prefixLength int, e error) {
-	nalPrefix3Bytes := []byte{0, 0, 1}
-	nalPrefix4Bytes := []byte{0, 0, 0, 1}
-
-	prefixBuffer, e := reader.read(4)
-	if e != nil {
-		return prefixLength, e
-	}
-
-	n := len(prefixBuffer)
-
-	if n == 0 {
-		return 0, io.EOF
-	}
-
-	if n < 3 {
-		return 0, errDataIsNotH265Stream
-	}
-
-	nalPrefix3BytesFound := bytes.Equal(nalPrefix3Bytes, prefixBuffer[:3])
-	if n == 3 {
-		if nalPrefix3BytesFound {
-			return 0, io.EOF
-		}
-
-		return 0, errDataIsNotH265Stream
-	}
-
-	// n == 4
-	if nalPrefix3BytesFound {
-		reader.nalBuffer = append(reader.nalBuffer, prefixBuffer[3])
-
-		return 3, nil
-	}
-
-	nalPrefix4BytesFound := bytes.Equal(nalPrefix4Bytes, prefixBuffer)
-	if nalPrefix4BytesFound {
-		return 4, nil
-	}
-
-	return 0, errDataIsNotH265Stream
-}
-
-// NextNAL reads from stream and returns then next NAL,
-// and an error if there is incomplete frame data.
-// Returns all nil values when no more NALs are available.
+// NextNAL returns the next NAL unit, or io.EOF after the final unit.
 func (reader *H265Reader) NextNAL() (*NAL, error) {
-	if !reader.nalPrefixParsed {
-		_, err := reader.bitStreamStartsWithH265Prefix()
+	for {
+		data, err := reader.reader.Next()
 		if err != nil {
 			return nil, err
 		}
-
-		reader.nalPrefixParsed = true
-	}
-
-	for {
-		buffer, err := reader.read(1)
-		if err != nil {
-			break
+		nal := newNal(data)
+		nal.parseHeader()
+		if !reader.includeSEI && (nal.NalUnitType == NalUnitTypePrefixSei || nal.NalUnitType == NalUnitTypeSuffixSei) {
+			continue
 		}
 
-		n := len(buffer)
-
-		if n != 1 {
-			break
-		}
-		readByte := buffer[0]
-		nalFound := reader.processByte(readByte)
-		if nalFound {
-			naluType := NalUnitType((reader.nalBuffer[0] & 0x7E) >> 1)
-			if reader.shouldSkipNAL(naluType) {
-				reader.nalBuffer = nil
-
-				continue
-			}
-
-			break
-		}
-
-		reader.nalBuffer = append(reader.nalBuffer, readByte)
+		return nal, nil
 	}
-
-	if len(reader.nalBuffer) == 0 {
-		return nil, io.EOF
-	}
-
-	nal := newNal(reader.nalBuffer)
-	reader.nalBuffer = nil
-	nal.parseHeader()
-
-	return nal, nil
-}
-
-func (reader *H265Reader) processByte(readByte byte) (nalFound bool) {
-	nalFound = false
-
-	switch readByte {
-	case 0:
-		reader.countOfConsecutiveZeroBytes++
-	case 1:
-		if reader.countOfConsecutiveZeroBytes >= 2 {
-			countOfConsecutiveZeroBytesInPrefix := 2
-			if reader.countOfConsecutiveZeroBytes > 2 {
-				countOfConsecutiveZeroBytesInPrefix = 3
-			}
-
-			if nalUnitLength := len(reader.nalBuffer) - countOfConsecutiveZeroBytesInPrefix; nalUnitLength > 0 {
-				reader.nalBuffer = reader.nalBuffer[0:nalUnitLength]
-				nalFound = true
-			}
-		}
-
-		reader.countOfConsecutiveZeroBytes = 0
-	default:
-		reader.countOfConsecutiveZeroBytes = 0
-	}
-
-	return nalFound
 }
 
 func newNal(data []byte) *NAL {
