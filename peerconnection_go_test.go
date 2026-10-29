@@ -1776,13 +1776,13 @@ func TestPeerConnectionNilCallback(t *testing.T) {
 	pc.OnICEConnectionStateChange(nil)
 	pc.onICEConnectionStateChange(ICEConnectionStateNew)
 
-	pc.onNegotiationNeeded()
+	// Run synchronously so queued work cannot observe the temporary handler.
 	pc.negotiationNeededOp()
 	pc.OnNegotiationNeeded(func() {
 		assert.Fail(t, "OnNegotiationNeeded called")
 	})
 	pc.OnNegotiationNeeded(nil)
-	pc.onNegotiationNeeded()
+	pc.isNegotiationNeeded.Store(false)
 	pc.negotiationNeededOp()
 
 	assert.NoError(t, pc.Close())
