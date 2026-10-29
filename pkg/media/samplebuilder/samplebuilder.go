@@ -119,36 +119,30 @@ func (s *SampleBuilder) releasePacket(i uint16) {
 	}
 }
 
-// purgeConsumedBuffers clears all buffers that have already been consumed by
-// popping.
-func (s *SampleBuilder) purgeConsumedBuffers() {
-	s.purgeConsumedLocation(s.active, false)
-}
-
 // purgeConsumedLocation clears all buffers that have already been consumed
 // during a sample building method.
 func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation, forceConsume bool) {
-	if !s.filled.hasData() {
-		return
-	}
+	for s.filled.hasData() {
+		switch consume.compare(s.filled.head) {
+		case slCompareInside:
+			if !forceConsume {
+				return
+			}
 
-	switch consume.compare(s.filled.head) {
-	case slCompareInside:
-		if !forceConsume {
-			break
+			fallthrough
+		case slCompareBefore:
+			s.releasePacket(s.filled.head)
+			s.filled.head++
+		default:
+			return
 		}
-
-		fallthrough
-	case slCompareBefore:
-		s.releasePacket(s.filled.head)
-		s.filled.head++
 	}
 }
 
 // purgeBuffers flushes all buffers that are already consumed or those buffers
 // that are too late to consume.
 func (s *SampleBuilder) purgeBuffers(flush bool) {
-	s.purgeConsumedBuffers()
+	s.purgeConsumedLocation(s.active, false)
 
 	for (s.tooOld(s.filled) || (s.filled.count() > s.maxLate) || flush) && s.filled.hasData() {
 		if s.active.empty() {
@@ -159,7 +153,7 @@ func (s *SampleBuilder) purgeBuffers(flush bool) {
 		if s.active.hasData() && (s.active.head == s.filled.head) {
 			// attempt to force the active packet to be consumed even though
 			// outstanding data may be pending arrival
-			if s.buildSample(true) != nil {
+			if s.buildSample(true) {
 				continue
 			}
 
@@ -201,18 +195,17 @@ func (s *SampleBuilder) Flush() {
 	s.droppedPackets = 0
 }
 
-// buildSample creates a sample from a valid collection of RTP Packets by
-// walking forwards building a sample if everything looks good clear and
-// update buffer+values
+// buildSample consumes a complete packet range and queues a sample if valid.
+// It returns whether packets were consumed, including discarded samples.
 //
 //nolint:cyclop
-func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
+func (s *SampleBuilder) buildSample(purgingBuffers bool) bool {
 	if s.active.empty() {
 		s.active = s.filled
 	}
 
 	if s.active.empty() {
-		return nil
+		return false
 	}
 
 	if s.filled.compare(s.active.tail) == slCompareInside {
@@ -220,39 +213,38 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	}
 
 	var consume sampleSequenceLocation
+	sampleTimestamp, _ := s.fetchTimestamp(s.active)
 
 	for i := s.active.head; s.buffer[i] != nil && s.active.compare(i) != slCompareAfter; i++ {
+		if s.buffer[i].Timestamp != sampleTimestamp {
+			consume.head = s.active.head
+			consume.tail = i
+
+			break
+		}
 		if s.depacketizer.IsPartitionTail(s.buffer[i].Marker, s.buffer[i].Payload) {
 			consume.head = s.active.head
 			consume.tail = i + 1
 
 			break
 		}
-		headTimestamp, hasData := s.fetchTimestamp(s.active)
-		if hasData && s.buffer[i].Timestamp != headTimestamp {
-			consume.head = s.active.head
-			consume.tail = i
-
-			break
-		}
 	}
 
 	if consume.empty() {
-		return nil
+		return false
 	}
 
 	if !purgingBuffers && s.buffer[consume.tail] == nil {
 		// wait for the next packet after this set of packets to arrive
 		// to ensure at least one post sample timestamp is known
 		// (unless we have to release right now)
-		return nil
+		return false
 	}
 
-	sampleTimestamp, _ := s.fetchTimestamp(s.active)
 	afterTimestamp := sampleTimestamp
 
 	// scan for any packet after the current and use that time stamp as the diff point
-	for i := consume.tail; i < s.active.tail; i++ {
+	for i := consume.tail; i != s.active.tail; i++ {
 		if s.buffer[i] != nil {
 			afterTimestamp = s.buffer[i].Timestamp
 
@@ -268,9 +260,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if !s.depacketizer.IsPartitionHead(s.buffer[consume.head].Payload) {
 		s.droppedPackets += consume.count()
 		s.purgeConsumedLocation(consume, true)
-		s.purgeConsumedBuffers()
 
-		return nil
+		return true
 	}
 
 	// merge all the buffers into a sample
@@ -284,7 +275,10 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	for i := consume.head; i != consume.tail; i++ {
 		payload, err := s.depacketizer.Unmarshal(s.buffer[i].Payload)
 		if err != nil {
-			return nil
+			s.droppedPackets += consume.count()
+			s.purgeConsumedLocation(consume, true)
+
+			return true
 		}
 		if i == consume.head && s.packetHeadHandler != nil {
 			metadata = s.packetHeadHandler(s.depacketizer)
@@ -321,15 +315,15 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	s.prepared.tail++
 
 	s.purgeConsumedLocation(consume, true)
-	s.purgeConsumedBuffers()
 
-	return sample
+	return true
 }
 
 // Pop compiles pushed RTP packets into media samples and then
 // returns the next valid sample (or nil if no sample is compiled).
 func (s *SampleBuilder) Pop() *media.Sample {
-	_ = s.buildSample(false)
+	for s.buildSample(false) && s.prepared.empty() {
+	}
 	if s.prepared.empty() {
 		return nil
 	}
