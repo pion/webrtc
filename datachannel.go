@@ -49,11 +49,8 @@ type DataChannel struct {
 	// binaryType                 string
 
 	onMessageHandler    func(DataChannelMessage)
-	openHandlerOnce     sync.Once
 	onOpenHandler       func()
-	dialHandlerOnce     sync.Once
 	onDialHandler       func()
-	closeHandlerOnce    sync.Once
 	onCloseHandler      func()
 	onBufferedAmountLow func()
 	onErrorHandler      func(error)
@@ -218,16 +215,18 @@ func (d *DataChannel) checkDetachAfterOpen() {
 // the underlying data transport has been established (or re-established).
 func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
-	d.openHandlerOnce = sync.Once{}
-	d.onOpenHandler = f
-	d.mu.Unlock()
-
-	if d.ReadyState() == DataChannelStateOpen {
-		// If the data channel is already open, call the handler immediately.
-		go d.openHandlerOnce.Do(func() {
+	handler := f
+	if f != nil {
+		handler = sync.OnceFunc(func() {
 			f()
 			d.checkDetachAfterOpen()
 		})
+	}
+	d.onOpenHandler = handler
+	d.mu.Unlock()
+
+	if handler != nil && d.ReadyState() == DataChannelStateOpen {
+		go handler()
 	}
 }
 
@@ -242,10 +241,7 @@ func (d *DataChannel) onOpen() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.openHandlerOnce.Do(func() {
-			handler()
-			d.checkDetachAfterOpen()
-		})
+		go handler()
 	}
 }
 
@@ -253,13 +249,14 @@ func (d *DataChannel) onOpen() {
 // peer has been dialed, but before said peer has responded.
 func (d *DataChannel) OnDial(f func()) {
 	d.mu.Lock()
-	d.dialHandlerOnce = sync.Once{}
+	if f != nil {
+		f = sync.OnceFunc(f)
+	}
 	d.onDialHandler = f
 	d.mu.Unlock()
 
-	if d.ReadyState() == DataChannelStateOpen {
-		// If the data channel is already open, call the handler immediately.
-		go d.dialHandlerOnce.Do(f)
+	if f != nil && d.ReadyState() == DataChannelStateOpen {
+		go f()
 	}
 }
 
@@ -274,7 +271,7 @@ func (d *DataChannel) onDial() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.dialHandlerOnce.Do(handler)
+		go handler()
 	}
 }
 
@@ -286,13 +283,14 @@ func (d *DataChannel) onDial() {
 // prior to GracefulClose.
 func (d *DataChannel) OnClose(f func()) {
 	d.mu.Lock()
-	d.closeHandlerOnce = sync.Once{}
+	if f != nil {
+		f = sync.OnceFunc(f)
+	}
 	d.onCloseHandler = f
 	d.mu.Unlock()
 
-	if d.ReadyState() == DataChannelStateClosed {
-		// If the data channel is already closed, call the handler immediately.
-		go d.closeHandlerOnce.Do(f)
+	if f != nil && d.ReadyState() == DataChannelStateClosed {
+		go f()
 	}
 }
 
@@ -302,7 +300,7 @@ func (d *DataChannel) onClose() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.closeHandlerOnce.Do(handler)
+		go handler()
 	}
 }
 
