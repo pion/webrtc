@@ -452,15 +452,9 @@ func (r *RTPSender) ReadSimulcast(b []byte, rid string) (n int, a interceptor.At
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you.
 func (r *RTPSender) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.ReadSimulcast(b, rid)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pkts, err := rtcp.Unmarshal(b[:i])
-
-	return pkts, attributes, err
+	return readRTCP(func(b []byte) (int, interceptor.Attributes, error) {
+		return r.ReadSimulcast(b, rid)
+	}, r.api.settingEngine.getReceiveMTU())
 }
 
 // SetReadDeadline sets the deadline for the Read operation.
