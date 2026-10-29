@@ -519,6 +519,66 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	wg.Wait()
 }
 
+// Assert that a track can be read while receiveForRid replaces its streams,
+// as happens when a RID shows up on a new SSRC.
+func TestRTPReceiver_ReadRTP_ReceiveForRidNoRace(t *testing.T) {
+	receiver := &RTPReceiver{
+		kind:       RTPCodecTypeVideo,
+		received:   make(chan any),
+		closedChan: make(chan any),
+		rtxPool: sync.Pool{New: func() any {
+			return make([]byte, 1200)
+		}},
+	}
+
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{RID: "rid", SSRC: 1111}}}})
+
+	params := RTPParameters{
+		Codecs: []RTPCodecParameters{
+			{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
+				PayloadType:        96,
+			},
+		},
+	}
+	rtpInterceptor := interceptor.RTPReaderFunc(
+		func(_ []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			return 0, a, nil
+		},
+	)
+	track, err := receiver.receiveForRid("rid", params, &interceptor.StreamInfo{SSRC: 1111}, nil, rtpInterceptor, false, nil, nil, nil)
+	require.NoError(t, err)
+
+	close(receiver.received)
+
+	started := make(chan struct{})
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b := make([]byte, 1500)
+		_, _, _ = receiver.readRTP(b, track)
+		close(started)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_, _, _ = receiver.readRTP(b, track)
+			}
+		}
+	}()
+	<-started
+
+	for ssrc := uint32(2222); ssrc < 2272; ssrc++ {
+		_, err = receiver.receiveForRid("rid", params, &interceptor.StreamInfo{SSRC: ssrc}, nil, rtpInterceptor, false, nil, nil, nil)
+		require.NoError(t, err)
+	}
+
+	close(stop)
+	<-done
+}
+
 // TestRTPReceiver_CollectStats_Mapping validates that collectStats maps
 // interceptor/pkg/stats values into InboundRTPStreamStats.
 func TestRTPReceiver_CollectStats_Mapping(t *testing.T) {

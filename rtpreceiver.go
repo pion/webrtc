@@ -540,8 +540,17 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 		return 0, nil, io.EOF
 	}
 
+	// receiveForRid replaces the streams of a track when its RID shows up on a
+	// new SSRC. Take the interceptor under the lock, and read outside of it.
+	r.mu.RLock()
+	var rtpInterceptor interceptor.RTPReader
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpInterceptor.Read(b, a)
+		rtpInterceptor = t.rtpInterceptor
+	}
+	r.mu.RUnlock()
+
+	if rtpInterceptor != nil {
+		return rtpInterceptor.Read(b, a)
 	}
 
 	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
