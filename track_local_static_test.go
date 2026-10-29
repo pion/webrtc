@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -553,8 +554,10 @@ var errWriteBoom = errors.New("fake write failure")
 
 type errWriter struct{}
 
-func (errWriter) WriteRTP(_ *rtp.Header, _ []byte) (int, error) { return 0, errWriteBoom }
-func (errWriter) Write(_ []byte) (int, error)                   { return 0, nil }
+func (errWriter) WriteRTP(_ *rtp.Header, _ []byte) (int, error) {
+	return 0, &net.OpError{Op: "write", Net: "udp", Err: errWriteBoom}
+}
+func (errWriter) Write(_ []byte) (int, error) { return 0, nil }
 
 func Test_TrackLocalStaticRTP_writeRTP_ReturnsError(t *testing.T) {
 	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "id", "stream")
@@ -574,6 +577,9 @@ func Test_TrackLocalStaticRTP_writeRTP_ReturnsError(t *testing.T) {
 	err = track.writeRTP(pkt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), errWriteBoom.Error())
+	require.ErrorIs(t, err, errWriteBoom)
+	var writeErr *net.OpError
+	require.ErrorAs(t, err, &writeErr)
 }
 
 func Test_TrackLocalStaticRTP_Write_UnmarshalError(t *testing.T) {
