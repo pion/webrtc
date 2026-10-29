@@ -833,3 +833,16 @@ func TestRTPReceiverRTXBufferFactory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint16(42), packet.SequenceNumber)
 }
+
+func TestRTPReceiverStopPreservesEarlierTrackError(t *testing.T) {
+	stream := &srtp.ReadStreamSRTCP{}
+	want := stream.Close()
+	require.Error(t, want)
+	receiver := &RTPReceiver{
+		received: make(chan any), closedChan: make(chan struct{}),
+		tracks: []trackStreams{{track: &TrackRemote{}, rtcpReadStream: stream}, {track: &TrackRemote{}}},
+	}
+	close(receiver.received)
+	require.ErrorIs(t, receiver.Stop(), want)
+	require.NoError(t, receiver.Stop())
+}

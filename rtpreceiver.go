@@ -367,19 +367,17 @@ func (r *RTPReceiver) haveClosed() bool {
 func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var err error
+	var errs []error
 
 	select {
 	case <-r.closedChan:
-		return err
+		return nil
 	default:
 	}
 
 	select {
 	case <-r.received:
 		for i := range r.tracks {
-			errs := []error{}
-
 			if r.tracks[i].rtcpReadStream != nil {
 				errs = append(errs, r.tracks[i].rtcpReadStream.Close())
 			}
@@ -403,8 +401,6 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 			if r.tracks[i].repairStreamInfo != nil {
 				r.api.interceptor.UnbindRemoteStream(r.tracks[i].repairStreamInfo)
 			}
-
-			err = errors.Join(errs...)
 		}
 	default:
 	}
@@ -419,7 +415,7 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
