@@ -466,11 +466,14 @@ func (r *RTPSender) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.At
 // SetReadDeadline sets the deadline for the Read operation.
 // Setting to zero means no deadline.
 func (r *RTPSender) SetReadDeadline(t time.Time) error {
-	if r.trackEncodings[0].srtpStream == nil {
+	r.mu.RLock()
+	stream := r.trackEncodings[0].srtpStream
+	r.mu.RUnlock()
+	if stream == nil {
 		return errRTPSenderSendNotCalled
 	}
 
-	return r.trackEncodings[0].srtpStream.SetReadDeadline(t)
+	return stream.SetReadDeadline(t)
 }
 
 // SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid
@@ -481,6 +484,10 @@ func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) err
 
 	for _, t := range r.trackEncodings {
 		if t.track != nil && t.track.RID() == rid {
+			if t.srtpStream == nil {
+				return errRTPSenderSendNotCalled
+			}
+
 			return t.srtpStream.SetReadDeadline(deadline)
 		}
 	}
