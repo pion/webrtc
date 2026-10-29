@@ -17,7 +17,27 @@ func profileLevelIDMatches(a, b string) bool {
 		return false
 	}
 
-	return aa[0] == bb[0] && aa[1] == bb[1]
+	return h264Profile(aa) == h264Profile(bb)
+}
+
+// RFC 6184, Table 5 permits different profile_idc/profile-iop combinations
+// to describe the same sub-profile. The level remains independent.
+func h264Profile(profile []byte) uint16 {
+	switch {
+	case profile[0] == 0x42 && profile[1]&0x4f == 0x40,
+		profile[0] == 0x4d && profile[1]&0x8f == 0x80,
+		profile[0] == 0x58 && profile[1]&0xcf == 0xc0:
+		return 0x42e0 // Constrained Baseline
+	case profile[0] == 0x42 && profile[1]&0x4f == 0,
+		profile[0] == 0x58 && profile[1]&0xcf == 0x80:
+		return 0x4200 // Baseline
+	case profile[0] == 0x4d && profile[1]&0xaf == 0:
+		return 0x4d00 // Main
+	case profile[0] == 0x58 && profile[1]&0xcf == 0:
+		return 0x5800 // Extended
+	default:
+		return uint16(profile[0])<<8 | uint16(profile[1])
+	}
 }
 
 type h264FMTP struct {
