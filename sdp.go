@@ -390,6 +390,12 @@ func populateLocalCandidates(
 		return sessionDescription
 	}
 
+	// GetLocalCandidates may change the order of candidates.
+	// Sort them so that SDP generation returns same value everytime
+	slices.SortFunc(candidates, func(a, b ICECandidate) int {
+		return cmp.Compare(a.statsID, b.statsID)
+	})
+
 	// Candidate population must not mutate the stored SDP, which can still be
 	// read by SetLocalDescription after it releases the PeerConnection lock.
 	parsed := *sessionDescription.parsed
