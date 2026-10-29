@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,7 +61,7 @@ func (f *fakeDepacketizer) IsPartitionTail(marker bool, _ []byte) bool {
 	return marker
 }
 
-func TestSampleBuilder(t *testing.T) { //nolint:maintidx
+func TestSampleBuilder(t *testing.T) {
 	testData := []sampleBuilderTest{
 		{
 			message: "SampleBuilder shouldn't emit anything if only one RTP packet has been pushed",
@@ -319,9 +320,7 @@ func TestSampleBuilder(t *testing.T) { //nolint:maintidx
 		for _, td := range testData {
 			var opts []Option
 			if td.maxLateTimestamp != 0 {
-				opts = append(opts, WithMaxTimeDelay(
-					time.Millisecond*time.Duration(int64(td.maxLateTimestamp)),
-				))
+				opts = append(opts, WithMaxTimeDelay(time.Millisecond*time.Duration(int64(td.maxLateTimestamp))))
 			}
 			if td.withRTPHeader {
 				opts = append(opts, WithRTPHeaders(true))
@@ -353,35 +352,18 @@ func TestSampleBuilderMaxLate(t *testing.T) {
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 0, Timestamp: 1}, Payload: []byte{0x01}})
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 2}, Payload: []byte{0x01}})
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 3}, Payload: []byte{0x01}})
-	assert.Equal(&media.Sample{
-		Data:            []byte{0x01},
-		Duration:        time.Second,
-		PacketTimestamp: 1,
-	}, fd.Pop(), "Failed to build samples before gap")
+	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 1}, fd.Pop(), "Failed to build samples before gap")
 
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5000, Timestamp: 500}, Payload: []byte{0x02}})
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5001, Timestamp: 501}, Payload: []byte{0x02}})
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 5002, Timestamp: 502}, Payload: []byte{0x02}})
 
-	assert.Equal(&media.Sample{
-		Data:            []byte{0x01},
-		Duration:        time.Second,
-		PacketTimestamp: 2,
-	}, fd.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 2}, fd.Pop(), "Failed to build samples after large gap")
 	assert.Equal((*media.Sample)(nil), fd.Pop(), "Failed to build samples after large gap")
 
 	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 6000, Timestamp: 600}, Payload: []byte{0x03}})
-	assert.Equal(&media.Sample{
-		Data:               []byte{0x02},
-		Duration:           time.Second,
-		PacketTimestamp:    500,
-		PrevDroppedPackets: 4998,
-	}, fd.Pop(), "Failed to build samples after large gap")
-	assert.Equal(&media.Sample{
-		Data:            []byte{0x02},
-		Duration:        time.Second,
-		PacketTimestamp: 501,
-	}, fd.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 500, PrevDroppedPackets: 4998}, fd.Pop(), "Failed to build samples after large gap")
+	assert.Equal(&media.Sample{Data: []byte{0x02}, Duration: time.Second, PacketTimestamp: 501}, fd.Pop(), "Failed to build samples after large gap")
 }
 
 func TestSeqnumDistance(t *testing.T) {
@@ -421,19 +403,10 @@ func TestSampleBuilderCleanReference(t *testing.T) {
 			fd.Push(pkt5)
 
 			for i := range 3 {
-				assert.Nilf(
-					t, fd.buffer[(i+int(seqStart))%0x10000],
-					"Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i,
-				)
+				assert.Nilf(t, fd.buffer[(i+int(seqStart))%0x10000], "Old packet (%d) is not unreferenced (maxLate: 10, pushed: 12)", i)
 			}
-			assert.Equal(
-				t, pkt4, fd.buffer[(14+int(seqStart))%0x10000],
-				"New packet must be referenced after jump",
-			)
-			assert.Equal(
-				t, pkt5, fd.buffer[(12+int(seqStart))%0x10000],
-				"New packet must be referenced after jump",
-			)
+			assert.Equal(t, pkt4, fd.buffer[(14+int(seqStart))%0x10000], "New packet must be referenced after jump")
+			assert.Equal(t, pkt5, fd.buffer[(12+int(seqStart))%0x10000], "New packet must be referenced after jump")
 		})
 	}
 }
@@ -515,10 +488,7 @@ func TestSampleBuilderWithPacketHeadHandler(t *testing.T) {
 }
 
 func TestSampleBuilderData(t *testing.T) {
-	fd := New(10, &fakeDepacketizer{
-		headChecker: true,
-		alwaysHead:  true,
-	}, 1)
+	fd := New(10, &fakeDepacketizer{headChecker: true, alwaysHead: true}, 1)
 	validSamples := 0
 	for i := range 0x20000 {
 		packet := rtp.Packet{
@@ -545,9 +515,7 @@ func TestSampleBuilderData(t *testing.T) {
 }
 
 func TestSampleBuilderPacketUnreference(t *testing.T) {
-	fd := New(10, &fakeDepacketizer{
-		headChecker: true,
-	}, 1)
+	fd := New(10, &fakeDepacketizer{headChecker: true}, 1)
 
 	var refs int64
 	finalizer := func(*rtp.Packet) {
@@ -584,26 +552,16 @@ func TestSampleBuilderPacketUnreference(t *testing.T) {
 }
 
 func TestSampleBuilder_Flush(t *testing.T) {
-	fd := New(50, &fakeDepacketizer{
-		headChecker: true,
-		headBytes:   []byte{0x01},
-	}, 1)
+	fd := New(50, &fakeDepacketizer{headChecker: true, headBytes: []byte{0x01}}, 1)
 
-	fd.Push(&rtp.Packet{
-		Header:  rtp.Header{SequenceNumber: 999, Timestamp: 0},
-		Payload: []byte{0x00},
-	}) // Invalid packet
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 999, Timestamp: 0}, Payload: []byte{0x00}}) // Invalid packet
 	// Gap preventing below packets to be processed
-	fd.Push(&rtp.Packet{
-		Header:  rtp.Header{SequenceNumber: 1001, Timestamp: 1, Marker: true},
-		Payload: []byte{0x01, 0x11},
-	}) // Valid packet
-	fd.Push(&rtp.Packet{
-		Header:  rtp.Header{SequenceNumber: 1011, Timestamp: 10, Marker: true},
-		Payload: []byte{0x01, 0x12},
-	}) // Valid packet
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1001, Timestamp: 1, Marker: true}, Payload: []byte{0x01, 0x11}})  // Valid packet
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1011, Timestamp: 10, Marker: true}, Payload: []byte{0x01, 0x12}}) // Valid packet
 
 	assert.Nil(t, fd.Pop(), "Unexpected sample is returned. Test precondition may be broken")
+
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1012, Timestamp: 10}}) // Trailing dropped packet.
 
 	fd.Flush()
 
@@ -618,6 +576,42 @@ func TestSampleBuilder_Flush(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, samples)
+
+	// Reuse the builder without carrying dropped packets into the next stream.
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2000, Timestamp: 10, Marker: true}, Payload: []byte{0x01}})
+	fd.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2001, Timestamp: 11}, Payload: []byte{0x01}})
+	assert.Equal(t, &media.Sample{Data: []byte{0x01}, Duration: time.Second, PacketTimestamp: 10}, fd.Pop())
+}
+
+func TestSampleBuilder_H264(t *testing.T) {
+	for _, mtu := range []uint16{4, 1200} { // Fragmented and single-packet NAL units.
+		t.Run(fmt.Sprint(mtu), func(t *testing.T) {
+			sb := New(50, &codecs.H264Packet{}, 90000)
+			payloads := (&codecs.H264Payloader{}).Payload(mtu, []byte{0x65, 1, 2, 3, 4})
+			for i, payload := range payloads {
+				sb.Push(&rtp.Packet{
+					Header: rtp.Header{
+						SequenceNumber: uint16(i), //nolint:gosec // The fixture produces at most two packets.
+						Timestamp:      1,
+						Marker:         i == len(payloads)-1,
+					},
+					Payload: payload,
+				})
+			}
+			sb.Flush()
+			assert.Equal(t, &media.Sample{Data: []byte{0, 0, 0, 1, 0x65, 1, 2, 3, 4}, PacketTimestamp: 1}, sb.Pop())
+		})
+	}
+}
+
+func TestSampleBuilder_ZeroSampleRate(t *testing.T) {
+	sb := New(50, &fakeDepacketizer{}, 0)
+	sb.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 1, Timestamp: 1, Marker: true}, Payload: []byte{0x01}})
+	sb.Push(&rtp.Packet{Header: rtp.Header{SequenceNumber: 2, Timestamp: 2, Marker: true}, Payload: []byte{0x02}})
+	assert.Equal(t, &media.Sample{Data: []byte{0x01}, PacketTimestamp: 1}, sb.Pop())
+
+	sb.Flush()
+	assert.Equal(t, &media.Sample{Data: []byte{0x02}, PacketTimestamp: 2}, sb.Pop())
 }
 
 func BenchmarkSampleBuilderSequential(b *testing.B) {

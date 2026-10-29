@@ -223,10 +223,7 @@ func TestOggReader_ChannelMappingFamily1(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader, err := NewWithOptions(
-				bytes.NewReader(buildChannelMappingFamilyContainer(1, tc.channels, tc.streams, tc.coupled, tc.channelMap)),
-				WithDoChecksum(false),
-			)
+			reader, err := NewWithOptions(bytes.NewReader(buildChannelMappingFamilyContainer(1, tc.channels, tc.streams, tc.coupled, tc.channelMap)), WithDoChecksum(false))
 			assert.NoError(t, err)
 			assert.NotNil(t, reader)
 
@@ -268,9 +265,7 @@ func TestOggReader_KnownChannelMappingFamilies(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			container := buildChannelMappingFamilyContainer(
-				tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap,
-			)
+			container := buildChannelMappingFamilyContainer(tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap)
 			reader, err := NewWithOptions(bytes.NewReader(container), WithDoChecksum(false))
 			assert.NoError(t, err)
 			assert.NotNil(t, reader)
@@ -319,9 +314,7 @@ func TestOggReader_ParseExtraFieldsForNonZeroMappingFamily(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			container := buildChannelMappingFamilyContainer(
-				tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap,
-			)
+			container := buildChannelMappingFamilyContainer(tc.mappingFamily, tc.channels, tc.streams, tc.coupled, tc.channelMap)
 			reader, err := NewWithOptions(bytes.NewReader(container), WithDoChecksum(false))
 			assert.NoError(t, err)
 			assert.NotNil(t, reader)
@@ -485,11 +478,7 @@ func TestOggReader_MultiTrackFile(t *testing.T) {
 	channelMap := uint8(0)
 	outputGain := uint16(0)
 
-	data := buildMultiTrackOggContainer(
-		firstSerial, secondSerial,
-		channels, sampleRate, preskip,
-		version, channelMap, outputGain,
-	)
+	data := buildMultiTrackOggContainer(firstSerial, secondSerial, channels, sampleRate, preskip, version, channelMap, outputGain)
 
 	reader, err := NewWithOptions(bytes.NewReader(data), WithDoChecksum(false))
 	assert.NoError(t, err)
@@ -519,8 +508,7 @@ func TestOggReader_MultiTrackFile(t *testing.T) {
 		headers = append(headers, header)
 		pageHeaders = append(pageHeaders, pageHeader)
 
-		t.Logf("Found header %d: Channels=%d, SampleRate=%d, Serial=%d",
-			len(headers), header.Channels, header.SampleRate, pageHeader.Serial)
+		t.Logf("Found header %d: Channels=%d, SampleRate=%d, Serial=%d", len(headers), header.Channels, header.SampleRate, pageHeader.Serial)
 	}
 
 	assert.Equal(t, 2, len(headers), "Should find exactly 2 headers")
@@ -716,10 +704,7 @@ func TestOggReader_DetectHeadersAndTags(t *testing.T) {
 	serial1 := uint32(0xd03ed35d)
 	serial2 := uint32(0xfa6e13f0)
 
-	track1Title := hex.EncodeToString([]byte{
-		0x6e, 0x65, 0x76, 0x65, 0x72, 0x20, 0x67, 0x6f, 0x6e, 0x6e, 0x61, 0x20,
-		0x67, 0x69, 0x76, 0x65, 0x20, 0x79, 0x6f, 0x75, 0x20, 0x75, 0x70,
-	})
+	track1Title := hex.EncodeToString([]byte{0x6e, 0x65, 0x76, 0x65, 0x72, 0x20, 0x67, 0x6f, 0x6e, 0x6e, 0x61, 0x20, 0x67, 0x69, 0x76, 0x65, 0x20, 0x79, 0x6f, 0x75, 0x20, 0x75, 0x70})
 
 	track1Comments := []UserComment{
 		{Comment: "title", Value: track1Title},

@@ -22,14 +22,7 @@ func TestMultiError(t *testing.T) {
 		errors.New("err3"), //nolint
 		errors.New("err4"), //nolint
 	}
-	errs := FlattenErrs([]error{
-		rawErrs[0],
-		nil,
-		rawErrs[1],
-		FlattenErrs([]error{
-			rawErrs[2],
-		}),
-	})
+	errs := FlattenErrs([]error{rawErrs[0], nil, rawErrs[1], FlattenErrs([]error{rawErrs[2]})})
 	str := "err1\nerr2\nerr3"
 
 	assert.Equal(t, str, errs.Error(), "String representation doesn't match")

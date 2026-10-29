@@ -611,10 +611,11 @@ func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) 
 }
 
 // Update the MediaEngine from a remote description.
-func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error { //nolint:cyclop,gocognit
+func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) error { //nolint:cyclop
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var rejectedAudio, rejectedVideo bool
 	for _, media := range desc.MediaDescriptions {
 		var typ RTPCodecType
 
@@ -623,6 +624,13 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 			typ = RTPCodecTypeAudio
 		case strings.EqualFold(media.MediaName.Media, "video"):
 			typ = RTPCodecTypeVideo
+		}
+
+		if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+			rejectedAudio = rejectedAudio || typ == RTPCodecTypeAudio
+			rejectedVideo = rejectedVideo || typ == RTPCodecTypeVideo
+
+			continue
 		}
 
 		switch {
@@ -718,6 +726,10 @@ func (m *MediaEngine) updateFromRemoteDescription(desc sdp.SessionDescription) e
 		}
 	}
 
+	// Rejected sections must not block active sections or fall back to local codecs.
+	m.negotiatedAudio = m.negotiatedAudio || rejectedAudio
+	m.negotiatedVideo = m.negotiatedVideo || rejectedVideo
+
 	return nil
 }
 
@@ -742,7 +754,7 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 	return nil
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (m *MediaEngine) getRTPParametersByKind(typ RTPCodecType, directions []RTPTransceiverDirection) RTPParameters {
 	headerExtensions := make([]RTPHeaderExtensionParameter, 0)
 

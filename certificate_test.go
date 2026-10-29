@@ -6,35 +6,34 @@
 package webrtc
 
 import (
+	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
+type signerOnly struct{ crypto.Signer }
+
 func TestGenerateCertificateRSA(t *testing.T) {
 	sk, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.Nil(t, err)
 
-	skPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(sk),
-	})
+	skPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(sk)})
 
 	cert, err := GenerateCertificate(sk)
 	assert.Nil(t, err)
 
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.x509Cert.Raw,
-	})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.x509Cert.Raw})
 
 	_, err = tls.X509KeyPair(certPEM, skPEM)
 	assert.Nil(t, err)
@@ -47,18 +46,12 @@ func TestGenerateCertificateECDSA(t *testing.T) {
 	skDER, err := x509.MarshalECPrivateKey(sk)
 	assert.Nil(t, err)
 
-	skPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: skDER,
-	})
+	skPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: skDER})
 
 	cert, err := GenerateCertificate(sk)
 	assert.Nil(t, err)
 
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.x509Cert.Raw,
-	})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.x509Cert.Raw})
 
 	_, err = tls.X509KeyPair(certPEM, skPEM)
 	assert.Nil(t, err)
@@ -170,4 +163,42 @@ func TestMultiPriv(t *testing.T) {
 	cert, err := CertificateFromPEM(certPriv + certHeader + certCert + certPriv)
 	assert.Nil(t, cert)
 	assert.Equal(t, errCertificatePEMMultiplePriv, err)
+}
+
+func TestCertificateEqualsEd25519(t *testing.T) {
+	_, sk, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+
+	tpl := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, sk.Public(), sk)
+	assert.NoError(t, err)
+	x, err := x509.ParseCertificate(der)
+	assert.NoError(t, err)
+
+	c := CertificateFromX509(sk, x)
+	other := c
+	assert.True(t, c.Equals(other))
+}
+
+func TestCertificateEqualsCustomSigner(t *testing.T) {
+	_, sk, err := ed25519.GenerateKey(rand.Reader)
+	assert.NoError(t, err)
+
+	tpl := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, sk.Public(), sk)
+	assert.NoError(t, err)
+	x, err := x509.ParseCertificate(der)
+	assert.NoError(t, err)
+
+	c1 := CertificateFromX509(signerOnly{sk}, x)
+	c2 := CertificateFromX509(signerOnly{sk}, x)
+	assert.True(t, c1.Equals(c2))
 }
