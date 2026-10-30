@@ -1321,6 +1321,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 			if transceiver != nil {
 				transceiver.setCurrentRemoteDirection(direction)
+				transceiver.updateCodecPreferencesFromRemoteDescription(media)
 			}
 
 			switch {
