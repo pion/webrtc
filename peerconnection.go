@@ -2928,7 +2928,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 	}
 
 	if isAlreadyClosingOrClosed {
-		return util.FlattenErrs(doGracefulCloseOps())
+		return errors.Join(doGracefulCloseOps()...)
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
@@ -2977,7 +2977,7 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
 	closeErrs = append(closeErrs, pc.api.interceptor.Close())
 
-	return util.FlattenErrs(closeErrs)
+	return errors.Join(closeErrs...)
 }
 
 // addRTPTransceiver appends t into rtpTransceivers

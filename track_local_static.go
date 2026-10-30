@@ -6,11 +6,11 @@
 package webrtc
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v5/internal/util"
 	"github.com/pion/webrtc/v5/pkg/media"
 )
 
@@ -211,7 +211,7 @@ func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }
 
 // Write writes a RTP Packet as a buffer to the TrackLocalStaticRTP
@@ -382,7 +382,7 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }
 
 // GeneratePadding writes padding-only samples to the TrackLocalStaticSample
@@ -407,5 +407,5 @@ func (s *TrackLocalStaticSample) GeneratePadding(samples uint32) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }

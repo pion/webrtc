@@ -30,7 +30,6 @@ import (
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v5/internal/detacheddtls"
 	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
 	"github.com/pion/webrtc/v5/pkg/rtcerr"
 )
 
@@ -773,7 +772,7 @@ func (t *DTLSTransport) Stop() error {
 		}
 	}
 
-	return util.FlattenErrs(closeErrs)
+	return errors.Join(closeErrs...)
 }
 
 func (t *DTLSTransport) validateFingerPrint(remoteCert *x509.Certificate) error {
