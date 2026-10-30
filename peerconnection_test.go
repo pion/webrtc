@@ -686,17 +686,46 @@ func marshalSDPWithBundle(t *testing.T, original SessionDescription, parsed *sdp
 
 func assertRemoteDescriptionRejected(t *testing.T, pc *PeerConnection, invalid, valid SessionDescription) {
 	t.Helper()
+	// ICE candidates come from a map, so compare snapshots in a stable order.
+	snapshot := func(description *SessionDescription) *SessionDescription {
+		if description == nil {
+			return nil
+		}
+		clone := *description
+		parsed, err := clone.Unmarshal()
+		require.NoError(t, err)
+		for _, media := range parsed.MediaDescriptions {
+			var candidates []sdp.Attribute
+			media.Attributes = slices.DeleteFunc(media.Attributes, func(attribute sdp.Attribute) bool {
+				if attribute.Key != "candidate" {
+					return false
+				}
+				candidates = append(candidates, attribute)
+
+				return true
+			})
+			slices.SortFunc(candidates, func(a, b sdp.Attribute) int {
+				return strings.Compare(a.Value, b.Value)
+			})
+			media.Attributes = append(media.Attributes, candidates...)
+		}
+		raw, err := parsed.Marshal()
+		require.NoError(t, err)
+		clone.SDP = string(raw)
+
+		return &clone
+	}
 	stateBefore := pc.SignalingState()
-	localBefore := pc.LocalDescription()
-	pendingLocalBefore := pc.PendingLocalDescription()
+	localBefore := snapshot(pc.LocalDescription())
+	pendingLocalBefore := snapshot(pc.PendingLocalDescription())
 
 	require.Error(t, pc.SetRemoteDescription(invalid))
 	assert.Equal(t, stateBefore, pc.SignalingState())
 	assert.Nil(t, pc.RemoteDescription())
 	assert.Nil(t, pc.PendingRemoteDescription())
 	assert.Nil(t, pc.CurrentRemoteDescription())
-	assert.Equal(t, localBefore, pc.LocalDescription())
-	assert.Equal(t, pendingLocalBefore, pc.PendingLocalDescription())
+	assert.Equal(t, localBefore, snapshot(pc.LocalDescription()))
+	assert.Equal(t, pendingLocalBefore, snapshot(pc.PendingLocalDescription()))
 	require.NoError(t, pc.SetRemoteDescription(valid), "a corrected description must succeed")
 }
 
