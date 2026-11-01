@@ -20,8 +20,8 @@ import (
 type srtpWriterFuture struct {
 	ssrc           SSRC
 	rtpSender      *RTPSender
-	rtcpReadStream atomic.Value // *srtp.ReadStreamSRTCP
-	rtpWriteStream atomic.Value // *srtp.WriteStreamSRTP
+	rtcpReadStream atomic.Pointer[srtp.ReadStreamSRTCP]
+	rtpWriteStream atomic.Pointer[srtp.WriteStreamSRTP]
 	mu             sync.Mutex
 	closed         bool
 }
@@ -90,7 +90,7 @@ func (s *srtpWriterFuture) Close() error {
 	}
 	s.closed = true
 
-	if value, ok := s.rtcpReadStream.Load().(*srtp.ReadStreamSRTCP); ok {
+	if value := s.rtcpReadStream.Load(); value != nil {
 		return value.Close()
 	}
 
@@ -98,7 +98,7 @@ func (s *srtpWriterFuture) Close() error {
 }
 
 func (s *srtpWriterFuture) Read(b []byte) (n int, err error) {
-	if value, ok := s.rtcpReadStream.Load().(*srtp.ReadStreamSRTCP); ok {
+	if value := s.rtcpReadStream.Load(); value != nil {
 		return value.Read(b)
 	}
 
@@ -110,7 +110,7 @@ func (s *srtpWriterFuture) Read(b []byte) (n int, err error) {
 }
 
 func (s *srtpWriterFuture) SetReadDeadline(t time.Time) error {
-	if value, ok := s.rtcpReadStream.Load().(*srtp.ReadStreamSRTCP); ok {
+	if value := s.rtcpReadStream.Load(); value != nil {
 		return value.SetReadDeadline(t)
 	}
 
@@ -122,7 +122,7 @@ func (s *srtpWriterFuture) SetReadDeadline(t time.Time) error {
 }
 
 func (s *srtpWriterFuture) WriteRTP(header *rtp.Header, payload []byte) (int, error) {
-	if value, ok := s.rtpWriteStream.Load().(*srtp.WriteStreamSRTP); ok {
+	if value := s.rtpWriteStream.Load(); value != nil {
 		return value.WriteRTP(header, payload)
 	}
 
@@ -134,7 +134,7 @@ func (s *srtpWriterFuture) WriteRTP(header *rtp.Header, payload []byte) (int, er
 }
 
 func (s *srtpWriterFuture) Write(b []byte) (int, error) {
-	if value, ok := s.rtpWriteStream.Load().(*srtp.WriteStreamSRTP); ok {
+	if value := s.rtpWriteStream.Load(); value != nil {
 		return value.Write(b)
 	}
 
