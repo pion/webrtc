@@ -25,18 +25,7 @@ var silentOpusFrame = []byte{0xf8, 0xff, 0xfe} // 20ms, 8kHz, mono
 
 var drivers = map[string]func() *agouti.WebDriver{
 	"Chrome": func() *agouti.WebDriver {
-		return agouti.ChromeDriver(
-			agouti.ChromeOptions("args", []string{
-				"--headless",
-				"--disable-gpu",
-				"--no-sandbox",
-			}),
-			agouti.Desired(agouti.Capabilities{
-				"loggingPrefs": map[string]string{
-					"browser": "INFO",
-				},
-			}),
-		)
+		return agouti.ChromeDriver(agouti.ChromeOptions("args", []string{"--headless", "--disable-gpu", "--no-sandbox"}), agouti.Desired(agouti.Capabilities{"loggingPrefs": map[string]string{"browser": "INFO"}}))
 	},
 }
 
@@ -73,9 +62,7 @@ func TestE2E_Audio(t *testing.T) {
 			if errPwd != nil {
 				t.Fatalf("Failed to get working directory: %v", errPwd)
 			}
-			if err := page.Navigate(
-				fmt.Sprintf("file://%s/test.html", pwd),
-			); err != nil {
+			if err := page.Navigate(fmt.Sprintf("file://%s/test.html", pwd)); err != nil {
 				t.Fatalf("Failed to navigate: %v", err)
 			}
 
@@ -93,19 +80,13 @@ func TestE2E_Audio(t *testing.T) {
 				t.Fatalf("Failed to marshal SDP: %v", errAnsSDP)
 			}
 			var result string
-			if err := page.RunScript(
-				"pc.setRemoteDescription(JSON.parse(answer))",
-				map[string]any{"answer": string(answerBytes)},
-				&result,
-			); err != nil {
+			if err := page.RunScript("pc.setRemoteDescription(JSON.parse(answer))", map[string]any{"answer": string(answerBytes)}, &result); err != nil {
 				t.Fatalf("Failed to run script to set SDP: %v", err)
 			}
 
 			go func() {
 				for {
-					if err := track.WriteSample(
-						media.Sample{Data: silentOpusFrame, Duration: time.Millisecond * 20},
-					); err != nil {
+					if err := track.WriteSample(media.Sample{Data: silentOpusFrame, Duration: time.Millisecond * 20}); err != nil {
 						t.Errorf("Failed to WriteSample: %v", err)
 						return
 					}
@@ -184,9 +165,7 @@ func TestE2E_DataChannel(t *testing.T) {
 			if errPwd != nil {
 				t.Fatalf("Failed to get working directory: %v", errPwd)
 			}
-			if err := page.Navigate(
-				fmt.Sprintf("file://%s/test.html", pwd),
-			); err != nil {
+			if err := page.Navigate(fmt.Sprintf("file://%s/test.html", pwd)); err != nil {
 				t.Fatalf("Failed to navigate: %v", err)
 			}
 
@@ -233,11 +212,7 @@ func TestE2E_DataChannel(t *testing.T) {
 				t.Fatalf("Failed to marshal SDP: %v", errAnsSDP)
 			}
 			var result string
-			if err := page.RunScript(
-				"pc.setRemoteDescription(JSON.parse(answer))",
-				map[string]any{"answer": string(answerBytes)},
-				&result,
-			); err != nil {
+			if err := page.RunScript("pc.setRemoteDescription(JSON.parse(answer))", map[string]any{"answer": string(answerBytes)}, &result); err != nil {
 				t.Fatalf("Failed to run script to set SDP: %v", err)
 			}
 

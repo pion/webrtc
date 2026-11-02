@@ -139,9 +139,7 @@ func Test_RTPSender_GetParameters_WithRID(t *testing.T) {
 
 	assert.NoError(t, signalPair(offerer, answerer))
 
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("moo"),
-	)
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("moo"))
 	assert.NoError(t, err)
 
 	err = rtpTransceiver.setSendingTrack(track)
@@ -245,10 +243,7 @@ func Test_RTPSender_ReplaceTrack_InvalidCodecChange(t *testing.T) {
 	rtpSender, err := sender.AddTrack(trackA)
 	assert.NoError(t, err)
 
-	err = rtpSender.rtpTransceiver.SetCodecPreferences([]RTPCodecParameters{{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8},
-		PayloadType:        96,
-	}})
+	err = rtpSender.rtpTransceiver.SetCodecPreferences([]RTPCodecParameters{{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8}, PayloadType: 96}})
 	assert.NoError(t, err)
 
 	seenPacket, seenPacketCancel := context.WithCancel(context.Background())
@@ -364,56 +359,40 @@ func Test_RTPSender_Add_Encoding(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderRidNil, rtpSender.AddEncoding(track1))
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("h"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("h"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderNoBaseEncoding, rtpSender.AddEncoding(track1))
 
-	track, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("q"),
-	)
+	track, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("q"))
 	assert.NoError(t, err)
 
 	rtpSender, err = peerConnection.AddTrack(track)
 	assert.NoError(t, err)
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video1", "pion", WithRTPStreamID("h"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video1", "pion", WithRTPStreamID("h"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderBaseEncodingMismatch, rtpSender.AddEncoding(track1))
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID("h"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion1", WithRTPStreamID("h"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderBaseEncodingMismatch, rtpSender.AddEncoding(track1))
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeOpus}, "video", "pion", WithRTPStreamID("h"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeOpus}, "video", "pion", WithRTPStreamID("h"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderBaseEncodingMismatch, rtpSender.AddEncoding(track1))
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("q"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("q"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderRIDCollision, rtpSender.AddEncoding(track1))
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("h"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("h"))
 	assert.NoError(t, err)
 	assert.NoError(t, rtpSender.AddEncoding(track1))
 
 	err = rtpSender.Send(rtpSender.GetParameters())
 	assert.NoError(t, err)
 
-	track1, err = NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("f"),
-	)
+	track1, err = NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion", WithRTPStreamID("f"))
 	assert.NoError(t, err)
 	assert.Equal(t, errRTPSenderSendAlreadyCalled, rtpSender.AddEncoding(track1))
 
@@ -443,14 +422,8 @@ func Test_RTPSender_FEC_Support(t *testing.T) {
 
 	t.Run("FEC can be enabled", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        94,
-		}, RTPCodecTypeVideo))
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil},
-			PayloadType:        95,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 94}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeFlexFEC, 90000, 0, "", nil}, PayloadType: 95}, RTPCodecTypeVideo))
 
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 
@@ -486,10 +459,7 @@ func Test_RTPSender_RTX_Support(t *testing.T) {
 
 	t.Run("RTX can be disabled", func(t *testing.T) {
 		mediaEngine := MediaEngine{}
-		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        94,
-		}, RTPCodecTypeVideo))
+		assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 94}, RTPCodecTypeVideo))
 		api := NewAPI(WithMediaEngine(&mediaEngine))
 
 		track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
@@ -529,11 +499,7 @@ func Test_RTPSender_RTCPReader_Bind_Not_Nil(t *testing.T) {
 	assert.NoError(t, err)
 
 	bindCalled := make(chan struct{})
-	rtpSender, err := peerConnection.AddTrack(&TrackLocalCheckRTCPReaderOnBind{
-		t:                      t,
-		TrackLocalStaticSample: track,
-		bindCalled:             bindCalled,
-	})
+	rtpSender, err := peerConnection.AddTrack(&TrackLocalCheckRTCPReaderOnBind{t: t, TrackLocalStaticSample: track, bindCalled: bindCalled})
 	assert.NoError(t, err)
 
 	parameter := rtpSender.GetParameters()

@@ -208,15 +208,9 @@ func Test_Interceptor_BindUnbind(t *testing.T) { //nolint:cyclop
 
 	// Bind/UnbindLocal/RemoteStream should be called from one side.
 	assert.Equal(t, uint32(1), atomic.LoadUint32(&cntBindLocalStream), "BindLocalStreamFn is expected to be called once")
-	assert.Equal(
-		t, uint32(1), atomic.LoadUint32(&cntUnbindLocalStream), "UnbindLocalStreamFn is expected to be called once",
-	)
-	assert.Equal(
-		t, uint32(2), atomic.LoadUint32(&cntBindRemoteStream), "BindRemoteStreamFn is expected to be called twice",
-	)
-	assert.Equal(
-		t, uint32(2), atomic.LoadUint32(&cntUnbindRemoteStream), "UnbindRemoteStreamFn is expected to be called twice",
-	)
+	assert.Equal(t, uint32(1), atomic.LoadUint32(&cntUnbindLocalStream), "UnbindLocalStreamFn is expected to be called once")
+	assert.Equal(t, uint32(2), atomic.LoadUint32(&cntBindRemoteStream), "BindRemoteStreamFn is expected to be called twice")
+	assert.Equal(t, uint32(2), atomic.LoadUint32(&cntUnbindRemoteStream), "UnbindRemoteStreamFn is expected to be called twice")
 
 	// BindRTCPWriter/Reader and Close should be called from both side.
 	assert.Equal(t, uint32(2), atomic.LoadUint32(&cntBindRTCPWriter), "BindRTCPWriterFn is expected to be called twice")
@@ -255,10 +249,7 @@ func TestConfigureFlexFEC03_FECParameters(t *testing.T) {
 
 	mediaEngine := &MediaEngine{}
 
-	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
-		PayloadType:        96,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, PayloadType: 96}, RTPCodecTypeVideo))
 
 	interceptorRegistry := &interceptor.Registry{}
 
@@ -339,11 +330,7 @@ func Test_Interceptor_ZeroSSRC(t *testing.T) {
 		for range ticker.C {
 			track.mu.Lock()
 			if len(track.bindings) == 1 {
-				_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{
-					Version:        2,
-					SSRC:           0,
-					SequenceNumber: sequenceNumber,
-				}, []byte{0, 1, 2, 3, 4, 5})
+				_, err = track.bindings[0].writeStream.WriteRTP(&rtp.Header{Version: 2, SSRC: 0, SequenceNumber: sequenceNumber}, []byte{0, 1, 2, 3, 4, 5})
 				assert.NoError(t, err)
 			}
 			sequenceNumber++
@@ -390,11 +377,7 @@ func TestStatsInterceptorIsAddedByDefault(t *testing.T) {
 	getter, ok := lookupStats(pc.id)
 	assert.True(t, ok, "lookupStats should return a getter for this statsID")
 	assert.NotNil(t, getter)
-	assert.Equal(t,
-		reflect.ValueOf(getter).Pointer(),
-		reflect.ValueOf(pc.statsGetter).Pointer(),
-		"getter returned by lookup should match pc.statsGetter",
-	)
+	assert.Equal(t, reflect.ValueOf(getter).Pointer(), reflect.ValueOf(pc.statsGetter).Pointer(), "getter returned by lookup should match pc.statsGetter")
 }
 
 // TestStatsGetterCleanup tests that statsGetter is properly cleaned up to prevent memory leaks.
@@ -444,22 +427,9 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 	if requestNack {
 		feedback = append(feedback, RTCPFeedback{"nack", ""})
 	}
-	err := mediaEngine.RegisterCodec(
-		RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				"video/VP8", 90000, 0,
-				"",
-				feedback,
-			},
-			PayloadType: 96,
-		},
-		RTPCodecTypeVideo,
-	)
+	err := mediaEngine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{"video/VP8", 90000, 0, "", feedback}, PayloadType: 96}, RTPCodecTypeVideo)
 	assert.NoError(t, err)
-	api := NewAPI(
-		WithMediaEngine(&mediaEngine),
-		WithInterceptorRegistry(&ir),
-	)
+	api := NewAPI(WithMediaEngine(&mediaEngine), WithInterceptorRegistry(&ir))
 
 	pc1, err := api.NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
@@ -471,10 +441,7 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 		}
 	})
 
-	track1, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeVP8},
-		"video", "pion",
-	)
+	track1, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 	sender, err := pc1.AddTrack(track1)
 	assert.NoError(t, err)
@@ -533,13 +500,8 @@ func testInterceptorNack(t *testing.T, requestNack bool) { //nolint:cyclop
 			for _, p := range ps {
 				if pn, ok := p.(*rtcp.TransportLayerNack); ok {
 					assert.Equal(t, len(pn.Nacks), 1)
-					assert.Equal(t,
-						pn.Nacks[0].PacketID, uint16(1),
-					)
-					assert.Equal(t,
-						pn.Nacks[0].LostPackets,
-						rtcp.PacketBitmap(0),
-					)
+					assert.Equal(t, pn.Nacks[0].PacketID, uint16(1))
+					assert.Equal(t, pn.Nacks[0].LostPackets, rtcp.PacketBitmap(0))
 					gotNack.Store(true)
 				}
 			}
@@ -646,8 +608,7 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 		return true
 	})
 
-	track, err := NewTrackLocalStaticSample(
-		RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, "video", "pion")
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000}, "video", "pion")
 	assert.NoError(t, err)
 
 	rtpSender, err := pcOffer.AddTrack(track)
@@ -703,8 +664,7 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 					}
 
 					if state.nackCount > 1 && state.inGrace {
-						triggerFailure(
-							fmt.Sprintf("received multiple NACKs for lost packet (seq=%d)", state.lostSeq))
+						triggerFailure(fmt.Sprintf("received multiple NACKs for lost packet (seq=%d)", state.lostSeq))
 						state.Unlock()
 
 						return
@@ -733,8 +693,7 @@ func TestNackTriggersSingleRTX(t *testing.T) { //nolint:cyclop
 				}
 
 				if state.rtxCount > 1 && state.inGrace {
-					triggerFailure(fmt.Sprintf(
-						"received multiple RTX retransmissions for lost packet (seq=%d)", state.lostSeq))
+					triggerFailure(fmt.Sprintf("received multiple RTX retransmissions for lost packet (seq=%d)", state.lostSeq))
 					state.Unlock()
 
 					return
@@ -822,9 +781,7 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 
 	pcOffer, pcAnswer, wan := createVNetPair(t, ir)
 
-	track, err := NewTrackLocalStaticRTP(
-		RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion",
-	)
+	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
 	rtpSender, err := pcOffer.AddTrack(track)
 	assert.NoError(t, err)
@@ -893,8 +850,7 @@ func TestNackNotSentForRTX(t *testing.T) { //nolint:cyclop
 	time.Sleep(time.Second)
 
 	assert.True(t, atomic.LoadUint32(&nackCount) > 0, "expected at least one NACK")
-	assert.Equal(t, uint32(0), atomic.LoadUint32(&badNackCount),
-		"NACKs must never target the RTX SSRC")
+	assert.Equal(t, uint32(0), atomic.LoadUint32(&badNackCount), "NACKs must never target the RTX SSRC")
 
 	assert.NoError(t, wan.Stop())
 	closePairNow(t, pcOffer, pcAnswer)
@@ -965,10 +921,7 @@ func testInterceptorNackReply(t *testing.T, negotiateRTX bool) {
 	first, _, err := remote.ReadRTP()
 	require.NoError(t, err)
 	require.Equal(t, uint16(1), first.SequenceNumber)
-	require.NoError(t, pc2.WriteRTCP([]rtcp.Packet{&rtcp.TransportLayerNack{
-		MediaSSRC: uint32(remote.SSRC()),
-		Nacks:     []rtcp.NackPair{{PacketID: 0}},
-	}}))
+	require.NoError(t, pc2.WriteRTCP([]rtcp.Packet{&rtcp.TransportLayerNack{MediaSSRC: uint32(remote.SSRC()), Nacks: []rtcp.NackPair{{PacketID: 0}}}}))
 	reply, attributes, err := remote.ReadRTP()
 	require.NoError(t, err)
 	assert.Equal(t, uint16(0), reply.SequenceNumber)

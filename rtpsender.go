@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -410,7 +411,7 @@ func (r *RTPSender) Stop() error {
 		}
 	}
 
-	return util.FlattenErrs(errs)
+	return errors.Join(errs...)
 }
 
 // Read reads incoming RTCP for this RTPSender.

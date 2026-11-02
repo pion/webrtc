@@ -27,7 +27,7 @@ func newTSFReadyButNoSessions(t *testing.T) *trackStreamFuture {
 
 func TestTrackStreamFuture_Errors_WhenStopCalled(t *testing.T) {
 	stopped, stop := context.WithCancel(t.Context())
-	future := &trackStreamFuture{stopped: stopped.Done(), stopErr: io.ErrClosedPipe}
+	future := &trackStreamFuture{transport: &DTLSTransport{}, stopped: stopped.Done(), stopErr: io.ErrClosedPipe}
 
 	// Writes before SRTP is ready must return without blocking.
 	n, err := future.WriteRTP(&rtp.Header{}, []byte("x"))

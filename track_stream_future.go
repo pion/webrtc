@@ -63,6 +63,10 @@ func (s *trackStreamFuture) wait(readDeadline *deadline.Deadline) error {
 }
 
 func (s *trackStreamFuture) init(returnWhenNoSRTP bool) error { //nolint:cyclop
+	// Sending needs SRTP even when no SDP negotiation starts it (the ORTC path).
+	if err := s.transport.wantSRTP(); err != nil {
+		return err
+	}
 	if returnWhenNoSRTP {
 		select {
 		case <-s.stopped:

@@ -103,7 +103,7 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 
 // match codecs from remote description, used when remote is offerer and creating a transceiver
 // from remote description with the aim of keeping order of codecs in remote description.
-func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop,gocognit
+func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.MediaDescription) { //nolint:cyclop
 	remoteCodecs, err := codecsFromMediaDescription(media)
 	if err != nil {
 		return

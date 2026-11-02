@@ -19,7 +19,6 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5/packetio"
 	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 const maxPendingTransportPackets = 15
@@ -275,7 +274,7 @@ func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 		}
 		t.closeEndpoints()
 
-		return util.FlattenErrs(closeErrs)
+		return errors.Join(closeErrs...)
 	} else if gatherer != nil {
 		if shouldGracefullyClose {
 			return gatherer.GracefulClose()

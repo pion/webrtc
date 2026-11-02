@@ -135,9 +135,7 @@ func TestWriteRTP(t *testing.T) {
 				h264Writer = reuseH264Writer
 			}
 
-			assert.Equal(t, tt.wantErr, h264Writer.WriteRTP(&rtp.Packet{
-				Payload: tt.payload,
-			}))
+			assert.Equal(t, tt.wantErr, h264Writer.WriteRTP(&rtp.Packet{Payload: tt.payload}))
 			assert.True(t, bytes.Equal(tt.wantBytes, writer.Bytes()))
 
 			if !tt.reuseWriter {
@@ -182,9 +180,7 @@ func TestNoZeroWrite(t *testing.T) {
 	}
 
 	for i := range payloads {
-		assert.NoError(t, h264Writer.WriteRTP(&rtp.Packet{
-			Payload: payloads[i],
-		}))
+		assert.NoError(t, h264Writer.WriteRTP(&rtp.Packet{Payload: payloads[i]}))
 	}
 	assert.Equal(t, 1, writer.writeCount)
 }

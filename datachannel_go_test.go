@@ -293,7 +293,13 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		var nOfferReceived uint32
 		var nAnswerReceived uint32
 
-		done := make(chan bool)
+		done := make(chan bool, 1)
+		signalDone := func() {
+			select {
+			case done <- true:
+			default:
+			}
+		}
 
 		answerPC.OnDataChannel(func(answerDC *DataChannel) {
 			// Make sure this is the data channel we were looking for. (Not the one
@@ -324,7 +330,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 			answerDC.OnBufferedAmountLow(func() {
 				atomic.AddUint32(&nAnswerBufferedAmountLowCbs, 1)
 				if atomic.LoadUint32(&nOfferBufferedAmountLowCbs) > 0 {
-					done <- true
+					signalDone()
 				}
 			})
 		})
@@ -355,7 +361,7 @@ func TestDataChannelBufferedAmount(t *testing.T) { //nolint:cyclop
 		offerDC.OnBufferedAmountLow(func() {
 			atomic.AddUint32(&nOfferBufferedAmountLowCbs, 1)
 			if atomic.LoadUint32(&nAnswerBufferedAmountLowCbs) > 0 {
-				done <- true
+				signalDone()
 			}
 		})
 
@@ -630,16 +636,8 @@ func TestDataChannel_BundleOnlyPortZero(t *testing.T) {
 
 	const applicationMLine = "m=application 9 UDP/DTLS/SCTP webrtc-datachannel"
 	require.Contains(t, offerPC.LocalDescription().SDP, applicationMLine)
-	bundleOnlyOfferSDP := strings.Replace(
-		offerPC.LocalDescription().SDP,
-		applicationMLine,
-		"m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only",
-		1,
-	)
-	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{
-		Type: SDPTypeOffer,
-		SDP:  bundleOnlyOfferSDP,
-	}))
+	bundleOnlyOfferSDP := strings.Replace(offerPC.LocalDescription().SDP, applicationMLine, "m=application 0 UDP/DTLS/SCTP webrtc-datachannel\r\na=bundle-only", 1)
+	require.NoError(t, answerPC.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: bundleOnlyOfferSDP}))
 
 	answer, err := answerPC.CreateAnswer(nil)
 	require.NoError(t, err)

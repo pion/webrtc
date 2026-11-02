@@ -7,6 +7,7 @@ package webrtc
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -19,7 +20,6 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -413,7 +413,7 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 				r.api.interceptor.UnbindRemoteStream(r.tracks[i].repairStreamInfo)
 			}
 
-			err = util.FlattenErrs(errs)
+			err = errors.Join(errs...)
 		}
 	default:
 	}
