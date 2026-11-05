@@ -63,6 +63,7 @@ type SCTPTransport struct {
 	onCloseHandler func(error)
 
 	sctpAssociation            *sctp.Association
+	finalStats                 *SCTPTransportStats // taken just before the association is closed
 	onDataChannelHandler       func(*DataChannel)
 	onDataChannelOpenedHandler func(*DataChannel)
 
@@ -250,6 +251,9 @@ func (r *SCTPTransport) Stop() error {
 	if r.sctpAssociation == nil {
 		return nil
 	}
+
+	finalStats := newSCTPTransportStats(r.sctpAssociation, r.dtlsTransport.statsID)
+	r.finalStats = &finalStats
 
 	r.sctpAssociation.Abort("")
 
@@ -493,14 +497,27 @@ func (r *SCTPTransport) Metadata() (SCTPTransportMetadata, bool) {
 
 // Stats reports the current statistics of the SCTPTransport.
 func (r *SCTPTransport) Stats() SCTPTransportStats {
+	r.lock.RLock()
+	association := r.sctpAssociation
+	finalStats := r.finalStats
+	transportStatsID := r.dtlsTransport.statsID
+	r.lock.RUnlock()
+
+	if association == nil && finalStats != nil {
+		return *finalStats
+	}
+
+	return newSCTPTransportStats(association, transportStatsID)
+}
+
+func newSCTPTransportStats(association *sctp.Association, transportStatsID string) SCTPTransportStats {
 	stats := SCTPTransportStats{
 		Timestamp:   statsTimestampFrom(time.Now()),
 		Type:        StatsTypeSCTPTransport,
 		ID:          "sctpTransport",
-		TransportID: r.Transport().statsID,
+		TransportID: transportStatsID,
 	}
 
-	association := r.association()
 	if association != nil {
 		stats.BytesSent = association.BytesSent()
 		stats.BytesReceived = association.BytesReceived()

@@ -54,6 +54,9 @@ type RTPSender struct {
 
 	rtpTransceiver *RTPTransceiver
 
+	// Stats taken just before the PeerConnection stops the sender.
+	finalStats []OutboundRTPStreamStats
+
 	mu                     sync.RWMutex
 	sendCalled, stopCalled chan struct{}
 }
@@ -490,24 +493,45 @@ func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) err
 }
 
 func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
-	if statsGetter == nil || !r.hasSent() || r.hasStopped() {
-		return
-	}
-
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	outboundStats := r.finalStats
+	if outboundStats == nil {
+		outboundStats = r.outboundStats(statsGetter)
+	}
+
+	for _, stats := range outboundStats {
+		collector.Collecting()
+		collector.Collect(stats.ID, stats)
+	}
+}
+
+// retainFinalStats stores the stats of the sender so that they stay available after it is stopped.
+// It must be called before the sender is stopped.
+func (r *RTPSender) retainFinalStats(statsGetter stats.Getter) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.finalStats = r.outboundStats(statsGetter)
+}
+
+// outboundStats returns the stats of the sender's encodings. The caller must hold r.mu.
+func (r *RTPSender) outboundStats(statsGetter stats.Getter) []OutboundRTPStreamStats {
+	if statsGetter == nil || !r.hasSent() || r.hasStopped() {
+		return nil
+	}
 
 	mid := ""
 	if r.rtpTransceiver != nil {
 		mid = r.rtpTransceiver.Mid()
 	}
 	now := statsTimestampNow()
+	result := make([]OutboundRTPStreamStats, 0, len(r.trackEncodings))
 	for _, trackEncoding := range r.trackEncodings {
 		if trackEncoding.track == nil || trackEncoding.context == nil {
 			continue
 		}
-
-		collector.Collecting()
 
 		outboundStats := OutboundRTPStreamStats{
 			Mid:         mid,
@@ -531,8 +555,10 @@ func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter st
 			outboundStats.PLICount = stats.OutboundRTPStreamStats.PLICount
 		}
 
-		collector.Collect(outboundStats.ID, outboundStats)
+		result = append(result, outboundStats)
 	}
+
+	return result
 }
 
 // hasSent tells if data has been ever sent for this instance.

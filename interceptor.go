@@ -109,6 +109,14 @@ func cleanupStats(id string) {
 	statsGetter.Delete(id)
 }
 
+// finalStatsGetter is a stats.Getter that serves the stats streams had when their PeerConnection was closed.
+type finalStatsGetter map[uint32]*stats.Stats
+
+// Get returns the final stats of the stream with ssrc.
+func (g finalStatsGetter) Get(ssrc uint32) *stats.Stats {
+	return g[ssrc]
+}
+
 // key: string (peerconnection.statsId), value: stats.Getter
 var statsGetter sync.Map // nolint:gochecknoglobals
 
