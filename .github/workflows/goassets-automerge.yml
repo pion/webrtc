@@ -78,7 +78,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.url }}
-        run: gh pr review "$PR_URL" --approve
+        run: |
+          approved=$(gh pr view "$PR_URL" --json latestReviews \
+            --jq 'any(.latestReviews[]; .state == "APPROVED")')
+          if [[ "$approved" == "false" ]]; then
+            gh pr review "$PR_URL" --approve
+          fi
 
       - name: Wait for required checks
         if: steps.pr.outputs.url != ''

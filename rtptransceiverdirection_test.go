@@ -22,11 +22,7 @@ func TestNewRTPTransceiverDirection(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			NewRTPTransceiverDirection(testCase.directionString),
-			testCase.expectedDirection,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, NewRTPTransceiverDirection(testCase.directionString), testCase.expectedDirection, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -43,10 +39,6 @@ func TestRTPTransceiverDirection_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.direction.String(),
-			testCase.expectedString,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.direction.String(), testCase.expectedString, "testCase: %d %v", i, testCase)
 	}
 }

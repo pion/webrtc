@@ -23,11 +23,7 @@ func TestNoEndpoints(t *testing.T) {
 	ca, cb := net.Pipe()
 	require.NoError(t, cb.Close())
 
-	mux := NewMux(Config{
-		Conn:          ca,
-		BufferSize:    testPipeBufferSize,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	mux := NewMux(Config{Conn: ca, BufferSize: testPipeBufferSize, LoggerFactory: logging.NewDefaultLoggerFactory()})
 	require.NoError(t, mux.dispatch(make([]byte, 1)))
 	require.NoError(t, mux.Close())
 	require.NoError(t, ca.Close())
@@ -55,11 +51,7 @@ func TestEndpointDeadline(t *testing.T) {
 				_ = cb.Close()
 			}()
 
-			mux := NewMux(Config{
-				Conn:          ca,
-				BufferSize:    testPipeBufferSize,
-				LoggerFactory: logging.NewDefaultLoggerFactory(),
-			})
+			mux := NewMux(Config{Conn: ca, BufferSize: testPipeBufferSize, LoggerFactory: logging.NewDefaultLoggerFactory()})
 
 			endpoint := mux.NewEndpoint(MatchAll)
 			require.NoError(t, tt.setDeadline(endpoint, time.Now().Add(10*time.Millisecond)))
@@ -101,11 +93,7 @@ func TestEndpointSetWriteDeadline(t *testing.T) {
 
 	rdConn := &writeDeadlineConn{Conn: ca}
 
-	mux := NewMux(Config{
-		Conn:          rdConn,
-		BufferSize:    testPipeBufferSize,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	mux := NewMux(Config{Conn: rdConn, BufferSize: testPipeBufferSize, LoggerFactory: logging.NewDefaultLoggerFactory()})
 
 	endpoint := mux.NewEndpoint(MatchAll)
 	deadline := time.Now().Add(10 * time.Millisecond)
@@ -142,11 +130,7 @@ func TestEndpointSetDeadlineWriteDeadlineError(t *testing.T) {
 
 	rdConn := &writeDeadlineErrorConn{Conn: ca, deadlineErr: errDeadlineTest}
 
-	mux := NewMux(Config{
-		Conn:          rdConn,
-		BufferSize:    testPipeBufferSize,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	mux := NewMux(Config{Conn: rdConn, BufferSize: testPipeBufferSize, LoggerFactory: logging.NewDefaultLoggerFactory()})
 
 	endpoint := mux.NewEndpoint(MatchAll)
 	err := endpoint.SetDeadline(time.Now().Add(10 * time.Millisecond))
@@ -208,11 +192,7 @@ func TestNonFatalRead(t *testing.T) {
 		{io.EOF, nil},
 	}}
 
-	mux := NewMux(Config{
-		Conn:          conn,
-		BufferSize:    testPipeBufferSize,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	mux := NewMux(Config{Conn: conn, BufferSize: testPipeBufferSize, LoggerFactory: logging.NewDefaultLoggerFactory()})
 
 	e := mux.NewEndpoint(MatchAll)
 
@@ -237,11 +217,7 @@ func TestNonFatalRead(t *testing.T) {
 func TestNonFatalDispatch(t *testing.T) {
 	in, out := net.Pipe()
 
-	mux := NewMux(Config{
-		Conn:          out,
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-		BufferSize:    1500,
-	})
+	mux := NewMux(Config{Conn: out, LoggerFactory: logging.NewDefaultLoggerFactory(), BufferSize: 1500})
 
 	e := mux.NewEndpoint(MatchSRTP)
 	e.buffer.SetLimitSize(1)

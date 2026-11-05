@@ -33,10 +33,7 @@ func TestDataChannel_ORTC_SCTPTransport(t *testing.T) {
 	assert.NoError(t, signalORTCPair(stackA, stackB))
 
 	var id uint16 = 1
-	_, err = stackA.api.NewDataChannel(stackA.sctp, &DataChannelParameters{
-		Label: "Foo",
-		ID:    &id,
-	})
+	_, err = stackA.api.NewDataChannel(stackA.sctp, &DataChannelParameters{Label: "Foo", ID: &id})
 	assert.NoError(t, err)
 
 	assert.NoError(t, <-getSelectedCandidatePairErrChan)

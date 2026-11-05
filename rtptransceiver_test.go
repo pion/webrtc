@@ -120,21 +120,10 @@ func Test_RTPTransceiver_SetCodecPreferences_PayloadType(t *testing.T) {
 
 	track, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
 	assert.NoError(t, err)
-	answerTransceiver, err := answerPC.AddTransceiverFromTrack(
-		track,
-		RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly},
-	)
+	answerTransceiver, err := answerPC.AddTransceiverFromTrack(track, RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly})
 	assert.NoError(t, err)
 
-	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{
-		notOfferedCodec,
-		offeredCodec,
-		offeredCodecRTX,
-		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        54,
-		},
-	}))
+	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{notOfferedCodec, offeredCodec, offeredCodecRTX, {RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 54}}))
 
 	offer, err := offerPC.CreateOffer(nil)
 	assert.NoError(t, err)
@@ -188,13 +177,7 @@ func Test_RTPTransceiver_UnattachedRTX(t *testing.T) {
 	answerTransceiver, err := answerPC.AddTransceiverFromKind(RTPCodecTypeVideo)
 	assert.NoError(t, err)
 
-	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{
-		testCodecRTX,
-		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        52,
-		},
-	}))
+	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{testCodecRTX, {RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 52}}))
 
 	// rtx should not be in the list of transceiver codecs as testCodec (primary) is
 	// not given to SetCodecPreferences
@@ -210,14 +193,7 @@ func Test_RTPTransceiver_UnattachedRTX(t *testing.T) {
 	assert.False(t, foundRTX)
 	answerTransceiver.mu.RUnlock()
 
-	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{
-		testCodec,
-		testCodecRTX,
-		{
-			RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-			PayloadType:        52,
-		},
-	}))
+	assert.NoError(t, answerTransceiver.SetCodecPreferences([]RTPCodecParameters{testCodec, testCodecRTX, {RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 52}}))
 
 	// rtx should be in the list of transceiver codecs as testCodec (primary) is
 	// given to SetCodecPreferences
@@ -295,11 +271,7 @@ func Test_ParseExtensionFromPaddingOnlyPacket(t *testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255,
 	}
-	mid, rid, rsid, paddingOnly, err := handleUnknownRTPPacket(
-		buf, uint8(4),
-		uint8(10),
-		uint8(11),
-	)
+	mid, rid, rsid, paddingOnly, err := handleUnknownRTPPacket(buf, uint8(4), uint8(10), uint8(11))
 	assert.NoError(t, err)
 
 	assert.Equal(t, mid, "1")
@@ -315,17 +287,9 @@ func TestRTPTransceiverH265AnswerPreservesPayloadTypes(t *testing.T) {
 	for _, withRTX := range []bool{false, true} {
 		t.Run(fmt.Sprintf("RTX=%t", withRTX), func(t *testing.T) {
 			engine := &MediaEngine{}
-			require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeH265, ClockRate: 90000},
-				PayloadType:        99,
-			}, RTPCodecTypeVideo))
+			require.NoError(t, engine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeH265, ClockRate: 90000}, PayloadType: 99}, RTPCodecTypeVideo))
 			if withRTX {
-				require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
-					RTPCodecCapability: RTPCodecCapability{
-						MimeType: MimeTypeRTX, ClockRate: 90000, SDPFmtpLine: "apt=99",
-					},
-					PayloadType: 100,
-				}, RTPCodecTypeVideo))
+				require.NoError(t, engine.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRTX, ClockRate: 90000, SDPFmtpLine: "apt=99"}, PayloadType: 100}, RTPCodecTypeVideo))
 			}
 			pc, err := NewAPI(WithMediaEngine(engine)).NewPeerConnection(Configuration{})
 			require.NoError(t, err)
@@ -355,10 +319,7 @@ a=rtpmap:97 H265/90000
 a=fmtp:97 level-id=186;profile-id=1`, formats,
 				strings.TrimSuffix(strings.Repeat("AA:", 32), ":")), "\n")
 			if withRTX {
-				lines = append(lines,
-					"a=rtpmap:98 rtx/90000", "a=fmtp:98 apt=96",
-					"a=rtpmap:99 rtx/90000", "a=fmtp:99 apt=97",
-				)
+				lines = append(lines, "a=rtpmap:98 rtx/90000", "a=fmtp:98 apt=96", "a=rtpmap:99 rtx/90000", "a=fmtp:99 apt=97")
 			}
 			offer := SessionDescription{Type: SDPTypeOffer, SDP: strings.Join(lines, "\r\n") + "\r\n"}
 			require.NoError(t, pc.SetRemoteDescription(offer))
@@ -434,10 +395,7 @@ func TestRTPTransceiverEquivalentCodecSelection(t *testing.T) {
 			attributes := []string{}
 			for _, remote := range tc.remote {
 				formats = append(formats, fmt.Sprint(remote.PayloadType))
-				attributes = append(attributes,
-					fmt.Sprintf("a=rtpmap:%d H265/90000", remote.PayloadType),
-					fmt.Sprintf("a=fmtp:%d %s", remote.PayloadType, remote.SDPFmtpLine),
-				)
+				attributes = append(attributes, fmt.Sprintf("a=rtpmap:%d H265/90000", remote.PayloadType), fmt.Sprintf("a=fmtp:%d %s", remote.PayloadType, remote.SDPFmtpLine))
 			}
 			header := strings.Split(fmt.Sprintf(`v=0
 o=- 1234 1 IN IP4 127.0.0.1

@@ -23,11 +23,7 @@ func TestDTLSRole_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.role.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.role.String(), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -75,10 +71,6 @@ a=setup:%s
 		{"MediaDescription, setup:active", parseSDP(fmt.Sprintf(mediaSetupDeclared, "active")), DTLSRoleClient},
 	}
 	for _, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedRole,
-			dtlsRoleFromSDP(testCase.sessionDescription),
-			"TestDTLSRoleFromSDP (%s)", testCase.test,
-		)
+		assert.Equal(t, testCase.expectedRole, dtlsRoleFromSDP(testCase.sessionDescription), "TestDTLSRoleFromSDP (%s)", testCase.test)
 	}
 }

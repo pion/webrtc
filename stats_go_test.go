@@ -51,7 +51,7 @@ type statSample struct {
 	json  string
 }
 
-func getStatsSamples() []statSample { //nolint:cyclop,maintidx
+func getStatsSamples() []statSample { //nolint:cyclop
 	codecStats := CodecStats{
 		Timestamp:      1688978831527.718,
 		Type:           StatsTypeCodec,
@@ -1366,21 +1366,15 @@ func TestStatsConvertState(t *testing.T) {
 	s, err := toStatsICECandidatePairState(ice.CandidatePairState(42))
 
 	assert.Error(t, err)
-	assert.Equal(t,
-		StatsICECandidatePairState("Unknown"),
-		s)
+	assert.Equal(t, StatsICECandidatePairState("Unknown"), s)
 	for i, testCase := range testCases {
 		s, err := toStatsICECandidatePairState(testCase.ice)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			testCase.stats,
-			s,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.stats, s, "testCase: %d %v", i, testCase)
 	}
 }
 
-func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop,maintidx // involves multiple branches and waits
+func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves multiple branches and waits
 	offerPC, answerPC, err := newPair()
 	assert.NoError(t, err)
 	defer closePairNow(t, offerPC, answerPC)
@@ -1512,13 +1506,7 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop,maintidx // inv
 	assert.NoError(t, track1.WriteSample(sample))
 
 	// Wait until the remote track has read one RTP packet (avoids racing GetStats with TrackRemote initialization).
-	assert.Eventually(
-		t,
-		gotFirstPacket.Load,
-		2*time.Second,
-		10*time.Millisecond,
-		"Expected to read an RTP packet",
-	)
+	assert.Eventually(t, gotFirstPacket.Load, 2*time.Second, 10*time.Millisecond, "Expected to read an RTP packet")
 
 	// Get fresh stats after sending the sample
 	reportPCAnswer = answerPC.GetStats()
@@ -1660,12 +1648,7 @@ func TestUnmarshalStatsJSON_SCTPTransport(t *testing.T) {
 	assert.EqualValues(t, 1200, st.MTU)
 	assert.EqualValues(t, 7, st.UNACKData)
 	require.NotNil(t, st.Metadata)
-	assert.Equal(t, &SCTPTransportMetadata{
-		MessageInterleavingEnabled:   true,
-		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
-		ZeroChecksumSendingEnabled:   true,
-		ZeroChecksumReceivingEnabled: true,
-	}, st.Metadata)
+	assert.Equal(t, &SCTPTransportMetadata{MessageInterleavingEnabled: true, PartialReliabilityMode: SCTPTransportPartialReliabilityModeIForwardTSN, ZeroChecksumSendingEnabled: true, ZeroChecksumReceivingEnabled: true}, st.Metadata)
 	assert.EqualValues(t, 12345, st.BytesSent)
 	assert.EqualValues(t, 67890, st.BytesReceived)
 }
@@ -2050,12 +2033,7 @@ func TestUnmarshalSCTPTransportStats_Success(t *testing.T) {
 	assert.Equal(t, uint32(1200), got.MTU)
 	assert.Equal(t, uint32(3), got.UNACKData)
 	require.NotNil(t, got.Metadata)
-	assert.Equal(t, &SCTPTransportMetadata{
-		MessageInterleavingEnabled:   true,
-		PartialReliabilityMode:       SCTPTransportPartialReliabilityModeIForwardTSN,
-		ZeroChecksumSendingEnabled:   true,
-		ZeroChecksumReceivingEnabled: true,
-	}, got.Metadata)
+	assert.Equal(t, &SCTPTransportMetadata{MessageInterleavingEnabled: true, PartialReliabilityMode: SCTPTransportPartialReliabilityModeIForwardTSN, ZeroChecksumSendingEnabled: true, ZeroChecksumReceivingEnabled: true}, got.Metadata)
 	assert.Equal(t, uint64(1000), got.BytesSent)
 	assert.Equal(t, uint64(2000), got.BytesReceived)
 }

@@ -22,16 +22,11 @@ func createVNetPair(t *testing.T, interceptorRegistry *interceptor.Registry) (
 ) {
 	t.Helper()
 	// Create a root router
-	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "1.2.3.0/24",
-		LoggerFactory: logging.NewDefaultLoggerFactory(),
-	})
+	wan, err := vnet.NewRouter(&vnet.RouterConfig{CIDR: "1.2.3.0/24", LoggerFactory: logging.NewDefaultLoggerFactory()})
 	assert.NoError(t, err)
 
 	// Create a network interface for offerer
-	offerVNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.4"},
-	})
+	offerVNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4"}})
 	assert.NoError(t, err)
 
 	// Add the network interface to the router
@@ -42,9 +37,7 @@ func createVNetPair(t *testing.T, interceptorRegistry *interceptor.Registry) (
 	offerSettingEngine.SetICETimeouts(time.Second, time.Second, time.Millisecond*200)
 
 	// Create a network interface for answerer
-	answerVNet, err := vnet.NewNet(&vnet.NetConfig{
-		StaticIPs: []string{"1.2.3.5"},
-	})
+	answerVNet, err := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.5"}})
 	assert.NoError(t, err)
 
 	// Add the network interface to the router

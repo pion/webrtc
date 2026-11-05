@@ -210,7 +210,7 @@ const secondToNanoseconds = 1000000000
 // walking forwards building a sample if everything looks good clear and
 // update buffer+values
 //
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if s.active.empty() {
 		s.active = s.filled

@@ -150,7 +150,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestMatch(t *testing.T) { //nolint:maintidx
+func TestMatch(t *testing.T) {
 	consistString := map[bool]string{true: "consist", false: "inconsist"}
 	parseH265 := func(line string) FMTP {
 		return Parse("video/h265", 90000, 0, line)
@@ -751,18 +751,10 @@ func TestMatch(t *testing.T) { //nolint:maintidx
 		t.Run(ca.name, func(t *testing.T) {
 			c := ca.a.Match(ca.b)
 			assert.Equal(t, ca.consist, c)
-			assert.Equal(
-				t, ca.consist, c,
-				"'%s' and '%s' are expected to be %s, but treated as %s",
-				ca.a, ca.b, consistString[ca.consist], consistString[c],
-			)
+			assert.Equal(t, ca.consist, c, "'%s' and '%s' are expected to be %s, but treated as %s", ca.a, ca.b, consistString[ca.consist], consistString[c])
 
 			c = ca.b.Match(ca.a)
-			assert.Equalf(
-				t, ca.consist, c,
-				"'%s' and '%s' are expected to be %s, but treated as %s",
-				ca.b, ca.a, consistString[ca.consist], consistString[c],
-			)
+			assert.Equalf(t, ca.consist, c, "'%s' and '%s' are expected to be %s, but treated as %s", ca.b, ca.a, consistString[ca.consist], consistString[c])
 		})
 	}
 }

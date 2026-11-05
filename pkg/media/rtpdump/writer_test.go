@@ -17,18 +17,10 @@ import (
 func TestWriter(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 
-	writer, err := NewWriter(buf, Header{
-		Start:  time.Unix(9, 0),
-		Source: net.IPv4(2, 2, 2, 2),
-		Port:   2222,
-	})
+	writer, err := NewWriter(buf, Header{Start: time.Unix(9, 0), Source: net.IPv4(2, 2, 2, 2), Port: 2222})
 	assert.NoError(t, err)
 
-	assert.NoError(t, writer.WritePacket(Packet{
-		Offset:  time.Millisecond,
-		IsRTCP:  false,
-		Payload: []byte{9},
-	}))
+	assert.NoError(t, writer.WritePacket(Packet{Offset: time.Millisecond, IsRTCP: false, Payload: []byte{9}}))
 
 	expected := append(
 		[]byte("#!rtpplay1.0 2.2.2.2/2222\n"),

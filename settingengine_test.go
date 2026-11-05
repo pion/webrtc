@@ -30,10 +30,7 @@ func TestSetEphemeralUDPPortRange(t *testing.T) {
 	assert.Equal(t, uint16(0), settingEngine.ephemeralUDP.PortMax)
 
 	// set bad ephemeral ports
-	assert.Error(
-		t, settingEngine.SetEphemeralUDPPortRange(3000, 2999),
-		"Setting engine should fail bad ephemeral ports",
-	)
+	assert.Error(t, settingEngine.SetEphemeralUDPPortRange(3000, 2999), "Setting engine should fail bad ephemeral ports")
 
 	assert.NoError(t, settingEngine.SetEphemeralUDPPortRange(3000, 4000))
 	assert.Equal(t, uint16(3000), settingEngine.ephemeralUDP.PortMin)
@@ -75,10 +72,7 @@ func TestICERenomination(t *testing.T) {
 		}
 
 		interval := 2 * time.Second
-		assert.NoError(t, settings.SetICERenomination(
-			WithRenominationGenerator(customGen),
-			WithRenominationInterval(interval),
-		))
+		assert.NoError(t, settings.SetICERenomination(WithRenominationGenerator(customGen), WithRenominationInterval(interval)))
 
 		assert.True(t, settings.renomination.enabled)
 		assert.True(t, settings.renomination.automatic)
@@ -149,11 +143,7 @@ func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
 	se := SettingEngine{}
 	assert.Nil(t, se.candidates.addressRewriteRules)
 
-	assert.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{"198.51.100.1"},
-		AsCandidateType: ICECandidateTypeHost,
-		Mode:            ICEAddressRewriteReplace,
-	}))
+	assert.NoError(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{"198.51.100.1"}, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace}))
 	assert.NotNil(t, se.candidates.addressRewriteRules)
 	assert.Len(t, se.candidates.addressRewriteRules, 1)
 
@@ -161,11 +151,7 @@ func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
 	assert.NoError(t, se.SetICEAddressRewriteRules())
 	assert.Nil(t, se.candidates.addressRewriteRules)
 
-	assert.ErrorIs(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{
-		External:        []string{"198.51.100.2"},
-		AsCandidateType: ICECandidateTypeHost,
-		Mode:            ICEAddressRewriteReplace,
-	}), errAddressRewriteWithNAT1To1)
+	assert.ErrorIs(t, se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{"198.51.100.2"}, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace}), errAddressRewriteWithNAT1To1)
 }
 
 // ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost demonstrates
@@ -173,13 +159,7 @@ func TestSettingEngine_SetICEAddressRewriteRules_EmptyClears(t *testing.T) {
 func ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost() {
 	var se SettingEngine
 
-	_ = se.SetICEAddressRewriteRules(
-		ICEAddressRewriteRule{
-			External:        []string{"198.51.100.1"},
-			AsCandidateType: ICECandidateTypeHost,
-			Mode:            ICEAddressRewriteReplace,
-		},
-	)
+	_ = se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{"198.51.100.1"}, AsCandidateType: ICECandidateTypeHost, Mode: ICEAddressRewriteReplace})
 }
 
 // ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx demonstrates
@@ -188,27 +168,13 @@ func ExampleSettingEngine_SetICEAddressRewriteRules_replaceHost() {
 func ExampleSettingEngine_SetICEAddressRewriteRules_appendSrflx() {
 	var se SettingEngine
 
-	_ = se.SetICEAddressRewriteRules(
-		ICEAddressRewriteRule{
-			External:        []string{"198.51.100.2"},
-			AsCandidateType: ICECandidateTypeSrflx,
-			Mode:            ICEAddressRewriteAppend,
-		},
-	)
+	_ = se.SetICEAddressRewriteRules(ICEAddressRewriteRule{External: []string{"198.51.100.2"}, AsCandidateType: ICECandidateTypeSrflx, Mode: ICEAddressRewriteAppend})
 }
 
 func TestSetAnsweringDTLSRole(t *testing.T) {
 	s := SettingEngine{}
-	assert.Error(
-		t,
-		s.SetAnsweringDTLSRole(DTLSRoleAuto),
-		"SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer",
-	)
-	assert.Error(
-		t,
-		s.SetAnsweringDTLSRole(DTLSRole(0)),
-		"SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer",
-	)
+	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRoleAuto), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
+	assert.Error(t, s.SetAnsweringDTLSRole(DTLSRole(0)), "SetAnsweringDTLSRole can only be called with DTLSRoleClient or DTLSRoleServer")
 }
 
 func TestSetReplayProtection(t *testing.T) {
@@ -222,31 +188,13 @@ func TestSetReplayProtection(t *testing.T) {
 	settingEngine.SetSRTPReplayProtectionWindow(64)
 	settingEngine.SetSRTCPReplayProtectionWindow(32)
 
-	assert.NotNil(
-		t, settingEngine.replayProtection.DTLS,
-		"DTLS replay protection window should not be nil",
-	)
-	assert.Equal(
-		t, uint(128), *settingEngine.replayProtection.DTLS,
-		"Failed to set DTLS replay protection window",
-	)
+	assert.NotNil(t, settingEngine.replayProtection.DTLS, "DTLS replay protection window should not be nil")
+	assert.Equal(t, uint(128), *settingEngine.replayProtection.DTLS, "Failed to set DTLS replay protection window")
 
-	assert.NotNil(
-		t, settingEngine.replayProtection.SRTP,
-		"SRTP replay protection window should not be nil",
-	)
-	assert.Equal(
-		t, uint(64), *settingEngine.replayProtection.SRTP,
-		"Failed to set SRTP replay protection window",
-	)
-	assert.NotNil(
-		t, settingEngine.replayProtection.SRTCP,
-		"SRTCP replay protection window should not be nil",
-	)
-	assert.Equal(
-		t, uint(32), *settingEngine.replayProtection.SRTCP,
-		"Failed to set SRTCP replay protection window",
-	)
+	assert.NotNil(t, settingEngine.replayProtection.SRTP, "SRTP replay protection window should not be nil")
+	assert.Equal(t, uint(64), *settingEngine.replayProtection.SRTP, "Failed to set SRTP replay protection window")
+	assert.NotNil(t, settingEngine.replayProtection.SRTCP, "SRTCP replay protection window should not be nil")
+	assert.Equal(t, uint(32), *settingEngine.replayProtection.SRTCP, "Failed to set SRTCP replay protection window")
 }
 
 func TestSettingEngine_SetICETCP(t *testing.T) {
@@ -351,16 +299,10 @@ func TestSetDTLSRetransmissionInterval(t *testing.T) {
 	assert.Equal(t, time.Duration(0), settingEngine.dtls.retransmissionInterval)
 
 	settingEngine.SetDTLSRetransmissionInterval(100 * time.Millisecond)
-	assert.Equal(
-		t, 100*time.Millisecond, settingEngine.dtls.retransmissionInterval,
-		"Failed to set DTLS retransmission interval",
-	)
+	assert.Equal(t, 100*time.Millisecond, settingEngine.dtls.retransmissionInterval, "Failed to set DTLS retransmission interval")
 
 	settingEngine.SetDTLSRetransmissionInterval(1 * time.Second)
-	assert.Equal(
-		t, 1*time.Second, settingEngine.dtls.retransmissionInterval,
-		"Failed to set DTLS retransmission interval",
-	)
+	assert.Equal(t, 1*time.Second, settingEngine.dtls.retransmissionInterval, "Failed to set DTLS retransmission interval")
 }
 
 func TestSetDTLSEllipticCurves(t *testing.T) {
@@ -455,18 +397,9 @@ func TestSetHooks(t *testing.T) {
 		return &msg
 	})
 
-	assert.NotNil(
-		t, settingEngine.dtls.clientHelloMessageHook,
-		"Failed to set DTLS Client Hello Hook",
-	)
-	assert.NotNil(
-		t, settingEngine.dtls.serverHelloMessageHook,
-		"Failed to set DTLS Server Hello Hook",
-	)
-	assert.NotNil(
-		t, settingEngine.dtls.certificateRequestMessageHook,
-		"Failed to set DTLS Certificate Request Hook",
-	)
+	assert.NotNil(t, settingEngine.dtls.clientHelloMessageHook, "Failed to set DTLS Client Hello Hook")
+	assert.NotNil(t, settingEngine.dtls.serverHelloMessageHook, "Failed to set DTLS Server Hello Hook")
+	assert.NotNil(t, settingEngine.dtls.certificateRequestMessageHook, "Failed to set DTLS Certificate Request Hook")
 }
 
 func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
@@ -480,32 +413,12 @@ func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
 	settingEngine.SetFireOnTrackBeforeFirstRTP(true)
 
 	mediaEngineOne := &MediaEngine{}
-	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 100,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineOne.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 100}, RTPCodecTypeVideo))
 
 	mediaEngineTwo := &MediaEngine{}
-	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{
-		RTPCodecCapability: RTPCodecCapability{
-			MimeType:     "video/VP8",
-			ClockRate:    90000,
-			Channels:     0,
-			SDPFmtpLine:  "",
-			RTCPFeedback: nil,
-		},
-		PayloadType: 200,
-	}, RTPCodecTypeVideo))
+	assert.NoError(t, mediaEngineTwo.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: "video/VP8", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 200}, RTPCodecTypeVideo))
 
-	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne), WithSettingEngine(settingEngine)).NewPeerConnection(
-		Configuration{},
-	)
+	offerer, err := NewAPI(WithMediaEngine(mediaEngineOne), WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
 	answerer, err := NewAPI(WithMediaEngine(mediaEngineTwo)).NewPeerConnection(Configuration{})
@@ -743,10 +656,7 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	assert.Equal(t, rootCAs, se.dtls.rootCAs)
 	_, _ = se.dtls.keyLogWriter.Write([]byte("test"))
 	assert.NotZero(t, keyBuf.Len())
-	assert.Equal(t, []dtls.CipherSuiteID{
-		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
-		dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	}, se.dtls.cipherSuites)
+	assert.Equal(t, []dtls.CipherSuiteID{dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}, se.dtls.cipherSuites)
 	_ = se.dtls.customCipherSuites()
 	assert.Equal(t, []string{"webrtc"}, se.dtls.supportedProtocols)
 	assert.True(t, called)

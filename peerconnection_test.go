@@ -107,11 +107,7 @@ func signalPairWithModification(
 	pcAnswer *PeerConnection,
 	modificationFunc func(string) string,
 ) error {
-	return signalPairWithOptions(
-		pcOffer,
-		pcAnswer,
-		withModificationFunc(modificationFunc),
-	)
+	return signalPairWithOptions(pcOffer, pcAnswer, withModificationFunc(modificationFunc))
 }
 
 func signalPair(pcOffer *PeerConnection, pcAnswer *PeerConnection) error {
@@ -206,9 +202,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "valid",
 			init: func() (*PeerConnection, error) {
-				pc, err := NewPeerConnection(Configuration{
-					ICECandidatePoolSize: 1,
-				})
+				pc, err := NewPeerConnection(Configuration{ICECandidatePoolSize: 1})
 				if err != nil {
 					return pc, err
 				}
@@ -295,9 +289,7 @@ func TestPeerConnection_SetConfiguration(t *testing.T) {
 		{
 			name: "update ICECandidatePoolSize",
 			init: func() (*PeerConnection, error) {
-				pc, err := NewPeerConnection(Configuration{
-					ICECandidatePoolSize: 0,
-				})
+				pc, err := NewPeerConnection(Configuration{ICECandidatePoolSize: 0})
 				if err != nil {
 					return pc, err
 				}
@@ -344,13 +336,9 @@ func TestPeerConnection_SetConfiguration_RejectsBeforeMutating(t *testing.T) {
 	pc, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	err = pc.SetConfiguration(Configuration{
-		AlwaysNegotiateDataChannels: true,
-		RTPHeaderEncryptionPolicy:   RTPHeaderEncryptionPolicyRequire,
-	})
+	err = pc.SetConfiguration(Configuration{AlwaysNegotiateDataChannels: true, RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
 	assert.Equal(t, &rtcerr.InvalidModificationError{Err: errModifyingRTPHeaderEncryptionPolicy}, err)
-	assert.False(t, pc.GetConfiguration().AlwaysNegotiateDataChannels,
-		"other fields in the same call must not be applied when the policy change is rejected")
+	assert.False(t, pc.GetConfiguration().AlwaysNegotiateDataChannels, "other fields in the same call must not be applied when the policy change is rejected")
 
 	assert.NoError(t, pc.Close())
 }
@@ -757,9 +745,7 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 	var offerOnce sync.Once
 	var answerOnce sync.Once
 
-	pcOffer, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 1,
-	})
+	pcOffer, err := NewPeerConnection(Configuration{ICECandidatePoolSize: 1})
 	assert.NoError(t, err)
 
 	// We need to create a data channel in order to set mid
@@ -791,9 +777,7 @@ func TestFlushOnSetLocalDescription(t *testing.T) {
 	<-pcOfferFlushStarted
 
 	// Create Answer PeerConnection
-	pcAnswer, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 1,
-	})
+	pcAnswer, err := NewPeerConnection(Configuration{ICECandidatePoolSize: 1})
 	assert.NoError(t, err)
 
 	pcAnswer.OnICECandidate(func(i *ICECandidate) {
@@ -827,9 +811,7 @@ func TestSetICECandidatePoolSizeLarge(t *testing.T) {
 		t.Skip("Skipping ICECandidatePool test on WASM")
 	}
 
-	pc, err := NewPeerConnection(Configuration{
-		ICECandidatePoolSize: 2,
-	})
+	pc, err := NewPeerConnection(Configuration{ICECandidatePoolSize: 2})
 	assert.Nil(t, pc)
 	assert.Equal(t, &rtcerr.NotSupportedError{Err: errICECandidatePoolSizeTooLarge}, err)
 }
@@ -869,9 +851,7 @@ func TestAddTransceiver(t *testing.T) {
 		pc, err := NewPeerConnection(Configuration{})
 		assert.NoError(t, err)
 
-		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{
-			Direction: testCase.direction,
-		})
+		transceiver, err := pc.AddTransceiverFromKind(RTPCodecTypeVideo, RTPTransceiverInit{Direction: testCase.direction})
 		assert.NoError(t, err)
 
 		if testCase.expectReceiver {
