@@ -469,6 +469,19 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 	}
 }
 
+// retainFinalStats copies the stats of the receiver's tracks from statsGetter to finalStats.
+func (r *RTPReceiver) retainFinalStats(statsGetter stats.Getter, finalStats finalStatsGetter) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for trackIndex := range r.tracks {
+		if remoteTrack := r.tracks[trackIndex].track; remoteTrack != nil {
+			ssrc := uint32(remoteTrack.SSRC())
+			finalStats[ssrc] = statsGetter.Get(ssrc)
+		}
+	}
+}
+
 func (r *RTPReceiver) populateInboundStats(
 	inboundStats *InboundRTPStreamStats,
 	statsGetter stats.Getter,

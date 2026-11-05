@@ -101,6 +101,7 @@ type PeerConnection struct {
 
 	interceptorRTCPWriter interceptor.RTCPWriter
 	statsGetter           stats.Getter
+	finalRTPStats         finalStatsGetter
 }
 
 // NewPeerConnection creates a PeerConnection with the default codecs and interceptors.
@@ -2936,6 +2937,19 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #4)
 	pc.mu.Lock()
+	// Stopping a sender or a receiver drops its stats, so retain them first.
+	if pc.statsGetter != nil {
+		pc.finalRTPStats = finalStatsGetter{}
+		for _, t := range pc.rtpTransceivers {
+			if sender := t.Sender(); sender != nil {
+				sender.retainFinalStats(pc.statsGetter)
+			}
+			if receiver := t.Receiver(); receiver != nil {
+				receiver.retainFinalStats(pc.statsGetter, pc.finalRTPStats)
+			}
+		}
+		pc.statsGetter = nil
+	}
 	for _, t := range pc.rtpTransceivers {
 		closeErrs = append(closeErrs, t.Stop())
 	}
@@ -2971,7 +2985,6 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 	closeErrs = append(closeErrs, doGracefulCloseOps()...)
 
-	pc.statsGetter = nil
 	cleanupStats(pc.id)
 
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
@@ -3137,20 +3150,31 @@ func (pc *PeerConnection) GetStats() StatsReport {
 			continue
 		}
 	}
+	statsGetter := pc.rtpStatsGetter()
 	pc.mu.Unlock()
 
 	receivers := pc.GetReceivers()
 	for _, receiver := range receivers {
-		receiver.collectStats(statsCollector, pc.statsGetter)
+		receiver.collectStats(statsCollector, statsGetter)
 	}
 
 	for _, sender := range pc.GetSenders() {
-		sender.collectStats(statsCollector, pc.statsGetter)
+		sender.collectStats(statsCollector, statsGetter)
 	}
 
 	pc.api.mediaEngine.collectStats(statsCollector, pc.dtlsTransport.statsID)
 
 	return statsCollector.Ready()
+}
+
+// rtpStatsGetter returns the source of the RTP stats, which are the retained ones after close.
+// The caller must hold pc.mu.
+func (pc *PeerConnection) rtpStatsGetter() stats.Getter {
+	if pc.finalRTPStats != nil {
+		return pc.finalRTPStats
+	}
+
+	return pc.statsGetter
 }
 
 // Start all transports. PeerConnection now has enough state.
