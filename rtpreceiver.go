@@ -7,6 +7,7 @@ package webrtc
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -19,7 +20,6 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -341,24 +341,15 @@ func readRTCP(read func([]byte) (int, interceptor.Attributes, error), mtu uint) 
 	}
 
 	pkts, err := rtcp.Unmarshal(b[:i])
-	if err != nil {
-		return nil, nil, err
-	}
 
-	return pkts, attributes, nil
+	return pkts, attributes, err
 }
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you.
 func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.ReadSimulcast(b, rid)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pkts, err := rtcp.Unmarshal(b[:i])
-
-	return pkts, attributes, err
+	return readRTCP(func(b []byte) (int, interceptor.Attributes, error) {
+		return r.ReadSimulcast(b, rid)
+	}, r.api.settingEngine.getReceiveMTU())
 }
 
 // ReadSimulcastSSRCRTCP is a convenience method that wraps ReadSimulcastSSRC and unmarshal for you.
@@ -385,19 +376,17 @@ func (r *RTPReceiver) haveClosed() bool {
 func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var err error
+	var errs []error
 
 	select {
 	case <-r.closedChan:
-		return err
+		return nil
 	default:
 	}
 
 	select {
 	case <-r.received:
 		for i := range r.tracks {
-			errs := []error{}
-
 			if r.tracks[i].rtcpReadStream != nil {
 				errs = append(errs, r.tracks[i].rtcpReadStream.Close())
 			}
@@ -421,8 +410,6 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 			if r.tracks[i].repairStreamInfo != nil {
 				r.api.interceptor.UnbindRemoteStream(r.tracks[i].repairStreamInfo)
 			}
-
-			err = util.FlattenErrs(errs)
 		}
 	default:
 	}
@@ -437,7 +424,7 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {

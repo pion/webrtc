@@ -390,10 +390,21 @@ func populateLocalCandidates(
 		return sessionDescription
 	}
 
-	parsed := sessionDescription.parsed
+	// GetLocalCandidates may change the order of candidates.
+	// Sort them so that SDP generation returns same value everytime
+	slices.SortFunc(candidates, func(a, b ICECandidate) int {
+		return cmp.Compare(a.statsID, b.statsID)
+	})
+
+	// Candidate population must not mutate the stored SDP, which can still be
+	// read by SetLocalDescription after it releases the PeerConnection lock.
+	parsed := *sessionDescription.parsed
 	if len(parsed.MediaDescriptions) > 0 {
-		mediaDescr := parsed.MediaDescriptions[0]
-		if err = addCandidatesToMediaDescriptions(candidates, mediaDescr, iceGatheringState); err != nil {
+		parsed.MediaDescriptions = slices.Clone(parsed.MediaDescriptions)
+		mediaDescr := *parsed.MediaDescriptions[0]
+		mediaDescr.Attributes = slices.Clone(mediaDescr.Attributes)
+		parsed.MediaDescriptions[0] = &mediaDescr
+		if err = addCandidatesToMediaDescriptions(candidates, &mediaDescr, iceGatheringState); err != nil {
 			return sessionDescription
 		}
 	}
@@ -406,7 +417,7 @@ func populateLocalCandidates(
 	return &SessionDescription{
 		SDP:    string(sdp),
 		Type:   sessionDescription.Type,
-		parsed: parsed,
+		parsed: &parsed,
 	}
 }
 
