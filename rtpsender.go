@@ -311,7 +311,11 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 
 	for idx := range r.trackEncodings {
 		trackEncoding := r.trackEncodings[idx]
-		srtpStream := &srtpWriterFuture{ssrc: parameters.Encodings[idx].SSRC, rtpSender: r}
+		srtpStream := &srtpWriterFuture{
+			ssrc:      parameters.Encodings[idx].SSRC,
+			rtxSSRC:   parameters.Encodings[idx].RTX.SSRC,
+			rtpSender: r,
+		}
 		writeStream := &interceptorToTrackLocalWriter{}
 		rtpParameters := r.api.mediaEngine.getRTPParametersByKind(
 			trackEncoding.track.Kind(),
