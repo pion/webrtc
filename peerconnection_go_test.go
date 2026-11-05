@@ -3677,7 +3677,7 @@ func TestCryptexRejectedAnswerPreservesSignalingState(t *testing.T) {
 	require.False(t, hasCryptexForSession(t, answer.SDP))
 
 	require.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
-	pendingBefore := pcOffer.PendingLocalDescription()
+	pendingBefore := pcOffer.pendingLocalDescription
 	require.NotNil(t, pendingBefore)
 
 	err = pcOffer.SetRemoteDescription(answer)
@@ -3687,8 +3687,7 @@ func TestCryptexRejectedAnswerPreservesSignalingState(t *testing.T) {
 	assert.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
 	assert.Nil(t, pcOffer.CurrentRemoteDescription())
 	assert.Nil(t, pcOffer.PendingRemoteDescription())
-	require.NotNil(t, pcOffer.PendingLocalDescription())
-	assert.Equal(t, pendingBefore.SDP, pcOffer.PendingLocalDescription().SDP)
+	assert.Equal(t, pendingBefore, pcOffer.pendingLocalDescription)
 
 	// A corrected answer (with Cryptex added) must still be accepted, proving the connection did
 	// not get stuck in an unrecoverable signaling state.
