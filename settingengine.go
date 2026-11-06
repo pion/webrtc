@@ -555,11 +555,10 @@ func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 
 // SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
 //
-// Deprecated: the HelloVerifyRequest cookie exchange only validates the
-// remote address, which the ICE connectivity checks have already done, so it
-// is skipped by default. This setter is retained for backward compatibility;
-// pass false to restore the cookie exchange when acting as DTLS server. It
-// will be removed in v5.
+// The HelloVerifyRequest cookie exchange is skipped by default when using a
+// full ICE agent, since ICE connectivity checks have already validated the
+// remote address. It is enabled by default when using an ICE Lite agent.
+// This setting overrides the default when acting as DTLS server.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
 	e.dtls.insecureSkipHelloVerify = &skip
 }

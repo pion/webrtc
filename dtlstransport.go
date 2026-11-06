@@ -627,9 +627,9 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 	}
 
 	// The HelloVerifyRequest cookie exchange only validates the remote
-	// address, which the ICE connectivity checks have already done, so it
-	// is skipped unless explicitly requested via the SettingEngine.
-	skipHelloVerify := true
+	// address, which the ICE connectivity checks have already done when
+	// using a full ICE agent, so it is skipped by default in that case.
+	skipHelloVerify := !t.api.settingEngine.candidates.ICELite
 	if skip := t.api.settingEngine.dtls.insecureSkipHelloVerify; skip != nil {
 		skipHelloVerify = *skip
 	}
