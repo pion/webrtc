@@ -16,8 +16,8 @@ import (
 
 	"github.com/pion/dtls/v4"
 	"github.com/pion/transport/v5/deadline"
-	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
+	"github.com/pion/webrtc/v4/internal/netconn"
+	"github.com/pion/webrtc/v4/internal/util"
 )
 
 // Config contains the transport operations used by a Conn.
@@ -181,6 +181,9 @@ func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
 			c.ready = true
 			c.notify(nil)
 			c.driveMu.Unlock()
+		case dtls.DetachedEarlyDataReady, dtls.DetachedEarlyDataAccepted, dtls.DetachedEarlyDataRejected:
+			// WebRTC does not use DTLS 0rtt/early data.
+			continue
 		case dtls.DetachedClosed:
 			if event.Err == nil {
 				event.Err = io.EOF

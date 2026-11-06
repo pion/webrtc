@@ -85,7 +85,7 @@ type SettingEngine struct {
 		customCipherSuites            func() []dtlsCipherSuite.Suite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
-		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
+		certificateRequestMessageHook func(handshake.Message) handshake.Message
 		supportedProtocols            []string
 	}
 	sctp struct {
@@ -671,9 +671,10 @@ func (e *SettingEngine) SetDTLSServerHelloMessageHook(hook func(handshake.Messag
 }
 
 // SetDTLSCertificateRequestMessageHook if not nil, is called when a DTLS Certificate Request message is sent
-// from a client. The returned handshake message replaces the original message.
+// from a server using DTLS 1.2 or 1.3. The hook receives a *dtls12.MessageCertificateRequest
+// or *dtls13.MessageCertificateRequest. The returned handshake message replaces the original message.
 func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
-	hook func(handshake.MessageCertificateRequest) handshake.Message,
+	hook func(handshake.Message) handshake.Message,
 ) {
 	e.dtls.certificateRequestMessageHook = hook
 }

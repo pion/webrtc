@@ -1202,10 +1202,10 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
 	t.Helper()
 
-	stats, ok := report["iceTransport"]
+	stats, ok := report[statsID]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)
@@ -1575,9 +1575,9 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 
 	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
 	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
-	assert.Equal(t, "FEFD", offerICETransportStats.TLSVersion)
-	assert.Equal(t, "FEFD", answerICETransportStats.TLSVersion)
-	assert.Equal(t, "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", offerICETransportStats.DTLSCipher)
+	assert.Equal(t, "FEFC", offerICETransportStats.TLSVersion)
+	assert.Equal(t, "FEFC", answerICETransportStats.TLSVersion)
+	assert.Equal(t, "TLS_AES_128_GCM_SHA256", offerICETransportStats.DTLSCipher)
 	assert.Equal(t, offerICETransportStats.DTLSCipher, answerICETransportStats.DTLSCipher)
 	assert.Equal(t, "SRTP_AEAD_AES_256_GCM", offerICETransportStats.SRTPCipher)
 	assert.Equal(t, offerICETransportStats.SRTPCipher, answerICETransportStats.SRTPCipher)

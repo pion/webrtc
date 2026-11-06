@@ -239,7 +239,10 @@ func (t *DTLSTransport) wantSRTP() error {
 
 // startSRTP requires the caller holds the lock.
 func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
-	connState, ok := t.conn.ConnectionState()
+	if t.dtlsConn == nil {
+		return io.ErrClosedPipe
+	}
+	connState, ok := t.dtlsConn.ConnectionState()
 	if !ok {
 		return errDtlsKeyExtractionFailed
 	}

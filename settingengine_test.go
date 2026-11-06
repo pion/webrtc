@@ -394,8 +394,8 @@ func TestSetHooks(t *testing.T) {
 	settingEngine.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
 		return &msg
 	})
-	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
-		return &msg
+	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.Message) handshake.Message {
+		return msg
 	})
 
 	assert.NotNil(t, settingEngine.dtls.clientHelloMessageHook, "Failed to set DTLS Client Hello Hook")
