@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v5"
+	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1276,6 +1277,73 @@ func TestPeerConnection_GetStats_Closed(t *testing.T) {
 	assert.NoError(t, pc.Close())
 
 	pc.GetStats()
+}
+
+// GetStats on a closed PeerConnection must return the final values of the stats.
+func TestPeerConnection_GetStats_RetainedAfterClose(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	offerPC, answerPC, err := newPair()
+	require.NoError(t, err)
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	require.NoError(t, err)
+	sender, err := offerPC.AddTrack(track)
+	require.NoError(t, err)
+	ssrc := sender.GetParameters().Encodings[0].SSRC
+
+	onTrack := make(chan struct{})
+	answerPC.OnTrack(func(remote *TrackRemote, _ *RTPReceiver) {
+		close(onTrack)
+		for {
+			if _, _, readErr := remote.ReadRTP(); readErr != nil {
+				return
+			}
+		}
+	})
+
+	require.NoError(t, signalPair(offerPC, answerPC))
+
+	stopSending, sendingDone := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(sendingDone)
+		sendVideoUntilDone(t, stopSending, []*TrackLocalStaticSample{track})
+	}()
+
+	<-onTrack
+	require.Eventually(t, func() bool {
+		report := answerPC.GetStats()
+		inbound := findInboundRTPStatsBySSRC(report, ssrc)
+		outbound := findOutboundRTPStatsBySSRC(offerPC.GetStats(), ssrc)
+
+		return len(inbound) == 1 && inbound[0].PacketsReceived > 0 &&
+			len(outbound) == 1 && outbound[0].PacketsSent > 0 &&
+			getSctpTransportStats(t, report).BytesReceived > 0
+	}, time.Second*10, time.Millisecond*20)
+
+	close(stopSending)
+	<-sendingDone
+	closePairNow(t, offerPC, answerPC)
+
+	report := answerPC.GetStats()
+
+	var iceBytesReceived uint64
+	for _, pair := range findCandidatePairStats(t, report) {
+		iceBytesReceived += pair.BytesReceived
+	}
+	assert.Positive(t, iceBytesReceived)
+	assert.NotEmpty(t, findLocalCandidateStats(report))
+	assert.NotEmpty(t, findRemoteCandidateStats(report))
+	assert.Positive(t, getSctpTransportStats(t, report).BytesReceived)
+
+	inbound := findInboundRTPStatsBySSRC(report, ssrc)
+	require.Len(t, inbound, 1)
+	assert.Positive(t, inbound[0].PacketsReceived)
+
+	outbound := findOutboundRTPStatsBySSRC(offerPC.GetStats(), ssrc)
+	require.Len(t, outbound, 1)
+	assert.Positive(t, outbound[0].PacketsSent)
 }
 
 func TestUnmarshalStatsJSON_TypeFieldUnmarshalError(t *testing.T) {
